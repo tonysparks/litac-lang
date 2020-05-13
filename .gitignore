@@ -1,0 +1,16 @@
+bin/*.c
+bin/*.exe
+bin/*.json
+bin/librealm*
+lib/*.lib
+.vscode/ipch
+bin/realm.exp
+bin/realm.lib
+bin/realm.pdb
+litac-lsp.log
+bin/realm
+bin/realm_test.*
+bin/realm_test
+bin/config.cfg
+bin_release/realm.c
+bin_release/realm.exe

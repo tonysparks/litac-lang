@@ -1,0 +1,60 @@
+import "libc"
+import "mem"
+import "io"
+import "lex"
+import "state"
+/*
+@include("<sys/time.h>");
+@foreign
+struct timeval {
+    tv_sec: u64
+    tv_usec: u64
+}
+@foreign
+func gettimeofday(t: *timeval, m: *void);
+
+func getTimeMsec() : u64 {
+    var tv: timeval;
+    gettimeofday(&tv, null)
+    return (tv.tv_sec*1000_u64) + (tv.tv_usec/1000_u64)
+}*/
+
+
+func main(len: i32, args: **char) {
+    var state = CompilerState {
+        .allocator = defaultAllocator
+    }
+
+    var filename = "../test/test.lita"
+
+    var text: *char = null;
+    defer if(text) state.allocator.free(text)
+
+    var status = ReadFile(filename, &text, state.allocator) 
+    if(status == FileStatus.FileNotFoundError) {
+        printf("Could not open file '%s'\n", filename)
+        exit(1)
+    }
+
+    if(status == FileStatus.IOError) {
+        printf("Could not read file '%s'\n", filename)
+        exit(1)
+    }
+    
+    var lex = LexerInit(filename, text, state.allocator)    
+    while(!lex.eof()) {
+        var token = lex.nextToken()
+        //printf("Size: %d\n", (token.pos.end - token.pos.start) as (i32))
+        printf("%s: '%s' '%.*s' ", TokenTypeAsStr(token.type), token.asString(), (token.pos.end - token.pos.start) as (i32), token.pos.start)
+        if(token.type == TokenType.INT_NUMBER) {
+            printf("'%llu'", token.value.intValue)
+        }
+        else if(token.type == TokenType.FLOAT_NUMBER) {
+            printf("'%f'", token.value.floatValue)
+        }
+        else if(token.type == TokenType.STRING) {
+            printf("'%.*s'", token.value.str.length, token.value.str.buffer)
+        }
+        printf("\n")
+    }
+}

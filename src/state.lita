@@ -1,0 +1,5 @@
+import "mem"
+
+public struct CompilerState {
+    allocator: *const Allocator
+}

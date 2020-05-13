@@ -1,0 +1,116 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "BuildRun",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "build.sh"
+            ],
+            "windows": {
+                "command": "build.bat",
+                "args": []
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },/*        
+        {
+            "label": "BuildTest",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "build_test.sh",
+                "${file}"
+            ],
+            "windows": {
+                "command": "build_test.bat",
+                "args": ["${file}"]
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "BuildDocs",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "build_docs.sh"
+            ],
+            "windows": {
+                "command": "build_docs.bat",
+                "args": []
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "BuildRelease",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "build_release.sh"
+            ],
+            "windows": {
+                "command": "build_release.bat",
+                "args": []
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },*/
+    ]
+}
