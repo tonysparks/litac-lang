@@ -1,7 +1,18 @@
+
+/* comment */
+
 func test(){var selfHosted=true
     var x: i32 = 0
     x += 100_00_00
-    var f: f32 = 5_0.5f
+    var f: f32 = 5_0.5f + 1_i8 + 2_u16 + 3f32 + 4f64 // + 4.4i32
+    var s = "hi"
+
+    var v = """
+        hello"
+        ""
+        there"
+
+    """
     /*
     |
     |=

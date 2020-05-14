@@ -3,6 +3,7 @@ import "mem"
 import "io"
 import "lex"
 import "state"
+import "types"
 /*
 @include("<sys/time.h>");
 @foreign
@@ -47,13 +48,18 @@ func main(len: i32, args: **char) {
         //printf("Size: %d\n", (token.pos.end - token.pos.start) as (i32))
         printf("%s: '%s' '%.*s' ", TokenTypeAsStr(token.type), token.asString(), (token.pos.end - token.pos.start) as (i32), token.pos.start)
         if(token.type == TokenType.INT_NUMBER) {
-            printf("'%llu'", token.value.intValue)
+            printf("value: '%llu'", token.value.intValue)
+            printf(" typeInfo: %s", TypeKindAsStr(token.typeInfo.kind))
         }
         else if(token.type == TokenType.FLOAT_NUMBER) {
-            printf("'%f'", token.value.floatValue)
+            printf("value: '%f'", token.value.floatValue)
+            printf(" typeInfo: %s", TypeKindAsStr(token.typeInfo.kind))
         }
         else if(token.type == TokenType.STRING) {
-            printf("'%.*s'", token.value.str.length, token.value.str.buffer)
+            printf("value: '%.*s'", token.value.str.length, token.value.str.buffer)
+        }
+        else if(token.type == TokenType.ERROR) {
+            printf("error: '%s'", lex.errorMsg)
         }
         printf("\n")
     }

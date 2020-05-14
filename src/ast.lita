@@ -1,0 +1,102 @@
+import "symbols"
+import "lex"
+import "array"
+
+public enum StmtKind {
+    CONST_DECL,
+    VAR_DECL,
+    STRUCT_DECL,
+    UNION_DECL,
+    ENUM_DECL,
+    FUNC_DECL,
+    TYPEDEF_DECL,
+    PARAM_DECL,
+
+    BLOCK_STMT,
+    BREAK_STMT,
+    COMP_STMT,
+    CONTINUE_STMT,
+    DEFER_STMT,
+    DO_WHILE_STMT,
+    EMPTY_STMT,
+    ENUM_FIELD_ENTRY_STMT,
+    ENUM_FIELD_STMT,
+    FIELD_STMT,
+    FOR_STMT,
+    FUNC_BODY_STMT,
+    GOTO_STMT,
+    IF_STMT,
+    IMPORT_STMT,
+    LABEL_STMT,
+    MODULE_STMT,
+    NOTE_STMT,
+    PARAMETERS_STMT,
+    RETURN_STMT,
+    STRUCT_FIELD_STMT,
+    SWITCH_CASE_STMT,
+    SWITCH_STMT,
+    UNION_FIELD_STMT,
+    VAR_FIELD_STMT,
+    WHILE_STMT,
+
+    ARRAY_DESIGNATION_EXPR,
+    ARRAY_INIT_EXPR,
+    BINARY_EXPR,
+    BOOLEAN_EXPR,
+    CAST_EXPR,
+    CHAR_EXPR,
+    FUNC_CALL_EXPR,
+    FUNC_IDENTIFIER_EXPR,
+    GET_EXPR,
+    GROUP_EXPR,
+    IDENTIFIER_EXPR,
+    INIT_EXPR,
+    INIT_ARG_EXPR,
+    NULL_EXPR,
+    NUMBER_EXPR,
+    OFFSET_OF_EXPR,
+    STRING_EXPR,
+    SUBSCRIPT_GET_EXPR,
+    SUBSCRIPT_SET_EXPR,
+    TERNARY_EXPR,
+    TYPE_IDENTIFIER_EXPR,
+    TYPE_OF_EXPR,
+    UNARY_EXPR,
+
+    MAX_STMT_KINDS
+}
+
+public struct Attributes {
+    isPublic: bool
+    isGlobal: bool
+    notes: Array<*NoteStmt>
+}
+
+public struct Identifier {}
+
+public struct Decl {
+    node: using Node
+    sym: *Symbol
+    name: Token
+    attributes: Attributes
+}
+
+public struct NoteStmt {
+    name: Token
+    attributes: Array<Token>
+}
+
+public struct Stmt {
+    node: using Node
+
+    union {
+        note: NoteStmt
+    }
+}
+
+public struct Node {
+    kind: StmtKind
+    parent: *Node
+    startPos: SrcPos
+    endPos: SrcPos
+}

@@ -2,6 +2,7 @@ import "string_view"
 import "string_buffer"
 import "libc"
 import "mem"
+import "types"
 
 @asStr
 public enum TokenType {
@@ -291,6 +292,7 @@ public union Value {
 
 public struct Token {
     type: TokenType
+    typeInfo: *TypeInfo
     pos: SrcPos
     value: Value
 }
@@ -319,6 +321,7 @@ public func LexerInit(filename: *const char,
         .allocator = allocator,
         .token = Token {
             .type = TokenType.END_OF_FILE,
+            .typeInfo = null,
             .pos = SrcPos {
                 .start = text,
                 .end = null,   
@@ -344,20 +347,21 @@ func (l: *Lexer) error(format: *const char, ...) {
     va_end(args)
 
     l.errorMsg = sb.cStr()
+    l.errorToken()
 }
 
 func (l: *Lexer) nextChar() : char {
     l.stream += 1
-    var c = *l.stream
-
     l.position += 1
+
+    var c = *l.stream
     if(c == '\n') {
         l.lineStart = l.stream;
         l.lineNumber += 1;
         l.position = 1;
     }
 
-    return *l.stream
+    return c
 }
 
 @inline
@@ -384,22 +388,30 @@ func (l: *Lexer) skipWhitespace() {
     }
 }
 
-func (l: *Lexer) skipComments() {
-    var c = *l.stream
-    if(c == '/') {
+func (l: *Lexer) skipComments() {    
+    if(*l.stream == '/') {
         if(l.peekChar() == '/') {
-            l.nextChar()
+            l.nextChar() // eat /
             do {
                 l.nextChar()
+                if(*l.stream == '\n') {
+                    l.nextChar()
+                    break;
+                }
             }
-            while(!l.eof() || l.peekChar() != '\n' || l.peekChar() != '\r') // TODO: Validate
+            while(!l.eof()) 
         }
         else if(l.peekChar() == '*') {
-            l.nextChar()
+            l.nextChar() // eat /
             do {
                 l.nextChar()
+                if((*l.stream == '*' && l.peekChar() == '/')) {
+                    l.nextChar()
+                    l.nextChar()
+                    break;
+                }
             }
-            while(!l.eof() || (*l.stream == '*' && l.peekChar() == '/'))
+            while(!l.eof())
         }
     }
 }
@@ -473,12 +485,7 @@ func (l: *Lexer) scanInt(stream: *char) {
         }
     }
     var val: i64 = 0;
-    for (;;) {
-        /*
-        if (*stream == '_') {
-            stream += 1;
-            continue;
-        }*/
+    for (;;) {        
         var digit = charToDigit[(*stream) as (i32)];
         if (digit == 0 && *stream != '0') {
             break;
@@ -547,6 +554,105 @@ func (l: *Lexer) scanFloat(stream: *char) {
     l.token.value.floatValue = val;
 }
 
+func (l: *Lexer) scanTypeInfo() {
+    var c = *l.stream
+    if(c == 'u' || c == 'i') {
+        if(l.token.typeInfo == &F32_TYPE || l.token.typeInfo == &F64_TYPE) {
+            l.error("Integer type designation on floating point number not allowed");
+            return;
+        }
+
+        var isSigned = (c == 'i');
+        
+        var start = l.stream
+        var len = 0
+        do {
+            len += 1
+            l.nextChar()
+
+            if(!isdigit(*l.stream)) {
+                break;
+            }            
+        } while(!l.eof())
+        
+        var kind = TypeKindFromString(start, len)
+        switch(kind) {
+            case TypeKind.I8: {
+                l.token.typeInfo = &I8_TYPE
+                break;
+            }
+            case TypeKind.U8: {
+                l.token.typeInfo = &U8_TYPE
+                break;
+            }
+            case TypeKind.I16: {
+                l.token.typeInfo = &I16_TYPE
+                break;
+            }
+            case TypeKind.U16: {
+                l.token.typeInfo = &U16_TYPE
+                break;
+            }
+            case TypeKind.I32: {
+                l.token.typeInfo = &I32_TYPE
+                break;
+            }
+            case TypeKind.U32: {
+                l.token.typeInfo = &U32_TYPE
+                break;
+            }
+            case TypeKind.I64: {
+                l.token.typeInfo = &I64_TYPE
+                break;
+            }
+            case TypeKind.U64: {
+                l.token.typeInfo = &U64_TYPE
+                break;
+            }
+            default: {
+                l.error("Invalid number type designator");
+            }
+        }
+
+    }
+    else if(tolower(c) == 'f' || tolower(c) == 'd' ) {
+        var start = l.stream
+        var len = 0
+        do {
+            len += 1
+            l.nextChar()
+
+            if(!isdigit(*l.stream)) {
+                break;
+            }            
+        } while(!l.eof())
+
+        if(len == 1) {
+            if(tolower(c) == 'f') {
+                l.token.typeInfo = &F32_TYPE
+            }
+            else {
+                l.token.typeInfo = &F64_TYPE
+            }
+        }
+        else {            
+            var kind = TypeKindFromString(start, len)
+            switch(kind) {
+                case TypeKind.F32: {
+                    l.token.typeInfo = &F32_TYPE
+                    break;
+                }
+                case TypeKind.F64: {
+                    l.token.typeInfo = &F64_TYPE
+                    break;
+                }
+                default: {
+                    l.error("Invalid number type designator");
+                }
+            }
+        }
+    }
+}
 
 func (l: *Lexer) scanNumber() : Token {
     var start = l.stream
@@ -556,26 +662,26 @@ func (l: *Lexer) scanNumber() : Token {
 
     var hasDecimal = false
     var hasExpo = false
-    while (isdigit(*l.stream) || 
-           tolower(*l.stream) == 'e' ||
-          *l.stream == '.' || 
-          *l.stream == '_') {
-
-        if(*l.stream == '.') {
+    while(!l.eof()) {
+        var c = *l.stream
+        if(c == '.') {
             if(hasDecimal) {
                 break;
             }
             hasDecimal = true
         }
-        else if(tolower(*l.stream) == 'e') {
+        else if(tolower(c) == 'e') {
             if(hasExpo) {
                 break;
             }
             hasExpo = true
         }
+        else if(!isdigit(c) && c != '_') {
+            break;
+        }
 
-        if(*l.stream != '_') {
-            numBuf[numIndex] = *l.stream
+        if(c != '_') {
+            numBuf[numIndex] = c
             numIndex += 1
         }
 
@@ -585,17 +691,60 @@ func (l: *Lexer) scanNumber() : Token {
     numBuf[numIndex] = '\0'
     if (hasDecimal || hasExpo) {
         l.scanFloat(numBuf);
+        l.token.typeInfo = &F64_TYPE
     } else {
         l.scanInt(numBuf);
+
+        l.token.typeInfo = &I32_TYPE
+        if(l.token.value.intValue > INT_MAX) {
+            l.token.typeInfo = &I64_TYPE
+        }
     }
-    // TODO: Parse TypeInfo
+
+    if(l.hasError()) {
+        return l.errorToken()
+    }
+    
+    l.scanTypeInfo()
 
     l.token.pos.end = l.stream
     l.token.pos.position += (l.stream - start)
     return l.token
 }
 
-func (l: *Lexer) scanString() : Token {
+func (l: *Lexer) scanString() : Token {    
+    var length = 0
+    if(l.stream[0] == '"') {
+        var isVerbatim = false        
+        if(l.stream[1] == '"' && l.stream[2] == '"') {
+            isVerbatim = true
+            l.nextChar()
+            l.nextChar()
+        }
+        
+        var c = l.nextChar()
+        
+        l.token.value.str.buffer = l.stream
+        while(!l.eof()) {
+            
+            if(l.stream[0] == '"') {        
+                if(!isVerbatim) {
+                    l.nextChar()
+                    break;
+                }
+                else if(l.stream[1] == '"' && l.stream[2] == '"') {
+                    l.nextChar()
+                    l.nextChar()
+                    l.nextChar()
+                    break;
+                }
+            }
+            l.nextChar()
+            length += 1
+        }
+    }
+    l.token.type = TokenType.STRING
+    l.token.value.str.length = length
     l.token.pos.end = l.stream
     return l.token
 }
@@ -818,6 +967,7 @@ public func (l: *Lexer) eof() : bool {
 
 
 public func (l: *Lexer) nextToken() : Token {
+
 repeat:
     if(l.eof()) {
         return l.eofToken()

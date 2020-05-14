@@ -1,0 +1,188 @@
+import "string_view"
+import "symbols"
+
+@asStr
+public enum TypeKind {
+    BOOL,
+    CHAR,
+    I8,
+    U8,
+    I16,
+    U16,
+    I32,
+    U32,
+    I64,
+    U64,
+    F32,
+    F64,
+    USIZE,
+    NULL,
+    VOID,
+
+    STR,
+    ARRAY,
+    PTR,
+    FUNCPTR,
+
+    STRUCT,
+    UNION,
+    ENUM,
+    FUNC,
+
+    CONST,
+    GENERIC_PARAM,
+
+    MAX_TYPE_KINDS
+}
+
+const typeKindText = []*const char {
+    [TypeKind.BOOL] = "bool",
+    [TypeKind.CHAR] = "char",
+    [TypeKind.I8] = "i8",
+    [TypeKind.U8] = "u8",
+    [TypeKind.I16] = "i16",
+    [TypeKind.U16] = "u16",
+    [TypeKind.I32] = "i32",
+    [TypeKind.U32] = "u32",
+    [TypeKind.I64] = "i64",
+    [TypeKind.U64] = "u64",
+    [TypeKind.F32] = "f32",
+    [TypeKind.F64] = "f64",
+    [TypeKind.USIZE] = "usize",
+    [TypeKind.NULL] = "null",
+    [TypeKind.VOID] = "void",
+
+    [TypeKind.STR] = "string",
+    [TypeKind.ARRAY] = "array",
+    [TypeKind.PTR] = "pointer",
+    [TypeKind.FUNCPTR] = "func_pointer",
+
+    [TypeKind.STRUCT] = "struct",
+    [TypeKind.UNION] = "union",
+    [TypeKind.ENUM] = "enum",
+    [TypeKind.FUNC] = "func",
+
+    [TypeKind.CONST] = "const",
+    [TypeKind.GENERIC_PARAM] = "generic_param",
+
+    [TypeKind.MAX_TYPE_KINDS] = "",
+}
+
+public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
+    var view = StringViewInit(str, len)
+    for(var i = TypeKind.BOOL; i < TypeKind.MAX_TYPE_KINDS; i += 1) {
+        if(view.equals(typeKindText[i])) {
+            return i;
+        }
+    }
+
+    return TypeKind.MAX_TYPE_KINDS
+}
+
+public typedef i64 as Typeid;
+var idGen: Typeid = TypeKind.MAX_TYPE_KINDS as (i64);
+
+public struct TypeInfo {
+    kind: TypeKind
+    typeid: Typeid
+    name: *const char
+    sym: *Symbol
+}
+
+public const BOOL_TYPE = TypeInfo {
+    .kind = TypeKind.BOOL,
+    .typeid = TypeKind.BOOL as (Typeid),
+    .name = "bool",
+    .sym = null
+}
+
+public const CHAR_TYPE = TypeInfo {
+    .kind = TypeKind.CHAR,
+    .typeid = TypeKind.CHAR as (Typeid),
+    .name = "char",
+    .sym = null
+}
+
+public const I8_TYPE = TypeInfo {
+    .kind = TypeKind.I8,
+    .typeid = TypeKind.I8 as (Typeid),
+    .name = "i8",
+    .sym = null
+}
+
+public const U8_TYPE = TypeInfo {
+    .kind = TypeKind.U8,
+    .typeid = TypeKind.U8 as (Typeid),
+    .name = "u8",
+    .sym = null
+}
+
+public const I16_TYPE = TypeInfo {
+    .kind = TypeKind.I16,
+    .typeid = TypeKind.I16 as (Typeid),
+    .name = "i16",
+    .sym = null
+}
+
+public const U16_TYPE = TypeInfo {
+    .kind = TypeKind.U16,
+    .typeid = TypeKind.U16 as (Typeid),
+    .name = "u16",
+    .sym = null
+}
+
+public const I32_TYPE = TypeInfo {
+    .kind = TypeKind.I32,
+    .typeid = TypeKind.I32 as (Typeid),
+    .name = "i32",
+    .sym = null
+}
+
+public const U32_TYPE = TypeInfo {
+    .kind = TypeKind.U32,
+    .typeid = TypeKind.U32 as (Typeid),
+    .name = "u32",
+    .sym = null
+}
+
+public const I64_TYPE = TypeInfo {
+    .kind = TypeKind.I64,
+    .typeid = TypeKind.I64 as (Typeid),
+    .name = "i64",
+    .sym = null
+}
+
+public const U64_TYPE = TypeInfo {
+    .kind = TypeKind.U64,
+    .typeid = TypeKind.U64 as (Typeid),
+    .name = "u64",
+    .sym = null
+}
+
+public const F32_TYPE = TypeInfo {
+    .kind = TypeKind.F32,
+    .typeid = TypeKind.F32 as (Typeid),
+    .name = "f32",
+    .sym = null
+}
+
+public const F64_TYPE = TypeInfo {
+    .kind = TypeKind.F64,
+    .typeid = TypeKind.F64 as (Typeid),
+    .name = "f64",
+    .sym = null
+}
+
+public const NULL_TYPE = TypeInfo {
+    .kind = TypeKind.NULL,
+    .typeid = TypeKind.NULL as (Typeid),
+    .name = "null",
+    .sym = null
+}
+
+public const VOID_TYPE = TypeInfo {
+    .kind = TypeKind.VOID,
+    .typeid = TypeKind.VOID as (Typeid),
+    .name = "void",
+    .sym = null
+}
