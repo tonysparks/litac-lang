@@ -1,0 +1,542 @@
+import "ast"
+import "lex"
+import "symbols"
+import "types"
+import "mem"
+import "array"
+import "common"
+
+public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
+    switch(kind) {
+        case TypeSpecKind.NONE: {
+            var result = new<TypeSpec>(allocator)
+            result.kind = TypeSpecKind.NONE
+            result.pos = pos
+            result.base = null
+            return result
+        }
+        case TypeSpecKind.ARRAY: {
+            var result = new<ArrayTypeSpec>(allocator)
+            result.kind = TypeSpecKind.ARRAY
+            result.pos = pos
+            result.base = null
+            result.numElements = null
+            return result as (*TypeSpec)
+        }
+        case TypeSpecKind.PTR: {
+            var result = new<PtrTypeSpec>(allocator)
+            result.kind = TypeSpecKind.PTR            
+            result.pos = pos
+            result.base = null
+            return result as (*TypeSpec)
+        }
+        case TypeSpecKind.CONST: {
+            var result = new<ConstTypeSpec>(allocator)
+            result.kind = TypeSpecKind.CONST
+            result.pos = pos
+            result.base = null
+            return result as (*TypeSpec)
+        }
+        case TypeSpecKind.NAME: {
+            var result = new<NameTypeSpec>(allocator)
+            result.kind = TypeSpecKind.NAME
+            result.pos = pos
+            result.base = null
+            result.name = null
+            result.genericArgs.init(0, allocator)
+            return result as (*TypeSpec)
+        }
+        default: {
+            Panic("Invalid TypeSpecKind: '%d'\n", kind)
+        }
+    }
+
+    return null
+}
+
+public func NewDecl(kind: StmtKind, startPos: SrcPos, allocator: *const Allocator) : *Decl {
+    return NewStmt(kind, startPos, allocator) as (*Decl)
+}
+
+public func NewExpr(kind: StmtKind, startPos: SrcPos, allocator: *const Allocator) : *Expr {
+    return NewStmt(kind, startPos, allocator) as (*Expr)
+}
+
+public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocator) : *Stmt {
+    switch(kind) {
+        case StmtKind.IMPORT_DECL: {
+            var decl = new<ImportDecl>(allocator)
+            decl.kind = StmtKind.IMPORT_DECL;
+            decl.startPos = startPos
+            //decl.moduleName = null
+            decl.alias.type = TokenType.END_OF_FILE
+            decl.isUsing = false
+            //stmt.moduleId ??
+            break;
+        }
+        case StmtKind.CONST_DECL: {
+            var decl = new<ConstDecl>(allocator)
+            decl.kind = StmtKind.CONST_DECL;
+            decl.startPos = startPos
+            decl.expr = null
+            decl.type = null
+            break;
+        }
+        case StmtKind.VAR_DECL: {
+            var decl = new<VarDecl>(allocator)
+            decl.kind = StmtKind.VAR_DECL;
+            decl.startPos = startPos
+            decl.expr = null
+            decl.type = null
+            break;
+        }
+        case StmtKind.STRUCT_DECL: {
+            var decl = new<AggregateDecl>(allocator)
+            decl.kind = StmtKind.STRUCT_DECL;
+            decl.startPos = startPos
+            decl.genericParams.init(6, allocator)
+            decl.fields.init(16, allocator)
+            decl.flags = 0
+            break;
+        }
+        case StmtKind.UNION_DECL: {
+            var decl = new<AggregateDecl>(allocator)
+            decl.kind = StmtKind.UNION_DECL;
+            decl.startPos = startPos
+            decl.genericParams.init(6, allocator)
+            decl.fields.init(16, allocator)
+            decl.flags = 0
+            break;
+        }
+        case StmtKind.ENUM_DECL: {
+            var decl = new<EnumDecl>(allocator)
+            decl.kind = StmtKind.ENUM_DECL;
+            decl.startPos = startPos            
+            decl.fields.init(16, allocator)            
+            break;
+        }
+        case StmtKind.FUNC_DECL: {
+            var decl = new<FuncDecl>(allocator)
+            decl.kind = StmtKind.FUNC_DECL;
+            decl.startPos = startPos
+            decl.genericParams.init(6, allocator)
+            decl.params = null
+            decl.body = null
+            decl.returnType = null
+            decl.flags = 0
+            break;
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            var decl = new<TypedefDecl>(allocator)
+            decl.kind = StmtKind.TYPEDEF_DECL;
+            decl.startPos = startPos
+            decl.type = null
+            decl.alias = null
+            break;
+        }
+        case StmtKind.PARAM_DECL: {
+            var decl = new<ParameterDecl>(allocator)
+            decl.kind = StmtKind.PARAM_DECL;
+            decl.startPos = startPos
+            decl.type = null
+            decl.defaultExpr = null
+            break;
+        }
+        case StmtKind.NATIVE_DECL: {
+            var decl = new<NativeDecl>(allocator)
+            decl.kind = StmtKind.NATIVE_DECL;
+            decl.startPos = startPos
+            decl.type = null
+            break;
+        }
+
+        case StmtKind.BLOCK_STMT: {
+            var stmt = new<BlockStmt>(allocator)
+            stmt.kind = StmtKind.BLOCK_STMT;
+            stmt.startPos = startPos
+            stmt.stmts.init(16, allocator)
+            break;
+        }
+        case StmtKind.BREAK_STMT: {
+            var stmt = new<BreakStmt>(allocator)
+            stmt.kind = StmtKind.BREAK_STMT;
+            stmt.startPos = startPos
+            break;
+        }
+        case StmtKind.COMP_STMT: {
+            var stmt = new<CompStmt>(allocator)
+            stmt.kind = StmtKind.COMP_STMT;
+            stmt.startPos = startPos
+            stmt.type = null
+            stmt.expr = null
+            stmt.body.init(16, allocator)
+            stmt.end = null
+            stmt.evaluatedStmt = null
+            break;
+        }
+        case StmtKind.CONTINUE_STMT: {
+            var stmt = new<ContinueStmt>(allocator)
+            stmt.kind = StmtKind.CONTINUE_STMT;
+            stmt.startPos = startPos
+            break;
+        }
+        case StmtKind.DEFER_STMT: {
+            var stmt = new<DeferStmt>(allocator)
+            stmt.kind = StmtKind.DEFER_STMT;
+            stmt.startPos = startPos
+            stmt.deferedStmt = null
+            break;
+        }
+        case StmtKind.DO_WHILE_STMT: {
+            var stmt = new<DoWhileStmt>(allocator)
+            stmt.kind = StmtKind.DO_WHILE_STMT;
+            stmt.startPos = startPos
+            stmt.cond = null
+            stmt.body = null
+            break;
+        }
+        case StmtKind.EMPTY_STMT: {
+            var stmt = new<EmptyStmt>(allocator)
+            stmt.kind = StmtKind.EMPTY_STMT;
+            stmt.startPos = startPos
+            break;
+        }
+        case StmtKind.ENUM_FIELD_ENTRY_STMT: {
+            var stmt = new<EnumFieldEntryStmt>(allocator)
+            stmt.kind = StmtKind.ENUM_FIELD_ENTRY_STMT;
+            stmt.startPos = startPos
+            stmt.fieldName = null
+            stmt.value = null
+            break;
+        }
+        case StmtKind.ENUM_FIELD_STMT: {
+            var stmt = new<EnumFieldStmt>(allocator)
+            stmt.kind = StmtKind.ENUM_FIELD_STMT;
+            stmt.startPos = startPos
+            stmt.decl = null
+            break;
+        }
+        case StmtKind.FOR_STMT: {
+            var stmt = new<ForStmt>(allocator)
+            stmt.kind = StmtKind.FOR_STMT;
+            stmt.startPos = startPos
+            stmt.init = null
+            stmt.cond = null
+            stmt.post = null
+            stmt.body = null
+            break;
+        }
+        case StmtKind.FUNC_BODY_STMT: {
+            var stmt = new<FuncBodyStmt>(allocator)
+            stmt.kind = StmtKind.FUNC_BODY_STMT;
+            stmt.startPos = startPos
+            stmt.stmts.init(16, allocator)
+            break;
+        }
+        case StmtKind.GOTO_STMT: {
+            var stmt = new<GotoStmt>(allocator)
+            stmt.kind = StmtKind.GOTO_STMT;
+            stmt.startPos = startPos
+            stmt.label = null
+            break;
+        }
+        case StmtKind.IF_STMT: {
+            var stmt = new<IfStmt>(allocator)
+            stmt.kind = StmtKind.IF_STMT;
+            stmt.startPos = startPos
+            stmt.cond = null
+            stmt.then = null
+            stmt.elseStmt = null
+            break;
+        }
+        case StmtKind.LABEL_STMT: {
+            var stmt = new<LabelStmt>(allocator)
+            stmt.kind = StmtKind.LABEL_STMT;
+            stmt.startPos = startPos
+            stmt.label = null
+            break;
+        }
+        case StmtKind.MODULE_STMT: {
+            var stmt = new<ModuleStmt>(allocator)
+            stmt.kind = StmtKind.MODULE_STMT;
+            stmt.startPos = startPos
+            stmt.imports.init(16, allocator)
+            stmt.notes.init(8, allocator)
+            stmt.declarations.init(16, allocator)
+            break;
+        }
+        case StmtKind.NOTE_STMT: {
+            var stmt = new<NoteStmt>(allocator)
+            stmt.kind = StmtKind.NOTE_STMT;
+            stmt.startPos = startPos
+            stmt.attributes.init(2, allocator)
+            break;
+        }
+        case StmtKind.PARAMETERS_STMT: {
+            var stmt = new<ParametersStmt>(allocator)
+            stmt.kind = StmtKind.PARAMETERS_STMT;
+            stmt.startPos = startPos
+            stmt.params.init(8, allocator)
+            break;
+        }
+        case StmtKind.RETURN_STMT: {
+            var stmt = new<ReturnStmt>(allocator)
+            stmt.kind = StmtKind.RETURN_STMT;
+            stmt.startPos = startPos
+            stmt.expr = null
+            break;
+        }
+        case StmtKind.STRUCT_FIELD_STMT: {
+            var stmt = new<AggregateFieldStmt>(allocator)
+            stmt.kind = StmtKind.STRUCT_FIELD_STMT;
+            stmt.startPos = startPos
+            stmt.decl = null
+            break;
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            var stmt = new<SwitchCaseStmt>(allocator)
+            stmt.kind = StmtKind.SWITCH_CASE_STMT;
+            stmt.startPos = startPos
+            stmt.cond = null
+            stmt.body = null
+            break;
+        }
+        case StmtKind.SWITCH_STMT: {
+            var stmt = new<SwitchStmt>(allocator)
+            stmt.kind = StmtKind.SWITCH_STMT;
+            stmt.startPos = startPos
+            stmt.cond = null
+            stmt.stmts.init(16, allocator)
+            stmt.defaultStmt = null
+            break;
+        }
+        case StmtKind.UNION_FIELD_STMT: {
+            var stmt = new<AggregateFieldStmt>(allocator)
+            stmt.kind = StmtKind.UNION_FIELD_STMT;
+            stmt.startPos = startPos
+            stmt.decl = null
+            break;
+        }
+        case StmtKind.VAR_FIELD_STMT: {
+            var stmt = new<VarFieldStmt>(allocator)
+            stmt.kind = StmtKind.VAR_FIELD_STMT;
+            stmt.startPos = startPos
+            stmt.fieldName = null
+            stmt.type = null
+            stmt.defaultExpr = null
+            stmt.attributes.isPublic = false
+            stmt.attributes.isGlobal = false
+            stmt.attributes.notes.init(2, allocator)
+            break;
+        }
+        case StmtKind.WHILE_STMT: {
+            var stmt = new<WhileStmt>(allocator)
+            stmt.kind = StmtKind.WHILE_STMT;
+            stmt.startPos = startPos
+            stmt.cond = null
+            stmt.body = null
+            break;
+        }
+
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            var expr = new<ArrayDesignationExpr>(allocator)
+            expr.kind = StmtKind.ARRAY_DESIGNATION_EXPR;
+            expr.startPos = startPos
+            expr.index = null
+            expr.value = null
+            break;
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            var expr = new<ArrayInitExpr>(allocator)
+            expr.kind = StmtKind.ARRAY_INIT_EXPR;
+            expr.startPos = startPos
+            expr.type = null
+            expr.values.init(16, allocator)
+            break;
+        }
+        case StmtKind.BINARY_EXPR: {
+            var expr = new<BinaryExpr>(allocator)
+            expr.kind = StmtKind.BINARY_EXPR;
+            expr.startPos = startPos
+            expr.left = null
+            expr.right = null
+            break;
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            var expr = new<BooleanExpr>(allocator)
+            expr.kind = StmtKind.BOOLEAN_EXPR;
+            expr.startPos = startPos            
+            break;
+        }
+        case StmtKind.CAST_EXPR: {
+            var expr = new<CastExpr>(allocator)
+            expr.kind = StmtKind.CAST_EXPR;
+            expr.startPos = startPos
+            expr.castTo = null
+            expr.exprToCast = null
+            break;
+        }
+        case StmtKind.CHAR_EXPR: {
+            var expr = new<CharExpr>(allocator)
+            expr.kind = StmtKind.CHAR_EXPR;
+            expr.startPos = startPos
+            expr.character = null
+            break;
+        }
+        case StmtKind.FUNC_CALL_EXPR: {
+            var expr = new<FuncCallExpr>(allocator)
+            expr.kind = StmtKind.FUNC_CALL_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.arguments.init(16, allocator)
+            break;
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            var expr = new<IdentifierExpr>(allocator)
+            expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR;
+            expr.startPos = startPos
+            expr.genericArgs.init(2, allocator)
+            expr.type = null
+            //expr.sym///            
+            break;
+        }
+        case StmtKind.GET_EXPR: {
+            var expr = new<GetExpr>(allocator)
+            expr.kind = StmtKind.GET_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.field = null
+            expr.isMethodCall = false
+            break;
+        }
+        case StmtKind.GROUP_EXPR: {
+            var expr = new<GroupExpr>(allocator)
+            expr.kind = StmtKind.GROUP_EXPR;
+            expr.startPos = startPos
+            expr.groupedExpr = null
+            break;
+        }
+        case StmtKind.IDENTIFIER_EXPR: {
+            var expr = new<IdentifierExpr>(allocator)
+            expr.kind = StmtKind.IDENTIFIER_EXPR;
+            expr.startPos = startPos
+            expr.genericArgs.init(2, allocator)
+            expr.type = null
+            //expr.sym//
+            break;
+        }
+        case StmtKind.INIT_ARG_EXPR: {
+            var expr = new<InitArgExpr>(allocator)
+            expr.kind = StmtKind.INIT_ARG_EXPR;
+            expr.startPos = startPos
+            expr.fieldName = null
+            expr.argPosition = 0
+            expr.value = null
+            break;
+        }
+        case StmtKind.INIT_EXPR: {
+            var expr = new<InitExpr>(allocator)
+            expr.kind = StmtKind.INIT_EXPR;
+            expr.startPos = startPos
+            expr.genericArgs.init(2, allocator)
+            expr.type = null
+            expr.arguments.init(8, allocator)
+            break;
+        }
+        case StmtKind.NULL_EXPR: {
+            var expr = new<NullExpr>(allocator)
+            expr.kind = StmtKind.NULL_EXPR;
+            expr.startPos = startPos
+            break;
+        }
+        case StmtKind.NUMBER_EXPR: {
+            var expr = new<NumberExpr>(allocator)
+            expr.kind = StmtKind.NUMBER_EXPR;
+            expr.startPos = startPos
+            expr.number = null
+            break;
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            var expr = new<OffsetOfExpr>(allocator)
+            expr.kind = StmtKind.OFFSET_OF_EXPR;
+            expr.startPos = startPos
+            expr.type = null
+            expr.field = null
+            break;
+        }
+        case StmtKind.SET_EXPR: {
+            var expr = new<SetExpr>(allocator)
+            expr.kind = StmtKind.SET_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.field = null
+            expr.value = null
+            break;
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var expr = new<SizeOfExpr>(allocator)
+            expr.kind = StmtKind.SIZE_OF_EXPR;
+            expr.startPos = startPos
+            expr.sizeOfExpr = null
+            break;
+        }
+        case StmtKind.STRING_EXPR: {
+            var expr = new<StringExpr>(allocator)
+            expr.kind = StmtKind.STRING_EXPR;
+            expr.startPos = startPos
+            expr.string = null
+            break;
+        }
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            var expr = new<SubscriptGetExpr>(allocator)
+            expr.kind = StmtKind.SUBSCRIPT_GET_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.index = null
+            break;
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            var expr = new<SubscriptSetExpr>(allocator)
+            expr.kind = StmtKind.SUBSCRIPT_SET_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.index = null
+            expr.value = null
+            break;
+        }
+        case StmtKind.TERNARY_EXPR: {
+            var expr = new<TernaryExpr>(allocator)
+            expr.kind = StmtKind.TERNARY_EXPR;
+            expr.startPos = startPos
+            expr.cond = null
+            expr.then = null
+            expr.other = null
+            break;
+        }
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            var expr = new<TypeIdentifierExpr>(allocator)
+            expr.kind = StmtKind.TYPE_IDENTIFIER_EXPR;
+            expr.startPos = startPos
+            expr.genericArgs.init(2, allocator)
+            expr.type = null
+            //expr.sym//
+            break;
+        }
+        case StmtKind.TYPE_OF_EXPR: {
+            var expr = new<TypeOfExpr>(allocator)
+            expr.kind = StmtKind.TYPE_OF_EXPR;
+            expr.startPos = startPos
+            expr.typeOfExpr = null
+            expr.type = null
+            break;
+        }
+        case StmtKind.UNARY_EXPR: {
+            var expr = new<UnaryExpr>(allocator)
+            expr.kind = StmtKind.UNARY_EXPR;
+            expr.startPos = startPos
+            expr.unaryExpr = null
+            break;
+        }
+    }
+    return null
+}

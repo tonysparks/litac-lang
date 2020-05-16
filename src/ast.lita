@@ -1,8 +1,12 @@
 import "symbols"
+import "types"
 import "lex"
 import "array"
+import "mem"
+import "common"
 
 public enum StmtKind {
+    IMPORT_DECL,
     CONST_DECL,
     VAR_DECL,
     STRUCT_DECL,
@@ -11,6 +15,7 @@ public enum StmtKind {
     FUNC_DECL,
     TYPEDEF_DECL,
     PARAM_DECL,
+    NATIVE_DECL,
 
     BLOCK_STMT,
     BREAK_STMT,
@@ -21,12 +26,11 @@ public enum StmtKind {
     EMPTY_STMT,
     ENUM_FIELD_ENTRY_STMT,
     ENUM_FIELD_STMT,
-    FIELD_STMT,
+    //FIELD_STMT,
     FOR_STMT,
     FUNC_BODY_STMT,
     GOTO_STMT,
     IF_STMT,
-    IMPORT_STMT,
     LABEL_STMT,
     MODULE_STMT,
     NOTE_STMT,
@@ -55,7 +59,9 @@ public enum StmtKind {
     NULL_EXPR,
     NUMBER_EXPR,
     OFFSET_OF_EXPR,
-    STRING_EXPR,
+    SET_EXPR, 
+    SIZE_OF_EXPR,
+    STRING_EXPR,   
     SUBSCRIPT_GET_EXPR,
     SUBSCRIPT_SET_EXPR,
     TERNARY_EXPR,
@@ -66,13 +72,84 @@ public enum StmtKind {
     MAX_STMT_KINDS
 }
 
+public enum TypeSpecKind {
+    NONE,
+    ARRAY,
+    PTR,
+    CONST,
+    NAME,
+    FUNC_PTR,
+
+    MAX_TYPESPEC_KINDS
+}
+
+public struct TypeSpec {
+    kind: TypeSpecKind
+    pos: SrcPos
+    base: *TypeSpec
+}
+
+public struct NameTypeSpec {
+    spec: using TypeSpec
+    name: *const char
+    genericArgs: Array<*TypeSpec>
+}
+
+public struct ArrayTypeSpec {
+    spec: using TypeSpec
+    numElements: *Expr
+}
+
+public struct PtrTypeSpec {
+    spec: using TypeSpec
+}
+
+public struct ConstTypeSpec {
+    spec: using TypeSpec
+}
+
+public struct FuncPtrTypeSpec {
+    spec: using TypeSpec
+    args: Array<TypeSpec>
+    ret: TypeSpec
+    hasVarargs: bool
+    genericParams: Array<GenericParam>
+}
+
+public struct GenericParam {
+    name: *const char
+}
+
 public struct Attributes {
     isPublic: bool
     isGlobal: bool
     notes: Array<*NoteStmt>
 }
 
-public struct Identifier {}
+
+public struct Node {
+    kind: StmtKind
+    parent: *Node
+    startPos: SrcPos
+    endPos: SrcPos
+}
+
+public func (n: *Node) becomeParentOf(child: *Node) {
+    child.parent = n
+}
+
+public func (n: *Node) becomeParentOfChildren<T>(children: *Array<*T>) {
+    var size = children.size()
+    for(var i = 0; i < size; i += 1) {
+        var child = children.get(i)
+        n.becomeParentOf(child.node)
+    }
+
+}
+
+public struct Identifier {
+    // TODO: Is this needed?
+}
 
 public struct Decl {
     node: using Node
@@ -81,22 +158,360 @@ public struct Decl {
     attributes: Attributes
 }
 
-public struct NoteStmt {
-    name: Token
-    attributes: Array<Token>
+public struct ImportDecl {
+    stmt: using Stmt
+    moduleName: Token // Identifier?
+    alias: Token // Identifier?
+    isUsing: bool
+    // TODO: moduleId: ModuleId
 }
+
+public struct VarDecl {
+    decl: using Decl
+    type: *TypeSpec
+    expr: *Expr
+}
+
+public struct ConstDecl {
+    decl: using Decl
+    type: *TypeSpec
+    expr: *Expr
+}
+
+public struct ParameterDecl {
+    decl: using Decl
+    type: *TypeSpec
+    defaultExpr: *Expr
+}
+
+public struct FuncDecl {
+    decl: using Decl
+    genericParams: Array<GenericParam>
+    params: *ParametersStmt
+    body: *FuncBodyStmt
+    returnType: *TypeSpec
+    flags: i32
+}
+
+public struct AggregateDecl {
+    decl: using Decl
+    genericParams: Array<GenericParam>
+    fields: Array<*FieldStmt>
+    flags: i32
+}
+
+public struct EnumDecl {
+    decl: using Decl
+    fields: Array<*EnumFieldEntryStmt>
+}
+
+public struct TypedefDecl {
+    decl: using Decl
+    type: *TypeSpec
+    alias: *const char
+}
+
+public struct NativeDecl {
+    decl: using Decl
+    type: *TypeInfo
+}
+
+public struct BlockStmt {
+    stmt: using Stmt
+    stmts: Array<*Stmt>
+}
+
+public struct BreakStmt {
+    stmt: using Stmt
+}
+
+public struct CompStmt {
+    stmt: using Stmt
+    type: *const char
+    expr: *const char
+    body: Array<*Stmt>
+    end: *CompStmt
+    evaluatedStmt: *Stmt
+}
+
+public struct ContinueStmt {
+    stmt: using Stmt
+}
+
+public struct DeferStmt {
+    stmt: using Stmt
+    deferedStmt: Stmt
+}
+
+public struct DoWhileStmt {
+    stmt: using Stmt
+    cond: *Expr
+    body: *Stmt
+}
+
+public struct EmptyStmt {
+    stmt: using Stmt
+}
+
+public struct EnumFieldEntryStmt {
+    stmt: using Stmt
+    fieldName: *Identifier
+    value: *Expr
+    attributes: Attributes
+}
+
+public struct EnumFieldStmt {
+    stmt: using Stmt
+    decl: *EnumDecl
+}
+
+public struct ForStmt {
+    stmt: using Stmt
+    init: *Stmt
+    cond: *Expr
+    post: *Stmt
+    body: *Stmt
+}
+
+public struct FuncBodyStmt {
+    stmt: using Stmt
+    stmts: Array<*Stmt>
+}
+
+public struct GotoStmt {
+    stmt: using Stmt
+    label: *const char // Identifer?
+}
+
+public struct IfStmt {
+    stmt: using Stmt
+    cond: *Expr
+    then: *Stmt
+    elseStmt: *Stmt
+}
+
+
+public struct LabelStmt {
+    stmt: using Stmt
+    label: *const char // Identifier?
+}
+
+// TODO: should ths be a declaration?
+public struct ModuleStmt {
+    stmt: using Stmt
+    imports: Array<*ImportDecl>
+    notes: Array<*NoteStmt>
+    declarations: Array<*Decl>
+    //TODO: id: ModuleId
+}
+
+public struct NoteStmt {
+    stmt: using Stmt
+    name: Token // Identifier?
+    attributes: Array<Token> // Identifier?
+}
+
+public struct ParametersStmt {
+    stmt: using Stmt
+    params: Array<*ParameterDecl>
+    isVararg: bool
+}
+
+public struct ReturnStmt {
+    stmt: using Stmt
+    expr: *Expr
+}
+
+public struct AggregateFieldStmt {
+    stmt: using Stmt
+    decl: *AggregateDecl
+}
+
+public struct SwitchCaseStmt {
+    stmt: using Stmt
+    cond: *Expr
+    body: *Stmt
+}
+
+public struct SwitchStmt {
+    stmt: using Stmt
+    cond: *Expr
+    stmts: Array<*SwitchCaseStmt>
+    defaultStmt: *Stmt
+}
+
+public struct VarFieldStmt {
+    stmt: using Stmt
+    fieldName: *Identifier
+    type: *TypeSpec
+    attributes: Attributes
+    defaultExpr: *Expr
+}
+
+public union FieldStmt {
+    enumField: *EnumFieldStmt
+    aggregateField: *AggregateFieldStmt
+    varField: *VarFieldStmt
+}
+
+public struct WhileStmt {
+    stmt: using Stmt
+    cond: *Expr
+    body: *Stmt
+}
+
 
 public struct Stmt {
     node: using Node
-
-    union {
-        note: NoteStmt
-    }
 }
 
-public struct Node {
-    kind: StmtKind
-    parent: *Node
-    startPos: SrcPos
-    endPos: SrcPos
+public struct ArrayDesignationExpr {
+    expr: using Expr
+    index: *Expr
+    value: *Expr
+}
+
+public struct ArrayInitExpr {
+    expr: using Expr
+    type: *TypeSpec
+    values: Array<*Expr>
+}
+
+public struct BinaryExpr {
+    expr: using Expr
+    left: *Expr
+    operator: TokenType
+    right: *Expr
+}
+
+public struct BooleanExpr {
+    expr: using Expr
+    boolean: bool
+}
+
+public struct CastExpr {
+    expr: using Expr
+    castTo: *TypeSpec
+    exprToCast: *Expr
+}
+
+public struct CharExpr {
+    expr: using Expr
+    character: *const char
+}
+
+public struct FuncCallExpr {
+    expr: using Expr
+    object: *Expr
+    arguments: Array<*Expr>
+}
+
+public struct GetExpr {
+    expr: using Expr
+    object: *Expr
+    field: *IdentifierExpr
+    isMethodCall: bool
+}
+
+public struct GroupExpr {
+    expr: using Expr
+    groupedExpr: *Expr
+}
+
+public struct IdentifierExpr {
+    expr: using Expr
+    genericArgs: Array<*TypeSpec>
+    type: *NameTypeSpec
+    sym: Symbol
+}
+
+public struct InitArgExpr {
+    expr: using Expr
+    fieldName: *const char // Identifier?
+    argPosition: i32
+    value: *Expr
+}
+
+public struct InitExpr {
+    expr: using Expr
+    genericArgs: Array<*TypeSpec>
+    type: *NameTypeSpec
+    arguments: Array<*InitArgExpr>
+}
+
+public struct NullExpr {
+    expr: using Expr
+}
+
+public struct NumberExpr {
+    expr: using Expr
+    number: *const char // TODO: should this be the number value? or Token
+}
+
+public struct OffsetOfExpr {
+    expr: using Expr
+    type: *TypeSpec
+    field: *const char // Identifier?
+}
+
+public struct SetExpr {
+    expr: using Expr
+    object: *Expr
+    field: *IdentifierExpr
+    operator: TokenType
+    value: *Expr
+}
+
+public struct SizeOfExpr {
+    expr: using Expr
+    sizeOfExpr: *Expr 
+}
+
+public struct StringExpr {
+    expr: using Expr
+    string: *const char // Identifier or Token?
+}
+
+public struct SubscriptGetExpr {
+    expr: using Expr
+    object: *Expr
+    index: *Expr
+}
+
+public struct SubscriptSetExpr {
+    expr: using Expr
+    object: *Expr
+    index: *Expr
+    operator: TokenType
+    value: *Expr
+}
+
+public struct TernaryExpr {
+    expr: using Expr
+    cond: *Expr
+    then: *Expr
+    other: *Expr
+}
+
+public struct TypeIdentifierExpr {
+    expr: using Expr
+    genericArgs: Array<*TypeSpec>
+    type: *TypeSpec
+    sym: Symbol
+}
+
+public struct TypeOfExpr {
+    expr: using Expr
+    typeOfExpr: *Expr
+    type: *TypeSpec
+}
+
+public struct UnaryExpr {
+    expr: using Expr
+    operator: TokenType
+    unaryExpr: *Expr
+}
+
+public struct Expr {
+    node: using Node
 }

@@ -4,6 +4,7 @@ import "io"
 import "lex"
 import "state"
 import "types"
+import "ast"
 /*
 @include("<sys/time.h>");
 @foreign

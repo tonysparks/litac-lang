@@ -1,0 +1,57 @@
+import "libc"
+
+public enum LogLevel {
+    TRACE,
+    INFO,
+    DEBUG,
+    ERROR,
+    FATAL
+}
+
+public func Log(level: LogLevel, format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    
+    if(level > LogLevel.DEBUG) {
+        vfprintf(stderr, format, args);            
+        va_end(args);    
+        fputs("\n", stderr);
+    }
+    else {
+        vfprintf(stdout, format, args);            
+        va_end(args);    
+        fputs("\n", stdout);
+    }
+
+    if(level == LogLevel.FATAL) {
+        exit(2);
+    }
+}
+
+public func Info(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);    
+    Log(LogLevel.INFO, format, args)
+    va_end(args)
+}
+
+public func Debug(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);    
+    Log(LogLevel.DEBUG, format, args)
+    va_end(args)
+}
+
+public func Error(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);    
+    Log(LogLevel.ERROR, format, args)
+    va_end(args)
+}
+
+public func Panic(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);    
+    Log(LogLevel.FATAL, format, args)
+    va_end(args)
+}

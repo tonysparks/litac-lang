@@ -1,0 +1,19 @@
+
+import "lex"
+import "common"
+import "array"
+
+public enum ErrorType {
+    WARN,
+    ERROR
+}
+
+public struct PhaseError {
+    type: ErrorType
+    message: *const char
+    pos: SrcPos
+}
+
+public struct PhaseResult {
+    errors: Array<*PhaseError>
+}

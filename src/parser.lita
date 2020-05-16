@@ -1,0 +1,257 @@
+import "ast"
+import "ast_new"
+import "lex"
+import "symbols"
+import "types"
+import "mem"
+import "array"
+import "phase_result"
+import "error_codes"
+import "common"
+import "libc"
+
+public struct Parser {
+    allocator: *const Allocator
+    lex: Lexer
+    tokens: Array<Token>
+    current: i32
+    currentPos: SrcPos
+    result: PhaseResult
+}
+
+public func ParserInit(filename: *const char, 
+                      text: *const char,
+                      allocator: *const Allocator) : Parser {
+
+    var parser = Parser {
+        .allocator = allocator
+    }
+
+    var lex = LexerInit(filename, text, allocator)
+    parser.tokens.init(512, allocator)
+
+    while(!lex.eof()) {
+        var token = lex.nextToken()
+        parser.tokens.add(token)
+    }
+
+    return parser
+}
+
+public func (p: *Parser) parseModule() : *ModuleStmt {
+    var pos = p.pos()
+    var moduleStmt = NewStmt(StmtKind.MODULE_STMT, pos, p.allocator) as (*ModuleStmt)
+
+    if(p.atEnd()) {
+        return moduleStmt
+    }
+
+    while(!p.atEnd()) {
+        p.parseModuleStmt(moduleStmt)
+        // TODO: check error and sync
+        /*if(p.hasError()) {
+            p.adjust(...)
+        }*/
+    }
+}
+
+func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {    
+    if(p.match(TokenType.IMPORT)) {
+        var importDecl = p.importDeclaration()
+        moduleStmt.imports.add(importDecl)
+    }
+    else if(p.match(TokenType.HASH)) {
+        // Ignore for now
+    }
+    else {        
+        var notes = p.notes()
+        var isPublic = p.match(TokenType.PUBLIC)
+
+        if(p.match(TokenType.VAR)) {
+            var decl = p.varDeclaration()            
+            moduleStmt.declarations.add(decl)
+        }
+        else if(p.match(TokenType.CONST)) {
+            var decl = p.constDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
+        else if(p.match(TokenType.FUNC)) {
+            var decl = p.funcDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
+        else if(p.match(TokenType.STRUCT)) {
+            var decl = p.structDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
+        else if(p.match(TokenType.UNION)) {
+            var decl = p.unionDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
+        else if(p.match(TokenType.ENUM)) {
+            var decl = p.enumDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
+        else if(p.match(TokenType.TYPEDEF)) {
+            var decl = p.typedefDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
+        else if(p.match(TokenType.SEMICOLON)) {
+            if(!notes.empty()) {
+                moduleStmt.notes.addAll(notes)
+            }
+            return;
+        }
+        else {
+            p.errorAt(p.peek(), ErrorCode.UNEXPECTED_TOKEN)
+        }
+
+        var decl = moduleStmt.declarations.last()
+        decl.attributes.notes.addAll(notes)
+        decl.attributes.isPublic = isPublic
+        decl.attributes.isGlobal = true
+    }
+}
+
+
+func (p: *Parser) importDeclaration() : *ImportDecl {    
+    var decl = NewStmt(StmtKind.IMPORT_DECL, p.pos(), p.allocator) as (*ImportDecl)
+    if(p.match(TokenType.USING)) {
+        decl.isUsing = true
+    }
+
+    var moduleName = p.consume(TokenType.STRING, ErrorCode.MISSING_IDENTIFIER);
+    if(moduleName) {
+        decl.moduleName = *moduleName
+    }
+    if(p.match(TokenType.AS)) {
+        var alias = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER);
+        if(alias) {
+            decl.alias = *alias
+        }
+    }
+
+    // TODO: Lookup physical file and calculate ModuleId
+    //decl.moduleId = //
+    return decl;
+}
+
+func (p: *Parser) notes() : Array<*NoteStmt> {
+    var notes = Array<*NoteStmt>{}
+    if(!p.check(TokenType.AT)) {
+        return notes
+    }
+
+    notes.init(4, p.allocator)
+
+    while(p.match(TokenType.AT)) {
+        var note = NewStmt(StmtKind.NOTE_STMT, p.pos(), p.allocator) as (*NoteStmt)
+        var name = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+        if(name) {
+            note.name = *name
+        }
+
+        if(p.match(TokenType.LEFT_PAREN)) {
+            do {
+                if(p.check(TokenType.STRING)) {
+                    note.attributes.add(*p.advance())
+                }
+            }
+            while(p.match(TokenType.COMMA));
+        }
+
+        notes.add(note)
+    }
+
+    return notes
+}
+
+func (p: *Parser) varDeclaration() : *VarDecl {
+}
+
+func (p: *Parser) constDeclaration() : *ConstDecl {
+}
+
+func (p: *Parser) funcDeclaration() : *FuncDecl {
+}
+
+func (p: *Parser) structDeclaration() : *AggregateDecl {
+}
+
+func (p: *Parser) unionDeclaration() : *AggregateDecl {
+}
+
+func (p: *Parser) enumDeclaration() : *EnumDecl {
+}
+
+func (p: *Parser) typedefDeclaration() : *TypedefDecl {
+}
+
+func (p: *Parser) error(format: *const char, ...) {
+    // TODO:
+    // Add to phase results
+    var args: va_list;
+    va_start(args, format);
+    printf(format, args)
+    va_end(args)
+}
+
+func (p: *Parser) pos() : SrcPos {
+    if(!p.atEnd()) {
+        return p.peek().pos
+    }
+
+    return SrcPos{}
+}
+
+func (p: *Parser) peek() : *Token {
+    return &p.tokens.get(p.current)
+}
+
+func (p: *Parser) rewind() {
+    p.current -= 1
+    if(p.current < 0) {
+        p.current = 0
+    }
+}
+
+func (p: *Parser) previous() : *Token{
+    return &p.tokens.get(p.current - 1)
+}
+
+func (p: *Parser) atEnd() : bool {
+    return p.tokens.empty() || p.peek().type == TokenType.END_OF_FILE
+}
+
+func (p: *Parser) advance() : *Token {
+    if(!p.atEnd()) {
+        p.current += 1
+    }
+    return p.previous()
+}
+
+func (p: *Parser) check(type: TokenType) : bool {
+    if(p.atEnd()) return false
+    return p.peek().type == type
+}
+
+func (p: *Parser) match(type: TokenType) : bool {
+    if(p.check(type)) {
+        p.advance()
+        return true
+    }
+    return false
+}
+
+func (p: *Parser) consume(type: TokenType, errorCode: ErrorCode) : *Token {
+    if(p.check(type)) {
+        return p.advance()
+    }
+
+    p.errorAt(type, errorCode)
+    return null
+}
+
+func (p: *Parser) errorAt(type: TokenType, errorCode: ErrorCode) {
+    // TODO: create an error message
+    p.error("Expected token: '%s' - %s\n", tokenText[type], errorCodeText[errorCode])
+}

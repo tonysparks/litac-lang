@@ -1,0 +1,78 @@
+import "ast"
+import "ast_new"
+import "lex"
+import "symbols"
+import "types"
+import "mem"
+import "array"
+import "common"
+
+
+public func CopyTypeSpecs(specs: Array<*TypeSpec>, allocator: *const Allocator) : Array<*TypeSpec> {
+    if(specs.empty()) {
+        return Array<*TypeSpec>{
+            0
+        }
+    }
+
+    var result = Array<*TypeSpec>{}
+    result.init(specs.size(), allocator)
+
+    for(var i = 0; i < specs.size(); i += 1) {
+        var spec = specs.get(i)
+        result.add(CopyTypeSpec(spec, allocator))
+    }
+
+    return result
+}
+
+public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSpec {
+    if(spec == null) {
+        return null;
+    }
+
+    var copy = NewTypeSpec(spec.kind, spec.pos, allocator)
+    copy.base = CopyTypeSpec(spec.base, allocator)
+
+    switch(spec.kind) {
+        case TypeSpecKind.NONE: {
+            return copy
+        }
+        case TypeSpecKind.ARRAY: {
+            var originalArray = spec as (*ArrayTypeSpec)
+            var copyArray = copy as (*ArrayTypeSpec)
+            if(originalArray.numElements) {
+                copyArray.numElements = CopyExpr(originalArray.numElements, allocator)
+            }
+            return copyArray as (*TypeSpec)
+        }
+        case TypeSpecKind.PTR: 
+        case TypeSpecKind.CONST: {
+            return copy
+        }
+        case TypeSpecKind.NAME: {
+            var originalName = spec as (*NameTypeSpec)
+            var copyName = copy as (*NameTypeSpec)
+            copyName.name = originalName.name
+            copyName.genericArgs = CopyTypeSpecs(originalName.genericArgs, allocator)
+        }
+        default: {
+            Panic("Invalid TypeSpecKind: '%d'\n", spec.kind)
+        }
+    }
+
+    return null
+}
+
+public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
+    return null;
+}
+
+
+public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
+    return null
+}
+
+public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
+    return null;
+}

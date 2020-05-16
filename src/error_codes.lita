@@ -1,0 +1,98 @@
+public enum ErrorCode {
+    INVALID_ASSIGNMENT,
+    INVALID_CONST_EXPR,
+    INVALID_ARRAY_DIMENSION_EXPR,
+    INVALID_CHARACTER,
+    INVALID_NUMBER,
+    INVALID_FIELD,
+    INVALID_IMPORT_ACCESS,
+    INVALID_CONTINUE,
+    INVALID_BREAK,    
+    INVALID_OBJECT_INIT,
+    INVALID_MODULE_ACCESS,
+    INVALID_VARARG_POSITION,
+    INVALID_NOTE_DECL,
+    INVALID_LABEL_STMT,
+    INVALID_COMP_STMT,
+    INVALID_DEFAULT_ASSIGNMENT,
+    
+    MISSING_COMMA,
+    MISSING_SEMICOLON,
+    MISSING_RIGHT_BRACE,
+    MISSING_EQUALS,
+    MISSING_IDENTIFIER,
+    MISSING_RIGHT_BRACKET,
+    MISSING_RIGHT_PAREN,
+    MISSING_LEFT_PAREN,
+    MISSING_LEFT_BRACE,
+    MISSING_ARRAY_BRACKETS,
+    MISSING_COLON,
+    MISSING_WHILE,
+    MISSING_AS,
+    MISSING_GENERIC_END,
+    MISSING_COMP_STMT_END,
+    
+    RANGE_INTEGER,
+    RANGE_LONG,
+    RANGE_REAL,
+
+    UNEXPECTED_EOF,
+    UNEXPECTED_TOKEN,
+    UNIMPLEMENTED,
+
+    UNKNOWN_ERROR,
+    TOO_MANY_ERRORS,
+
+    MAX_NUM_ERROR_CODES
+}
+
+
+
+public const errorCodeText = []*const char {
+    [ErrorCode.INVALID_ASSIGNMENT] = "Invalid assignment statement",
+    [ErrorCode.INVALID_CONST_EXPR] = "Invalid constant expression",
+    [ErrorCode.INVALID_ARRAY_DIMENSION_EXPR] = "Invalid array dimension expression",
+    [ErrorCode.INVALID_CHARACTER] = "Invalid character",
+    [ErrorCode.INVALID_NUMBER] = "Invalid number",
+    [ErrorCode.INVALID_FIELD] = "Invalid field member",
+    [ErrorCode.INVALID_IMPORT_ACCESS] = "Invalid import access",
+    [ErrorCode.INVALID_CONTINUE] = "Invalid continue statement",
+    [ErrorCode.INVALID_BREAK] = "Invalid break statement",    
+    [ErrorCode.INVALID_OBJECT_INIT] = "Invalid structure initializer",
+    [ErrorCode.INVALID_MODULE_ACCESS] = "Invalid module access",
+    [ErrorCode.INVALID_VARARG_POSITION] = "Invalid variable argument position",
+    [ErrorCode.INVALID_NOTE_DECL] = "Invalid note declaration, must preceed either a 'var' or 'const' declaration",
+    [ErrorCode.INVALID_LABEL_STMT] = "Invalid label statement, goto labels are only valid in functions",
+    [ErrorCode.INVALID_COMP_STMT] = "Invalid compile time statement",
+    [ErrorCode.INVALID_DEFAULT_ASSIGNMENT] = "Invalid default assignment statement, only allowed for 'struct'",
+    
+    [ErrorCode.MISSING_COMMA] = "Missing ,",
+    [ErrorCode.MISSING_SEMICOLON] = "Missing ;",
+    [ErrorCode.MISSING_RIGHT_BRACE] = "Missing }",
+    [ErrorCode.MISSING_EQUALS] = "Missing =",
+    [ErrorCode.MISSING_IDENTIFIER] = "Missing identifier",
+    [ErrorCode.MISSING_RIGHT_BRACKET] = "Missing ]",
+    [ErrorCode.MISSING_RIGHT_PAREN] = "Missing )",
+    [ErrorCode.MISSING_LEFT_PAREN] = "Missing ]",
+    [ErrorCode.MISSING_LEFT_BRACE] = "Missing {",
+    [ErrorCode.MISSING_ARRAY_BRACKETS] = "Missing []",
+    [ErrorCode.MISSING_COLON] = "Missing :",
+    [ErrorCode.MISSING_WHILE] = "Missing 'while'",
+    [ErrorCode.MISSING_AS] = "Missing 'as'",
+    [ErrorCode.MISSING_GENERIC_END] = "Missing >",
+    [ErrorCode.MISSING_COMP_STMT_END] = "Missing #end",
+    
+    
+    [ErrorCode.RANGE_INTEGER] = "Integer literal out of range",
+    [ErrorCode.RANGE_LONG] = "Long literal out of range",
+    [ErrorCode.RANGE_REAL] = "Real literal out of range",
+
+    [ErrorCode.UNEXPECTED_EOF] = "Unexpected end of file",
+    [ErrorCode.UNEXPECTED_TOKEN] = "Unexpected token",
+    [ErrorCode.UNIMPLEMENTED] = "Unimplemented feature",
+
+    [ErrorCode.UNKNOWN_ERROR] = "An unknown error occured",
+    [ErrorCode.TOO_MANY_ERRORS] = "Too many syntax errors",
+
+    [ErrorCode.MAX_NUM_ERROR_CODES] = ""
+}
