@@ -1,6 +1,7 @@
 bin/*.c
 bin/*.exe
 bin/*.json
+bin/*.pdb
 lib/*.lib
 .vscode/ipch
 bin/litaC.exp
