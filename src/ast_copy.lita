@@ -7,6 +7,16 @@ import "mem"
 import "array"
 import "common"
 
+public func TokenName(token: Token, allocator: *const Allocator) : *const char {
+    if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
+        return tokenText[token.type]
+    }
+
+    var bytes = allocator.alloc(token.value.str.length + 1) as (*char)
+    token.value.str.copyTo(bytes, token.value.str.length)
+
+    return bytes
+}
 
 public func CopyTypeSpecs(specs: Array<*TypeSpec>, allocator: *const Allocator) : Array<*TypeSpec> {
     if(specs.empty()) {

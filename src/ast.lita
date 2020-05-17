@@ -110,8 +110,8 @@ public struct ConstTypeSpec {
 
 public struct FuncPtrTypeSpec {
     spec: using TypeSpec
-    args: Array<TypeSpec>
-    ret: TypeSpec
+    args: Array<*TypeSpec>
+    ret: *TypeSpec
     hasVarargs: bool
     genericParams: Array<GenericParam>
 }
@@ -240,7 +240,7 @@ public struct ContinueStmt {
 
 public struct DeferStmt {
     stmt: using Stmt
-    deferedStmt: Stmt
+    deferedStmt: *Stmt
 }
 
 public struct DoWhileStmt {
@@ -348,10 +348,13 @@ public struct VarFieldStmt {
     defaultExpr: *Expr
 }
 
-public union FieldStmt {
-    enumField: *EnumFieldStmt
-    aggregateField: *AggregateFieldStmt
-    varField: *VarFieldStmt
+public struct FieldStmt {
+    kind: StmtKind
+    union {
+        enumField: *EnumFieldStmt
+        aggregateField: *AggregateFieldStmt
+        varField: *VarFieldStmt
+    }
 }
 
 public struct WhileStmt {
@@ -397,7 +400,7 @@ public struct CastExpr {
 
 public struct CharExpr {
     expr: using Expr
-    character: *const char
+    character: Token
 }
 
 public struct FuncCallExpr {
@@ -445,7 +448,7 @@ public struct NullExpr {
 
 public struct NumberExpr {
     expr: using Expr
-    number: *const char // TODO: should this be the number value? or Token
+    number: Token // TODO: should this be the number value? or Token
 }
 
 public struct OffsetOfExpr {
@@ -469,7 +472,7 @@ public struct SizeOfExpr {
 
 public struct StringExpr {
     expr: using Expr
-    string: *const char // Identifier or Token?
+    string: Token // Identifier or Token?
 }
 
 public struct SubscriptGetExpr {
@@ -513,5 +516,5 @@ public struct UnaryExpr {
 }
 
 public struct Expr {
-    node: using Node
+    stmt: using Stmt
 }

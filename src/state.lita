@@ -1,5 +1,24 @@
 import "mem"
+import "phase_result"
 
-public struct CompilerState {
+public struct Lita {
     allocator: *const Allocator
+    result: PhaseResult
+}
+
+var arena: Arena;
+
+public func LitaInit() : Lita {
+    arena.init()
+
+    var c = Lita {
+        .allocator = defaultAllocator
+            //(&arena) as (*const Allocator)
+    }
+    c.result = PhaseResultInit(c.allocator)
+    return c
+}
+
+public func LitaDestroy() {
+    arena.free()
 }

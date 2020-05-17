@@ -1,216 +1,308 @@
+
+import "libc"
 import "ast"
 import "lex"
-import "symbols"
-import "types"
-import "mem"
 import "array"
 import "common"
 
-public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
-    switch(kind) {
-        case TypeSpecKind.NONE: {
-            var result = new<TypeSpec>(allocator)
-            result.kind = TypeSpecKind.NONE
-            result.pos = pos
-            result.base = null
-            return result
-        }
-        case TypeSpecKind.ARRAY: {
-            var result = new<ArrayTypeSpec>(allocator)
-            result.kind = TypeSpecKind.ARRAY
-            result.pos = pos
-            result.base = null
-            result.numElements = null
-            return result as (*TypeSpec)
-        }
-        case TypeSpecKind.PTR: {
-            var result = new<PtrTypeSpec>(allocator)
-            result.kind = TypeSpecKind.PTR            
-            result.pos = pos
-            result.base = null
-            return result as (*TypeSpec)
-        }
-        case TypeSpecKind.CONST: {
-            var result = new<ConstTypeSpec>(allocator)
-            result.kind = TypeSpecKind.CONST
-            result.pos = pos
-            result.base = null
-            return result as (*TypeSpec)
-        }
-        case TypeSpecKind.NAME: {
-            var result = new<NameTypeSpec>(allocator)
-            result.kind = TypeSpecKind.NAME
-            result.pos = pos
-            result.base = null
-            result.name = null
-            result.genericArgs.init(0, allocator)
-            return result as (*TypeSpec)
-        }
-        case TypeSpecKind.FUNC_PTR: {
-            var result = new<FuncPtrTypeSpec>(allocator)
-            result.kind = TypeSpecKind.NAME
-            result.pos = pos
-            result.base = null
-            result.args.init(0, allocator)
-            result.ret = null
-            result.hasVarargs = false
-            result.genericParams.init(0, allocator)
-            return result as (*TypeSpec)
-        }
-        default: {
-            Panic("Invalid TypeSpecKind: '%d'\n", kind)
-        }
+public func PrintTypeSpec(spec: *TypeSpec) {
+    if(spec == null) {
+        return;
     }
 
-    return null
+    switch(spec.kind) {
+        case TypeSpecKind.NONE: {
+            return;
+        }
+        case TypeSpecKind.ARRAY: {
+            var array = spec as (*ArrayTypeSpec)
+            printf("[");
+            if(array.numElements) {
+                PrintStmt(array.numElements)
+            }
+            printf("]");
+            PrintTypeSpec(array.base)
+            return;
+        }
+        case TypeSpecKind.PTR: {
+            var ptr = spec as (*PtrTypeSpec)
+            printf("*");
+            PrintTypeSpec(ptr.base)
+            return;
+        }
+        case TypeSpecKind.CONST: {
+            var c = spec as (*ConstTypeSpec)
+            printf("const ");
+            PrintTypeSpec(c.base)
+            return;
+        }
+        case TypeSpecKind.NAME: {
+            var name = spec as (*NameTypeSpec)
+            printf("%s", name.name)
+            if(!name.genericArgs.empty()) {
+                printf("<")
+                for(var i = 0; i < name.genericArgs.size(); i += 1) {
+                    if(i > 0) printf(",")
+                    PrintTypeSpec(name.genericArgs.get(i))
+                }
+                printf(">")
+            }
+            return;
+        }
+        default: {
+            Panic("Invalid TypeSpecKind: '%d'\n", spec.kind)
+        }
+    }
 }
 
-public func NewDecl(kind: StmtKind, startPos: SrcPos, allocator: *const Allocator) : *Decl {
-    return NewStmt(kind, startPos, allocator) as (*Decl)
+func PrintName(tok: Token) {
+    printf("%.*s", tok.value.str.length, tok.value.str.buffer)
 }
 
-public func NewExpr(kind: StmtKind, startPos: SrcPos, allocator: *const Allocator) : *Expr {
-    return NewStmt(kind, startPos, allocator) as (*Expr)
-}
-
-public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocator) : *Stmt {
-    switch(kind) {
+public func PrintStmt(s: *Stmt) {
+    switch(s.kind) {
         case StmtKind.IMPORT_DECL: {
-            var decl = new<ImportDecl>(allocator)
-            decl.kind = StmtKind.IMPORT_DECL;
-            decl.startPos = startPos
-            decl.moduleName.type = TokenType.END_OF_FILE            
-            decl.alias.type = TokenType.END_OF_FILE
-            decl.isUsing = false
-            //stmt.moduleId ??
-            return decl as (*Stmt)
+            var decl = s as (*ImportDecl)
+            printf("import '%.*s'", decl.moduleName.value.str.length, decl.moduleName.value.str.buffer)
+            if(decl.alias.type == TokenType.IDENTIFIER) {
+                printf("as '%.*s'", decl.alias.value.str.length, decl.alias.value.str.buffer)
+            }
+            printf("\n")
+            return;
         }
         case StmtKind.CONST_DECL: {
-            var decl = new<ConstDecl>(allocator)
-            decl.kind = StmtKind.CONST_DECL;
-            decl.startPos = startPos
-            decl.expr = null
-            decl.type = null
-            return decl as (*Stmt)
+            var decl = s as (*ConstDecl)
+            printf("const ")
+            PrintName(decl.name)
+            if(decl.type != null) {
+                printf(": ")
+                PrintTypeSpec(decl.type)
+            }
+            if(decl.expr != null) {
+                printf(" = ")
+                PrintStmt(decl.expr)
+            }
+            printf(";")
+            return;
         }
         case StmtKind.VAR_DECL: {
-            var decl = new<VarDecl>(allocator)
-            decl.kind = StmtKind.VAR_DECL;
-            decl.startPos = startPos
-            decl.expr = null
-            decl.type = null
-            return decl as (*Stmt)
+            var decl = s as (*VarDecl)            
+            printf("var ")
+            PrintName(decl.name)
+            if(decl.type != null) {
+                printf(": ")
+                PrintTypeSpec(decl.type)
+            }
+            if(decl.expr != null) {
+                printf(" = ")
+                PrintStmt(decl.expr)
+            }
+            printf(";")
+            return;
         }
         case StmtKind.STRUCT_DECL: {
-            var decl = new<AggregateDecl>(allocator)
-            decl.kind = StmtKind.STRUCT_DECL;
-            decl.startPos = startPos
-            decl.genericParams.init(6, allocator)
-            decl.fields.init(16, allocator)
-            decl.flags = 0
-            return decl as (*Stmt)
+            var decl = s as (*AggregateDecl)
+            if(decl.attributes.isPublic) {
+                printf("public ")
+            }            
+            printf("struct ")
+            PrintName(decl.name)
+            if(decl.genericParams.empty()) {
+                printf("<")
+                for(var i = 0; i < decl.genericParams.size(); i += 1) {
+                    if(i > 0) printf(",")
+                    printf("%s", decl.genericParams.get(i).name)
+                }
+                printf(">")
+            }
+            printf("{\n")
+            for(var i = 0; i < decl.fields.size(); i+=1) {
+                var field = decl.fields.get(i)
+                switch(field.kind) {
+                    case StmtKind.ENUM_FIELD_STMT: {
+                        PrintStmt(field.enumField)
+                        break;
+                    }
+                    case StmtKind.STRUCT_FIELD_STMT: 
+                    case StmtKind.UNION_FIELD_STMT: {
+                        PrintStmt(field.aggregateField)
+                        break;
+                    }
+                    case StmtKind.VAR_FIELD_STMT: {
+                        PrintStmt(field.varField)
+                        break;
+                    }
+                    default:{}
+                }
+            }
+            printf("}")
+            return;
         }
         case StmtKind.UNION_DECL: {
-            var decl = new<AggregateDecl>(allocator)
-            decl.kind = StmtKind.UNION_DECL;
-            decl.startPos = startPos
-            decl.genericParams.init(6, allocator)
-            decl.fields.init(16, allocator)
-            decl.flags = 0
-            return decl as (*Stmt)
+            var decl = s as (*AggregateDecl)
+            if(decl.attributes.isPublic) {
+                printf("public ")
+            }            
+            printf("union ")
+            PrintName(decl.name)
+            if(decl.genericParams.empty()) {
+                printf("<")
+                for(var i = 0; i < decl.genericParams.size(); i += 1) {
+                    if(i > 0) printf(",")
+                    printf("%s", decl.genericParams.get(i).name)
+                }
+                printf(">")
+            }
+            printf(" {\n")
+            for(var i = 0; i < decl.fields.size(); i+=1) {
+                var field = decl.fields.get(i)
+                switch(field.kind) {
+                    case StmtKind.ENUM_FIELD_STMT: {
+                        PrintStmt(field.enumField)
+                        break;
+                    }
+                    case StmtKind.STRUCT_FIELD_STMT: 
+                    case StmtKind.UNION_FIELD_STMT: {
+                        PrintStmt(field.aggregateField)
+                        break;
+                    }
+                    case StmtKind.VAR_FIELD_STMT: {
+                        PrintStmt(field.varField)
+                        break;
+                    }
+                    default: {}
+                }
+            }
+            printf("}")
+            return;
         }
         case StmtKind.ENUM_DECL: {
-            var decl = new<EnumDecl>(allocator)
-            decl.kind = StmtKind.ENUM_DECL;
-            decl.startPos = startPos            
-            decl.fields.init(16, allocator)            
-            return decl as (*Stmt)
+            var decl = s as (*EnumDecl)
+            if(decl.attributes.isPublic) {
+                printf("public ")
+            }        
+            printf("enum ")
+            PrintName(decl.name)        
+            printf(" {\n")
+            for(var i = 0; i < decl.fields.size(); i+=1) {
+                var field = decl.fields.get(i)
+                PrintStmt(field)
+            }
+            printf("}")
+            return;
         }
         case StmtKind.FUNC_DECL: {
-            var decl = new<FuncDecl>(allocator)
-            decl.kind = StmtKind.FUNC_DECL;
-            decl.startPos = startPos
-            decl.genericParams.init(6, allocator)
-            decl.params = null
-            decl.body = null
-            decl.returnType = null
-            decl.flags = 0
-            return decl as (*Stmt)
+            var decl = s as (*FuncDecl)
+            if(decl.attributes.isPublic) {
+                printf("public ")
+            }            
+            printf("func ")
+            PrintName(decl.name)
+            if(decl.genericParams.empty()) {
+                printf("<")
+                for(var i = 0; i < decl.genericParams.size(); i += 1) {
+                    if(i > 0) printf(",")
+                    printf("%s", decl.genericParams.get(i).name)
+                }
+                printf(">")
+            }
+            printf("(")
+            if(decl.params) {
+                PrintStmt(decl.params)
+            }
+            printf(")")
+            if(decl.returnType) {
+                printf(" : ")
+                PrintTypeSpec(decl.returnType)
+            }
+            if(decl.body) {
+                printf(" {\n")
+                PrintStmt(decl.body)
+                printf("}")
+            }
+            return;
         }
         case StmtKind.TYPEDEF_DECL: {
-            var decl = new<TypedefDecl>(allocator)
-            decl.kind = StmtKind.TYPEDEF_DECL;
-            decl.startPos = startPos
-            decl.type = null
-            decl.alias = null
-            return decl as (*Stmt)
+            var decl = s as (*TypedefDecl)
+            if(decl.attributes.isPublic) {
+                printf("public ")
+            }
+            printf("typedef ")
+            PrintTypeSpec(decl.type)
+            printf(" as %s", decl.alias)
+            return;
         }
         case StmtKind.PARAM_DECL: {
-            var decl = new<ParameterDecl>(allocator)
-            decl.kind = StmtKind.PARAM_DECL;
-            decl.startPos = startPos
-            decl.type = null
-            decl.defaultExpr = null
-            return decl as (*Stmt)
+            var decl = s as (*ParameterDecl)            
+            PrintName(decl.name)
+            printf(": ")
+            PrintTypeSpec(decl.type)
+            if(decl.defaultExpr) {
+                printf(" = ")
+                PrintStmt(decl.defaultExpr)
+            }
+            return;
         }
+        /*
         case StmtKind.NATIVE_DECL: {
-            var decl = new<NativeDecl>(allocator)
-            decl.kind = StmtKind.NATIVE_DECL;
-            decl.startPos = startPos
-            decl.type = null
-            return decl as (*Stmt)
+            // var decl = new<NativeDecl>(allocator)
+            // decl.kind = StmtKind.NATIVE_DECL;
+            // decl.startPos = startPos
+            // decl.type = null
+            // return decl as (*Stmt)
+            return;
         }
 
         case StmtKind.BLOCK_STMT: {
-            var stmt = new<BlockStmt>(allocator)
-            stmt.kind = StmtKind.BLOCK_STMT;
-            stmt.startPos = startPos
-            stmt.stmts.init(16, allocator)
-            return stmt as (*Stmt)
+            // var stmt = new<BlockStmt>(allocator)
+            // stmt.kind = StmtKind.BLOCK_STMT;
+            // stmt.startPos = startPos
+            // stmt.stmts.init(16, allocator)
+            // return stmt as (*Stmt)
         }
         case StmtKind.BREAK_STMT: {
-            var stmt = new<BreakStmt>(allocator)
-            stmt.kind = StmtKind.BREAK_STMT;
-            stmt.startPos = startPos
-            return stmt as (*Stmt)
+            // var stmt = new<BreakStmt>(allocator)
+            // stmt.kind = StmtKind.BREAK_STMT;
+            // stmt.startPos = startPos
+            // return stmt as (*Stmt)
         }
         case StmtKind.COMP_STMT: {
-            var stmt = new<CompStmt>(allocator)
-            stmt.kind = StmtKind.COMP_STMT;
-            stmt.startPos = startPos
-            stmt.type = null
-            stmt.expr = null
-            stmt.body.init(16, allocator)
-            stmt.end = null
-            stmt.evaluatedStmt = null
-            return stmt as (*Stmt)
+            // var stmt = new<CompStmt>(allocator)
+            // stmt.kind = StmtKind.COMP_STMT;
+            // stmt.startPos = startPos
+            // stmt.type = null
+            // stmt.expr = null
+            // stmt.body.init(16, allocator)
+            // stmt.end = null
+            // stmt.evaluatedStmt = null
+            // return stmt as (*Stmt)
         }
         case StmtKind.CONTINUE_STMT: {
-            var stmt = new<ContinueStmt>(allocator)
-            stmt.kind = StmtKind.CONTINUE_STMT;
-            stmt.startPos = startPos
-            return stmt as (*Stmt)
+            // var stmt = new<ContinueStmt>(allocator)
+            // stmt.kind = StmtKind.CONTINUE_STMT;
+            // stmt.startPos = startPos
+            // return stmt as (*Stmt)
         }
         case StmtKind.DEFER_STMT: {
-            var stmt = new<DeferStmt>(allocator)
-            stmt.kind = StmtKind.DEFER_STMT;
-            stmt.startPos = startPos
-            stmt.deferedStmt = null
-            return stmt as (*Stmt)
+            // var stmt = new<DeferStmt>(allocator)
+            // stmt.kind = StmtKind.DEFER_STMT;
+            // stmt.startPos = startPos
+            // stmt.deferedStmt = null
+            // return stmt as (*Stmt)
         }
         case StmtKind.DO_WHILE_STMT: {
-            var stmt = new<DoWhileStmt>(allocator)
-            stmt.kind = StmtKind.DO_WHILE_STMT;
-            stmt.startPos = startPos
-            stmt.cond = null
-            stmt.body = null
-            return stmt as (*Stmt)
+            // var stmt = new<DoWhileStmt>(allocator)
+            // stmt.kind = StmtKind.DO_WHILE_STMT;
+            // stmt.startPos = startPos
+            // stmt.cond = null
+            // stmt.body = null
+            // return stmt as (*Stmt)
         }
         case StmtKind.EMPTY_STMT: {
-            var stmt = new<EmptyStmt>(allocator)
-            stmt.kind = StmtKind.EMPTY_STMT;
-            stmt.startPos = startPos
-            return stmt as (*Stmt)
+            // var stmt = new<EmptyStmt>(allocator)
+            // stmt.kind = StmtKind.EMPTY_STMT;
+            // stmt.startPos = startPos
+            // return stmt as (*Stmt)
         }
         case StmtKind.ENUM_FIELD_ENTRY_STMT: {
             var stmt = new<EnumFieldEntryStmt>(allocator)
@@ -266,16 +358,25 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             stmt.startPos = startPos
             stmt.label = null
             return stmt as (*Stmt)
-        }
+        }*/
         case StmtKind.MODULE_STMT: {
-            var stmt = new<ModuleStmt>(allocator)
-            stmt.kind = StmtKind.MODULE_STMT;
-            stmt.startPos = startPos
-            stmt.imports.init(16, allocator)
-            stmt.notes.init(8, allocator)
-            stmt.declarations.init(16, allocator)
-            return stmt as (*Stmt)
-        }
+            var stmt = s as (*ModuleStmt)
+            for(var i = 0; i < stmt.imports.size(); i += 1) {
+                PrintStmt(stmt.imports.get(i))
+                printf("\n")
+            }
+
+            for(var i = 0; i < stmt.notes.size(); i += 1) {
+                PrintStmt(stmt.notes.get(i))
+                printf("\n")
+            }
+
+            for(var i = 0; i < stmt.declarations.size(); i += 1) {                
+                PrintStmt(stmt.declarations.get(i) as (*Stmt))
+                printf("\n")
+            }
+            return;
+        }/*
         case StmtKind.NOTE_STMT: {
             var stmt = new<NoteStmt>(allocator)
             stmt.kind = StmtKind.NOTE_STMT;
@@ -391,7 +492,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             var expr = new<CharExpr>(allocator)
             expr.kind = StmtKind.CHAR_EXPR;
             expr.startPos = startPos
-            //expr.character = null
+            expr.character = null
             return expr as (*Stmt)
         }
         case StmtKind.FUNC_CALL_EXPR: {
@@ -459,14 +560,22 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             expr.kind = StmtKind.NULL_EXPR;
             expr.startPos = startPos
             break;
-        }
+        }*/
         case StmtKind.NUMBER_EXPR: {
-            var expr = new<NumberExpr>(allocator)
-            expr.kind = StmtKind.NUMBER_EXPR;
-            expr.startPos = startPos
-            //expr.number = null
-            return expr as (*Stmt)
-        }
+            var expr = s as (*NumberExpr)
+            switch(expr.number.type) {
+                case TokenType.INT_NUMBER: {
+                    printf("%llu", expr.number.value.intValue)
+                    break;
+                }
+                case TokenType.FLOAT_NUMBER: {
+                    printf("%f", expr.number.value.floatValue)
+                    break;
+                }
+                default: {}
+            }
+            return;
+        }/*
         case StmtKind.OFFSET_OF_EXPR: {
             var expr = new<OffsetOfExpr>(allocator)
             expr.kind = StmtKind.OFFSET_OF_EXPR;
@@ -495,7 +604,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             var expr = new<StringExpr>(allocator)
             expr.kind = StmtKind.STRING_EXPR;
             expr.startPos = startPos
-            //expr.string = null
+            expr.string = null
             return expr as (*Stmt)
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
@@ -547,11 +656,10 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             expr.startPos = startPos
             expr.unaryExpr = null
             return expr as (*Stmt);
-        }
+        }*/
         default: {
             // TODO: Error
-            Panic("Unknown statement kind: %d", kind)
+            //Panic("Unknown statement kind: %d", kind)
         }
-    }
-    return null
+    }    
 }

@@ -1,5 +1,6 @@
 import "ast"
 import "ast_new"
+import "ast_copy"
 import "lex"
 import "symbols"
 import "types"
@@ -7,28 +8,31 @@ import "mem"
 import "array"
 import "phase_result"
 import "error_codes"
+import "state"
 import "common"
 import "libc"
+import "assert"
+import "string_buffer"
 
 public struct Parser {
-    allocator: *const Allocator
-    lex: Lexer
+    allocator: *const Allocator    
     tokens: Array<Token>
     current: i32
     currentPos: SrcPos
-    result: PhaseResult
+    result: *PhaseResult
 }
 
 public func ParserInit(filename: *const char, 
                       text: *const char,
-                      allocator: *const Allocator) : Parser {
+                      lita: *Lita) : Parser {
 
     var parser = Parser {
-        .allocator = allocator
+        .allocator = lita.allocator,
+        .result = &lita.result
     }
 
-    var lex = LexerInit(filename, text, allocator)
-    parser.tokens.init(512, allocator)
+    var lex = LexerInit(filename, text, lita.allocator)
+    parser.tokens.init(512, lita.allocator)
 
     while(!lex.eof()) {
         var token = lex.nextToken()
@@ -47,15 +51,32 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
     }
 
     while(!p.atEnd()) {
+        var errorCount = p.numOfErrors()
         p.parseModuleStmt(moduleStmt)
-        // TODO: check error and sync
-        /*if(p.hasError()) {
-            p.adjust(...)
-        }*/
+
+        if(p.numOfErrors() > errorCount) {
+            p.adjust([]TokenType {
+                TokenType.IMPORT, 
+                TokenType.HASH, 
+                TokenType.PUBLIC, 
+                TokenType.VAR, 
+                TokenType.CONST, 
+                TokenType.FUNC, 
+                TokenType.STRUCT, 
+                TokenType.UNION, 
+                TokenType.ENUM, 
+                TokenType.TYPEDEF
+            }, 10)
+        }
     }
+
+    return moduleStmt
 }
 
 func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {    
+
+    printf("HERE %s\n", tokenText[p.peek().type])
+
     if(p.match(TokenType.IMPORT)) {
         var importDecl = p.importDeclaration()
         moduleStmt.imports.add(importDecl)
@@ -69,31 +90,31 @@ func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {
 
         if(p.match(TokenType.VAR)) {
             var decl = p.varDeclaration()            
-            moduleStmt.declarations.add(decl)
+            moduleStmt.declarations.add(&decl.decl)
         }
         else if(p.match(TokenType.CONST)) {
             var decl = p.constDeclaration()
-            moduleStmt.declarations.add(decl)
+            moduleStmt.declarations.add(&decl.decl)
         }
         else if(p.match(TokenType.FUNC)) {
             var decl = p.funcDeclaration()
-            moduleStmt.declarations.add(decl)
+            moduleStmt.declarations.add(&decl.decl)
         }
         else if(p.match(TokenType.STRUCT)) {
             var decl = p.structDeclaration()
-            moduleStmt.declarations.add(decl)
+            moduleStmt.declarations.add(&decl.decl)
         }
         else if(p.match(TokenType.UNION)) {
             var decl = p.unionDeclaration()
-            moduleStmt.declarations.add(decl)
+            moduleStmt.declarations.add(&decl.decl)
         }
         else if(p.match(TokenType.ENUM)) {
             var decl = p.enumDeclaration()
-            moduleStmt.declarations.add(decl)
+            moduleStmt.declarations.add(&decl.decl)
         }
         else if(p.match(TokenType.TYPEDEF)) {
             var decl = p.typedefDeclaration()
-            moduleStmt.declarations.add(decl)
+            moduleStmt.declarations.add(&decl.decl)
         }
         else if(p.match(TokenType.SEMICOLON)) {
             if(!notes.empty()) {
@@ -101,8 +122,8 @@ func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {
             }
             return;
         }
-        else {
-            p.errorAt(p.peek(), ErrorCode.UNEXPECTED_TOKEN)
+        else {            
+            p.errorAtToken(p.peek(), ErrorCode.UNEXPECTED_TOKEN)
         }
 
         var decl = moduleStmt.declarations.last()
@@ -120,7 +141,9 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
     }
 
     var moduleName = p.consume(TokenType.STRING, ErrorCode.MISSING_IDENTIFIER);
-    if(moduleName) {
+    if(moduleName) { 
+        moduleName.print() 
+        decl.moduleName.print()
         decl.moduleName = *moduleName
     }
     if(p.match(TokenType.AS)) {
@@ -166,33 +189,252 @@ func (p: *Parser) notes() : Array<*NoteStmt> {
 }
 
 func (p: *Parser) varDeclaration() : *VarDecl {
+    var decl = NewStmt(StmtKind.VAR_DECL, p.pos(), p.allocator) as (*VarDecl)
+    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(identifier) {
+        decl.name = *identifier
+    }
+
+    if(p.match(TokenType.COLON)) {
+        // TODO 'using'
+        decl.type = p.type()
+        if(p.match(TokenType.EQUALS)) {
+            decl.expr = p.expression()
+        }
+    }
+    else {
+        p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
+        decl.expr = p.expression()
+    }
+
+    return decl
 }
 
 func (p: *Parser) constDeclaration() : *ConstDecl {
+    var decl = NewStmt(StmtKind.CONST_DECL, p.pos(), p.allocator) as (*ConstDecl)
+    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(identifier) {
+        decl.name = *identifier
+    }
+
+    if(p.match(TokenType.COLON)) {
+        // TODO 'using'
+        decl.type = p.type()
+        if(p.match(TokenType.EQUALS)) {
+            decl.expr = p.expression()
+        }
+    }
+    else {
+        p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
+        decl.expr = p.expression()
+    }
+
+    return decl
 }
 
 func (p: *Parser) funcDeclaration() : *FuncDecl {
+    return null;
 }
 
 func (p: *Parser) structDeclaration() : *AggregateDecl {
+    return null;
 }
 
 func (p: *Parser) unionDeclaration() : *AggregateDecl {
+    return null;
 }
 
 func (p: *Parser) enumDeclaration() : *EnumDecl {
+    return null;
 }
 
 func (p: *Parser) typedefDeclaration() : *TypedefDecl {
+    return null;
 }
 
-func (p: *Parser) error(format: *const char, ...) {
-    // TODO:
-    // Add to phase results
-    var args: va_list;
-    va_start(args, format);
-    printf(format, args)
-    va_end(args)
+func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
+    var token = p.peek()
+    switch(token.type) {
+        case TokenType.BOOL:
+        case TokenType.CHAR:
+        case TokenType.I8:
+        case TokenType.U8:
+        case TokenType.I16:
+        case TokenType.U16:
+        case TokenType.I32:
+        case TokenType.U32:
+        case TokenType.I64:
+        case TokenType.U64:
+        case TokenType.F32:
+        case TokenType.F64:
+        case TokenType.USIZE:
+        case TokenType.VOID: {
+            p.advance()
+            var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.allocator) as (*NameTypeSpec)
+            spec.name = TokenName(token, p.allocator)
+            
+            return spec as (*TypeSpec)
+        }
+        case TokenType.STAR: {
+            p.advance()
+            var base = p.type(disambiguate)
+
+            var spec = NewTypeSpec(TypeSpecKind.PTR, token.pos, p.allocator)
+            spec.base = base
+            return spec as (*TypeSpec)
+        }
+        case TokenType.CONST: {
+            p.advance()
+            var base = p.type(disambiguate)
+
+            var spec = NewTypeSpec(TypeSpecKind.CONST, token.pos, p.allocator)
+            spec.base = base
+            return spec as (*TypeSpec)
+        }
+        case TokenType.IDENTIFIER: {
+            return p.identifier(disambiguate) as (*TypeSpec)
+        }
+        case TokenType.LEFT_BRACKET: {
+            var spec = p.arrayType()
+            p.advance()
+
+            spec.base = p.type(disambiguate)
+            return spec as (*TypeSpec)
+        }
+        case TokenType.FUNC: {
+            p.advance()
+            return p.funcPtrType() as (*TypeSpec)
+        }
+        default: {
+            p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
+            break;
+        }
+    }
+
+    return null
+}
+
+func (p: *Parser) identifier(disambiguate: bool) : *NameTypeSpec {
+    var token = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    var sb = StringBufferInit(token.value.str.length, p.allocator)
+    sb.append("%.*s", token.value.str.length, token.value.str.buffer)
+
+    if(p.match(TokenType.COLON_COLON)) {
+        // TODO - packages
+    }
+
+    if(p.check(TokenType.LESS_THAN)) {
+        // TODO - generics
+    }
+
+    var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.allocator) as (*NameTypeSpec)
+    spec.name = sb.cStr()
+
+    return spec;
+}
+
+func (p: *Parser) arrayType() : *ArrayTypeSpec {    
+    var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.allocator) as (*ArrayTypeSpec)    
+    p.advance()
+
+    if(p.check(TokenType.RIGHT_BRACKET)) {
+        var expr = p.expression()
+
+        if(!p.isConstNumberExpr(expr)) {
+            p.errorAtToken(p.peek(), ErrorCode.INVALID_ARRAY_DIMENSION_EXPR)
+        }
+        else {
+            spec.numElements = expr
+        }
+    }
+
+    return spec
+}
+
+func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {   
+    var token = p.peek()
+    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, p.pos(), p.allocator) as (*FuncPtrTypeSpec)    
+
+    if(p.match(TokenType.LESS_THAN))  {
+        // TODO: Generics
+    }
+
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)
+    if(!p.check(TokenType.RIGHT_PAREN)) {
+        do {
+            if(p.match(TokenType.VAR_ARGS)) {
+                spec.hasVarargs = true
+                if(!p.check(TokenType.RIGHT_PAREN)) {
+                    p.errorAtToken(p.peek(), ErrorCode.INVALID_VARARG_POSITION)
+                }
+            }
+            else {
+                var arg = p.type(false)
+                spec.args.add(arg)
+            }
+        }
+        while(p.match(TokenType.COMMA))
+    }
+
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
+
+    spec.ret = p.type(false)
+    return spec
+}
+
+func (p: *Parser) isConstNumberExpr(expr: *Expr) : bool {
+    return false
+}
+
+func (p: *Parser) expression() : *Expr {
+    return p.primary()
+    //return null
+}
+
+func (p: *Parser) primary() : *Expr {
+    var token = p.peek()
+    if(p.match(TokenType.TRUE)) {
+        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
+        expr.boolean = true
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.FALSE)) {
+        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
+        expr.boolean = false
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.NULL)) {
+        var expr = NewStmt(StmtKind.NULL_EXPR, token.pos, p.allocator) as (*NullExpr)        
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.INT_NUMBER)) {
+        var expr = NewStmt(StmtKind.NUMBER_EXPR, token.pos, p.allocator) as (*NumberExpr)
+        expr.number = *token
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.STRING)) {
+        var expr = NewStmt(StmtKind.STRING_EXPR, token.pos, p.allocator) as (*StringExpr)
+        expr.string = *token
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.CHAR)) {
+        var expr = NewStmt(StmtKind.CHAR_EXPR, token.pos, p.allocator) as (*CharExpr)
+        expr.character = *token
+        return expr as (*Expr)
+    }
+
+    p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
+    return null
+}
+
+func (p: *Parser) statement() : *Stmt {
+    return null
 }
 
 func (p: *Parser) pos() : SrcPos {
@@ -204,7 +446,8 @@ func (p: *Parser) pos() : SrcPos {
 }
 
 func (p: *Parser) peek() : *Token {
-    return &p.tokens.get(p.current)
+    assert(p.current < p.tokens.size())
+    return &p.tokens.elements[p.current]
 }
 
 func (p: *Parser) rewind() {
@@ -214,8 +457,10 @@ func (p: *Parser) rewind() {
     }
 }
 
-func (p: *Parser) previous() : *Token{
-    return &p.tokens.get(p.current - 1)
+func (p: *Parser) previous() : *Token {
+    var index = p.current - 1;
+    assert(index < p.tokens.size() && index >= 0)
+    return &p.tokens.elements[index]
 }
 
 func (p: *Parser) atEnd() : bool {
@@ -251,7 +496,40 @@ func (p: *Parser) consume(type: TokenType, errorCode: ErrorCode) : *Token {
     return null
 }
 
+func (p: *Parser) adjust(types: *TokenType, len: i32) {
+    if(!types || len < 1) {
+        p.advance()
+        return;
+    }
+
+    while(!p.atEnd()) {
+        var type = p.peek().type
+        for(var i = 0; i < len; i+=1) {
+            if(types[i] == type) {
+                return;
+            }
+        }
+
+        p.advance()
+    }
+}
+
+func (p: *Parser) errorAtToken(token: *Token, errorCode: ErrorCode) {
+    if(!token) {
+        // TODO: create an error message        
+        p.result.addError(token.pos,"%s\n", errorCodeText[errorCode])
+    }
+    else {
+        p.errorAt(token.type, errorCode)
+    }
+    
+}
+
 func (p: *Parser) errorAt(type: TokenType, errorCode: ErrorCode) {
     // TODO: create an error message
-    p.error("Expected token: '%s' - %s\n", tokenText[type], errorCodeText[errorCode])
+    p.result.addError(p.pos(), "Expected token: '%s' - %s\n", tokenText[type], errorCodeText[errorCode])
+}
+
+func (p: *Parser) numOfErrors() : i32 {
+    return p.result.errors.size()
 }

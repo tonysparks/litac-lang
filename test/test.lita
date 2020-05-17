@@ -1,6 +1,9 @@
-
+import "../test/ast.lita"
 /* comment */
 
+var t: i32 = 0
+
+/*
 func test(){var selfHosted=true
     var x: i32 = 0
     x += 100_00_00
@@ -13,7 +16,12 @@ func test(){var selfHosted=true
         there"
 
     """
-    /*
+    
+}
+*/
+
+
+/*
     |
     |=
     ||
@@ -29,5 +37,5 @@ func test(){var selfHosted=true
     &
     &&
     ~
-    ~=*/
-}
+    ~=
+*/    

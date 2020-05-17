@@ -5,34 +5,24 @@ import "lex"
 import "state"
 import "types"
 import "ast"
-/*
-@include("<sys/time.h>");
-@foreign
-struct timeval {
-    tv_sec: u64
-    tv_usec: u64
-}
-@foreign
-func gettimeofday(t: *timeval, m: *void);
-
-func getTimeMsec() : u64 {
-    var tv: timeval;
-    gettimeofday(&tv, null)
-    return (tv.tv_sec*1000_u64) + (tv.tv_usec/1000_u64)
-}*/
-
+import "ast_print"
+import "parser"
+import "phase_result"
+import "system"
 
 func main(len: i32, args: **char) {
-    var state = CompilerState {
-        .allocator = defaultAllocator
-    }
+    SystemInit()
+
+    var lita = LitaInit()
+    defer LitaDestroy()
 
     var filename = "../test/test.lita"
 
     var text: *char = null;
-    defer if(text) state.allocator.free(text)
+    defer if(text) lita.allocator.free(text)
 
-    var status = ReadFile(filename, &text, state.allocator) 
+    var startTime = SystemTimeMSec()    
+    var status = ReadFile(filename, &text, lita.allocator) 
     if(status == FileStatus.FileNotFoundError) {
         printf("Could not open file '%s'\n", filename)
         exit(1)
@@ -42,7 +32,18 @@ func main(len: i32, args: **char) {
         printf("Could not read file '%s'\n", filename)
         exit(1)
     }
-    
+
+    var parser = ParserInit(filename, text, &lita)
+    var moduleStmt = parser.parseModule()
+    printf("Total time: %f\n", SystemTimeMSec() - startTime)
+
+    if(moduleStmt) {
+        printf("Printing AST...\n\n")
+        PrintStmt(moduleStmt)
+        printf("\n")
+    }
+
+    /*
     var lex = LexerInit(filename, text, state.allocator)    
     while(!lex.eof()) {
         var token = lex.nextToken()
@@ -63,5 +64,5 @@ func main(len: i32, args: **char) {
             printf("error: '%s'", lex.errorMsg)
         }
         printf("\n")
-    }
+    }*/
 }

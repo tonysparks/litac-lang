@@ -1,0 +1,65 @@
+@raw("""
+#include <windows.h>
+#include <libloaderapi.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#ifndef WIN32
+#include <unistd.h>
+#endif
+
+#ifdef WIN32
+#define stat _stat
+#endif
+
+typedef struct stat FileStat;
+""");
+
+@foreign
+struct FileStat;
+
+@foreign
+struct LARGE_INTEGER {
+    QuadPart: u64
+}
+
+@foreign
+func stat(filename: *const char, s: *FileStat) : i32;
+
+@foreign
+func QueryPerformanceFrequency(freq: *LARGE_INTEGER);
+
+@foreign
+func QueryPerformanceCounter(time: *LARGE_INTEGER);
+
+var systemFreq: f64;
+var systemStart: u64;
+
+public func FileExists(filename: *const char) : bool {
+    var s: FileStat;
+    return stat(filename, &s) == 0
+}
+
+public func SystemTimeMSec() : f64 {
+    var time: LARGE_INTEGER;
+    QueryPerformanceCounter(&time);
+    
+    return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;
+}
+
+
+
+public func SystemInit() : bool {    
+    var freq: LARGE_INTEGER;
+    if(!QueryPerformanceFrequency(&freq)) {
+        return false
+    }
+
+    systemFreq = freq.QuadPart as (f64) / 1_000.0
+
+    var time: LARGE_INTEGER;
+    QueryPerformanceCounter(&time);
+    systemStart = time.QuadPart
+
+    return true
+}

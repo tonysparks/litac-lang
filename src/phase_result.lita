@@ -2,6 +2,9 @@
 import "lex"
 import "common"
 import "array"
+import "string_buffer"
+import "mem"
+import "libc"
 
 public enum ErrorType {
     WARN,
@@ -15,5 +18,29 @@ public struct PhaseError {
 }
 
 public struct PhaseResult {
-    errors: Array<*PhaseError>
+    allocator: *const Allocator
+    errors: Array<PhaseError>
+}
+
+public func PhaseResultInit(allocator: *const Allocator) : PhaseResult {
+    var result = PhaseResult {
+        .allocator = allocator,        
+    }
+
+    result.errors.init(16, allocator)
+    return result
+}
+
+public func (r: *PhaseResult) addError(pos: SrcPos, format: *const char, ...) {
+    var sb = StringBufferInit(256, r.allocator)
+    var args: va_list;
+    va_start(args, format);    
+    sb.append(format, args)
+    va_end(args)
+
+    r.errors.add(PhaseError {
+        .type = ErrorType.ERROR,
+        .message = sb.cStr(),
+        .pos = pos
+    })
 }
