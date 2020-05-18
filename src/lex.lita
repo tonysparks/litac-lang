@@ -409,17 +409,16 @@ func (l: *Lexer) skipWhitespace() {
 }
 
 func (l: *Lexer) skipComments() {    
-    if(*l.stream == '/') {
-        if(l.peekChar() == '/') {
+    if(*l.stream == '/') {        
+        if(l.peekChar() == '/') {            
             l.nextChar() // eat /
             do {
                 l.nextChar()
-                if(*l.stream == '\n') {
-                    l.nextChar()
+                if(*l.stream == '\n') {                    
                     break;
                 }
             }
-            while(!l.eof()) 
+            while(!l.eof())             
         }
         else if(l.peekChar() == '*') {
             l.nextChar() // eat /
@@ -431,7 +430,7 @@ func (l: *Lexer) skipComments() {
                     break;
                 }
             }
-            while(!l.eof())
+            while(!l.eof())            
         }
     }
 }

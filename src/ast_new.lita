@@ -73,6 +73,154 @@ public func NewExpr(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
     return NewStmt(kind, startPos, allocator) as (*Expr)
 }
 
+public func NewBinaryExpr(startPos: SrcPos, 
+                          endPos: SrcPos, 
+                          left: *Expr, 
+                          operator: TokenType,
+                          right: *Expr, 
+                          allocator: *const Allocator) : *Expr {                              
+    var binExpr = new<BinaryExpr>(allocator)
+    binExpr.kind = StmtKind.BINARY_EXPR;
+    binExpr.startPos = startPos
+    binExpr.left = binExpr.node.becomeParentOf(left)
+    binExpr.operator = operator
+    binExpr.right = binExpr.node.becomeParentOf(right)
+    binExpr.endPos = endPos
+
+    return binExpr as (*Expr)
+}
+
+public func NewUnaryExpr(startPos: SrcPos, 
+                         endPos: SrcPos, 
+                         operator: TokenType,
+                         expr: *Expr,
+                         allocator: *const Allocator) : *Expr {                              
+    var unaryExpr = new<UnaryExpr>(allocator)
+    unaryExpr.kind = StmtKind.UNARY_EXPR;
+    unaryExpr.startPos = startPos
+    unaryExpr.unaryExpr = unaryExpr.node.becomeParentOf(expr)
+    unaryExpr.operator = operator    
+    unaryExpr.endPos = endPos
+
+    return unaryExpr as (*Expr)
+}
+
+public func NewInitExpr(startPos: SrcPos,
+                        endPos: SrcPos,
+                        type: *NameTypeSpec,
+                        arguments: Array<*InitArgExpr>,
+                        allocator: *const Allocator) : *Expr {
+    var initExpr = new<InitExpr>(allocator)
+    initExpr.kind = StmtKind.INIT_EXPR
+    initExpr.startPos = startPos
+    initExpr.endPos = endPos
+    initExpr.type = type
+    initExpr.arguments = arguments
+    initExpr.node.becomeParentOfChildren(initExpr.arguments)
+
+    return initExpr as (*Expr)
+}
+
+public func NewSubscriptGetExpr(startPos: SrcPos,
+                                endPos: SrcPos,
+                                object: *Expr,
+                                index: *Expr,
+                                allocator: *const Allocator) : *Expr {
+    var expr = new<SubscriptGetExpr>(allocator)
+    expr.kind = StmtKind.SUBSCRIPT_GET_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.object = expr.node.becomeParentOf(object)
+    expr.index = expr.node.becomeParentOf(index)
+
+    return expr as (*Expr)
+}
+
+public func NewGetExpr(startPos: SrcPos,
+                       endPos: SrcPos,
+                       object: *Expr,
+                       field: *IdentifierExpr,
+                       allocator: *const Allocator) : *Expr {
+    var expr = new<GetExpr>(allocator)
+    expr.kind = StmtKind.GET_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.object = expr.node.becomeParentOf(object)
+    expr.field = expr.node.becomeParentOf(field) as (*IdentifierExpr)
+
+    return expr as (*Expr)
+}
+
+public func NewIdentifierExpr(startPos: SrcPos,
+                              endPos: SrcPos,                              
+                              type: *NameTypeSpec,
+                              allocator: *const Allocator) : *Expr {
+    var expr = new<IdentifierExpr>(allocator)
+    expr.kind = StmtKind.IDENTIFIER_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.type = type
+
+    return expr as (*Expr)
+}
+
+public func NewCastExpr(startPos: SrcPos,
+                       endPos: SrcPos,
+                       castExpr: *Expr,
+                       castTo: *TypeSpec,
+                       allocator: *const Allocator) : *Expr {
+    var expr = new<CastExpr>(allocator)
+    expr.kind = StmtKind.CAST_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.exprToCast = expr.node.becomeParentOf(castExpr)
+    expr.castTo = castTo
+
+    return expr as (*Expr)
+}
+
+public func NewArrayDesignationExpr(startPos: SrcPos,
+                                    endPos: SrcPos,
+                                    index: *Expr,
+                                    value: *Expr,
+                                    allocator: *const Allocator) : *Expr {
+    var expr = new<ArrayDesignationExpr>(allocator)
+    expr.kind = StmtKind.ARRAY_DESIGNATION_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.index = expr.node.becomeParentOf(index)
+    expr.value = expr.node.becomeParentOf(value)
+
+    return expr as (*Expr)
+}
+
+public func NewInitArgExpr(startPos: SrcPos,
+                           endPos: SrcPos,
+                           fieldName: Token,
+                           position: i32,
+                           value: *Expr,
+                           allocator: *const Allocator) : *Expr {
+    var expr = new<InitArgExpr>(allocator)
+    expr.kind = StmtKind.INIT_ARG_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.fieldName = fieldName
+    expr.argPosition = position
+    expr.value = expr.node.becomeParentOf(value)
+
+    return expr as (*Expr)
+}
+
+public func NewPoisonExpr(startPos: SrcPos,
+                          endPos: SrcPos,                          
+                          allocator: *const Allocator) : *Expr {
+    var expr = new<PoisonExpr>(allocator)
+    expr.kind = StmtKind.POISON_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    return expr as (*Expr)
+}
+
 public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocator) : *Stmt {
     switch(kind) {
         case StmtKind.IMPORT_DECL: {
@@ -406,7 +554,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             var expr = new<IdentifierExpr>(allocator)
             expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR;
             expr.startPos = startPos
-            expr.genericArgs.init(2, allocator)
+            //expr.genericArgs.init(2, allocator)
             expr.type = null
             //expr.sym///            
             return expr as (*Stmt)
@@ -431,7 +579,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             var expr = new<IdentifierExpr>(allocator)
             expr.kind = StmtKind.IDENTIFIER_EXPR;
             expr.startPos = startPos
-            expr.genericArgs.init(2, allocator)
+            //expr.genericArgs.init(2, allocator)
             expr.type = null
             //expr.sym//
             return expr as (*Stmt)
@@ -440,7 +588,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             var expr = new<InitArgExpr>(allocator)
             expr.kind = StmtKind.INIT_ARG_EXPR;
             expr.startPos = startPos
-            expr.fieldName = null
+            //expr.fieldName = null
             expr.argPosition = 0
             expr.value = null
             return expr as (*Stmt)

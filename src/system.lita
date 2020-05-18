@@ -35,19 +35,8 @@ func QueryPerformanceCounter(time: *LARGE_INTEGER);
 var systemFreq: f64;
 var systemStart: u64;
 
-public func FileExists(filename: *const char) : bool {
-    var s: FileStat;
-    return stat(filename, &s) == 0
-}
-
-public func SystemTimeMSec() : f64 {
-    var time: LARGE_INTEGER;
-    QueryPerformanceCounter(&time);
-    
-    return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;
-}
-
-
+@foreign
+func getenv(varname: *const char) : *char;
 
 public func SystemInit() : bool {    
     var freq: LARGE_INTEGER;
@@ -63,3 +52,21 @@ public func SystemInit() : bool {
 
     return true
 }
+
+public func GetEnv(varName: *const char) : *char {
+    return getenv(varName)
+}
+
+public func FileExists(filename: *const char) : bool {
+    var s: FileStat;
+    return stat(filename, &s) == 0
+}
+
+public func SystemTimeMSec() : f64 {
+    var time: LARGE_INTEGER;
+    QueryPerformanceCounter(&time);
+    
+    return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;
+}
+
+

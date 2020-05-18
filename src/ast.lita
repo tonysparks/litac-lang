@@ -68,6 +68,7 @@ public enum StmtKind {
     TYPE_IDENTIFIER_EXPR,
     TYPE_OF_EXPR,
     UNARY_EXPR,
+    POISON_EXPR,
 
     MAX_STMT_KINDS
 }
@@ -117,7 +118,7 @@ public struct FuncPtrTypeSpec {
 }
 
 public struct GenericParam {
-    name: *const char
+    name: Token
 }
 
 public struct Attributes {
@@ -134,15 +135,23 @@ public struct Node {
     endPos: SrcPos
 }
 
-public func (n: *Node) becomeParentOf(child: *Node) {
-    child.parent = n
+public func (n: *Node) setSrcPos(start: SrcPos, end: SrcPos) {
+    n.startPos = start
+    n.endPos = end
 }
 
-public func (n: *Node) becomeParentOfChildren<T>(children: *Array<*T>) {
+public func (n: *Node) becomeParentOf<T>(child: *T) : *T {
+    child.parent = n as (*Node)
+    return child
+}
+
+public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) {
     var size = children.size()
     for(var i = 0; i < size; i += 1) {
         var child = children.get(i)
-        n.becomeParentOf(child.node)
+        if(child) {
+            n.becomeParentOf(child)
+        }
     }
 
 }
@@ -423,14 +432,14 @@ public struct GroupExpr {
 
 public struct IdentifierExpr {
     expr: using Expr
-    genericArgs: Array<*TypeSpec>
+    //genericArgs: Array<*TypeSpec>
     type: *NameTypeSpec
     sym: Symbol
 }
 
 public struct InitArgExpr {
     expr: using Expr
-    fieldName: *const char // Identifier?
+    fieldName: Token // Identifier?
     argPosition: i32
     value: *Expr
 }
@@ -513,6 +522,10 @@ public struct UnaryExpr {
     expr: using Expr
     operator: TokenType
     unaryExpr: *Expr
+}
+
+public struct PoisonExpr {
+    expr: using Expr
 }
 
 public struct Expr {

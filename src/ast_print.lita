@@ -111,7 +111,8 @@ public func PrintStmt(s: *Stmt) {
                 printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) printf(",")
-                    printf("%s", decl.genericParams.get(i).name)
+                    var t = decl.genericParams.get(i).name                    
+                    printf("%.*s", t.value.str.length, t.value.str.buffer)
                 }
                 printf(">")
             }
@@ -149,7 +150,8 @@ public func PrintStmt(s: *Stmt) {
                 printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) printf(",")
-                    printf("%s", decl.genericParams.get(i).name)
+                    var t = decl.genericParams.get(i).name                    
+                    printf("%.*s", t.value.str.length, t.value.str.buffer)                    
                 }
                 printf(">")
             }
@@ -201,8 +203,9 @@ public func PrintStmt(s: *Stmt) {
             if(decl.genericParams.empty()) {
                 printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
-                    if(i > 0) printf(",")
-                    printf("%s", decl.genericParams.get(i).name)
+                    if(i > 0) printf(",")                    
+                    var t = decl.genericParams.get(i).name                    
+                    printf("%.*s", t.value.str.length, t.value.str.buffer)
                 }
                 printf(">")
             }
@@ -465,15 +468,14 @@ public func PrintStmt(s: *Stmt) {
             expr.type = null
             expr.values.init(16, allocator)
             return expr as (*Stmt)
-        }
+        }*/
         case StmtKind.BINARY_EXPR: {
-            var expr = new<BinaryExpr>(allocator)
-            expr.kind = StmtKind.BINARY_EXPR;
-            expr.startPos = startPos
-            expr.left = null
-            expr.right = null
-            return expr as (*Stmt)
-        }
+            var expr = s as (*BinaryExpr)
+            PrintStmt(expr.left)
+            printf(" %s ", tokenText[expr.operator])
+            PrintStmt(expr.right)
+            break;
+        }/*
         case StmtKind.BOOLEAN_EXPR: {
             var expr = new<BooleanExpr>(allocator)
             expr.kind = StmtKind.BOOLEAN_EXPR;

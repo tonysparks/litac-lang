@@ -43,8 +43,8 @@ func main(len: i32, args: **char) {
         printf("\n")
     }
 
-    /*
-    var lex = LexerInit(filename, text, state.allocator)    
+    
+    var lex = LexerInit(filename, text, lita.allocator)    
     while(!lex.eof()) {
         var token = lex.nextToken()
         //printf("Size: %d\n", (token.pos.end - token.pos.start) as (i32))
@@ -64,5 +64,5 @@ func main(len: i32, args: **char) {
             printf("error: '%s'", lex.errorMsg)
         }
         printf("\n")
-    }*/
+    }
 }

@@ -75,8 +75,6 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
 
 func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {    
 
-    printf("HERE %s\n", tokenText[p.peek().type])
-
     if(p.match(TokenType.IMPORT)) {
         var importDecl = p.importDeclaration()
         moduleStmt.imports.add(importDecl)
@@ -133,6 +131,10 @@ func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {
     }
 }
 
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                            Declarations
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
 
 func (p: *Parser) importDeclaration() : *ImportDecl {    
     var decl = NewStmt(StmtKind.IMPORT_DECL, p.pos(), p.allocator) as (*ImportDecl)
@@ -142,8 +144,6 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
 
     var moduleName = p.consume(TokenType.STRING, ErrorCode.MISSING_IDENTIFIER);
     if(moduleName) { 
-        moduleName.print() 
-        decl.moduleName.print()
         decl.moduleName = *moduleName
     }
     if(p.match(TokenType.AS)) {
@@ -217,8 +217,7 @@ func (p: *Parser) constDeclaration() : *ConstDecl {
         decl.name = *identifier
     }
 
-    if(p.match(TokenType.COLON)) {
-        // TODO 'using'
+    if(p.match(TokenType.COLON)) {        
         decl.type = p.type()
         if(p.match(TokenType.EQUALS)) {
             decl.expr = p.expression()
@@ -251,6 +250,392 @@ func (p: *Parser) enumDeclaration() : *EnumDecl {
 func (p: *Parser) typedefDeclaration() : *TypedefDecl {
     return null;
 }
+
+
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                            Expressions
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
+func (p: *Parser) expression() : *Expr {
+    var pos = p.pos()
+
+    var errorCount = p.numOfErrors()
+    var expr = p.assignment()
+    if(p.numOfErrors() > errorCount) {
+        p.adjust()
+        return NewStmt(StmtKind.NULL_EXPR, p.pos(), p.allocator) as (*Expr)
+    }
+
+    if(expr) {
+        expr.setSrcPos(pos, p.pos())
+    }
+
+    return expr
+}
+
+
+func (p: *Parser) assignment() : *Expr {
+    var expr = p.ternary()
+    if(!expr) return null;
+
+    var pos = p.pos()
+    while(p.matches([]TokenType{
+            TokenType.EQUALS,
+            TokenType.PLUS_EQ, 
+            TokenType.MINUS_EQ, 
+            TokenType.DIV_EQ, 
+            TokenType.MUL_EQ,
+            TokenType.MOD_EQ,
+            TokenType.LSHIFT_EQ, 
+            TokenType.RSHIFT_EQ, 
+            TokenType.BNOT_EQ, 
+            TokenType.XOR_EQ, 
+            TokenType.BAND_EQ, 
+            TokenType.BOR_EQ}, 12)) {
+        var operator = p.previous().type
+        var right = p.ternary()
+
+        if(expr.kind == StmtKind.GET_EXPR) {
+            var getExpr = expr as (*GetExpr)
+            var setExpr = NewStmt(StmtKind.SET_EXPR, pos, p.allocator) as (*SetExpr)
+            setExpr.object = setExpr.node.becomeParentOf(getExpr.object)
+            setExpr.field = setExpr.node.becomeParentOf(getExpr.field)
+            setExpr.operator = operator
+            setExpr.value = setExpr.node.becomeParentOf(right)
+            setExpr.endPos = p.pos()
+
+            expr = setExpr as (*Expr)
+        }
+        else if(expr.kind == StmtKind.SUBSCRIPT_GET_EXPR) {
+            var getExpr = expr as (*SubscriptGetExpr)
+            var setExpr = NewStmt(StmtKind.SUBSCRIPT_SET_EXPR, pos, p.allocator) as (*SubscriptSetExpr)
+            setExpr.object = setExpr.node.becomeParentOf(getExpr.object)
+            setExpr.index = setExpr.node.becomeParentOf(getExpr.index)
+            setExpr.operator = operator
+            setExpr.value = setExpr.node.becomeParentOf(right)
+            setExpr.endPos = p.pos()
+
+            expr = setExpr as (*Expr)
+
+        }
+        else {
+            expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+        }
+
+        pos = p.pos()
+    }
+
+    return expr
+}
+
+func (p: *Parser) ternary() : *Expr {
+    var expr = p.or()
+    var pos = p.pos()
+    
+    if(p.match(TokenType.QUESTION_MARK)) {
+        var then = p.expression()
+        p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
+        var other = p.expression()
+        var ternaryExpr = NewStmt(StmtKind.TERNARY_EXPR, pos, p.allocator) as (*TernaryExpr)
+        ternaryExpr.cond = ternaryExpr.node.becomeParentOf(expr)
+        ternaryExpr.then = ternaryExpr.node.becomeParentOf(then)
+        ternaryExpr.other = ternaryExpr.node.becomeParentOf(other)
+        ternaryExpr.endPos = p.pos()
+        expr = ternaryExpr as (*Expr)
+    }
+
+    return expr
+}
+
+func (p: *Parser) or() : *Expr {
+    var expr = p.and()
+    var pos = p.pos()
+
+    while(p.match(TokenType.OR)) {
+        var operator = p.previous().type 
+        var right = p.and()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) and() : *Expr {
+    var expr = p.bitOr()
+    var pos = p.pos()
+
+    while(p.match(TokenType.AND)) {
+        var operator = p.previous().type
+        var right = p.bitOr()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) bitOr() : *Expr {
+    var expr = p.bitXor()
+    var pos = p.pos()
+
+    while(p.match(TokenType.BOR)) {
+        var operator = p.previous().type
+        var right = p.bitXor()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) bitXor() : *Expr {
+    var expr = p.bitAnd()
+    var pos = p.pos()
+
+    while(p.match(TokenType.XOR)) {
+        var operator = p.previous().type
+        var right = p.bitAnd()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) bitAnd() : *Expr {
+    var expr = p.equality()
+    var pos = p.pos()
+
+    while(p.match(TokenType.BAND)) {
+        var operator = p.previous().type    
+        var right = p.equality()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) equality() : *Expr {
+    var expr = p.comparison()
+    var pos = p.pos()
+
+    while(p.matches([]TokenType{
+            TokenType.NOT_EQUALS, 
+            TokenType.EQUALS_EQUALS}, 2)) {
+        var operator = p.previous().type   
+        var right = p.comparison()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) comparison() : *Expr {
+    var expr = p.bitShift()
+    var pos = p.pos()
+
+    while(p.matches([]TokenType{
+            TokenType.GREATER_THAN, 
+            TokenType.GREATER_EQUALS,
+            TokenType.LESS_THAN,
+            TokenType.LESS_EQUALS}, 4)) {
+        var operator = p.previous().type     
+        var right = p.bitShift()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) bitShift() : *Expr {
+    var expr = p.term()
+    var pos = p.pos()
+
+    var bitExpr = p.tryBitShiftRight(expr)
+    if(bitExpr) {
+        return bitExpr
+    }
+
+    while(p.matches([]TokenType{
+            TokenType.LSHIFT, 
+            TokenType.RSHIFT}, 2)) {
+        var operator = p.previous().type    
+        var right = p.term()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) term() : *Expr {
+    var expr = p.factor()
+    var pos = p.pos()
+
+    while(p.matches([]TokenType{
+            TokenType.MINUS, 
+            TokenType.PLUS}, 2)) {
+        var operator = p.previous().type    
+        var right = p.factor()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr
+}
+
+func (p: *Parser) factor() : *Expr {
+    var expr = p.unary()
+    var pos = p.pos()
+
+    while(p.matches([]TokenType{
+            TokenType.SLASH, 
+            TokenType.STAR,
+            TokenType.MOD}, 3)) {
+        var operator = p.previous().type        
+        var right = p.unary()
+
+        expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
+    }
+    
+    return expr    
+}
+
+func (p: *Parser) unary() : *Expr {
+    var pos = p.pos()
+    if(p.matches([]TokenType{
+            TokenType.NOT, 
+            TokenType.MINUS,
+            TokenType.PLUS,
+            TokenType.STAR,
+            TokenType.BAND,
+            TokenType.BNOT}, 6)) {
+        var operator = p.previous().type
+        var right = p.unary()
+
+        return NewUnaryExpr(pos, p.pos(), operator, right, p.allocator)
+    }
+    
+    return p.functionCall()
+}
+
+func (p: *Parser) functionCall() : *Expr {    
+    var expr = p.primary()
+    expr.endPos = p.pos()
+
+    while(true) {
+        if(p.match(TokenType.LEFT_PAREN)) {
+            expr = p.finishFunctionCall(expr)
+            expr.endPos = p.pos()
+        }
+        else if(p.match(TokenType.LEFT_BRACE)) {
+            if(expr.kind != StmtKind.IDENTIFIER_EXPR &&
+               expr.kind != StmtKind.FUNC_IDENTIFIER_EXPR &&
+               expr.kind != StmtKind.TYPE_IDENTIFIER_EXPR) {
+                return expr
+            }
+
+            p.advance()
+
+            var idExpr = expr as (*IdentifierExpr) // delete idExpr??
+            var arguments = p.structArguments()
+            expr = NewInitExpr(expr.startPos, p.pos(), idExpr.type, arguments, p.allocator)
+        }
+        else if(p.match(TokenType.LEFT_BRACKET)) {
+            var index = p.expression()
+            p.consume(TokenType.RIGHT_BRACKET, ErrorCode.MISSING_RIGHT_BRACKET)
+
+            expr = NewSubscriptGetExpr(expr.startPos, p.pos(), expr, index, p.allocator)
+        }
+        else if(p.match(TokenType.DOT)) {
+            var identifier = p.identifierType(true)
+            expr = NewGetExpr(expr.startPos, 
+                              p.pos(), 
+                              expr, 
+                              NewIdentifierExpr(identifier.pos, p.pos(), identifier, p.allocator) as (*IdentifierExpr), 
+                              p.allocator)
+        }
+        else if(p.match(TokenType.AS)) {            
+            expr = p.cast(expr)
+        }        
+        else {
+            break;
+        }
+    }
+
+    return expr
+}
+
+func (p: *Parser) primary() : *Expr {
+    var token = p.peek()
+    if(p.match(TokenType.TRUE)) {
+        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
+        expr.boolean = true
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.FALSE)) {
+        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
+        expr.boolean = false
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.NULL)) {
+        var expr = NewStmt(StmtKind.NULL_EXPR, token.pos, p.allocator) as (*NullExpr)        
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.INT_NUMBER)) {
+        var expr = NewStmt(StmtKind.NUMBER_EXPR, token.pos, p.allocator) as (*NumberExpr)
+        expr.number = *token
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.STRING)) {
+        var expr = NewStmt(StmtKind.STRING_EXPR, token.pos, p.allocator) as (*StringExpr)
+        expr.string = *token
+        return expr as (*Expr)
+    }
+
+    if(p.match(TokenType.CHAR)) {
+        var expr = NewStmt(StmtKind.CHAR_EXPR, token.pos, p.allocator) as (*CharExpr)
+        expr.character = *token
+        return expr as (*Expr)
+    }
+
+    p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
+    return NewPoisonExpr(token.pos, p.pos(), p.allocator)
+}
+
+func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
+    return NewPoisonExpr(expr.startPos, p.pos(), p.allocator)
+}
+
+func (p: *Parser) cast(expr: *Expr) : *Expr {
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)
+    var castTo = p.type(false)
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    return NewCastExpr(expr.startPos, p.pos(), expr, castTo, p.allocator)
+}
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                            Statements
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
+func (p: *Parser) statement() : *Stmt {
+    return null
+}
+
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        Type Specifications
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
 
 func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
     var token = p.peek()
@@ -292,7 +677,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             return spec as (*TypeSpec)
         }
         case TokenType.IDENTIFIER: {
-            return p.identifier(disambiguate) as (*TypeSpec)
+            return p.identifierType(disambiguate) as (*TypeSpec)
         }
         case TokenType.LEFT_BRACKET: {
             var spec = p.arrayType()
@@ -314,7 +699,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
     return null
 }
 
-func (p: *Parser) identifier(disambiguate: bool) : *NameTypeSpec {
+func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
     var token = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
     var sb = StringBufferInit(token.value.str.length, p.allocator)
     sb.append("%.*s", token.value.str.length, token.value.str.buffer)
@@ -323,12 +708,12 @@ func (p: *Parser) identifier(disambiguate: bool) : *NameTypeSpec {
         // TODO - packages
     }
 
-    if(p.check(TokenType.LESS_THAN)) {
-        // TODO - generics
-    }
-
     var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.allocator) as (*NameTypeSpec)
     spec.name = sb.cStr()
+
+    if(p.check(TokenType.LESS_THAN)) {        
+        spec.genericArgs = p.tryGenericArguments(disambiguate)
+    }
 
     return spec;
 }
@@ -383,59 +768,256 @@ func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {
     return spec
 }
 
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                            Utility
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
+func (p: *Parser) structArguments() : Array<*InitArgExpr> {
+    var arguments = Array<*InitArgExpr>{}
+    arguments.init(16, p.allocator)
+
+    var argPosition = 0
+    do {
+        if(p.check(TokenType.RIGHT_BRACE)) {
+            break;
+        }
+
+        var pos = p.pos()
+        var fieldName = Token{}
+        if(p.check(TokenType.DOT)) {
+            var name = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+            if(name) {
+                fieldName = *name
+            }
+            
+            if(p.check(TokenType.COLON)) {
+                p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
+            }
+            else if(p.check(TokenType.EQUALS)) {
+                p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
+            }
+            else {
+                p.errorAtToken(p.peek(), ErrorCode.MISSING_COLON)
+            }
+        }
+        
+        var value = p.expression()        
+        var arg = NewInitArgExpr(pos, p.pos(), fieldName, argPosition, value, p.allocator) as (*InitArgExpr)
+        arguments.add(arg)
+        argPosition += 1        
+    }
+    while(p.match(TokenType.COMMA))
+
+    p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE)
+    return arguments    
+}
+
+func (p: *Parser) arguments() : Array<*Expr> {
+    var arguments = Array<*Expr>{}
+    if(!p.check(TokenType.RIGHT_PAREN)) {
+        arguments.init(8, p.allocator)
+
+        do {
+            var expr = p.expression()
+            arguments.add(expr)
+        }
+        while(p.match(TokenType.COMMA))
+    }
+
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    return arguments
+}
+
+
+func (p: *Parser) genericParameters() : Array<GenericParam> {
+    var arguments = Array<GenericParam>{}
+    if(!p.check(TokenType.GREATER_THAN)) {
+        arguments.init(2, p.allocator)
+
+        do {
+            var typeName = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+            if(typeName) {
+                arguments.add(GenericParam {
+                    .name = *typeName
+                })
+            }
+        }
+        while(p.match(TokenType.COMMA))
+    }
+
+    p.consume(TokenType.GREATER_THAN, ErrorCode.MISSING_GENERIC_END)
+    return arguments
+}
+
+func (p: *Parser) genericArguments() : Array<*TypeSpec> {
+    var arguments = Array<*TypeSpec>{}
+    if(!p.check(TokenType.GREATER_THAN)) {
+        arguments.init(2, p.allocator)
+
+        do {
+            var type = p.type(false)
+            if(type) {
+                arguments.add(type)
+            }
+        }
+        while(p.match(TokenType.COMMA))
+    }
+
+    p.consume(TokenType.GREATER_THAN, ErrorCode.MISSING_GENERIC_END)
+    return arguments
+}
+
+func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
+    var backtrack = p.current
+    var numOfErrors = p.numOfErrors()
+    var pos = p.pos()
+
+    var arguments = p.genericArguments()
+    var isFailed = false
+
+    if(p.numOfErrors() == numOfErrors) {
+        if(disambiguate) {
+            var token = p.peek()
+            switch(token.type) {
+                case TokenType.LEFT_PAREN:
+                case TokenType.RIGHT_PAREN:
+                case TokenType.RIGHT_BRACKET:
+                case TokenType.LEFT_BRACE:
+                case TokenType.RIGHT_BRACE:
+                case TokenType.COLON:
+                case TokenType.SEMICOLON:
+                case TokenType.COMMA:
+                case TokenType.DOT:
+                case TokenType.QUESTION_MARK:
+                case TokenType.EQUALS_EQUALS:
+                case TokenType.NOT_EQUALS:
+                case TokenType.OR:
+                case TokenType.XOR:
+                case TokenType.STAR:
+                    return arguments;
+                default: {                  
+                    isFailed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if(p.numOfErrors() > numOfErrors) {
+        p.rewindTo(backtrack, numOfErrors)
+        isFailed = true;
+    }
+
+    if(isFailed) {
+        for(var i = 0; i < arguments.size(); i += 1) {
+            var type = arguments.get(i)
+            p.allocator.free(type)
+        }
+        arguments.free()
+    }
+
+    return arguments
+}
+
+func (p: *Parser) arrayArguments() : Array<*Expr> {
+    var arguments = Array<*Expr>{}
+    arguments.init(16, p.allocator)
+
+    do {
+        if(p.check(TokenType.RIGHT_BRACE)) {
+            break;
+        }
+
+        var expr: *Expr = null
+        if(p.check(TokenType.LEFT_BRACKET)) {
+            expr = p.tryArrayDesignationExpr()
+        }
+
+        if(!expr) {
+            expr = p.expression()
+        }
+
+        if(expr) {
+            arguments.add(expr)
+        }
+    }
+    while(p.match(TokenType.COMMA))
+
+    p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE)
+    return arguments
+}
+
+func (p: *Parser) tryArrayDesignationExpr() : *Expr {
+    var backtrack = p.current
+    var numOfErrors = p.numOfErrors()
+    var pos = p.pos()
+
+    var designatorExpr: *Expr = null
+    if(p.match(TokenType.LEFT_BRACKET)) {
+        var index = p.expression()
+        p.consume(TokenType.RIGHT_BRACKET, ErrorCode.MISSING_RIGHT_BRACKET)
+        p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
+        var value = p.expression()
+
+        if(p.numOfErrors() == numOfErrors) {
+            designatorExpr = NewArrayDesignationExpr(pos, p.pos(), index, value, p.allocator)
+        }
+        else {
+            p.allocator.free(index)
+            p.allocator.free(value)
+        }
+    }
+
+    if(p.numOfErrors() > numOfErrors) {
+        p.rewindTo(backtrack, numOfErrors)
+    }
+
+    return designatorExpr
+}
+
+func (p: *Parser) rewindTo(backtrack: i32, numOfErrors: i32) {
+    assert(p.numOfErrors() > numOfErrors) 
+    {
+        // rewind the parser and errors
+        p.current = backtrack
+        for(var i = p.numOfErrors() - 1; i >= numOfErrors; i -= 1) {
+            var error = p.result.errors.removeAt(i)
+            p.allocator.free(error.message as (*void))
+        }
+    }
+}
+
+// account for generics, we must peek ahead to see if
+// this is a bit shift operator or generics
+func (p: *Parser) tryBitShiftRight(expr: *Expr) : *Expr {
+
+    if(!p.check(TokenType.GREATER_THAN)) {
+        return null
+    }
+
+    var prevToken = p.advance()
+    if(!p.check(TokenType.GREATER_THAN)) {
+        p.rewind()
+        return null
+    }
+
+    var nextToken = p.advance()
+    if((nextToken.pos.position - prevToken.pos.position) == 1) {
+        var right = p.term()
+        return NewBinaryExpr(expr.startPos, p.pos(), expr, TokenType.RSHIFT, right, p.allocator)
+    }
+
+    // this wasn't a bit shift attempt, abort!
+    p.rewind() 
+    p.rewind()
+    return null
+}
+
 func (p: *Parser) isConstNumberExpr(expr: *Expr) : bool {
     return false
 }
 
-func (p: *Parser) expression() : *Expr {
-    return p.primary()
-    //return null
-}
-
-func (p: *Parser) primary() : *Expr {
-    var token = p.peek()
-    if(p.match(TokenType.TRUE)) {
-        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
-        expr.boolean = true
-        return expr as (*Expr)
-    }
-
-    if(p.match(TokenType.FALSE)) {
-        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
-        expr.boolean = false
-        return expr as (*Expr)
-    }
-
-    if(p.match(TokenType.NULL)) {
-        var expr = NewStmt(StmtKind.NULL_EXPR, token.pos, p.allocator) as (*NullExpr)        
-        return expr as (*Expr)
-    }
-
-    if(p.match(TokenType.INT_NUMBER)) {
-        var expr = NewStmt(StmtKind.NUMBER_EXPR, token.pos, p.allocator) as (*NumberExpr)
-        expr.number = *token
-        return expr as (*Expr)
-    }
-
-    if(p.match(TokenType.STRING)) {
-        var expr = NewStmt(StmtKind.STRING_EXPR, token.pos, p.allocator) as (*StringExpr)
-        expr.string = *token
-        return expr as (*Expr)
-    }
-
-    if(p.match(TokenType.CHAR)) {
-        var expr = NewStmt(StmtKind.CHAR_EXPR, token.pos, p.allocator) as (*CharExpr)
-        expr.character = *token
-        return expr as (*Expr)
-    }
-
-    p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
-    return null
-}
-
-func (p: *Parser) statement() : *Stmt {
-    return null
-}
 
 func (p: *Parser) pos() : SrcPos {
     if(!p.atEnd()) {
@@ -487,6 +1069,17 @@ func (p: *Parser) match(type: TokenType) : bool {
     return false
 }
 
+func (p: *Parser) matches(types: *TokenType, len: i32) : bool {
+    for(var i = 0; i < len; i += 1) {
+        var type = types[i]
+        if(p.check(type)) {
+            p.advance()
+            return true
+        }
+    }
+    return false
+}
+
 func (p: *Parser) consume(type: TokenType, errorCode: ErrorCode) : *Token {
     if(p.check(type)) {
         return p.advance()
@@ -496,7 +1089,7 @@ func (p: *Parser) consume(type: TokenType, errorCode: ErrorCode) : *Token {
     return null
 }
 
-func (p: *Parser) adjust(types: *TokenType, len: i32) {
+func (p: *Parser) adjust(types: *TokenType = null, len: i32 = 0) {
     if(!types || len < 1) {
         p.advance()
         return;
