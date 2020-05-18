@@ -121,6 +121,23 @@ public func NewInitExpr(startPos: SrcPos,
     return initExpr as (*Expr)
 }
 
+public func NewFuncCallExpr(startPos: SrcPos,
+                            endPos: SrcPos,
+                            object: *Expr,
+                            arguments: Array<*Expr>,
+                            genericArgs: Array<*TypeSpec>,
+                            allocator: *const Allocator) : *Expr {
+    var expr = new<FuncCallExpr>(allocator)
+    expr.kind = StmtKind.FUNC_CALL_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.object = expr.node.becomeParentOf(object)
+    expr.node.becomeParentOfChildren(expr.arguments)
+    expr.genericArgs = genericArgs
+
+    return expr as (*Expr)
+}
+
 public func NewSubscriptGetExpr(startPos: SrcPos,
                                 endPos: SrcPos,
                                 object: *Expr,

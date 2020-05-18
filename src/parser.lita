@@ -534,9 +534,7 @@ func (p: *Parser) functionCall() : *Expr {
             expr.endPos = p.pos()
         }
         else if(p.match(TokenType.LEFT_BRACE)) {
-            if(expr.kind != StmtKind.IDENTIFIER_EXPR &&
-               expr.kind != StmtKind.FUNC_IDENTIFIER_EXPR &&
-               expr.kind != StmtKind.TYPE_IDENTIFIER_EXPR) {
+            if(!p.isIdentifier(expr)) {
                 return expr
             }
 
@@ -613,7 +611,20 @@ func (p: *Parser) primary() : *Expr {
 }
 
 func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
-    return NewPoisonExpr(expr.startPos, p.pos(), p.allocator)
+    var pos = p.pos()
+    var arguments = p.arguments()
+    var genericArgs = Array<*TypeSpec>{}
+    if(p.isIdentifier(expr)) {
+        expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
+    }
+    else if(expr.kind == StmtKind.GET_EXPR) {
+        var getExpr = expr as (*GetExpr)        
+        var idExpr = getExpr.field
+        idExpr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
+        genericArgs = idExpr.type.genericArgs
+    }
+    //return NewPoisonExpr(expr.startPos, p.pos(), p.allocator)
+    return NewFuncCallExpr(pos, p.pos(), expr, arguments, genericArgs, p.allocator)
 }
 
 func (p: *Parser) cast(expr: *Expr) : *Expr {
@@ -628,7 +639,7 @@ func (p: *Parser) cast(expr: *Expr) : *Expr {
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 func (p: *Parser) statement() : *Stmt {
-    return null
+    return NewPoisonExpr(p.pos(), p.pos(), p.allocator) as (*Stmt)
 }
 
 
@@ -1013,6 +1024,17 @@ func (p: *Parser) tryBitShiftRight(expr: *Expr) : *Expr {
     p.rewind()
     return null
 }
+
+func (p: *Parser) isIdentifier(expr: *Expr) : bool {
+    if(!expr) {
+        return false
+    }
+
+    return expr.kind == StmtKind.IDENTIFIER_EXPR ||
+           expr.kind == StmtKind.FUNC_IDENTIFIER_EXPR ||
+           expr.kind == StmtKind.TYPE_IDENTIFIER_EXPR
+}
+
 
 func (p: *Parser) isConstNumberExpr(expr: *Expr) : bool {
     return false
