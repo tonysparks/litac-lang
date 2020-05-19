@@ -19,6 +19,10 @@ public struct Parser {
     tokens: Array<Token>
     current: i32
     currentPos: SrcPos
+    breakLevel: i32
+    loopLevel: i32
+    switchLevel: i32
+    funcLevel: i32
     result: *PhaseResult
 }
 
@@ -28,7 +32,11 @@ public func ParserInit(filename: *const char,
 
     var parser = Parser {
         .allocator = lita.allocator,
-        .result = &lita.result
+        .result = &lita.result,
+        .breakLevel = 0,
+        .loopLevel = 0,
+        .switchLevel = 0,
+        .funcLevel = 0,
     }
 
     var lex = LexerInit(filename, text, lita.allocator)
@@ -44,7 +52,17 @@ public func ParserInit(filename: *const char,
 
 public func (p: *Parser) parseModule() : *ModuleStmt {
     var pos = p.pos()
-    var moduleStmt = NewStmt(StmtKind.MODULE_STMT, pos, p.allocator) as (*ModuleStmt)
+
+    var imports = Array<*ImportDecl>{}
+    imports.init(16, p.allocator)
+
+    var notes = Array<*NoteStmt>{}
+    notes.init(2, p.allocator)
+    
+    var declarations = Array<*Decl>{}
+    declarations.init(16, p.allocator)    
+
+    var moduleStmt = NewModuleStmt(pos, pos, imports, notes, declarations, p.allocator) as (*ModuleStmt)
 
     if(p.atEnd()) {
         return moduleStmt
@@ -70,6 +88,7 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
         }
     }
 
+    moduleStmt.endPos = p.prevPos()
     return moduleStmt
 }
 
@@ -88,31 +107,31 @@ func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {
 
         if(p.match(TokenType.VAR)) {
             var decl = p.varDeclaration()            
-            moduleStmt.declarations.add(&decl.decl)
+            moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.CONST)) {
             var decl = p.constDeclaration()
-            moduleStmt.declarations.add(&decl.decl)
+            moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.FUNC)) {
             var decl = p.funcDeclaration()
-            moduleStmt.declarations.add(&decl.decl)
+            moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.STRUCT)) {
             var decl = p.structDeclaration()
-            moduleStmt.declarations.add(&decl.decl)
+            moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.UNION)) {
             var decl = p.unionDeclaration()
-            moduleStmt.declarations.add(&decl.decl)
+            moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.ENUM)) {
             var decl = p.enumDeclaration()
-            moduleStmt.declarations.add(&decl.decl)
+            moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.TYPEDEF)) {
             var decl = p.typedefDeclaration()
-            moduleStmt.declarations.add(&decl.decl)
+            moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.SEMICOLON)) {
             if(!notes.empty()) {
@@ -137,25 +156,31 @@ func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {
 
 
 func (p: *Parser) importDeclaration() : *ImportDecl {    
-    var decl = NewStmt(StmtKind.IMPORT_DECL, p.pos(), p.allocator) as (*ImportDecl)
-    if(p.match(TokenType.USING)) {
-        decl.isUsing = true
+    var pos = p.prevPos()
+
+    var isUsing = p.match(TokenType.USING)
+    var moduleName = Token {
+        .type = TokenType.ERROR
+    }
+    var moduleNameStr = p.consume(TokenType.STRING, ErrorCode.MISSING_IDENTIFIER);
+    if(moduleNameStr) {
+        moduleName = *moduleNameStr
+    }
+    
+    var alias = Token{
+        .type = TokenType.END_OF_FILE
     }
 
-    var moduleName = p.consume(TokenType.STRING, ErrorCode.MISSING_IDENTIFIER);
-    if(moduleName) { 
-        decl.moduleName = *moduleName
-    }
     if(p.match(TokenType.AS)) {
-        var alias = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER);
-        if(alias) {
-            decl.alias = *alias
+        var aliasId = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER);
+        if(aliasId) {
+            alias = *aliasId
         }
     }
 
     // TODO: Lookup physical file and calculate ModuleId
     //decl.moduleId = //
-    return decl;
+    return NewImportDecl(pos, p.pos(), moduleName, alias, isUsing, p.allocator) as (*ImportDecl)    
 }
 
 func (p: *Parser) notes() : Array<*NoteStmt> {
@@ -166,88 +191,111 @@ func (p: *Parser) notes() : Array<*NoteStmt> {
 
     notes.init(4, p.allocator)
 
+
     while(p.match(TokenType.AT)) {
-        var note = NewStmt(StmtKind.NOTE_STMT, p.pos(), p.allocator) as (*NoteStmt)
-        var name = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-        if(name) {
-            note.name = *name
+        var pos = p.prevPos()
+
+        var name = Token {
+            .type = TokenType.ERROR
+        }        
+        
+        var attributes = Array<Token>{}
+        attributes.init(2, p.allocator)
+
+        var nameId = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+        if(nameId) {
+            name = *nameId
         }
 
         if(p.match(TokenType.LEFT_PAREN)) {
             do {
                 if(p.check(TokenType.STRING)) {
-                    note.attributes.add(*p.advance())
+                    attributes.add(*p.advance())
                 }
             }
             while(p.match(TokenType.COMMA));
         }
 
+        var note = NewNoteStmt(pos, p.pos(), name, attributes, p.allocator) as (*NoteStmt)
         notes.add(note)
     }
 
     return notes
 }
 
-func (p: *Parser) varDeclaration() : *VarDecl {
-    var decl = NewStmt(StmtKind.VAR_DECL, p.pos(), p.allocator) as (*VarDecl)
+func (p: *Parser) varDeclaration() : *Decl {
+    var pos = p.prevPos()
+
+    var name = Token {
+        .type = TokenType.ERROR
+    }
     var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
     if(identifier) {
-        decl.name = *identifier
+        name = *identifier
     }
 
-    if(p.match(TokenType.COLON)) {
-        // TODO 'using'
-        decl.type = p.type()
-        if(p.match(TokenType.EQUALS)) {
-            decl.expr = p.expression()
-        }
-    }
-    else {
-        p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
-        decl.expr = p.expression()
-    }
-
-    return decl
-}
-
-func (p: *Parser) constDeclaration() : *ConstDecl {
-    var decl = NewStmt(StmtKind.CONST_DECL, p.pos(), p.allocator) as (*ConstDecl)
-    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-    if(identifier) {
-        decl.name = *identifier
-    }
+    var type: *TypeSpec = null
+    var expr: *Expr = null
 
     if(p.match(TokenType.COLON)) {        
-        decl.type = p.type()
+        type = p.type()
         if(p.match(TokenType.EQUALS)) {
-            decl.expr = p.expression()
+            expr = p.expression()
         }
     }
     else {
         p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
-        decl.expr = p.expression()
+        expr = p.expression()
     }
 
-    return decl
+    return NewVarDecl(pos, p.pos(), name, type, expr, p.allocator)
 }
 
-func (p: *Parser) funcDeclaration() : *FuncDecl {
+func (p: *Parser) constDeclaration() : *Decl {
+    var pos = p.prevPos()
+
+    var name = Token {
+        .type = TokenType.ERROR
+    }
+    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(identifier) {
+        name = *identifier
+    }
+
+    var type: *TypeSpec = null
+    var expr: *Expr = null
+
+    if(p.match(TokenType.COLON)) {        
+        type = p.type()
+        if(p.match(TokenType.EQUALS)) {
+            expr = p.expression()
+        }
+    }
+    else {
+        p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
+        expr = p.expression()
+    }
+
+    return NewConstDecl(pos, p.pos(), name, type, expr, p.allocator)
+}
+
+func (p: *Parser) funcDeclaration() : *Decl {
     return null;
 }
 
-func (p: *Parser) structDeclaration() : *AggregateDecl {
+func (p: *Parser) structDeclaration() : *Decl {
     return null;
 }
 
-func (p: *Parser) unionDeclaration() : *AggregateDecl {
+func (p: *Parser) unionDeclaration() : *Decl {
     return null;
 }
 
-func (p: *Parser) enumDeclaration() : *EnumDecl {
+func (p: *Parser) enumDeclaration() : *Decl {
     return null;
 }
 
-func (p: *Parser) typedefDeclaration() : *TypedefDecl {
+func (p: *Parser) typedefDeclaration() : *Decl {
     return null;
 }
 
@@ -264,11 +312,15 @@ func (p: *Parser) expression() : *Expr {
     var expr = p.assignment()
     if(p.numOfErrors() > errorCount) {
         p.adjust()
-        return NewStmt(StmtKind.NULL_EXPR, p.pos(), p.allocator) as (*Expr)
-    }
+        if(expr) {
+            if(expr.kind == StmtKind.POISON_EXPR) {
+                return expr
+            }
 
-    if(expr) {
-        expr.setSrcPos(pos, p.pos())
+            p.allocator.free(expr)
+        }
+
+        return NewPoisonExpr(pos, p.pos(), p.allocator)
     }
 
     return expr
@@ -298,26 +350,11 @@ func (p: *Parser) assignment() : *Expr {
 
         if(expr.kind == StmtKind.GET_EXPR) {
             var getExpr = expr as (*GetExpr)
-            var setExpr = NewStmt(StmtKind.SET_EXPR, pos, p.allocator) as (*SetExpr)
-            setExpr.object = setExpr.node.becomeParentOf(getExpr.object)
-            setExpr.field = setExpr.node.becomeParentOf(getExpr.field)
-            setExpr.operator = operator
-            setExpr.value = setExpr.node.becomeParentOf(right)
-            setExpr.endPos = p.pos()
-
-            expr = setExpr as (*Expr)
+            expr = NewSetExpr(pos, p.pos(), getExpr.object, getExpr.field, operator, right, p.allocator)
         }
         else if(expr.kind == StmtKind.SUBSCRIPT_GET_EXPR) {
             var getExpr = expr as (*SubscriptGetExpr)
-            var setExpr = NewStmt(StmtKind.SUBSCRIPT_SET_EXPR, pos, p.allocator) as (*SubscriptSetExpr)
-            setExpr.object = setExpr.node.becomeParentOf(getExpr.object)
-            setExpr.index = setExpr.node.becomeParentOf(getExpr.index)
-            setExpr.operator = operator
-            setExpr.value = setExpr.node.becomeParentOf(right)
-            setExpr.endPos = p.pos()
-
-            expr = setExpr as (*Expr)
-
+            expr = NewSubscriptSetExpr(pos, p.pos(), getExpr.object, getExpr.index, operator, right, p.allocator)
         }
         else {
             expr = NewBinaryExpr(pos, p.pos(), expr, operator, right, p.allocator)
@@ -337,12 +374,7 @@ func (p: *Parser) ternary() : *Expr {
         var then = p.expression()
         p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
         var other = p.expression()
-        var ternaryExpr = NewStmt(StmtKind.TERNARY_EXPR, pos, p.allocator) as (*TernaryExpr)
-        ternaryExpr.cond = ternaryExpr.node.becomeParentOf(expr)
-        ternaryExpr.then = ternaryExpr.node.becomeParentOf(then)
-        ternaryExpr.other = ternaryExpr.node.becomeParentOf(other)
-        ternaryExpr.endPos = p.pos()
-        expr = ternaryExpr as (*Expr)
+        expr = NewTernaryExpr(pos, p.pos(), expr, then, other, p.allocator)
     }
 
     return expr
@@ -571,39 +603,29 @@ func (p: *Parser) functionCall() : *Expr {
 
 func (p: *Parser) primary() : *Expr {
     var token = p.peek()
-    if(p.match(TokenType.TRUE)) {
-        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
-        expr.boolean = true
-        return expr as (*Expr)
+    var pos = token.pos
+    if(p.match(TokenType.TRUE)) {        
+        return NewBooleanExpr(pos, p.pos(), true, p.allocator)
     }
 
     if(p.match(TokenType.FALSE)) {
-        var expr = NewStmt(StmtKind.BOOLEAN_EXPR, token.pos, p.allocator) as (*BooleanExpr)
-        expr.boolean = false
-        return expr as (*Expr)
+        return NewBooleanExpr(pos, p.pos(), false, p.allocator)
     }
 
     if(p.match(TokenType.NULL)) {
-        var expr = NewStmt(StmtKind.NULL_EXPR, token.pos, p.allocator) as (*NullExpr)        
-        return expr as (*Expr)
+        return NewNullExpr(pos, p.pos(), p.allocator)
     }
 
-    if(p.match(TokenType.INT_NUMBER)) {
-        var expr = NewStmt(StmtKind.NUMBER_EXPR, token.pos, p.allocator) as (*NumberExpr)
-        expr.number = *token
-        return expr as (*Expr)
+    if(p.match(TokenType.INT_NUMBER) || p.match(TokenType.FLOAT_NUMBER)) {        
+        return NewNumberExpr(pos, p.pos(), token, p.allocator)
     }
 
     if(p.match(TokenType.STRING)) {
-        var expr = NewStmt(StmtKind.STRING_EXPR, token.pos, p.allocator) as (*StringExpr)
-        expr.string = *token
-        return expr as (*Expr)
+        return NewStringExpr(pos, p.pos(), token, p.allocator)
     }
 
     if(p.match(TokenType.CHAR)) {
-        var expr = NewStmt(StmtKind.CHAR_EXPR, token.pos, p.allocator) as (*CharExpr)
-        expr.character = *token
-        return expr as (*Expr)
+        return NewCharExpr(pos, p.pos(), token, p.allocator)
     }
 
     p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
@@ -623,7 +645,7 @@ func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
         idExpr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
         genericArgs = idExpr.type.genericArgs
     }
-    //return NewPoisonExpr(expr.startPos, p.pos(), p.allocator)
+    
     return NewFuncCallExpr(pos, p.pos(), expr, arguments, genericArgs, p.allocator)
 }
 
@@ -639,9 +661,372 @@ func (p: *Parser) cast(expr: *Expr) : *Expr {
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 func (p: *Parser) statement() : *Stmt {
-    return NewPoisonExpr(p.pos(), p.pos(), p.allocator) as (*Stmt)
+    var pos = p.pos()
+
+    var errorCount = p.numOfErrors()
+    var stmt = p.tryStatement()
+    if(p.numOfErrors() > errorCount) {
+        p.adjust()
+        if(stmt) {
+            if(stmt.kind == StmtKind.POISON_EXPR) {
+                return stmt
+            }
+
+            p.allocator.free(stmt)
+        }
+
+        return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
+    }
+
+    return stmt
 }
 
+func (p: *Parser) tryStatement() : *Stmt {
+    var pos = p.pos()
+
+    // check for note declarations
+    if(p.check(TokenType.AT)) {
+        var notes = p.notes()
+
+        var decl: *Decl = null
+        if(p.match(TokenType.VAR)) {
+            decl = p.varDeclaration()
+        }
+        else if(p.match(TokenType.CONST)) {
+            decl = p.constDeclaration()
+        }
+        else {
+            p.errorAtToken(p.peek(), ErrorCode.INVALID_NOTE_DECL)
+            return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
+        }
+
+        decl.attributes.notes = notes
+        decl.startPos = pos
+        return decl as (*Stmt)
+    }
+
+    if(p.match(TokenType.HASH)) {
+        // TODO: Compile statement
+    }
+
+    if(p.match(TokenType.LEFT_BRACE)) {
+        return p.blockStatement()
+    }
+
+    if(p.match(TokenType.VAR)) {
+        return p.varDeclaration() as (*Stmt)
+    }
+
+    if(p.match(TokenType.CONST)) {
+        return p.constDeclaration() as (*Stmt)
+    }
+
+    if(p.match(TokenType.IF)) {
+        return p.ifStatement()
+    }
+
+    if(p.match(TokenType.WHILE)) {
+        return p.whileStatement()
+    }
+
+    if(p.match(TokenType.DO)) {
+        return p.doWhileStatement()
+    }
+
+    if(p.match(TokenType.FOR)) {
+        return p.forStatement()
+    }
+
+    if(p.match(TokenType.SWITCH)) {
+        return p.switchStatement()
+    }
+
+    if(p.match(TokenType.BREAK)) {
+        return p.breakStatement()
+    }
+
+    if(p.match(TokenType.CONTINUE)) {
+        return p.continueStatement()
+    }
+
+    if(p.match(TokenType.RETURN)) {
+        return p.returnStatement()
+    }
+
+    if(p.match(TokenType.DEFER)) {
+        return p.deferStatement()
+    }
+
+    if(p.match(TokenType.GOTO)) {
+        return p.gotoStatement()
+    }
+
+    if(p.check(TokenType.IDENTIFIER)) {
+        var stmt = p.tryLabelStatement()
+        if(stmt) {
+            return stmt
+        }
+    }
+
+    return p.expression() as (*Stmt)
+}
+
+func (p: *Parser) blockStatement() : *Stmt {
+    if(p.breakLevel > 0) {
+        p.breakLevel -= 1
+    }
+
+    var pos = p.prevPos()
+
+    var stmts = Array<*Stmt>{}
+    stmts.init(16, p.allocator)
+
+    do {
+        if(p.check(TokenType.RIGHT_BRACE)) {
+            break
+        }
+
+        var stmt = p.statement()
+        stmts.add(stmt)
+
+        p.eatSemicolon()
+    }
+    while(!p.atEnd())
+
+    p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE)
+
+    return NewBlockStmt(pos, p.pos(), stmts, p.allocator)
+}
+
+func (p: *Parser) ifStatement() : *Stmt {
+    var pos = p.prevPos()
+
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)
+    var cond = p.expression()
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    
+    var then = p.statement();
+    var elseStmt: *Stmt = null;
+    if(p.match(TokenType.ELSE)) {
+        elseStmt = p.statement();
+    }
+    
+    return NewIfStmt(pos, p.pos(), cond, then, elseStmt, p.allocator);
+}
+
+func (p: *Parser) whileStatement() : *Stmt {
+    var pos = p.prevPos()
+    p.loopLevel += 1;
+        
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN);
+    var cond = p.expression();
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN);
+    
+    var body = p.statement();
+    p.loopLevel -= 1;
+    
+    return NewWhileStmt(pos, p.pos(), cond, body, p.allocator);
+}
+
+func (p: *Parser) doWhileStatement() : *Stmt {
+    var pos = p.prevPos()
+    p.loopLevel += 1;
+    var body = p.statement();
+
+    p.consume(TokenType.WHILE, ErrorCode.MISSING_WHILE);
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN);
+    var cond = p.expression();
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN);
+    
+    p.loopLevel -= 1;
+    
+    return NewDoWhileStmt(pos, p.pos(), cond, body, p.allocator);
+}
+
+func (p: *Parser) forStatement() : *Stmt {
+    var pos = p.prevPos()
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN);
+    
+    var init = !p.check(TokenType.SEMICOLON) ? p.statement() : null;
+    p.consume(TokenType.SEMICOLON, ErrorCode.MISSING_SEMICOLON);        
+    
+    var cond = !p.check(TokenType.SEMICOLON) ? p.expression() : null;    
+    p.consume(TokenType.SEMICOLON, ErrorCode.MISSING_SEMICOLON);
+    
+    var post = !p.check(TokenType.RIGHT_PAREN) ? p.statement() : null;    
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN);
+    
+    p.loopLevel += 1;
+    var body = p.statement();
+    p.loopLevel -= 1;
+    
+    return NewForStmt(pos, p.pos(), init, cond, post, body, p.allocator);
+}
+
+func (p: *Parser) switchCaseStatement() : *Stmt {
+    var pos = p.prevPos()
+
+    var cond = p.expression()
+    p.consume(TokenType.COLON, ErrorCode.MISSING_COLON);
+
+    var bodyPos = p.pos()
+    var stmts = Array<*Stmt>{}
+    stmts.init(8, p.allocator)
+
+    while(!p.atEnd()) {
+        if(p.check(TokenType.RIGHT_BRACE) || 
+           p.check(TokenType.CASE) ||
+           p.check(TokenType.DEFAULT)) {
+            break;
+        }
+
+        var stmt = p.statement()
+        p.match(TokenType.SEMICOLON)
+
+        stmts.add(stmt)
+    }
+    var body: *Stmt = null
+    if(stmts.empty()) {
+        body = NewEmptyStmt(bodyPos, p.pos(), p.allocator)
+    }
+    else {
+        body = NewBlockStmt(bodyPos, p.pos(), stmts, p.allocator)
+    }
+
+    return NewSwitchCaseStmt(pos, p.pos(), cond, body, p.allocator);
+}
+
+
+func (p: *Parser) switchDefaultStatement() : *Stmt {
+    var pos = p.prevPos()
+
+    var breakCount = p.breakLevel
+    
+    var stmts = Array<*Stmt>{}
+    stmts.init(8, p.allocator)
+
+    while(!p.atEnd()) {
+        if(p.check(TokenType.RIGHT_BRACE) || 
+           p.check(TokenType.CASE)) {
+            break;
+        }
+
+        var stmt = p.statement()
+        p.eatSemicolon()
+
+        stmts.add(stmt)
+
+        if(breakCount != p.breakLevel) {
+            p.breakLevel -= 1
+            break
+        }
+    }
+
+    return NewBlockStmt(pos, p.pos(), stmts, p.allocator)
+}
+
+func (p: *Parser) switchStatement() : *Stmt {
+    var pos = p.prevPos()
+
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN);
+    var cond = p.expression()
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN);
+
+    var startBrace = p.match(TokenType.LEFT_BRACE)
+
+    var cases = Array<*SwitchCaseStmt>{}
+    cases.init(8, p.allocator)
+
+    var defaultStmt: *Stmt = null
+
+    p.switchLevel += 1
+    while(!p.atEnd()) {
+        if(p.check(TokenType.CASE)) {
+            var caseStmt = p.switchCaseStatement() as (*SwitchCaseStmt)
+            cases.add(caseStmt)
+
+            p.eatSemicolon()
+        }
+        else if(p.check(TokenType.DEFAULT)) {
+            p.consume(TokenType.COLON, ErrorCode.MISSING_COLON);
+            defaultStmt = p.switchDefaultStatement()
+
+            p.eatSemicolon()
+        }
+        else {
+            break
+        }
+    }
+    p.switchLevel -= 1
+
+    if(startBrace) {
+        p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE);
+    }
+
+    return NewSwitchStmt(pos, p.pos(), cond, cases, defaultStmt, p.allocator);
+}
+
+
+func (p: *Parser) breakStatement() : *Stmt {
+    if(p.loopLevel < 1 && p.switchLevel < 1) {
+        p.errorAtToken(p.previous(), ErrorCode.INVALID_BREAK)
+    }
+
+    if(p.switchLevel > 0 && p.loopLevel < 1) {
+        p.breakLevel += 1
+    }
+
+    var pos = p.prevPos()
+    return NewBreakStmt(pos, p.pos(), p.allocator)
+}
+
+func (p: *Parser) continueStatement() : *Stmt {
+    if(p.loopLevel < 1) {
+        p.errorAtToken(p.previous(), ErrorCode.INVALID_CONTINUE)
+    }
+
+    var pos = p.prevPos()
+    return NewContinueStmt(pos, p.pos(), p.allocator)
+}
+
+func (p: *Parser) returnStatement() : *Stmt {    
+    var pos = p.prevPos()
+    var expr: *Expr = null
+    if(!p.check(TokenType.SEMICOLON)) {
+        expr = p.expression()
+    }
+
+    return NewReturnStmt(pos, p.pos(), expr, p.allocator)
+}
+
+func (p: *Parser) deferStatement() : *Stmt {    
+    var pos = p.prevPos()
+    var defered = p.statement()
+    return NewDeferStmt(pos, p.pos(), defered, p.allocator)
+}
+
+func (p: *Parser) gotoStatement() : *Stmt {    
+    var pos = p.prevPos()
+    var label = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    return NewGotoStmt(pos, p.pos(), label, p.allocator)
+}
+
+func (p: *Parser) tryLabelStatement() : *Stmt {    
+    var backtrack = p.current    
+    var pos = p.pos()
+
+    var label = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(!p.match(TokenType.COLON)) {
+        p.current = backtrack
+        return null
+    }
+
+    if(p.funcLevel < 1) {
+        p.errorAtToken(p.peek(), ErrorCode.INVALID_LABEL_STMT)
+    }
+
+    return NewLabelStmt(pos, p.pos(), label, p.allocator)
+}
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         Type Specifications
@@ -1025,6 +1410,10 @@ func (p: *Parser) tryBitShiftRight(expr: *Expr) : *Expr {
     return null
 }
 
+func (p: *Parser) eatSemicolon() {
+    p.match(TokenType.SEMICOLON)
+}
+
 func (p: *Parser) isIdentifier(expr: *Expr) : bool {
     if(!expr) {
         return false
@@ -1047,6 +1436,10 @@ func (p: *Parser) pos() : SrcPos {
     }
 
     return SrcPos{}
+}
+
+func (p: *Parser) prevPos() : SrcPos {    
+    return p.previous().pos
 }
 
 func (p: *Parser) peek() : *Token {

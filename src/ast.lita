@@ -141,11 +141,13 @@ public func (n: *Node) setSrcPos(start: SrcPos, end: SrcPos) {
 }
 
 public func (n: *Node) becomeParentOf<T>(child: *T) : *T {
+    if(!child) return null;
+
     child.parent = n as (*Node)
     return child
 }
 
-public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) {
+public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) : *Array<T> {
     var size = children.size()
     for(var i = 0; i < size; i += 1) {
         var child = children.get(i)
@@ -154,6 +156,7 @@ public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) {
         }
     }
 
+    return children
 }
 
 public struct Identifier {
@@ -168,8 +171,7 @@ public struct Decl {
 }
 
 public struct ImportDecl {
-    stmt: using Stmt
-    moduleName: Token // Identifier?
+    stmt: using Decl    
     alias: Token // Identifier?
     isUsing: bool
     // TODO: moduleId: ModuleId
@@ -289,7 +291,7 @@ public struct FuncBodyStmt {
 
 public struct GotoStmt {
     stmt: using Stmt
-    label: *const char // Identifer?
+    label: Token // Identifer?
 }
 
 public struct IfStmt {
@@ -302,7 +304,7 @@ public struct IfStmt {
 
 public struct LabelStmt {
     stmt: using Stmt
-    label: *const char // Identifier?
+    label: Token // Identifier?
 }
 
 // TODO: should ths be a declaration?
@@ -345,7 +347,7 @@ public struct SwitchCaseStmt {
 public struct SwitchStmt {
     stmt: using Stmt
     cond: *Expr
-    stmts: Array<*SwitchCaseStmt>
+    cases: Array<*SwitchCaseStmt>
     defaultStmt: *Stmt
 }
 
