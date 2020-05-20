@@ -84,6 +84,11 @@ public enum TypeSpecKind {
     MAX_TYPESPEC_KINDS
 }
 
+public enum FuncFlags {
+    HAS_VARARGS = (1<<0),
+    IS_METHOD   = (1<<1),
+}
+
 public struct TypeSpec {
     kind: TypeSpecKind
     pos: SrcPos
@@ -124,6 +129,7 @@ public struct GenericParam {
 public struct Attributes {
     isPublic: bool
     isGlobal: bool
+    isUsing: bool
     notes: Array<*NoteStmt>
 }
 
@@ -157,10 +163,6 @@ public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) : *Array<T
     }
 
     return children
-}
-
-public struct Identifier {
-    // TODO: Is this needed?
 }
 
 public struct Decl {
@@ -199,7 +201,7 @@ public struct FuncDecl {
     decl: using Decl
     genericParams: Array<GenericParam>
     params: *ParametersStmt
-    body: *FuncBodyStmt
+    body: *Stmt
     returnType: *TypeSpec
     flags: i32
 }
@@ -218,8 +220,7 @@ public struct EnumDecl {
 
 public struct TypedefDecl {
     decl: using Decl
-    type: *TypeSpec
-    alias: *const char
+    type: *TypeSpec    
 }
 
 public struct NativeDecl {
@@ -266,7 +267,7 @@ public struct EmptyStmt {
 
 public struct EnumFieldEntryStmt {
     stmt: using Stmt
-    fieldName: *Identifier
+    fieldName: Token
     value: *Expr
     attributes: Attributes
 }
@@ -353,7 +354,7 @@ public struct SwitchStmt {
 
 public struct VarFieldStmt {
     stmt: using Stmt
-    fieldName: *Identifier
+    fieldName: Token
     type: *TypeSpec
     attributes: Attributes
     defaultExpr: *Expr

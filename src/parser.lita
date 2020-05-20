@@ -70,7 +70,7 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
 
     while(!p.atEnd()) {
         var errorCount = p.numOfErrors()
-        p.parseModuleStmt(moduleStmt)
+        p.parseModuleDeclaration(moduleStmt)
 
         if(p.numOfErrors() > errorCount) {
             p.adjust([]TokenType {
@@ -92,7 +92,7 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
     return moduleStmt
 }
 
-func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {    
+func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {    
 
     if(p.match(TokenType.IMPORT)) {
         var importDecl = p.importDeclaration()
@@ -141,6 +141,7 @@ func (p: *Parser) parseModuleStmt(moduleStmt: *ModuleStmt) {
         }
         else {            
             p.errorAtToken(p.peek(), ErrorCode.UNEXPECTED_TOKEN)
+            return;
         }
 
         var decl = moduleStmt.declarations.last()
@@ -195,17 +196,10 @@ func (p: *Parser) notes() : Array<*NoteStmt> {
     while(p.match(TokenType.AT)) {
         var pos = p.prevPos()
 
-        var name = Token {
-            .type = TokenType.ERROR
-        }        
-        
+        var name = p.identifier()
+
         var attributes = Array<Token>{}
         attributes.init(2, p.allocator)
-
-        var nameId = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-        if(nameId) {
-            name = *nameId
-        }
 
         if(p.match(TokenType.LEFT_PAREN)) {
             do {
@@ -226,13 +220,7 @@ func (p: *Parser) notes() : Array<*NoteStmt> {
 func (p: *Parser) varDeclaration() : *Decl {
     var pos = p.prevPos()
 
-    var name = Token {
-        .type = TokenType.ERROR
-    }
-    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-    if(identifier) {
-        name = *identifier
-    }
+    var name = p.identifier()
 
     var type: *TypeSpec = null
     var expr: *Expr = null
@@ -254,13 +242,7 @@ func (p: *Parser) varDeclaration() : *Decl {
 func (p: *Parser) constDeclaration() : *Decl {
     var pos = p.prevPos()
 
-    var name = Token {
-        .type = TokenType.ERROR
-    }
-    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-    if(identifier) {
-        name = *identifier
-    }
+    var name = p.identifier()
 
     var type: *TypeSpec = null
     var expr: *Expr = null
@@ -280,7 +262,64 @@ func (p: *Parser) constDeclaration() : *Decl {
 }
 
 func (p: *Parser) funcDeclaration() : *Decl {
-    return null;
+    var pos = p.prevPos()
+    p.funcLevel += 1;
+    
+    var objectParam: *ParameterDecl = null
+    if(p.match(TokenType.LEFT_PAREN)) {
+        objectParam = p.paramDeclaration()
+        p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    }
+    
+    var name = p.identifier()
+    
+    var genericParams = Array<GenericParam>{}
+    if(p.match(TokenType.LESS_THAN)) {
+        genericParams = p.genericParameters()
+    }
+
+    
+    var parameters = p.parametersStatement();
+    if(objectParam != null) {
+        parameters.params.insertAt(0, objectParam);
+    }
+    
+    
+    var returnType: *TypeSpec = null
+    if(p.match(TokenType.COLON)) {
+        returnType = p.type();
+    }
+    else {
+        returnType = NewVoidTypeSpec(p.pos(), p.allocator)
+    }
+    
+    var flags = 0;
+    if(parameters.isVararg) {
+        flags |= FuncFlags.HAS_VARARGS;
+    }
+    
+    if(objectParam != null) {
+        flags |= FuncFlags.IS_METHOD;
+    }
+            
+    var body: *Stmt = null;
+    if(p.match(TokenType.SEMICOLON)) {
+        body = NewEmptyStmt(p.prevPos(), p.pos(), p.allocator)
+    }
+    else {
+        body = p.statement();
+        
+        // convert to FuncBodyStmt from a block stmt, so that
+        // downstream systems don't have to do funky scope management
+        // with function parameters
+        if(body.kind == StmtKind.BLOCK_STMT) {
+            body.kind = StmtKind.FUNC_BODY_STMT
+        }
+    }
+    
+    p.funcLevel -= 1;
+    
+    return NewFuncDecl(pos, p.pos(), name, genericParams, parameters, body, returnType, flags, p.allocator)
 }
 
 func (p: *Parser) structDeclaration() : *Decl {
@@ -297,6 +336,23 @@ func (p: *Parser) enumDeclaration() : *Decl {
 
 func (p: *Parser) typedefDeclaration() : *Decl {
     return null;
+}
+
+func (p: *Parser) paramDeclaration() : *ParameterDecl {
+    var pos = p.pos()
+
+    var name = p.identifier()
+    p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
+    
+    var isUsing = p.match(TokenType.USING)
+    var type = p.type()
+    
+    var defaultExpr: *Expr = null
+    if(p.match(TokenType.EQUALS)) {
+        defaultExpr = p.constExpression()
+    }
+
+    return NewParameterDecl(pos, p.pos(), name, type, defaultExpr, isUsing, p.allocator) as (*ParameterDecl)
 }
 
 
@@ -322,6 +378,13 @@ func (p: *Parser) expression() : *Expr {
 
         return NewPoisonExpr(pos, p.pos(), p.allocator)
     }
+
+    return expr
+}
+
+func (p: *Parser) constExpression() : *Expr {
+    var expr = p.expression()
+    p.checkConstExpr(expr)
 
     return expr
 }
@@ -1164,6 +1227,34 @@ func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {
     return spec
 }
 
+func (p: *Parser) parametersStatement() : *ParametersStmt {
+    var pos = p.pos()
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN);
+    
+    var params = Array<*ParameterDecl>{}
+    var isVarargs = false;
+    
+    if(!p.check(TokenType.RIGHT_PAREN)) {
+        params.init(8, p.allocator)
+
+        do {                
+            if(p.match(TokenType.VAR_ARGS)) {
+                isVarargs = true;
+                if(!p.check(TokenType.RIGHT_PAREN)) {
+                    p.errorAtToken(p.peek(), ErrorCode.INVALID_VARARG_POSITION);
+                }
+            }
+            else {               
+                var param = p.paramDeclaration();
+                params.add(param);
+            }
+        }
+        while(p.match(TokenType.COMMA));
+    }
+    
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN);
+    return NewParametersStmt(pos, p.pos(), params, isVarargs, p.allocator) as (*ParametersStmt)
+}
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Utility
@@ -1414,6 +1505,18 @@ func (p: *Parser) eatSemicolon() {
     p.match(TokenType.SEMICOLON)
 }
 
+func (p: *Parser) identifier() : Token {
+    var name = Token {
+        .type = TokenType.ERROR
+    }
+    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(identifier) {
+        name = *identifier
+    }
+
+    return name
+}
+
 func (p: *Parser) isIdentifier(expr: *Expr) : bool {
     if(!expr) {
         return false
@@ -1426,9 +1529,75 @@ func (p: *Parser) isIdentifier(expr: *Expr) : bool {
 
 
 func (p: *Parser) isConstNumberExpr(expr: *Expr) : bool {
+    if(!expr) {
+        return false;
+    }
+    
+    switch(expr.kind) {
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.BOOLEAN_EXPR:
+        //case STRING_EXPR:
+        case StmtKind.CHAR_EXPR:
+        //case NULL_EXPR:
+        case StmtKind.IDENTIFIER_EXPR:
+        case StmtKind.GET_EXPR: {
+            return true
+        }
+        case StmtKind.GROUP_EXPR: {
+            var groupExpr = expr as (*GroupExpr)
+            return p.isConstNumberExpr(groupExpr.expr)
+        }
+        case StmtKind.BINARY_EXPR: {
+            var binExpr = expr as (*BinaryExpr)
+            return p.isConstNumberExpr(binExpr.left) &&
+                   p.isConstNumberExpr(binExpr.right)
+        }
+        case StmtKind.UNARY_EXPR: {
+            var unaryExpr = expr as (*UnaryExpr)
+            return p.isConstNumberExpr(unaryExpr.unaryExpr)
+        }
+        default: {
+            return false
+        }
+    }
     return false
 }
 
+
+func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
+    if(!expr) {
+        return false;
+    }
+
+    switch(expr.kind) {
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.BOOLEAN_EXPR:
+        case StmtKind.STRING_EXPR:
+        case StmtKind.CHAR_EXPR:
+        case StmtKind.NULL_EXPR:
+        case StmtKind.IDENTIFIER_EXPR:
+        case StmtKind.GET_EXPR: {
+            return true
+        }
+        case StmtKind.GROUP_EXPR: {
+            var groupExpr = expr as (*GroupExpr)
+            return p.checkConstExpr(groupExpr.expr)
+        }
+        case StmtKind.BINARY_EXPR: {
+            var binExpr = expr as (*BinaryExpr)
+            return p.checkConstExpr(binExpr.left) &&
+                   p.checkConstExpr(binExpr.right)
+        }
+        case StmtKind.UNARY_EXPR: {
+            var unaryExpr = expr as (*UnaryExpr)
+            return p.checkConstExpr(unaryExpr.unaryExpr)
+        }
+        default: {
+            p.errorAtPos(expr.startPos, ErrorCode.INVALID_CONST_EXPR)
+        }
+    }
+    return false
+}
 
 func (p: *Parser) pos() : SrcPos {
     if(!p.atEnd()) {
@@ -1531,6 +1700,10 @@ func (p: *Parser) errorAtToken(token: *Token, errorCode: ErrorCode) {
         p.errorAt(token.type, errorCode)
     }
     
+}
+
+func (p: *Parser) errorAtPos(pos: SrcPos, errorCode: ErrorCode) {
+    p.result.addError(pos,"%s\n", errorCodeText[errorCode])    
 }
 
 func (p: *Parser) errorAt(type: TokenType, errorCode: ErrorCode) {

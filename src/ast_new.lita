@@ -5,6 +5,13 @@ import "types"
 import "mem"
 import "array"
 import "common"
+import "assert"
+
+public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
+    var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, allocator) as (*NameTypeSpec)
+    voidSpec.name = "void" // TODO: Should this be allocated memory?
+    return voidSpec as (*TypeSpec)
+}
 
 public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
     switch(kind) {
@@ -112,6 +119,144 @@ public func NewConstDecl(startPos: SrcPos,
     decl.name = name
     decl.type = type
     decl.expr = expr
+
+    return decl as (*Decl)
+}
+
+
+public func NewFuncDecl(startPos: SrcPos, 
+                         endPos: SrcPos,
+                         name: Token,
+                         genericParams: Array<GenericParam>,
+                         params: *ParametersStmt,
+                         body: *Stmt,
+                         returnType: *TypeSpec,
+                         flags: i32,
+                         allocator: *const Allocator) : *Decl {                              
+    var decl = new<FuncDecl>(allocator)
+    decl.kind = StmtKind.FUNC_DECL;
+    decl.startPos = startPos
+    decl.endPos = endPos
+    decl.name = name
+    decl.genericParams = genericParams
+    decl.params = decl.node.becomeParentOf(params)
+    decl.body = decl.node.becomeParentOf(body)
+    decl.returnType = returnType
+    decl.flags = flags
+
+    return decl as (*Decl)
+}
+
+func NewAggregateDecl(startPos: SrcPos, 
+                      endPos: SrcPos,
+                      name: Token,
+                      genericParams: Array<GenericParam>,
+                      fields: Array<*FieldStmt>,
+                      flags: i32,
+                      allocator: *const Allocator) : *Decl {                              
+    var decl = new<AggregateDecl>(allocator)    
+    decl.startPos = startPos
+    decl.endPos = endPos
+    decl.name = name
+    decl.genericParams = genericParams
+    decl.fields = fields
+    decl.flags = flags
+
+    for(var i = 0; i < fields.size(); i += 1) {
+        var field = fields.get(i)
+        switch(field.kind) {
+            case StmtKind.ENUM_FIELD_STMT: {
+                decl.node.becomeParentOf(field.enumField)
+                break
+            }
+            case StmtKind.UNION_FIELD_STMT:
+            case StmtKind.STRUCT_FIELD_STMT: {
+                decl.node.becomeParentOf(field.aggregateField)
+                break
+            }
+            case StmtKind.VAR_FIELD_STMT: {
+                decl.node.becomeParentOf(field.varField)
+                break
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+
+    return decl as (*Decl)
+}
+
+public func NewStructDecl(startPos: SrcPos, 
+                          endPos: SrcPos,
+                          name: Token,
+                          genericParams: Array<GenericParam>,
+                          fields: Array<*FieldStmt>,
+                          flags: i32,
+                          allocator: *const Allocator) : *Decl {  
+    var aggregate = NewAggregateDecl(startPos, endPos, name, genericParams, fields, flags, allocator)
+    aggregate.kind = StmtKind.STRUCT_DECL;
+    return aggregate
+}
+
+public func NewUnionDecl(startPos: SrcPos, 
+                         endPos: SrcPos,
+                         name: Token,
+                         genericParams: Array<GenericParam>,
+                         fields: Array<*FieldStmt>,
+                         flags: i32,
+                         allocator: *const Allocator) : *Decl {                                  
+    
+    var aggregate = NewAggregateDecl(startPos, endPos, name, genericParams, fields, flags, allocator)
+    aggregate.kind = StmtKind.UNION_DECL;
+    return aggregate
+}
+
+public func NewEnumDecl(startPos: SrcPos, 
+                         endPos: SrcPos,
+                         name: Token,
+                         fields: Array<*EnumFieldEntryStmt>,
+                         allocator: *const Allocator) : *Decl {                              
+    var decl = new<EnumDecl>(allocator)
+    decl.kind = StmtKind.ENUM_DECL;
+    decl.startPos = startPos
+    decl.endPos = endPos
+    decl.name = name    
+    decl.fields = *decl.node.becomeParentOfChildren(fields)
+
+    return decl as (*Decl)
+}
+
+public func NewTypedefDecl(startPos: SrcPos, 
+                         endPos: SrcPos,
+                         name: Token,
+                         type: *TypeSpec,                         
+                         allocator: *const Allocator) : *Decl {                              
+    var decl = new<TypedefDecl>(allocator)
+    decl.kind = StmtKind.TYPEDEF_DECL;
+    decl.startPos = startPos
+    decl.endPos = endPos
+    decl.name = name    
+    decl.type = type
+
+    return decl as (*Decl)
+}
+
+public func NewParameterDecl(startPos: SrcPos, 
+                         endPos: SrcPos,
+                         name: Token,
+                         type: *TypeSpec,
+                         defaultExpr: *Expr,
+                         isUsing: bool,
+                         allocator: *const Allocator) : *Decl {                              
+    var decl = new<ParameterDecl>(allocator)
+    decl.kind = StmtKind.PARAM_DECL;
+    decl.startPos = startPos
+    decl.endPos = endPos
+    decl.name = name    
+    decl.type = type
+    decl.defaultExpr = decl.node.becomeParentOf(defaultExpr)
+    decl.attributes.isUsing = isUsing
 
     return decl as (*Decl)
 }
@@ -605,6 +750,20 @@ public func NewEmptyStmt(startPos: SrcPos,
     stmt.kind = StmtKind.EMPTY_STMT
     stmt.startPos = startPos
     stmt.endPos = endPos
+    return stmt as (*Stmt)
+}
+
+public func NewParametersStmt(startPos: SrcPos,
+                              endPos: SrcPos,
+                              params: Array<*ParameterDecl>,
+                              isVararg: bool,
+                              allocator: *const Allocator) : *Stmt {
+    var stmt = new<ParametersStmt>(allocator)
+    stmt.kind = StmtKind.PARAMETERS_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.params = *stmt.node.becomeParentOfChildren(params)
+    stmt.isVararg = isVararg
     return stmt as (*Stmt)
 }
 

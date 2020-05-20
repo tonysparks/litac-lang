@@ -35,9 +35,9 @@ public func (r: *PhaseResult) addError(pos: SrcPos, format: *const char, ...) {
     var sb = StringBufferInit(256, r.allocator)
     var args: va_list;
     va_start(args, format);    
-    sb.append(format, args)
+    sb.appendArgs(format, args)
     va_end(args)
-
+    
     r.errors.add(PhaseError {
         .type = ErrorType.ERROR,
         .message = sb.cStr(),

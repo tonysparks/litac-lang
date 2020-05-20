@@ -65,10 +65,10 @@ func Printf(indent: i32, format: *const char, ...) {
     for(var i = 0; i < indent; i += 1) {
         printf("    ");
     }
-    
+
     var args: va_list;
     va_start(args, format);    
-    printf(format, args)
+    vprintf(format, args)
     va_end(args)
 }
 
@@ -250,11 +250,12 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
             Printf(indent, "typedef ")
             PrintTypeSpec(decl.type)
-            Printf(indent, " as %s", decl.alias)
+            printf(" as ")
+            PrintName(decl.name)
             return;
         }
         case StmtKind.PARAM_DECL: {
-            var decl = s as (*ParameterDecl)            
+            var decl = s as (*ParameterDecl)
             PrintName(decl.name)
             Printf(indent, ": ")
             PrintTypeSpec(decl.type)
@@ -588,8 +589,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             var expr = s as (*NumberExpr)
             switch(expr.number.type) {
                 case TokenType.INT_NUMBER: {
-                    //Printf(indent, "%llu", expr.number.value.intValue)
-                    printf("%llu", expr.number.value.intValue)
+                    Printf(indent, "%llu", expr.number.value.intValue)
                     break;
                 }
                 case TokenType.FLOAT_NUMBER: {
@@ -682,8 +682,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             return expr as (*Stmt);
         }*/
         default: {
-            // TODO: Error
-            //Panic("Unknown statement kind: %d", kind)
+            Panic("Unknown statement kind: %d", s.kind)
         }
     }    
 }

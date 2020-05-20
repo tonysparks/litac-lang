@@ -1,4 +1,4 @@
-import "../test/ast.lita"
+import "../test/ast.lita" ~
 /* comment */
 
 //var t: i32 = 0
