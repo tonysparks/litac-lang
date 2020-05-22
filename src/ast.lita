@@ -89,6 +89,11 @@ public enum FuncFlags {
     IS_METHOD   = (1<<1),
 }
 
+public enum AggregateFlags {
+    IS_EMBEDDED  = (1<<0),
+    IS_ANONYMOUS = (1<<1),
+}
+
 public struct TypeSpec {
     kind: TypeSpecKind
     pos: SrcPos
@@ -209,7 +214,7 @@ public struct FuncDecl {
 public struct AggregateDecl {
     decl: using Decl
     genericParams: Array<GenericParam>
-    fields: Array<*FieldStmt>
+    fields: Array<FieldStmt>
     flags: i32
 }
 
@@ -220,6 +225,7 @@ public struct EnumDecl {
 
 public struct TypedefDecl {
     decl: using Decl
+    genericParams: Array<GenericParam>
     type: *TypeSpec    
 }
 
@@ -363,8 +369,10 @@ public struct VarFieldStmt {
 public struct FieldStmt {
     kind: StmtKind
     union {
-        enumField: *EnumFieldStmt
-        aggregateField: *AggregateFieldStmt
+        //enumField: *EnumFieldStmt
+        //aggregateField: *AggregateFieldStmt
+        enumField: *EnumDecl
+        aggregateField: *AggregateDecl
         varField: *VarFieldStmt
     }
 }

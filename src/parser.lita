@@ -23,6 +23,7 @@ public struct Parser {
     loopLevel: i32
     switchLevel: i32
     funcLevel: i32
+    aggregateLevel: i32
     result: *PhaseResult
 }
 
@@ -37,6 +38,7 @@ public func ParserInit(filename: *const char,
         .loopLevel = 0,
         .switchLevel = 0,
         .funcLevel = 0,
+        .aggregateLevel = 0,
     }
 
     var lex = LexerInit(filename, text, lita.allocator)
@@ -323,19 +325,97 @@ func (p: *Parser) funcDeclaration() : *Decl {
 }
 
 func (p: *Parser) structDeclaration() : *Decl {
-    return null;
+    return p.aggregateDeclaration(StmtKind.STRUCT_DECL)
 }
 
 func (p: *Parser) unionDeclaration() : *Decl {
-    return null;
+    return p.aggregateDeclaration(StmtKind.UNION_DECL)
+}
+
+func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
+    var pos = p.prevPos()
+    
+    var flags = 0;
+    if(p.aggregateLevel > 0) {
+        flags |= AggregateFlags.IS_EMBEDDED;
+    }
+    
+    var name = Token{
+        .type = TokenType.END_OF_FILE
+    }
+    if(p.check(TokenType.IDENTIFIER)) {            
+        name = p.identifier();
+    }
+    else {        
+        flags |= AggregateFlags.IS_ANONYMOUS;
+    }
+
+    var genericParams = Array<GenericParam>{}
+    if(p.match(TokenType.LESS_THAN)) {
+        genericParams = p.genericParameters();
+    }
+    
+    var fields = Array<FieldStmt>{}
+    p.aggregateLevel += 1;
+    
+    if(!p.match(TokenType.SEMICOLON)) {  
+        p.consume(TokenType.LEFT_BRACE, ErrorCode.MISSING_LEFT_BRACE);
+        fields.init(8, p.allocator)      
+        
+        do {
+            if(p.check(TokenType.RIGHT_BRACE)) {
+                break;
+            }
+            
+            var field = p.fieldStatement(kind == StmtKind.STRUCT_DECL);
+            fields.add(field);
+            
+            p.eatSemicolon();
+        }
+        while(!p.atEnd());
+        p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE);
+    }
+    p.aggregateLevel -= 1;
+                                    
+    return NewAggregateDecl(pos, p.pos(), kind, name, genericParams, fields, flags, p.allocator)
 }
 
 func (p: *Parser) enumDeclaration() : *Decl {
-    return null;
+    var pos = p.prevPos()
+    var name = p.identifier()
+
+    p.consume(TokenType.LEFT_BRACE, ErrorCode.MISSING_LEFT_BRACE);
+
+    var fields = Array<*EnumFieldEntryStmt>{}
+    fields.init(16, p.allocator)
+
+    do {
+        if(p.check(TokenType.RIGHT_BRACE)) {
+            break;
+        }
+        
+        var field = p.enumFieldEntryStatement()
+        fields.add(field);        
+    }
+    while(p.match(TokenType.COMMA));
+
+    p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE);
+
+    return NewEnumDecl(pos, p.pos(), name, fields, p.allocator)
 }
 
 func (p: *Parser) typedefDeclaration() : *Decl {
-    return null;
+    var pos = p.prevPos()
+    var aliasedType = p.type()    
+    p.match(TokenType.AS)
+    var name = p.identifier()
+
+    var genericParams = Array<GenericParam>{}
+    if(p.match(TokenType.LESS_THAN)) {
+        genericParams = p.genericParameters();
+    }
+
+    return NewTypedefDecl(pos, p.pos(), name, genericParams, aliasedType, p.allocator)
 }
 
 func (p: *Parser) paramDeclaration() : *ParameterDecl {
@@ -1461,6 +1541,88 @@ func (p: *Parser) tryArrayDesignationExpr() : *Expr {
     }
 
     return designatorExpr
+}
+
+func (p: *Parser) fieldStatement(isStruct: bool) : FieldStmt {
+    var pos = p.pos()
+    var notes = p.notes()
+
+    switch(p.peek().type) {
+        case TokenType.IDENTIFIER: {
+            var fieldName = p.identifier();
+            p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
+            var attributes = Attributes{}
+            attributes.isUsing = p.match(TokenType.USING)
+            attributes.notes = notes
+            var type = p.type()
+            var defaultExpr: *Expr = null
+            if(p.match(TokenType.EQUALS)) {
+                if(!isStruct) {
+                    p.errorAtToken(p.previous(), ErrorCode.INVALID_DEFAULT_ASSIGNMENT)
+                }
+                defaultExpr = p.constExpression()
+            }
+            var varField = NewVarFieldStmt(pos, p.pos(), fieldName, type, attributes, defaultExpr, p.allocator);
+            return FieldStmt {
+                .kind = StmtKind.VAR_FIELD_STMT,
+                .varField = varField as (*VarFieldStmt)
+            }
+        }
+        case TokenType.STRUCT: {
+            p.advance()
+            var structField = p.structDeclaration()
+            structField.startPos = pos
+            structField.attributes.notes = notes
+            return FieldStmt {
+                .kind = StmtKind.STRUCT_FIELD_STMT,
+                .aggregateField = structField as (*AggregateDecl)
+            }
+        }
+        case TokenType.UNION: {
+            p.advance()
+            var unionField = p.unionDeclaration()
+            unionField.startPos = pos
+            unionField.attributes.notes = notes
+            return FieldStmt {
+                .kind = StmtKind.UNION_FIELD_STMT,
+                .aggregateField = unionField as (*AggregateDecl)
+            }
+        }
+        case TokenType.ENUM: {
+            p.advance()
+            var enumField = p.enumDeclaration()
+            enumField.startPos = pos
+            enumField.attributes.notes = notes
+            return FieldStmt {
+                .kind = StmtKind.ENUM_FIELD_STMT,
+                .enumField = enumField as (*EnumDecl)
+            }
+        }
+        default: {
+            p.errorAtToken(p.peek(), ErrorCode.INVALID_FIELD)
+        }
+    }
+
+    return FieldStmt {
+        .kind = StmtKind.POISON_EXPR
+    }
+}
+
+func (p: *Parser) enumFieldEntryStatement() : *EnumFieldEntryStmt {
+    var pos = p.pos()    
+    var notes = p.notes()
+    var fieldName = p.identifier()
+
+    var value: *Expr = null
+    if(p.match(TokenType.EQUALS)) {
+        value = p.constExpression()
+    }
+
+    var attributes = Attributes {
+        .notes = notes
+    }
+
+    return NewEnumFieldEntryStmt(pos, p.pos(), fieldName, value, attributes, p.allocator) as (*EnumFieldEntryStmt)
 }
 
 func (p: *Parser) rewindTo(backtrack: i32, numOfErrors: i32) {

@@ -147,14 +147,16 @@ public func NewFuncDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-func NewAggregateDecl(startPos: SrcPos, 
+public func NewAggregateDecl(startPos: SrcPos, 
                       endPos: SrcPos,
+                      kind: StmtKind,
                       name: Token,
                       genericParams: Array<GenericParam>,
-                      fields: Array<*FieldStmt>,
+                      fields: Array<FieldStmt>,
                       flags: i32,
                       allocator: *const Allocator) : *Decl {                              
     var decl = new<AggregateDecl>(allocator)    
+    decl.kind = kind
     decl.startPos = startPos
     decl.endPos = endPos
     decl.name = name
@@ -191,25 +193,23 @@ public func NewStructDecl(startPos: SrcPos,
                           endPos: SrcPos,
                           name: Token,
                           genericParams: Array<GenericParam>,
-                          fields: Array<*FieldStmt>,
+                          fields: Array<FieldStmt>,
                           flags: i32,
                           allocator: *const Allocator) : *Decl {  
-    var aggregate = NewAggregateDecl(startPos, endPos, name, genericParams, fields, flags, allocator)
-    aggregate.kind = StmtKind.STRUCT_DECL;
-    return aggregate
+    return NewAggregateDecl(startPos, endPos, StmtKind.STRUCT_DECL, 
+                                name, genericParams, fields, flags, allocator)    
 }
 
 public func NewUnionDecl(startPos: SrcPos, 
                          endPos: SrcPos,
                          name: Token,
                          genericParams: Array<GenericParam>,
-                         fields: Array<*FieldStmt>,
+                         fields: Array<FieldStmt>,
                          flags: i32,
                          allocator: *const Allocator) : *Decl {                                  
     
-    var aggregate = NewAggregateDecl(startPos, endPos, name, genericParams, fields, flags, allocator)
-    aggregate.kind = StmtKind.UNION_DECL;
-    return aggregate
+    return NewAggregateDecl(startPos, endPos, StmtKind.UNION_DECL, 
+                                name, genericParams, fields, flags, allocator)
 }
 
 public func NewEnumDecl(startPos: SrcPos, 
@@ -230,6 +230,7 @@ public func NewEnumDecl(startPos: SrcPos,
 public func NewTypedefDecl(startPos: SrcPos, 
                          endPos: SrcPos,
                          name: Token,
+                         genericParams: Array<GenericParam>,
                          type: *TypeSpec,                         
                          allocator: *const Allocator) : *Decl {                              
     var decl = new<TypedefDecl>(allocator)
@@ -237,6 +238,7 @@ public func NewTypedefDecl(startPos: SrcPos,
     decl.startPos = startPos
     decl.endPos = endPos
     decl.name = name    
+    decl.genericParams = genericParams
     decl.type = type
 
     return decl as (*Decl)
@@ -764,6 +766,42 @@ public func NewParametersStmt(startPos: SrcPos,
     stmt.endPos = endPos
     stmt.params = *stmt.node.becomeParentOfChildren(params)
     stmt.isVararg = isVararg
+    return stmt as (*Stmt)
+}
+
+
+public func NewVarFieldStmt(startPos: SrcPos,
+                            endPos: SrcPos,
+                            fieldName: Token,
+                            type: *TypeSpec,
+                            attributes: Attributes,
+                            defaultExpr: *Expr,
+                            allocator: *const Allocator) : *Stmt {
+    var stmt = new<VarFieldStmt>(allocator)
+    stmt.kind = StmtKind.VAR_FIELD_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.fieldName = fieldName
+    stmt.type = type
+    stmt.attributes = attributes
+    stmt.defaultExpr = stmt.node.becomeParentOf(defaultExpr)    
+    return stmt as (*Stmt)
+}
+
+
+public func NewEnumFieldEntryStmt(startPos: SrcPos,
+                            endPos: SrcPos,
+                            fieldName: Token,
+                            value: *Expr,
+                            attributes: Attributes,
+                            allocator: *const Allocator) : *Stmt {
+    var stmt = new<EnumFieldEntryStmt>(allocator)
+    stmt.kind = StmtKind.ENUM_FIELD_ENTRY_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.fieldName = fieldName
+    stmt.attributes = attributes
+    stmt.value = stmt.node.becomeParentOf(value)
     return stmt as (*Stmt)
 }
 

@@ -139,12 +139,12 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
                     case StmtKind.ENUM_FIELD_STMT: {
-                        PrintStmt(field.enumField, indent+1)
+                        PrintStmt(field.enumField as (*Stmt), indent+1)
                         break;
                     }
                     case StmtKind.STRUCT_FIELD_STMT: 
                     case StmtKind.UNION_FIELD_STMT: {
-                        PrintStmt(field.aggregateField, indent+1)
+                        PrintStmt(field.aggregateField as (*Stmt), indent+1)
                         break;
                     }
                     case StmtKind.VAR_FIELD_STMT: {
@@ -178,12 +178,12 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
                     case StmtKind.ENUM_FIELD_STMT: {
-                        PrintStmt(field.enumField, indent+1)
+                        PrintStmt(field.enumField as (*Stmt), indent+1)
                         break;
                     }
                     case StmtKind.STRUCT_FIELD_STMT: 
                     case StmtKind.UNION_FIELD_STMT: {
-                        PrintStmt(field.aggregateField, indent+1)
+                        PrintStmt(field.aggregateField as (*Stmt), indent+1)
                         break;
                     }
                     case StmtKind.VAR_FIELD_STMT: {
