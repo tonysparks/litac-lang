@@ -4,6 +4,7 @@ import "lex"
 import "array"
 import "mem"
 import "common"
+import "module"
 
 public enum StmtKind {
     IMPORT_DECL,
@@ -16,6 +17,7 @@ public enum StmtKind {
     TYPEDEF_DECL,
     PARAM_DECL,
     NATIVE_DECL,
+    POISON_DECL,
 
     BLOCK_STMT,
     BREAK_STMT,
@@ -181,7 +183,6 @@ public struct ImportDecl {
     stmt: using Decl    
     alias: Token // Identifier?
     isUsing: bool
-    // TODO: moduleId: ModuleId
 }
 
 public struct VarDecl {
@@ -232,6 +233,10 @@ public struct TypedefDecl {
 public struct NativeDecl {
     decl: using Decl
     type: *TypeInfo
+}
+
+public struct PoisonDecl {
+    decl: using Decl
 }
 
 public struct BlockStmt {
@@ -475,7 +480,7 @@ public struct NumberExpr {
 public struct OffsetOfExpr {
     expr: using Expr
     type: *TypeSpec
-    field: *const char // Identifier?
+    field: Token // Identifier?
 }
 
 public struct SetExpr {
@@ -519,7 +524,7 @@ public struct TernaryExpr {
 
 public struct TypeIdentifierExpr {
     expr: using Expr
-    genericArgs: Array<*TypeSpec>
+    //genericArgs: Array<*TypeSpec>
     type: *TypeSpec
     sym: Symbol
 }
@@ -542,4 +547,41 @@ public struct PoisonExpr {
 
 public struct Expr {
     stmt: using Stmt
+}
+
+
+public func IsExpr(node: *Node) : bool {
+    if(!node) return false;
+
+    switch(node.kind) {
+        case StmtKind.ARRAY_DESIGNATION_EXPR:
+        case StmtKind.ARRAY_INIT_EXPR:
+        case StmtKind.BINARY_EXPR:
+        case StmtKind.BOOLEAN_EXPR:
+        case StmtKind.CAST_EXPR:
+        case StmtKind.CHAR_EXPR:
+        case StmtKind.FUNC_CALL_EXPR:
+        case StmtKind.FUNC_IDENTIFIER_EXPR:
+        case StmtKind.GET_EXPR:
+        case StmtKind.GROUP_EXPR:
+        case StmtKind.IDENTIFIER_EXPR:
+        case StmtKind.INIT_EXPR:
+        case StmtKind.INIT_ARG_EXPR:
+        case StmtKind.NULL_EXPR:
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.OFFSET_OF_EXPR:
+        case StmtKind.SET_EXPR: 
+        case StmtKind.SIZE_OF_EXPR:
+        case StmtKind.STRING_EXPR:   
+        case StmtKind.SUBSCRIPT_GET_EXPR:
+        case StmtKind.SUBSCRIPT_SET_EXPR:
+        case StmtKind.TERNARY_EXPR:
+        case StmtKind.TYPE_IDENTIFIER_EXPR:
+        case StmtKind.TYPE_OF_EXPR:
+        case StmtKind.UNARY_EXPR:
+        case StmtKind.POISON_EXPR:
+            return true;
+        default: 
+            return false;
+    }
 }

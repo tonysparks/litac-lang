@@ -276,7 +276,9 @@ const escapeToChar = [256]char {
 };
 
 public struct SrcPos {
-    filename: *const char    
+    filename: *const char
+    lineStart: *const char
+
     start: *const char
     end: *const char
     lineNumber: i32
@@ -296,6 +298,21 @@ public struct Token {
     pos: SrcPos
     value: Value
 }
+
+public func (p: *SrcPos) getLineLength() : i32 {
+    if(!p.lineStart) return -1
+
+    var len = 0
+    while(p.lineStart[len] != '\0') {
+        if(p.lineStart[len] == '\n') {
+            break
+        }
+        len += 1
+    }
+
+    return len
+}
+
 
 public func (t: *Token) asString() : *const char {
     return tokenText[t.type]
@@ -319,6 +336,7 @@ public func (token: *Token) print() {
     }
     printf("\n")
 }
+
 
 public struct Lexer {
     allocator: *const Allocator
@@ -348,6 +366,7 @@ public func LexerInit(filename: *const char,
             }         
         },
         .stream = text,
+        .lineStart = text,
         .lineNumber = 1,
         .position = 1,
         .errorMsg = null,
@@ -371,17 +390,16 @@ func (l: *Lexer) error(format: *const char, ...) {
 }
 
 func (l: *Lexer) nextChar() : char {
-    l.stream += 1
-    l.position += 1
-
     var c = *l.stream
     if(c == '\n') {
-        l.lineStart = l.stream;
+        l.lineStart = l.stream + 1;
         l.lineNumber += 1;
         l.position = 1;
     }
 
-    return c
+    l.stream += 1
+    l.position += 1
+    return *l.stream
 }
 
 @inline
@@ -391,12 +409,15 @@ func (l: *Lexer) peekChar() : char {
 
 func (l: *Lexer) eofToken() : Token {
     l.token.type = TokenType.END_OF_FILE
-    l.token.pos = SrcPos{}
+    l.token.pos.lineStart = l.lineStart
+    l.token.pos.lineNumber = l.lineNumber
+    l.token.pos.position = l.position
     return l.token
 }
 
 func (l: *Lexer) errorToken() : Token {
     l.token.type = TokenType.ERROR    
+    l.token.pos.lineStart = l.lineStart
     l.token.pos.lineNumber = l.lineNumber
     l.token.pos.position = l.position
     return l.token
@@ -477,6 +498,7 @@ func (l: *Lexer) scanWord() : Token {
     }
     
     l.token.pos.end = l.stream
+    //l.token.pos.lineNumber = l.lineNumber
     l.token.type = TokenType.IDENTIFIER
     l.token.value.str = StringViewInit(l.token.pos.start, length)
 
@@ -728,6 +750,7 @@ func (l: *Lexer) scanNumber() : Token {
 
     l.token.pos.end = l.stream
     l.token.pos.position += (l.stream - start)
+    //l.token.pos.lineNumber = l.lineNumber
     return l.token
 }
 
@@ -740,8 +763,8 @@ func (l: *Lexer) scanString() : Token {
             l.nextChar()
             l.nextChar()
         }
-        
-        var c = l.nextChar()
+                
+        l.nextChar()
         
         l.token.value.str.buffer = l.stream
         while(!l.eof()) {
@@ -765,6 +788,7 @@ func (l: *Lexer) scanString() : Token {
     l.token.type = TokenType.STRING
     l.token.value.str.length = length
     l.token.pos.end = l.stream
+    //l.token.pos.lineNumber = l.lineNumber
     return l.token
 }
 
@@ -977,6 +1001,7 @@ func (l: *Lexer) scanSymbol() : Token {
     }
     
     l.token.pos.end = l.stream
+    //l.token.pos.lineNumber = l.lineNumber
     return l.token
 }
 
@@ -993,6 +1018,8 @@ repeat:
     }
     l.skipComments()
 
+    l.token.pos.lineNumber = l.lineNumber
+    l.token.pos.lineStart = l.lineStart
     l.token.pos.start = l.stream
     l.token.typeInfo = null
 

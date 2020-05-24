@@ -1,9 +1,21 @@
-import "../test/ast.lita" ~
+import "test2"
 /* comment */
 
 //var t: i32 = 0
+//func x[]
+
+func test(a: i32) : *void {
+    if(true) {
+        var x = 1
+    }
+    else {
+        var y = 2
+    }
+
+}
 
 var b: f32 = 1 + 2 // + (7 ^ 2)
+
 /*
 func test(){var selfHosted=true
     var x: i32 = 0

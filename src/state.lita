@@ -1,24 +1,45 @@
 import "mem"
 import "phase_result"
+import "array"
+import "map"
+import "module"
+import "string_view"
 
 public struct Lita {
-    allocator: *const Allocator
+    allocator: *const Allocator // TODO proper arena allocator
     result: PhaseResult
+    modules: Map<*const char, *Module>
+    options: *LitaOptions
 }
 
-var arena: Arena;
+public struct LitaOptions {
+    srcPath: *const char        // the directory of where the main source module is
+    libPath: *const char        // optional configurable path to modules for libraries
+    litaPath: *const char       // the LITAC_HOME environment variable for standard lita modules
+}
 
-public func LitaInit() : Lita {
-    arena.init()
+public func LitaInit(options: *LitaOptions) : Lita {    
+    debugAllocator.init()
 
     var c = Lita {
-        .allocator = defaultAllocator
-            //(&arena) as (*const Allocator)
+        .allocator = debugAllocator as (*const Allocator),
+        .options = options            
     }
     c.result = PhaseResultInit(c.allocator)
+    c.modules = StrMap<*Module>(null, 32, c.allocator)
     return c
 }
 
-public func LitaDestroy() {
-    arena.free()
+public func (lita: *Lita) free() {    
+    var allocator: *DebugAllocator = lita.allocator as (*DebugAllocator)    
+    for(var i = 0; i < allocator.allocations.size(); i += 1) {
+        var a = allocator.allocations.get(i)
+        allocator.decorated.free(a.addr)
+        allocator.decorated.free(a)
+    }
+    debugAllocator.free()
+}
+
+public func (lita: *Lita) addModule(module: *Module) {
+    lita.modules.put(module.id.filename, module)    
 }

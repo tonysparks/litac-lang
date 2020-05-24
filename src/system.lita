@@ -16,6 +16,9 @@ typedef struct stat FileStat;
 """);
 
 @foreign
+public const MAX_PATH: i32;
+
+@foreign
 struct FileStat;
 
 @foreign

@@ -9,41 +9,94 @@ import "ast_print"
 import "parser"
 import "phase_result"
 import "system"
+import "array"
+import "map"
+import "error_codes"
+import "module"
+import "string"
+import "string_view"
 
 func main(len: i32, args: **char) {
     SystemInit()
 
-    var lita = LitaInit()
-    defer LitaDestroy()
-
+    var options = LitaOptions {
+        .srcPath = "../test",
+        .libPath = null,
+        .litaPath = GetEnv("LITAC_HOME")
+    }
     var filename = "../test/test.lita"
 
-    var text: *char = null;
-    defer if(text) lita.allocator.free(text)
+
+    var lita = LitaInit(&options)
+    defer lita.free()
 
     var startTime = SystemTimeMSec()    
-    var status = ReadFile(filename, &text, lita.allocator) 
-    if(status == FileStatus.FileNotFoundError) {
-        printf("Could not open file '%s'\n", filename)
-        exit(1)
+
+    var root = NewModule(lita.allocator)
+    root.id.fromFile(lita, filename)
+
+    lita.addModule(root)
+    
+    var pos = SrcPos{}
+
+    ReadModuleText(lita, root, pos)
+    ParseModule(lita, root, pos)
+
+    for(var i = 0; i < root.ast.imports.size(); i += 1) {
+        var importStmt = root.ast.imports.get(i)
+        if(importStmt.name.type == TokenType.ERROR) {
+            lita.result.addError(importStmt.pos, "Could not parse import statement")
+            continue
+        }
+
+        var filename: [MAX_PATH]char
+        if(!FindModulePath(lita, importStmt.name.value.str, filename)) {  
+            lita.result.addError(importStmt.pos, "Could not find module '%s'", importStmt.name.value.str)
+            continue
+        }
+
+        if(lita.modules.contains(filename)) {
+            continue;
+        }        
+
+        
+        var module = NewModule(lita.allocator)
+        module.id.fromFile(lita, filename)
+
+        lita.addModule(module)
+
+
+        if(!ReadModuleText(lita, module, importStmt.pos)) {
+            continue
+        }
+
+        ParseModule(lita, module, importStmt.pos)
     }
 
-    if(status == FileStatus.IOError) {
-        printf("Could not read file '%s'\n", filename)
-        exit(1)
+    printf("Total parse time: %f\n", SystemTimeMSec() - startTime)
+
+    if(!lita.result.errors.empty()) {
+        for(var i = 0; i < lita.result.errors.size(); i += 1) {
+            PrintError(lita.result.errors.get(i))
+        }
     }
 
-    var parser = ParserInit(filename, text, &lita)
-    var moduleStmt = parser.parseModule()
-    printf("Total time: %f\n", SystemTimeMSec() - startTime)
-
-    if(moduleStmt) {
-        printf("Printing AST...\n\n")
-        PrintStmt(moduleStmt)
+    for(var it = lita.modules.iter(); it.hasNext();) {
+        var entry = it.next()
+        printf("Printing AST for '%s'...\n\n", entry.key)
+        PrintStmt(entry.value.ast)
         printf("\n")
     }
-
+/*
+    if(root.ast) {
+        printf("Printing AST...\n\n")
+        PrintStmt(root.ast)
+        printf("\n")
+    }
+*/
     
+
+    /*
     var lex = LexerInit(filename, text, lita.allocator)    
     while(!lex.eof()) {
         var token = lex.nextToken()
@@ -64,5 +117,71 @@ func main(len: i32, args: **char) {
             printf("error: '%s'", lex.errorMsg)
         }
         printf("\n")
+    }*/
+}
+
+// TODO: Handle module names with packages
+func FindModulePath(lita: *Lita, 
+                    moduleName: StringView, 
+                    filename: [MAX_PATH]char) : bool {    
+
+    var pathStr = StringInit(filename, MAX_PATH);
+/*
+    var pathStr = StringInit(moduleId.filename, MAX_PATH);
+    defer {
+        moduleId.packageName = StringViewInit(pathStr.str, 0) // TODO
+        moduleId.name = GetModuleName(pathStr.asView())
     }
+*/
+    if(lita.options.srcPath) {        
+        pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
+        //printf("Check: '%s'\n", pathStr.cStr())
+        if(FileExists(pathStr.cConstStr())) {            
+            return true
+        }
+    }
+    if(lita.options.libPath) {
+        pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
+        //printf("Check: '%s'\n", pathStr.cStr())
+        if(FileExists(pathStr.cConstStr())) {
+            return true
+        }
+    }
+    if(lita.options.litaPath) {
+        pathStr.format("%s/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
+        //printf("Check: '%s'\n", pathStr.cStr())
+        if(FileExists(pathStr.cConstStr())) {
+            return true
+        }
+    }
+
+    pathStr.clear()
+    return false
+}
+
+func ReadModuleText(lita: *Lita, 
+                    module: *Module, 
+                    pos: SrcPos) : bool {    
+
+    var status = ReadFile(module.id.filename, &module.text, lita.allocator) 
+    if(status == FileStatus.FileNotFoundError) {
+        lita.result.addError(pos, "Could not open file '%s'\n", module.id.filename)
+        return false
+    }
+
+    if(status == FileStatus.IOError) {
+        lita.result.addError(pos, "Could not read file '%s'\n", module.id.filename)
+        return false
+    }
+
+    return true
+}
+
+func ParseModule(lita: *Lita, 
+                 module: *Module,
+                 pos: SrcPos) {
+
+    var parser = ParserInit(module.id.filename, module.text, lita)
+    var moduleStmt = parser.parseModule()
+    module.ast = moduleStmt
 }

@@ -1,0 +1,5 @@
+var someVar = 43
+func SomeTest() : i32 
+{
+    return someVar
+}

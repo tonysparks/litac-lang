@@ -1,0 +1,66 @@
+import "ast"
+import "array"
+import "phase_result"
+import "string"
+import "string_view"
+import "system"
+import "state"
+import "libc"
+import "mem"
+
+public struct ModuleId {    
+    filename: [MAX_PATH]char   // full path the file of this module
+    packageName: StringView    // relative path from the main module's directory
+    name: StringView           // the name of the module 
+}
+
+public struct Module {
+    id: ModuleId       // TODO: don't make a separate allocation
+    text: *char         // text of modules file
+    ast: *ModuleStmt
+    //result: PhaseResult
+    //decls: Array<*Decl>
+}
+
+public func NewModule(allocator: *const Allocator) : *Module {
+    var mod = new<Module>(allocator)    
+    mod.text = null
+    mod.ast = null
+    return mod
+}
+
+public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {
+    var pathStr = StringViewInit(filename);    
+    pathStr.copyTo(moduleId.filename, pathStr.length)
+
+    moduleId.packageName = StringViewInit(moduleId.filename, 0)
+    moduleId.name = GetModuleName(pathStr)
+}
+
+public func GetModuleName(pathStr: StringView) : StringView {
+    var endIndex = -1
+    var startIndex = -1
+    for(var i = pathStr.length - 1; i >= 0; i -= 1) {
+        var c = pathStr.buffer[i]
+        if(c == '.' && endIndex < 0) {
+            endIndex = i
+        }
+        else if(c == '/') {
+            startIndex = i
+            break
+        }
+    }
+
+    if(endIndex < 0 || startIndex < 0 || startIndex > endIndex) {
+        return StringView {
+            .buffer = 0,
+            .length = 0
+        }
+    }
+
+    return StringView {
+        .buffer = pathStr.buffer + startIndex,
+        .length = endIndex - startIndex
+    }
+}
+

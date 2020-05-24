@@ -1,3 +1,6 @@
+import "phase_result"
+import "libc"
+
 public enum ErrorCode {
     INVALID_ASSIGNMENT,
     INVALID_CONST_EXPR,
@@ -73,7 +76,7 @@ public const errorCodeText = []*const char {
     [ErrorCode.MISSING_IDENTIFIER] = "Missing identifier",
     [ErrorCode.MISSING_RIGHT_BRACKET] = "Missing ]",
     [ErrorCode.MISSING_RIGHT_PAREN] = "Missing )",
-    [ErrorCode.MISSING_LEFT_PAREN] = "Missing ]",
+    [ErrorCode.MISSING_LEFT_PAREN] = "Missing (",
     [ErrorCode.MISSING_LEFT_BRACE] = "Missing {",
     [ErrorCode.MISSING_ARRAY_BRACKETS] = "Missing []",
     [ErrorCode.MISSING_COLON] = "Missing :",
@@ -95,4 +98,31 @@ public const errorCodeText = []*const char {
     [ErrorCode.TOO_MANY_ERRORS] = "Too many syntax errors",
 
     [ErrorCode.MAX_NUM_ERROR_CODES] = ""
+}
+
+
+public func PrintError(error: PhaseError) {    
+    if(!error.pos.lineStart) {
+        printf("%s\n", error.message)
+        return;
+    }
+
+    printf("Error at line %d in '%s'\n", error.pos.lineNumber, error.pos.filename)    
+    printf("%.*s\n", error.pos.getLineLength(), error.pos.lineStart)
+    var spaceCount = 0
+    while(true) {
+        var c = error.pos.lineStart[spaceCount]
+        if(c == '\0') {
+            break;
+        }
+        if((error.pos.lineStart + spaceCount) == error.pos.start) {
+            break;
+        }
+
+        spaceCount += 1
+    }
+    for(var i = 0; i < spaceCount; i += 1) {
+        printf(" ")
+    }
+    printf("^\n*** %s\n", error.message)
 }

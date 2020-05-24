@@ -12,10 +12,14 @@ import "state"
 import "common"
 import "libc"
 import "assert"
+import "module"
 import "string_buffer"
 
 public struct Parser {
     allocator: *const Allocator    
+    result: *PhaseResult
+    lita: *Lita
+
     tokens: Array<Token>
     current: i32
     currentPos: SrcPos
@@ -24,16 +28,16 @@ public struct Parser {
     switchLevel: i32
     funcLevel: i32
     aggregateLevel: i32
-    result: *PhaseResult
 }
 
 public func ParserInit(filename: *const char, 
-                      text: *const char,
-                      lita: *Lita) : Parser {
+                       text: *const char,
+                       lita: *Lita) : Parser {
 
     var parser = Parser {
         .allocator = lita.allocator,
         .result = &lita.result,
+        .lita = lita,
         .breakLevel = 0,
         .loopLevel = 0,
         .switchLevel = 0,
@@ -47,6 +51,11 @@ public func ParserInit(filename: *const char,
     while(!lex.eof()) {
         var token = lex.nextToken()
         parser.tokens.add(token)
+    }
+
+    // ensure there is always at least one token
+    if(parser.tokens.empty()) {
+        parser.tokens.add(Token{.type = TokenType.END_OF_FILE})
     }
 
     return parser
@@ -181,8 +190,6 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
         }
     }
 
-    // TODO: Lookup physical file and calculate ModuleId
-    //decl.moduleId = //
     return NewImportDecl(pos, p.pos(), moduleName, alias, isUsing, p.allocator) as (*ImportDecl)    
 }
 
@@ -308,7 +315,7 @@ func (p: *Parser) funcDeclaration() : *Decl {
     if(p.match(TokenType.SEMICOLON)) {
         body = NewEmptyStmt(p.prevPos(), p.pos(), p.allocator)
     }
-    else {
+    else {    
         body = p.statement();
         
         // convert to FuncBodyStmt from a block stmt, so that
@@ -467,6 +474,108 @@ func (p: *Parser) constExpression() : *Expr {
     p.checkConstExpr(expr)
 
     return expr
+}
+
+func (p: *Parser) group() : *Expr {
+    var pos = p.prevPos()
+    var expr = p.expression()
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    return NewGroupExpr(pos, p.pos(), expr, p.allocator)
+}
+
+func (p: *Parser) arrayInit() : *Expr {
+    var pos = p.prevPos()
+    var type = p.type()
+    if(type.kind != TypeSpecKind.ARRAY) {
+        p.errorAtPos(type.pos, ErrorCode.MISSING_LEFT_BRACE)        
+    }
+
+    var values = Array<*Expr>{}
+    if(p.match(TokenType.LEFT_BRACE)) {
+        values.init(16, p.allocator)
+        values = p.arrayArguments()
+    }
+
+    return NewArrayInitExpr(pos, p.pos(), type, values, p.allocator)
+}
+
+func (p: *Parser) aggregateInit() : *Expr {
+    var pos = p.prevPos()
+    var arguments = p.structArguments()
+    return NewInitExpr(pos, p.pos(), null, arguments, p.allocator)
+}
+
+func (p: *Parser) sizeOf() : *Expr {
+    var pos = p.prevPos()
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)
+    var isType = p.match(TokenType.COLON)
+    var expr: *Expr = null
+    var type: *TypeSpec = null
+
+    var backtrack = p.current
+
+    if(isType) {
+        type = p.type(true)
+
+        if(p.check(TokenType.DOT)) {
+            p.current = backtrack
+            expr = p.unary()
+            if(type) {
+                p.allocator.free(type)
+            }
+        }
+        else {
+            expr = NewTypeIdentifierExpr(type.pos, p.pos(), type, p.allocator)
+        }
+    }
+    else {
+        expr = p.unary()
+    }
+
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    return NewSizeOfExpr(pos, p.pos(), expr, p.allocator)
+
+}
+
+func (p: *Parser) typeOf() : *Expr {
+    var pos = p.prevPos()
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)
+    var isType = p.match(TokenType.COLON)
+    var expr: *Expr = null
+    var type: *TypeSpec = null
+
+    var backtrack = p.current
+
+    if(isType) {
+        type = p.type(true)
+
+        if(p.check(TokenType.DOT)) {
+            p.current = backtrack
+            expr = p.unary()
+            if(type) {
+                p.allocator.free(type)
+            }
+        }
+        else {
+            expr = NewTypeIdentifierExpr(type.pos, p.pos(), type, p.allocator)
+        }
+    }
+    else {
+        expr = p.unary()
+    }
+
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    return NewTypeOfExpr(pos, p.pos(), expr, type, p.allocator)
+}
+
+func (p: *Parser) offsetOf() : *Expr {
+    var pos = p.prevPos()
+    p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)
+    var type = p.type(true)
+    p.consume(TokenType.COMMA, ErrorCode.MISSING_COMMA)
+    var fieldName = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
+    return NewOffsetOfExpr(pos, p.pos(), type, fieldName, p.allocator)
 }
 
 
@@ -720,7 +829,7 @@ func (p: *Parser) functionCall() : *Expr {
             expr = NewInitExpr(expr.startPos, p.pos(), idExpr.type, arguments, p.allocator)
         }
         else if(p.match(TokenType.LEFT_BRACKET)) {
-            var index = p.expression()
+            var index = p.expression()            
             p.consume(TokenType.RIGHT_BRACKET, ErrorCode.MISSING_RIGHT_BRACKET)
 
             expr = NewSubscriptGetExpr(expr.startPos, p.pos(), expr, index, p.allocator)
@@ -771,6 +880,36 @@ func (p: *Parser) primary() : *Expr {
         return NewCharExpr(pos, p.pos(), token, p.allocator)
     }
 
+    if(p.match(TokenType.LEFT_PAREN)) {
+        return p.group()
+    }
+
+    if(p.match(TokenType.LEFT_BRACKET)) {
+        return p.arrayInit()
+    }
+
+    if(p.match(TokenType.LEFT_BRACE)) {
+        return p.aggregateInit()
+    }
+
+    if(p.match(TokenType.SIZEOF)) {
+        return p.sizeOf()
+    }
+
+    if(p.match(TokenType.TYPEOF)) {
+        return p.typeOf()
+    }
+
+    if(p.match(TokenType.OFFSETOF)) {
+        return p.offsetOf()
+    }
+
+    if(p.check(TokenType.IDENTIFIER)) {
+        var name = p.identifierType(true)
+        return NewIdentifierExpr(pos, p.pos(), name, p.allocator)
+    }
+
+    //printf("Token: %d %s\n", token.pos.lineNumber, tokenText[token.type])
     p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
     return NewPoisonExpr(token.pos, p.pos(), p.allocator)
 }
@@ -805,7 +944,6 @@ func (p: *Parser) cast(expr: *Expr) : *Expr {
 
 func (p: *Parser) statement() : *Stmt {
     var pos = p.pos()
-
     var errorCount = p.numOfErrors()
     var stmt = p.tryStatement()
     if(p.numOfErrors() > errorCount) {
@@ -1238,16 +1376,22 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
     return null
 }
 
-func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
-    var token = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-    var sb = StringBufferInit(token.value.str.length, p.allocator)
-    sb.append("%.*s", token.value.str.length, token.value.str.buffer)
+func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {    
+    var pos = p.pos()
+
+    var name = p.identifier()
+    if(name.type != TokenType.IDENTIFIER) {
+        return null
+    }
+
+    var sb = StringBufferInit(name.value.str.length, p.allocator)
+    sb.append("%.*s", name.value.str.length, name.value.str.buffer)
 
     if(p.match(TokenType.COLON_COLON)) {
         // TODO - packages
     }
 
-    var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.allocator) as (*NameTypeSpec)
+    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.allocator) as (*NameTypeSpec)
     spec.name = sb.cStr()
 
     if(p.check(TokenType.LESS_THAN)) {        
@@ -1522,7 +1666,7 @@ func (p: *Parser) tryArrayDesignationExpr() : *Expr {
 
     var designatorExpr: *Expr = null
     if(p.match(TokenType.LEFT_BRACKET)) {
-        var index = p.expression()
+        var index = p.expression()        
         p.consume(TokenType.RIGHT_BRACKET, ErrorCode.MISSING_RIGHT_BRACKET)
         p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
         var value = p.expression()
@@ -1774,8 +1918,12 @@ func (p: *Parser) prevPos() : SrcPos {
 }
 
 func (p: *Parser) peek() : *Token {
-    assert(p.current < p.tokens.size())
-    return &p.tokens.elements[p.current]
+    //assert(p.current < p.tokens.size())
+    var index = p.current
+    if(index >= p.tokens.size()) {
+        index = p.tokens.size() - 1
+    }
+    return &p.tokens.elements[index]
 }
 
 func (p: *Parser) rewind() {
@@ -1786,13 +1934,15 @@ func (p: *Parser) rewind() {
 }
 
 func (p: *Parser) previous() : *Token {
-    var index = p.current - 1;
+    var index = p.current - 1;    
     assert(index < p.tokens.size() && index >= 0)
     return &p.tokens.elements[index]
 }
 
 func (p: *Parser) atEnd() : bool {
-    return p.tokens.empty() || p.peek().type == TokenType.END_OF_FILE
+    return p.tokens.empty() || 
+           p.current >= p.tokens.size() ||
+           p.peek().type == TokenType.END_OF_FILE
 }
 
 func (p: *Parser) advance() : *Token {
@@ -1831,7 +1981,8 @@ func (p: *Parser) consume(type: TokenType, errorCode: ErrorCode) : *Token {
         return p.advance()
     }
 
-    p.errorAt(type, errorCode)
+    //printf("Token Type: %s vs. %s\n", tokenText[type], tokenText[p.peek().type])
+    p.errorUnexpectedToken(p.peek(), errorCode)
     return null
 }
 
@@ -1842,35 +1993,37 @@ func (p: *Parser) adjust(types: *TokenType = null, len: i32 = 0) {
     }
 
     while(!p.atEnd()) {
-        var type = p.peek().type
+        var type = p.advance().type
         for(var i = 0; i < len; i+=1) {
             if(types[i] == type) {
                 return;
             }
         }
-
-        p.advance()
     }
 }
 
 func (p: *Parser) errorAtToken(token: *Token, errorCode: ErrorCode) {
-    if(!token) {
-        // TODO: create an error message        
-        p.result.addError(token.pos,"%s\n", errorCodeText[errorCode])
+    if(!token) {        
+        p.errorAtPos(p.pos(), errorCode)
     }
     else {
-        p.errorAt(token.type, errorCode)
+        p.errorAtPos(token.pos, errorCode)
     }
     
 }
 
 func (p: *Parser) errorAtPos(pos: SrcPos, errorCode: ErrorCode) {
-    p.result.addError(pos,"%s\n", errorCodeText[errorCode])    
+    p.result.addError(pos, "%s", errorCodeText[errorCode])    
 }
 
-func (p: *Parser) errorAt(type: TokenType, errorCode: ErrorCode) {
-    // TODO: create an error message
-    p.result.addError(p.pos(), "Expected token: '%s' - %s\n", tokenText[type], errorCodeText[errorCode])
+
+func (p: *Parser) errorUnexpectedToken(token: *Token, errorCode: ErrorCode) {    
+    if(token) {
+        p.result.addError(p.pos(), "Unexpected token: '%s' - %s", tokenText[token.type], errorCodeText[errorCode])
+    }
+    else {
+        p.errorAtPos(p.pos(), errorCode)
+    }
 }
 
 func (p: *Parser) numOfErrors() : i32 {

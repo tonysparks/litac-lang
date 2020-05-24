@@ -6,6 +6,7 @@ import "mem"
 import "array"
 import "common"
 import "assert"
+import "module"
 
 public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
     var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, allocator) as (*NameTypeSpec)
@@ -263,6 +264,16 @@ public func NewParameterDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
+public func NewPoisonDecl(startPos: SrcPos, 
+                          endPos: SrcPos,                      
+                          allocator: *const Allocator) : *Decl {                              
+    var decl = new<PoisonDecl>(allocator)
+    decl.kind = StmtKind.POISON_DECL;
+    decl.startPos = startPos
+    decl.endPos = endPos
+    return decl as (*Decl)
+}
+
 public func NewTernaryExpr(startPos: SrcPos, 
                            endPos: SrcPos, 
                            cond: *Expr,                            
@@ -426,6 +437,21 @@ public func NewIdentifierExpr(startPos: SrcPos,
     return expr as (*Expr)
 }
 
+public func NewTypeIdentifierExpr(startPos: SrcPos,
+                                  endPos: SrcPos,                              
+                                  //genericArgs: Array<*TypeSpec>,
+                                  type: *TypeSpec,
+                                  allocator: *const Allocator) : *Expr {
+    var expr = new<TypeIdentifierExpr>(allocator)
+    expr.kind = StmtKind.TYPE_IDENTIFIER_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    //expr.genericArgs = genericArgs
+    expr.type = type
+
+    return expr as (*Expr)
+}
+
 public func NewCastExpr(startPos: SrcPos,
                        endPos: SrcPos,
                        castExpr: *Expr,
@@ -529,6 +555,78 @@ public func NewCharExpr(startPos: SrcPos,
     expr.startPos = startPos
     expr.endPos = endPos
     expr.character = character
+    return expr as (*Expr)
+}
+
+public func NewGroupExpr(startPos: SrcPos,
+                         endPos: SrcPos,
+                         groupedExpr: *Expr,
+                         allocator: *const Allocator) : *Expr {
+    var expr = new<GroupExpr>(allocator)
+    expr.kind = StmtKind.GROUP_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.groupedExpr = expr.node.becomeParentOf(groupedExpr)
+
+    return expr as (*Expr)
+}
+
+public func NewArrayInitExpr(startPos: SrcPos,
+                             endPos: SrcPos,
+                             type: *TypeSpec,
+                             values: Array<*Expr>,
+                             allocator: *const Allocator) : *Expr {
+    var expr = new<ArrayInitExpr>(allocator)
+    expr.kind = StmtKind.ARRAY_INIT_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.type = type
+    expr.values = *expr.node.becomeParentOfChildren(values)
+
+    return expr as (*Expr)
+}
+
+public func NewSizeOfExpr(startPos: SrcPos,
+                         endPos: SrcPos,
+                         sizeOfExpr: *Expr,
+                         allocator: *const Allocator) : *Expr {
+    var expr = new<SizeOfExpr>(allocator)
+    expr.kind = StmtKind.SIZE_OF_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.sizeOfExpr = expr.node.becomeParentOf(sizeOfExpr)
+
+    return expr as (*Expr)
+}
+
+
+public func NewTypeOfExpr(startPos: SrcPos,
+                          endPos: SrcPos,
+                          typeOfExpr: *Expr,
+                          type: *TypeSpec,
+                          allocator: *const Allocator) : *Expr {
+    var expr = new<TypeOfExpr>(allocator)
+    expr.kind = StmtKind.TYPE_OF_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.typeOfExpr = expr.node.becomeParentOf(typeOfExpr)
+    expr.type = type
+
+    return expr as (*Expr)
+}
+
+public func NewOffsetOfExpr(startPos: SrcPos,
+                          endPos: SrcPos,
+                          type: *TypeSpec,
+                          field: Token,
+                          allocator: *const Allocator) : *Expr {
+    var expr = new<OffsetOfExpr>(allocator)
+    expr.kind = StmtKind.TYPE_OF_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos    
+    expr.type = type
+    expr.field = field
+
     return expr as (*Expr)
 }
 
