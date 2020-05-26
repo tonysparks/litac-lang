@@ -49,6 +49,26 @@ public func PrintTypeSpec(spec: *TypeSpec) {
             }
             return;
         }
+        case TypeSpecKind.FUNC_PTR: {
+            var fn = spec as (*FuncPtrTypeSpec)
+            printf("func")
+            if(!fn.genericParams.empty()) {
+                printf("<")
+                for(var i = 0; i < fn.genericParams.size(); i += 1) {
+                    if(i > 0) printf(",")
+                    PrintName(fn.genericParams.get(i).name)
+                }
+                printf(">")
+            }
+            printf("(")
+            for(var i = 0; i < fn.args.size(); i += 1) {
+                if(i > 0) printf(",")
+                PrintTypeSpec(fn.args.get(i))
+            }
+            printf(") : ")
+            PrintTypeSpec(fn.ret)
+            return;
+        }
         default: {
             Panic("Invalid TypeSpecKind: '%d'\n", spec.kind)
         }
@@ -78,18 +98,24 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
     switch(s.kind) {
         case StmtKind.IMPORT_DECL: {
             var decl = s as (*ImportDecl)
-            Printf(indent, "import '")
+            Printf(0, "import '")
             PrintName(decl.name)
             printf("'")
             if(decl.alias.type == TokenType.IDENTIFIER) {
-                Printf(indent, " as ")
+                Printf(0, " as ")
                 PrintName(decl.alias)
-            }
-            Printf(indent, "\n")
+            }            
             return;
         }
         case StmtKind.CONST_DECL: {
             var decl = s as (*ConstDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
             Printf(indent, "const ")
             PrintName(decl.name)
             if(decl.type != null) {
@@ -104,7 +130,14 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             return;
         }
         case StmtKind.VAR_DECL: {
-            var decl = s as (*VarDecl)            
+            var decl = s as (*VarDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
             Printf(indent, "var ")
             PrintName(decl.name)
             if(decl.type != null) {
@@ -120,21 +153,29 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         case StmtKind.STRUCT_DECL: {
             var decl = s as (*AggregateDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
+            Printf(indent, "")
             if(decl.attributes.isPublic) {
-                Printf(indent, "public ")
+                printf("public ")
             }            
-            Printf(indent, "struct ")
+            printf("struct ")
             PrintName(decl.name)
-            if(decl.genericParams.empty()) {
-                Printf(indent, "<")
+            if(!decl.genericParams.empty()) {
+                printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) Printf(indent, ",")
                     var t = decl.genericParams.get(i).name                    
-                    Printf(indent, "%.*s", t.value.str.length, t.value.str.buffer)
+                    printf("%.*s", t.value.str.length, t.value.str.buffer)
                 }
-                Printf(indent, ">")
+                printf(">")
             }
-            Printf(indent, "{\n")
+            printf(" {\n")
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
@@ -153,27 +194,36 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                     }
                     default:{}
                 }
+                printf("\n")
             }
             Printf(indent, "}")
             return;
         }
         case StmtKind.UNION_DECL: {
             var decl = s as (*AggregateDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
+            Printf(indent, "")
             if(decl.attributes.isPublic) {
-                Printf(indent, "public ")
+                printf("public ")
             }            
-            Printf(indent, "union ")
+            printf("union ")
             PrintName(decl.name)
-            if(decl.genericParams.empty()) {
-                Printf(indent, "<")
+            if(!decl.genericParams.empty()) {
+                printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) Printf(indent, ",")
                     var t = decl.genericParams.get(i).name                    
-                    Printf(indent, "%.*s", t.value.str.length, t.value.str.buffer)                    
+                    printf("%.*s", t.value.str.length, t.value.str.buffer)
                 }
-                Printf(indent, ">")
+                printf(">")
             }
-            Printf(indent, " {\n")
+            printf(" {\n")
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
@@ -190,29 +240,46 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                         PrintStmt(field.varField, indent+1)
                         break;
                     }
-                    default: {}
+                    default:{}
                 }
+                printf("\n")
             }
             Printf(indent, "}")
             return;
         }
         case StmtKind.ENUM_DECL: {
             var decl = s as (*EnumDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
+            Printf(indent, "")
             if(decl.attributes.isPublic) {
-                Printf(indent, "public ")
+                printf("public ")
             }        
-            Printf(indent, "enum ")
+            printf("enum ")
             PrintName(decl.name)        
-            Printf(indent, " {\n")
+            printf(" {\n")
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
                 PrintStmt(field, indent+1)
+                printf(",\n")
             }
             Printf(indent, "}")
             return;
         }
         case StmtKind.FUNC_DECL: {
             var decl = s as (*FuncDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
             if(decl.attributes.isPublic) {
                 Printf(indent, "public ")
             }            
@@ -246,6 +313,13 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         case StmtKind.TYPEDEF_DECL: {
             var decl = s as (*TypedefDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
             if(decl.attributes.isPublic) {
                 Printf(indent, "public ")
             }
@@ -257,6 +331,13 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         case StmtKind.PARAM_DECL: {
             var decl = s as (*ParameterDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
             PrintName(decl.name)
             Printf(indent, ": ")
             PrintTypeSpec(decl.type)
@@ -284,9 +365,16 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             var stmt = s as (*BlockStmt)
             Printf(indent-1, "{\n")
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
-                PrintStmt(stmt.stmts.get(i), indent+1)
-                printf(";\n")
+                var n = stmt.stmts.get(i)
+                PrintStmt(n, indent+1)
+                if(IsExpr(n)) {
+                    printf(";\n")
+                }
+                else {
+                    printf("\n")
+                }
             }
+            printf("\n")
             Printf(indent-1, "}")
             return;
         }
@@ -329,51 +417,66 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         case StmtKind.EMPTY_STMT: {
             printf("\n")
             return;
-        }/*
+        }
         case StmtKind.ENUM_FIELD_ENTRY_STMT: {
-            var stmt = new<EnumFieldEntryStmt>(allocator)
-            stmt.kind = StmtKind.ENUM_FIELD_ENTRY_STMT;
-            stmt.startPos = startPos
-            stmt.fieldName = null
-            stmt.value = null
-            return stmt as (*Stmt)
-        }
+            var stmt = s as (*EnumFieldEntryStmt)
+            Printf(indent, "")
+            PrintName(stmt.fieldName)
+            if(stmt.value) {
+                printf(" = ")
+                PrintStmt(stmt.value, 0)
+            }
+            return;
+        }/*
         case StmtKind.ENUM_FIELD_STMT: {
-            var stmt = new<EnumFieldStmt>(allocator)
-            stmt.kind = StmtKind.ENUM_FIELD_STMT;
-            stmt.startPos = startPos
-            stmt.decl = null
-            return stmt as (*Stmt)
-        }
-        case StmtKind.FOR_STMT: {
-            var stmt = new<ForStmt>(allocator)
-            stmt.kind = StmtKind.FOR_STMT;
-            stmt.startPos = startPos
-            stmt.init = null
-            stmt.cond = null
-            stmt.post = null
-            stmt.body = null
-            return stmt as (*Stmt)
+            var stmt = s as (*EnumDecl)
+            PrintStmt(stmt)
+            return;
+            
         }*/
+        case StmtKind.FOR_STMT: {
+            var stmt = s as (*ForStmt)
+            Printf(indent, "for(")
+            if(stmt.init) {
+                PrintStmt(stmt.init, 0)
+            }
+            printf(";")
+            if(stmt.cond) {
+                PrintStmt(stmt.cond, 0)
+            }
+            printf(";")
+            if(stmt.post) {
+                PrintStmt(stmt.post, 0)
+            }
+            printf(")\n")
+            if(stmt.body) {
+                PrintStmt(stmt.body, indent+1)
+            }
+            return;
+        }
         case StmtKind.FUNC_BODY_STMT: {
             var stmt = s as (*FuncBodyStmt)
             Printf(indent-1, "{\n")
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
-                var ss = stmt.stmts.get(i)
-                PrintStmt(ss, indent+1)
-
-                printf(";\n")
+                var n = stmt.stmts.get(i)
+                PrintStmt(n, indent+1)
+                if(IsExpr(n)) {
+                    printf(";\n")
+                }
+                else {
+                    printf("\n")
+                }
             }
+            printf("\n")
             Printf(indent-1, "}")
             return;
-        }/*
+        }
         case StmtKind.GOTO_STMT: {
-            var stmt = new<GotoStmt>(allocator)
-            stmt.kind = StmtKind.GOTO_STMT;
-            stmt.startPos = startPos
-            stmt.label = null
-            return stmt as (*Stmt)
-        }*/
+            var stmt = s as (*GotoStmt)
+            Printf(indent, "goto ")
+            PrintName(stmt.label)
+            return;
+        }
         case StmtKind.IF_STMT: {
             var stmt = s as (*IfStmt)
             Printf(indent, "if(")
@@ -388,14 +491,13 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
             printf("\n")
             return;
-        }/*
+        }
         case StmtKind.LABEL_STMT: {
-            var stmt = new<LabelStmt>(allocator)
-            stmt.kind = StmtKind.LABEL_STMT;
-            stmt.startPos = startPos
-            stmt.label = null
-            return stmt as (*Stmt)
-        }*/
+            var stmt = s as (*LabelStmt)
+            printf(":")
+            PrintName(stmt.label)
+            return;
+        }
         case StmtKind.MODULE_STMT: {
             var stmt = s as (*ModuleStmt)
             for(var i = 0; i < stmt.imports.size(); i += 1) {
@@ -403,24 +505,40 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 Printf(indent, "\n")
             }
 
+            printf("\n")
+
             for(var i = 0; i < stmt.notes.size(); i += 1) {
                 PrintStmt(stmt.notes.get(i))
-                Printf(indent, "\n")
+                Printf(indent, ";\n")
             }
+
+            printf("\n")
 
             for(var i = 0; i < stmt.declarations.size(); i += 1) {                
                 PrintStmt(stmt.declarations.get(i) as (*Stmt))
                 Printf(indent, "\n")
+                printf("\n")
+            }
+
+            printf("\n")
+            return;
+        }
+        case StmtKind.NOTE_STMT: {
+            var stmt = s as (*NoteStmt)
+            Printf(indent, "@")
+            PrintName(stmt.name)
+            if(!stmt.attributes.empty()) {
+                printf("(")
+                for(var i = 0; i < stmt.attributes.size(); i += 1) {
+                    if(i > 0) printf(", ")
+                    printf("'")
+                    PrintName(stmt.attributes.get(i))
+                    printf("'")
+                }
+                printf(")")
             }
             return;
-        }/*
-        case StmtKind.NOTE_STMT: {
-            var stmt = new<NoteStmt>(allocator)
-            stmt.kind = StmtKind.NOTE_STMT;
-            stmt.startPos = startPos
-            stmt.attributes.init(2, allocator)
-            return stmt as (*Stmt)
-        }*/
+        }
         case StmtKind.PARAMETERS_STMT: {
             var stmt = s as (*ParametersStmt)
             for(var i = 0; i < stmt.params.size(); i += 1) {
@@ -468,28 +586,30 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             stmt.startPos = startPos
             stmt.decl = null
             return stmt as (*Stmt)
-        }
+        }*/
         case StmtKind.VAR_FIELD_STMT: {
-            var stmt = new<VarFieldStmt>(allocator)
-            stmt.kind = StmtKind.VAR_FIELD_STMT;
-            stmt.startPos = startPos
-            stmt.fieldName = null
-            stmt.type = null
-            stmt.defaultExpr = null
-            stmt.attributes.isPublic = false
-            stmt.attributes.isGlobal = false
-            stmt.attributes.notes.init(2, allocator)
-            return stmt as (*Stmt)
+            var stmt = s as (*VarFieldStmt)
+            if(!stmt.attributes.notes.empty()) {
+                for(var i = 0; i < stmt.attributes.notes.size(); i += 1) {
+                    PrintStmt(stmt.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+            Printf(indent, "")
+            PrintName(stmt.fieldName)
+            printf(": ")
+            PrintTypeSpec(stmt.type)
+            return;
         }
         case StmtKind.WHILE_STMT: {
-            var stmt = new<WhileStmt>(allocator)
-            stmt.kind = StmtKind.WHILE_STMT;
-            stmt.startPos = startPos
-            stmt.cond = null
-            stmt.body = null
-            return stmt as (*Stmt)
+            var stmt = s as (*WhileStmt)            
+            Printf(indent, "while(")
+            PrintStmt(stmt.cond, 0)
+            Printf(0, ")\n")
+            PrintStmt(stmt.body, indent)
+            return;
         }
-
+        /*
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = new<ArrayDesignationExpr>(allocator)
             expr.kind = StmtKind.ARRAY_DESIGNATION_EXPR;
@@ -508,9 +628,9 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }*/
         case StmtKind.BINARY_EXPR: {
             var expr = s as (*BinaryExpr)
-            PrintStmt(expr.left)
-            Printf(indent, " %s ", tokenText[expr.operator])
-            PrintStmt(expr.right)
+            PrintStmt(expr.left, indent)
+            printf(" %s ", tokenText[expr.operator])
+            PrintStmt(expr.right, 0)
             break;
         }
         case StmtKind.BOOLEAN_EXPR: {
@@ -525,14 +645,12 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.castTo = null
             expr.exprToCast = null
             return expr as (*Stmt)
-        }
+        }*/
         case StmtKind.CHAR_EXPR: {
-            var expr = new<CharExpr>(allocator)
-            expr.kind = StmtKind.CHAR_EXPR;
-            expr.startPos = startPos
-            expr.character = null
-            return expr as (*Stmt)
-        }
+            var expr = s as (*CharExpr)
+            Printf(indent, "'%c'", expr.character.intValue as (char))            
+            return;
+        }/*
         case StmtKind.FUNC_CALL_EXPR: {
             var expr = new<FuncCallExpr>(allocator)
             expr.kind = StmtKind.FUNC_CALL_EXPR;
@@ -558,14 +676,14 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.field = null
             expr.isMethodCall = false
             return expr as (*Stmt)
-        }
-        case StmtKind.GROUP_EXPR: {
-            var expr = new<GroupExpr>(allocator)
-            expr.kind = StmtKind.GROUP_EXPR;
-            expr.startPos = startPos
-            expr.groupedExpr = null
-            return expr as (*Stmt)
         }*/
+        case StmtKind.GROUP_EXPR: {
+            var expr = s as (*GroupExpr)
+            Printf(indent, "(")
+            PrintStmt(expr.groupedExpr, 0)
+            Printf(0, ")")
+            return;
+        }
         case StmtKind.IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
             Printf(indent, "%s", expr.type.name)
@@ -588,13 +706,12 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.type = null
             expr.arguments.init(8, allocator)
             return expr as (*Stmt)
-        }
-        case StmtKind.NULL_EXPR: {
-            var expr = new<NullExpr>(allocator)
-            expr.kind = StmtKind.NULL_EXPR;
-            expr.startPos = startPos
-            break;
         }*/
+        case StmtKind.NULL_EXPR: {
+            var expr = s as (*NullExpr)
+            printf("null")
+            return;
+        }
         case StmtKind.NUMBER_EXPR: {
             var expr = s as (*NumberExpr)
             switch(expr.number.type) {
@@ -633,14 +750,12 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.startPos = startPos
             expr.sizeOfExpr = null
             return expr as (*Stmt)
-        }
+        }*/
         case StmtKind.STRING_EXPR: {
-            var expr = new<StringExpr>(allocator)
-            expr.kind = StmtKind.STRING_EXPR;
-            expr.startPos = startPos
-            expr.string = null
-            return expr as (*Stmt)
-        }
+            var expr = s as (*StringExpr)
+            Printf(indent, "\"%.*s\"", expr.string.str.length, expr.string.str.buffer)
+            return;
+        }/*
         case StmtKind.SUBSCRIPT_GET_EXPR: {
             var expr = new<SubscriptGetExpr>(allocator)
             expr.kind = StmtKind.SUBSCRIPT_GET_EXPR;
@@ -696,7 +811,9 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             return;
         }
         default: {
-            Panic("Unknown statement kind: %d", s.kind)
+            //Panic("Unknown statement kind: %d", s.kind)
+            Printf(indent, "<%s Not Implemented>", StmtKindAsStr(s.kind))
+            return;
         }
     }    
 }

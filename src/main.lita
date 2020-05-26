@@ -19,140 +19,78 @@ import "string_view"
 func main(len: i32, args: **char) {
     SystemInit()
 
-    var options = LitaOptions {
-        .srcPath = "../test",
-        .libPath = null,
-        .litaPath = GetEnv("LITAC_HOME")
-    }
-    var filename = "../test/test.lita"
-
+    var options = LitaOptions{}
+    ParseArgs(len, args, &options)
 
     var lita = LitaInit(&options)
     defer lita.free()
 
-    var startTime = SystemTimeMSec()    
+    Parse(lita)
 
-    var root = NewModule(lita.allocator)
-    root.id.fromFile(lita, filename)
-
-    lita.addModule(root)
-    
-    var pos = SrcPos{}
-
-    ReadModuleText(lita, root, pos)
-    ParseModule(lita, root, pos)
-
-    for(var i = 0; i < root.ast.imports.size(); i += 1) {
-        var importStmt = root.ast.imports.get(i)
-        if(importStmt.name.type == TokenType.ERROR) {
-            lita.result.addError(importStmt.pos, "Could not parse import statement")
-            continue
+    if(false) {
+        for(var it = lita.modules.iter(); it.hasNext();) {
+            var entry = it.next()
+            printf("Printing AST for '%s'...\n\n", entry.key)
+            if(entry.value && entry.value.ast) {
+               PrintStmt(entry.value.ast)
+            }
+            printf("\n")
         }
-
-        var filename: [MAX_PATH]char
-        if(!FindModulePath(lita, importStmt.name.value.str, filename)) {  
-            lita.result.addError(importStmt.pos, "Could not find module '%s'", importStmt.name.value.str)
-            continue
-        }
-
-        if(lita.modules.contains(filename)) {
-            continue;
-        }        
-
-        
-        var module = NewModule(lita.allocator)
-        module.id.fromFile(lita, filename)
-
-        lita.addModule(module)
-
-
-        if(!ReadModuleText(lita, module, importStmt.pos)) {
-            continue
-        }
-
-        ParseModule(lita, module, importStmt.pos)
     }
-
-    printf("Total parse time: %f\n", SystemTimeMSec() - startTime)
 
     if(!lita.result.errors.empty()) {
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
             PrintError(lita.result.errors.get(i))
+            printf("\n")
         }
     }
-
-    for(var it = lita.modules.iter(); it.hasNext();) {
-        var entry = it.next()
-        printf("Printing AST for '%s'...\n\n", entry.key)
-        PrintStmt(entry.value.ast)
-        printf("\n")
-    }
-/*
-    if(root.ast) {
-        printf("Printing AST...\n\n")
-        PrintStmt(root.ast)
-        printf("\n")
-    }
-*/
     
-
-    /*
-    var lex = LexerInit(filename, text, lita.allocator)    
-    while(!lex.eof()) {
-        var token = lex.nextToken()
-        //printf("Size: %d\n", (token.pos.end - token.pos.start) as (i32))
-        printf("%s: '%s' '%.*s' ", TokenTypeAsStr(token.type), token.asString(), (token.pos.end - token.pos.start) as (i32), token.pos.start)
-        if(token.type == TokenType.INT_NUMBER) {
-            printf("value: '%llu'", token.value.intValue)
-            printf(" typeInfo: %s", TypeKindAsStr(token.typeInfo.kind))
-        }
-        else if(token.type == TokenType.FLOAT_NUMBER) {
-            printf("value: '%f'", token.value.floatValue)
-            printf(" typeInfo: %s", TypeKindAsStr(token.typeInfo.kind))
-        }
-        else if(token.type == TokenType.STRING) {
-            printf("value: '%.*s'", token.value.str.length, token.value.str.buffer)
-        }
-        else if(token.type == TokenType.ERROR) {
-            printf("error: '%s'", lex.errorMsg)
-        }
-        printf("\n")
-    }*/
+    var allocator: *DebugAllocator = lita.allocator as (*DebugAllocator)
+    var metric = &lita.metrics[MetricType.PARSING]
+    printf("Total parse time: %f\n", metric.executionTime)
+    printf("Total memory: %zu bytes\n", metric.bytesAllocated)
+    printf("Total allocations: %u\n", allocator.totalAllocations)
+    printf("Total source code lines: %u\n", lita.totalSourceLines)
 }
 
-// TODO: Handle module names with packages
+func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
+    strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
+
+
+    //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
+    strncpy(options.inputFile, "../test/test.lita", MAX_PATH) // TEMP
+
+    if(n > 1) {
+        strncpy(options.inputFile, args[1], MAX_PATH)        
+    }
+
+    FilePath(options.inputFile, options.srcPath)
+    printf("Reading in: '%s'\n", options.inputFile)
+    printf("Source Path: '%s'\n", options.srcPath)
+}
+
 func FindModulePath(lita: *Lita, 
                     moduleName: StringView, 
                     filename: [MAX_PATH]char) : bool {    
 
     var pathStr = StringInit(filename, MAX_PATH);
-/*
-    var pathStr = StringInit(moduleId.filename, MAX_PATH);
-    defer {
-        moduleId.packageName = StringViewInit(pathStr.str, 0) // TODO
-        moduleId.name = GetModuleName(pathStr.asView())
+    
+    pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
+    //printf("Check: '%s'\n", pathStr.cStr())
+    if(FileExists(pathStr.cConstStr())) {            
+        return true
     }
-*/
-    if(lita.options.srcPath) {        
-        pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
-        //printf("Check: '%s'\n", pathStr.cStr())
-        if(FileExists(pathStr.cConstStr())) {            
-            return true
-        }
+    
+    pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
+    //printf("Check: '%s'\n", pathStr.cStr())
+    if(FileExists(pathStr.cConstStr())) {
+        return true
     }
-    if(lita.options.libPath) {
-        pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
-        //printf("Check: '%s'\n", pathStr.cStr())
-        if(FileExists(pathStr.cConstStr())) {
-            return true
-        }
-    }
-    if(lita.options.litaPath) {
-        pathStr.format("%s/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
-        //printf("Check: '%s'\n", pathStr.cStr())
-        if(FileExists(pathStr.cConstStr())) {
-            return true
-        }
+
+    pathStr.format("%s/lib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
+    //printf("Check: '%s'\n", pathStr.cStr())
+    if(FileExists(pathStr.cConstStr())) {
+        return true
     }
 
     pathStr.clear()
@@ -184,4 +122,65 @@ func ParseModule(lita: *Lita,
     var parser = ParserInit(module.id.filename, module.text, lita)
     var moduleStmt = parser.parseModule()
     module.ast = moduleStmt
+    lita.totalSourceLines += parser.totalLines
+}
+
+func ParseImport(lita: *Lita, root: *Module) {
+    if(!root) {
+        return;
+    }
+
+    //printf("Parsing Imports for '%s'\n", root.id.filename)
+
+    for(var i = 0; i < root.ast.imports.size(); i += 1) {
+        var importStmt = root.ast.imports.get(i)
+        if(importStmt.name.type == TokenType.ERROR) {
+            lita.result.addError(importStmt.pos, "Could not parse import statement")
+            continue
+        }
+
+        var filename: [MAX_PATH]char
+        if(!FindModulePath(lita, importStmt.name.str, filename)) {  
+            lita.result.addError(importStmt.pos, "Could not find module '%.*s'", 
+                    importStmt.name.str.length, importStmt.name.str.buffer)
+            continue
+        }
+
+        if(lita.modules.contains(filename)) {
+            continue;
+        }        
+
+        //printf("Parsing file: '%s' with error count: %d\n", filename, lita.result.errors.size())
+        
+        var module = NewModule(lita.allocator)
+        module.id.fromFile(lita, filename)
+
+        lita.addModule(module)
+
+        if(!ReadModuleText(lita, module, importStmt.pos)) {
+            continue
+        }
+
+        ParseModule(lita, module, importStmt.pos)
+        ParseImport(lita, module)
+    }
+}
+
+func Parse(lita: *Lita) {
+    lita.startCapture(MetricType.PARSING)
+    defer lita.endCapture(MetricType.PARSING)
+
+    var root = NewModule(lita.allocator)
+    root.id.fromFile(lita, lita.options.inputFile)
+
+    lita.addModule(root)
+    
+    var pos = SrcPos{}
+
+    if(!ReadModuleText(lita, root, pos)) {
+        return;
+    }
+
+    ParseModule(lita, root, pos)
+    ParseImport(lita, root)
 }

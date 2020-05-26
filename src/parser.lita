@@ -15,11 +15,15 @@ import "assert"
 import "module"
 import "string_buffer"
 
+import "ast_print"
+
 public struct Parser {
     allocator: *const Allocator    
     result: *PhaseResult
     lita: *Lita
+    filename: *const char
 
+    totalLines: i32
     tokens: Array<Token>
     current: i32
     currentPos: SrcPos
@@ -38,6 +42,7 @@ public func ParserInit(filename: *const char,
         .allocator = lita.allocator,
         .result = &lita.result,
         .lita = lita,
+        .filename = filename,
         .breakLevel = 0,
         .loopLevel = 0,
         .switchLevel = 0,
@@ -52,6 +57,8 @@ public func ParserInit(filename: *const char,
         var token = lex.nextToken()
         parser.tokens.add(token)
     }
+
+    parser.totalLines = lex.lineNumber
 
     // ensure there is always at least one token
     if(parser.tokens.empty()) {
@@ -109,8 +116,9 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
         var importDecl = p.importDeclaration()
         moduleStmt.imports.add(importDecl)
     }
-    else if(p.match(TokenType.HASH)) {
-        // Ignore for now
+    else if(p.match(TokenType.HASH)) {        
+        var comp = p.compStatement()
+        // TODO: Eval the compile time statement
     }
     else {        
         var notes = p.notes()
@@ -144,7 +152,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             var decl = p.typedefDeclaration()
             moduleStmt.declarations.add(decl)
         }
-        else if(p.match(TokenType.SEMICOLON)) {
+        else if(p.match(TokenType.SEMICOLON)) {            
             if(!notes.empty()) {
                 moduleStmt.notes.addAll(notes)
             }
@@ -155,8 +163,9 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             return;
         }
 
-        var decl = moduleStmt.declarations.last()
-        decl.attributes.notes.addAll(notes)
+        var decl = moduleStmt.declarations.last()        
+        //printf("Decl: %.*s\n", decl.name.str.length, decl.name.str.buffer)
+        decl.attributes.notes = notes        
         decl.attributes.isPublic = isPublic
         decl.attributes.isGlobal = true
     }
@@ -202,7 +211,7 @@ func (p: *Parser) notes() : Array<*NoteStmt> {
     notes.init(4, p.allocator)
 
 
-    while(p.match(TokenType.AT)) {
+    while(p.match(TokenType.AT)) {        
         var pos = p.prevPos()
 
         var name = p.identifier()
@@ -217,6 +226,8 @@ func (p: *Parser) notes() : Array<*NoteStmt> {
                 }
             }
             while(p.match(TokenType.COMMA));
+
+            p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
         }
 
         var note = NewNoteStmt(pos, p.pos(), name, attributes, p.allocator) as (*NoteStmt)
@@ -290,6 +301,9 @@ func (p: *Parser) funcDeclaration() : *Decl {
     
     var parameters = p.parametersStatement();
     if(objectParam != null) {
+        if(parameters.params.empty()) {
+            parameters.params.init(1, p.allocator)
+        }
         parameters.params.insertAt(0, objectParam);
     }
     
@@ -348,7 +362,7 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
     }
     
     var name = Token{
-        .type = TokenType.END_OF_FILE
+        .type = TokenType.VOID
     }
     if(p.check(TokenType.IDENTIFIER)) {            
         name = p.identifier();
@@ -486,13 +500,13 @@ func (p: *Parser) group() : *Expr {
 func (p: *Parser) arrayInit() : *Expr {
     var pos = p.prevPos()
     var type = p.type()
+    // TODO: check Null pointer
     if(type.kind != TypeSpecKind.ARRAY) {
         p.errorAtPos(type.pos, ErrorCode.MISSING_LEFT_BRACE)        
     }
 
     var values = Array<*Expr>{}
-    if(p.match(TokenType.LEFT_BRACE)) {
-        values.init(16, p.allocator)
+    if(p.match(TokenType.LEFT_BRACE)) {        
         values = p.arrayArguments()
     }
 
@@ -817,14 +831,14 @@ func (p: *Parser) functionCall() : *Expr {
             expr = p.finishFunctionCall(expr)
             expr.endPos = p.pos()
         }
-        else if(p.match(TokenType.LEFT_BRACE)) {
+        else if(p.check(TokenType.LEFT_BRACE)) {
             if(!p.isIdentifier(expr)) {
                 return expr
             }
 
             p.advance()
 
-            var idExpr = expr as (*IdentifierExpr) // delete idExpr??
+            var idExpr = expr as (*IdentifierExpr) // TODO: delete idExpr??
             var arguments = p.structArguments()
             expr = NewInitExpr(expr.startPos, p.pos(), idExpr.type, arguments, p.allocator)
         }
@@ -854,7 +868,7 @@ func (p: *Parser) functionCall() : *Expr {
 }
 
 func (p: *Parser) primary() : *Expr {
-    var token = p.peek()
+    var token = p.peek()    
     var pos = token.pos
     if(p.match(TokenType.TRUE)) {        
         return NewBooleanExpr(pos, p.pos(), true, p.allocator)
@@ -876,7 +890,7 @@ func (p: *Parser) primary() : *Expr {
         return NewStringExpr(pos, p.pos(), token, p.allocator)
     }
 
-    if(p.match(TokenType.CHAR)) {
+    if(p.match(TokenType.CHAR)) {        
         return NewCharExpr(pos, p.pos(), token, p.allocator)
     }
 
@@ -884,7 +898,7 @@ func (p: *Parser) primary() : *Expr {
         return p.group()
     }
 
-    if(p.match(TokenType.LEFT_BRACKET)) {
+    if(p.check(TokenType.LEFT_BRACKET)) {
         return p.arrayInit()
     }
 
@@ -987,7 +1001,7 @@ func (p: *Parser) tryStatement() : *Stmt {
     }
 
     if(p.match(TokenType.HASH)) {
-        // TODO: Compile statement
+        return p.compStatement()
     }
 
     if(p.match(TokenType.LEFT_BRACE)) {
@@ -1050,6 +1064,25 @@ func (p: *Parser) tryStatement() : *Stmt {
     }
 
     return p.expression() as (*Stmt)
+}
+
+func (p: *Parser) compStatement() : *Stmt {
+    // TODO: really support this!!
+    var pos = p.prevPos()
+    while(!p.atEnd()) {
+        if(p.match(TokenType.HASH)) {
+            if(p.check(TokenType.IDENTIFIER)) {
+                var identifier = p.identifier()
+                if(identifier.value.str.equals("end")) {
+                    break;
+                }
+            }
+        }
+
+        p.advance()
+    }
+
+    return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
 }
 
 func (p: *Parser) blockStatement() : *Stmt {
@@ -1147,7 +1180,7 @@ func (p: *Parser) forStatement() : *Stmt {
 func (p: *Parser) switchCaseStatement() : *Stmt {
     var pos = p.prevPos()
 
-    var cond = p.expression()
+    var cond = p.constExpression()
     p.consume(TokenType.COLON, ErrorCode.MISSING_COLON);
 
     var bodyPos = p.pos()
@@ -1161,8 +1194,8 @@ func (p: *Parser) switchCaseStatement() : *Stmt {
             break;
         }
 
-        var stmt = p.statement()
-        p.match(TokenType.SEMICOLON)
+        var stmt = p.statement()        
+        p.eatSemicolon()
 
         stmts.add(stmt)
     }
@@ -1222,13 +1255,13 @@ func (p: *Parser) switchStatement() : *Stmt {
 
     p.switchLevel += 1
     while(!p.atEnd()) {
-        if(p.check(TokenType.CASE)) {
+        if(p.match(TokenType.CASE)) {
             var caseStmt = p.switchCaseStatement() as (*SwitchCaseStmt)
             cases.add(caseStmt)
 
             p.eatSemicolon()
         }
-        else if(p.check(TokenType.DEFAULT)) {
+        else if(p.match(TokenType.DEFAULT)) {
             p.consume(TokenType.COLON, ErrorCode.MISSING_COLON);
             defaultStmt = p.switchDefaultStatement()
 
@@ -1381,34 +1414,43 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
 
     var name = p.identifier()
     if(name.type != TokenType.IDENTIFIER) {
-        return null
+        goto err;
     }
 
-    var sb = StringBufferInit(name.value.str.length, p.allocator)
-    sb.append("%.*s", name.value.str.length, name.value.str.buffer)
+    var sb = StringBufferInit(name.str.length, p.allocator)
+    sb.append("%.*s", name.str.length, name.str.buffer)
 
     if(p.match(TokenType.COLON_COLON)) {
-        // TODO - packages
+        var identifier = p.identifier()
+        if(identifier.type != TokenType.IDENTIFIER) {
+            goto err;
+        }
+
+        sb.append("::%.*s", identifier.str.length, identifier.str.buffer)
     }
 
     var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.allocator) as (*NameTypeSpec)
     spec.name = sb.cStr()
 
-    if(p.check(TokenType.LESS_THAN)) {        
+    if(p.check(TokenType.LESS_THAN)) { 
         spec.genericArgs = p.tryGenericArguments(disambiguate)
     }
 
     return spec;
+
+err:
+    sb.free()    
+    return null
 }
 
 func (p: *Parser) arrayType() : *ArrayTypeSpec {    
     var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.allocator) as (*ArrayTypeSpec)    
     p.advance()
 
-    if(p.check(TokenType.RIGHT_BRACKET)) {
+    if(!p.check(TokenType.RIGHT_BRACKET)) {
         var expr = p.expression()
-
         if(!p.isConstNumberExpr(expr)) {
+
             p.errorAtToken(p.peek(), ErrorCode.INVALID_ARRAY_DIMENSION_EXPR)
         }
         else {
@@ -1419,12 +1461,13 @@ func (p: *Parser) arrayType() : *ArrayTypeSpec {
     return spec
 }
 
-func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {   
+func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec { 
+    var pos = p.prevPos()  
     var token = p.peek()
-    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, p.pos(), p.allocator) as (*FuncPtrTypeSpec)    
+    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.allocator) as (*FuncPtrTypeSpec)    
 
     if(p.match(TokenType.LESS_THAN))  {
-        // TODO: Generics
+        spec.genericParams = p.genericParameters()
     }
 
     p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)
@@ -1447,7 +1490,7 @@ func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {
     p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
     p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
 
-    spec.ret = p.type(false)
+    spec.ret = p.type(false)    
     return spec
 }
 
@@ -1495,12 +1538,9 @@ func (p: *Parser) structArguments() : Array<*InitArgExpr> {
         }
 
         var pos = p.pos()
-        var fieldName = Token{}
-        if(p.check(TokenType.DOT)) {
-            var name = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-            if(name) {
-                fieldName = *name
-            }
+        var fieldName = Token{.type = TokenType.VOID}
+        if(p.match(TokenType.DOT)) {            
+            fieldName = p.identifier()
             
             if(p.check(TokenType.COLON)) {
                 p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
@@ -1584,6 +1624,8 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
     var numOfErrors = p.numOfErrors()
     var pos = p.pos()
 
+    p.advance()
+
     var arguments = p.genericArguments()
     var isFailed = false
 
@@ -1648,10 +1690,8 @@ func (p: *Parser) arrayArguments() : Array<*Expr> {
         if(!expr) {
             expr = p.expression()
         }
-
-        if(expr) {
-            arguments.add(expr)
-        }
+        
+        arguments.add(expr)
     }
     while(p.match(TokenType.COMMA))
 
@@ -1693,19 +1733,23 @@ func (p: *Parser) fieldStatement(isStruct: bool) : FieldStmt {
 
     switch(p.peek().type) {
         case TokenType.IDENTIFIER: {
-            var fieldName = p.identifier();
+            var fieldName = p.identifier();            
             p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
+            
             var attributes = Attributes{}
             attributes.isUsing = p.match(TokenType.USING)
             attributes.notes = notes
+            
             var type = p.type()
             var defaultExpr: *Expr = null
+            
             if(p.match(TokenType.EQUALS)) {
                 if(!isStruct) {
                     p.errorAtToken(p.previous(), ErrorCode.INVALID_DEFAULT_ASSIGNMENT)
                 }
                 defaultExpr = p.constExpression()
             }
+            
             var varField = NewVarFieldStmt(pos, p.pos(), fieldName, type, attributes, defaultExpr, p.allocator);
             return FieldStmt {
                 .kind = StmtKind.VAR_FIELD_STMT,
@@ -1744,6 +1788,7 @@ func (p: *Parser) fieldStatement(isStruct: bool) : FieldStmt {
         }
         default: {
             p.errorAtToken(p.peek(), ErrorCode.INVALID_FIELD)
+            p.advance()
         }
     }
 
@@ -1887,7 +1932,7 @@ func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
         }
         case StmtKind.GROUP_EXPR: {
             var groupExpr = expr as (*GroupExpr)
-            return p.checkConstExpr(groupExpr.expr)
+            return p.checkConstExpr(groupExpr.groupedExpr)
         }
         case StmtKind.BINARY_EXPR: {
             var binExpr = expr as (*BinaryExpr)

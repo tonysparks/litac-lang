@@ -6,6 +6,7 @@ import "mem"
 import "common"
 import "module"
 
+@asStr
 public enum StmtKind {
     IMPORT_DECL,
     CONST_DECL,
@@ -75,6 +76,7 @@ public enum StmtKind {
     MAX_STMT_KINDS
 }
 
+@asStr
 public enum TypeSpecKind {
     NONE,
     ARRAY,
@@ -374,11 +376,10 @@ public struct VarFieldStmt {
 public struct FieldStmt {
     kind: StmtKind
     union {
-        //enumField: *EnumFieldStmt
-        //aggregateField: *AggregateFieldStmt
         enumField: *EnumDecl
         aggregateField: *AggregateDecl
         varField: *VarFieldStmt
+        poisonField: *Expr
     }
 }
 
@@ -580,6 +581,27 @@ public func IsExpr(node: *Node) : bool {
         case StmtKind.TYPE_OF_EXPR:
         case StmtKind.UNARY_EXPR:
         case StmtKind.POISON_EXPR:
+            return true;
+        default: 
+            return false;
+    }
+}
+
+public func IsDecl(node: *Node) : bool {
+    if(!node) return false;
+
+    switch(node.kind) {
+        case StmtKind.IMPORT_DECL:
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL:
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.UNION_DECL:
+        case StmtKind.ENUM_DECL:
+        case StmtKind.FUNC_DECL:
+        case StmtKind.TYPEDEF_DECL:
+        case StmtKind.PARAM_DECL:
+        case StmtKind.NATIVE_DECL:
+        case StmtKind.POISON_DECL:
             return true;
         default: 
             return false;
