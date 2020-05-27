@@ -1,3 +1,167 @@
+import "array"
+import "map"
+import "ast"
+import "lex"
+import "types"
+import "module"
+import "state"
+import "mem"
+import "phase_result"
+
+public enum SymbolKind {
+    TYPE,
+    VAR,
+    CONST,
+    FUNC,
+}
+
+public enum SymbolFlags {
+    IS_LOCAL                = (1<<1),
+    IS_FOREIGN              = (1<<2),
+    IS_CONSTANT             = (1<<3),
+    IS_USING                = (1<<4),
+    IS_TYPE                 = (1<<5),
+    IS_INCOMPLETE           = (1<<6),
+    IS_GENERIC_TEMPLATE     = (1<<7),
+    IS_BUILTIN              = (1<<8),
+    IS_FROM_GENERIC_TEMPLATE  = (1<<9),
+}
+
 public struct Symbol {
-    // TODO
+    kind: SymbolKind
+    name: Token
+    decl: *Decl
+    type: *TypeInfo
+    declared: *Module
+    flags: i32
+}
+
+public enum ScopeKind {
+    MODULE,
+    FUNC,
+}
+
+public struct Scope {
+    kind: ScopeKind
+    allocator: *const Allocator
+    result: *PhaseResult
+    parent: *Scope
+    symbols: Map<Token, *Symbol>
+}
+
+public func NewScope(kind: ScopeKind, parent: *Scope, result: *PhaseResult, allocator: *const Allocator) : *Scope {
+    var scope = new<Scope>(allocator)
+    scope.init(kind, parent, result, allocator)
+}
+
+public func (scope: *Scope) init(kind: ScopeKind, 
+                                 parent: *Scope, 
+                                 result: *PhaseResult,
+                                 allocator: *const Allocator) : *Scope {    
+    scope.kind = kind
+    scope.allocator = allocator
+    scope.parent = parent
+    scope.result = result
+    scope.symbols.init(null,
+                       16,
+                       TokenHash,
+                       TokenEquals,
+                       allocator)
+}
+
+
+public func (s: *Scope) lookup(name: Token) : *Symbol {
+    var sym = s.symbols.get(name)
+    if(sym) {
+        return sym
+    }
+
+    if(!s.parent) {
+        return null
+    }
+
+    return s.parent.lookup(name)
+}
+
+public func (this: *Scope) addSymbol(module: *Module, decl: *Decl, flags: i32) : *Symbol {
+    if(this.symbols.contains(decl.name) && !decl.hasNote("generated")) {
+        this.result.addError(decl.startPos, "symbol '%.*s' already defined", 
+                    decl.name.str.length, decl.name.str.buffer)
+    }
+
+    var isNewType = (decl.kind == StmtKind.FUNC_DECL   ||
+                     decl.kind == StmtKind.STRUCT_DECL ||
+                     decl.kind == StmtKind.UNION_DECL  ||
+                     decl.kind == StmtKind.TYPEDEF_DECL||
+                     decl.kind == StmtKind.ENUM_DECL)
+    
+    if(this.kind == ScopeKind.FUNC) {
+        if(!isNewType) {
+            flags |= SymbolFlags.IS_LOCAL
+        }
+    }
+
+    if(decl.hasNote("foreign")) {
+        flags |= SymbolFlags.IS_FOREIGN
+    }
+
+    if(isNewType) {
+        flags |= SymbolFlags.IS_TYPE
+    }
+
+    var kind = SymbolKind.VAR
+    switch(decl.kind) {
+        case StmtKind.ENUM_DECL:
+        case StmtKind.UNION_DECL:
+        case StmtKind.TYPEDEF_DECL:
+        case StmtKind.STRUCT_DECL: {
+            kind = SymbolKind.TYPE
+            break;
+        }
+        case StmtKind.FUNC_DECL: {
+            kind = SymbolKind.FUNC
+            break;
+        }
+        case StmtKind.CONST_DECL: {
+            kind = SymbolKind.CONST
+            flags |= SymbolFlags.IS_CONSTANT
+            break;
+        }
+        default: {
+            kind = SymbolKind.VAR
+            break;
+        }
+    }
+
+    var sym = new<Symbol>(this.allocator)
+    decl.sym = sym
+
+    this.symbols.put(decl.name, sym)
+    return sym
+}
+
+
+func TokenHash(token: Token) : u32 {
+    if(token.type != TokenType.IDENTIFIER) {
+        return 31
+    }
+
+    var hash = 5381_u32;
+    for(var i = 0; i < token.str.length; i+=1) {
+        var c = token.str.buffer[i]
+        hash = ((hash << 5_u32) + hash) ^ (c as (u32));        
+    }
+    return hash;
+}
+
+func TokenEquals(a: Token, b: Token) : bool {
+    if(a.type != b.type) {
+        return false
+    }
+
+    if(a.type == TokenType.IDENTIFIER) {
+        
+    }
+
+    return true // should we expand this out to other types?
 }

@@ -47,6 +47,7 @@ func main(len: i32, args: **char) {
     
     var allocator: *DebugAllocator = lita.allocator as (*DebugAllocator)
     var metric = &lita.metrics[MetricType.PARSING]
+    printf("Total errors: %d\n", lita.result.errors.size())
     printf("Total parse time: %f\n", metric.executionTime)
     printf("Total memory: %zu bytes\n", metric.bytesAllocated)
     printf("Total allocations: %u\n", allocator.totalAllocations)
@@ -146,14 +147,17 @@ func ParseImport(lita: *Lita, root: *Module) {
             continue
         }
 
-        if(lita.modules.contains(filename)) {
+        var module = lita.modules.get(filename)
+        if(module) {
+            importStmt.moduleId = &module.id
             continue;
         }        
 
         //printf("Parsing file: '%s' with error count: %d\n", filename, lita.result.errors.size())
         
-        var module = NewModule(lita.allocator)
+        module = NewModule(lita.result, lita.allocator)
         module.id.fromFile(lita, filename)
+        importStmt.moduleId = &module.id
 
         lita.addModule(module)
 
@@ -170,7 +174,7 @@ func Parse(lita: *Lita) {
     lita.startCapture(MetricType.PARSING)
     defer lita.endCapture(MetricType.PARSING)
 
-    var root = NewModule(lita.allocator)
+    var root = NewModule(lita.result, lita.allocator)
     root.id.fromFile(lita, lita.options.inputFile)
 
     lita.addModule(root)

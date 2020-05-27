@@ -1,0 +1,116 @@
+/**
+    Type Checker
+*/
+import "types"
+import "symbols"
+import "phase_result"
+import "module"
+import "ast"
+import "lex"
+import "state"
+import "map"
+import "array"
+import "assert"
+
+public struct TypeChecker {
+    lita: *Lita
+    result: *PhaseResult
+
+    prev: *Module
+    current: *Module
+}
+
+public func (this: *TypeChecker) typeCheck(root: *Module) {
+    if(root.flags & ModuleFlags.TYPE_CHECKED) {
+        return;
+    }
+    root.flags |= ModuleFlags.TYPE_CHECKED
+    this.resolveModule(root)
+}
+
+
+
+func (this: *TypeChecker) resolveModule(module: *Module) {
+    if(!module.ast) {
+        return;
+    }
+
+    this.enterModule(module)
+    defer this.leaveModule(module)
+
+    for(var i = 0; i < module.ast.declarations.size(); i += 1) {
+        var decl = module.ast.declarations.get(i)
+        this.tryResolveDecl(decl)
+    }
+
+    for(var i = 0; i < module.ast.imports.size(); i += 1) {
+        var imp = module.ast.imports.get(i)
+        this.tryResolveImport(imp)
+    }
+}
+
+func (this: *TypeChecker) enterModule(module: *Module) {
+    this.prev = this.current
+    this.current = module
+}
+
+func (this: *TypeChecker) leaveModule(module: *Module) {    
+    this.current = this.prev
+}
+
+
+func (this: *TypeChecker) tryResolveDecl(decl: *Decl) {
+    switch(decl.kind) {
+        case StmtKind.CONST_DECL: {
+            break;
+        }
+        case StmtKind.VAR_DECL: {
+            break;
+        }
+        case StmtKind.FUNC_DECL: {
+            break;
+        }
+        case StmtKind.ENUM_DECL: {
+            break;
+        }
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL: {
+            break;
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+}
+
+func (this: *TypeChecker) tryResolveImport(imp: *ImportDecl) {
+    // TODO: check if duplicate 
+    for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
+        var other = this.current.ast.imports.get(i)
+        if(imp == other) {
+            continue
+        }
+
+        if(other.name.str.equalsStringView(imp.name.str)) {
+            this.result.addError(imp.startPos, "duplicate import of module '%.*s'", 
+                imp.name.str.length, imp.name.str.buffer)
+            goto err;
+        }
+    }
+
+    if(!imp.moduleId) {
+        goto err;
+    }
+
+    var module = this.lita.modules.get(imp.moduleId.filename)
+    if(!module) {
+        this.result.addError(imp.startPos, "could not find module '%s'", 
+                imp.moduleId.filename)
+        goto err;
+    }
+err:
+    return;    
+}

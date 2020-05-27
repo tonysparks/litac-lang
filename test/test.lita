@@ -1,1218 +1,260 @@
-//import "test2"
-//import "libc"
-//import "io"
-//import "../src/ast"
-/* comment */
+var : void* = "hi"
+var t = 1
+const x i32 = 42
 
-func test() {
-    switch(1) {
-        case 0:
-        case 1: 
-            break;
-        default: {
-            break
-        }
-    }
+func test2<  (x: bool, ...) : i32 {
+    return 4
 }
 
-
-@asStr
-public enum TokenType {
-    IMPORT,
-
-    STRUCT,
-    UNION,
-    ENUM,
-    FUNC,
-    TYPEDEF,
-    VAR,
-    CONST,
-    
-    NULL,
-    VOID,
-    TRUE, 
-    FALSE,
-    BOOL,
-    CHAR,
-    I8,
-    U8,
-    I16,
-    U16,
-    I32,
-    U32,
-    I64,
-    U64,
-    F32,
-    F64,
-    USIZE,
-
-    FOR,
-    WHILE,
-    DO,
-    IF,
-    ELSE,
-    SWITCH,
-    CASE,
-    DEFAULT,
-    DEFER,
-
-    BREAK,
-    CONTINUE,
-    RETURN,
-    GOTO,
-    
-    SIZEOF,
-    TYPEOF,
-    OFFSETOF,
-
-    AS,
-    PUBLIC,
-    USING,
-
-    // End KeyWords
-
-    // Symbols
-    PLUS,
-    MINUS,
-    STAR,
-    MOD,
-    SLASH,
-    DOLLAR,
-    HASH,
-    DOT,
-    VAR_ARGS,
-    AT,
-    QUESTION_MARK,
-    COMMA,
-    SEMICOLON,
-    COLON,
-    COLON_COLON,
-    DOUBLE_QUOTE,
-    
-    LESS_THAN,
-    LESS_EQUALS,
-    GREATER_THAN,
-    GREATER_EQUALS,
-    EQUALS_EQUALS,
-    EQUALS,
-    NOT_EQUALS,
-    PLUS_EQ,
-    MINUS_EQ,
-    DIV_EQ,
-    MUL_EQ,
-    MOD_EQ,
-    LSHIFT_EQ,
-    RSHIFT_EQ,
-    BNOT_EQ,
-    XOR_EQ,
-    BAND_EQ,
-    BOR_EQ,
-
-    LSHIFT,
-    RSHIFT,
-    BNOT,
-    XOR,
-    BAND,
-    BOR,
-
-    LEFT_PAREN,
-    RIGHT_PAREN,
-    LEFT_BRACKET,
-    RIGHT_BRACKET,
-    LEFT_BRACE,
-    RIGHT_BRACE,
-
-    NOT,
-    OR,
-    AND,
-    // Symbol End
-
-    STRING,
-    IDENTIFIER,
-    INT_NUMBER,
-    FLOAT_NUMBER,
-    ERROR,
-    END_OF_FILE,    
-
-    MAX_TOKEN_TYPES
+func test(x: bool, ...) : i32 {
+    return 4
 }
-
-public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
-    [TokenType.IMPORT] = "import",
-
-    [TokenType.STRUCT] = "struct",
-    [TokenType.UNION] = "union",
-    [TokenType.ENUM] = "enum",
-    [TokenType.FUNC] = "func",
-    [TokenType.TYPEDEF] = "typedef",
-    [TokenType.VAR] = "var",
-    [TokenType.CONST] = "const",
-    
-    [TokenType.NULL] = "null",
-    [TokenType.VOID] = "void",
-    [TokenType.TRUE] = "true", 
-    [TokenType.FALSE] = "false",
-    [TokenType.BOOL] = "bool",
-    [TokenType.CHAR] = "char",
-    [TokenType.I8] = "i8",
-    [TokenType.U8] = "u8",
-    [TokenType.I16] = "i16",
-    [TokenType.U16] = "u16",
-    [TokenType.I32] = "i32",
-    [TokenType.U32] = "u32",
-    [TokenType.I64] = "i64",
-    [TokenType.U64] = "u64",
-    [TokenType.F32] = "f32",
-    [TokenType.F64] = "f64",
-    [TokenType.USIZE] = "usize",
-
-    [TokenType.FOR] = "for",
-    [TokenType.WHILE] = "while",
-    [TokenType.DO] = "do",
-    [TokenType.IF] = "if",
-    [TokenType.ELSE] = "else",
-    [TokenType.SWITCH] = "switch",
-    [TokenType.CASE] = "case",
-    [TokenType.DEFAULT] = "default",
-    [TokenType.DEFER] = "defer",
-
-    [TokenType.BREAK] = "break",
-    [TokenType.CONTINUE] = "continue",
-    [TokenType.RETURN] = "return",
-    [TokenType.GOTO] = "goto",
-    
-    [TokenType.SIZEOF] = "sizeof",
-    [TokenType.TYPEOF] = "typeof",
-    [TokenType.OFFSETOF] = "offsetof",
-
-    [TokenType.AS] = "as",
-    [TokenType.PUBLIC] = "public",
-    [TokenType.USING] = "using",
-
-    // End KeyWords
-
-    // Symbols
-    [TokenType.PLUS] = "+",
-    [TokenType.MINUS] = "-",
-    [TokenType.STAR] = "*",
-    [TokenType.MOD] = "%",
-    [TokenType.SLASH] = "/",
-    [TokenType.DOLLAR] = "$",
-    [TokenType.HASH] = "#",
-    [TokenType.DOT] = ".",
-    [TokenType.VAR_ARGS] = "...",
-    [TokenType.AT] = "@",
-    [TokenType.QUESTION_MARK] = "?",
-    [TokenType.COMMA] = ",",
-    [TokenType.SEMICOLON] = ";",
-    [TokenType.COLON] = ":",
-    [TokenType.COLON_COLON] = "::",
-    [TokenType.DOUBLE_QUOTE] = "\"",
-    
-    [TokenType.LESS_THAN] = "<",
-    [TokenType.LESS_EQUALS] = "<=",
-    [TokenType.GREATER_THAN] = ">",
-    [TokenType.GREATER_EQUALS] = ">=",
-    [TokenType.EQUALS_EQUALS] = "==",
-    [TokenType.EQUALS] = "=",
-    [TokenType.NOT_EQUALS] = "!=",
-    [TokenType.PLUS_EQ] = "+=",
-    [TokenType.MINUS_EQ] = "-=",
-    [TokenType.DIV_EQ] = "/=",
-    [TokenType.MUL_EQ] = "*=",
-    [TokenType.MOD_EQ] = "%=",
-    [TokenType.LSHIFT_EQ] = "<<=",
-    [TokenType.RSHIFT_EQ] = ">>=",
-    [TokenType.BNOT_EQ] = "~=",
-    [TokenType.XOR_EQ] = "^=",
-    [TokenType.BAND_EQ] = "&=",
-    [TokenType.BOR_EQ] = "|=",
-
-    [TokenType.LSHIFT] = "<<",
-    [TokenType.RSHIFT] = ">>",
-    [TokenType.BNOT] = "~",
-    [TokenType.XOR] = "^",
-    [TokenType.BAND] = "&",
-    [TokenType.BOR] = "|",
-
-    [TokenType.LEFT_PAREN] = "(",
-    [TokenType.RIGHT_PAREN] = ")",
-    [TokenType.LEFT_BRACKET] = "[",
-    [TokenType.RIGHT_BRACKET] = "]",
-    [TokenType.LEFT_BRACE] = "{",
-    [TokenType.RIGHT_BRACE] = "}",
-
-    [TokenType.NOT] = "!",
-    [TokenType.OR] = "||",
-    [TokenType.AND] = "&&",
-
-    [TokenType.STRING] = "STRING",
-    [TokenType.IDENTIFIER] = "IDENTIFER",
-    [TokenType.INT_NUMBER] = "INT_NUMBER",
-    [TokenType.FLOAT_NUMBER] = "FLOAT_NUMBER",
-    [TokenType.ERROR] = "ERROR",
-    [TokenType.END_OF_FILE] = "\0",   
-};
-
-const charToDigit = [256]i32 {
-    ['0'] = 0,
-    ['1'] = 1,
-    ['2'] = 2,
-    ['3'] = 3,
-    ['4'] = 4,
-    ['5'] = 5,
-    ['6'] = 6,
-    ['7'] = 7,
-    ['8'] = 8,
-    ['9'] = 9,
-    ['a'] = 10, ['A'] = 10,
-    ['b'] = 11, ['B'] = 11,
-    ['c'] = 12, ['C'] = 12,
-    ['d'] = 13, ['D'] = 13,
-    ['e'] = 14, ['E'] = 14,
-    ['f'] = 15, ['F'] = 15,
-};
-
-const escapeToChar = [256]char {
-    ['0'] = '\0',
-    ['\''] = '\'',
-    ['"'] = '"',  // "
-    ['\\'] = '\\',
-    ['n'] = '\n',
-    ['r'] = '\r',
-    ['t'] = '\t',
-    ['/'] = '/',
-    //['v'] = '\v',
-  //  ['b'] = '\b',
-  //  ['a'] = '\a',
-};
-
-public struct SrcPos {
-    filename: *const char
-    lineStart: *const char
-
-    start: *const char
-    end: *const char
-    lineNumber: i32
-    position: i32
-}
-
-public union Value {
-    floatValue: f64
-    intValue: i64
-    uintValue: u64
-    str: StringView
-}
-
-public struct Token {
-    type: TokenType
-    typeInfo: *TypeInfo
-    pos: SrcPos
-    value: using Value
-}
-
-public func (p: *SrcPos) getLineLength() : i32 {
-    if(!p.lineStart) return -1
-
-    var len = 0
-    while(p.lineStart[len] != '\0') {
-        if(p.lineStart[len] == '\n') {
-            break
-        }
-        len += 1
-    }
-
-    return len
-}
-
-
-public func (t: *Token) asString() : *const char {
-    return tokenText[t.type]
-}
-
-public func (token: *Token) print() {    
-    printf("%s: '%s' '%.*s' ", TokenTypeAsStr(token.type), token.asString(), (token.pos.end - token.pos.start) as (i32), token.pos.start)
-    if(token.type == TokenType.INT_NUMBER) {
-        printf("value: '%llu'", token.value.intValue)
-        printf(" typeInfo: %s", TypeKindAsStr(token.typeInfo.kind))
-    }
-    else if(token.type == TokenType.FLOAT_NUMBER) {
-        printf("value: '%f'", token.value.floatValue)
-        printf(" typeInfo: %s", TypeKindAsStr(token.typeInfo.kind))
-    }
-    else if(token.type == TokenType.STRING) {
-        printf("value: '%.*s'", token.value.str.length, token.value.str.buffer)
-    }
-    else if(token.type == TokenType.ERROR) {
-        printf("error: '%s'", "X")
-    }
-    printf("\n")
-}
-
-
-public struct Lexer {
-    allocator: *const Allocator
-    filename: *const char
-    token: Token
-    stream: *const char
-
-    lineStart: *const char
-    lineNumber: i32
-    position: i32
-
-    errorMsg: *const char
-}
-
-public func LexerInit(filename: *const char, 
-                      text: *const char,
-                      allocator: *const Allocator) : Lexer {
-    return Lexer {
-        .allocator = allocator,
-        .token = Token {
-            .type = TokenType.END_OF_FILE,
-            .typeInfo = null,
-            .pos = SrcPos {
-                .filename = filename,
-                .start = text,
-                .end = null,   
-            }         
-        },
-        .stream = text,
-        .lineStart = text,
-        .lineNumber = 1,
-        .position = 1,
-        .errorMsg = null,
-    }
-}
-
-public func (l: *Lexer) hasError() : bool {
-    return l.errorMsg != null
-}
-
-func (l: *Lexer) error(format: *const char, ...) {
-    var sb = StringBufferInit(256, l.allocator)
-    
-    var args: va_list;
-    va_start(args, format);
-    sb.append(format, args)
-    va_end(args)
-
-    l.errorMsg = sb.cStr()
-    l.errorToken()
-}
-
-func (l: *Lexer) nextChar() : char {
-    var c = *l.stream
-    if(c == '\n') {
-        l.lineStart = l.stream + 1;
-        l.lineNumber += 1;
-        l.position = 1;
-    }
-
-    l.stream += 1
-    l.position += 1
-    return *l.stream
-}
-
-@inline
-func (l: *Lexer) peekChar() : char {
-    return *(l.stream + 1)
-}
-
-func (l: *Lexer) eofToken() : Token {
-    l.token.type = TokenType.END_OF_FILE
-    l.token.pos.lineStart = l.lineStart
-    l.token.pos.lineNumber = l.lineNumber
-    l.token.pos.position = l.position
-    return l.token
-}
-
-func (l: *Lexer) errorToken() : Token {
-    l.token.type = TokenType.ERROR    
-    l.token.pos.lineStart = l.lineStart
-    l.token.pos.lineNumber = l.lineNumber
-    l.token.pos.position = l.position
-    return l.token
-}
-
-func (l: *Lexer) skipWhitespace() {
-    while (isspace(*l.stream)) {
-        l.nextChar()
-    }
-}
-
-func (l: *Lexer) skipComments() {    
-    if(*l.stream == '/') {        
-        if(l.peekChar() == '/') {            
-            l.nextChar() // eat /
-            do {
-                l.nextChar()
-                if(*l.stream == '\n') {                    
-                    break;
-                }
-            }
-            while(!l.eof())             
-        }
-        else if(l.peekChar() == '*') {
-            l.nextChar() // eat /
-            do {
-                l.nextChar()
-                if((*l.stream == '*' && l.peekChar() == '/')) {
-                    l.nextChar()
-                    l.nextChar()
-                    break;
-                }
-            }
-            while(!l.eof())            
-        }
-    }
-}
-
-func (l: *Lexer) isValidIdentifierStart(c: char) : bool {
-    return ((c == '_') ||
-            (c >= 'A' && c <= 'Z') ||
-            (c >= 'a' && c <= 'z'))
-}
-
-func (l: *Lexer) isValidIdentifierChar(c: char) : bool {
-    return ((c == '_') ||
-            (isdigit(c)) ||
-            (isalpha(c)))
-}
-
-func (l: *Lexer) isSymbolStart(c: char) : bool {
-    for(var i = TokenType.PLUS; i < TokenType.AND; i += 1) {
-        if(tokenText[i][0] == c) {
-            return true
-        }
-    }
-
-    return false
-}
-
-func (l: *Lexer) checkKeyword() : bool {    
-    for(var i = TokenType.IMPORT; i <= TokenType.USING; i += 1) {
-        if(l.token.value.str.equals(tokenText[i])) {
-            l.token.type = i as (TokenType)
-            return true
-        }
-    }
-
-    return false
-}
-
-
-func (l: *Lexer) scanWord() : Token {
-    var length = 0
-    while(l.isValidIdentifierChar(*l.stream)) {
-        l.nextChar()
-        length += 1
-    }
-    
-    l.token.pos.end = l.stream
-    //l.token.pos.lineNumber = l.lineNumber
-    l.token.type = TokenType.IDENTIFIER
-    l.token.value.str = StringViewInit(l.token.pos.start, length)
-
-    l.checkKeyword()
-
-    return l.token
-}
-
-func (l: *Lexer) scanInt(stream: *char) {
-    var base = 10;
-    var start_digits = stream;
-    if (*stream == '0') {
-        stream += 1;
-        if (tolower(*stream) == 'x') {
-            stream += 1;
-            base = 16;
-            start_digits = stream;
-        } else if (tolower(*stream) == 'b') {
-            stream += 1;
-            base = 2;
-            start_digits = stream;
-        } else if (isdigit(*stream)) {
-            base = 8;
-            start_digits = stream;
-        }
-    }
-    var val: i64 = 0;
-    for (;;) {        
-        var digit = charToDigit[(*stream) as (i32)];
-        if (digit == 0 && *stream != '0') {
-            break;
-        }
-        if (digit >= base) {
-            l.error("Digit '%c' out of range for base %d", *stream, base);
-            digit = 0;
-        }
-        if (val > (ULLONG_MAX - digit)/base) {
-            l.error("Integer literal overflow");
-            while (isdigit(*stream)) {
-                stream += 1;
-            }
-            val = 0;
-            break;
-        }
-        val = val*base + digit;
-        stream += 1;
-    }
-    if (stream == start_digits) {
-        l.error("Expected base %d digit, got '%c'", base, *stream);
-    }
-
-    if(l.hasError()) {
-        return;
-    }
-
-    l.token.type = TokenType.INT_NUMBER;
-    l.token.value.intValue = val
-}
-
-func (l: *Lexer) scanFloat(stream: *char) {    
-    var start = stream;
-
-    while (isdigit(*stream)) {
-        stream+=1;
-    }
-    if (*stream == '.') {
-        stream+=1;
-    }
-    while (isdigit(*stream)) {
-        stream+=1;
-    }
-    if (tolower(*stream) == 'e') {
-        stream+=1;
-        if (*stream == '+' || *stream == '-') {
-            stream+=1;
-        }
-        if (!isdigit(*stream)) {
-            l.error("Expected digit after float literal exponent, found '%c'.", *stream);
-        }
-        while (isdigit(*stream)) {
-            stream+=1;
-        }
-    }
-    var val = strtod(start, null);
-    if (val == HUGE_VAL) {
-        l.error("Float literal overflow");
-    }
-
-    if(l.hasError()) {
-        return;
-    }
-
-    l.token.type = TokenType.FLOAT_NUMBER
-    l.token.value.floatValue = val;
-}
-
-func (l: *Lexer) scanTypeInfo() {
-    var c = *l.stream
-    if(c == 'u' || c == 'i') {
-        if(l.token.typeInfo == &F32_TYPE || l.token.typeInfo == &F64_TYPE) {
-            l.error("Integer type designation on floating point number not allowed");
-            return;
-        }
-
-        var isSigned = (c == 'i');
-        
-        var start = l.stream
-        var len = 0
-        do {
-            len += 1
-            l.nextChar()
-
-            if(!isdigit(*l.stream)) {
-                break;
-            }            
-        } while(!l.eof())
-        
-        var kind = TypeKindFromString(start, len)
-        switch(kind) {
-            case TypeKind.I8: {
-                l.token.typeInfo = &I8_TYPE
-                break;
-            }
-            case TypeKind.U8: {
-                l.token.typeInfo = &U8_TYPE
-                break;
-            }
-            case TypeKind.I16: {
-                l.token.typeInfo = &I16_TYPE
-                break;
-            }
-            case TypeKind.U16: {
-                l.token.typeInfo = &U16_TYPE
-                break;
-            }
-            case TypeKind.I32: {
-                l.token.typeInfo = &I32_TYPE
-                break;
-            }
-            case TypeKind.U32: {
-                l.token.typeInfo = &U32_TYPE
-                break;
-            }
-            case TypeKind.I64: {
-                l.token.typeInfo = &I64_TYPE
-                break;
-            }
-            case TypeKind.U64: {
-                l.token.typeInfo = &U64_TYPE
-                break;
-            }
-            default: {
-                l.error("Invalid number type designator");
-            }
-        }
-
-    }
-    else if(tolower(c) == 'f' || tolower(c) == 'd' ) {
-        var start = l.stream
-        var len = 0
-        do {
-            len += 1
-            l.nextChar()
-
-            if(!isdigit(*l.stream)) {
-                break;
-            }            
-        } while(!l.eof())
-
-        if(len == 1) {
-            if(tolower(c) == 'f') {
-                l.token.typeInfo = &F32_TYPE
-            }
-            else {
-                l.token.typeInfo = &F64_TYPE
-            }
-        }
-        else {            
-            var kind = TypeKindFromString(start, len)
-            switch(kind) {
-                case TypeKind.F32: {
-                    l.token.typeInfo = &F32_TYPE
-                    break;
-                }
-                case TypeKind.F64: {
-                    l.token.typeInfo = &F64_TYPE
-                    break;
-                }
-                default: {
-                    l.error("Invalid number type designator");
-                }
-            }
-        }
-    }
-}
-
-func (l: *Lexer) scanNumber() : Token {
-    var start = l.stream
-
-    var numBuf = [256]char
-    var numIndex = 0
-
-    var hasDecimal = false
-    var hasExpo = false
-    while(!l.eof()) {
-        var c = *l.stream
-        if(c == '.') {
-            if(hasDecimal) {
-                break;
-            }
-            hasDecimal = true
-        }
-        else if(tolower(c) == 'e') {
-            if(hasExpo) {
-                break;
-            }
-            hasExpo = true
-        }
-        else if(!isdigit(c) && c != '_') {
-            break;
-        }
-
-        if(c != '_') {
-            numBuf[numIndex] = c
-            numIndex += 1
-        }
-
-        l.stream+=1
-    }
-
-    numBuf[numIndex] = '\0'
-    if (hasDecimal || hasExpo) {
-        l.scanFloat(numBuf);
-        l.token.typeInfo = &F64_TYPE
-    } else {
-        l.scanInt(numBuf);
-
-        l.token.typeInfo = &I32_TYPE
-        if(l.token.value.intValue > INT_MAX) {
-            l.token.typeInfo = &I64_TYPE
-        }
-    }
-
-    if(l.hasError()) {
-        return l.errorToken()
-    }
-    
-    l.scanTypeInfo()
-
-    l.token.pos.end = l.stream
-    l.token.pos.position += (l.stream - start)
-    //l.token.pos.lineNumber = l.lineNumber
-    return l.token
-}
-
-func (l: *Lexer) scanChar() : Token {
-    var c = l.nextChar() // eat the '
-    var value: char = '\0';
-
-    if(c == '\\') {                
-        c = l.nextChar() // eat the \
-        
-        if(escapeToChar[c] == 0 && c != '0') {            
-            return l.errorToken()
-        }
-        l.nextChar() // eat the character
-
-        // TODO: unicode support
-        // TODO: Hex support
-
-        value = escapeToChar[c]
-    }
-    else {
-        value = c
-        l.nextChar() // eat the character
-    }
-
-
-    if(*l.stream != '\'') {
-        return l.errorToken()
-    }
-
-    l.nextChar() // eat the closing '
-
-    l.token.type = TokenType.CHAR    
-    l.token.pos.end = l.stream
-    l.token.intValue = value
-    return l.token
-}
-
-func (l: *Lexer) scanString() : Token {    
-    var length = 0
-    if(l.stream[0] == '"') {
-        var isVerbatim = false        
-        if(l.stream[1] == '"' && l.stream[2] == '"') {
-            isVerbatim = true
-            l.nextChar()
-            l.nextChar()
-        }
-                
-        l.nextChar()
-        
-        l.token.value.str.buffer = l.stream
-        while(!l.eof()) {
-            if(l.stream[0] == '\\') {
-                if(l.stream[1] == '"') {
-                    l.nextChar()
-                    length += 1
-                }
-            }
-            else if(l.stream[0] == '"') {        
-                if(!isVerbatim) {
-                    l.nextChar()
-                    break;
-                }
-                else if(l.stream[1] == '"' && l.stream[2] == '"') {
-                    l.nextChar()
-                    l.nextChar()
-                    l.nextChar()
-                    break;
-                }
-            }
-            l.nextChar()
-            length += 1
-        }
-    }
-    l.token.type = TokenType.STRING
-    l.token.value.str.length = length
-    l.token.pos.end = l.stream
-    //l.token.pos.lineNumber = l.lineNumber
-    return l.token
-}
-
-func (l: *Lexer) scanSymbol() : Token {
-    var c = *l.stream
-    l.nextChar()
-    switch(c) {
-        case '+': {
-            l.token.type = TokenType.PLUS
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.PLUS_EQ
-            }
-            break;
-        }
-        case '-': {
-            l.token.type = TokenType.MINUS
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.MINUS_EQ
-            }
-            break;
-        }
-        case '*': {
-            l.token.type = TokenType.STAR
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.MUL_EQ
-            }
-            break;
-        }
-        case '%': {
-            l.token.type = TokenType.MOD
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.MOD_EQ
-            }
-            break;
-        }
-        case '/': {
-            l.token.type = TokenType.SLASH
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.DIV_EQ
-            }
-            break;
-        }
-        case '$': {
-            l.token.type = TokenType.DOLLAR
-            break;
-        }
-        case '#': {
-            l.token.type = TokenType.HASH
-            break;
-        }
-        case '.': {
-            l.token.type = TokenType.DOT
-            if(l.stream[0] == '.') {
-                if( l.stream[1] == '.') {
-                    l.nextChar()
-                    l.nextChar()
-                    l.token.type = TokenType.VAR_ARGS
-                }
-            }
-            break;
-        }
-        case '@': {
-            l.token.type = TokenType.AT
-            break;
-        }
-        case '?': {
-            l.token.type = TokenType.QUESTION_MARK
-            break;
-        }
-        case ',': {
-            l.token.type = TokenType.COMMA
-            break;
-        }
-        case ';': {
-            l.token.type = TokenType.SEMICOLON
-            break;
-        }
-        case ':': {
-            l.token.type = TokenType.COLON
-            if(l.stream[0] == ':') {
-                l.nextChar()
-                l.token.type = TokenType.COLON_COLON
-            }
-            break;
-        }
-        case '"': { //"
-            l.token.type = TokenType.DOUBLE_QUOTE
-            break;
-        }
-        case '<': {
-            l.token.type = TokenType.LESS_THAN
-            if(l.stream[0]== '=') {
-                l.nextChar()
-                l.token.type = TokenType.LESS_EQUALS
-            }
-            else if(l.stream[0] == '<') {
-                l.nextChar()
-                l.token.type = TokenType.LSHIFT
-                if( l.stream[0] == '=') {
-                    l.nextChar()
-                    l.token.type = TokenType.LSHIFT_EQ
-                }
-            }
-            break;
-        }
-        case '>': {
-            l.token.type = TokenType.GREATER_THAN
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.GREATER_EQUALS
-            }
-            else if(l.stream[0] == '>') {
-                l.nextChar()
-                l.token.type = TokenType.RSHIFT
-                if( l.stream[0] == '=') {
-                    l.nextChar()
-                    l.token.type = TokenType.RSHIFT_EQ
-                }
-            }
-            break;
-        }
-        case '=': {
-            l.token.type = TokenType.EQUALS
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.EQUALS_EQUALS
-            }
-            break;
-        }
-        case '!': {
-            l.token.type = TokenType.NOT
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.NOT_EQUALS
-            }
-            break;
-        }
-        case '~': {
-            l.token.type = TokenType.BNOT
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.BNOT_EQ
-            }
-            break;
-        }
-        case '^': {
-            l.token.type = TokenType.XOR
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.XOR_EQ
-            }
-            break;
-        }
-        case '&': {
-            l.token.type = TokenType.BAND
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.BAND_EQ
-            }
-            else if(l.stream[0] == '&') {
-                l.nextChar()
-                l.token.type = TokenType.AND
-            }
-            break;
-        }
-        case '|': {
-            l.token.type = TokenType.BOR
-            if(l.stream[0] == '=') {
-                l.nextChar()
-                l.token.type = TokenType.BOR_EQ
-            }
-            else if(l.stream[0] == '|') {
-                l.nextChar()
-                l.token.type = TokenType.OR
-            }
-            break;
-        }
-        case '(': { 
-            l.token.type = TokenType.LEFT_PAREN
-            break;
-        }
-        case ')': { 
-            l.token.type = TokenType.RIGHT_PAREN
-            break;
-        }
-        case '[': { 
-            l.token.type = TokenType.LEFT_BRACKET
-            break;
-        }
-        case ']': { 
-            l.token.type = TokenType.RIGHT_BRACKET
-            break;
-        }
-        case '{': { 
-            l.token.type = TokenType.LEFT_BRACE
-            break;
-        }
-        case '}': { 
-            l.token.type = TokenType.RIGHT_BRACE
-            break;
-        }
-        default: {
-            return l.errorToken();
-        }
-    }
-    
-    l.token.pos.end = l.stream
-    //l.token.pos.lineNumber = l.lineNumber
-    return l.token
-}
-
-public func (l: *Lexer) eof() : bool {
-    return *l.stream == '\0'
-}
-
-
-public func (l: *Lexer) nextToken() : Token {
-
-repeat:
-    if(l.eof()) {
-        return l.eofToken()
-    }
-    l.skipComments()
-
-    l.token.pos.lineNumber = l.lineNumber
-    l.token.pos.lineStart = l.lineStart
-    l.token.pos.start = l.stream
-    l.token.typeInfo = null
-
-    var c = *l.stream
-    switch(c) {
-        case '\0': {            
-            return l.eofToken()
-        }
-        case ' ': 
-        case '\n': 
-        case '\r': 
-        case '\t': {
-        //case '\v':
-            l.skipWhitespace()        
-            goto repeat;        
-        }
-        case '"': { // "
-            return l.scanString()
-        }
-        case '\'': {
-            return l.scanChar()
-        }
-        default: {
-            if(l.isValidIdentifierStart(c)) {
-                return l.scanWord()
-            }
-
-            if(isdigit(c)) {
-                return l.scanNumber()
-            }
-
-            if(l.isSymbolStart(c)) {
-                return l.scanSymbol()
-            }
-
-            return l.errorToken()
-        }
-    }
-
-    return l.eofToken()
-}
-/**/
-
-var s = "\""
-var str = """
-    hi " \' \"
-    there"
-"""
-var d = '\0'
-var c = 'z'
-
-
-@raw("1");
-@raw("2");
-@raw("3");
-@raw("4");
-@raw("5");
-
-//var t: i32 = 0
-//func x[]
-//#if false
+//import "../src/main"
+import "string_view"
 /*
-public struct Person {
-    a: i32
-
-    struct X {
-        last: *const char
-    }
-
-    enum Y {
-        X = 1,
-        Z
-    }
-}*/
-//#end
-/*
-public struct Array<T> {
+public struct StringView {
+    buffer: *const char
     length: i32
-    capacity: i32
-    elements: *T
-    alloc: *const mem::Allocator
+}
+
+public func StringViewInit(str: *const char, len: i32 = -1) : StringView {
+    if(str == null) {
+        return StringView {
+            .buffer = null,
+            .length = 0
+        }    
+    }
+
+    return StringView {
+        .buffer = str,
+        .length = (len < 0) ? strlen(str) : len
+    }
+}
+
+public func (b: StringView) hash() : u32 {
+    var hash = 5381_u32;
+    for(var i = 0; i < b.length; i+=1) {        
+        hash = ((hash << 5_u32) + hash) ^ ((b.buffer[i]) as (u32));        
+    }
+    return hash;
 }*/
 
-public func (a: *Array<T>) init<T>(){
-}
+public func (b: StringView) substring(start: i32, end: i32 = -1) : StringView {
+    var endIndex = end < 0 ? b.length : end
 
-func (p: *Person) name() {
-    return;
-}
-
-func (p: *Person) first(a: i32) {
-    return;
-}
-
-@inline
-@raw("c")
-func test(a: i32) : *void {
-    if(true) {
-        var x = 1
+    if(endIndex <= start || start < 0 || start >= b.length) {
+        /*return StringView {
+            .buffer = null,
+            .length = 0
+        }*/
     }
-    else {
-        var y = 2
-    }
-
-}
-
-var b: f32 = 1 + 2 // + (7 ^ 2)
-
 /*
-func test(){var selfHosted=true
-    var x: i32 = 0
-    x += 100_00_00
-    var f: f32 = 5_0.5f + 1_i8 + 2_u16 + 3f32 + 4f64 // + 4.4i32
-    var s = "hi"
+    return StringView {
+        .buffer = &b.buffer[start],
+        .length = endIndex - start
+    }*/
+}
+/*
+public func (b: StringView) startsWith(prefix: *const char, len: i32 = -1, fromIndex: i32 = 0) : bool {
+    if(!prefix) return false;
 
-    var v = """
-        hello"
-        ""
-        there"
+    var ta = b.buffer;
+    var to = fromIndex;
+    var pa = prefix;
+    var po = 0;
+    var pc = (len < 0) ? strlen(prefix) : len;
 
-    """
+    if ((fromIndex < 0) || (fromIndex > b.length - pc)) {
+        return false;
+    }
+
+    while ((pc -= 1) >= 0) {
+        if (ta[to] != pa[po]) {
+            return false;
+        }
+        to+=1
+        po+=1
+    }
+    return true;
+}
+
+public func (b: StringView) endsWith(suffix: *const char, len: i32 = -1) : bool {
+    if(!suffix) return false;
+
+    len = (len < 0) ? strlen(suffix) : len;
+    return b.startsWith(suffix, len, b.length - len)
+}
+
+public func (b: StringView) equals(str: *const char, len: i32 = -1) : bool {
+    if(!str) {
+        return b.buffer == null;
+    }
+
+    len = (len < 0) ? strlen(str) : len;
+    if(b.length != len) {
+        return false;
+    }
+
+    return strncmp(b.buffer, str, len) == 0
+}
+
+public func (b: StringView) equalsStringView(other: StringView) : bool {
+    return b.equals(other.buffer, other.length)
+}
+
+public func (b: StringView) contains(str: *const char, len: i32 = -1) : bool {
+    return b.indexOf(str, len) > -1;
+}
+
+public func (b: StringView) indexOf(str: *const char, len: i32 = -1) : i32 {
+    return b.indexOfAt(str, len, 0)
+}
+
+public func (b: StringView) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
+    if(!str) return -1;
+
+    var target = str
+    var source = b.buffer
+
+    var targetOffset = 0;
+    var sourceOffset = 0;
+
+    var first = target[0];
+
+    var targetCount = len
+    if(len < 0) {
+        targetCount = strlen(str);
+    }
+
+    var max = sourceOffset + (b.length - targetCount);
+
+    for (var i = sourceOffset + fromIndex; i <= max; i += 1) {
+        if (source[i] != first) {
+            while (i <= max && source[i] != first) {
+                i+=1
+            }
+        }
+
+        if (i <= max) {
+            var j = i + 1;
+            var end = j + targetCount - 1;
+            for (var k = targetOffset + 1; j < end && source[j] == target[k];) {
+                j += 1;
+                k += 1;
+            }
+
+            if (j == end) {
+                return i - sourceOffset;
+            }
+        }
+    }
+    return -1;
+}
+
+public func (b: StringView) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
+    if(!buf || len == 0) return 0;
+
+    var bytesCopied = len
+    if(b.length < len) {
+        bytesCopied = b.length
+    }
     
+    memcpy(buf as (*void),
+          (&b.buffer[0]) as (*const void), 
+           bytesCopied * sizeof(:char))
+
+    if(addZero) buf[bytesCopied] = '\0'
+
+    return (bytesCopied)
 }
-*/
+
+public func (b: StringView) forEach(fn : func(char) : bool) {
+    for(var i = 0; i < b.length; i+=1) {
+        if(fn(b.buffer[i])) {
+            break;
+        }
+    }
+}
+
+public func (b: StringView) empty() : bool {
+    return b.length == 0
+}
+
+public func (b: StringView) size() : i32 {
+    return b.length
+}
+
+public func (b: StringView) clear() {
+    b.length = 0
+}
+
+public func (b: StringView) get(index: i32) : char {
+    if(index < 0 || index >= b.length) {
+        return '\0'
+    }
+
+    return b.buffer[index]
+}
+
+@test("equals")
+func testEquals() {
+    var a = StringViewInit("Hello World")
+    var b = StringViewInit("Bye World")
+    var c = a
+    var d = StringViewInit("HelloWorld")
+    var e = StringViewInit(null)
+
+    assert(a.equals(c.buffer, c.length) == true)
+    assert(a.equals("Hell") == false)
+    assert(a.equals("Hello World") == true)
+    assert(a.equals(b.buffer, b.length) == false)
+    assert(a.equals(d.buffer, d.length) == false)
+    assert(e.equals(d.buffer, d.length) == false)
+    assert(a.equals(e.buffer, e.length) == false)
+}
 
 
-/*
-    |
-    |=
-    ||
-    >
-    >=
-    >>
-    >>=
-    .
-    ...
-    <
-    <<
-    <<=
-    &
-    &&
-    ~
-    ~=
-*/    
+@test("contains")
+func testContains() {
+    var a = StringViewInit("Hello World")
+    var e = StringViewInit(null)
+
+    assert(a.contains("World") == true)
+    assert(a.contains("d") == true)
+    assert(a.contains("H") == true)
+    assert(a.contains("Which", 1) == true)    
+    assert(e.contains("World") == false)
+    assert(a.contains(e.buffer, e.length) == false)
+}
+
+@test("startsWith")
+func testStartsWith() {
+    var a = StringViewInit("Hello World")    
+    var e = StringViewInit(null)
+
+    assert(a.startsWith("World") == false)
+    assert(a.startsWith("d") == false)
+    assert(a.startsWith("H") == true)
+    assert(a.startsWith("Hell") == true)
+    assert(a.startsWith("Hello World") == true)
+    assert(a.startsWith("Hello World!") == false)
+    assert(a.startsWith("Which", 1) == false)
+    assert(a.startsWith("Hhich", 1) == true)
+    assert(e.startsWith("World") == false)
+    assert(a.startsWith(e.buffer, e.length) == false)
+}
+
+@test("indexOf")
+func testIndexOf() {
+    var a = StringViewInit("Hello World")    
+    var e = StringViewInit(null)
+
+    assert(a.indexOfAt("World", 2) == 6)
+    assert(a.indexOfAt("World", 7) == -1)
+    assert(a.indexOfAt("d") == 10)
+    assert(a.indexOfAt("H") == 0)
+    assert(a.indexOfAt("H", 2) == -1)
+    
+    assert(e.indexOfAt("World") == -1)
+    assert(a.indexOfAt(e.buffer, e.length) == -1)
+}*/

@@ -185,15 +185,12 @@ public struct ImportDecl {
     stmt: using Decl    
     alias: Token // Identifier?
     isUsing: bool
+
+    moduleId: *ModuleId
 }
 
+// For var or const declarations
 public struct VarDecl {
-    decl: using Decl
-    type: *TypeSpec
-    expr: *Expr
-}
-
-public struct ConstDecl {
     decl: using Decl
     type: *TypeSpec
     expr: *Expr
@@ -606,4 +603,20 @@ public func IsDecl(node: *Node) : bool {
         default: 
             return false;
     }
+}
+
+public func (d: *Decl) hasNote(name: *const char) : bool {
+    if(!d) return false;
+
+    if(d.attributes.notes.empty()) {
+        return false;
+    }
+
+    for(var i = 0; i < d.attributes.notes.size(); i += 1) {
+        var note = d.attributes.notes.get(i)
+        if(note.name.nameEquals(name)) {
+            return true;
+        }
+    }
+    return false;
 }

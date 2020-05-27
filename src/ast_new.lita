@@ -107,24 +107,6 @@ public func NewVarDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewConstDecl(startPos: SrcPos, 
-                         endPos: SrcPos,
-                         name: Token, 
-                         type: *TypeSpec,
-                         expr: *Expr,
-                         allocator: *const Allocator) : *Decl {                              
-    var decl = new<ConstDecl>(allocator)
-    decl.kind = StmtKind.CONST_DECL;
-    decl.startPos = startPos
-    decl.endPos = endPos
-    decl.name = name
-    decl.type = type
-    decl.expr = expr
-
-    return decl as (*Decl)
-}
-
-
 public func NewFuncDecl(startPos: SrcPos, 
                          endPos: SrcPos,
                          name: Token,

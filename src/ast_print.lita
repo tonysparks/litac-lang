@@ -107,28 +107,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }            
             return;
         }
-        case StmtKind.CONST_DECL: {
-            var decl = s as (*ConstDecl)
-            if(!decl.attributes.notes.empty()) {
-                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    PrintStmt(decl.attributes.notes.get(i), indent)
-                    printf("\n")
-                }
-            }
-
-            Printf(indent, "const ")
-            PrintName(decl.name)
-            if(decl.type != null) {
-                Printf(indent, ": ")
-                PrintTypeSpec(decl.type)
-            }
-            if(decl.expr != null) {
-                Printf(indent, " = ")
-                PrintStmt(decl.expr)
-            }
-            Printf(indent, ";")
-            return;
-        }
+        case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
             var decl = s as (*VarDecl)
             if(!decl.attributes.notes.empty()) {
@@ -138,7 +117,12 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
 
-            Printf(indent, "var ")
+            if(decl.kind == StmtKind.CONST_DECL) {
+                Printf(indent, "const ")
+            }
+            else {
+                Printf(indent, "var ")
+            }
             PrintName(decl.name)
             if(decl.type != null) {
                 printf(": ")
@@ -667,16 +651,14 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.type = null
             //expr.sym///            
             return expr as (*Stmt)
-        }
-        case StmtKind.GET_EXPR: {
-            var expr = new<GetExpr>(allocator)
-            expr.kind = StmtKind.GET_EXPR;
-            expr.startPos = startPos
-            expr.object = null
-            expr.field = null
-            expr.isMethodCall = false
-            return expr as (*Stmt)
         }*/
+        case StmtKind.GET_EXPR: {
+            var expr = s as (*GetExpr)
+            PrintStmt(expr.object, indent)
+            printf(".")
+            PrintStmt(expr.field)
+            return;
+        }
         case StmtKind.GROUP_EXPR: {
             var expr = s as (*GroupExpr)
             Printf(indent, "(")
@@ -772,16 +754,17 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.index = null
             expr.value = null
             return expr as (*Stmt);
-        }
+        }*/
         case StmtKind.TERNARY_EXPR: {
-            var expr = new<TernaryExpr>(allocator)
-            expr.kind = StmtKind.TERNARY_EXPR;
-            expr.startPos = startPos
-            expr.cond = null
-            expr.then = null
-            expr.other = null
-            return expr as (*Stmt);
-        }
+            var expr = s as (*TernaryExpr)
+            Printf(indent, "(")
+            PrintStmt(expr.cond)
+            printf(") ? ")
+            PrintStmt(expr.then)
+            printf(" : ")
+            PrintStmt(expr.other)
+            return;
+        }/*
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
             var expr = new<TypeIdentifierExpr>(allocator)
             expr.kind = StmtKind.TYPE_IDENTIFIER_EXPR;

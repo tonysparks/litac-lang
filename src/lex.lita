@@ -435,6 +435,14 @@ public struct Token {
     value: using Value
 }
 
+public func (token: *Token) nameEquals(str: *const char) : bool {
+    if(token.type != TokenType.IDENTIFIER) {
+        return false
+    }
+
+    return token.str.equals(str)
+}
+
 public func (p: *SrcPos) getLineLength() : i32 {
     if(!p.lineStart) return -1
 

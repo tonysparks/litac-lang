@@ -7,6 +7,11 @@ import "system"
 import "state"
 import "libc"
 import "mem"
+import "symbols"
+
+public enum ModuleFlags {
+    TYPE_CHECKED = (1<<0),
+}
 
 public struct ModuleId {    
     filename: [MAX_PATH]char   // full path the file of this module
@@ -18,15 +23,26 @@ public struct Module {
     id: ModuleId       // TODO: don't make a separate allocation
     text: *char         // text of modules file
     ast: *ModuleStmt
+    result: *PhaseResult
+    symbols: Scope
+    flags: i32
     //result: PhaseResult
     //decls: Array<*Decl>
 }
 
-public func NewModule(allocator: *const Allocator) : *Module {
+public func NewModule(result: *PhaseResult, 
+                      allocator: *const Allocator) : *Module {
+
     var mod = new<Module>(allocator)    
-    mod.text = null
-    mod.ast = null
+    mod.init(result, allocator)
     return mod
+}
+
+public func (this: *Module) init(result: *PhaseResult, allocator: *const Allocator) {
+    this.text = null
+    this.ast = null
+    this.symbols.init(ScopeKind.MODULE, null, result, allocator)
+    this.flags = 0
 }
 
 public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {
