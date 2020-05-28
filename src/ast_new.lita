@@ -250,6 +250,18 @@ public func NewParameterDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
+public func NewBuiltinDecl(startPos: SrcPos, 
+                           endPos: SrcPos,                      
+                           type: *TypeInfo,
+                           allocator: *const Allocator) : *Decl {                              
+    var decl = new<NativeDecl>(allocator)
+    decl.kind = StmtKind.NATIVE_DECL;
+    decl.startPos = startPos
+    decl.endPos = endPos
+    decl.type = type
+    return decl as (*Decl)
+}
+
 public func NewPoisonDecl(startPos: SrcPos, 
                           endPos: SrcPos,                      
                           allocator: *const Allocator) : *Decl {                              

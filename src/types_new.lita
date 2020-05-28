@@ -1,0 +1,119 @@
+import "mem"
+import "types"
+import "symbols"
+import "array"
+import "ast"
+
+public func NewFuncTypeInfo(sym: *Symbol,
+                            funcDecl: *FuncDecl,
+                            allocator: *const Allocator) : *FuncTypeInfo {
+
+    var type = new<FuncTypeInfo>(allocator)
+    type.kind = TypeKind.FUNC
+    type.typeid = NextTypeId()
+    type.name = sym.name
+    type.sym = sym
+    type.decl = funcDecl
+    type.returnType = null    
+    return type;
+}
+
+public func NewFuncPtrTypeInfo(genericParams: Array<GenericParam>,
+                               returnType: *TypeInfo,
+                               paramDecls: Array<*TypeInfo>,
+                               allocator: *const Allocator) : *FuncPtrTypeInfo {
+
+    var type = new<FuncPtrTypeInfo>(allocator)
+    type.kind = TypeKind.FUNC_PTR
+    type.typeid = NextTypeId()        
+    type.genericParams = genericParams
+    type.returnType = returnType
+    type.paramDecls = paramDecls
+    return type;
+}
+
+public func NewAggregateTypeInfo(sym: *Symbol,
+                                 aggregateDecl: *AggregateDecl, 
+                                 allocator: *const Allocator) : *AggregateTypeInfo {
+
+    var type = new<AggregateTypeInfo>(allocator)
+    type.kind = aggregateDecl.kind == StmtKind.STRUCT_DECL ? TypeKind.STRUCT : TypeKind.UNION
+    type.typeid = NextTypeId()
+    type.name = sym.name
+    type.decl = aggregateDecl
+    type.sym = sym
+    return type
+}
+
+public func NewEnumTypeInfo(sym: *Symbol,
+                            enumDecl: *EnumDecl, 
+                            allocator: *const Allocator) : *EnumTypeInfo {
+
+    var type = new<EnumTypeInfo>(allocator)
+    type.kind = TypeKind.ENUM
+    type.typeid = NextTypeId()
+    type.name = sym.name
+    type.decl = enumDecl
+    type.sym = sym
+    return type
+}
+
+public func NewForeignTypeInfo(sym: *Symbol,
+                               allocator: *const Allocator) : *TypeInfo {
+
+    var type = new<TypeInfo>(allocator)
+    type.kind = TypeKind.VOID
+    type.typeid = NextTypeId()    
+    type.name = sym.name
+    type.sym = sym
+    return type 
+}
+
+public func NewConstTypeInfo(base: *TypeInfo, allocator: *const Allocator) : *ConstTypeInfo {
+    var type = new<ConstTypeInfo>(allocator)
+    type.kind = TypeKind.CONST
+    type.typeid = NextTypeId()
+    type.constOf = base
+    return type
+}
+
+public func NewPtrTypeInfo(base: *TypeInfo, allocator: *const Allocator) : *PtrTypeInfo {
+    var type = new<PtrTypeInfo>(allocator)
+    type.kind = TypeKind.PTR
+    type.typeid = NextTypeId()
+    type.ptrOf = base
+    return type
+}
+
+public func (this: *FuncTypeInfo) asPtr(allocator: *const Allocator) : *FuncPtrTypeInfo {
+    var genericParams = Array<GenericParam>{}
+    genericParams.init(this.decl.genericParams.size(), allocator)
+    genericParams.addAll(this.decl.genericParams)
+
+    var paramDecls = Array<*TypeInfo>{}
+    paramDecls.init(this.decl.params.size(), allocator)
+    for(var i = 0; i < this.decl.params.size() ; i += 1) {
+        var p = this.decl.params.get(i)
+        paramDecls.add(p.typeInfo)
+    }
+
+    return NewFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, allocator)
+}
+
+public func TypeDecay(type: *TypeInfo, allocator: *const Allocator) : *TypeInfo {
+    if(!type) return null;
+
+    switch(type.kind) {
+        case TypeKind.ARRAY: {
+            var arrayInfo = type as (*ArrayTypeInfo)
+            return NewPtrTypeInfo(TypeDecay(arrayInfo.arrayOf, allocator), allocator) as (*TypeInfo)
+        }
+        case TypeKind.FUNC: {
+            var funcInfo = type as (*FuncTypeInfo)
+            return funcInfo.asPtr(allocator) as (*TypeInfo)
+        }
+        default: {
+            return type
+        }
+    }
+}

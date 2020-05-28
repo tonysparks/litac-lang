@@ -7,12 +7,21 @@ import "module"
 import "state"
 import "mem"
 import "phase_result"
+import "symbol_table"
+import "libc"
 
 public enum SymbolKind {
     TYPE,
     VAR,
     CONST,
     FUNC,
+}
+
+public enum SymbolState {
+    UNRESOLVED = 0,
+    RESOLVING,
+    RESOLVED,
+    ERROR
 }
 
 public enum SymbolFlags {
@@ -24,12 +33,16 @@ public enum SymbolFlags {
     IS_INCOMPLETE           = (1<<6),
     IS_GENERIC_TEMPLATE     = (1<<7),
     IS_BUILTIN              = (1<<8),
-    IS_FROM_GENERIC_TEMPLATE  = (1<<9),
+    IS_FROM_GENERIC_TEMPLATE= (1<<9),
+    IS_IMPORTED             = (1<<10),
 }
+
+public const MAX_SYMBOL_NAME = 256;
 
 public struct Symbol {
     kind: SymbolKind
-    name: Token
+    name: [MAX_SYMBOL_NAME]char
+    state: SymbolState
     decl: *Decl
     type: *TypeInfo
     declared: *Module
@@ -46,31 +59,30 @@ public struct Scope {
     allocator: *const Allocator
     result: *PhaseResult
     parent: *Scope
-    symbols: Map<Token, *Symbol>
+    //symbols: using SymbolTable
+    symbols: using Map<*const char, *Symbol>
 }
 
 public func NewScope(kind: ScopeKind, parent: *Scope, result: *PhaseResult, allocator: *const Allocator) : *Scope {
     var scope = new<Scope>(allocator)
     scope.init(kind, parent, result, allocator)
+    return scope
 }
 
 public func (scope: *Scope) init(kind: ScopeKind, 
                                  parent: *Scope, 
                                  result: *PhaseResult,
-                                 allocator: *const Allocator) : *Scope {    
+                                 allocator: *const Allocator) {    
     scope.kind = kind
     scope.allocator = allocator
     scope.parent = parent
     scope.result = result
-    scope.symbols.init(null,
-                       16,
-                       TokenHash,
-                       TokenEquals,
-                       allocator)
+    //scope.symbols.init(16, allocator)
+    scope.symbols = StrMap<*Symbol>(null, 16, allocator)
 }
 
 
-public func (s: *Scope) lookup(name: Token) : *Symbol {
+public func (s: *Scope) lookup(name: *const char) : *Symbol {
     var sym = s.symbols.get(name)
     if(sym) {
         return sym
@@ -83,10 +95,35 @@ public func (s: *Scope) lookup(name: Token) : *Symbol {
     return s.parent.lookup(name)
 }
 
-public func (this: *Scope) addSymbol(module: *Module, decl: *Decl, flags: i32) : *Symbol {
-    if(this.symbols.contains(decl.name) && !decl.hasNote("generated")) {
-        this.result.addError(decl.startPos, "symbol '%.*s' already defined", 
-                    decl.name.str.length, decl.name.str.buffer)
+public func (s: *Scope) lookupByToken(name: Token) : *Symbol {
+    if(name.type != TokenType.IDENTIFIER) {
+        return null
+    }
+
+    var buf:[MAX_SYMBOL_NAME]char
+    name.str.copyTo(buf, MAX_SYMBOL_NAME)
+    return s.lookup(buf)    
+}
+
+public func (this: *Scope) importSymbol(name:[MAX_SYMBOL_NAME]const char, 
+                                        symbol: *Symbol) {
+
+    if(this.symbols.contains(name) && !symbol.decl.hasNote("generated")) {
+        this.result.addError(symbol.decl.startPos, "symbol '%s' already defined", name)
+        return;
+    }
+
+    this.symbols.put(name, symbol)
+}
+
+public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char, 
+                                     module: *Module, 
+                                     decl: *Decl, 
+                                     flags: i32) : *Symbol {
+
+    if(this.symbols.contains(name) && !decl.hasNote("generated")) {
+        this.result.addError(decl.startPos, "symbol '%s' already defined", name)
+        return null;
     }
 
     var isNewType = (decl.kind == StmtKind.FUNC_DECL   ||
@@ -134,34 +171,16 @@ public func (this: *Scope) addSymbol(module: *Module, decl: *Decl, flags: i32) :
     }
 
     var sym = new<Symbol>(this.allocator)
+    sym.kind = kind
+    strncpy(sym.name, name, MAX_SYMBOL_NAME)
+    sym.state = SymbolState.UNRESOLVED
+    sym.decl = decl
+    sym.type = null
+    sym.declared = module
+    sym.flags = flags
+
     decl.sym = sym
 
-    this.symbols.put(decl.name, sym)
+    this.symbols.put(sym.name, sym)
     return sym
-}
-
-
-func TokenHash(token: Token) : u32 {
-    if(token.type != TokenType.IDENTIFIER) {
-        return 31
-    }
-
-    var hash = 5381_u32;
-    for(var i = 0; i < token.str.length; i+=1) {
-        var c = token.str.buffer[i]
-        hash = ((hash << 5_u32) + hash) ^ (c as (u32));        
-    }
-    return hash;
-}
-
-func TokenEquals(a: Token, b: Token) : bool {
-    if(a.type != b.type) {
-        return false
-    }
-
-    if(a.type == TokenType.IDENTIFIER) {
-        
-    }
-
-    return true // should we expand this out to other types?
 }

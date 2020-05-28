@@ -1,0 +1,193 @@
+import "mem"
+import "lex"
+import "symbols"
+
+public struct SymbolTable {
+    alloc: *const Allocator
+    length: i32
+    capacity: i32
+    keys: *Token
+    values: **Symbol
+}
+
+public func (this: *SymbolTable) init(initialSize: i32,                                      
+                                      alloc: *const Allocator) {
+    
+    this.length = 0;
+    this.capacity = 0;    
+    this.alloc = alloc;
+    this.keys =  null;
+    this.values = null;
+    
+    SymbolTableGrow(this, initialSize);
+}
+
+public func (this: *SymbolTable) free() {
+    if(this) {
+        this.capacity = 0;
+        this.length = 0;
+        this.alloc.free(this.keys as (*void));
+        this.alloc.free(this.values as (*void));    
+
+        this.keys = null;
+        this.values = null;    
+    }
+}
+
+@inline
+public func (this: *SymbolTable) size() : i32 {
+    return this.length
+}
+
+public func (this: *SymbolTable) empty() : bool {
+    return this.length == 0
+}
+
+
+public func (this: *SymbolTable) put(key: Token, value: *Symbol) {
+    
+    if(2 * this.length >= this.capacity) {        
+        SymbolTableGrow(this, 2 * this.capacity);    
+    }
+    
+    var i = TokenHash(key)
+    for(;;) {
+        i &= this.capacity - 1;
+        var storedKey = &this.keys[i]
+        if(storedKey.type == 0) {
+            this.length += 1
+            this.keys[i] = key;
+            this.values[i] = value;
+            return;
+        }
+        else if(TokenEquals(storedKey, &key)) {
+            this.values[i] = value;
+            return;
+        }
+        
+        i += 1;
+    }
+
+}
+
+public func (this: *SymbolTable) get(key: Token) : *Symbol {
+    if(this.length == 0) {
+        return null
+    }
+    
+    var i = TokenHash(key);
+    for(;;) {
+        i &= this.capacity - 1;
+        var storedKey = &this.keys[i]
+        if(TokenEquals(storedKey, &key)) {
+            return this.values[i];
+        }
+        else if(storedKey.type == 0) {
+            return null;
+        }
+        
+        i += 1;
+    }
+    
+    return null;
+}
+
+public func (this: *SymbolTable) remove(key: Token) : *Symbol {
+    if(this.length == 0) {
+        return null;
+    }
+    
+    var i = TokenHash(&key);
+    for(;;) {
+        i &= this.capacity - 1;
+        var storedKey = &this.keys[i]
+        if(TokenEquals(storedKey, key)) {
+            var v = this.values[i];
+            this.keys[i].type = 0
+            this.length -= 1
+            return v;
+        }
+        else if(storedKey.type == 0) {
+            return null;
+        }
+        
+        i += 1;
+    }
+    
+    return null;
+}
+
+public func (this: *SymbolTable) contains(key: Token) : bool {
+    if(this.length == 0) {
+        return false;
+    }
+    
+    var i = TokenHash(&key);
+    for(;;) {
+        i &= this.capacity - 1;
+        var storedKey = &this.keys[i]
+        if(TokenEquals(storedKey, &key)) {
+            return true
+        }
+        else if(storedKey.type == 0) {
+            return false;
+        }
+        
+        i += 1;
+    }
+    
+    return false;
+}
+
+func SymbolTableGrow(this: *SymbolTable, newlength: i32) {
+    if(newlength < 16) {
+        newlength = 16;
+    }
+    
+    var newMap = SymbolTable {
+        .length: 0,
+        .capacity: newlength,
+        .keys: this.alloc.calloc(newlength, sizeof(:Token)) as (*Token),
+        .values: this.alloc.alloc(newlength * sizeof(:*Symbol)) as (**Symbol),  
+        .alloc: this.alloc
+    }
+    
+    for(var i = 0; i < this.capacity; i+=1) {
+        var storedKey = &this.keys[i]
+        if(storedKey.type != 0) {
+            newMap.put(*storedKey, this.values[i]);
+        }
+    }
+    
+    this.free();
+    
+    *this = newMap;
+}
+
+
+
+
+func TokenHash(token: *Token) : u32 {
+    if(token.type != TokenType.IDENTIFIER) {
+        return 31
+    }
+
+    var hash = 5381_u32;
+    for(var i = 0; i < token.str.length; i+=1) {
+        var c = token.str.buffer[i]
+        hash = ((hash << 5_u32) + hash) ^ (c as (u32));        
+    }
+    return hash;
+}
+
+func TokenEquals(a: *Token, b: *Token) : bool {
+    if(a.type != b.type) {
+        return false
+    }
+
+    if(a.type == TokenType.IDENTIFIER) {
+        
+    }
+
+    return true // should we expand this out to other types?
+}

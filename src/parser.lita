@@ -1696,7 +1696,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
         case TokenType.VOID: {
             p.advance()
             var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.allocator) as (*NameTypeSpec)
-            spec.name = TokenName(token, p.allocator)
+            spec.name = NewTokenName(token, p.allocator)
             
             return spec as (*TypeSpec)
         }

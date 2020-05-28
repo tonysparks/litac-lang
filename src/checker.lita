@@ -2,6 +2,7 @@
     Type Checker
 */
 import "types"
+import "types_new"
 import "symbols"
 import "phase_result"
 import "module"
@@ -12,12 +13,29 @@ import "map"
 import "array"
 import "assert"
 
-public struct TypeChecker {
-    lita: *Lita
-    result: *PhaseResult
+import "ast_print"
+import "libc"
 
+public struct TypeChecker {
+    lita: using *Lita
+    
     prev: *Module
     current: *Module
+
+    currentScope: *Scope
+    pendingValues: Array<*Symbol>
+    pendingTypes: Array<*Symbol>
+
+    randomNameIndex: u32
+}
+
+public func (this: *TypeChecker) init(lita: *Lita) {
+    this.lita = lita
+    this.prev = null
+    this.current = null
+    this.currentScope = null
+    this.pendingValues.init(64, lita.allocator)
+    this.pendingTypes.init(64, lita.allocator)
 }
 
 public func (this: *TypeChecker) typeCheck(root: *Module) {
@@ -25,12 +43,14 @@ public func (this: *TypeChecker) typeCheck(root: *Module) {
         return;
     }
     root.flags |= ModuleFlags.TYPE_CHECKED
-    this.resolveModule(root)
+    this.currentScope = &root.symbols
+
+    this.createModuleSymbols(root)
 }
 
 
 
-func (this: *TypeChecker) resolveModule(module: *Module) {
+func (this: *TypeChecker) createModuleSymbols(module: *Module) {
     if(!module.ast) {
         return;
     }
@@ -40,12 +60,12 @@ func (this: *TypeChecker) resolveModule(module: *Module) {
 
     for(var i = 0; i < module.ast.declarations.size(); i += 1) {
         var decl = module.ast.declarations.get(i)
-        this.tryResolveDecl(decl)
+        this.createDeclSymbols(decl)
     }
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var imp = module.ast.imports.get(i)
-        this.tryResolveImport(imp)
+        this.createImportSymbols(imp)
     }
 }
 
@@ -59,15 +79,48 @@ func (this: *TypeChecker) leaveModule(module: *Module) {
 }
 
 
-func (this: *TypeChecker) tryResolveDecl(decl: *Decl) {
-    switch(decl.kind) {
-        case StmtKind.CONST_DECL: {
-            break;
+func (this: *TypeChecker) createDeclSymbols(decl: *Decl) {
+    printf("Resolving Decl: ")
+    PrintName(decl.name)
+    printf("\n")
+
+    var name:[MAX_SYMBOL_NAME]char;
+    if(decl.name.type == TokenType.IDENTIFIER) {
+        decl.name.str.copyTo(name, MAX_SYMBOL_NAME)
+    }
+    else {
+        // TODO: Generate a random name
+    }
+
+    var sym: *Symbol = null
+    if(decl.kind != StmtKind.FUNC_DECL) {
+        sym = this.current.symbols.addSymbol(name as (*const char), this.current, decl, SymbolFlags.IS_INCOMPLETE)
+        if(!sym) {
+            goto err;
         }
+    }
+
+    switch(decl.kind) {            
+        case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
+            this.pendingValues.add(sym)
             break;
         }
         case StmtKind.FUNC_DECL: {
+            var funcDecl = decl as (*FuncDecl)
+            if(funcDecl.flags & FuncFlags.IS_METHOD) {
+                if(!funcDecl.getName(name)) {
+                    this.result.addError(decl.startPos, "invalid function name")
+                    goto err;
+                }                
+            }
+
+            sym = this.current.symbols.addSymbol(name as (*const char), this.current, decl, SymbolFlags.IS_INCOMPLETE)
+            if(!sym) {
+                goto err;
+            }
+
+            sym.type = NewFuncTypeInfo(sym, funcDecl, this.allocator) as (*TypeInfo)
             break;
         }
         case StmtKind.ENUM_DECL: {
@@ -79,15 +132,25 @@ func (this: *TypeChecker) tryResolveDecl(decl: *Decl) {
         }
         case StmtKind.TYPEDEF_DECL: {
             break;
-        }
+        }     
+        case StmtKind.POISON_DECL: {            
+            break; // Ignore, as this will already have a parsing error
+        }   
         default: {
+            PrintStmt(decl as (*Stmt), 0)
             assert(false)
         }
     }
+
+err:
+    return;    
 }
 
-func (this: *TypeChecker) tryResolveImport(imp: *ImportDecl) {
-    // TODO: check if duplicate 
+func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
+    printf("Resolving Import: ")
+    PrintName(imp.name)
+    printf("\n")
+
     for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
         var other = this.current.ast.imports.get(i)
         if(imp == other) {
@@ -111,6 +174,180 @@ func (this: *TypeChecker) tryResolveImport(imp: *ImportDecl) {
                 imp.moduleId.filename)
         goto err;
     }
+
+    this.current.importModule(imp, module)
 err:
     return;    
+}
+
+
+func (this: *TypeChecker) resolveModuleSymbol(module: *Module) {
+    this.enterModule(module)
+    defer this.leaveModule(module)
+
+    // Start resolving the symbols - this creates forward declarations
+    // so that function signatures can be defined
+    for(var i = 0; i < module.symbols.capacity; i += 1) {
+        var symName = module.symbols.keys[i]
+        var symbol = module.symbols.values[i]
+        if(!symName || !symbol) {
+            continue
+        }
+
+        if(symbol.declared != module) {
+            continue
+        }
+
+        this.resolveSymbol(symbol)
+    }
+}
+
+
+func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
+    if(sym.state == SymbolState.RESOLVED ||
+       sym.state == SymbolState.ERROR) {
+        return;
+    }
+
+    if(sym.state == SymbolState.RESOLVING) {
+        this.result.addError(sym.decl.startPos, "cyclic dependency found with '%s'", sym.name)
+        return;
+    }
+
+    sym.state = SymbolState.RESOLVING
+    switch(sym.kind) {
+        case SymbolKind.TYPE: {
+            switch(sym.decl.kind) {
+                case StmtKind.ENUM_DECL: {
+                    var enumDecl = sym.decl as (*EnumDecl)
+                    sym.type = NewEnumTypeInfo(sym, enumDecl, this.allocator) as (*TypeInfo)
+                    break;
+                }
+                case StmtKind.TYPEDEF_DECL: {
+                    var typedefDecl = sym.decl as (*TypedefDecl)
+                    var aliasedType = this.resolveTypeSpec(typedefDecl.type)
+                    if(!aliasedType) {
+                        goto err;
+                    }
+
+                    if(typedefDecl.hasNote("foreign") && aliasedType.kind == TypeKind.VOID) {
+                        aliasedType = NewForeignTypeInfo(sym, this.allocator)                        
+                    }
+                    sym.type = aliasedType
+                    break;
+                }
+                case StmtKind.STRUCT_DECL: 
+                case StmtKind.UNION_DECL: {
+                    var aggregateDecl = sym.decl as (*AggregateDecl)
+                    sym.type = NewAggregateTypeInfo(sym, aggregateDecl, this.allocator) as (*TypeInfo)
+
+                    this.pendingTypes.add(sym)
+                    break;
+                }
+                default: {
+                    assert(false)
+                }
+            }
+            break
+        }
+        case SymbolKind.VAR:
+        case SymbolKind.CONST: {
+            if(!(sym.flags & SymbolFlags.IS_LOCAL)) {
+                this.pendingValues.add(sym)
+                return;
+            }
+
+            break
+        }
+        case SymbolKind.FUNC: {
+            var funcDecl = sym.decl as (*FuncDecl)
+            for(var i = 0; i < funcDecl.params.size() ; i += 1) {
+                var param = funcDecl.params.get(i)
+                param.typeInfo = this.resolveTypeSpec(param.type)
+            }
+            var funcInfo = sym.type != null ? 
+                                sym.type as (*FuncTypeInfo) :
+                                NewFuncTypeInfo(sym, funcDecl, this.allocator)
+
+            var retType = this.resolveTypeSpec(funcDecl.returnType)
+            funcInfo.returnType = TypeDecay(retType, this.allocator)
+
+            sym.type = funcInfo
+            break
+        }
+        default: {
+            assert(false)
+        }
+    }
+
+    sym.state = SymbolState.RESOLVED
+    return;
+
+err:    
+    sym.state = SymbolState.ERROR
+    return;
+}
+
+func (this: *TypeChecker) getType(spec: *NameTypeSpec) : *Symbol {
+    return this.current.getType(spec.name)
+}
+
+func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
+    if(!spec) {
+        return &VOID_TYPE
+    }
+
+    if(spec.typeInfo) {
+        return spec.typeInfo
+    }
+
+    switch(spec.kind) {
+        case TypeSpecKind.NAME: {
+            var nameSpec = spec as (*NameTypeSpec)
+            var sym = this.getType(nameSpec)
+            if(!sym) {
+                this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
+                goto err;
+            }
+
+            if(!(sym.flags & SymbolFlags.IS_TYPE)) {
+                this.result.addError(spec.pos, "'%s' must be a type", nameSpec.name)
+                goto err;
+            }
+
+            this.resolveSymbol(sym)
+            spec.typeInfo = sym.type
+            return sym.type
+        }
+        case TypeSpecKind.CONST: {
+            var constSpec = spec as (*ConstTypeSpec)
+            var constOf = this.resolveTypeSpec(constSpec.base)
+            var type = NewConstTypeInfo(constOf, this.allocator) as (*TypeInfo)
+            spec.typeInfo = type
+            return type
+        }
+        case TypeSpecKind.PTR: {
+            var ptrSpec = spec as (*PtrTypeSpec)
+            var ptrOf = this.resolveTypeSpec(ptrSpec.base)
+            var type = NewPtrTypeInfo(ptrOf, this.allocator) as (*TypeInfo)
+            spec.typeInfo = type
+            return type
+        }
+        case TypeSpecKind.ARRAY: {
+            var arraySpec = spec as (*ArrayTypeSpec)
+            var arrayOf = this.resolveTypeSpec(arraySpec.base)
+            // TODO
+            break;
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            // TODO
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+
+err:
+    return null
 }

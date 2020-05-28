@@ -1,13 +1,17 @@
 import "ast"
+import "ast_new"
+import "lex"
 import "array"
 import "phase_result"
 import "string"
 import "string_view"
+import "string_buffer"
 import "system"
 import "state"
 import "libc"
 import "mem"
 import "symbols"
+import "types"
 
 public enum ModuleFlags {
     TYPE_CHECKED = (1<<0),
@@ -26,8 +30,34 @@ public struct Module {
     result: *PhaseResult
     symbols: Scope
     flags: i32
-    //result: PhaseResult
-    //decls: Array<*Decl>
+
+    allocator: *const Allocator
+}
+
+public const builtins = Scope{}
+public func BuiltinsInit(lita: *Lita) {
+    builtins.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
+    AddBuiltin(lita, &BOOL_TYPE)
+    AddBuiltin(lita, &CHAR_TYPE)
+    AddBuiltin(lita, &I8_TYPE)
+    AddBuiltin(lita, &U8_TYPE)
+    AddBuiltin(lita, &I16_TYPE)
+    AddBuiltin(lita, &U16_TYPE)
+    AddBuiltin(lita, &I32_TYPE)
+    AddBuiltin(lita, &U32_TYPE)
+    AddBuiltin(lita, &I64_TYPE)
+    AddBuiltin(lita, &U64_TYPE)
+    AddBuiltin(lita, &F32_TYPE)
+    AddBuiltin(lita, &F64_TYPE)
+    AddBuiltin(lita, &USIZE_TYPE)
+    AddBuiltin(lita, &NULL_TYPE)
+    AddBuiltin(lita, &VOID_TYPE)
+}
+
+func AddBuiltin(lita: *Lita, type: *TypeInfo) {
+    var sym = builtins.addSymbol(type.name, null, NewBuiltinDecl(SrcPos{}, SrcPos{}, type, lita.allocator), SymbolFlags.IS_BUILTIN)
+    sym.state = SymbolState.RESOLVED
+    type.sym = sym
 }
 
 public func NewModule(result: *PhaseResult, 
@@ -38,11 +68,54 @@ public func NewModule(result: *PhaseResult,
     return mod
 }
 
-public func (this: *Module) init(result: *PhaseResult, allocator: *const Allocator) {
+public func (this: *Module) init(result: *PhaseResult, 
+                                 allocator: *const Allocator) {
     this.text = null
     this.ast = null
-    this.symbols.init(ScopeKind.MODULE, null, result, allocator)
+    this.symbols.init(ScopeKind.MODULE, &builtins, result, allocator)
     this.flags = 0
+    this.allocator = allocator
+}
+
+public func (this: *Module) getType(type: *const char) : *Symbol {
+    return this.symbols.lookup(type)
+}
+
+public func (this: *Module) importModule(importDecl: *ImportDecl, module: *Module) {
+    if(importDecl.alias.type == TokenType.IDENTIFIER) {
+        this.importModuleAlias(importDecl.alias.str, module)
+    }
+    else {
+        this.importModuleNormal(module)
+    }
+}
+
+
+func (this: *Module) importModuleNormal(module: *Module) {
+    for(var i = 0; i < module.symbols.capacity; i += 1) {
+        var symName = module.symbols.keys[i]
+        var symbol = module.symbols.values[i]
+        if(!symName || !symbol) {
+            continue
+        }
+
+        this.symbols.importSymbol(symName, symbol)
+    }
+}
+
+func (this: *Module) importModuleAlias(alias: StringView, module: *Module) {
+    for(var i = 0; i < module.symbols.capacity; i += 1) {
+        var symName = module.symbols.keys[i]
+        var symbol = module.symbols.values[i]
+        if(!symName || !symbol) {
+            continue
+        }
+
+        var name = StringBufferInit(MAX_SYMBOL_NAME, this.allocator)
+        name.appendStr(alias.buffer, alias.length)
+        name.append("::%s", symbol.name)
+        this.symbols.importSymbol(name.cStrConst(), symbol)
+    }
 }
 
 public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {

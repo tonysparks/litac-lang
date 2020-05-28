@@ -15,6 +15,7 @@ import "error_codes"
 import "module"
 import "string"
 import "string_view"
+import "checker"
 
 func main(len: i32, args: **char) {
     SystemInit()
@@ -25,7 +26,10 @@ func main(len: i32, args: **char) {
     var lita = LitaInit(&options)
     defer lita.free()
 
-    Parse(lita)
+    var root = Parse(lita)
+    if(root) {
+        TypeCheck(lita, root)
+    }
 
     if(false) {
         for(var it = lita.modules.iter(); it.hasNext();) {
@@ -170,7 +174,7 @@ func ParseImport(lita: *Lita, root: *Module) {
     }
 }
 
-func Parse(lita: *Lita) {
+func Parse(lita: *Lita) : *Module {
     lita.startCapture(MetricType.PARSING)
     defer lita.endCapture(MetricType.PARSING)
 
@@ -182,9 +186,21 @@ func Parse(lita: *Lita) {
     var pos = SrcPos{}
 
     if(!ReadModuleText(lita, root, pos)) {
-        return;
+        return null;
     }
 
     ParseModule(lita, root, pos)
     ParseImport(lita, root)
+
+    return root
+}
+
+func TypeCheck(lita: *Lita, module: *Module) {
+    lita.startCapture(MetricType.TYPE_CHECKING)
+    defer lita.endCapture(MetricType.TYPE_CHECKING)
+
+    var checker = TypeChecker{}
+    checker.init(lita)
+
+    checker.typeCheck(module)
 }

@@ -7,7 +7,7 @@ import "mem"
 import "array"
 import "common"
 
-public func TokenName(token: Token, allocator: *const Allocator) : *const char {
+public func NewTokenName(token: Token, allocator: *const Allocator) : *const char {
     if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
         return tokenText[token.type]
     }

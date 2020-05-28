@@ -6,6 +6,9 @@ import "mem"
 import "common"
 import "module"
 
+import "libc"
+import "string"
+
 @asStr
 public enum StmtKind {
     IMPORT_DECL,
@@ -102,6 +105,7 @@ public struct TypeSpec {
     kind: TypeSpecKind
     pos: SrcPos
     base: *TypeSpec
+    typeInfo: *TypeInfo    // resolved from the type checker
 }
 
 public struct NameTypeSpec {
@@ -200,6 +204,7 @@ public struct ParameterDecl {
     decl: using Decl
     type: *TypeSpec
     defaultExpr: *Expr
+    typeInfo: *TypeInfo
 }
 
 public struct FuncDecl {
@@ -209,6 +214,7 @@ public struct FuncDecl {
     body: *Stmt
     returnType: *TypeSpec
     flags: i32
+
 }
 
 public struct AggregateDecl {
@@ -231,7 +237,7 @@ public struct TypedefDecl {
 
 public struct NativeDecl {
     decl: using Decl
-    type: *TypeInfo
+    typeInfo: *TypeInfo
 }
 
 public struct PoisonDecl {
@@ -335,7 +341,7 @@ public struct NoteStmt {
 
 public struct ParametersStmt {
     stmt: using Stmt
-    params: Array<*ParameterDecl>
+    params: using Array<*ParameterDecl>
     isVararg: bool
 }
 
@@ -343,6 +349,7 @@ public struct ReturnStmt {
     stmt: using Stmt
     expr: *Expr
 }
+
 
 public struct AggregateFieldStmt {
     stmt: using Stmt
@@ -372,6 +379,7 @@ public struct VarFieldStmt {
 
 public struct FieldStmt {
     kind: StmtKind
+    typeInfo: *TypeInfo
     union {
         enumField: *EnumDecl
         aggregateField: *AggregateDecl
@@ -619,4 +627,38 @@ public func (d: *Decl) hasNote(name: *const char) : bool {
         }
     }
     return false;
+}
+
+public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
+    if(f.name.type != TokenType.IDENTIFIER) {
+        return false
+    }
+
+    if(f.flags & FuncFlags.IS_METHOD) {
+        if(f.params.empty()) {
+            return false
+        }
+        var first = f.params.first()
+        if(!first.type) {
+            return false
+        }
+
+        if(first.type.kind != TypeSpecKind.NAME) {
+            return false
+        }
+
+        var type = first.type as (*NameTypeSpec)
+        var totalLen = f.name.str.length + strlen(type.name) + 2 // _ and \0
+        if(totalLen > MAX_SYMBOL_NAME) {
+            return false
+        }
+
+        var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+        nameStr.format("%.*s_%s", f.name.str.length, f.name.str.buffer, type.name)
+        return true
+    }
+
+    var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+    nameStr.format("%.*s", f.name.str.length, f.name.str.buffer)
+    return true
 }

@@ -1,5 +1,7 @@
 import "string_view"
 import "symbols"
+import "ast"
+import "array"
 
 @asStr
 public enum TypeKind {
@@ -22,7 +24,7 @@ public enum TypeKind {
     STR,
     ARRAY,
     PTR,
-    FUNCPTR,
+    FUNC_PTR,
 
     STRUCT,
     UNION,
@@ -55,7 +57,7 @@ const typeKindText = []*const char {
     [TypeKind.STR] = "string",
     [TypeKind.ARRAY] = "array",
     [TypeKind.PTR] = "pointer",
-    [TypeKind.FUNCPTR] = "func_pointer",
+    [TypeKind.FUNC_PTR] = "func_pointer",
 
     [TypeKind.STRUCT] = "struct",
     [TypeKind.UNION] = "union",
@@ -79,14 +81,60 @@ public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
     return TypeKind.MAX_TYPE_KINDS
 }
 
+
 public typedef i64 as Typeid;
 var idGen: Typeid = TypeKind.MAX_TYPE_KINDS as (i64);
+
+public func NextTypeId() : Typeid {
+    idGen += 1
+    return idGen;
+}
 
 public struct TypeInfo {
     kind: TypeKind
     typeid: Typeid
     name: *const char
     sym: *Symbol
+}
+
+public struct FuncTypeInfo {
+    info: using TypeInfo    
+    returnType: *TypeInfo
+    decl: *FuncDecl
+}
+
+public struct ConstTypeInfo {
+    info: using TypeInfo
+    constOf: *TypeInfo
+}
+
+public struct PtrTypeInfo {
+    info: using TypeInfo
+    ptrOf: *TypeInfo
+}
+
+public struct ArrayTypeInfo {
+    info: using TypeInfo
+    arrayOf: *TypeInfo
+    length: usize
+    numElements: *Expr
+}
+
+public struct FuncPtrTypeInfo {
+    info: using TypeInfo
+    genericParams: Array<GenericParam>
+    returnType: *TypeInfo
+    paramDecls: Array<*TypeInfo>
+}
+
+public struct EnumTypeInfo {
+    info: using TypeInfo
+    decl: *EnumDecl
+}
+
+public struct AggregateTypeInfo {
+    info: using TypeInfo
+    decl: *AggregateDecl
 }
 
 public const BOOL_TYPE = TypeInfo {
@@ -170,6 +218,13 @@ public const F64_TYPE = TypeInfo {
     .kind = TypeKind.F64,
     .typeid = TypeKind.F64 as (Typeid),
     .name = "f64",
+    .sym = null
+}
+
+public const USIZE_TYPE = TypeInfo {
+    .kind = TypeKind.USIZE,
+    .typeid = TypeKind.USIZE as (Typeid),
+    .name = "usize",
     .sym = null
 }
 
