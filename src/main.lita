@@ -196,6 +196,8 @@ func Parse(lita: *Lita) : *Module {
 }
 
 func TypeCheck(lita: *Lita, module: *Module) {
+    BuiltinsInit(lita)
+    
     lita.startCapture(MetricType.TYPE_CHECKING)
     defer lita.endCapture(MetricType.TYPE_CHECKING)
 

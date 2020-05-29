@@ -101,7 +101,7 @@ public func NewVarDecl(startPos: SrcPos,
     decl.startPos = startPos
     decl.endPos = endPos
     decl.name = name
-    decl.type = type
+    decl.typeSpec = type
     decl.expr = expr
 
     return decl as (*Decl)
@@ -258,7 +258,7 @@ public func NewBuiltinDecl(startPos: SrcPos,
     decl.kind = StmtKind.NATIVE_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
-    decl.type = type
+    decl.typeInfo = type
     return decl as (*Decl)
 }
 

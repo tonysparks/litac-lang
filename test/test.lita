@@ -6,8 +6,9 @@ func test2<  (x: bool, ...) : i32 {
     return 4
 }*/
 
-func test(x: bool, ...) : i32 {
-    return 4
+var x:bool = "hi"
+
+
+func test() {
+    var y = x
 }
-//import "../src/main"
-import "string_view"

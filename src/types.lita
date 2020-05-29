@@ -1,7 +1,9 @@
 import "string_view"
+import "string_buffer"
 import "symbols"
 import "ast"
 import "array"
+import "assert"
 
 @asStr
 public enum TypeKind {
@@ -81,6 +83,359 @@ public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
     return TypeKind.MAX_TYPE_KINDS
 }
 
+public func IsPtrLike(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.PTR:
+        case TypeKind.STR:
+        case TypeKind.ARRAY: {
+            return true;
+        }
+        case TypeKind.CONST: {
+            var constInfo = type as (*ConstTypeInfo)
+            return IsPtrLike(constInfo.constOf)
+        }
+        default: {
+            return false;
+        }
+    }
+}
+
+public func IsPtrOf(type: *TypeInfo, kind: TypeKind) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.PTR: {
+            var ptrInfo = type as (*PtrTypeInfo)
+            return ptrInfo.ptrOf.kind == kind
+        }
+        case TypeKind.STR: {
+            return kind == TypeKind.CHAR
+        }
+        case TypeKind.ARRAY: {
+            var arrayInfo = type as (*ArrayTypeInfo)
+            return arrayInfo.arrayOf.kind == kind
+        }
+        case TypeKind.CONST: {
+            var constInfo = type as (*ConstTypeInfo)
+            return IsPtrLike(constInfo.constOf)
+        }
+        default: {
+            return false;
+        }
+    }
+}
+
+public func IsFuncLike(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.FUNC:
+        case TypeKind.FUNC_PTR: {
+            return true;
+        }
+        default: {
+            return false;
+        }
+    }
+}
+
+public func IsPrimitive(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    return type.kind < TypeKind.STR
+}
+
+public func IsNumberLike(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    return type.kind < TypeKind.NULL
+}
+
+public func (this: *TypeInfo) toString(sb: *StringBuffer) {
+    if(!this) return;
+
+    switch(this.kind) {
+        case TypeKind.BOOL:
+        case TypeKind.CHAR:
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.I16:
+        case TypeKind.U16:
+        case TypeKind.I32:
+        case TypeKind.U32:
+        case TypeKind.I64:
+        case TypeKind.U64:
+        case TypeKind.F32:
+        case TypeKind.F64:
+        case TypeKind.USIZE:
+        case TypeKind.NULL:
+        case TypeKind.VOID:
+        case TypeKind.STRUCT: 
+        case TypeKind.UNION: 
+        case TypeKind.ENUM:
+            sb.append(this.name)
+            break;
+        case TypeKind.STR: {
+            sb.append("*const char")
+            break;
+        }
+        case TypeKind.ARRAY: {
+            var arrayInfo = this as (*ArrayTypeInfo)
+            sb.append("[]")
+            arrayInfo.arrayOf.toString(sb)
+            break;
+        }
+        case TypeKind.PTR: {
+            var ptrInfo = this as (*PtrTypeInfo)
+            sb.append("*")
+            ptrInfo.ptrOf.toString(sb)
+            break;
+        }
+        case TypeKind.CONST: {
+            var constInfo = this as (*ConstTypeInfo)
+            sb.append("const ")
+            constInfo.constOf.toString(sb)
+            break;
+        }
+        case TypeKind.FUNC_PTR: {
+            var funcPtrInfo = this as (*FuncPtrTypeInfo)
+            sb.append("func")
+            if(!funcPtrInfo.genericParams.empty()) {
+                sb.append("<")
+                for(var i = 0; i < funcPtrInfo.genericParams.size(); i += 1) {
+                    if(i > 0) sb.append(",")                    
+                    var t = funcPtrInfo.genericParams.get(i).name                    
+                    sb.append("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                sb.append(">")
+            }
+            sb.append("(")
+            for(var i = 0; i < funcPtrInfo.paramDecls.size(); i += 1) {
+                if(i > 0) sb.append(",")
+                var paramType = funcPtrInfo.paramDecls.get(i)
+                paramType.toString(sb)
+            }
+            sb.append(") : ")
+            funcPtrInfo.returnType.toString(sb)
+            break;
+        }
+        case TypeKind.FUNC: {
+            var funcInfo = this as (*FuncTypeInfo)
+            sb.append("func")
+            if(!funcInfo.genericParams.empty()) {
+                sb.append("<")
+                for(var i = 0; i < funcInfo.genericParams.size(); i += 1) {
+                    if(i > 0) sb.append(",")                    
+                    var t = funcInfo.genericParams.get(i).name                    
+                    sb.append("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                sb.append(">")
+            }
+            sb.append("(")
+            for(var i = 0; i < funcInfo.decl.params.size(); i += 1) {
+                if(i > 0) sb.append(",")
+                var paramType = funcInfo.decl.params.get(i)
+                paramType.typeInfo.toString(sb)
+            }
+            sb.append(") : ")
+            funcInfo.returnType.toString(sb)
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+}
+
+public func (this: *TypeInfo) strictEquals(castTo: *TypeInfo) : bool {
+    return false
+}
+
+public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
+    // this = other
+    switch(this.kind) {
+        case TypeKind.BOOL: {
+            return IsNumberLike(other) || IsPtrLike(other)
+        }
+        case TypeKind.CHAR: {
+            return other.kind <= TypeKind.CHAR
+        }
+        case TypeKind.I8: {
+            return other.kind <= TypeKind.I8
+        }
+        case TypeKind.U8: {
+            return other.kind <= TypeKind.U8
+        }
+        case TypeKind.I16: {
+            return other.kind <= TypeKind.I16
+        }
+        case TypeKind.U16: {
+            return other.kind <= TypeKind.U16
+        }
+        case TypeKind.I32: {
+            return other.kind <= TypeKind.I32
+        }
+        case TypeKind.U32: {
+            return other.kind <= TypeKind.U32
+        }
+        case TypeKind.I64: {
+            return other.kind <= TypeKind.I64
+        }
+        case TypeKind.U64: {
+            return other.kind <= TypeKind.U64
+        }
+        case TypeKind.F32: {
+            return other.kind == TypeKind.F32
+        }
+        case TypeKind.F64: {
+            return other.kind == TypeKind.F32 ||
+                   other.kind == TypeKind.F64
+        }
+        case TypeKind.USIZE: {
+            return other.kind == TypeKind.USIZE || 
+                   other.kind == TypeKind.NULL ||
+                   IsPtrLike(other);
+        }
+        case TypeKind.NULL: {
+            return other.kind == TypeKind.NULL
+        }
+        case TypeKind.VOID: {
+            return other.kind == TypeKind.VOID
+        }
+
+        case TypeKind.STR: {
+            return other.kind == TypeKind.STR ||
+                   IsPtrOf(other, TypeKind.CHAR)
+        }
+        // TODO
+        case TypeKind.ARRAY: {
+            break;
+        }
+        case TypeKind.PTR: {
+            break;
+        }        
+        case TypeKind.CONST: {
+            break;
+        }
+
+        case TypeKind.FUNC_PTR: {
+            break;
+        }
+
+        case TypeKind.STRUCT: {
+            break;
+        }
+        case TypeKind.UNION: {
+            break;
+        }
+        case TypeKind.ENUM: {
+            break;
+        }
+        case TypeKind.FUNC: {
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }    
+    return false
+}
+
+public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
+    switch(this.kind) {
+        case TypeKind.BOOL: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.CHAR: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.I8: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.U8: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.I16: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.U16: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.I32: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.U32: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.I64: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.U64: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.F32: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.F64: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.USIZE: {
+            return IsNumberLike(castTo)
+        }
+        case TypeKind.NULL: {
+            return IsPtrLike(castTo)
+        }
+        case TypeKind.VOID: {
+            return castTo.kind == TypeKind.VOID
+        }
+
+        case TypeKind.STR: {
+            break;
+        }
+        case TypeKind.ARRAY: {
+            break;
+        }
+        case TypeKind.PTR: {
+            break;
+        }
+        case TypeKind.FUNC_PTR: {
+            break;
+        }
+
+        case TypeKind.STRUCT: {
+            break;
+        }
+        case TypeKind.UNION: {
+            break;
+        }
+        case TypeKind.ENUM: {
+            break;
+        }
+        case TypeKind.FUNC: {
+            break;
+        }
+
+        case TypeKind.CONST: {
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+    return false
+}
 
 public typedef i64 as Typeid;
 var idGen: Typeid = TypeKind.MAX_TYPE_KINDS as (i64);
@@ -98,7 +453,8 @@ public struct TypeInfo {
 }
 
 public struct FuncTypeInfo {
-    info: using TypeInfo    
+    info: using TypeInfo   
+    genericParams: Array<GenericParam> 
     returnType: *TypeInfo
     decl: *FuncDecl
 }

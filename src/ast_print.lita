@@ -124,9 +124,9 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 Printf(indent, "var ")
             }
             PrintName(decl.name)
-            if(decl.type != null) {
+            if(decl.typeSpec != null) {
                 printf(": ")
-                PrintTypeSpec(decl.type)
+                PrintTypeSpec(decl.typeSpec)
             }
             if(decl.expr != null) {
                 printf(" = ")

@@ -76,8 +76,7 @@ public func (scope: *Scope) init(kind: ScopeKind,
     scope.kind = kind
     scope.allocator = allocator
     scope.parent = parent
-    scope.result = result
-    //scope.symbols.init(16, allocator)
+    scope.result = result    
     scope.symbols = StrMap<*Symbol>(null, 16, allocator)
 }
 

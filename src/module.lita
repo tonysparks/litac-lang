@@ -14,7 +14,8 @@ import "symbols"
 import "types"
 
 public enum ModuleFlags {
-    TYPE_CHECKED = (1<<0),
+    TYPE_CHECKED  = (1<<0),
+    TYPE_RESOLVED = (1<<1),
 }
 
 public struct ModuleId {    
@@ -34,9 +35,14 @@ public struct Module {
     allocator: *const Allocator
 }
 
-public const builtins = Scope{}
+public const builtins = Module{}
 public func BuiltinsInit(lita: *Lita) {
-    builtins.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
+    builtins.text = null
+    builtins.ast = null
+    builtins.flags = 0
+    builtins.allocator = lita.allocator
+    builtins.symbols.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
+
     AddBuiltin(lita, &BOOL_TYPE)
     AddBuiltin(lita, &CHAR_TYPE)
     AddBuiltin(lita, &I8_TYPE)
@@ -55,7 +61,11 @@ public func BuiltinsInit(lita: *Lita) {
 }
 
 func AddBuiltin(lita: *Lita, type: *TypeInfo) {
-    var sym = builtins.addSymbol(type.name, null, NewBuiltinDecl(SrcPos{}, SrcPos{}, type, lita.allocator), SymbolFlags.IS_BUILTIN)
+    var sym = builtins.symbols.addSymbol(type.name, 
+                                        &builtins, 
+                                        NewBuiltinDecl(SrcPos{}, SrcPos{}, type, lita.allocator), 
+                                        SymbolFlags.IS_BUILTIN|SymbolFlags.IS_TYPE)
+
     sym.state = SymbolState.RESOLVED
     type.sym = sym
 }
@@ -72,7 +82,7 @@ public func (this: *Module) init(result: *PhaseResult,
                                  allocator: *const Allocator) {
     this.text = null
     this.ast = null
-    this.symbols.init(ScopeKind.MODULE, &builtins, result, allocator)
+    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, result, allocator)
     this.flags = 0
     this.allocator = allocator
 }

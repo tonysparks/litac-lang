@@ -38,6 +38,10 @@ public func (r: *PhaseResult) addError(pos: SrcPos, format: *const char, ...) {
     sb.appendArgs(format, args)
     va_end(args)
     
+    r.addErrorStr(pos, sb)
+}
+
+public func (r: *PhaseResult) addErrorStr(pos: SrcPos, sb: *StringBuffer) {        
     r.errors.add(PhaseError {
         .type = ErrorType.ERROR,
         .message = sb.cStr(),

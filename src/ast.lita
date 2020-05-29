@@ -196,7 +196,7 @@ public struct ImportDecl {
 // For var or const declarations
 public struct VarDecl {
     decl: using Decl
-    type: *TypeSpec
+    typeSpec: *TypeSpec
     expr: *Expr
 }
 
@@ -457,7 +457,7 @@ public struct IdentifierExpr {
     expr: using Expr
     //genericArgs: Array<*TypeSpec>
     type: *NameTypeSpec
-    sym: Symbol
+    sym: *Symbol
 }
 
 public struct InitArgExpr {
@@ -532,7 +532,7 @@ public struct TypeIdentifierExpr {
     expr: using Expr
     //genericArgs: Array<*TypeSpec>
     type: *TypeSpec
-    sym: Symbol
+    sym: *Symbol
 }
 
 public struct TypeOfExpr {
@@ -553,8 +553,17 @@ public struct PoisonExpr {
 
 public struct Expr {
     stmt: using Stmt
+    operand: Operand
+    expectedType: *TypeInfo
 }
 
+
+public struct Operand {
+    typeInfo: *TypeInfo
+    isLeftValue: bool
+    isConst: bool
+    val: Token
+}
 
 public func IsExpr(node: *Node) : bool {
     if(!node) return false;
@@ -661,4 +670,50 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
     var nameStr = StringInit(name, MAX_SYMBOL_NAME)
     nameStr.format("%.*s", f.name.str.length, f.name.str.buffer)
     return true
+}
+
+public func (expr: *Expr) isIdentifier() : bool {
+    if(!expr) {
+        return false
+    }
+
+    return expr.kind == StmtKind.IDENTIFIER_EXPR ||
+           expr.kind == StmtKind.FUNC_IDENTIFIER_EXPR ||
+           expr.kind == StmtKind.TYPE_IDENTIFIER_EXPR
+}
+
+
+public func (expr: *Expr) isConstNumberExpr() : bool {
+    if(!expr) {
+        return false;
+    }
+    
+    switch(expr.kind) {
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.BOOLEAN_EXPR:
+        //case STRING_EXPR:
+        case StmtKind.CHAR_EXPR:
+        //case NULL_EXPR:
+        case StmtKind.IDENTIFIER_EXPR:
+        case StmtKind.GET_EXPR: {
+            return true
+        }
+        case StmtKind.GROUP_EXPR: {
+            var groupExpr = expr as (*GroupExpr)
+            return groupExpr.expr.isConstNumberExpr()
+        }
+        case StmtKind.BINARY_EXPR: {
+            var binExpr = expr as (*BinaryExpr)
+            return binExpr.left.isConstNumberExpr() &&
+                   binExpr.right.isConstNumberExpr()
+        }
+        case StmtKind.UNARY_EXPR: {
+            var unaryExpr = expr as (*UnaryExpr)
+            return unaryExpr.unaryExpr.isConstNumberExpr()
+        }
+        default: {
+            return false
+        }
+    }
+    return false
 }

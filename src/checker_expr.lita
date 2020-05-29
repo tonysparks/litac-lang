@@ -1,0 +1,133 @@
+import "types"
+import "types_new"
+import "symbols"
+import "phase_result"
+import "module"
+import "ast"
+import "lex"
+import "state"
+import "map"
+import "string_buffer"
+import "array"
+import "assert"
+
+import "ast_print"
+import "libc"
+
+import "checker"
+
+public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
+    if(!expr) return false
+
+    switch(expr.kind) {
+        case StmtKind.ARRAY_DESIGNATION_EXPR:
+        case StmtKind.ARRAY_INIT_EXPR:
+        case StmtKind.BINARY_EXPR: {
+            return this.resolveBinaryExpr(expr as (*BinaryExpr))
+        }
+        case StmtKind.BOOLEAN_EXPR:
+        case StmtKind.CAST_EXPR:
+        case StmtKind.CHAR_EXPR:
+        case StmtKind.FUNC_CALL_EXPR:
+        case StmtKind.FUNC_IDENTIFIER_EXPR:
+        case StmtKind.GET_EXPR:
+        case StmtKind.GROUP_EXPR:
+        case StmtKind.IDENTIFIER_EXPR: {
+            return this.resolveIdentiferExpr(expr as (*IdentifierExpr))            
+        }
+        case StmtKind.INIT_EXPR:
+        case StmtKind.INIT_ARG_EXPR:
+        case StmtKind.NULL_EXPR:
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.OFFSET_OF_EXPR:
+        case StmtKind.SET_EXPR: 
+        case StmtKind.SIZE_OF_EXPR:
+        case StmtKind.STRING_EXPR:   
+        case StmtKind.SUBSCRIPT_GET_EXPR:
+        case StmtKind.SUBSCRIPT_SET_EXPR:
+        case StmtKind.TERNARY_EXPR:
+        case StmtKind.TYPE_IDENTIFIER_EXPR:
+        case StmtKind.TYPE_OF_EXPR:
+        case StmtKind.UNARY_EXPR:
+        case StmtKind.POISON_EXPR: {
+            break;
+        }
+        default: {
+            PrintStmt(expr as (*Stmt))
+            assert(false)
+        }
+    }
+    return false
+}
+
+
+
+
+func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
+    assert(expr != null)
+
+    if(!this.resolveExpr(expr.left)) {
+        goto err;
+    }
+
+    if(!this.resolveExpr(expr.right)) {
+        goto err;
+    }
+
+    var leftType = expr.left.operand.typeInfo
+    var rightType = expr.right.operand.typeInfo
+
+    var targetType = leftType
+
+    switch(expr.operator) {
+        case TokenType.EQUALS: {
+            this.checkConstant(expr.left)
+            this.checkAssignability(expr.right.startPos, leftType, rightType)
+            break;
+        }
+        // TODO
+    }
+
+err:
+    return false    
+}
+
+func (this: *TypeChecker) checkConstant(expr: *Expr) {
+    assert(expr != null)
+
+    var sym: *Symbol = null
+    if(expr.kind == StmtKind.IDENTIFIER_EXPR) {
+        var idExpr = expr as (*IdentifierExpr)
+        sym = idExpr.sym        
+    }
+
+    if(!sym) {
+        if(!expr.operand.typeInfo) {
+            return;
+        }
+
+        sym = expr.operand.typeInfo.sym
+        if(!sym) {
+            return;
+        }
+    }
+    
+    if(sym.flags & SymbolFlags.IS_CONSTANT) {
+       this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)       
+    }
+}
+
+func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
+    assert(expr != null)
+
+    var sym = this.currentScope.lookup(expr.type.name)
+    if(!sym) {
+        this.result.addError(expr.startPos, "unknown variable '%s'", expr.type.name)
+        return false
+    }
+
+    expr.operand.typeInfo = sym.type
+    expr.operand.isConst = sym.flags & SymbolFlags.IS_CONSTANT
+    expr.sym = sym
+    return true;
+}

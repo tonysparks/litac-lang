@@ -1035,7 +1035,7 @@ func (p: *Parser) functionCall() : *Expr {
             expr.endPos = p.pos()
         }
         else if(p.check(TokenType.LEFT_BRACE)) {
-            if(!p.isIdentifier(expr)) {
+            if(!expr.isIdentifier()) {
                 return expr
             }
 
@@ -1156,7 +1156,7 @@ func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
     }
 
     var genericArgs = Array<*TypeSpec>{}
-    if(p.isIdentifier(expr)) {
+    if(expr.isIdentifier()) {
         expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
     }
     else if(expr.kind == StmtKind.GET_EXPR) {
@@ -1780,7 +1780,7 @@ func (p: *Parser) arrayType() : *ArrayTypeSpec {
 
     if(!p.check(TokenType.RIGHT_BRACKET)) {
         var expr = p.expression()
-        if(!p.isConstNumberExpr(expr)) {
+        if(!expr.isConstNumberExpr()) {
             p.errorAtToken(p.peek(), ErrorCode.INVALID_ARRAY_DIMENSION_EXPR)
             goto err;
         }
@@ -2305,53 +2305,6 @@ func (p: *Parser) identifier() : Token {
 
     return name
 }
-
-func (p: *Parser) isIdentifier(expr: *Expr) : bool {
-    if(!expr) {
-        return false
-    }
-
-    return expr.kind == StmtKind.IDENTIFIER_EXPR ||
-           expr.kind == StmtKind.FUNC_IDENTIFIER_EXPR ||
-           expr.kind == StmtKind.TYPE_IDENTIFIER_EXPR
-}
-
-
-func (p: *Parser) isConstNumberExpr(expr: *Expr) : bool {
-    if(!expr) {
-        return false;
-    }
-    
-    switch(expr.kind) {
-        case StmtKind.NUMBER_EXPR:
-        case StmtKind.BOOLEAN_EXPR:
-        //case STRING_EXPR:
-        case StmtKind.CHAR_EXPR:
-        //case NULL_EXPR:
-        case StmtKind.IDENTIFIER_EXPR:
-        case StmtKind.GET_EXPR: {
-            return true
-        }
-        case StmtKind.GROUP_EXPR: {
-            var groupExpr = expr as (*GroupExpr)
-            return p.isConstNumberExpr(groupExpr.expr)
-        }
-        case StmtKind.BINARY_EXPR: {
-            var binExpr = expr as (*BinaryExpr)
-            return p.isConstNumberExpr(binExpr.left) &&
-                   p.isConstNumberExpr(binExpr.right)
-        }
-        case StmtKind.UNARY_EXPR: {
-            var unaryExpr = expr as (*UnaryExpr)
-            return p.isConstNumberExpr(unaryExpr.unaryExpr)
-        }
-        default: {
-            return false
-        }
-    }
-    return false
-}
-
 
 func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
     if(!expr) {
