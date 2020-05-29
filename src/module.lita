@@ -67,6 +67,7 @@ func AddBuiltin(lita: *Lita, type: *TypeInfo) {
                                         SymbolFlags.IS_BUILTIN|SymbolFlags.IS_TYPE)
 
     sym.state = SymbolState.RESOLVED
+    sym.type = type
     type.sym = sym
 }
 

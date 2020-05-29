@@ -33,10 +33,8 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
         case StmtKind.UNION_DECL:
         case StmtKind.ENUM_DECL:
         case StmtKind.FUNC_DECL: {
-            var funcDecl = decl as (*FuncDecl)
-            this.enterModule(funcDecl.sym.declared)
-            defer this.leaveModule()
-            return true;
+            var funcDecl = decl as (*FuncDecl)            
+            return this.resolveFuncDecl(funcDecl)
         }
         case StmtKind.TYPEDEF_DECL:
         case StmtKind.PARAM_DECL:
@@ -48,4 +46,34 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     }
 
     return false
+}
+
+func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
+    this.enterModule(funcDecl.sym.declared)
+    defer this.leaveModule()
+
+    this.pushScope(Scope{})
+    defer this.popScope()
+
+    this.resolveStmt(funcDecl.params)
+    if(funcDecl.body) {
+        // TODO Handle goto labels
+        this.resolveStmt(funcDecl.body)
+    }
+
+    return true
+}
+
+public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : bool {
+    assert(paramDecl != null)
+    
+    if(paramDecl.defaultExpr) {
+        this.resolveExpr(paramDecl.defaultExpr)
+    }
+
+    var typeInfo = this.resolveTypeSpec(paramDecl.type)
+    paramDecl.sym = this.addSymbol(paramDecl, typeInfo)
+
+    // TODO: Handle using parameters
+    return true
 }

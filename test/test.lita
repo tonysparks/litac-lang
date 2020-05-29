@@ -6,9 +6,13 @@ func test2<  (x: bool, ...) : i32 {
     return 4
 }*/
 
+const z:i32;
 var x:bool = "hi"
+var y = null
 
 
 func test() {
-    var y = x
+    //var y = x
+    var w = null
+    var w = true
 }

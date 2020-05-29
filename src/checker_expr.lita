@@ -25,9 +25,21 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.BINARY_EXPR: {
             return this.resolveBinaryExpr(expr as (*BinaryExpr))
         }
-        case StmtKind.BOOLEAN_EXPR:
+        case StmtKind.BOOLEAN_EXPR: {
+            expr.operand.typeInfo = &BOOL_TYPE
+            expr.operand.isConst = true
+            expr.operand.isLeftValue = false
+            //expr.operand.val = (expr as (*BooleanExpr)).string TODO
+            return true
+        }
         case StmtKind.CAST_EXPR:
-        case StmtKind.CHAR_EXPR:
+        case StmtKind.CHAR_EXPR: {
+            expr.operand.typeInfo = &CHAR_TYPE
+            expr.operand.isConst = true
+            expr.operand.isLeftValue = false
+            expr.operand.val = (expr as (*CharExpr)).character
+            return true
+        }
         case StmtKind.FUNC_CALL_EXPR:
         case StmtKind.FUNC_IDENTIFIER_EXPR:
         case StmtKind.GET_EXPR:
@@ -37,12 +49,30 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         }
         case StmtKind.INIT_EXPR:
         case StmtKind.INIT_ARG_EXPR:
-        case StmtKind.NULL_EXPR:
-        case StmtKind.NUMBER_EXPR:
+        case StmtKind.NULL_EXPR: {
+            expr.operand.typeInfo = &NULL_TYPE
+            expr.operand.isConst = true
+            expr.operand.isLeftValue = false            
+            return true
+        }
+        case StmtKind.NUMBER_EXPR: {
+            var numberExpr = (expr as (*NumberExpr))
+            expr.operand.typeInfo = numberExpr.number.typeInfo
+            expr.operand.isConst = true
+            expr.operand.isLeftValue = false
+            expr.operand.val = numberExpr.number
+            return true
+        }
         case StmtKind.OFFSET_OF_EXPR:
         case StmtKind.SET_EXPR: 
         case StmtKind.SIZE_OF_EXPR:
-        case StmtKind.STRING_EXPR:   
+        case StmtKind.STRING_EXPR: {
+            expr.operand.typeInfo = &STR_TYPE
+            expr.operand.isConst = true
+            expr.operand.isLeftValue = false
+            expr.operand.val = (expr as (*StringExpr)).string
+            return true
+        }
         case StmtKind.SUBSCRIPT_GET_EXPR:
         case StmtKind.SUBSCRIPT_SET_EXPR:
         case StmtKind.TERNARY_EXPR:
@@ -85,11 +115,102 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
             this.checkAssignability(expr.right.startPos, leftType, rightType)
             break;
         }
-        // TODO
+        case TokenType.BAND_EQ:
+        case TokenType.BNOT_EQ:
+        case TokenType.BOR_EQ:
+        case TokenType.XOR_EQ:
+        case TokenType.LSHIFT_EQ:
+        case TokenType.RSHIFT_EQ: 
+            this.checkConstant(expr.left)
+            this.checkAssignability(expr.right.startPos, leftType, rightType)
+            // fallthru
+        case TokenType.BAND:
+        case TokenType.BNOT:
+        case TokenType.BOR:
+        case TokenType.XOR:
+        case TokenType.LSHIFT:
+        case TokenType.RSHIFT: {
+            if(!IsInteger(leftType)) {
+                this.errorOperand(expr.left, leftType, "left")
+            }
+            
+            if(!IsInteger(rightType)) {
+                this.errorOperand(expr.right, rightType, "right")
+            }
+            break;
+        }
+        case TokenType.AND:
+        case TokenType.OR: {
+            this.checkTruthyness(expr.left, leftType)
+            this.checkTruthyness(expr.right, rightType)
+            targetType = &BOOL_TYPE
+            break;
+        }
+        case TokenType.EQUALS_EQUALS:
+        case TokenType.NOT_EQUALS: {
+            this.checkTruthyness(expr.left, leftType)
+            this.checkTruthyness(expr.right, rightType)
+            targetType = &BOOL_TYPE
+            break;
+        }
+        case TokenType.GREATER_EQUALS:
+        case TokenType.GREATER_THAN:
+        case TokenType.LESS_EQUALS:
+        case TokenType.LESS_THAN: {
+            if(!IsNumberLike(leftType)) {
+                this.errorOperand(expr.left, leftType, "left")
+            }
+            
+            if(!IsNumberLike(rightType)) {
+                this.errorOperand(expr.right, rightType, "right")
+            }
+            targetType = &BOOL_TYPE;
+            break;
+        }
+        case TokenType.MINUS_EQ:
+        case TokenType.PLUS_EQ:
+        case TokenType.MOD_EQ:
+        case TokenType.MUL_EQ:
+        case TokenType.DIV_EQ:
+            this.checkConstant(expr.left)
+            this.checkAssignability(expr.right.startPos, leftType, rightType)
+            // fallthru
+        case TokenType.MINUS:
+        case TokenType.PLUS:
+        case TokenType.MOD:
+        case TokenType.STAR:
+        case TokenType.SLASH: {
+            if(!IsNumberLike(leftType)) {
+                this.errorOperand(expr.left, leftType, "left")
+            }
+            
+            if(!IsNumberLike(rightType)) {
+                this.errorOperand(expr.right, rightType, "right")
+            }
+            break;
+        }
+        default: {
+            assert(false)
+        }
     }
+
+    expr.operand.typeInfo = targetType
+    //expr.operand.isConst = expr.left.operand.isConst && expr.right.operand.isConst
 
 err:
     return false    
+}
+
+func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *const char) {
+    assert(expr != null)
+    assert(type != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("illegal, %s operand has type '", side)
+    type.toString(sb)
+    sb.append("'")
+
+    this.result.addErrorStr(expr.startPos, sb)
 }
 
 func (this: *TypeChecker) checkConstant(expr: *Expr) {
@@ -114,6 +235,20 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) {
     
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
        this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)       
+    }
+}
+
+func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) {
+    assert(expr != null)
+    assert(type != null)
+
+    if(!IsBooleanable(type)) {
+        var sb = StringBufferInit(256, this.allocator)
+        sb.append("'")
+        type.toString(sb)
+        sb.append("' can't be coerced to boolean")
+
+        this.result.addErrorStr(expr.startPos, sb)
     }
 }
 

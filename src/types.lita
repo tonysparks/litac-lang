@@ -4,6 +4,7 @@ import "symbols"
 import "ast"
 import "array"
 import "assert"
+import "libc"
 
 @asStr
 public enum TypeKind {
@@ -160,7 +161,101 @@ public func IsNumberLike(type: *TypeInfo) : bool {
         return false;
     }
 
-    return type.kind < TypeKind.NULL
+    switch(type.kind) {
+        case TypeKind.BOOL:
+        case TypeKind.CHAR:
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.I16:
+        case TypeKind.U16:
+        case TypeKind.I32:
+        case TypeKind.U32:
+        case TypeKind.I64:
+        case TypeKind.U64:
+        case TypeKind.F32:
+        case TypeKind.F64:
+        case TypeKind.USIZE:
+        case TypeKind.PTR:
+        case TypeKind.STR:
+        case TypeKind.ARRAY:
+        case TypeKind.NULL:
+        case TypeKind.ENUM: {
+            return true;
+        }
+        case TypeKind.CONST: {
+            var constInfo = type as (*ConstTypeInfo)
+            return IsNumberLike(constInfo.constOf)
+        }
+        default: {
+            return false
+        }
+    }
+}
+
+public func IsInteger(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.BOOL:
+        case TypeKind.CHAR:
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.I16:
+        case TypeKind.U16:
+        case TypeKind.I32:
+        case TypeKind.U32:
+        case TypeKind.I64:
+        case TypeKind.U64:        
+        case TypeKind.USIZE:
+        case TypeKind.ENUM: {
+            return true;
+        }
+        case TypeKind.CONST: {
+            var constInfo = type as (*ConstTypeInfo)
+            return IsInteger(constInfo.constOf)
+        }
+        default: {
+            return false
+        }
+    }
+}
+
+public func IsBooleanable(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.BOOL:
+        case TypeKind.CHAR:
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.I16:
+        case TypeKind.U16:
+        case TypeKind.I32:
+        case TypeKind.U32:
+        case TypeKind.I64:
+        case TypeKind.U64:
+        case TypeKind.F32:
+        case TypeKind.F64:
+        case TypeKind.USIZE:
+        case TypeKind.PTR:
+        case TypeKind.STR:
+        case TypeKind.ARRAY:
+        case TypeKind.NULL:
+        case TypeKind.ENUM: {
+            return true;
+        }
+        case TypeKind.CONST: {
+            var constInfo = type as (*ConstTypeInfo)
+            return IsBooleanable(constInfo.constOf)
+        }
+        default: {
+            return false
+        }
+    }
 }
 
 public func (this: *TypeInfo) toString(sb: *StringBuffer) {
@@ -264,10 +359,10 @@ public func (this: *TypeInfo) strictEquals(castTo: *TypeInfo) : bool {
 }
 
 public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
-    // this = other
+    // this = other    
     switch(this.kind) {
         case TypeKind.BOOL: {
-            return IsNumberLike(other) || IsPtrLike(other)
+            return other.kind == TypeKind.BOOL
         }
         case TypeKind.CHAR: {
             return other.kind <= TypeKind.CHAR
@@ -595,5 +690,12 @@ public const VOID_TYPE = TypeInfo {
     .kind = TypeKind.VOID,
     .typeid = TypeKind.VOID as (Typeid),
     .name = "void",
+    .sym = null
+}
+
+public const STR_TYPE = TypeInfo {
+    .kind = TypeKind.STR,
+    .typeid = TypeKind.STR as (Typeid),
+    .name = "*char",
     .sym = null
 }

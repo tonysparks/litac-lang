@@ -57,6 +57,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module) {
     this.resolveSymbols()
 }
 
+/*
 func (this: *TypeChecker) checkTypes(src: SrcPos, a: *TypeInfo, b: *TypeInfo, isCasted: bool = false) {
     if(isCasted) {
         if(!a.canCastTo(b)) {
@@ -73,15 +74,15 @@ func (this: *TypeChecker) checkTypes(src: SrcPos, a: *TypeInfo, b: *TypeInfo, is
     else {
 
     }
-}
+}*/
 
 func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) {    
     if(!a.isAssignable(b)) {
         var sb = StringBufferInit(256, this.allocator)
         sb.append("'")
-        a.toString(sb)
-        sb.append("' can't be assigned to '")
         b.toString(sb)
+        sb.append("' can't be assigned to '")
+        a.toString(sb)
         sb.append("'")
 
         this.result.addErrorStr(src, sb)
@@ -423,7 +424,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
 
     switch(spec.kind) {
         case TypeSpecKind.NAME: {
-            var nameSpec = spec as (*NameTypeSpec)
+            var nameSpec = spec as (*NameTypeSpec)            
             var sym = this.getType(nameSpec)
             if(!sym) {
                 this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
@@ -494,6 +495,10 @@ func (this: *TypeChecker) resolveValue(sym: *Symbol) {
             sym.type = this.resolveValueDecl(varDecl)
             sym.state = SymbolState.RESOLVED
             sym.flags &= ~SymbolFlags.IS_INCOMPLETE
+
+            var sb= StringBufferInit(256, this.allocator)
+            sym.type.toString(sb)
+            printf("Resolved Value %s type: %s\n", sym.name, sb.cStr())
             break;
         }
         default: {
@@ -509,7 +514,6 @@ func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
             return null
         }
     }
-
     var declaredType: *TypeInfo = null
     var inferredType: *TypeInfo = null
 
@@ -528,7 +532,7 @@ func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
             inferredType = op.typeInfo
         }
         else if(op.typeInfo.kind == TypeKind.NULL && declaredType == null) {
-            this.result.addError(decl.startPos,
+            this.result.addError(decl.expr.startPos,
                 "invalid variable declaration, can't infer type from 'null' for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
             return null
         }
@@ -539,7 +543,7 @@ func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         decl.expr.expectedType = declaredType ? declaredType : inferredType;
     }
 
-    if(declaredType && inferredType) {
+    if(declaredType && inferredType) {        
         this.checkAssignability(decl.expr.startPos, declaredType, inferredType)
     }
 
@@ -552,8 +556,10 @@ func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol 
     decl.name.str.copyTo(name, MAX_SYMBOL_NAME)
     
     var sym = this.currentScope.addSymbol(name as (*const char), this.current, decl, 0)
-    sym.type = typeInfo
-    this.resolveSymbol(sym)
+    if(sym) {
+        sym.type = typeInfo
+        this.resolveSymbol(sym)
+    }
 
     return sym
 }
@@ -563,6 +569,9 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
     if(!stmt) return true;
 
     switch(stmt.kind) {
+        // --------------------------------------------------
+        //          Declarations
+        // --------------------------------------------------
         case StmtKind.IMPORT_DECL:
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL:
@@ -577,18 +586,49 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             return this.resolveDecl(stmt as (*Decl))
         }
 
-        case StmtKind.BLOCK_STMT:
-        case StmtKind.BREAK_STMT:
-        case StmtKind.COMP_STMT:
-        case StmtKind.CONTINUE_STMT:
-        case StmtKind.DEFER_STMT:
+        // --------------------------------------------------
+        //          Statements
+        // --------------------------------------------------
+        case StmtKind.BLOCK_STMT: {
+            var body = stmt as (*BlockStmt)
+            for(var i = 0; i < body.stmts.size(); i+=1) {
+                var s = body.stmts.get(i)
+                this.resolveStmt(s)
+            }
+            return true
+        }
+        case StmtKind.BREAK_STMT: {
+            return true;
+        }
+        case StmtKind.COMP_STMT: {
+            return false; // TODO
+        }
+        case StmtKind.CONTINUE_STMT: {
+            return true;
+        }
+        case StmtKind.DEFER_STMT: {
+            var deferStmt = stmt as (*DeferStmt)
+            this.resolveStmt(deferStmt.deferedStmt)
+            return true
+        }
         case StmtKind.DO_WHILE_STMT:
-        case StmtKind.EMPTY_STMT:
+        case StmtKind.EMPTY_STMT: {
+            return true;
+        }
         case StmtKind.ENUM_FIELD_ENTRY_STMT:
         case StmtKind.ENUM_FIELD_STMT:
         case StmtKind.FOR_STMT:
-        case StmtKind.FUNC_BODY_STMT:
-        case StmtKind.GOTO_STMT:
+        case StmtKind.FUNC_BODY_STMT: {
+            var body = stmt as (*FuncBodyStmt)
+            for(var i = 0; i < body.stmts.size(); i+=1) {
+                var s = body.stmts.get(i)
+                this.resolveStmt(s)
+            }
+            return true
+        }
+        case StmtKind.GOTO_STMT: {
+            return false; // TODO
+        }
         case StmtKind.IF_STMT: {
             var ifStmt = stmt as (*IfStmt)
             this.resolveExpr(ifStmt.cond)
@@ -604,14 +644,37 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true
         }
-        case StmtKind.LABEL_STMT:
+        case StmtKind.LABEL_STMT: {
+            return false; // TODO
+        }
         case StmtKind.MODULE_STMT: {
             return true;
         }
         case StmtKind.NOTE_STMT: {
             return true;
         }
-        case StmtKind.PARAMETERS_STMT:
+        case StmtKind.PARAMETERS_STMT: {
+            var params = stmt as (*ParametersStmt)
+            var hasDefault = false
+            for(var i = 0; i < params.size(); i += 1) {
+                var param = params.get(i)
+                this.resolveParamDecl(param)
+
+                if(param.defaultExpr) {
+                    hasDefault = true
+                }
+                else if(hasDefault) {
+                    var parentDecl = params.parent as (*FuncDecl)
+                    assert(parentDecl != null)
+                    assert(parentDecl.kind == StmtKind.FUNC_DECL)
+                    this.result.addError(parentDecl.startPos, "'%.*s' must have default arguments defined last", 
+                                    parentDecl.name.str.length, parentDecl.name.str.buffer)
+                    return false;
+                }
+
+            }
+            return true;
+        }
         case StmtKind.RETURN_STMT:
         case StmtKind.STRUCT_FIELD_STMT:
         case StmtKind.SWITCH_CASE_STMT:
@@ -623,6 +686,9 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             return true;
         }
 
+        // --------------------------------------------------
+        //          Expressions
+        // --------------------------------------------------
         case StmtKind.ARRAY_DESIGNATION_EXPR:
         case StmtKind.ARRAY_INIT_EXPR:
         case StmtKind.BINARY_EXPR:
