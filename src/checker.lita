@@ -28,6 +28,7 @@ public struct TypeChecker {
     current: *Module
 
     currentScope: *Scope            // for function scopes
+    currentFuncDecl: *FuncTypeInfo
 
     pendingValues: Array<*Symbol>
     symbolTypes: Array<*Symbol>     // all types from all modules
@@ -57,26 +58,29 @@ public func (this: *TypeChecker) typeCheck(root: *Module) {
     this.resolveSymbols()
 }
 
-/*
-func (this: *TypeChecker) checkTypes(src: SrcPos, a: *TypeInfo, b: *TypeInfo, isCasted: bool = false) {
-    if(isCasted) {
-        if(!a.canCastTo(b)) {
-            var sb = StringBufferInit(256, this.allocator)
-            sb.append("'")
-            a.toString(sb)
-            sb.append("' can't be casted to '")
-            b.toString(sb)
-            sb.append("'")
+func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
+    assert(a != null)
+    assert(b != null)
 
-            this.result.addErrorStr(src, sb)
-        }
+    if(!a.canCastTo(b)) {
+        var sb = StringBufferInit(256, this.allocator)
+        sb.append("'")
+        b.toString(sb)
+        sb.append("' can't be casted to '")
+        a.toString(sb)
+        sb.append("'")
+
+        this.result.addErrorStr(src, sb)
+        return false
     }
-    else {
 
-    }
-}*/
+    return true
+}
 
-func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) {    
+func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
+    assert(a != null)
+    assert(b != null)
+
     if(!a.isAssignable(b)) {
         var sb = StringBufferInit(256, this.allocator)
         sb.append("'")
@@ -86,8 +90,47 @@ func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *Type
         sb.append("'")
 
         this.result.addErrorStr(src, sb)
+        return false
     }
-    
+
+    return true
+}
+
+func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
+    assert(a != null)
+    assert(b != null)
+
+    if(!a.isDeclarable(b)) {
+        var sb = StringBufferInit(256, this.allocator)
+        sb.append("'")
+        b.toString(sb)
+        sb.append("' can't be assigned to '")
+        a.toString(sb)
+        sb.append("'")
+
+        this.result.addErrorStr(src, sb)
+        return false
+    }
+
+    return true
+}
+
+func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
+    assert(a != null)
+    assert(b != null)
+
+    if(!a.isAssignable(b)) {
+        var sb = StringBufferInit(256, this.allocator)
+        sb.append("'")
+        b.toString(sb)
+        sb.append("' is not of type '")
+        a.toString(sb)
+        sb.append("'")
+
+        this.result.addErrorStr(src, sb)
+        return false
+    }
+    return true
 }
 
 func (this: *TypeChecker) createModuleSymbols(module: *Module) {
@@ -438,31 +481,60 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
 
             this.resolveSymbol(sym)
             spec.typeInfo = sym.type
-            return sym.type
+            return spec.typeInfo
         }
         case TypeSpecKind.CONST: {
             var constSpec = spec as (*ConstTypeSpec)
             var constOf = this.resolveTypeSpec(constSpec.base)
-            var type = NewConstTypeInfo(constOf, this.allocator) as (*TypeInfo)
-            spec.typeInfo = type
-            return type
+            spec.typeInfo = NewConstTypeInfo(constOf, this.allocator) as (*TypeInfo)
+            return spec.typeInfo
         }
         case TypeSpecKind.PTR: {
             var ptrSpec = spec as (*PtrTypeSpec)
             var ptrOf = this.resolveTypeSpec(ptrSpec.base)
-            var type = NewPtrTypeInfo(ptrOf, this.allocator) as (*TypeInfo)
-            spec.typeInfo = type
-            return type
+            spec.typeInfo = NewPtrTypeInfo(ptrOf, this.allocator) as (*TypeInfo)
+            return spec.typeInfo
         }
         case TypeSpecKind.ARRAY: {
             var arraySpec = spec as (*ArrayTypeSpec)
             var arrayOf = this.resolveTypeSpec(arraySpec.base)
-            // TODO
-            break;
+            var length: usize = 0
+            if(arraySpec.numElements) {
+                var expr = arraySpec.numElements
+                if(!this.resolveConstExpr(expr)) {
+                    goto err;
+                }
+                
+                if(!IsInteger(expr.operand.typeInfo)) {
+                    this.result.addError(expr.startPos,
+                        "array size expression must be an integer type")
+                    goto err;
+                }
+
+
+                length = expr.operand.val.intValue // TODO: fix: usize != i64
+            }
+            spec.typeInfo = NewArrayTypeInfo(arrayOf, length, arraySpec.numElements, this.allocator) as (*TypeInfo)
+            return spec.typeInfo
         }
         case TypeSpecKind.FUNC_PTR: {
-            // TODO
-            break;
+            var funcPtrSpec = spec as (*FuncPtrTypeSpec)
+            var paramDecls = Array<*TypeInfo>{}
+            if(!funcPtrSpec.args.empty()) {
+                paramDecls.init(funcPtrSpec.args.size(), this.allocator)
+                for(var i = 0; i < funcPtrSpec.args.size(); i+=1) {
+                    var arg = funcPtrSpec.args.get(i)
+                    var typeInfo = this.resolveTypeSpec(arg)
+                    if(!typeInfo) {
+                        goto err;
+                    }
+
+                    paramDecls.add(typeInfo)                    
+                }
+            }
+            var returnType = this.resolveTypeSpec(funcPtrSpec.ret)
+            spec.typeInfo = NewFuncPtrTypeInfo(funcPtrSpec.genericParams, returnType, paramDecls, this.allocator) as (*TypeInfo)
+            return spec.typeInfo
         }
         default: {
             assert(false)
@@ -497,8 +569,7 @@ func (this: *TypeChecker) resolveValue(sym: *Symbol) {
             sym.flags &= ~SymbolFlags.IS_INCOMPLETE
 
             var sb= StringBufferInit(256, this.allocator)
-            sym.type.toString(sb)
-            printf("Resolved Value %s type: %s\n", sym.name, sb.cStr())
+            sym.type.toString(sb)            
             break;
         }
         default: {
@@ -544,7 +615,7 @@ func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
     }
 
     if(declaredType && inferredType) {        
-        this.checkAssignability(decl.expr.startPos, declaredType, inferredType)
+        this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)
     }
 
     return declaredType ? declaredType : inferredType
@@ -611,13 +682,34 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             this.resolveStmt(deferStmt.deferedStmt)
             return true
         }
-        case StmtKind.DO_WHILE_STMT:
+        case StmtKind.DO_WHILE_STMT: {
+            var whileStmt = stmt as (*DoWhileStmt)
+            this.pushScope(&Scope{})
+            this.resolveStmt(whileStmt.body)
+            this.popScope()
+
+            this.resolveExpr(whileStmt.cond)            
+            return true
+        }
         case StmtKind.EMPTY_STMT: {
             return true;
         }
-        case StmtKind.ENUM_FIELD_ENTRY_STMT:
-        case StmtKind.ENUM_FIELD_STMT:
-        case StmtKind.FOR_STMT:
+        case StmtKind.ENUM_FIELD_ENTRY_STMT: {
+            return false; // TODO
+        }
+        case StmtKind.ENUM_FIELD_STMT:{
+            return false; // TODO
+        }
+        case StmtKind.FOR_STMT: {
+            var forStmt = stmt as (*ForStmt)
+            this.pushScope(&Scope{})
+            if(forStmt.init) this.resolveStmt(forStmt.init)
+            if(forStmt.cond) this.resolveExpr(forStmt.cond)
+            if(forStmt.post) this.resolveStmt(forStmt.post)
+            this.resolveStmt(forStmt.body)
+            this.popScope()
+            return true
+        }
         case StmtKind.FUNC_BODY_STMT: {
             var body = stmt as (*FuncBodyStmt)
             for(var i = 0; i < body.stmts.size(); i+=1) {
@@ -675,15 +767,56 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true;
         }
-        case StmtKind.RETURN_STMT:
-        case StmtKind.STRUCT_FIELD_STMT:
-        case StmtKind.SWITCH_CASE_STMT:
-        case StmtKind.SWITCH_STMT:
-        case StmtKind.UNION_FIELD_STMT:
-        case StmtKind.VAR_FIELD_STMT:
-        case StmtKind.WHILE_STMT: {
-            // TODO
+        case StmtKind.RETURN_STMT: {
+            var ret = stmt as (*ReturnStmt)
+            if(ret.expr) {
+                if(!this.resolveExpr(ret.expr)) {
+                    return false
+                }
+
+                this.checkTypeCompatibility(ret.expr.startPos, ret.expr.operand.typeInfo, this.currentFuncDecl.returnType)
+                ret.expr.expectedType = this.currentFuncDecl.returnType
+            }
+            else {
+                this.checkTypeCompatibility(ret.startPos, &VOID_TYPE, this.currentFuncDecl.returnType)
+            }
             return true;
+        }
+        case StmtKind.STRUCT_FIELD_STMT:{
+            return false; // TODO
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            var caseStmt = stmt as (*SwitchCaseStmt)
+            this.resolveExpr(caseStmt.cond)            
+            this.resolveStmt(caseStmt.body)            
+            return true
+        }
+        case StmtKind.SWITCH_STMT:{
+            var switchStmt = stmt as (*SwitchStmt)
+            this.resolveExpr(switchStmt.cond)
+            for(var i = 0; i < switchStmt.cases.size(); i+=1) {
+                var caseStmt = switchStmt.cases.get(i)
+                this.resolveStmt(caseStmt)
+            }
+            if(switchStmt.defaultStmt) {
+                this.resolveStmt(switchStmt.defaultStmt)
+            }
+            return true
+        }
+        case StmtKind.UNION_FIELD_STMT:{
+            return false; // TODO
+        }
+        case StmtKind.VAR_FIELD_STMT:{
+            return false; // TODO
+        }
+        case StmtKind.WHILE_STMT: {
+            var whileStmt = stmt as (*WhileStmt)
+            this.resolveExpr(whileStmt.cond)
+            
+            this.pushScope(&Scope{})
+            this.resolveStmt(whileStmt.body)
+            this.popScope()
+            return true
         }
 
         // --------------------------------------------------

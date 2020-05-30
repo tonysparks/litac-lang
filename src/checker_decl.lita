@@ -57,6 +57,10 @@ func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
 
     this.resolveStmt(funcDecl.params)
     if(funcDecl.body) {
+        // keep track of which function we are currently parsing
+        this.currentFuncDecl = funcDecl.sym.type as (*FuncTypeInfo)
+        defer this.currentFuncDecl = null
+
         // TODO Handle goto labels
         this.resolveStmt(funcDecl.body)
     }
@@ -66,7 +70,7 @@ func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
 
 public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : bool {
     assert(paramDecl != null)
-    
+
     if(paramDecl.defaultExpr) {
         this.resolveExpr(paramDecl.defaultExpr)
     }

@@ -18,6 +18,20 @@ public func NewFuncTypeInfo(sym: *Symbol,
     return type;
 }
 
+public func NewArrayTypeInfo(arrayOf: *TypeInfo,
+                             length: usize,
+                             numOfElements: *Expr,
+                             allocator: *const Allocator) : *ArrayTypeInfo {
+
+    var type = new<ArrayTypeInfo>(allocator)
+    type.kind = TypeKind.ARRAY
+    type.typeid = NextTypeId()            
+    type.arrayOf = arrayOf
+    type.length = length
+    type.numOfElements = numOfElements
+    return type;
+}
+
 public func NewFuncPtrTypeInfo(genericParams: Array<GenericParam>,
                                returnType: *TypeInfo,
                                paramDecls: Array<*TypeInfo>,

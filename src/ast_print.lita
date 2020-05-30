@@ -593,23 +593,28 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             PrintStmt(stmt.body, indent)
             return;
         }
-        /*
+        
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
-            var expr = new<ArrayDesignationExpr>(allocator)
-            expr.kind = StmtKind.ARRAY_DESIGNATION_EXPR;
-            expr.startPos = startPos
-            expr.index = null
-            expr.value = null
-            return expr as (*Stmt)
+            var expr = s as (*ArrayDesignationExpr)
+            Printf(indent, "[")
+            PrintStmt(expr.index, 0)
+            Printf(0, "] = ")
+            PrintStmt(expr.value, 0)
+            return;
         }
         case StmtKind.ARRAY_INIT_EXPR: {
-            var expr = new<ArrayInitExpr>(allocator)
-            expr.kind = StmtKind.ARRAY_INIT_EXPR;
-            expr.startPos = startPos
-            expr.type = null
-            expr.values.init(16, allocator)
-            return expr as (*Stmt)
-        }*/
+            var expr = s as (*ArrayInitExpr)
+            Printf(indent, "[]")
+            PrintTypeSpec(expr.type)
+            Printf(0, "{\n")
+            for(var i = 0; i < expr.values.size(); i+=1) {
+                var v = expr.values.get(i)
+                if(i > 0) Printf(0, ",\n")
+                PrintStmt(v, indent+1)
+            }
+            Printf(indent, "}\n")
+            return;
+        }
         case StmtKind.BINARY_EXPR: {
             var expr = s as (*BinaryExpr)
             PrintStmt(expr.left, indent)

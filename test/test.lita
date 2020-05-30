@@ -6,13 +6,39 @@ func test2<  (x: bool, ...) : i32 {
     return 4
 }*/
 
-const z:i32;
-var x:bool = "hi"
-var y = null
+//const z:i32;
+//var x:bool = "hi"
+//var y = null
 
 
 func test() {
     //var y = x
-    var w = null
-    var w = true
+    //var w = null
+    /*var w = true
+
+    var tmp = 2
+    const t = 10
+    if(true) {
+        tmp = "hi" + 2
+        var ww:i32 = 2 + "hi"
+       // t -= 2
+    }*/
+/*
+    var array:[]i32 = [2]i32{1,2}
+    var array2 = [4]i32{5,6,7,8}
+    var array3 = [4]i32{15,16,17,18}
+
+    array2 = array3*/
+    /*var x = 10
+    const y = 2
+    var array4 = [2]i32 {
+        [0] = 99,
+        [true] = 4,
+        ["hi"] = 2,
+        [x]= 5,
+        [y] = 111
+    }*/
+
+    var z = 10
+    var zz:f32 = z as (void)
 }

@@ -1897,7 +1897,7 @@ err:
                             Utility
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-func (p: *Parser) structArguments(arguments: Array<*InitArgExpr>) : bool {
+func (p: *Parser) structArguments(arguments: *Array<*InitArgExpr>) : bool {
     arguments.init(16, p.allocator)
 
     var argPosition = 0
@@ -1944,7 +1944,7 @@ err:
     return false    
 }
 
-func (p: *Parser) arguments(arguments: Array<*Expr>) : bool {    
+func (p: *Parser) arguments(arguments: *Array<*Expr>) : bool {    
     if(!p.check(TokenType.RIGHT_PAREN)) {
         arguments.init(8, p.allocator)
 
@@ -2073,7 +2073,7 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
     return arguments
 }
 
-func (p: *Parser) arrayArguments(arguments: Array<*Expr>) : bool {    
+func (p: *Parser) arrayArguments(arguments: *Array<*Expr>) : bool {    
     arguments.init(16, p.allocator)
     do {
         if(p.check(TokenType.RIGHT_BRACE)) {
@@ -2088,12 +2088,12 @@ func (p: *Parser) arrayArguments(arguments: Array<*Expr>) : bool {
         if(!expr) {
             expr = p.expression()
         }
-        
+
         arguments.add(expr)
     }
     while(p.match(TokenType.COMMA))
 
-    if(!p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE)) {
+    if(!p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE)) {        
         goto err;
     }
     

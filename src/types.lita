@@ -288,7 +288,12 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
         }
         case TypeKind.ARRAY: {
             var arrayInfo = this as (*ArrayTypeInfo)
-            sb.append("[]")
+            if(arrayInfo.length) {
+                sb.append("[%llu]", arrayInfo.length)
+            }
+            else {
+                sb.append("[]")
+            }
             arrayInfo.arrayOf.toString(sb)
             break;
         }
@@ -354,11 +359,156 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
     }
 }
 
-public func (this: *TypeInfo) strictEquals(castTo: *TypeInfo) : bool {
+public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
+    if(!other) {
+        return false
+    }
+
+    if(other.kind != this.kind) {
+        return false
+    }
+
+    switch(this.kind) {
+        case TypeKind.PTR: {
+            var thisInfo = this as (*PtrTypeInfo)
+            var otherInfo = other as (*PtrTypeInfo)
+            return thisInfo.ptrOf.strictEquals(otherInfo.ptrOf)
+        }
+        case TypeKind.CONST: {
+            var thisInfo = this as (*ConstTypeInfo)
+            var otherInfo = other as (*ConstTypeInfo)
+            return thisInfo.constOf.strictEquals(otherInfo.constOf)
+        }
+        case TypeKind.ARRAY: {
+            var thisInfo = this as (*ArrayTypeInfo)
+            var otherInfo = other as (*ArrayTypeInfo)
+            if(thisInfo.length != otherInfo.length) {
+                return false;
+            }
+            return thisInfo.arrayOf.strictEquals(otherInfo.arrayOf)
+        }
+        case TypeKind.FUNC_PTR: {
+            var thisInfo = this as (*FuncPtrTypeInfo)
+            var otherInfo = other as (*FuncPtrTypeInfo)
+            if(thisInfo.paramDecls.size() != otherInfo.paramDecls.size()) {
+                return false;
+            }
+            if(!thisInfo.returnType.strictEquals(otherInfo.returnType)) {
+                return false;
+            }
+            for(var i = 0; i < thisInfo.paramDecls.size(); i += 1) {
+                var a = thisInfo.paramDecls.get(i)
+                var b = otherInfo.paramDecls.get(i)
+                if(a.strictEquals(b)) {
+                    return false;
+                }
+            }
+            return true
+        }
+        default: {
+            return true
+        }
+    }
+
     return false
 }
 
 public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
+    // this = other    
+    switch(this.kind) {
+        case TypeKind.BOOL: {
+            return other.kind == TypeKind.BOOL
+        }
+        case TypeKind.CHAR: {
+            return other.kind <= TypeKind.CHAR
+        }
+        case TypeKind.I8: {
+            return other.kind <= TypeKind.I8
+        }
+        case TypeKind.U8: {
+            return other.kind <= TypeKind.U8
+        }
+        case TypeKind.I16: {
+            return other.kind <= TypeKind.I16
+        }
+        case TypeKind.U16: {
+            return other.kind <= TypeKind.U16
+        }
+        case TypeKind.I32: {
+            return other.kind <= TypeKind.I32
+        }
+        case TypeKind.U32: {
+            return other.kind <= TypeKind.U32
+        }
+        case TypeKind.I64: {
+            return other.kind <= TypeKind.I64
+        }
+        case TypeKind.U64: {
+            return other.kind <= TypeKind.U64
+        }
+        case TypeKind.F32: {
+            return other.kind == TypeKind.F32
+        }
+        case TypeKind.F64: {
+            return other.kind == TypeKind.F32 ||
+                   other.kind == TypeKind.F64
+        }
+        case TypeKind.USIZE: {
+            return other.kind <= TypeKind.USIZE || 
+                   other.kind == TypeKind.NULL ||
+                   IsPtrLike(other);
+        }
+        case TypeKind.NULL: {
+            return other.kind == TypeKind.NULL
+        }
+        case TypeKind.VOID: {
+            return other.kind == TypeKind.VOID
+        }
+
+        case TypeKind.STR: {
+            return other.kind == TypeKind.STR ||
+                   IsPtrOf(other, TypeKind.CHAR)
+        }
+        case TypeKind.ARRAY: {
+            return false
+        }
+        // TODO
+        case TypeKind.PTR: {
+            var thisInfo = this as (*PtrTypeInfo)
+            if(thisInfo.ptrOf == TypeKind.VOID) {
+                return IsPtrLike(other)
+            }
+
+            break;
+        }        
+        case TypeKind.CONST: {
+            break;
+        }
+
+        case TypeKind.FUNC_PTR: {
+            break;
+        }
+
+        case TypeKind.STRUCT: {
+            break;
+        }
+        case TypeKind.UNION: {
+            break;
+        }
+        case TypeKind.ENUM: {
+            break;
+        }
+        case TypeKind.FUNC: {
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }    
+    return false
+}
+
+public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
     // this = other    
     switch(this.kind) {
         case TypeKind.BOOL: {
@@ -414,10 +564,23 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return other.kind == TypeKind.STR ||
                    IsPtrOf(other, TypeKind.CHAR)
         }
-        // TODO
         case TypeKind.ARRAY: {
-            break;
+            if(other.kind != TypeKind.ARRAY) {
+                return false
+            }
+            var thisArray = this as (*ArrayTypeInfo)
+            var otherArray = other as (*ArrayTypeInfo)
+
+            if(!thisArray.arrayOf.isDeclarable(otherArray.arrayOf)) {
+                return false
+            }
+
+            if(!thisArray.length) {
+                return true
+            }
+            return thisArray.length == otherArray.length
         }
+        // TODO
         case TypeKind.PTR: {
             break;
         }        
@@ -447,6 +610,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
     }    
     return false
 }
+
 
 public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
     switch(this.kind) {
@@ -495,7 +659,7 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
         case TypeKind.VOID: {
             return castTo.kind == TypeKind.VOID
         }
-
+        // TODO
         case TypeKind.STR: {
             break;
         }
@@ -568,7 +732,7 @@ public struct ArrayTypeInfo {
     info: using TypeInfo
     arrayOf: *TypeInfo
     length: usize
-    numElements: *Expr
+    numOfElements: *Expr
 }
 
 public struct FuncPtrTypeInfo {

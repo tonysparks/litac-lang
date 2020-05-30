@@ -16,12 +16,28 @@ import "libc"
 
 import "checker"
 
+public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
+    if(!this.resolveExpr(expr)) {
+        return false
+    }
+
+    if(!expr.operand.isConst) {
+        this.result.addError(expr.startPos, "expected a constant expression")
+        return false;
+    }
+    return true
+}
+
 public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
     if(!expr) return false
 
     switch(expr.kind) {
-        case StmtKind.ARRAY_DESIGNATION_EXPR:
-        case StmtKind.ARRAY_INIT_EXPR:
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            return this.resolveArrayDesignationExpr(expr as (*ArrayDesignationExpr))
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            return this.resolveArrayInitExpr(expr as (*ArrayInitExpr))
+        }
         case StmtKind.BINARY_EXPR: {
             return this.resolveBinaryExpr(expr as (*BinaryExpr))
         }
@@ -32,7 +48,9 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
             //expr.operand.val = (expr as (*BooleanExpr)).string TODO
             return true
         }
-        case StmtKind.CAST_EXPR:
+        case StmtKind.CAST_EXPR: {
+            return this.resolveCastExpr(expr as (*CastExpr))
+        }
         case StmtKind.CHAR_EXPR: {
             expr.operand.typeInfo = &CHAR_TYPE
             expr.operand.isConst = true
@@ -90,8 +108,100 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
     return false
 }
 
+func (this: *TypeChecker) resolveCastExpr(expr: *CastExpr) : bool {
+    assert(expr != null)
+
+    var typeInfo = this.resolveTypeSpec(expr.castTo)
+    if(!typeInfo) {
+        return false
+    }
+
+    if(!this.resolveExpr(expr.exprToCast)) {
+        return false
+    }
+
+    expr.operand.typeInfo = typeInfo
+
+    if(!this.checkCastability(expr.startPos, expr.expr.operand.typeInfo, typeInfo)) {
+        return false
+    }
+
+    return true
+}
 
 
+func (this: *TypeChecker) resolveArrayDesignationExpr(expr: *ArrayDesignationExpr) : bool {
+    assert(expr != null)
+
+    if(!this.resolveExpr(expr.index)) {
+        return false
+    }
+
+    if(!this.resolveExpr(expr.value)) {
+        return false
+    }
+
+    if(!expr.index.isConstNumberExpr()) {
+        this.result.addError(expr.index.startPos, "array designation must be indexed by a number")
+        return false
+    }
+
+    if(expr.index.kind == StmtKind.IDENTIFIER_EXPR) {
+        var idExpr = expr.index as (*IdentifierExpr)
+        if(idExpr.sym != null && !(idExpr.sym.flags & SymbolFlags.IS_CONSTANT)) {
+            this.result.addError(expr.index.startPos, "'%s' must be a constant", idExpr.sym.name)
+            return false
+        }
+    }
+    
+    if(!this.checkTypeCompatibility(expr.startPos, &USIZE_TYPE, expr.index.operand.typeInfo)) {
+        return false
+    }
+
+    expr.operand = expr.value.operand
+    return true
+}
+
+func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
+    assert(expr != null)
+
+    var typeInfo = this.resolveTypeSpec(expr.type)
+    if(!typeInfo) {
+        return false
+    }
+
+    expr.operand.typeInfo = typeInfo
+    expr.operand.isLeftValue = false
+
+    assert(typeInfo.kind == TypeKind.ARRAY)
+
+    var arrayInfo = typeInfo as (*ArrayTypeInfo)
+    var arrayOf = arrayInfo.arrayOf
+
+    if(!expr.values.empty()) {
+        if(!arrayInfo.numOfElements && !arrayInfo.length) {
+            arrayInfo.length = expr.values.size()
+        }
+
+        var hasFailed = false
+        for(var i = 0; i < expr.values.size(); i += 1) {
+            var value = expr.values.get(i)
+            value.expectedType = arrayOf
+
+            if(!this.resolveExpr(value)) {
+                hasFailed = true
+            }
+
+            if(value.operand.typeInfo) {
+                this.checkTypeCompatibility(value.startPos, arrayOf, value.operand.typeInfo)
+            }
+        }
+
+        return hasFailed
+    }
+
+    return true
+}
 
 func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
     assert(expr != null)
@@ -113,6 +223,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
         case TokenType.EQUALS: {
             this.checkConstant(expr.left)
             this.checkAssignability(expr.right.startPos, leftType, rightType)
+            this.checkRightValue(expr.left)
             break;
         }
         case TokenType.BAND_EQ:
@@ -123,6 +234,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
         case TokenType.RSHIFT_EQ: 
             this.checkConstant(expr.left)
             this.checkAssignability(expr.right.startPos, leftType, rightType)
+            this.checkRightValue(expr.left)
             // fallthru
         case TokenType.BAND:
         case TokenType.BNOT:
@@ -195,7 +307,8 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
     }
 
     expr.operand.typeInfo = targetType
-    //expr.operand.isConst = expr.left.operand.isConst && expr.right.operand.isConst
+    expr.operand.isConst = expr.left.operand.isConst && 
+                           expr.right.operand.isConst
 
 err:
     return false    
@@ -249,6 +362,13 @@ func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) {
         sb.append("' can't be coerced to boolean")
 
         this.result.addErrorStr(expr.startPos, sb)
+    }
+}
+
+func (this: *TypeChecker) checkRightValue(expr: *Expr) {
+    assert(expr != null)    
+    if(!expr.operand.isLeftValue) {        
+        this.result.addError(expr.startPos, "rvalue can't be assigned to")
     }
 }
 
