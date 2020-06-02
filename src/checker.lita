@@ -174,7 +174,7 @@ func (this: *TypeChecker) popScope() {
 
 
 func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
-    printf("Resolving Decl: ")
+    printf("Creating Decl: ")
     PrintName(decl.name)
     printf("\n")
 
@@ -338,9 +338,11 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         return;
     }
 
-    sym.state = SymbolState.RESOLVING
     this.enterModule(sym.declared)
     defer this.leaveModule()
+
+    sym.state = SymbolState.RESOLVING
+
     switch(sym.kind) {
         case SymbolKind.TYPE: {
             switch(sym.decl.kind) {
@@ -422,6 +424,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     this.leaveModule()
 
     sym.flags &= ~SymbolFlags.IS_INCOMPLETE
+
     switch(sym.decl.kind) {
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
