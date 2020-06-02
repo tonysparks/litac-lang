@@ -38,7 +38,16 @@ func test() {
         [x]= 5,
         [y] = 111
     }*/
-
+/*
     var z = 10
-    var zz:f32 = z as (void)
+    var zz:f32 = z as (void)*/
+
+/*
+    var a = [2]i32{1,2}
+    var x = 10
+    var p = &x
+    var pp = &10
+    var pp2 = &a*/
+
+    var z:[2]f32 = (1+2)
 }

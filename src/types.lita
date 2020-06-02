@@ -2,6 +2,7 @@ import "string_view"
 import "string_buffer"
 import "symbols"
 import "ast"
+import "lex"
 import "array"
 import "assert"
 import "libc"
@@ -82,6 +83,19 @@ public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
     }
 
     return TypeKind.MAX_TYPE_KINDS
+}
+
+public func IsPtr(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    if(type.kind == TypeKind.CONST) {
+        var constInfo = type as (*ConstTypeInfo)
+        return IsPtr(constInfo.constOf)
+    }
+
+    return type.kind == TypeKind.PTR
 }
 
 public func IsPtrLike(type: *TypeInfo) : bool {
@@ -254,6 +268,71 @@ public func IsBooleanable(type: *TypeInfo) : bool {
         }
         default: {
             return false
+        }
+    }
+}
+
+public func IsAggregate(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    if(type.kind == TypeKind.CONST) {
+        var constInfo = type as (*ConstTypeInfo)
+        return IsAggregate(constInfo.constOf)
+    }
+
+    return type.kind == TypeKind.STRUCT ||
+           type.kind == TypeKind.UNION
+}
+
+public func IsPtrAggregate(type: *TypeInfo) : bool {
+    if(!IsPtr(type)) {
+        return false;
+    }
+    var ptrInfo: *TypeInfo = null
+    if(type.kind == TypeKind.CONST) {
+        var constInfo = type as (*ConstTypeInfo)
+        ptrInfo = constInfo.constOf
+    }
+    else {
+        ptrInfo = (type as (*PtrTypeInfo)).ptrOf
+    }
+    return IsAggregate(ptrInfo)
+}
+
+public func IsFieldAccessible(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    if(IsAggregate(type) || IsPtrAggregate(type) || type.kind == TypeKind.ENUM) {
+        return true
+    }
+
+    return false
+}
+
+public func (this: *TypeInfo) getBaseType() : *TypeInfo {
+    if(!this) return null;
+    switch(this.kind) {
+        case TypeKind.PTR: {
+            var info = this as (*PtrTypeInfo)
+            return info.ptrOf.getBaseType()
+        }
+        case TypeKind.CONST: {
+            var info = this as (*ConstTypeInfo)
+            return info.constOf.getBaseType()
+        }
+        case TypeKind.ARRAY: {
+            var info = this as (*ArrayTypeInfo)
+            return info.arrayOf.getBaseType()
+        }
+        case TypeKind.STR: {
+            return &CHAR_TYPE
+        }
+        default: {
+            return this
         }
     }
 }
@@ -694,6 +773,66 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
         }
     }
     return false
+}
+
+public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryStmt {
+    assert(this != null)
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)        
+        if(field.fieldName.str.equals(name)) {
+            return field
+        }
+    }
+
+    return null
+}
+
+public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
+    assert(this != null)
+
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_STMT: {
+                var varField = field.varField
+                if(varField.fieldName.str.equals(name)) {
+                    return field
+                }
+                break;
+            }
+            case StmtKind.ENUM_FIELD_STMT: {
+                var enumField = field.enumField
+                if(enumField.name.str.equals(name)) {
+                    return field
+                }
+                break;
+            }
+            case StmtKind.UNION_FIELD_STMT: 
+            case StmtKind.STRUCT_FIELD_STMT: {
+                var aggField = field.aggregateField
+
+                // if this is an anonymous aggregate, the fields
+                // should be looked at for matching
+                if(aggField.name.type == TokenType.VOID) {
+                    var aggType = aggField.typeInfo as (*AggregateTypeInfo)
+                    return aggType.getField(name)
+                }
+
+                if(aggField.name.str.equals(name)) {
+                    return field
+                }
+                // TODO: Account for using field aggregates
+                break;
+            }
+            default: {
+                goto err;
+            }
+        }
+    }
+err:
+    return FieldStmt {
+        .kind = StmtKind.POISON_EXPR
+    }    
 }
 
 public typedef i64 as Typeid;

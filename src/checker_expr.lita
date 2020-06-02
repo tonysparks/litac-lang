@@ -9,12 +9,14 @@ import "state"
 import "map"
 import "string_buffer"
 import "array"
+import "checker"
 import "assert"
 
 import "ast_print"
 import "libc"
+import "error_codes"
 
-import "checker"
+
 
 public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
     if(!this.resolveExpr(expr)) {
@@ -44,7 +46,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.BOOLEAN_EXPR: {
             expr.operand.typeInfo = &BOOL_TYPE
             expr.operand.isConst = true
-            expr.operand.isLeftValue = false
+            expr.operand.isRightValue = true
             //expr.operand.val = (expr as (*BooleanExpr)).string TODO
             return true
         }
@@ -54,30 +56,34 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.CHAR_EXPR: {
             expr.operand.typeInfo = &CHAR_TYPE
             expr.operand.isConst = true
-            expr.operand.isLeftValue = false
+            expr.operand.isRightValue = true
             expr.operand.val = (expr as (*CharExpr)).character
             return true
         }
         case StmtKind.FUNC_CALL_EXPR:
         case StmtKind.FUNC_IDENTIFIER_EXPR:
-        case StmtKind.GET_EXPR:
-        case StmtKind.GROUP_EXPR:
+        case StmtKind.GET_EXPR:{
+            return this.resolveGetExpr(expr as (*GetExpr))
+        }
+        case StmtKind.GROUP_EXPR: {
+            return this.resolveGroupExpr(expr as (*GroupExpr))
+        }
         case StmtKind.IDENTIFIER_EXPR: {
-            return this.resolveIdentiferExpr(expr as (*IdentifierExpr))            
+            return this.resolveIdentiferExpr(expr as (*IdentifierExpr))
         }
         case StmtKind.INIT_EXPR:
         case StmtKind.INIT_ARG_EXPR:
         case StmtKind.NULL_EXPR: {
             expr.operand.typeInfo = &NULL_TYPE
             expr.operand.isConst = true
-            expr.operand.isLeftValue = false            
+            expr.operand.isRightValue = true
             return true
         }
         case StmtKind.NUMBER_EXPR: {
             var numberExpr = (expr as (*NumberExpr))
             expr.operand.typeInfo = numberExpr.number.typeInfo
             expr.operand.isConst = true
-            expr.operand.isLeftValue = false
+            expr.operand.isRightValue = true
             expr.operand.val = numberExpr.number
             return true
         }
@@ -87,7 +93,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.STRING_EXPR: {
             expr.operand.typeInfo = &STR_TYPE
             expr.operand.isConst = true
-            expr.operand.isLeftValue = false
+            expr.operand.isRightValue = true
             expr.operand.val = (expr as (*StringExpr)).string
             return true
         }
@@ -96,9 +102,11 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.TERNARY_EXPR:
         case StmtKind.TYPE_IDENTIFIER_EXPR:
         case StmtKind.TYPE_OF_EXPR:
-        case StmtKind.UNARY_EXPR:
+        case StmtKind.UNARY_EXPR: {
+            return this.resolveUnaryExpr(expr as (*UnaryExpr))
+        }
         case StmtKind.POISON_EXPR: {
-            break;
+            return false
         }
         default: {
             PrintStmt(expr as (*Stmt))
@@ -106,6 +114,152 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         }
     }
     return false
+}
+
+func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
+    assert(expr != null)
+
+    if(!this.resolveExpr(expr.object)) {
+        return false
+    }
+
+    // should we resolve field?
+    if(!expr.field) {
+        return false
+    }
+
+    var objectTypeInfo = expr.object.operand.typeInfo
+    if(!IsFieldAccessible(objectTypeInfo)) {
+        this.errorNoFieldAccess(expr.object, objectTypeInfo, expr.field.type.name)
+        return false
+    }
+
+    if(objectTypeInfo.kind == TypeKind.ENUM) {
+        var enumInfo = objectTypeInfo as (*EnumTypeInfo)
+        var field = enumInfo.getField(expr.field.type.name)
+        if(!field) {
+            this.errorNoField(expr.field, objectTypeInfo, expr.field.type.name)
+            return false
+        }
+
+        expr.operand.typeInfo = &I32_TYPE
+        expr.operand.isConst = true
+        expr.operand.isRightValue = true
+        return true
+    }
+    else {
+        var info = objectTypeInfo.getBaseType()
+        assert(info != null)
+        assert(info.kind == TypeKind.STRUCT || info.kind == TypeKind.STRUCT)
+
+        var aggInfo = info as (*AggregateTypeInfo)
+        var field = aggInfo.getField(expr.field.type.name)
+        if(field.kind != StmtKind.POISON_EXPR) {
+            expr.operand.typeInfo = field.typeInfo
+            return true
+        }
+        // TODO: Account for method look ups
+    }
+
+    return true
+}
+
+func (this: *TypeChecker) resolveGroupExpr(expr: *GroupExpr) : bool {
+    assert(expr != null)
+
+    if(!this.resolveExpr(expr.groupedExpr)) {
+        return false
+    }
+
+    expr.operand = expr.groupedExpr.operand
+    return true
+}
+
+func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
+    assert(expr != null)
+
+    if(!this.resolveExpr(expr.unaryExpr)) {
+        return false
+    }
+    
+    var type = expr.unaryExpr.operand.typeInfo
+    switch(expr.operator) {
+        case TokenType.STAR: {            
+            switch(type.kind) {
+                case TypeKind.PTR: {
+                    var info = type as (*PtrTypeInfo)
+                    if(info.ptrOf.kind == TypeKind.CONST) {
+                        var constInfo = info.ptrOf as (*ConstTypeInfo)
+                        expr.operand.typeInfo = constInfo.constOf
+                    }
+                    else {
+                        expr.operand.typeInfo = info.ptrOf
+                    }
+                    break
+                }
+                case TypeKind.STR: {
+                    expr.operand.typeInfo = &CHAR_TYPE
+                    break
+                }
+                case TypeKind.ARRAY: {
+                    var info = type as (*ArrayTypeInfo)
+                    if(info.arrayOf.kind == TypeKind.CONST) {
+                        var constInfo = info.arrayOf as (*ConstTypeInfo)
+                        expr.operand.typeInfo = constInfo.constOf
+                    }
+                    else {
+                        expr.operand.typeInfo = info.arrayOf
+                    }
+                    break
+                }
+                case TypeKind.CONST: {
+                    var constInfo = type as (*ConstTypeInfo)
+                    if(IsPtrLike(constInfo.constOf)) {
+                        expr.operand.typeInfo = constInfo.constOf
+                    }
+                    break
+                }
+                default: {
+                    var sb = StringBufferInit(256, this.allocator)
+                    sb.append("'")
+                    type.toString(sb)
+                    sb.append("' is not a pointer type")
+                    
+                    this.result.addErrorStr(expr.unaryExpr.startPos, sb)
+                    return false
+                }
+
+            }
+            break;
+        }
+        case TokenType.BAND: {
+            if(type.kind == TypeKind.FUNC) {
+                expr.operand.typeInfo = (type as (*FuncTypeInfo)).asPtr(this.allocator) as (*TypeInfo)
+                expr.operand.isRightValue = true
+            }
+            else if(expr.unaryExpr.operand.isRightValue) {
+                this.result.addError(expr.unaryExpr.startPos, "lvalue required as unary '&' operand")
+                return false
+            }
+            else {
+                expr.operand.typeInfo = NewPtrTypeInfo(type, this.allocator) as (*TypeInfo)
+            }
+            break;
+        }
+        case TokenType.NOT: {
+            if(!this.checkTruthyness(expr.unaryExpr, type)) {
+                return false
+            }
+            expr.operand.typeInfo = &BOOL_TYPE
+            break;
+        }
+        default: {
+            expr.operand = expr.unaryExpr.operand
+            break;
+        }
+    }
+
+    return true
 }
 
 func (this: *TypeChecker) resolveCastExpr(expr: *CastExpr) : bool {
@@ -171,7 +325,7 @@ func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
     }
 
     expr.operand.typeInfo = typeInfo
-    expr.operand.isLeftValue = false
+    expr.operand.isRightValue = true
 
     assert(typeInfo.kind == TypeKind.ARRAY)
 
@@ -183,21 +337,20 @@ func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
             arrayInfo.length = expr.values.size()
         }
 
-        var hasFailed = false
+        var hasSucceed = true
         for(var i = 0; i < expr.values.size(); i += 1) {
             var value = expr.values.get(i)
             value.expectedType = arrayOf
 
             if(!this.resolveExpr(value)) {
-                hasFailed = true
+                hasSucceed = false
             }
 
             if(value.operand.typeInfo) {
                 this.checkTypeCompatibility(value.startPos, arrayOf, value.operand.typeInfo)
             }
         }
-
-        return hasFailed
+        return hasSucceed
     }
 
     return true
@@ -309,6 +462,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
     expr.operand.typeInfo = targetType
     expr.operand.isConst = expr.left.operand.isConst && 
                            expr.right.operand.isConst
+    return true
 
 err:
     return false    
@@ -326,7 +480,33 @@ func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *cons
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) checkConstant(expr: *Expr) {
+func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: *const char) {
+    assert(expr != null)
+    assert(type != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("'")
+    type.toString(sb)
+    sb.append("'")
+    sb.append(" does not have field '%s'", field)
+
+    this.result.addErrorStr(expr.startPos, sb)
+}
+
+func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field: *const char) {
+    assert(expr != null)
+    assert(type != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("'")
+    type.toString(sb)
+    sb.append("'")
+    sb.append(" can't be accessed with field '%s'", field)
+
+    this.result.addErrorStr(expr.startPos, sb)
+}
+
+func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     assert(expr != null)
 
     var sym: *Symbol = null
@@ -337,21 +517,24 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) {
 
     if(!sym) {
         if(!expr.operand.typeInfo) {
-            return;
+            return false;
         }
 
         sym = expr.operand.typeInfo.sym
         if(!sym) {
-            return;
+            return false;
         }
     }
     
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
        this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)       
+       return false
     }
+
+    return true
 }
 
-func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) {
+func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) : bool {
     assert(expr != null)
     assert(type != null)
 
@@ -362,14 +545,18 @@ func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) {
         sb.append("' can't be coerced to boolean")
 
         this.result.addErrorStr(expr.startPos, sb)
+        return false
     }
+    return true
 }
 
-func (this: *TypeChecker) checkRightValue(expr: *Expr) {
+func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
     assert(expr != null)    
-    if(!expr.operand.isLeftValue) {        
+    if(expr.operand.isRightValue) {        
         this.result.addError(expr.startPos, "rvalue can't be assigned to")
+        return false
     }
+    return true
 }
 
 func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {

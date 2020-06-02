@@ -560,7 +560,7 @@ public struct Expr {
 
 public struct Operand {
     typeInfo: *TypeInfo
-    isLeftValue: bool
+    isRightValue: bool
     isConst: bool
     val: Token
 }

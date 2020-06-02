@@ -30,16 +30,30 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
             return true;
         }
         case StmtKind.STRUCT_DECL:
-        case StmtKind.UNION_DECL:
-        case StmtKind.ENUM_DECL:
+        case StmtKind.UNION_DECL: {
+            var aggDecl = decl as (*AggregateDecl)
+            return this.resolveAggregateDecl(aggDecl)
+        }
+        case StmtKind.ENUM_DECL: {
+            var enumDecl = decl as (*EnumDecl)
+            return this.resolveEnumDecl(enumDecl)
+        }
         case StmtKind.FUNC_DECL: {
             var funcDecl = decl as (*FuncDecl)            
             return this.resolveFuncDecl(funcDecl)
         }
-        case StmtKind.TYPEDEF_DECL:
-        case StmtKind.PARAM_DECL:
+        case StmtKind.TYPEDEF_DECL: {
+            var typedefDecl = decl as (*TypedefDecl)
+            return this.resolveTypedefDecl(typedefDecl)
+        }
+        case StmtKind.PARAM_DECL: {
+            var paramDecl = decl as (*ParameterDecl)
+            return this.resolveParamDecl(paramDecl)
+        }
         case StmtKind.NATIVE_DECL:
-        case StmtKind.POISON_DECL:
+        case StmtKind.POISON_DECL: {
+            break
+        }
         default: {
             assert(false)
         }
@@ -48,7 +62,149 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     return false
 }
 
-func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
+public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {    
+    if(!decl.expr && decl.kind == StmtKind.CONST_DECL) {
+        if(!decl.hasNote("foreign")) {
+            this.result.addError(decl.startPos, "const declaration must have an assignment (unless it is '@foreign')")
+            return null
+        }
+    }
+    var declaredType: *TypeInfo = null
+    var inferredType: *TypeInfo = null
+
+    if(decl.typeSpec) {
+        declaredType = this.resolveTypeSpec(decl.typeSpec)
+    }
+
+    if(decl.expr) {
+        if(!this.resolveExpr(decl.expr)) {
+            return null
+        }
+
+        var op = decl.expr.operand
+        if(decl.expr.kind == StmtKind.ARRAY_INIT_EXPR || 
+           decl.expr.kind == StmtKind.INIT_EXPR) {
+            inferredType = op.typeInfo
+        }
+        else if(op.typeInfo.kind == TypeKind.NULL && declaredType == null) {
+            this.result.addError(decl.expr.startPos,
+                "invalid variable declaration, can't infer type from 'null' for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
+            return null
+        }
+        else {
+            inferredType = TypeDecay(op.typeInfo, this.allocator)
+        }
+
+        decl.expr.expectedType = declaredType ? declaredType : inferredType;
+    }
+
+    if(declaredType && inferredType) {        
+        this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)
+    }
+
+    return declaredType ? declaredType : inferredType
+}
+
+func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {
+    // TODO
+    return false
+}
+
+public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
+    for(var i = 0; i < aggDecl.fields.size(); i+=1) {
+        var field = aggDecl.fields.get(i)
+        this.checkAggregateFieldDuplicate(aggDecl, field, i)
+
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_STMT: {
+                var varField = field.varField
+                field.typeInfo = this.resolveTypeSpec(varField.type)
+                if(!field.typeInfo) {
+                    return false
+                }
+                if(varField.defaultExpr) {
+                    if(!this.resolveExpr(varField.defaultExpr)) {
+                        return false
+                    }
+                }                
+                break;
+            }
+            case StmtKind.ENUM_FIELD_STMT: {
+                var sym = this.createDeclSymbol(field.enumField)
+                if(!sym) {
+                    return false
+                }
+                sym.flags |= SymbolFlags.IS_INCOMPLETE
+                this.resolveSymbol(sym)
+
+                if(!this.resolveEnumDecl(field.enumField)) {
+                    return false
+                }
+
+                field.typeInfo = sym.type
+                break;
+            }
+            case StmtKind.UNION_FIELD_STMT:
+            case StmtKind.STRUCT_FIELD_STMT: {
+                var sym = this.createDeclSymbol(field.aggregateField)
+                if(!sym) {
+                    return false
+                }
+                sym.flags |= SymbolFlags.IS_INCOMPLETE
+                this.resolveSymbol(sym)
+
+                if(!this.resolveAggregateDecl(field.aggregateField)) {
+                    return false
+                }
+
+                field.typeInfo = sym.type
+                break;
+            }
+            case StmtKind.POISON_EXPR: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+    return true
+}
+
+func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *EnumFieldEntryStmt, index: i32) : bool {
+    var hasDuplicates = false
+    for(var i = 0; i < enumDecl.fields.size(); i+=1) {
+        if(i == index) continue
+
+        var other = enumDecl.fields.get(i)
+        if(other.fieldName.str.equalsStringView(field.fieldName.str)) {
+            this.result.addError(other.startPos, "duplicate member '%.*s'", 
+                                field.fieldName.str.length, field.fieldName.str.buffer)
+            hasDuplicates = true
+        }
+    }
+
+    return !hasDuplicates
+}
+
+public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
+    for(var i = 0; i < enumDecl.fields.size(); i+=1) {
+        var field = enumDecl.fields.get(i)
+        if(field.value) {
+            if(!this.resolveExpr(field.value)) {
+                return false
+            }
+
+            var typeInfo = field.value.operand.typeInfo
+            this.checkTypeCompatibility(field.value.startPos, typeInfo, &I32_TYPE)
+        }
+
+        this.checkEnumFieldDuplicate(enumDecl, field, i)
+    }
+    return true
+}
+
+public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     this.enterModule(funcDecl.sym.declared)
     defer this.leaveModule()
 
@@ -79,5 +235,10 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
     paramDecl.sym = this.addSymbol(paramDecl, typeInfo)
 
     // TODO: Handle using parameters
+    return true
+}
+
+public func (this: *TypeChecker) resolveTypedefDecl(typedefDecl: *TypedefDecl) : bool {
+    // nothing to type check
     return true
 }

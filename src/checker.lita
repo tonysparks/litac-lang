@@ -173,7 +173,7 @@ func (this: *TypeChecker) popScope() {
 }
 
 
-func (this: *TypeChecker) createDeclSymbol(decl: *Decl) {
+func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     printf("Resolving Decl: ")
     PrintName(decl.name)
     printf("\n")
@@ -240,8 +240,10 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) {
         }
     }
 
+    return sym
+
 err:
-    return;    
+    return null
 }
 
 func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
@@ -287,16 +289,16 @@ err:
 }
 
 
-func (this: *TypeChecker) resolveSymbols() {    
+func (this: *TypeChecker) resolveSymbols() {
     
     {   // Start resolving the symbol types
         for(var i = 0; i < this.symbolTypes.size(); i += 1) {
             var symbol = this.symbolTypes.get(i)
-            this.resolveSymbol(symbol)        
+            this.resolveSymbol(symbol)
         }
 
         for(var i = 0; i < this.symbolTypes.size(); i += 1) {
-            var symbol = this.symbolTypes.get(i)     
+            var symbol = this.symbolTypes.get(i)
             this.finishResolveSymbol(symbol)
         }
     }
@@ -304,7 +306,7 @@ func (this: *TypeChecker) resolveSymbols() {
     {   // Resolve functions
         for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
             var symbol = this.symbolFuncs.get(i)
-            this.resolveSymbol(symbol)        
+            this.resolveSymbol(symbol)
         }
     }
 
@@ -312,14 +314,14 @@ func (this: *TypeChecker) resolveSymbols() {
     {   // Resolve variables
         for(var i = 0; i < this.pendingValues.size(); i += 1) {
             var symbol = this.pendingValues.get(i)
-            this.resolveValue(symbol)        
+            this.finishResolveSymbol(symbol)
         }
     }
 
     {   // Finish resolving the functions
         for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
             var symbol = this.symbolFuncs.get(i)
-            this.resolveFunc(symbol)        
+            this.finishResolveSymbol(symbol)
         }
     }
 }
@@ -410,7 +412,7 @@ err:
     return;
 }
 
-func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
+func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {    
     // check to see if this symbol is completed
     if(!(sym.flags & SymbolFlags.IS_INCOMPLETE)) {
         return;
@@ -418,37 +420,41 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
 
     this.enterModule(sym.declared)
     this.leaveModule()
+
+    sym.flags &= ~SymbolFlags.IS_INCOMPLETE
     switch(sym.decl.kind) {
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
             var aggDecl = sym.decl as (*AggregateDecl)
-            for(var i = 0; i < aggDecl.fields.size(); i+=1) {
-                var field = aggDecl.fields.get(i)
-                this.resolveFieldStmt(sym, field)
-            }
-
-            this.resolveStmt(aggDecl as (*Stmt))
-            sym.flags &= ~SymbolFlags.IS_INCOMPLETE
+            this.resolveAggregateDecl(aggDecl)
             break;
         }
-        case StmtKind.ENUM_DECL: 
+        case StmtKind.ENUM_DECL: {
+            var enumDecl = sym.decl as (*EnumDecl)
+            this.resolveEnumDecl(enumDecl)
+            break;
+        }
         case StmtKind.TYPEDEF_DECL: {
-            this.resolveStmt(sym.decl as (*Stmt))
-            sym.flags &= ~SymbolFlags.IS_INCOMPLETE
+            var typedefDecl = sym.decl as (*TypedefDecl)
+            this.resolveTypedefDecl(typedefDecl)
             break;
         }
-        case StmtKind.FUNC_DECL:
-        case StmtKind.CONST_DECL:
-        case StmtKind.VAR_DECL:
+        case StmtKind.FUNC_DECL: {            
+            var funcDecl = sym.decl as (*FuncDecl)
+            this.resolveFuncDecl(funcDecl)
             break;
+        }
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL: {
+            var varDecl = sym.decl as (*VarDecl)
+            sym.type = this.resolveValueDecl(varDecl)
+            sym.state = SymbolState.RESOLVED
+            break;
+        }
         default: {
             assert(false)
         }
     }
-}
-
-func (this: *TypeChecker) resolveFieldStmt(parentSym: *Symbol, field: FieldStmt) {
-    // TODO
 }
 
 func (this: *TypeChecker) getType(spec: *NameTypeSpec) : *Symbol {
@@ -543,82 +549,6 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
 
 err:
     return null
-}
-
-func (this: *TypeChecker) resolveFunc(sym: *Symbol) {
-    assert(sym.decl.kind == StmtKind.FUNC_DECL)
-
-    this.resolveSymbol(sym) // I don't think this is needed..
-
-    this.enterModule(sym.declared)
-    defer this.leaveModule()
-
-    sym.flags &= ~SymbolFlags.IS_INCOMPLETE
-    this.resolveStmt(sym.decl as (*Stmt))
-}
-
-func (this: *TypeChecker) resolveValue(sym: *Symbol) {
-    this.enterModule(sym.declared)
-    this.leaveModule()
-    switch(sym.kind) {
-        case SymbolKind.CONST: 
-        case SymbolKind.VAR: {
-            var varDecl = sym.decl as (*VarDecl)
-            sym.type = this.resolveValueDecl(varDecl)
-            sym.state = SymbolState.RESOLVED
-            sym.flags &= ~SymbolFlags.IS_INCOMPLETE
-
-            var sb= StringBufferInit(256, this.allocator)
-            sym.type.toString(sb)            
-            break;
-        }
-        default: {
-            assert(false)
-        }
-    }
-}
-
-func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {    
-    if(!decl.expr && decl.kind == StmtKind.CONST_DECL) {
-        if(!decl.hasNote("foreign")) {
-            this.result.addError(decl.startPos, "const declaration must have an assignment (unless it is '@foreign')")
-            return null
-        }
-    }
-    var declaredType: *TypeInfo = null
-    var inferredType: *TypeInfo = null
-
-    if(decl.typeSpec) {
-        declaredType = this.resolveTypeSpec(decl.typeSpec)
-    }
-
-    if(decl.expr) {
-        if(!this.resolveExpr(decl.expr)) {
-            return null
-        }
-
-        var op = decl.expr.operand
-        if(decl.expr.kind == StmtKind.ARRAY_INIT_EXPR || 
-           decl.expr.kind == StmtKind.INIT_EXPR) {
-            inferredType = op.typeInfo
-        }
-        else if(op.typeInfo.kind == TypeKind.NULL && declaredType == null) {
-            this.result.addError(decl.expr.startPos,
-                "invalid variable declaration, can't infer type from 'null' for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
-            return null
-        }
-        else {
-            inferredType = TypeDecay(op.typeInfo, this.allocator)
-        }
-
-        decl.expr.expectedType = declaredType ? declaredType : inferredType;
-    }
-
-    if(declaredType && inferredType) {        
-        this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)
-    }
-
-    return declaredType ? declaredType : inferredType
 }
 
 func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
