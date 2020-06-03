@@ -107,7 +107,7 @@ public func PrintError(error: PhaseError) {
         return;
     }
 
-    printf("Error at line %d in '%s'\n", error.pos.lineNumber, error.pos.filename)    
+    printf("error at line %d in '%s'\n", error.pos.lineNumber, error.pos.filename)    
     printf("%.*s\n", error.pos.getLineLength(), error.pos.lineStart)
     var spaceCount = 0
     while(true) {

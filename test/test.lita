@@ -48,6 +48,10 @@ func test() {
     var p = &x
     var pp = &10
     var pp2 = &a*/
-
+l4:
+    goto l2;
     var z:[2]f32 = (1+2)
+l2:
+    goto l3;
+    goto l4
 }

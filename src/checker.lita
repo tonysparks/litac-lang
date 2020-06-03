@@ -11,6 +11,7 @@ import "lex"
 import "state"
 import "map"
 import "string_buffer"
+import "string_view"
 import "array"
 import "assert"
 
@@ -20,6 +21,15 @@ import "libc"
 import "checker_decl"
 import "checker_expr"
 
+// max number of labels in a function scope -- this should be enough :S
+const MAX_LABELS = 256;
+const MAX_LABEL_NAME = 32;
+
+struct LabelInfo {
+    name: StringView
+    defined: bool
+    stmt: *Stmt
+}
 
 public struct TypeChecker {
     lita: using *Lita
@@ -34,6 +44,9 @@ public struct TypeChecker {
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
 
+    labels: [MAX_LABELS]LabelInfo;
+    numOfLabels: i32
+
     randomNameIndex: u32
 }
 
@@ -45,6 +58,9 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.pendingValues.init(64, lita.allocator)
     this.symbolTypes.init(64, lita.allocator)
     this.symbolFuncs.init(32, lita.allocator)
+
+    memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
+    this.numOfLabels = 0
 }
 
 public func (this: *TypeChecker) typeCheck(root: *Module) {
@@ -652,7 +668,29 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             return true
         }
         case StmtKind.GOTO_STMT: {
-            return false; // TODO
+            var gotoStmt = stmt as (*GotoStmt)
+            if(gotoStmt.label.type != TokenType.IDENTIFIER) {
+                return false
+            }
+
+            // check to see if the label has already been created
+            for(var i = 0; i < this.numOfLabels; i+=1) {
+                var label = &this.labels[i]
+                if(gotoStmt.label.str.equalsStringView(label.name)) {
+                    label.stmt = stmt
+                    return true
+                }
+            }
+
+            // other create it
+            var labelName = &this.labels[this.numOfLabels]
+            labelName.name = gotoStmt.label.str
+            labelName.stmt = stmt
+            labelName.defined = false
+
+            this.numOfLabels += 1
+            
+            return false;
         }
         case StmtKind.IF_STMT: {
             var ifStmt = stmt as (*IfStmt)
@@ -670,7 +708,31 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             return true
         }
         case StmtKind.LABEL_STMT: {
-            return false; // TODO
+            var labelStmt = stmt as (*LabelStmt)
+            if(labelStmt.label.type != TokenType.IDENTIFIER) {
+                return false
+            }
+
+            if(this.numOfLabels >= MAX_LABELS) {
+                this.result.addError(labelStmt.startPos, "max number of labels reached")
+                return false
+            }
+
+            for(var i = 0; i < this.numOfLabels; i+=1) {
+                var label = &this.labels[i]                
+                if(labelStmt.label.str.equalsStringView(label.name)) {
+                    label.defined = true
+                    return true
+                }
+            }
+
+            var labelName = &this.labels[this.numOfLabels]
+            labelName.name = labelStmt.label.str
+            labelName.defined = true
+            labelName.stmt = null
+
+            this.numOfLabels += 1
+            return true;
         }
         case StmtKind.MODULE_STMT: {
             return true;
@@ -715,13 +777,10 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true;
         }
-        case StmtKind.STRUCT_FIELD_STMT:{
-            return false; // TODO
-        }
         case StmtKind.SWITCH_CASE_STMT: {
             var caseStmt = stmt as (*SwitchCaseStmt)
-            this.resolveExpr(caseStmt.cond)            
-            this.resolveStmt(caseStmt.body)            
+            this.resolveExpr(caseStmt.cond)
+            this.resolveStmt(caseStmt.body)
             return true
         }
         case StmtKind.SWITCH_STMT:{
@@ -735,6 +794,9 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 this.resolveStmt(switchStmt.defaultStmt)
             }
             return true
+        }
+        case StmtKind.STRUCT_FIELD_STMT:{
+            return false; // TODO
         }
         case StmtKind.UNION_FIELD_STMT:{
             return false; // TODO

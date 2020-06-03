@@ -9,6 +9,7 @@ import "state"
 import "map"
 import "string_buffer"
 import "array"
+import "string_view"
 import "assert"
 
 import "ast_print"
@@ -105,28 +106,21 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
     return declaredType ? declaredType : inferredType
 }
 
-func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {
-    // TODO
-    return false
-}
-
-public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
+func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, fieldName: StringView, index: i32) : bool {
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
-        var field = aggDecl.fields.get(i)
-        this.checkAggregateFieldDuplicate(aggDecl, field, i)
+        if(index == i) {
+            continue
+        }
 
+        var field = aggDecl.fields.get(i)
         switch(field.kind) {
             case StmtKind.VAR_FIELD_STMT: {
                 var varField = field.varField
-                field.typeInfo = this.resolveTypeSpec(varField.type)
-                if(!field.typeInfo) {
-                    return false
-                }
-                if(varField.defaultExpr) {
-                    if(!this.resolveExpr(varField.defaultExpr)) {
-                        return false
+                if(varField.fieldName.type == TokenType.IDENTIFIER) {
+                    if(varField.fieldName.str.equalsStringView(fieldName)) {
+
                     }
-                }                
+                }
                 break;
             }
             case StmtKind.ENUM_FIELD_STMT: {
@@ -158,6 +152,79 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 }
 
                 field.typeInfo = sym.type
+                break;
+            }
+            case StmtKind.POISON_EXPR: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+    return true
+}
+
+public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
+    for(var i = 0; i < aggDecl.fields.size(); i+=1) {
+        var field = aggDecl.fields.get(i)
+
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_STMT: {
+                var varField = field.varField
+                field.typeInfo = this.resolveTypeSpec(varField.type)
+                if(!field.typeInfo) {
+                    return false
+                }
+                if(varField.defaultExpr) {
+                    if(!this.resolveExpr(varField.defaultExpr)) {
+                        return false
+                    }
+                }
+                this.checkAggregateFieldDuplicate(aggDecl, varField.fieldName.str, i)
+                break;
+            }
+            case StmtKind.ENUM_FIELD_STMT: {
+                var sym = this.createDeclSymbol(field.enumField)
+                if(!sym) {
+                    return false
+                }
+                sym.flags |= SymbolFlags.IS_INCOMPLETE
+                this.resolveSymbol(sym)
+
+                if(!this.resolveEnumDecl(field.enumField)) {
+                    return false
+                }
+
+                field.typeInfo = sym.type
+                if(field.enumField.name.type == TokenType.IDENTIFIER) {
+                    this.checkAggregateFieldDuplicate(aggDecl, field.enumField.name.str, i)
+                }
+                break;
+            }
+            case StmtKind.UNION_FIELD_STMT:
+            case StmtKind.STRUCT_FIELD_STMT: {
+                var sym = this.createDeclSymbol(field.aggregateField)
+                if(!sym) {
+                    return false
+                }
+                sym.flags |= SymbolFlags.IS_INCOMPLETE
+                this.resolveSymbol(sym)
+
+                if(!this.resolveAggregateDecl(field.aggregateField)) {
+                    return false
+                }
+
+                field.typeInfo = sym.type
+                if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
+                    this.checkAggregateFieldDuplicate(aggDecl, field.aggregateField.name.str, i)
+                }
+                else {
+                    for(var i = 0; i < field.aggregateField.fields.size(); i+=1) {
+                        var anonymousField = field.aggregateField.fields.get(i)
+                        // TODO
+                    }
+                }
                 break;
             }
             case StmtKind.POISON_EXPR: {
@@ -204,6 +271,16 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
     return true
 }
 
+func (this: *TypeChecker) checkLabels() {
+    for(var i = 0; i < this.numOfLabels; i+=1) {
+        var label = &this.labels[i]
+        if(!label.defined) {
+            assert(label.stmt != null)
+            this.result.addError(label.stmt.startPos, "'%.*s' label was not found", label.name.length, label.name.buffer)
+        }
+    }
+}
+
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     this.enterModule(funcDecl.sym.declared)
     defer this.leaveModule()
@@ -217,8 +294,9 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         this.currentFuncDecl = funcDecl.sym.type as (*FuncTypeInfo)
         defer this.currentFuncDecl = null
 
-        // TODO Handle goto labels
+        this.numOfLabels = 0
         this.resolveStmt(funcDecl.body)
+        this.checkLabels()
     }
 
     return true
