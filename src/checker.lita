@@ -643,12 +643,6 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.EMPTY_STMT: {
             return true;
         }
-        case StmtKind.ENUM_FIELD_ENTRY_STMT: {
-            return false; // TODO
-        }
-        case StmtKind.ENUM_FIELD_STMT:{
-            return false; // TODO
-        }
         case StmtKind.FOR_STMT: {
             var forStmt = stmt as (*ForStmt)
             this.pushScope(&Scope{})
@@ -795,14 +789,15 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true
         }
-        case StmtKind.STRUCT_FIELD_STMT:{
-            return false; // TODO
-        }
-        case StmtKind.UNION_FIELD_STMT:{
-            return false; // TODO
-        }
+        case StmtKind.ENUM_FIELD_STMT: 
+            // handled in resolveEnumDecl
+        case StmtKind.ENUM_FIELD_ENTRY_STMT:
+        case StmtKind.STRUCT_FIELD_STMT:
+        case StmtKind.UNION_FIELD_STMT:
         case StmtKind.VAR_FIELD_STMT:{
-            return false; // TODO
+            // handled in the resolveAggregateDecl 
+            assert(false)
+            return false;
         }
         case StmtKind.WHILE_STMT: {
             var whileStmt = stmt as (*WhileStmt)
