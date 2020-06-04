@@ -106,7 +106,65 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
     return declaredType ? declaredType : inferredType
 }
 
+func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {
+    switch(field.kind) {
+        case StmtKind.VAR_FIELD_STMT: {
+            var varField = field.varField
+            if(varField.fieldName.type != TokenType.IDENTIFIER) {
+                break
+            }
+
+            this.checkAggregateFieldDuplicate(aggDecl, varField.fieldName.str, index)
+            break;
+        }
+        case StmtKind.ENUM_FIELD_STMT: {
+            var enumField = field.enumField
+            if(enumField.name.type != TokenType.IDENTIFIER) {
+                break
+            }
+            this.checkAggregateFieldDuplicate(aggDecl, enumField.name.str, index)
+            break;
+        }
+        case StmtKind.UNION_FIELD_STMT:
+        case StmtKind.STRUCT_FIELD_STMT: {
+            var aggField = field.aggregateField
+            if(aggField.name.type == TokenType.IDENTIFIER) {
+                this.checkAggregateFieldDuplicate(aggDecl, aggField.name.str, index)
+                break;
+            }
+            else if(aggField.name.type == TokenType.VOID) {
+                for(var j = 0; j < aggField.fields.size(); j+=1) {
+                    var anonymousField = aggField.fields.get(j)
+                    this.checkAnonAggregateFieldDuplicate(aggDecl, anonymousField, index)
+                }
+            }
+            break;
+        }
+        case StmtKind.POISON_EXPR: {
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+
+    return true
+}
+
+func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
+    if(aggDecl.name.str.length) {
+        this.result.addError(pos, "duplicate member '%.*s' in '%.*s'", 
+                                        fieldName.length, fieldName.buffer, 
+                                        aggDecl.name.str.length, aggDecl.name.str.buffer)
+    }
+    else {
+        this.result.addError(pos, "duplicate member '%.*s'", 
+                                fieldName.length, fieldName.buffer)
+    }
+}
+
 func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, fieldName: StringView, index: i32) : bool {
+    var isValid = true;
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         if(index == i) {
             continue
@@ -116,42 +174,40 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
         switch(field.kind) {
             case StmtKind.VAR_FIELD_STMT: {
                 var varField = field.varField
-                if(varField.fieldName.type == TokenType.IDENTIFIER) {
-                    if(varField.fieldName.str.equalsStringView(fieldName)) {
-
-                    }
+                if(varField.fieldName.type != TokenType.IDENTIFIER) {
+                    continue
                 }
+
+                if(varField.fieldName.str.equalsStringView(fieldName)) {
+                    this.errorDuplicateMember(aggDecl, fieldName, varField.startPos)
+                    isValid = false
+                }
+                
                 break;
             }
             case StmtKind.ENUM_FIELD_STMT: {
-                var sym = this.createDeclSymbol(field.enumField)
-                if(!sym) {
-                    return false
+                var enumField = field.enumField
+                if(enumField.name.type != TokenType.IDENTIFIER) {
+                    continue
                 }
-                sym.flags |= SymbolFlags.IS_INCOMPLETE
-                this.resolveSymbol(sym)
-
-                if(!this.resolveEnumDecl(field.enumField)) {
-                    return false
+                if(enumField.name.str.equalsStringView(fieldName)) {
+                    this.errorDuplicateMember(aggDecl, fieldName, enumField.startPos)
+                    isValid = false
                 }
-
-                field.typeInfo = sym.type
                 break;
             }
             case StmtKind.UNION_FIELD_STMT:
             case StmtKind.STRUCT_FIELD_STMT: {
-                var sym = this.createDeclSymbol(field.aggregateField)
-                if(!sym) {
-                    return false
+                var aggField = field.aggregateField
+                if(aggField.name.type == TokenType.IDENTIFIER) {
+                    if(aggField.name.str.equalsStringView(fieldName)) {
+                        this.errorDuplicateMember(aggDecl, fieldName, aggField.startPos)
+                        isValid = false
+                    }
                 }
-                sym.flags |= SymbolFlags.IS_INCOMPLETE
-                this.resolveSymbol(sym)
-
-                if(!this.resolveAggregateDecl(field.aggregateField)) {
-                    return false
+                else if(aggField.name.type == TokenType.VOID) {
+                    this.checkAggregateFieldDuplicate(aggField, fieldName, -1)
                 }
-
-                field.typeInfo = sym.type
                 break;
             }
             case StmtKind.POISON_EXPR: {
@@ -162,7 +218,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
             }
         }
     }
-    return true
+    return isValid
 }
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
@@ -192,10 +248,6 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
 
-                if(!this.resolveEnumDecl(field.enumField)) {
-                    return false
-                }
-
                 field.typeInfo = sym.type
                 if(field.enumField.name.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.enumField.name.str, i)
@@ -211,18 +263,14 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
 
-                if(!this.resolveAggregateDecl(field.aggregateField)) {
-                    return false
-                }
-
                 field.typeInfo = sym.type
                 if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.aggregateField.name.str, i)
                 }
                 else {
-                    for(var i = 0; i < field.aggregateField.fields.size(); i+=1) {
-                        var anonymousField = field.aggregateField.fields.get(i)
-                        // TODO
+                    for(var j = 0; j < field.aggregateField.fields.size(); j+=1) {
+                        var anonymousField = field.aggregateField.fields.get(j)
+                        this.checkAnonAggregateFieldDuplicate(aggDecl, anonymousField, i)
                     }
                 }
                 break;

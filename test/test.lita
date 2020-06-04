@@ -10,6 +10,22 @@ func test2<  (x: bool, ...) : i32 {
 //var x:bool = "hi"
 //var y = null
 
+struct Person {
+    name: *const char
+    age: i32
+
+    struct Employer {
+        name: *const char
+        struct {
+            age: f32
+        }
+        age: i64
+    }
+/*
+    struct {
+        //name: i32
+    }*/
+}
 
 func test() {
     //var y = x
@@ -48,10 +64,11 @@ func test() {
     var p = &x
     var pp = &10
     var pp2 = &a*/
+    /*
 l4:
     goto l2;
     var z:[2]f32 = (1+2)
 l2:
     goto l3;
-    goto l4
+    goto l4*/
 }

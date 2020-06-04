@@ -14,7 +14,7 @@ import "string_buffer"
 import "string_view"
 import "array"
 import "assert"
-
+import "string"
 import "ast_print"
 import "libc"
 
@@ -190,17 +190,20 @@ func (this: *TypeChecker) popScope() {
 
 
 func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
-    printf("Creating Decl: ")
-    PrintName(decl.name)
-    printf("\n")
+    assert(decl != null)
+    assert(!decl.sym)
 
     var name:[MAX_SYMBOL_NAME]char;
     if(decl.name.type == TokenType.IDENTIFIER) {
         decl.name.str.copyTo(name, MAX_SYMBOL_NAME)
     }
     else {
-        // TODO: Generate a random name
+        var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+        nameStr.format("anon_%d", this.randomNameIndex)
+        this.randomNameIndex+=1
     }
+
+    printf("Creating Decl: %s\n", name)
 
     var sym: *Symbol = null
     if(decl.kind != StmtKind.FUNC_DECL) {
