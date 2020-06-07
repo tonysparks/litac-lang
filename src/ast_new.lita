@@ -619,7 +619,7 @@ public func NewOffsetOfExpr(startPos: SrcPos,
                           field: Token,
                           allocator: *const Allocator) : *Expr {
     var expr = new<OffsetOfExpr>(allocator)
-    expr.kind = StmtKind.TYPE_OF_EXPR
+    expr.kind = StmtKind.OFFSET_OF_EXPR
     expr.startPos = startPos
     expr.endPos = endPos    
     expr.type = type

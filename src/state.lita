@@ -5,6 +5,7 @@ import "map"
 import "module"
 import "string_view"
 import "system"
+import "symbols"
 
 public struct Lita {
     allocator: *const Allocator // TODO proper arena allocator
@@ -16,8 +17,11 @@ public struct Lita {
     totalAllocations: u32
 
     options: *LitaOptions
+
+    programSymbols: ProgramSymbols
 }
 
+@asStr
 public enum MetricType {
     PARSING,
     TYPE_CHECKING,
@@ -42,12 +46,16 @@ public struct LitaOptions {
     litaPath: [MAX_PATH]char       // the LITAC_HOME environment variable for standard lita modules
 
     inputFile: [MAX_PATH]char      // the input source file
+
+    checkerOnly: bool              // only do the checker
+    cOutputOnly: bool              // generates C file only, does not compile it
+    run: bool                      // runs after successful compilation
+    showProfileInfo: bool          // outputs profiling information
 }
 
 var linearAllocator = LinearAllocator{}
 
 public func LitaInit(options: *LitaOptions) : Lita {    
-    //debugAllocator.init()
     var size: usize = 1024 * 1024 * 500;
     linearAllocator.init(defaultAllocator.alloc(size), size)
 
@@ -55,7 +63,7 @@ public func LitaInit(options: *LitaOptions) : Lita {
         .allocator = (&linearAllocator) as (*const Allocator),
         .options = options,
         .totalSourceLines = 0,
-        .totalAllocations = 0,
+        .totalAllocations = 0,        
         
     }
     c.result = PhaseResultInit(c.allocator)

@@ -1,0 +1,44 @@
+import "ast"
+import "string_buffer"
+import "types"
+import "module"
+import "symbols"
+import "state"
+import "phase_result"
+import "lex"
+import "libc"
+import "array"
+import "common"
+import "assert"
+import "cgen"
+
+public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
+    assert(decl.sym != null)
+
+    if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
+        return;
+    }
+
+    this.emitLineInfo(decl.stmt)
+
+    if(decl.sym.flags & SymbolFlags.IS_CONSTANT) {
+        // TODO: check if primitive expr
+        assert(decl.expr != null)
+        buf.append("#define ")
+        this.emitCName(decl.sym)
+
+        buf.append(" (")
+        this.emitStmt(decl.expr)
+        buf.append(")\n")
+
+        // TODO pop/undef if not a globa
+    }
+    else {
+        this.emitTypeDeclForC(decl.sym, decl.sym.name)
+        if(decl.expr) {
+            buf.append(" = ")
+            this.emitStmt(decl.expr)
+        }
+        buf.append(";\n")
+    }
+}

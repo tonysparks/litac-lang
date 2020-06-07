@@ -1,0 +1,921 @@
+import "ast"
+import "string_buffer"
+import "types"
+import "module"
+import "symbols"
+import "state"
+import "phase_result"
+import "lex"
+import "libc"
+import "array"
+import "common"
+import "assert"
+
+import "cgen_decl"
+
+public struct CGen {
+    lita: *Lita
+    buf: StringBuffer
+}
+
+public func (this: *CGen) init(lita: *Lita) {
+    this.lita = lita
+    this.buf.init(4096, lita.allocator)
+}
+
+public func (this: using *CGen) emitProgram(module: *Module) {
+    assert(module != null)
+    assert(module.ast != null)
+
+    this.emitForward()
+    this.emitPrimitiveConstDecls()
+    this.emitForwardDecls()
+
+    buf.append("\n// translated code begins\n")
+    this.emitStmt(module.ast)
+}
+
+func (this: using *CGen) emitForward() {
+    this.buf.append(
+"""
+// Generated on %s
+""", "'TODO insert date'")
+}
+
+func (this: using *CGen) emitPrimitiveConstDecls() {
+    var program = &this.lita.programSymbols
+    for(var i = 0; i < program.values.size(); i += 1) {
+        var sym = program.values.get(i)
+
+        if(!(sym.flags & SymbolFlags.IS_CONSTANT)) {
+            continue
+        }
+
+        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+            continue
+        }
+
+        if(!IsPrimitive(sym.type)) {
+            continue
+        }
+
+        this.emitVarDecl(sym.decl as (*VarDecl))
+    }
+}
+
+func (this: using *CGen) emitForwardDecls() {
+    var program = &this.lita.programSymbols
+    for(var i = 0; i < program.symbolTypes.size(); i += 1) {
+        var sym = program.symbolTypes.get(i)
+        this.emitTypeForwardDecl(sym)
+    }
+}
+
+func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
+    var decl = sym.decl
+
+    if(sym.flags & SymbolFlags.IS_FOREIGN) {
+        return;
+    }
+
+    switch(decl.kind) {
+        case StmtKind.VAR_DECL:
+        case StmtKind.CONST_DECL:
+        case StmtKind.FUNC_DECL:
+            this.buf.append("~~ %s;\n", sym.name)
+            break;
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL: {
+            this.buf.append("struct %s;\n", sym.name)
+            break;
+        }
+        case StmtKind.ENUM_DECL: {
+            this.buf.append("enum %s;\n", sym.name)
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+}
+
+func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
+    // TODO
+}
+
+/**
+    Outputs a type declaration in C for the supplied symbol
+*/
+func (this: using *CGen) emitTypeDeclForC(sym: *Symbol, name: *const char) {
+    // TODO
+    buf.append("%s", name)
+}
+
+/**
+    Outputs the C name for the symbol
+*/    
+func (this: using *CGen) emitCName(sym: *Symbol) {
+    // TODO
+    buf.append("%s", sym.name)
+}
+
+func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
+    assert(spec != null)
+
+    switch(spec.kind) {
+        case TypeSpecKind.NONE: {
+            return;
+        }
+        case TypeSpecKind.ARRAY: {
+            var array = spec as (*ArrayTypeSpec)
+            buf.append("[");
+            if(array.numElements) {
+                this.emitStmt(array.numElements)
+            }
+            buf.append("]");
+            this.emitTypeSpec(array.base)
+            return;
+        }
+        case TypeSpecKind.PTR: {
+            var ptr = spec as (*PtrTypeSpec)
+            buf.append("*");
+            this.emitTypeSpec(ptr.base)
+            return;
+        }
+        case TypeSpecKind.CONST: {
+            var c = spec as (*ConstTypeSpec)
+            buf.append("const ");
+            this.emitTypeSpec(c.base)
+            return;
+        }
+        case TypeSpecKind.NAME: {
+            var name = spec as (*NameTypeSpec)
+            buf.append("%s", name.name)
+            if(!name.genericArgs.empty()) {
+                buf.append("<")
+                for(var i = 0; i < name.genericArgs.size(); i += 1) {
+                    if(i > 0) buf.append(",")
+                    this.emitTypeSpec(name.genericArgs.get(i))
+                }
+                buf.append(">")
+            }
+            return;
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            var fn = spec as (*FuncPtrTypeSpec)
+            buf.append("func")
+            if(!fn.genericParams.empty()) {
+                buf.append("<")
+                for(var i = 0; i < fn.genericParams.size(); i += 1) {
+                    if(i > 0) buf.append(",")
+                    this.emitName(fn.genericParams.get(i).name)
+                }
+                buf.append(">")
+            }
+            buf.append("(")
+            for(var i = 0; i < fn.args.size(); i += 1) {
+                if(i > 0) buf.append(",")
+                this.emitTypeSpec(fn.args.get(i))
+            }
+            buf.append(") : ")
+            this.emitTypeSpec(fn.ret)
+            return;
+        }
+        default: {
+            Panic("Invalid TypeSpecKind: '%d'\n", spec.kind)
+        }
+    }
+}
+
+func (this: using *CGen) emitName(tok: Token) {
+    if(tok.type != TokenType.ERROR) {        
+        buf.append("%.*s", tok.value.str.length, tok.value.str.buffer)
+    }
+}
+
+func (this: using *CGen) emit(indent: i32, format: *const char, ...) {
+    for(var i = 0; i < indent; i += 1) {
+        buf.append("    ");
+    }
+
+    var args: va_list;
+    va_start(args, format);    
+    buf.appendArgs(format, args)
+    va_end(args)
+}
+
+func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
+    if(!s) return;
+
+    switch(s.kind) {
+        case StmtKind.IMPORT_DECL: {
+            var decl = s as (*ImportDecl)
+            this.emit(0, "import '")
+            this.emitName(decl.name)
+            buf.append("'")
+            if(decl.alias.type == TokenType.IDENTIFIER) {
+                this.emit(0, " as ")
+                this.emitName(decl.alias)
+            }            
+            return;
+        }
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL: {
+            var decl = s as (*VarDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    this.emitStmt(decl.attributes.notes.get(i), indent)
+                    buf.append("\n")
+                }
+            }
+
+            if(decl.kind == StmtKind.CONST_DECL) {
+                this.emit(indent, "const ")
+            }
+            else {
+                this.emit(indent, "var ")
+            }
+            this.emitName(decl.name)
+            if(decl.typeSpec != null) {
+                buf.append(": ")
+                this.emitTypeSpec(decl.typeSpec)
+            }
+            if(decl.expr != null) {
+                buf.append(" = ")
+                this.emitStmt(decl.expr)
+            }
+            buf.append(";")
+            return;
+        }
+        case StmtKind.STRUCT_DECL: {
+            var decl = s as (*AggregateDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    this.emitStmt(decl.attributes.notes.get(i), indent)
+                    buf.append("\n")
+                }
+            }
+
+            this.emit(indent, "")
+            if(decl.attributes.isPublic) {
+                buf.append("public ")
+            }            
+            buf.append("struct ")
+            this.emitName(decl.name)
+            if(!decl.genericParams.empty()) {
+                buf.append("<")
+                for(var i = 0; i < decl.genericParams.size(); i += 1) {
+                    if(i > 0) buf.append(",")
+                    var t = decl.genericParams.get(i).name                    
+                    buf.append("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                buf.append(">")
+            }
+            buf.append(" {\n")
+            for(var i = 0; i < decl.fields.size(); i+=1) {
+                var field = decl.fields.get(i)
+                switch(field.kind) {
+                    case StmtKind.ENUM_FIELD_STMT: {
+                        this.emitStmt(field.enumField as (*Stmt), indent+1)
+                        break;
+                    }
+                    case StmtKind.STRUCT_FIELD_STMT: 
+                    case StmtKind.UNION_FIELD_STMT: {
+                        this.emitStmt(field.aggregateField as (*Stmt), indent+1)
+                        break;
+                    }
+                    case StmtKind.VAR_FIELD_STMT: {
+                        this.emitStmt(field.varField, indent+1)
+                        break;
+                    }
+                    default:{}
+                }
+                buf.append("\n")
+            }
+            this.emit(indent, "}")
+            return;
+        }
+        case StmtKind.UNION_DECL: {
+            var decl = s as (*AggregateDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    this.emitStmt(decl.attributes.notes.get(i), indent)
+                    buf.append("\n")
+                }
+            }
+
+            this.emit(indent, "")
+            if(decl.attributes.isPublic) {
+                buf.append("public ")
+            }            
+            buf.append("union ")
+            this.emitName(decl.name)
+            if(!decl.genericParams.empty()) {
+                buf.append("<")
+                for(var i = 0; i < decl.genericParams.size(); i += 1) {
+                    if(i > 0) buf.append(",")
+                    var t = decl.genericParams.get(i).name                    
+                    buf.append("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                buf.append(">")
+            }
+            buf.append(" {\n")
+            for(var i = 0; i < decl.fields.size(); i+=1) {
+                var field = decl.fields.get(i)
+                switch(field.kind) {
+                    case StmtKind.ENUM_FIELD_STMT: {
+                        this.emitStmt(field.enumField as (*Stmt), indent+1)
+                        break;
+                    }
+                    case StmtKind.STRUCT_FIELD_STMT: 
+                    case StmtKind.UNION_FIELD_STMT: {
+                        this.emitStmt(field.aggregateField as (*Stmt), indent+1)
+                        break;
+                    }
+                    case StmtKind.VAR_FIELD_STMT: {
+                        this.emitStmt(field.varField, indent+1)
+                        break;
+                    }
+                    default:{}
+                }
+                buf.append("\n")
+            }
+            this.emit(indent, "}")
+            return;
+        }
+        case StmtKind.ENUM_DECL: {
+            var decl = s as (*EnumDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    this.emitStmt(decl.attributes.notes.get(i), indent)
+                    buf.append("\n")
+                }
+            }
+
+            this.emit(indent, "")
+            if(decl.attributes.isPublic) {
+                buf.append("public ")
+            }        
+            buf.append("enum ")
+            this.emitName(decl.name)        
+            buf.append(" {\n")
+            for(var i = 0; i < decl.fields.size(); i+=1) {
+                var field = decl.fields.get(i)
+                this.emitStmt(field, indent+1)
+                buf.append(",\n")
+            }
+            this.emit(indent, "}")
+            return;
+        }
+        case StmtKind.FUNC_DECL: {
+            var decl = s as (*FuncDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    this.emitStmt(decl.attributes.notes.get(i), indent)
+                    buf.append("\n")
+                }
+            }
+
+            this.emit(indent, "")
+            if(decl.attributes.isPublic) {
+                buf.append("public ")
+            }            
+            buf.append("func ")
+            this.emitName(decl.name)
+            if(!decl.genericParams.empty()) {
+                buf.append("<")
+                for(var i = 0; i < decl.genericParams.size(); i += 1) {
+                    if(i > 0) buf.append(",")                    
+                    var t = decl.genericParams.get(i).name                    
+                    buf.append("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                buf.append(">")
+            }
+            buf.append("(")
+            if(decl.params) {
+                this.emitStmt(decl.params)
+            }
+            buf.append(")")
+            if(decl.returnType) {
+                buf.append(" : ")
+                this.emitTypeSpec(decl.returnType)
+            }
+            if(decl.body) {
+                buf.append("\n")
+                //buf.append(indent, " {\n")
+                this.emitStmt(decl.body, indent)
+                //buf.append(indent, "}")
+            }
+            return;
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            var decl = s as (*TypedefDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    this.emitStmt(decl.attributes.notes.get(i), indent)
+                    buf.append("\n")
+                }
+            }
+
+            this.emit(indent, "")
+            if(decl.attributes.isPublic) {
+                buf.append("public ")
+            }
+            buf.append("typedef ")
+            this.emitTypeSpec(decl.type)
+            buf.append(" as ")
+            this.emitName(decl.name)
+            return;
+        }
+        case StmtKind.PARAM_DECL: {
+            var decl = s as (*ParameterDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    this.emitStmt(decl.attributes.notes.get(i), 0)
+                    buf.append("\n")
+                }
+            }
+
+            this.emitName(decl.name)
+            buf.append(": ")
+            this.emitTypeSpec(decl.type)
+            if(decl.defaultExpr) {
+                buf.append(" = ")
+                this.emitStmt(decl.defaultExpr)
+            }
+            return;
+        }
+        /*
+        case StmtKind.NATIVE_DECL: {
+            // var decl = new<NativeDecl>(allocator)
+            // decl.kind = StmtKind.NATIVE_DECL;
+            // decl.startPos = startPos
+            // decl.type = null
+            // return decl as (*Stmt)
+            return;
+        }*/
+        case StmtKind.POISON_DECL: {
+            buf.append("<poison_decl>")
+            return;
+        }
+
+        case StmtKind.BLOCK_STMT: {
+            var stmt = s as (*BlockStmt)
+            this.emit(indent-1, "{\n")
+            for(var i = 0; i < stmt.stmts.size(); i += 1) {
+                var n = stmt.stmts.get(i)
+                this.emitStmt(n, indent+1)
+                if(IsExpr(n)) {
+                    buf.append(";\n")
+                }
+                else {
+                    buf.append("\n")
+                }
+            }
+            buf.append("\n")
+            this.emit(indent-1, "}")
+            return;
+        }
+        case StmtKind.BREAK_STMT: {
+            var stmt = s as (*BreakStmt)
+            this.emit(indent, "break")
+            return;
+        }/*
+        case StmtKind.COMP_STMT: {
+            // var stmt = new<CompStmt>(allocator)
+            // stmt.kind = StmtKind.COMP_STMT;
+            // stmt.startPos = startPos
+            // stmt.type = null
+            // stmt.expr = null
+            // stmt.body.init(16, allocator)
+            // stmt.end = null
+            // stmt.evaluatedStmt = null
+            // return stmt as (*Stmt)
+        }*/
+        case StmtKind.CONTINUE_STMT: {            
+            var stmt = s as (*ContinueStmt)
+            this.emit(indent, "continue")
+            return;
+        }
+        case StmtKind.DEFER_STMT: {            
+            var stmt = s as (*DeferStmt)
+            this.emit(indent, "defer ")
+            this.emitStmt(stmt.deferedStmt, indent)
+            return;
+        }
+        case StmtKind.DO_WHILE_STMT: {            
+            var stmt = s as (*DoWhileStmt)
+            this.emit(indent, "do\n")
+            this.emitStmt(stmt.body, indent+1)
+            this.emit(indent, "\nwhile(")
+            this.emitStmt(stmt.cond, 0)
+            buf.append(")")
+            return;
+        }
+        case StmtKind.EMPTY_STMT: {
+            buf.append("\n")
+            return;
+        }
+        case StmtKind.ENUM_FIELD_ENTRY_STMT: {
+            var stmt = s as (*EnumFieldEntryStmt)
+            this.emit(indent, "")
+            this.emitName(stmt.fieldName)
+            if(stmt.value) {
+                buf.append(" = ")
+                this.emitStmt(stmt.value, 0)
+            }
+            return;
+        }/*
+        case StmtKind.ENUM_FIELD_STMT: {
+            var stmt = s as (*EnumDecl)
+            this.emitStmt(stmt)
+            return;
+            
+        }*/
+        case StmtKind.FOR_STMT: {
+            var stmt = s as (*ForStmt)
+            this.emit(indent, "for(")
+            if(stmt.init) {
+                this.emitStmt(stmt.init, 0)
+            }
+            buf.append(";")
+            if(stmt.cond) {
+                this.emitStmt(stmt.cond, 0)
+            }
+            buf.append(";")
+            if(stmt.post) {
+                this.emitStmt(stmt.post, 0)
+            }
+            buf.append(")\n")
+            if(stmt.body) {
+                this.emitStmt(stmt.body, indent+1)
+            }
+            return;
+        }
+        case StmtKind.FUNC_BODY_STMT: {
+            var stmt = s as (*FuncBodyStmt)
+            this.emit(indent-1, "{\n")
+            for(var i = 0; i < stmt.stmts.size(); i += 1) {
+                var n = stmt.stmts.get(i)
+                this.emitStmt(n, indent+1)
+                if(IsExpr(n)) {
+                    buf.append(";\n")
+                }
+                else {
+                    buf.append("\n")
+                }
+            }
+            buf.append("\n")
+            this.emit(indent-1, "}")
+            return;
+        }
+        case StmtKind.GOTO_STMT: {
+            var stmt = s as (*GotoStmt)
+            this.emit(indent, "goto ")
+            this.emitName(stmt.label)
+            return;
+        }
+        case StmtKind.IF_STMT: {
+            var stmt = s as (*IfStmt)
+            this.emit(indent, "if(")
+            this.emitStmt(stmt.cond, 0)
+            buf.append(") \n")
+            this.emitStmt(stmt.then, indent+1)
+            buf.append("\n")
+            if(stmt.elseStmt) {
+                
+                this.emit(indent, "else \n")                
+                this.emitStmt(stmt.elseStmt, indent+1)                
+            }
+            buf.append("\n")
+            return;
+        }
+        case StmtKind.LABEL_STMT: {
+            var stmt = s as (*LabelStmt)
+            buf.append(":")
+            this.emitName(stmt.label)
+            return;
+        }
+        case StmtKind.MODULE_STMT: {
+            var stmt = s as (*ModuleStmt)
+            for(var i = 0; i < stmt.imports.size(); i += 1) {
+                this.emitStmt(stmt.imports.get(i) as (*Stmt))
+                buf.append("\n")
+            }
+
+            buf.append("\n")
+
+            for(var i = 0; i < stmt.notes.size(); i += 1) {
+                this.emitStmt(stmt.notes.get(i))
+                buf.append(";\n")
+            }
+
+            buf.append("\n")
+
+            for(var i = 0; i < stmt.declarations.size(); i += 1) {                
+                this.emitStmt(stmt.declarations.get(i) as (*Stmt))
+                buf.append("\n")
+                buf.append("\n")
+            }
+
+            buf.append("\n")
+            return;
+        }
+        case StmtKind.NOTE_STMT: {
+            var stmt = s as (*NoteStmt)
+            this.emit(indent, "@")
+            this.emitName(stmt.name)
+            if(!stmt.attributes.empty()) {
+                buf.append("(")
+                for(var i = 0; i < stmt.attributes.size(); i += 1) {
+                    if(i > 0) buf.append(", ")
+                    buf.append("'")
+                    this.emitName(stmt.attributes.get(i))
+                    buf.append("'")
+                }
+                buf.append(")")
+            }
+            return;
+        }
+        case StmtKind.PARAMETERS_STMT: {
+            var stmt = s as (*ParametersStmt)
+            for(var i = 0; i < stmt.params.size(); i += 1) {
+                if(i>0) buf.append(", ")
+                this.emitStmt(stmt.params.get(i) as (*Stmt), 0)
+            }
+            return;
+        }
+        case StmtKind.RETURN_STMT: {
+            var stmt = s as (*ReturnStmt)
+            this.emit(indent, "return");
+            if(stmt.expr) {
+                buf.append(" ")
+                this.emitStmt(stmt.expr, 0)
+            }
+            return;
+        }/*
+        case StmtKind.STRUCT_FIELD_STMT: {
+            var stmt = new<AggregateFieldStmt>(allocator)
+            stmt.kind = StmtKind.STRUCT_FIELD_STMT;
+            stmt.startPos = startPos
+            stmt.decl = null
+            return stmt as (*Stmt)
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            var stmt = new<SwitchCaseStmt>(allocator)
+            stmt.kind = StmtKind.SWITCH_CASE_STMT;
+            stmt.startPos = startPos
+            stmt.cond = null
+            stmt.body = null
+            return stmt as (*Stmt)
+        }
+        case StmtKind.SWITCH_STMT: {
+            var stmt = new<SwitchStmt>(allocator)
+            stmt.kind = StmtKind.SWITCH_STMT;
+            stmt.startPos = startPos
+            stmt.cond = null
+            stmt.stmts.init(16, allocator)
+            stmt.defaultStmt = null
+            return stmt as (*Stmt)
+        }
+        case StmtKind.UNION_FIELD_STMT: {
+            var stmt = new<AggregateFieldStmt>(allocator)
+            stmt.kind = StmtKind.UNION_FIELD_STMT;
+            stmt.startPos = startPos
+            stmt.decl = null
+            return stmt as (*Stmt)
+        }*/
+        case StmtKind.VAR_FIELD_STMT: {
+            var stmt = s as (*VarFieldStmt)
+            if(!stmt.attributes.notes.empty()) {
+                for(var i = 0; i < stmt.attributes.notes.size(); i += 1) {
+                    this.emitStmt(stmt.attributes.notes.get(i), indent)
+                    buf.append("\n")
+                }
+            }
+            this.emit(indent, "")
+            this.emitName(stmt.fieldName)
+            buf.append(": ")
+            this.emitTypeSpec(stmt.type)
+            return;
+        }
+        case StmtKind.WHILE_STMT: {
+            var stmt = s as (*WhileStmt)            
+            this.emit(indent, "while(")
+            this.emitStmt(stmt.cond, 0)
+            buf.append(")\n")
+            this.emitStmt(stmt.body, indent)
+            return;
+        }
+        
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            var expr = s as (*ArrayDesignationExpr)
+            this.emit(indent, "[")
+            this.emitStmt(expr.index, 0)
+            buf.append("] = ")
+            this.emitStmt(expr.value, 0)
+            return;
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            var expr = s as (*ArrayInitExpr)
+            buf.append("[]")
+            this.emitTypeSpec(expr.type)
+            buf.append("{\n")
+            for(var i = 0; i < expr.values.size(); i+=1) {
+                var v = expr.values.get(i)
+                if(i > 0) buf.append(",\n")
+                this.emitStmt(v, indent+1)
+            }
+            buf.append("}\n")
+            return;
+        }
+        case StmtKind.BINARY_EXPR: {
+            var expr = s as (*BinaryExpr)
+            this.emitStmt(expr.left)
+            buf.append(" %s ", tokenText[expr.operator])
+            this.emitStmt(expr.right)
+            break;
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            var expr = s as (*BooleanExpr)
+            buf.append("%s", expr.boolean ? "true" : "false")
+            return;
+        }/*
+        case StmtKind.CAST_EXPR: {
+            var expr = new<CastExpr>(allocator)
+            expr.kind = StmtKind.CAST_EXPR;
+            expr.startPos = startPos
+            expr.castTo = null
+            expr.exprToCast = null
+            return expr as (*Stmt)
+        }*/
+        case StmtKind.CHAR_EXPR: {
+            var expr = s as (*CharExpr)
+            buf.append("'%c'", expr.character.intValue as (char))            
+            return;
+        }/*
+        case StmtKind.FUNC_CALL_EXPR: {
+            var expr = new<FuncCallExpr>(allocator)
+            expr.kind = StmtKind.FUNC_CALL_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.arguments.init(16, allocator)
+            return expr as (*Stmt)
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            var expr = new<IdentifierExpr>(allocator)
+            expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR;
+            expr.startPos = startPos
+            expr.genericArgs.init(2, allocator)
+            expr.type = null
+            //expr.sym///            
+            return expr as (*Stmt)
+        }*/
+        case StmtKind.GET_EXPR: {
+            var expr = s as (*GetExpr)
+            this.emitStmt(expr.object)
+            buf.append(".")
+            this.emitStmt(expr.field)
+            return;
+        }
+        case StmtKind.GROUP_EXPR: {
+            var expr = s as (*GroupExpr)
+            buf.append("(")
+            this.emitStmt(expr.groupedExpr)
+            buf.append(")")
+            return;
+        }
+        case StmtKind.IDENTIFIER_EXPR: {
+            var expr = s as (*IdentifierExpr)
+            buf.append("%s", expr.type.name)
+            return;
+        }/*
+        case StmtKind.INIT_ARG_EXPR: {
+            var expr = new<InitArgExpr>(allocator)
+            expr.kind = StmtKind.INIT_ARG_EXPR;
+            expr.startPos = startPos
+            expr.fieldName = null
+            expr.argPosition = 0
+            expr.value = null
+            return expr as (*Stmt)
+        }
+        case StmtKind.INIT_EXPR: {
+            var expr = new<InitExpr>(allocator)
+            expr.kind = StmtKind.INIT_EXPR;
+            expr.startPos = startPos
+            expr.genericArgs.init(2, allocator)
+            expr.type = null
+            expr.arguments.init(8, allocator)
+            return expr as (*Stmt)
+        }*/
+        case StmtKind.NULL_EXPR: {
+            var expr = s as (*NullExpr)
+            buf.append("null")
+            return;
+        }
+        case StmtKind.NUMBER_EXPR: {
+            var expr = s as (*NumberExpr)
+            switch(expr.number.type) {
+                case TokenType.INT_NUMBER: {
+                    buf.append("%llu", expr.number.value.intValue)
+                    break;
+                }
+                case TokenType.FLOAT_NUMBER: {
+                    buf.append("%f", expr.number.value.floatValue)
+                    break;
+                }
+                default: {}
+            }
+            return;
+        }/*
+        case StmtKind.OFFSET_OF_EXPR: {
+            var expr = new<OffsetOfExpr>(allocator)
+            expr.kind = StmtKind.OFFSET_OF_EXPR;
+            expr.startPos = startPos
+            expr.type = null
+            expr.field = null
+            return expr as (*Stmt)
+        }
+        case StmtKind.SET_EXPR: {
+            var expr = new<SetExpr>(allocator)
+            expr.kind = StmtKind.SET_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.field = null
+            expr.value = null
+            return expr as (*Stmt)
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var expr = new<SizeOfExpr>(allocator)
+            expr.kind = StmtKind.SIZE_OF_EXPR;
+            expr.startPos = startPos
+            expr.sizeOfExpr = null
+            return expr as (*Stmt)
+        }*/
+        case StmtKind.STRING_EXPR: {
+            var expr = s as (*StringExpr)
+            buf.append("\"%.*s\"", expr.string.str.length, expr.string.str.buffer)
+            return;
+        }/*
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            var expr = new<SubscriptGetExpr>(allocator)
+            expr.kind = StmtKind.SUBSCRIPT_GET_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.index = null
+            return expr as (*Stmt);
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            var expr = new<SubscriptSetExpr>(allocator)
+            expr.kind = StmtKind.SUBSCRIPT_SET_EXPR;
+            expr.startPos = startPos
+            expr.object = null
+            expr.index = null
+            expr.value = null
+            return expr as (*Stmt);
+        }*/
+        case StmtKind.TERNARY_EXPR: {
+            var expr = s as (*TernaryExpr)
+            buf.append("(")
+            this.emitStmt(expr.cond)
+            buf.append(") ? ")
+            this.emitStmt(expr.then)
+            buf.append(" : ")
+            this.emitStmt(expr.other)
+            return;
+        }/*
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            var expr = new<TypeIdentifierExpr>(allocator)
+            expr.kind = StmtKind.TYPE_IDENTIFIER_EXPR;
+            expr.startPos = startPos
+            expr.genericArgs.init(2, allocator)
+            expr.type = null
+            //expr.sym//
+            return expr as (*Stmt);
+        }
+        case StmtKind.TYPE_OF_EXPR: {
+            var expr = new<TypeOfExpr>(allocator)
+            expr.kind = StmtKind.TYPE_OF_EXPR;
+            expr.startPos = startPos
+            expr.typeOfExpr = null
+            expr.type = null
+            return expr as (*Stmt);
+        }
+        case StmtKind.UNARY_EXPR: {
+            var expr = new<UnaryExpr>(allocator)
+            expr.kind = StmtKind.UNARY_EXPR;
+            expr.startPos = startPos
+            expr.unaryExpr = null
+            return expr as (*Stmt);
+        }*/
+        case StmtKind.POISON_EXPR: {
+            buf.append("<poison_expr>")
+            return;
+        }
+        default: {
+            //Panic("Unknown statement kind: %d", s.kind)
+            buf.append("<%s Not Implemented>", StmtKindAsStr(s.kind))
+            return;
+        }
+    }    
+}

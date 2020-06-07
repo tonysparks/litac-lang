@@ -138,7 +138,7 @@ public func IsPtrOf(type: *TypeInfo, kind: TypeKind) : bool {
         }
         case TypeKind.CONST: {
             var constInfo = type as (*ConstTypeInfo)
-            return IsPtrLike(constInfo.constOf)
+            return constInfo.constOf.kind == kind
         }
         default: {
             return false;
@@ -493,6 +493,9 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
 }
 
 public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
+    assert(this != null)
+    assert(other != null)
+
     // this = other    
     switch(this.kind) {
         case TypeKind.BOOL: {
@@ -544,7 +547,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return other.kind == TypeKind.VOID
         }
 
-        case TypeKind.STR: {
+        case TypeKind.STR: {            
             return other.kind == TypeKind.STR ||
                    IsPtrOf(other, TypeKind.CHAR)
         }
@@ -554,27 +557,62 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
         // TODO
         case TypeKind.PTR: {
             var thisInfo = this as (*PtrTypeInfo)
-            if(thisInfo.ptrOf == TypeKind.VOID) {
+            if(thisInfo.ptrOf.kind == TypeKind.VOID) {
                 return IsPtrLike(other)
             }
 
-            break;
+            if(other.kind == TypeKind.STR) {
+                return thisInfo.ptrOf.isAssignable(&CHAR_TYPE)
+            }
+
+            if(other.kind != TypeKind.PTR) {
+                return false
+            }
+
+            var otherInfo = other as (*PtrTypeInfo)
+            return thisInfo.ptrOf.isAssignable(otherInfo.ptrOf)
         }        
         case TypeKind.CONST: {
-            break;
-        }
+            var thisInfo = this as (*ConstTypeInfo)
 
-        case TypeKind.FUNC_PTR: {
-            break;
-        }
+            // Allow for *const char = *char
+            if(other.kind != TypeKind.CONST) {
+                return thisInfo.constOf.isAssignable(other)
+            }
 
+            var otherInfo = other as (*ConstTypeInfo)
+            return thisInfo.constOf.isAssignable(otherInfo.constOf)
+        }
+        case TypeKind.UNION:
         case TypeKind.STRUCT: {
-            break;
-        }
-        case TypeKind.UNION: {
-            break;
+            if(this.kind != other.kind) {
+                return false
+            }
+            var thisInfo = this as (*AggregateTypeInfo)
+            var otherInfo = other as (*AggregateTypeInfo)
+
+            if(thisInfo.sym == otherInfo.sym) {
+                return true
+            }
+
+            if(thisInfo.decl.fields.size() != otherInfo.decl.fields.size()) {
+                return false
+            }
+
+            for(var i = 0; i < thisInfo.decl.fields.size(); i+=1) {
+                var thisField = thisInfo.decl.fields.get(i)
+                var otherField = otherInfo.decl.fields.get(i)
+                if(!thisField.typeInfo.isAssignable(otherField.typeInfo)) {
+                    return false
+                }
+            }
+
+            return true
         }
         case TypeKind.ENUM: {
+            break;
+        }        
+        case TypeKind.FUNC_PTR: {
             break;
         }
         case TypeKind.FUNC: {
@@ -787,6 +825,17 @@ public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryS
     return null
 }
 
+public func (this: *AggregateTypeInfo) getFieldByPosition(position: i32) : FieldStmt {
+    assert(this != null)
+    if(position < 0 || position >= this.decl.fields.size()) {
+        return FieldStmt {
+            .kind = StmtKind.POISON_EXPR
+        }
+    }
+
+    return this.decl.fields.get(position)
+}
+
 public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
     assert(this != null)
 
@@ -814,7 +863,7 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
                 // if this is an anonymous aggregate, the fields
                 // should be looked at for matching
                 if(aggField.name.type == TokenType.VOID) {
-                    var aggType = aggField.typeInfo as (*AggregateTypeInfo)
+                    var aggType = aggField.sym.type as (*AggregateTypeInfo)
                     return aggType.getField(name)
                 }
 

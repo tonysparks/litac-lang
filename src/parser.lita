@@ -1913,8 +1913,8 @@ func (p: *Parser) structArguments(arguments: *Array<*InitArgExpr>) : bool {
             if(!identifier) {
                 goto err;
             }
-            var fieldName = *identifier
-            
+            fieldName = *identifier
+                        
             if(p.check(TokenType.COLON)) {
                 p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
             }
@@ -1928,7 +1928,7 @@ func (p: *Parser) structArguments(arguments: *Array<*InitArgExpr>) : bool {
         }
         
         var value = p.expression()        
-        var arg = NewInitArgExpr(pos, p.pos(), fieldName, argPosition, value, p.allocator) as (*InitArgExpr)
+        var arg = NewInitArgExpr(pos, p.pos(), fieldName, argPosition, value, p.allocator) as (*InitArgExpr)        
         arguments.add(arg)
         argPosition += 1        
     }

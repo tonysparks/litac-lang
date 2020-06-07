@@ -223,7 +223,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
-        var field = aggDecl.fields.get(i)
+        var field = &aggDecl.fields.elements[i]
 
         switch(field.kind) {
             case StmtKind.VAR_FIELD_STMT: {
@@ -311,6 +311,7 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
             }
 
             var typeInfo = field.value.operand.typeInfo
+            printf("Is Type Info null? %d\n", typeInfo == null)
             this.checkTypeCompatibility(field.value.startPos, typeInfo, &I32_TYPE)
         }
 

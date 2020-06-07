@@ -10,24 +10,59 @@ func test2<  (x: bool, ...) : i32 {
 //var x:bool = "hi"
 //var y = null
 
-struct Person {
-    name: *const char
+const c = 2;
+var x = 4;
+
+@foreign
+enum EnumTest {
+  //  TEST_FIELD = c
+}
+
+struct StructTest {
+    name: *const char = "sparks"
     age: i32
 
-    struct Employer {
+    struct EmbeddedStruct {
         name: *const char
         struct {
             age: f32
         }
-        age: i64
+       // age: i64
     }
-/*
-    struct {
-        //name: i32
-    }*/
 }
 
-func test() {
+func FuncTest() {
+    var a = [2]i32{0,1}
+    a[0] = 1 
+    a[1] = "hi"
+    /*
+    var a = [2]i32{0,1}
+    var str = "hi"
+    var y = str[0]
+    var z = 0
+    var x = z[1]*/
+    /*
+    var z = StructTest{
+    //    .stage = true,
+        .EmbeddedStruct = EmbeddedStruct {
+            .name = "tony",
+            .age = 36f,
+        }
+    }*/
+    //var x = z ? y : z
+/*
+    var i = typeof(:StructTest)
+    var x = typeof(:Struct)
+    var z = typeof(i)
+    var z2 = typeof(w)
+    var i = offsetof(StructTest, name)
+    var x = offsetof(Struct, name)
+    var x = offsetof(StructTest, namex)
+    var z = sizeof(:StructTest)
+    var y = sizeof(:Struct)
+    var w = sizeof(z)
+    var w2 = sizeof(z2)
+    */
     //var y = x
     //var w = null
     /*var w = true

@@ -63,15 +63,23 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.numOfLabels = 0
 }
 
-public func (this: *TypeChecker) typeCheck(root: *Module) {
+public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     if(root.flags & ModuleFlags.TYPE_CHECKED) {
-        return;
+        goto exit;
     }
+
     root.flags |= ModuleFlags.TYPE_CHECKED
     this.currentScope = &root.symbols
 
     this.createModuleSymbols(root)
     this.resolveSymbols()
+
+exit:
+    return ProgramSymbols {
+        .values = this.pendingValues,
+        .symbolTypes = this.symbolTypes,
+        .symbolFuncs = this.symbolFuncs,
+    };
 }
 
 func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
@@ -213,9 +221,10 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         }
     }
 
-    switch(decl.kind) {            
+    switch(decl.kind) {
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
+            // TODO: resolve value if const primitive expr
             this.pendingValues.add(sym)
             break;
         }

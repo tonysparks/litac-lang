@@ -16,9 +16,11 @@ import "module"
 import "string"
 import "string_view"
 import "checker"
+import "cgen"
 
 func main(len: i32, args: **char) {
     SystemInit()
+    var startTime = SystemTimeMSec()
 
     var options = LitaOptions{}
     ParseArgs(len, args, &options)
@@ -31,39 +33,60 @@ func main(len: i32, args: **char) {
         TypeCheck(lita, root)
     }
 
-    if(false) {
-        for(var it = lita.modules.iter(); it.hasNext();) {
-            var entry = it.next()
-            printf("Printing AST for '%s'...\n\n", entry.key)
-            if(entry.value && entry.value.ast) {
-               PrintStmt(entry.value.ast)
-            }
-            printf("\n")
-        }
-    }
-
     if(!lita.result.errors.empty()) {
+        printf("Total errors: %d\n", lita.result.errors.size())
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
             PrintError(lita.result.errors.get(i))
             printf("\n")
         }
+
+        goto report;
     }
-    
-    var allocator: *DebugAllocator = lita.allocator as (*DebugAllocator)
-    var metric = &lita.metrics[MetricType.PARSING]
-    printf("Total errors: %d\n", lita.result.errors.size())
-    printf("Total parse time: %f\n", metric.executionTime)
-    printf("Total memory: %zu bytes\n", metric.bytesAllocated)
-    printf("Total allocations: %u\n", allocator.totalAllocations)
-    printf("Total source code lines: %u\n", lita.totalSourceLines)
+
+    if(options.checkerOnly) {
+        goto report;
+    }
+
+    if(root) {
+        GenerateC(lita, root)
+    }
+
+report:
+    var endTime = SystemTimeMSec()
+    if(options.showProfileInfo) {
+        var allocator: *LinearAllocator = lita.allocator as (*LinearAllocator)
+
+        printf("%-30s %-17s %-6s %-14s %-5s\n", "Segment", "Time", "%", "Mem", "#")
+        printf("====================================================================================\n")
+        for(var i = 0; i < MetricType.MAX_METRIC_TYPES; i+=1) {
+            var metric = &lita.metrics[i]
+            printf("%-30s %-15.6f   %-6d %-14zu %-5u\n", 
+                MetricTypeAsStr(i), 
+                metric.executionTime, 
+                0, 
+                metric.bytesAllocated, 
+                metric.allocationCount)
+        }
+        printf("\n")
+        printf("Total time:         %f\n", endTime - startTime)
+        printf("Total memory:       %llu\n", allocator.totalBytesAllocated)
+        printf("Total allocations:  %u\n", allocator.totalAllocations)
+        printf("Total source lines: %u\n", lita.totalSourceLines)
+        printf("\n")
+    }
 }
 
 func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
     strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
 
+// TEMP start
+    options.checkerOnly = false
+    options.cOutputOnly = true
+    options.showProfileInfo = true
 
     //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
     strncpy(options.inputFile, "../test/test.lita", MAX_PATH) // TEMP
+// TEMP end
 
     if(n > 1) {
         strncpy(options.inputFile, args[1], MAX_PATH)        
@@ -197,12 +220,24 @@ func Parse(lita: *Lita) : *Module {
 
 func TypeCheck(lita: *Lita, module: *Module) {
     BuiltinsInit(lita)
-    
+
     lita.startCapture(MetricType.TYPE_CHECKING)
     defer lita.endCapture(MetricType.TYPE_CHECKING)
 
     var checker = TypeChecker{}
     checker.init(lita)
 
-    checker.typeCheck(module)
+    lita.programSymbols = checker.typeCheck(module)
+}
+
+func GenerateC(lita: *Lita, module: *Module) {
+    lita.startCapture(MetricType.CGEN)
+    defer lita.endCapture(MetricType.CGEN)
+
+    var cgen = CGen{}
+    cgen.init(lita)
+
+    cgen.emitProgram(module)
+
+    printf("Generated: \n%s", cgen.buf.cStr())
 }

@@ -53,6 +53,12 @@ public enum ScopeKind {
     FUNC,
 }
 
+public struct ProgramSymbols {
+    values: Array<*Symbol>
+    symbolTypes: Array<*Symbol>
+    symbolFuncs: Array<*Symbol>
+}
+
 public struct Scope {
     kind: ScopeKind
     allocator: *const Allocator

@@ -5,7 +5,7 @@ import "array"
 import "mem"
 import "common"
 import "module"
-
+import "string_view"
 import "libc"
 import "string"
 
@@ -179,14 +179,14 @@ public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) : *Array<T
 }
 
 public struct Decl {
-    node: using Node
+    stmt: using Stmt
     sym: *Symbol
     name: Token
     attributes: Attributes
 }
 
 public struct ImportDecl {
-    stmt: using Decl    
+    decl: using Decl
     alias: Token // Identifier?
     isUsing: bool
 
@@ -557,12 +557,11 @@ public struct Expr {
     expectedType: *TypeInfo
 }
 
-
 public struct Operand {
     typeInfo: *TypeInfo
     isRightValue: bool
     isConst: bool
-    val: Token
+    val: Value
 }
 
 public func IsExpr(node: *Node) : bool {
@@ -691,9 +690,7 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
     switch(expr.kind) {
         case StmtKind.NUMBER_EXPR:
         case StmtKind.BOOLEAN_EXPR:
-        //case STRING_EXPR:
         case StmtKind.CHAR_EXPR:
-        //case NULL_EXPR:
         case StmtKind.IDENTIFIER_EXPR:
         case StmtKind.GET_EXPR: {
             return true
