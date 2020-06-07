@@ -46,21 +46,13 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
             return this.resolveBinaryExpr(expr as (*BinaryExpr))
         }
         case StmtKind.BOOLEAN_EXPR: {
-            expr.operand.typeInfo = &BOOL_TYPE
-            expr.operand.isConst = true
-            expr.operand.isRightValue = true
-            expr.operand.val.intValue = (expr as (*BooleanExpr)).boolean
-            return true
+            return this.resolveBooleanExpr(expr as (*BooleanExpr))
         }
         case StmtKind.CAST_EXPR: {
             return this.resolveCastExpr(expr as (*CastExpr))
         }
         case StmtKind.CHAR_EXPR: {
-            expr.operand.typeInfo = &CHAR_TYPE
-            expr.operand.isConst = true
-            expr.operand.isRightValue = true
-            expr.operand.val = (expr as (*CharExpr)).character.value
-            return true
+            return this.resolveCharExpr(expr as (*CharExpr))
         }
         case StmtKind.FUNC_CALL_EXPR:
         case StmtKind.FUNC_IDENTIFIER_EXPR:
@@ -80,18 +72,10 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
             return this.resolveInitExpr(expr as (*InitExpr))
         }
         case StmtKind.NULL_EXPR: {
-            expr.operand.typeInfo = &NULL_TYPE
-            expr.operand.isConst = true
-            expr.operand.isRightValue = true
-            return true
+            return this.resolveNullExpr(expr as (*NullExpr))
         }
         case StmtKind.NUMBER_EXPR: {
-            var numberExpr = (expr as (*NumberExpr))
-            expr.operand.typeInfo = numberExpr.number.typeInfo
-            expr.operand.isConst = true
-            expr.operand.isRightValue = true
-            expr.operand.val = numberExpr.number.value
-            return true
+            return this.resolveNumberExpr(expr as (*NumberExpr))
         }
         case StmtKind.SET_EXPR: {
             return this.resolveSetExpr(expr as (*SetExpr))
@@ -102,12 +86,8 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.SIZE_OF_EXPR: {
             return this.resolveSizeOfExpr(expr as (*SizeOfExpr))
         }
-        case StmtKind.STRING_EXPR: {
-            expr.operand.typeInfo = &STR_TYPE
-            expr.operand.isConst = true
-            expr.operand.isRightValue = true
-            expr.operand.val = (expr as (*StringExpr)).string.value
-            return true
+        case StmtKind.STRING_EXPR: {            
+            return this.resolveStringExpr(expr as (*StringExpr))
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
             return this.resolveSubscriptGetExpr(expr as (*SubscriptGetExpr))
@@ -136,6 +116,50 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         }
     }
     return false
+}
+
+func (this: *TypeChecker) resolveBooleanExpr(expr: *BooleanExpr) : bool {
+    assert(expr != null)
+    expr.operand.typeInfo = &BOOL_TYPE
+    expr.operand.isConst = true
+    expr.operand.isRightValue = true
+    expr.operand.val.intValue = expr.boolean
+    return true
+}
+
+func (this: *TypeChecker) resolveCharExpr(expr: *CharExpr) : bool {
+    assert(expr != null)
+    expr.operand.typeInfo = &CHAR_TYPE
+    expr.operand.isConst = true
+    expr.operand.isRightValue = true
+    expr.operand.val = expr.character.value
+    return true
+}
+
+func (this: *TypeChecker) resolveNullExpr(expr: *NullExpr) : bool {
+    assert(expr != null)
+    expr.operand.typeInfo = &NULL_TYPE
+    expr.operand.isConst = true
+    expr.operand.isRightValue = true
+    return true
+}
+
+func (this: *TypeChecker) resolveNumberExpr(expr: *NumberExpr) : bool {
+    assert(expr != null)
+    expr.operand.typeInfo = expr.number.typeInfo
+    expr.operand.isConst = true
+    expr.operand.isRightValue = true
+    expr.operand.val = expr.number.value
+    return true
+}
+
+func (this: *TypeChecker) resolveStringExpr(expr: *StringExpr) : bool {
+    assert(expr != null)
+    expr.operand.typeInfo = &STR_TYPE
+    expr.operand.isConst = true
+    expr.operand.isRightValue = true
+    expr.operand.val = expr.string.value
+    return true
 }
 
 func (this: *TypeChecker) resolveSubscriptSetExpr(expr: *SubscriptSetExpr) : bool {
