@@ -5,7 +5,7 @@ import "phase_result"
 import "module"
 import "ast"
 import "lex"
-import "state"
+import "lita"
 import "map"
 import "string_buffer"
 import "array"
@@ -25,7 +25,7 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
             return true;
         }
         case StmtKind.CONST_DECL:
-        case StmtKind.VAR_DECL: {            
+        case StmtKind.VAR_DECL: {
             var type = this.resolveValueDecl(decl as (*VarDecl))
             this.addSymbol(decl, type)
             return true;
@@ -40,7 +40,7 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
             return this.resolveEnumDecl(enumDecl)
         }
         case StmtKind.FUNC_DECL: {
-            var funcDecl = decl as (*FuncDecl)            
+            var funcDecl = decl as (*FuncDecl)
             return this.resolveFuncDecl(funcDecl)
         }
         case StmtKind.TYPEDEF_DECL: {
@@ -310,8 +310,9 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
                 return false
             }
 
+            // TODO: Generate primitive constants ordering
             var typeInfo = field.value.operand.typeInfo
-            printf("Is Type Info null? %d\n", typeInfo == null)
+            //printf("Is Type Info null? %d\n", typeInfo == null)
             this.checkTypeCompatibility(field.value.startPos, typeInfo, &I32_TYPE)
         }
 

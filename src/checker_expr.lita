@@ -6,7 +6,7 @@ import "module"
 import "ast"
 import "ast_new"
 import "lex"
-import "state"
+import "lita"
 import "map"
 import "string_buffer"
 import "string"
@@ -1080,6 +1080,5 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     expr.operand.isConst = sym.flags & SymbolFlags.IS_CONSTANT
     expr.sym = sym
 
-    printf("~Is Type Info null? %d\n", sym.type == null)
     return true;
 }

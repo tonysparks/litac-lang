@@ -1,6 +1,3 @@
-/**
-    Type Checker
-*/
 import "types"
 import "types_new"
 import "symbols"
@@ -8,7 +5,7 @@ import "phase_result"
 import "module"
 import "ast"
 import "lex"
-import "state"
+import "lita"
 import "map"
 import "string_buffer"
 import "string_view"
@@ -20,6 +17,10 @@ import "libc"
 
 import "checker_decl"
 import "checker_expr"
+
+/**
+    Type Checker
+*/
 
 // max number of labels in a function scope -- this should be enough :S
 const MAX_LABELS = 256;
