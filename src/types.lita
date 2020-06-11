@@ -928,6 +928,7 @@ public struct FuncPtrTypeInfo {
     genericParams: Array<GenericParam>
     returnType: *TypeInfo
     paramDecls: Array<*TypeInfo>
+    hasVarargs: bool
 }
 
 public struct EnumTypeInfo {

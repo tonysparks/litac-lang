@@ -25,7 +25,7 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         // TODO: check if primitive expr
         assert(decl.expr != null)
         buf.append("#define ")
-        this.emitCName(decl.sym)
+        //this.emitCName(decl.sym)
 
         buf.append(" (")
         this.emitStmt(decl.expr)
@@ -34,7 +34,7 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         // TODO pop/undef if not a globa
     }
     else {
-        this.emitTypeDeclForC(decl.sym, decl.sym.name)
+        //this.emitTypeDeclForC(decl.sym, decl.sym.name)
         if(decl.expr) {
             buf.append(" = ")
             this.emitStmt(decl.expr)

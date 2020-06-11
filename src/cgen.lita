@@ -16,11 +16,16 @@ import "cgen_decl"
 public struct CGen {
     lita: *Lita
     buf: StringBuffer
+    line: StringBuffer
+    tmp: StringBuffer
+    indent: i32
 }
 
 public func (this: *CGen) init(lita: *Lita) {
     this.lita = lita
     this.buf.init(4096, lita.allocator)
+    this.line.init(1024, lita.allocator)
+    this.tmp.init(1024, lita.allocator)
 }
 
 public func (this: using *CGen) emitProgram(module: *Module) {
@@ -99,6 +104,63 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     }
 }
 
+func (this: using *CGen) escapeNameStr(name: *const char) : *char {
+    tmp.clear()
+    tmp.appendStr(name, strlen(name))
+    for(var i = 0; i < tmp.length; i+=1) {
+        var c = tmp.buffer[i]
+        switch(c) {
+            case '*': tmp.replace(i, i+1, "_ptr_"); i+=6; break;
+            case '<': tmp.replace(i, i+1, "_cb_");  i+=4; break;
+            case '>': tmp.replace(i, i+1, "_ce_");  i+=4; break;
+            case '[': tmp.replace(i, i+1, "_bb_");  i+=4; break;
+            case ']': tmp.replace(i, i+1, "_be_");  i+=4; break;
+            case '(': tmp.replace(i, i+1, "_pb_");  i+=4; break;
+            case ')': tmp.replace(i, i+1, "_pe_");  i+=4; break;
+            case ',': tmp.replace(i, i+1, "_c_");   i+=3; break;
+            case ' ': tmp.replace(i, i+1, "_");     i+=1; break;
+            case ':': {
+                var n = i + 1;
+                if(n < tmp.length) {
+                    var nc = tmp.buffer[n]
+                    if(nc == ':') {
+                        tmp.replace(i, i+1, "__")
+                        i+=2;
+                        break;
+                    }
+                }
+                tmp.replace(i, i+1, "_r_")
+                i+=3;
+                break;
+            }
+            default: {
+                i+=1;
+                break;
+            }
+        }
+    }
+
+    return tmp.cStr()
+}
+
+func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
+    if(IsAggregate(type)) {
+        return this.escapeNameStr(type.name)
+    }
+
+    if(IsFuncLike(type)) {
+        if(type.kind == TypeKind.FUNC) {
+            // TODO: Get method name
+            var funcInfo = type as (*FuncTypeInfo)
+            //var methodName = funcInfo.getMethodName()
+            assert(false)
+        }
+        return this.escapeNameStr(type.name)
+    }
+
+    return type.name
+}
+
 func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
     // TODO
 }
@@ -106,7 +168,7 @@ func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
 /**
     Outputs a type declaration in C for the supplied symbol
 */
-func (this: using *CGen) emitTypeDeclForC(sym: *Symbol, name: *const char) {
+func (this: using *CGen) emitTypeDeclForC(type: *TypeInfo, name: *const char, decay: bool = false) {
     // TODO
     buf.append("%s", name)
 }
@@ -114,8 +176,19 @@ func (this: using *CGen) emitTypeDeclForC(sym: *Symbol, name: *const char) {
 /**
     Outputs the C name for the symbol
 */    
-func (this: using *CGen) emitCName(sym: *Symbol) {
-    // TODO
+func (this: using *CGen) cName(sym: *Symbol) : *const char {
+    var declName:*const char = (sym.flags & SymbolFlags.IS_TYPE) 
+                                    ? this.escapeName(sym.type) : sym.name;
+
+    if(sym.flags & SymbolFlags.IS_LOCAL) {
+        return declName
+    }
+
+    if(sym.flags & SymbolFlags.IS_FOREIGN) {
+        // TODO: Get the foreign override name
+    }
+
+    // TODO: Append module name to name
     buf.append("%s", sym.name)
 }
 
@@ -188,35 +261,60 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
 }
 
 func (this: using *CGen) emitName(tok: Token) {
-    if(tok.type != TokenType.ERROR) {        
+    if(tok.type != TokenType.ERROR) {
         buf.append("%.*s", tok.value.str.length, tok.value.str.buffer)
     }
 }
 
-func (this: using *CGen) emit(indent: i32, format: *const char, ...) {
+func (this: using *CGen) emitln() {
+    buf.appendChar('\n')
     for(var i = 0; i < indent; i += 1) {
-        buf.append("    ");
+        buf.appendStr("    ", 4);
     }
-
-    var args: va_list;
-    va_start(args, format);    
-    buf.appendArgs(format, args)
-    va_end(args)
 }
 
-func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
+func (this: using *CGen) emit(format: *const char, ...) {
+    line.clear()
+
+    var args: va_list;
+    va_start(args, format);
+    line.appendArgs(format, args)
+    va_end(args)
+
+    for(var i = 0; i < line.length; i+=1) {
+        var c = line.buffer[i]
+        if(c == '\n') {
+            this.emitln()
+        }
+        else if(c == '{') {
+            buf.appendChar(c)
+            indent+=1
+            this.emitln()
+        }
+        else if(c == '}') {
+            indent-=1
+            this.emitln()
+            buf.appendChar(c)
+        }
+        else {
+            buf.appendChar(c)
+        }
+    }
+}
+
+func (this: using *CGen) emitStmt(s: *Stmt) {
     if(!s) return;
 
     switch(s.kind) {
         case StmtKind.IMPORT_DECL: {
             var decl = s as (*ImportDecl)
-            this.emit(0, "import '")
+            this.emit("import '")
             this.emitName(decl.name)
-            buf.append("'")
+            this.emit("'")
             if(decl.alias.type == TokenType.IDENTIFIER) {
-                this.emit(0, " as ")
+                this.emit(" as ")
                 this.emitName(decl.alias)
-            }            
+            }
             return;
         }
         case StmtKind.CONST_DECL:
@@ -224,187 +322,188 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
             var decl = s as (*VarDecl)
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    this.emitStmt(decl.attributes.notes.get(i), indent)
-                    buf.append("\n")
+                    this.emitStmt(decl.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
 
             if(decl.kind == StmtKind.CONST_DECL) {
-                this.emit(indent, "const ")
+                this.emit("const ")
             }
             else {
-                this.emit(indent, "var ")
+                this.emit("var ")
             }
             this.emitName(decl.name)
             if(decl.typeSpec != null) {
-                buf.append(": ")
+                this.emit(": ")
                 this.emitTypeSpec(decl.typeSpec)
             }
             if(decl.expr != null) {
-                buf.append(" = ")
+                this.emit(" = ")
                 this.emitStmt(decl.expr)
             }
-            buf.append(";")
+            this.emit(";")
             return;
         }
         case StmtKind.STRUCT_DECL: {
             var decl = s as (*AggregateDecl)
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    this.emitStmt(decl.attributes.notes.get(i), indent)
-                    buf.append("\n")
+                    this.emitStmt(decl.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
 
-            this.emit(indent, "")
             if(decl.attributes.isPublic) {
-                buf.append("public ")
+                this.emit("public ")
             }            
-            buf.append("struct ")
+            this.emit("struct ")
             this.emitName(decl.name)
             if(!decl.genericParams.empty()) {
-                buf.append("<")
+                this.emit("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
-                    if(i > 0) buf.append(",")
+                    if(i > 0) {
+                        this.emit(",")
+                    }
                     var t = decl.genericParams.get(i).name                    
-                    buf.append("%.*s", t.value.str.length, t.value.str.buffer)
+                    this.emit("%.*s", t.value.str.length, t.value.str.buffer)
                 }
-                buf.append(">")
+                this.emit(">")
             }
-            buf.append(" {\n")
+            this.emit(" {")
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
                     case StmtKind.ENUM_FIELD_STMT: {
-                        this.emitStmt(field.enumField as (*Stmt), indent+1)
+                        this.emitStmt(field.enumField as (*Stmt))
                         break;
                     }
                     case StmtKind.STRUCT_FIELD_STMT: 
                     case StmtKind.UNION_FIELD_STMT: {
-                        this.emitStmt(field.aggregateField as (*Stmt), indent+1)
+                        this.emitStmt(field.aggregateField as (*Stmt))
                         break;
                     }
                     case StmtKind.VAR_FIELD_STMT: {
-                        this.emitStmt(field.varField, indent+1)
+                        this.emitStmt(field.varField)
                         break;
                     }
                     default:{}
                 }
-                buf.append("\n")
+                this.emit("\n")
             }
-            this.emit(indent, "}")
+            this.emit("}")
             return;
         }
         case StmtKind.UNION_DECL: {
             var decl = s as (*AggregateDecl)
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    this.emitStmt(decl.attributes.notes.get(i), indent)
-                    buf.append("\n")
+                    this.emitStmt(decl.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
 
-            this.emit(indent, "")
             if(decl.attributes.isPublic) {
-                buf.append("public ")
+                this.emit("public ")
             }            
-            buf.append("union ")
+            this.emit("union ")
             this.emitName(decl.name)
             if(!decl.genericParams.empty()) {
-                buf.append("<")
+                this.emit("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
-                    if(i > 0) buf.append(",")
-                    var t = decl.genericParams.get(i).name                    
-                    buf.append("%.*s", t.value.str.length, t.value.str.buffer)
+                    if(i > 0) {
+                        this.emit(",")
+                    }
+                    var t = decl.genericParams.get(i).name
+                    this.emit("%.*s", t.value.str.length, t.value.str.buffer)
                 }
-                buf.append(">")
+                this.emit(">")
             }
-            buf.append(" {\n")
+            this.emit(" {")
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
                     case StmtKind.ENUM_FIELD_STMT: {
-                        this.emitStmt(field.enumField as (*Stmt), indent+1)
+                        this.emitStmt(field.enumField as (*Stmt))
                         break;
                     }
                     case StmtKind.STRUCT_FIELD_STMT: 
                     case StmtKind.UNION_FIELD_STMT: {
-                        this.emitStmt(field.aggregateField as (*Stmt), indent+1)
+                        this.emitStmt(field.aggregateField as (*Stmt))
                         break;
                     }
                     case StmtKind.VAR_FIELD_STMT: {
-                        this.emitStmt(field.varField, indent+1)
+                        this.emitStmt(field.varField)
                         break;
                     }
                     default:{}
                 }
-                buf.append("\n")
+                this.emit("\n")
             }
-            this.emit(indent, "}")
+            this.emit("}")
             return;
         }
         case StmtKind.ENUM_DECL: {
             var decl = s as (*EnumDecl)
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    this.emitStmt(decl.attributes.notes.get(i), indent)
-                    buf.append("\n")
+                    this.emitStmt(decl.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
 
-            this.emit(indent, "")
             if(decl.attributes.isPublic) {
-                buf.append("public ")
+                this.emit("public ")
             }        
-            buf.append("enum ")
+            this.emit("enum ")
             this.emitName(decl.name)        
-            buf.append(" {\n")
+            this.emit(" {\n")
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
-                this.emitStmt(field, indent+1)
-                buf.append(",\n")
+                this.emitStmt(field)
+                this.emit(",\n")
             }
-            this.emit(indent, "}")
+            this.emit("}")
             return;
         }
         case StmtKind.FUNC_DECL: {
             var decl = s as (*FuncDecl)
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    this.emitStmt(decl.attributes.notes.get(i), indent)
-                    buf.append("\n")
+                    this.emitStmt(decl.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
 
-            this.emit(indent, "")
+            this.emit("")
             if(decl.attributes.isPublic) {
-                buf.append("public ")
+                this.emit("public ")
             }            
-            buf.append("func ")
+            this.emit("func ")
             this.emitName(decl.name)
             if(!decl.genericParams.empty()) {
-                buf.append("<")
+                this.emit("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
-                    if(i > 0) buf.append(",")                    
+                    if(i > 0) this.emit(",")                    
                     var t = decl.genericParams.get(i).name                    
-                    buf.append("%.*s", t.value.str.length, t.value.str.buffer)
+                    this.emit("%.*s", t.value.str.length, t.value.str.buffer)
                 }
-                buf.append(">")
+                this.emit(">")
             }
-            buf.append("(")
+            this.emit("(")
             if(decl.params) {
                 this.emitStmt(decl.params)
             }
-            buf.append(")")
+            this.emit(")")
             if(decl.returnType) {
-                buf.append(" : ")
+                this.emit(" : ")
                 this.emitTypeSpec(decl.returnType)
             }
             if(decl.body) {
-                buf.append("\n")
-                //buf.append(indent, " {\n")
-                this.emitStmt(decl.body, indent)
-                //buf.append(indent, "}")
+                this.emit("\n")
+                //this.emit(indent, " {\n")
+                this.emitStmt(decl.body)
+                //this.emit(indent, "}")
             }
             return;
         }
@@ -412,18 +511,18 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
             var decl = s as (*TypedefDecl)
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    this.emitStmt(decl.attributes.notes.get(i), indent)
-                    buf.append("\n")
+                    this.emitStmt(decl.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
 
-            this.emit(indent, "")
+            this.emit("")
             if(decl.attributes.isPublic) {
-                buf.append("public ")
+                this.emit("public ")
             }
-            buf.append("typedef ")
+            this.emit("typedef ")
             this.emitTypeSpec(decl.type)
-            buf.append(" as ")
+            this.emit(" as ")
             this.emitName(decl.name)
             return;
         }
@@ -431,16 +530,16 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
             var decl = s as (*ParameterDecl)
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
-                    this.emitStmt(decl.attributes.notes.get(i), 0)
-                    buf.append("\n")
+                    this.emitStmt(decl.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
 
             this.emitName(decl.name)
-            buf.append(": ")
+            this.emit(": ")
             this.emitTypeSpec(decl.type)
             if(decl.defaultExpr) {
-                buf.append(" = ")
+                this.emit(" = ")
                 this.emitStmt(decl.defaultExpr)
             }
             return;
@@ -455,30 +554,30 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
             return;
         }*/
         case StmtKind.POISON_DECL: {
-            buf.append("<poison_decl>")
+            this.emit("<poison_decl>")
             return;
         }
 
         case StmtKind.BLOCK_STMT: {
             var stmt = s as (*BlockStmt)
-            this.emit(indent-1, "{\n")
+            this.emit("{")
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
-                this.emitStmt(n, indent+1)
+                this.emitStmt(n)
                 if(IsExpr(n)) {
-                    buf.append(";\n")
+                    this.emit(";\n")
                 }
                 else {
-                    buf.append("\n")
+                    this.emit("\n")
                 }
             }
-            buf.append("\n")
-            this.emit(indent-1, "}")
+            this.emit("\n")
+            this.emit("}")
             return;
         }
         case StmtKind.BREAK_STMT: {
             var stmt = s as (*BreakStmt)
-            this.emit(indent, "break")
+            this.emit("break")
             return;
         }/*
         case StmtKind.COMP_STMT: {
@@ -494,35 +593,35 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
         }*/
         case StmtKind.CONTINUE_STMT: {            
             var stmt = s as (*ContinueStmt)
-            this.emit(indent, "continue")
+            this.emit("continue")
             return;
         }
-        case StmtKind.DEFER_STMT: {            
+        case StmtKind.DEFER_STMT: {
             var stmt = s as (*DeferStmt)
-            this.emit(indent, "defer ")
-            this.emitStmt(stmt.deferedStmt, indent)
+            this.emit("defer ")
+            this.emitStmt(stmt.deferedStmt)
             return;
         }
-        case StmtKind.DO_WHILE_STMT: {            
+        case StmtKind.DO_WHILE_STMT: {
             var stmt = s as (*DoWhileStmt)
-            this.emit(indent, "do\n")
-            this.emitStmt(stmt.body, indent+1)
-            this.emit(indent, "\nwhile(")
-            this.emitStmt(stmt.cond, 0)
-            buf.append(")")
+            this.emit("do\n")
+            this.emitStmt(stmt.body)
+            this.emit("\nwhile(")
+            this.emitStmt(stmt.cond)
+            this.emit(")")
             return;
         }
         case StmtKind.EMPTY_STMT: {
-            buf.append("\n")
+            this.emit("\n")
             return;
         }
         case StmtKind.ENUM_FIELD_ENTRY_STMT: {
             var stmt = s as (*EnumFieldEntryStmt)
-            this.emit(indent, "")
+            this.emit("")
             this.emitName(stmt.fieldName)
             if(stmt.value) {
-                buf.append(" = ")
-                this.emitStmt(stmt.value, 0)
+                this.emit(" = ")
+                this.emitStmt(stmt.value)
             }
             return;
         }/*
@@ -534,65 +633,64 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
         }*/
         case StmtKind.FOR_STMT: {
             var stmt = s as (*ForStmt)
-            this.emit(indent, "for(")
+            this.emit("for(")
             if(stmt.init) {
-                this.emitStmt(stmt.init, 0)
+                this.emitStmt(stmt.init)
             }
-            buf.append(";")
+            this.emit(";")
             if(stmt.cond) {
-                this.emitStmt(stmt.cond, 0)
+                this.emitStmt(stmt.cond)
             }
-            buf.append(";")
+            this.emit(";")
             if(stmt.post) {
-                this.emitStmt(stmt.post, 0)
+                this.emitStmt(stmt.post)
             }
-            buf.append(")\n")
+            this.emit(")\n")
             if(stmt.body) {
-                this.emitStmt(stmt.body, indent+1)
+                this.emitStmt(stmt.body)
             }
             return;
         }
         case StmtKind.FUNC_BODY_STMT: {
             var stmt = s as (*FuncBodyStmt)
-            this.emit(indent-1, "{\n")
+            this.emit("{")
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
-                this.emitStmt(n, indent+1)
+                this.emitStmt(n)
                 if(IsExpr(n)) {
-                    buf.append(";\n")
+                    this.emit(";\n")
                 }
                 else {
-                    buf.append("\n")
+                    this.emit("\n")
                 }
             }
-            buf.append("\n")
-            this.emit(indent-1, "}")
+            this.emit("}")
             return;
         }
         case StmtKind.GOTO_STMT: {
             var stmt = s as (*GotoStmt)
-            this.emit(indent, "goto ")
+            this.emit("goto ")
             this.emitName(stmt.label)
             return;
         }
         case StmtKind.IF_STMT: {
             var stmt = s as (*IfStmt)
-            this.emit(indent, "if(")
-            this.emitStmt(stmt.cond, 0)
-            buf.append(") \n")
-            this.emitStmt(stmt.then, indent+1)
-            buf.append("\n")
+            this.emit("if(")
+            this.emitStmt(stmt.cond)
+            this.emit(") \n")
+            this.emitStmt(stmt.then)
+            this.emit("\n")
             if(stmt.elseStmt) {
                 
-                this.emit(indent, "else \n")                
-                this.emitStmt(stmt.elseStmt, indent+1)                
+                this.emit("else \n")
+                this.emitStmt(stmt.elseStmt)
             }
-            buf.append("\n")
+            this.emit("\n")
             return;
         }
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
-            buf.append(":")
+            this.emit(":")
             this.emitName(stmt.label)
             return;
         }
@@ -600,57 +698,57 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
             var stmt = s as (*ModuleStmt)
             for(var i = 0; i < stmt.imports.size(); i += 1) {
                 this.emitStmt(stmt.imports.get(i) as (*Stmt))
-                buf.append("\n")
+                this.emit("\n")
             }
 
-            buf.append("\n")
+            this.emit("\n")
 
             for(var i = 0; i < stmt.notes.size(); i += 1) {
                 this.emitStmt(stmt.notes.get(i))
-                buf.append(";\n")
+                this.emit(";\n")
             }
 
-            buf.append("\n")
+            this.emit("\n")
 
             for(var i = 0; i < stmt.declarations.size(); i += 1) {                
                 this.emitStmt(stmt.declarations.get(i) as (*Stmt))
-                buf.append("\n")
-                buf.append("\n")
+                this.emit("\n")
+                this.emit("\n")
             }
 
-            buf.append("\n")
+            this.emit("\n")
             return;
         }
         case StmtKind.NOTE_STMT: {
             var stmt = s as (*NoteStmt)
-            this.emit(indent, "@")
+            this.emit("@")
             this.emitName(stmt.name)
             if(!stmt.attributes.empty()) {
-                buf.append("(")
+                this.emit("(")
                 for(var i = 0; i < stmt.attributes.size(); i += 1) {
-                    if(i > 0) buf.append(", ")
-                    buf.append("'")
+                    if(i > 0) this.emit(", ")
+                    this.emit("'")
                     this.emitName(stmt.attributes.get(i))
-                    buf.append("'")
+                    this.emit("'")
                 }
-                buf.append(")")
+                this.emit(")")
             }
             return;
         }
         case StmtKind.PARAMETERS_STMT: {
             var stmt = s as (*ParametersStmt)
             for(var i = 0; i < stmt.params.size(); i += 1) {
-                if(i>0) buf.append(", ")
-                this.emitStmt(stmt.params.get(i) as (*Stmt), 0)
+                if(i>0) this.emit(", ")
+                this.emitStmt(stmt.params.get(i) as (*Stmt))
             }
             return;
         }
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
-            this.emit(indent, "return");
+            this.emit("return");
             if(stmt.expr) {
-                buf.append(" ")
-                this.emitStmt(stmt.expr, 0)
+                this.emit(" ")
+                this.emitStmt(stmt.expr)
             }
             return;
         }/*
@@ -689,56 +787,58 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
             var stmt = s as (*VarFieldStmt)
             if(!stmt.attributes.notes.empty()) {
                 for(var i = 0; i < stmt.attributes.notes.size(); i += 1) {
-                    this.emitStmt(stmt.attributes.notes.get(i), indent)
-                    buf.append("\n")
+                    this.emitStmt(stmt.attributes.notes.get(i))
+                    this.emit("\n")
                 }
             }
-            this.emit(indent, "")
+            this.emit("")
             this.emitName(stmt.fieldName)
-            buf.append(": ")
+            this.emit(": ")
             this.emitTypeSpec(stmt.type)
             return;
         }
         case StmtKind.WHILE_STMT: {
             var stmt = s as (*WhileStmt)            
-            this.emit(indent, "while(")
-            this.emitStmt(stmt.cond, 0)
-            buf.append(")\n")
-            this.emitStmt(stmt.body, indent)
+            this.emit("while(")
+            this.emitStmt(stmt.cond)
+            this.emit(")\n")
+            this.emitStmt(stmt.body)
             return;
         }
         
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = s as (*ArrayDesignationExpr)
-            this.emit(indent, "[")
-            this.emitStmt(expr.index, 0)
-            buf.append("] = ")
-            this.emitStmt(expr.value, 0)
+            this.emit("[")
+            this.emitStmt(expr.index)
+            this.emit("] = ")
+            this.emitStmt(expr.value)
             return;
         }
         case StmtKind.ARRAY_INIT_EXPR: {
             var expr = s as (*ArrayInitExpr)
-            buf.append("[]")
             this.emitTypeSpec(expr.type)
-            buf.append("{\n")
+            this.emit(" {")
             for(var i = 0; i < expr.values.size(); i+=1) {
                 var v = expr.values.get(i)
-                if(i > 0) buf.append(",\n")
-                this.emitStmt(v, indent+1)
+                if(i > 0) {
+                    this.emit(",\n")
+                }
+                this.emitStmt(v)
             }
-            buf.append("}\n")
+            
+            this.emit("}")
             return;
         }
         case StmtKind.BINARY_EXPR: {
             var expr = s as (*BinaryExpr)
             this.emitStmt(expr.left)
-            buf.append(" %s ", tokenText[expr.operator])
+            this.emit(" %s ", tokenText[expr.operator])
             this.emitStmt(expr.right)
             break;
         }
         case StmtKind.BOOLEAN_EXPR: {
             var expr = s as (*BooleanExpr)
-            buf.append("%s", expr.boolean ? "true" : "false")
+            this.emit("%s", expr.boolean ? "true" : "false")
             return;
         }/*
         case StmtKind.CAST_EXPR: {
@@ -751,7 +851,7 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
         }*/
         case StmtKind.CHAR_EXPR: {
             var expr = s as (*CharExpr)
-            buf.append("'%c'", expr.character.intValue as (char))            
+            this.emit("'%c'", expr.character.intValue as (char))            
             return;
         }/*
         case StmtKind.FUNC_CALL_EXPR: {
@@ -774,20 +874,20 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
         case StmtKind.GET_EXPR: {
             var expr = s as (*GetExpr)
             this.emitStmt(expr.object)
-            buf.append(".")
+            this.emit(".")
             this.emitStmt(expr.field)
             return;
         }
         case StmtKind.GROUP_EXPR: {
             var expr = s as (*GroupExpr)
-            buf.append("(")
+            this.emit("(")
             this.emitStmt(expr.groupedExpr)
-            buf.append(")")
+            this.emit(")")
             return;
         }
         case StmtKind.IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
-            buf.append("%s", expr.type.name)
+            this.emit("%s", expr.type.name)
             return;
         }/*
         case StmtKind.INIT_ARG_EXPR: {
@@ -810,18 +910,18 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
         }*/
         case StmtKind.NULL_EXPR: {
             var expr = s as (*NullExpr)
-            buf.append("null")
+            this.emit("null")
             return;
         }
         case StmtKind.NUMBER_EXPR: {
             var expr = s as (*NumberExpr)
             switch(expr.number.type) {
                 case TokenType.INT_NUMBER: {
-                    buf.append("%llu", expr.number.value.intValue)
+                    this.emit("%llu", expr.number.value.intValue)
                     break;
                 }
                 case TokenType.FLOAT_NUMBER: {
-                    buf.append("%f", expr.number.value.floatValue)
+                    this.emit("%f", expr.number.value.floatValue)
                     break;
                 }
                 default: {}
@@ -854,7 +954,7 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
         }*/
         case StmtKind.STRING_EXPR: {
             var expr = s as (*StringExpr)
-            buf.append("\"%.*s\"", expr.string.str.length, expr.string.str.buffer)
+            this.emit("\"%.*s\"", expr.string.str.length, expr.string.str.buffer)
             return;
         }/*
         case StmtKind.SUBSCRIPT_GET_EXPR: {
@@ -876,11 +976,11 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
         }*/
         case StmtKind.TERNARY_EXPR: {
             var expr = s as (*TernaryExpr)
-            buf.append("(")
+            this.emit("(")
             this.emitStmt(expr.cond)
-            buf.append(") ? ")
+            this.emit(") ? ")
             this.emitStmt(expr.then)
-            buf.append(" : ")
+            this.emit(" : ")
             this.emitStmt(expr.other)
             return;
         }/*
@@ -909,12 +1009,12 @@ func (this: using *CGen) emitStmt(s: *Stmt, indent: i32 = 0) {
             return expr as (*Stmt);
         }*/
         case StmtKind.POISON_EXPR: {
-            buf.append("<poison_expr>")
+            this.emit("<poison_expr>")
             return;
         }
         default: {
             //Panic("Unknown statement kind: %d", s.kind)
-            buf.append("<%s Not Implemented>", StmtKindAsStr(s.kind))
+            this.emit("<%s Not Implemented>", StmtKindAsStr(s.kind))
             return;
         }
     }    

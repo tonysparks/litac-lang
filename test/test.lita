@@ -34,7 +34,7 @@ struct StructTest {
 func FuncTest() {
     var a = [2]i32{0,1}
     a[0] = 1 
-    a[1] = "hi"
+    //a[1] = "hi"
     /*
     var a = [2]i32{0,1}
     var str = "hi"

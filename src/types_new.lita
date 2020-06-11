@@ -35,6 +35,7 @@ public func NewArrayTypeInfo(arrayOf: *TypeInfo,
 public func NewFuncPtrTypeInfo(genericParams: Array<GenericParam>,
                                returnType: *TypeInfo,
                                paramDecls: Array<*TypeInfo>,
+                               hasVarargs: bool,
                                allocator: *const Allocator) : *FuncPtrTypeInfo {
 
     var type = new<FuncPtrTypeInfo>(allocator)
@@ -43,6 +44,7 @@ public func NewFuncPtrTypeInfo(genericParams: Array<GenericParam>,
     type.genericParams = genericParams
     type.returnType = returnType
     type.paramDecls = paramDecls
+    type.hasVarargs = hasVarargs
     return type;
 }
 
@@ -111,7 +113,7 @@ public func (this: *FuncTypeInfo) asPtr(allocator: *const Allocator) : *FuncPtrT
         paramDecls.add(p.typeInfo)
     }
 
-    return NewFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, allocator)
+    return NewFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.decl.flags & FuncFlags.HAS_VARARGS, allocator)
 }
 
 public func TypeDecay(type: *TypeInfo, allocator: *const Allocator) : *TypeInfo {

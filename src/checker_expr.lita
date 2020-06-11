@@ -54,8 +54,12 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.CHAR_EXPR: {
             return this.resolveCharExpr(expr as (*CharExpr))
         }
-        case StmtKind.FUNC_CALL_EXPR:
-        case StmtKind.FUNC_IDENTIFIER_EXPR:
+        case StmtKind.FUNC_CALL_EXPR: {
+            return this.resolveFuncCallExpr(expr as (*FuncCallExpr))
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            return this.resolveFuncIdentifierExpr(expr as (*IdentifierExpr))
+        }
         case StmtKind.GET_EXPR:{
             return this.resolveGetExpr(expr as (*GetExpr))
         }
@@ -116,6 +120,98 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         }
     }
     return false
+}
+
+
+func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
+    assert(expr != null)
+    // TODO
+    return false
+}
+
+func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, funcPtr: *FuncPtrTypeInfo, suppliedArgs: *Array<*Expr>) : bool {    
+    assert(expr != null)
+    return false
+}
+
+func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr, 
+                                            funcName: *const char, 
+                                            funcPtr: *FuncPtrTypeInfo, 
+                                            numberOfSuppliedArgs: i32,
+                                            numberOfDefaultArgs: i32) : bool {
+    assert(expr != null)
+    return false
+}
+
+func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
+    assert(expr != null)
+
+    if(!this.resolveExpr(expr.object)) {
+        return false
+    }
+
+    var objectType = expr.object.operand.typeInfo
+    if(!IsFuncLike(objectType)){
+        this.errorNonFuncType(expr.object, objectType)
+        return false
+    }
+
+    var isMethod = false
+    var numberOfDefaultArgs = 0
+    var suppliedArgs = Array<*Expr>{}
+    suppliedArgs.init(expr.arguments.size(), this.allocator)
+    suppliedArgs.addAll(expr.arguments)
+
+    var funcPtr: *FuncPtrTypeInfo = null
+
+    if(objectType.kind == TypeKind.FUNC) {
+        var funcInfo = objectType as (*FuncTypeInfo)
+        isMethod = funcInfo.decl.flags & FuncFlags.IS_METHOD
+        funcPtr = funcInfo.asPtr(this.allocator)
+
+        for(var i = 0; i < funcInfo.decl.params.size(); i += 1) {
+            var p = funcInfo.decl.params.get(i)
+            if(!p.defaultExpr) {
+                numberOfDefaultArgs += 1
+            }
+        }
+    }
+    else {
+        funcPtr = objectType as (*FuncPtrTypeInfo)
+    }
+
+    var isMethodCall = isMethod && this.isMethodSyntax(expr, funcPtr, &suppliedArgs)
+    var numberOfSuppliedArgs = suppliedArgs.size()
+    this.checkNumberOfArgs(expr, objectType.name, funcPtr, numberOfSuppliedArgs, numberOfDefaultArgs)
+
+
+    var i = 0;
+    for(; i < funcPtr.paramDecls.size(); i+=1) {
+        var p = funcPtr.paramDecls.get(i)
+        if(i < numberOfSuppliedArgs) {
+            var arg = suppliedArgs.get(i)
+            if(!this.resolveExpr(arg)) {
+                return false
+            }
+
+            this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo)
+            arg.expectedType = p;
+        }
+    }
+
+    if(funcPtr.hasVarargs) {
+        for(; i < numberOfSuppliedArgs; i+=1) {
+            var arg = suppliedArgs.get(i)
+            if(!this.resolveExpr(arg)) {
+                return false
+            }
+        }
+    }
+
+    expr.arguments = *expr.node.becomeParentOfChildren(suppliedArgs)
+    expr.operand.typeInfo = funcPtr.returnType
+    expr.operand.isRightValue = true
+    return true
 }
 
 func (this: *TypeChecker) resolveBooleanExpr(expr: *BooleanExpr) : bool {
@@ -947,6 +1043,19 @@ func (this: *TypeChecker) errorNonAggregateType(expr: *Expr, type: *TypeInfo) {
     type.toString(sb)
     sb.append("'")
     sb.append(" must be an aggregate type")
+
+    this.result.addErrorStr(expr.startPos, sb)
+}
+
+func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
+    assert(expr != null)
+    assert(type != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("'")
+    type.toString(sb)
+    sb.append("'")
+    sb.append(" must be function type")
 
     this.result.addErrorStr(expr.startPos, sb)
 }

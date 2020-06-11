@@ -571,7 +571,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                 }
             }
             var returnType = this.resolveTypeSpec(funcPtrSpec.ret)
-            spec.typeInfo = NewFuncPtrTypeInfo(funcPtrSpec.genericParams, returnType, paramDecls, this.allocator) as (*TypeInfo)
+            spec.typeInfo = NewFuncPtrTypeInfo(funcPtrSpec.genericParams, returnType, paramDecls, funcPtrSpec.hasVarargs, this.allocator) as (*TypeInfo)
             return spec.typeInfo
         }
         default: {
