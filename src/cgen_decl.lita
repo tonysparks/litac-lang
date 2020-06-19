@@ -22,24 +22,97 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
 
+    var name = this.cName(decl.sym)
     if(decl.sym.flags & SymbolFlags.IS_CONSTANT) {
         // TODO: check if primitive expr
         assert(decl.expr != null)
         buf.append("#define ")
-        this.emit(this.cName(decl.sym))
+        this.emit(name)
 
         buf.append(" (")
         this.emitStmt(decl.expr)
         buf.append(")\n")
 
-        // TODO pop/undef if not a globa
+        // TODO pop/undef if not a global
     }
     else {
-        buf.append("%s", this.cTypeDecl(decl.sym.type, decl.sym.name))
+        buf.append("%s", this.cTypeDecl(decl.sym.type, name))
         if(decl.expr) {
             buf.append(" = ")
             this.emitStmt(decl.expr)
         }
         buf.append(";\n")
     }
+}
+
+public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
+    assert(decl.sym != null)
+
+    if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
+        return;
+    }
+
+    this.emitNotes(decl.attributes)
+    this.emitLineInfo(decl.stmt)
+
+    this.emitln()
+
+    var name = this.cName(decl.sym)
+    var funcInfo = decl.sym.type as (*FuncTypeInfo)
+    if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
+        var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+        buf.append("%s (*%s(", this.cType(funcPtrInfo.returnType), name)
+    }
+    else {
+        buf.append("%s %s(", this.cType(funcInfo.returnType), name)
+    }
+
+    var decayArrays = true
+    var i = 0
+    for(; i < funcInfo.decl.params.size(); i += 1) {
+        if(i > 0) {
+            buf.append(",")
+        }
+
+        var param = funcInfo.decl.params.get(i)
+        var tmp = StringBufferInit(256, this.allocator)
+        buf.append("%s", this.cTypeDecl(param.sym.type, this.prefix(param.sym.name, &tmp), decayArrays))
+    }
+
+    if(funcInfo.decl.flags & FuncFlags.HAS_VARARGS) {
+        if(i > 0) {
+            buf.append(",")
+        }
+        buf.append("...")
+    }
+
+    buf.append(")")
+
+    if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
+        var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+        buf.append(")  (")
+
+        var j = 0
+        for(; j < funcPtrInfo.paramDecls.size(); j+=1) {
+            if(j > 0) {
+                buf.append(",")
+            }
+
+            buf.append("%s", this.cType(funcPtrInfo.paramDecls.get(j)))
+        }
+        if(funcPtrInfo.hasVarargs) {
+            if(j > 0) {
+                buf.append(",")
+            }
+            buf.append("...")
+        }
+        buf.append(")")
+    }
+
+    this.emit(" {")
+    if(decl.body) {
+        this.emitStmt(decl.body)
+    }
+    this.emit("}")
+    this.emitln()
 }

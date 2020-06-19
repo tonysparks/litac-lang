@@ -153,8 +153,10 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
         if(type.kind == TypeKind.FUNC) {
             // TODO: Get method name
             var funcInfo = type as (*FuncTypeInfo)
-            //var methodName = funcInfo.getMethodName()
-            assert(false)
+            if(funcInfo.decl.flags & FuncFlags.IS_METHOD) {
+                //var methodName = funcInfo.getMethodName()
+                assert(false)
+            }
         }
         return this.escapeNameStr(type.name)
     }
@@ -393,7 +395,6 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
         default: {
             var cType = this.cType(type, false, decay)
             sb.append("%s %s", cType, name)
-            printf("HERE: `%s`\n", sb.cStrConst())
             return sb.cStrConst()
         }
     }
@@ -408,8 +409,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 
     var sb = StringBufferInit(256, this.allocator)
     if(sym.flags & SymbolFlags.IS_LOCAL) {
-        sb.append("%s%s", this.options.cPrefix, declName)
-        return sb.cStrConst()
+        return this.prefix(declName, sb)
     }
 
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
@@ -434,8 +434,7 @@ func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     var sb = StringBufferInit(256, this.allocator)
 
     if(!type.sym) {
-        sb.append("%s%s", this.options.cPrefix, typeName)
-        return sb.cStrConst()
+        return this.prefix(typeName, sb)
     }
 
     var sym = type.sym
@@ -448,6 +447,11 @@ func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
 
     // TODO: Get a non-collision based module name
     sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, typeName)
+    return sb.cStrConst()
+}
+
+func (this: using *CGen) prefix(name: *const char, sb: *StringBuffer) : *const char {
+    sb.append("%s%s", this.options.cPrefix, name)
     return sb.cStrConst()
 }
 
@@ -740,7 +744,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.FUNC_DECL: {
             var decl = s as (*FuncDecl)
-            if(!decl.attributes.notes.empty()) {
+            this.emitFuncDecl(decl)
+            return;
+            /*if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
                     this.emitStmt(decl.attributes.notes.get(i))
                     this.emit("\n")
@@ -777,7 +783,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emitStmt(decl.body)
                 //this.emit(indent, "}")
             }
-            return;
+            return;*/
         }
         case StmtKind.TYPEDEF_DECL: {
             var decl = s as (*TypedefDecl)
@@ -925,7 +931,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.FUNC_BODY_STMT: {
             var stmt = s as (*FuncBodyStmt)
-            this.emit("{")
+           // this.emit("{")
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
                 this.emitStmt(n)
@@ -936,7 +942,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     this.emit("\n")
                 }
             }
-            this.emit("}")
+            //this.emit("}")
             return;
         }
         case StmtKind.GOTO_STMT: {

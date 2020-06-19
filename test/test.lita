@@ -49,6 +49,8 @@ func TestV(i: i32, ...) {
 
 
 func FuncTest() {
+    var x = 123;
+    var y = 4 + 5
     /*
     Test1()
     Test1(4, 5)
