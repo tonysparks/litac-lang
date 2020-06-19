@@ -146,7 +146,7 @@ public func GetModuleName(pathStr: StringView) : StringView {
             endIndex = i
         }
         else if(c == '/') {
-            startIndex = i
+            startIndex = i + 1
             break
         }
     }

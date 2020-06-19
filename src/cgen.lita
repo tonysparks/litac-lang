@@ -1,5 +1,6 @@
 import "ast"
 import "string_buffer"
+import "string_view"
 import "types"
 import "module"
 import "symbols"
@@ -14,7 +15,7 @@ import "assert"
 import "cgen_decl"
 
 public struct CGen {
-    lita: *Lita
+    lita: using *Lita
     buf: StringBuffer
     line: StringBuffer
     tmp: StringBuffer
@@ -161,16 +162,241 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
     return type.name
 }
 
+func (this: using *CGen) baseTypeName(name: *const char) : StringView {
+    var str = StringViewInit(name)
+    
+    // strip module name
+    var index = str.indexOf("::")
+    if(index >= 0) {
+        str = str.substring(index + 2)
+    }
+
+    // strip generics
+    index = str.indexOf("<")
+    if(index >= 0) {
+        str = str.substring(0, index)
+    }
+    
+    return str
+}
+
 func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
     // TODO
 }
 
 /**
+    Outputs a type in C for the supplied symbol
+*/
+func (this: using *CGen) cType(type: *TypeInfo, 
+                               isCast: bool = false, 
+                               decay: bool = false) : *const char {
+    var sb = StringBufferInit(256, this.allocator)
+    switch(type.kind) {
+        case TypeKind.PTR: {
+            var ptrInfo = type as (*PtrTypeInfo)
+            var baseInfo = ptrInfo.getBaseType()
+            if(baseInfo.kind == TypeKind.ARRAY && !decay) {
+                var arrayInfo = baseInfo as (*ArrayTypeInfo)
+                if(arrayInfo.length > -1) {
+                    var cType = this.cType(arrayInfo.arrayOf, isCast, decay)
+                    sb.append("%s (*)[%zu]", cType, arrayInfo.length)
+                    return sb.cStrConst()
+                }
+            }
+            var cType = this.cType(ptrInfo.ptrOf, isCast, decay)
+            sb.append("%s*", cType)
+            return sb.cStrConst()
+
+        }
+        case TypeKind.CONST: {
+            var constInfo = type as (*ConstTypeInfo)
+            if(IsPtrLike(constInfo.constOf)) {
+                var cType = this.cType(constInfo.constOf, isCast, decay)
+                sb.append("%s const", cType)
+                return sb.cStrConst()
+            }
+            var cType = this.cType(constInfo.constOf, isCast, decay)
+            sb.append("const %s", cType)
+            return sb.cStrConst()
+        }
+        case TypeKind.ARRAY: {
+            var arrayInfo = type as (*ArrayTypeInfo)
+            if(decay) {
+                var ptrInfo = PtrTypeInfo {
+                    .info = TypeInfo {. kind = TypeKind.PTR},
+                    .ptrOf = arrayInfo.arrayOf
+                }
+                return this.cType(ptrInfo, isCast, decay)
+            }
+
+            var baseInfo = arrayInfo.getBaseType()
+            var baseName = this.cType(baseInfo)
+
+            var buf = StringBufferInit(256, this.allocator)
+            do {
+                if(arrayInfo.length < 0) {
+                    if(arrayInfo.numOfElements) {
+                        buf.append("[")
+                        var cgen = CGen {
+                            .lita = this.lita,
+                            .buf = buf
+                        }
+                        cgen.emitStmt(arrayInfo.numOfElements)
+                        buf.append("]")
+                    }
+                    else {
+                        buf.append("[]")
+                    }
+                }
+                else {
+                    buf.append("[%zu]", arrayInfo.length)
+                }
+
+                if(arrayInfo.arrayOf && arrayInfo.arrayOf.kind == TypeKind.ARRAY) {
+                    arrayInfo = arrayInfo.arrayOf as (*ArrayTypeInfo)
+                }
+                else {
+                    arrayInfo = null
+                }
+            }
+            while(arrayInfo);
+
+            sb.append("%s%s", baseName, buf.cStrConst())
+            return sb.cStrConst()
+        }        
+        case TypeKind.FUNC_PTR: {
+            var funcInfo = type as (*FuncPtrTypeInfo)
+            var params = StringBufferInit(512, this.allocator)
+            for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
+                if(i > 0) {
+                    params.append(",")
+                }
+
+                var param = funcInfo.paramDecls.get(i)
+                params.append("%s", this.cType(param, isCast, true))
+            }
+
+            sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, isCast, decay), 
+                isCast ? "" : this.cTypeName(funcInfo), params.cStrConst())
+            return sb.cStrConst()
+        }
+        default: {
+            return this.cTypeName(type)
+        }
+    }
+}
+
+/**
     Outputs a type declaration in C for the supplied symbol
 */
-func (this: using *CGen) emitTypeDeclForC(type: *TypeInfo, name: *const char, decay: bool = false) {
-    // TODO
-    buf.append("%s", name)
+func (this: using *CGen) cTypeDecl(type: *TypeInfo, 
+                                   name: *const char, 
+                                   decay: bool = false) : *const char {
+
+    var sb = StringBufferInit(256, this.allocator)
+    switch(type.kind) {
+        case TypeKind.PTR: {
+            var ptrInfo = type as (*PtrTypeInfo)
+            var baseInfo = ptrInfo.getBaseType()
+            if(baseInfo.kind == TypeKind.ARRAY && !decay) {
+                var arrayInfo = baseInfo as (*ArrayTypeInfo)
+                if(arrayInfo.length > -1) {
+                    var cType = this.cType(arrayInfo.arrayOf)
+                    sb.append("%s (*%s)[%zu]", cType, name, arrayInfo.length)
+                    return sb.cStrConst()
+                }
+            }
+            var cType = this.cType(type, false, decay)
+            sb.append("%s %s", cType, name)
+            return sb.cStrConst()
+        }
+        case TypeKind.CONST: {
+            var constInfo = type as (*ConstTypeInfo)
+            if(IsPtrLike(constInfo.constOf)) {
+                var cType = this.cType(constInfo.constOf, false, decay)
+                sb.append("%s const %s", cType, name)
+                return sb.cStrConst()
+            }
+            var cType = this.cTypeDecl(constInfo.constOf, name, decay)
+            sb.append("const %s", cType)
+            return sb.cStrConst()
+        }
+        case TypeKind.ARRAY: {
+            var arrayInfo = type as (*ArrayTypeInfo)
+            if(decay) {
+                var ptrInfo = PtrTypeInfo {
+                    .info = TypeInfo {. kind = TypeKind.PTR},
+                    .ptrOf = arrayInfo.arrayOf
+                }
+                return this.cTypeDecl(ptrInfo, name, decay)
+            }
+
+            var baseInfo = arrayInfo.getBaseType()
+            var baseName = this.cType(baseInfo)
+
+            var buf = StringBufferInit(256, this.allocator)
+            do {
+                if(arrayInfo.length < 0) {
+                    if(arrayInfo.numOfElements) {
+                        buf.append("[")
+                        var cgen = CGen {
+                            .lita = this.lita,
+                            .buf = buf
+                        }
+                        cgen.emitStmt(arrayInfo.numOfElements)
+                        buf.append("]")
+                    }
+                    else {
+                        buf.append("[]")
+                    }
+                }
+                else {
+                    buf.append("[%zu]", arrayInfo.length)
+                }
+
+                if(arrayInfo.arrayOf && arrayInfo.arrayOf.kind == TypeKind.ARRAY) {
+                    arrayInfo = arrayInfo.arrayOf as (*ArrayTypeInfo)
+                }
+                else {
+                    arrayInfo = null
+                }
+            }
+            while(arrayInfo);
+
+            if(baseInfo.kind == TypeKind.FUNC_PTR) {
+                buf.insert(0, "%s", name)
+                return this.cTypeDecl(baseInfo, buf.cStrConst(), decay)
+            }
+            
+            sb.append("%s %s%s", baseName, name, buf.cStrConst())
+            return sb.cStrConst()
+        }        
+        case TypeKind.STR: {
+            sb.append("const char* %s", name)
+            return sb.cStrConst()
+        }
+        case TypeKind.FUNC_PTR: {
+            var funcInfo = type as (*FuncPtrTypeInfo)
+            var params = StringBufferInit(512, this.allocator)
+            for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
+                if(i > 0) {
+                    params.append(",")
+                }
+
+                var param = funcInfo.paramDecls.get(i)
+                params.append("%s", this.cType(param, false, true))
+            }
+
+            sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, false, decay), name, params.cStrConst())
+            return sb.cStrConst()
+        }
+        default: {
+            var cType = this.cType(type, false, decay)
+            sb.append("%s %s", cType, name)
+            printf("HERE: `%s`\n", sb.cStrConst())
+            return sb.cStrConst()
+        }
+    }
 }
 
 /**
@@ -180,16 +406,49 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var declName:*const char = (sym.flags & SymbolFlags.IS_TYPE) 
                                     ? this.escapeName(sym.type) : sym.name;
 
+    var sb = StringBufferInit(256, this.allocator)
     if(sym.flags & SymbolFlags.IS_LOCAL) {
-        return declName
+        sb.append("%s%s", this.options.cPrefix, declName)
+        return sb.cStrConst()
     }
 
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
+        if(sym.flags & SymbolFlags.IS_BUILTIN) {
+
+        }
         // TODO: Get the foreign override name
     }
 
-    // TODO: Append module name to name
-    buf.append("%s", sym.name)
+    // TODO: Get a non-collision based module name
+    sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, declName)
+    return sb.cStrConst()
+}
+
+/**
+    Outputs the C name for the symbol
+*/    
+func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
+    assert(type != null)
+
+    var typeName = this.escapeName(type)
+    var sb = StringBufferInit(256, this.allocator)
+
+    if(!type.sym) {
+        sb.append("%s%s", this.options.cPrefix, typeName)
+        return sb.cStrConst()
+    }
+
+    var sym = type.sym
+    if(sym.flags & SymbolFlags.IS_FOREIGN) {
+        if(sym.flags & SymbolFlags.IS_BUILTIN) {
+
+        }
+        // TODO: Get the foreign override name
+    }
+
+    // TODO: Get a non-collision based module name
+    sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, typeName)
+    return sb.cStrConst()
 }
 
 func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
@@ -302,6 +561,16 @@ func (this: using *CGen) emit(format: *const char, ...) {
     }
 }
 
+func (this: using *CGen) emitNotes(attributes: *Attributes) {
+    if(!attributes.notes.empty()) {
+        // TODO Notes!!
+        for(var i = 0; i < attributes.notes.size(); i += 1) {
+            //this.emitStmt(decl.attributes.notes.get(i))
+            //this.emit("\n")
+        }
+    }
+}
+
 func (this: using *CGen) emitStmt(s: *Stmt) {
     if(!s) return;
 
@@ -320,6 +589,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
             var decl = s as (*VarDecl)
+            this.emitVarDecl(decl)
+            return;
+            /*
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
                     this.emitStmt(decl.attributes.notes.get(i))
@@ -343,7 +615,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emitStmt(decl.expr)
             }
             this.emit(";")
-            return;
+            return;*/
         }
         case StmtKind.STRUCT_DECL: {
             var decl = s as (*AggregateDecl)

@@ -348,7 +348,7 @@ public func NewFuncCallExpr(startPos: SrcPos,
     expr.startPos = startPos
     expr.endPos = endPos
     expr.object = expr.node.becomeParentOf(object)
-    expr.node.becomeParentOfChildren(expr.arguments)
+    expr.arguments = *expr.node.becomeParentOfChildren(arguments)
     expr.genericArgs = genericArgs
 
     return expr as (*Expr)

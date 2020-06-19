@@ -125,13 +125,49 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
 
 func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
-    // TODO
-    return false
+    var type = this.resolveTypeSpec(expr.type)
+    if(!type) {
+        this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
+        return false
+    }
+
+    var sym = type.sym
+    if(type.kind == TypeKind.FUNC_PTR) {
+        var funcSym = this.current.getType(expr.type.name)
+        if(funcSym && funcSym.type && funcSym.type.kind == TypeKind.FUNC_PTR) {
+            sym = funcSym
+        }
+    }
+
+    if(!sym) {
+        this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
+        return false
+    }
+
+    expr.operand.typeInfo = sym.type
+    expr.operand.isRightValue = true
+    expr.sym = sym
+    return true
 }
 
 func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, funcPtr: *FuncPtrTypeInfo, suppliedArgs: *Array<*Expr>) : bool {    
     assert(expr != null)
-    return false
+    if(expr.object.kind != StmtKind.GET_EXPR) {
+        return false
+    }
+
+    var getExpr = expr.object as (*GetExpr)
+    if(getExpr.field.operand.typeInfo.kind != TypeKind.FUNC) {
+        return false
+    }
+
+    if(getExpr.isMethodCall) {
+        return true
+    }
+
+    getExpr.isMethodCall = true
+    suppliedArgs.insertAt(0, getExpr.object)
+    return true
 }
 
 func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr, 
@@ -140,7 +176,31 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
                                             numberOfSuppliedArgs: i32,
                                             numberOfDefaultArgs: i32) : bool {
     assert(expr != null)
-    return false
+
+    var maxNumOfArgs = funcPtr.paramDecls.size()
+    if(maxNumOfArgs == numberOfSuppliedArgs) {
+        return true
+    }
+
+    var minNumOfArgs = maxNumOfArgs - numberOfDefaultArgs
+    if(numberOfSuppliedArgs == minNumOfArgs) {
+        return true
+    }
+    if(minNumOfArgs > numberOfSuppliedArgs) {
+        this.result.addError(expr.startPos, "'%s' called with too few arguments", funcName)
+        return false
+    }
+
+    if(funcPtr.hasVarargs) {
+        return true
+    }
+
+    if(maxNumOfArgs < numberOfSuppliedArgs) {
+        this.result.addError(expr.startPos, "'%s' called with too many arguments", funcName)
+        return false
+    }
+
+    return true
 }
 
 func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
@@ -159,7 +219,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     var isMethod = false
     var numberOfDefaultArgs = 0
     var suppliedArgs = Array<*Expr>{}
-    suppliedArgs.init(expr.arguments.size(), this.allocator)
+    suppliedArgs.init(expr.arguments.size() + 1, this.allocator)
     suppliedArgs.addAll(expr.arguments)
 
     var funcPtr: *FuncPtrTypeInfo = null
@@ -171,7 +231,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
 
         for(var i = 0; i < funcInfo.decl.params.size(); i += 1) {
             var p = funcInfo.decl.params.get(i)
-            if(!p.defaultExpr) {
+            if(p.defaultExpr) {
                 numberOfDefaultArgs += 1
             }
         }

@@ -12,7 +12,10 @@ func test2<  (x: bool, ...) : i32 {
 
 const c = 2;
 var x = 4;
-
+var y = "hi"
+var z = [2]i32 {1, 2}
+var w = &x
+/*
 @foreign
 enum EnumTest {
   //  TEST_FIELD = c
@@ -31,9 +34,33 @@ struct StructTest {
     }
 }
 
+func Test1(i: i32) {
+
+}
+
+func Test2(i: i32, j: i32) {
+
+}
+
+func TestV(i: i32, ...) {
+
+}
+*/
+
+
 func FuncTest() {
-    var a = [2]i32{0,1}
-    a[0] = 1 
+    /*
+    Test1()
+    Test1(4, 5)
+    Test1(4)
+    Test2(1)
+    Test2(1,2,4)
+    Test2(1,2)
+    TestV(3)
+    TestV()
+    TestV(1,2,3,4)*/
+    //var a = [2]i32{0,1}
+    //a[0] = 1 
     //a[1] = "hi"
     /*
     var a = [2]i32{0,1}

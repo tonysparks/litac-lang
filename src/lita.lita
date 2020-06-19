@@ -7,6 +7,8 @@ import "string_view"
 import "system"
 import "symbols"
 
+public const MAX_PREFIX_SIZE = 32
+
 public struct Lita {
     allocator: *const Allocator // TODO proper arena allocator
     result: PhaseResult
@@ -51,6 +53,8 @@ public struct LitaOptions {
     cOutputOnly: bool              // generates C file only, does not compile it
     run: bool                      // runs after successful compilation
     showProfileInfo: bool          // outputs profiling information
+
+    cPrefix: [MAX_PREFIX_SIZE]char // Prefix for types/variables defined in C
 }
 
 var linearAllocator = LinearAllocator{}
