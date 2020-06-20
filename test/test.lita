@@ -47,10 +47,33 @@ func TestV(i: i32, ...) {
 }
 */
 
+enum TypeKind {
+    Array = 1,
+    Const = 2 + 3,
+    Ptr
+}
+
+struct Person {
+    name: *const char
+    struct Address {
+        line: *const char
+        zip: i32
+    }
+
+    union Value {
+        t: [2]i32
+        m: [2]*const char
+    }
+}
+
+func AnotherFunc() : i32 {
+
+}
 
 func FuncTest() {
     var x = 123;
-    var y = 4 + 5
+    var y = 4 + 5;
+    var z: [2]*const char;
     /*
     Test1()
     Test1(4, 5)

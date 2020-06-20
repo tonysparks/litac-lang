@@ -163,16 +163,16 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
-                    case StmtKind.ENUM_FIELD_STMT: {
+                    case StmtKind.ENUM_FIELD_DECL: {
                         PrintStmt(field.enumField as (*Stmt), indent+1)
                         break;
                     }
-                    case StmtKind.STRUCT_FIELD_STMT: 
-                    case StmtKind.UNION_FIELD_STMT: {
+                    case StmtKind.STRUCT_FIELD_DECL: 
+                    case StmtKind.UNION_FIELD_DECL: {
                         PrintStmt(field.aggregateField as (*Stmt), indent+1)
                         break;
                     }
-                    case StmtKind.VAR_FIELD_STMT: {
+                    case StmtKind.VAR_FIELD_DECL: {
                         PrintStmt(field.varField, indent+1)
                         break;
                     }
@@ -211,16 +211,16 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
                 switch(field.kind) {
-                    case StmtKind.ENUM_FIELD_STMT: {
+                    case StmtKind.ENUM_FIELD_DECL: {
                         PrintStmt(field.enumField as (*Stmt), indent+1)
                         break;
                     }
-                    case StmtKind.STRUCT_FIELD_STMT: 
-                    case StmtKind.UNION_FIELD_STMT: {
+                    case StmtKind.STRUCT_FIELD_DECL: 
+                    case StmtKind.UNION_FIELD_DECL: {
                         PrintStmt(field.aggregateField as (*Stmt), indent+1)
                         break;
                     }
-                    case StmtKind.VAR_FIELD_STMT: {
+                    case StmtKind.VAR_FIELD_DECL: {
                         PrintStmt(field.varField, indent+1)
                         break;
                     }
@@ -402,10 +402,10 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             printf("\n")
             return;
         }
-        case StmtKind.ENUM_FIELD_ENTRY_STMT: {
-            var stmt = s as (*EnumFieldEntryStmt)
+        case StmtKind.ENUM_FIELD_ENTRY_DECL: {
+            var stmt = s as (*EnumFieldEntryDecl)
             Printf(indent, "")
-            PrintName(stmt.fieldName)
+            PrintName(stmt.name)
             if(stmt.value) {
                 printf(" = ")
                 PrintStmt(stmt.value, 0)
@@ -571,8 +571,8 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             stmt.decl = null
             return stmt as (*Stmt)
         }*/
-        case StmtKind.VAR_FIELD_STMT: {
-            var stmt = s as (*VarFieldStmt)
+        case StmtKind.VAR_FIELD_DECL: {
+            var stmt = s as (*VarFieldDecl)
             if(!stmt.attributes.notes.empty()) {
                 for(var i = 0; i < stmt.attributes.notes.size(); i += 1) {
                     PrintStmt(stmt.attributes.notes.get(i), indent)
@@ -580,7 +580,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
             Printf(indent, "")
-            PrintName(stmt.fieldName)
+            PrintName(stmt.name)
             printf(": ")
             PrintTypeSpec(stmt.type)
             return;

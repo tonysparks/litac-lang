@@ -105,19 +105,19 @@ func FindModulePath(lita: *Lita,
     
     pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
     //printf("Check: '%s'\n", pathStr.cStr())
-    if(FileExists(pathStr.cConstStr())) {            
+    if(FileExists(pathStr.cStrConst())) {
         return true
     }
     
     pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
     //printf("Check: '%s'\n", pathStr.cStr())
-    if(FileExists(pathStr.cConstStr())) {
+    if(FileExists(pathStr.cStrConst())) {
         return true
     }
 
     pathStr.format("%s/lib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
     //printf("Check: '%s'\n", pathStr.cStr())
-    if(FileExists(pathStr.cConstStr())) {
+    if(FileExists(pathStr.cStrConst())) {
         return true
     }
 

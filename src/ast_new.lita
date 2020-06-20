@@ -150,16 +150,16 @@ public func NewAggregateDecl(startPos: SrcPos,
     for(var i = 0; i < fields.size(); i += 1) {
         var field = fields.get(i)
         switch(field.kind) {
-            case StmtKind.ENUM_FIELD_STMT: {
+            case StmtKind.ENUM_FIELD_DECL: {
                 decl.node.becomeParentOf(field.enumField)
                 break
             }
-            case StmtKind.UNION_FIELD_STMT:
-            case StmtKind.STRUCT_FIELD_STMT: {
+            case StmtKind.UNION_FIELD_DECL:
+            case StmtKind.STRUCT_FIELD_DECL: {
                 decl.node.becomeParentOf(field.aggregateField)
                 break
             }
-            case StmtKind.VAR_FIELD_STMT: {
+            case StmtKind.VAR_FIELD_DECL: {
                 decl.node.becomeParentOf(field.varField)
                 break
             }
@@ -202,7 +202,7 @@ public func NewUnionDecl(startPos: SrcPos,
 public func NewEnumDecl(startPos: SrcPos, 
                          endPos: SrcPos,
                          name: Token,
-                         fields: Array<*EnumFieldEntryStmt>,
+                         fields: Array<*EnumFieldEntryDecl>,
                          allocator: *const Allocator) : *Decl {                              
     var decl = new<EnumDecl>(allocator)
     decl.kind = StmtKind.ENUM_DECL;
@@ -866,36 +866,36 @@ public func NewParametersStmt(startPos: SrcPos,
 }
 
 
-public func NewVarFieldStmt(startPos: SrcPos,
+public func NewVarFieldDecl(startPos: SrcPos,
                             endPos: SrcPos,
                             fieldName: Token,
                             type: *TypeSpec,
                             attributes: Attributes,
                             defaultExpr: *Expr,
                             allocator: *const Allocator) : *Stmt {
-    var stmt = new<VarFieldStmt>(allocator)
-    stmt.kind = StmtKind.VAR_FIELD_STMT
+    var stmt = new<VarFieldDecl>(allocator)
+    stmt.kind = StmtKind.VAR_FIELD_DECL
     stmt.startPos = startPos
     stmt.endPos = endPos
-    stmt.fieldName = fieldName
+    stmt.name = fieldName
     stmt.type = type
     stmt.attributes = attributes
-    stmt.defaultExpr = stmt.node.becomeParentOf(defaultExpr)    
+    stmt.defaultExpr = stmt.node.becomeParentOf(defaultExpr)
     return stmt as (*Stmt)
 }
 
 
-public func NewEnumFieldEntryStmt(startPos: SrcPos,
+public func NewEnumFieldEntryDecl(startPos: SrcPos,
                             endPos: SrcPos,
                             fieldName: Token,
                             value: *Expr,
                             attributes: Attributes,
                             allocator: *const Allocator) : *Stmt {
-    var stmt = new<EnumFieldEntryStmt>(allocator)
-    stmt.kind = StmtKind.ENUM_FIELD_ENTRY_STMT
+    var stmt = new<EnumFieldEntryDecl>(allocator)
+    stmt.kind = StmtKind.ENUM_FIELD_ENTRY_DECL
     stmt.startPos = startPos
     stmt.endPos = endPos
-    stmt.fieldName = fieldName
+    stmt.name = fieldName
     stmt.attributes = attributes
     stmt.value = stmt.node.becomeParentOf(value)
     return stmt as (*Stmt)

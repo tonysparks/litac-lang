@@ -802,12 +802,12 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true
         }
-        case StmtKind.ENUM_FIELD_STMT: 
+        case StmtKind.ENUM_FIELD_DECL: 
             // handled in resolveEnumDecl
-        case StmtKind.ENUM_FIELD_ENTRY_STMT:
-        case StmtKind.STRUCT_FIELD_STMT:
-        case StmtKind.UNION_FIELD_STMT:
-        case StmtKind.VAR_FIELD_STMT:{
+        case StmtKind.ENUM_FIELD_ENTRY_DECL:
+        case StmtKind.STRUCT_FIELD_DECL:
+        case StmtKind.UNION_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL:{
             // handled in the resolveAggregateDecl 
             assert(false)
             return false;

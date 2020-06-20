@@ -31,7 +31,7 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
 
         buf.append(" (")
         this.emitStmt(decl.expr)
-        buf.append(")\n")
+        buf.append(")")
 
         // TODO pop/undef if not a global
     }
@@ -41,7 +41,7 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
             buf.append(" = ")
             this.emitStmt(decl.expr)
         }
-        buf.append(";\n")
+        buf.append(";")
     }
 }
 
@@ -54,8 +54,6 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
 
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
-
-    this.emitln()
 
     var name = this.cName(decl.sym)
     var funcInfo = decl.sym.type as (*FuncTypeInfo)
@@ -113,6 +111,84 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     if(decl.body) {
         this.emitStmt(decl.body)
     }
-    this.emit("}")
-    this.emitln()
+    this.emit("}\n")
+}
+
+
+public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
+    assert(decl.sym != null)
+
+    
+    if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
+        return;
+    }
+
+    if(decl.flags & AggregateFlags.IS_EMBEDDED && this.aggregateLevel < 1) {
+        return;
+    }
+
+    this.aggregateLevel += 1
+    defer this.aggregateLevel -= 1
+
+    // TODO: Prelude notes and Postlude notes
+    this.emitNotes(decl.attributes)
+    this.emitLineInfo(decl.stmt)
+
+    var name = this.cName(decl.sym)
+    var aggInfo = decl.sym.type as (*AggregateTypeInfo)
+
+    this.emit("%s %s {", decl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", name)
+    for(var i = 0; i < decl.fields.size(); i+=1) {
+        var field = decl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                this.emitStmt(field.varField)
+                break;
+            }
+            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.STRUCT_FIELD_DECL: {
+                this.emitStmt(field.aggregateField)
+                break;
+            }
+            case StmtKind.ENUM_FIELD_DECL: {
+                this.emitStmt(field.enumField)
+                break;
+            }
+            default: {
+            }
+        }
+    }
+    this.emit("};\n")
+}
+
+
+public func (this: using *CGen) emitEnumDecl(decl: *EnumDecl) {
+    assert(decl.sym != null)
+
+    
+    if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
+        return;
+    }
+
+    this.emitNotes(decl.attributes)
+    this.emitLineInfo(decl.stmt)
+
+    var name = this.cName(decl.sym)
+    var enumInfo = decl.sym.type as (*EnumTypeInfo)
+    this.emit("typedef enum %s {", name)
+    for(var i = 0; i < decl.fields.size(); i+=1) {
+        if(i > 0) {
+            this.emit(",\n")
+        }
+
+        var field = decl.fields.get(i)
+        this.emit("%s_%.*s", name, field.name.str.length, field.name.str.buffer)
+        if(field.value) {
+            this.emit(" = ")
+            this.emitStmt(field.value)
+        }
+    }
+    this.emit("} %s;\n", name)
+
+    // TODO: enumAsStr function
 }

@@ -21,6 +21,11 @@ public enum StmtKind {
     TYPEDEF_DECL,
     PARAM_DECL,
     NATIVE_DECL,
+    VAR_FIELD_DECL,    
+    ENUM_FIELD_ENTRY_DECL,
+    ENUM_FIELD_DECL,
+    STRUCT_FIELD_DECL,
+    UNION_FIELD_DECL,
     POISON_DECL,
 
     BLOCK_STMT,
@@ -30,8 +35,6 @@ public enum StmtKind {
     DEFER_STMT,
     DO_WHILE_STMT,
     EMPTY_STMT,
-    ENUM_FIELD_ENTRY_STMT,
-    ENUM_FIELD_STMT,
     //FIELD_STMT,
     FOR_STMT,
     FUNC_BODY_STMT,
@@ -42,11 +45,8 @@ public enum StmtKind {
     NOTE_STMT,
     PARAMETERS_STMT,
     RETURN_STMT,
-    STRUCT_FIELD_STMT,
     SWITCH_CASE_STMT,
     SWITCH_STMT,
-    UNION_FIELD_STMT,
-    VAR_FIELD_STMT,
     WHILE_STMT,
 
     ARRAY_DESIGNATION_EXPR,
@@ -226,7 +226,7 @@ public struct AggregateDecl {
 
 public struct EnumDecl {
     decl: using Decl
-    fields: Array<*EnumFieldEntryStmt>
+    fields: Array<*EnumFieldEntryDecl>
 }
 
 public struct TypedefDecl {
@@ -281,16 +281,9 @@ public struct EmptyStmt {
     stmt: using Stmt
 }
 
-public struct EnumFieldEntryStmt {
-    stmt: using Stmt
-    fieldName: Token
+public struct EnumFieldEntryDecl {
+    decl: using Decl
     value: *Expr
-    attributes: Attributes
-}
-
-public struct EnumFieldStmt {
-    stmt: using Stmt
-    decl: *EnumDecl
 }
 
 public struct ForStmt {
@@ -350,12 +343,6 @@ public struct ReturnStmt {
     expr: *Expr
 }
 
-
-public struct AggregateFieldStmt {
-    stmt: using Stmt
-    decl: *AggregateDecl
-}
-
 public struct SwitchCaseStmt {
     stmt: using Stmt
     cond: *Expr
@@ -369,11 +356,9 @@ public struct SwitchStmt {
     defaultStmt: *Stmt
 }
 
-public struct VarFieldStmt {
-    stmt: using Stmt
-    fieldName: Token
+public struct VarFieldDecl {
+    decl: using Decl
     type: *TypeSpec
-    attributes: Attributes
     defaultExpr: *Expr
 }
 
@@ -383,7 +368,7 @@ public struct FieldStmt {
     union {
         enumField: *EnumDecl
         aggregateField: *AggregateDecl
-        varField: *VarFieldStmt
+        varField: *VarFieldDecl
         poisonField: *Expr
     }
 }
@@ -622,19 +607,24 @@ public func IsDecl(node: *Node) : bool {
 }
 
 public func (d: *Decl) hasNote(name: *const char) : bool {
-    if(!d) return false;
+    return d.getNote(name) != null
+}
+
+
+public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
+    if(!d) return null;
 
     if(d.attributes.notes.empty()) {
-        return false;
+        return null;
     }
 
     for(var i = 0; i < d.attributes.notes.size(); i += 1) {
         var note = d.attributes.notes.get(i)
         if(note.name.nameEquals(name)) {
-            return true;
+            return note;
         }
     }
-    return false;
+    return null;
 }
 
 public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {

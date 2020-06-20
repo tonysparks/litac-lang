@@ -326,7 +326,10 @@ public func (this: *TypeInfo) getBaseType() : *TypeInfo {
         }
         case TypeKind.ARRAY: {
             var info = this as (*ArrayTypeInfo)
-            return info.arrayOf.getBaseType()
+            if(info.arrayOf.kind == TypeKind.ARRAY) {
+                return info.arrayOf.getBaseType()
+            }
+            return info.arrayOf
         }
         case TypeKind.STR: {
             return &CHAR_TYPE
@@ -813,11 +816,11 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
     return false
 }
 
-public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryStmt {
+public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryDecl {
     assert(this != null)
     for(var i = 0; i < this.decl.fields.size(); i+=1) {
         var field = this.decl.fields.get(i)        
-        if(field.fieldName.str.equals(name)) {
+        if(field.name.str.equals(name)) {
             return field
         }
     }
@@ -842,22 +845,22 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
     for(var i = 0; i < this.decl.fields.size(); i+=1) {
         var field = this.decl.fields.get(i)
         switch(field.kind) {
-            case StmtKind.VAR_FIELD_STMT: {
+            case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
-                if(varField.fieldName.str.equals(name)) {
+                if(varField.name.str.equals(name)) {
                     return field
                 }
                 break;
             }
-            case StmtKind.ENUM_FIELD_STMT: {
+            case StmtKind.ENUM_FIELD_DECL: {
                 var enumField = field.enumField
                 if(enumField.name.str.equals(name)) {
                     return field
                 }
                 break;
             }
-            case StmtKind.UNION_FIELD_STMT: 
-            case StmtKind.STRUCT_FIELD_STMT: {
+            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.STRUCT_FIELD_DECL: {
                 var aggField = field.aggregateField
 
                 // if this is an anonymous aggregate, the fields

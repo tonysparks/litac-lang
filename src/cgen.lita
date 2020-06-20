@@ -1,6 +1,7 @@
 import "ast"
 import "string_buffer"
 import "string_view"
+import "string"
 import "types"
 import "module"
 import "symbols"
@@ -20,6 +21,7 @@ public struct CGen {
     line: StringBuffer
     tmp: StringBuffer
     indent: i32
+    aggregateLevel: i32
 }
 
 public func (this: *CGen) init(lita: *Lita) {
@@ -27,6 +29,7 @@ public func (this: *CGen) init(lita: *Lita) {
     this.buf.init(4096, lita.allocator)
     this.line.init(1024, lita.allocator)
     this.tmp.init(1024, lita.allocator)
+    this.aggregateLevel = 0
 }
 
 public func (this: using *CGen) emitProgram(module: *Module) {
@@ -66,6 +69,7 @@ func (this: using *CGen) emitPrimitiveConstDecls() {
         }
 
         this.emitVarDecl(sym.decl as (*VarDecl))
+        this.emitln()
     }
 }
 
@@ -73,6 +77,11 @@ func (this: using *CGen) emitForwardDecls() {
     var program = &this.lita.programSymbols
     for(var i = 0; i < program.symbolTypes.size(); i += 1) {
         var sym = program.symbolTypes.get(i)
+        this.emitTypeForwardDecl(sym)
+    }
+
+    for(var i = 0; i < program.symbolFuncs.size(); i += 1) {
+        var sym = program.symbolFuncs.get(i)
         this.emitTypeForwardDecl(sym)
     }
 }
@@ -87,12 +96,73 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     switch(decl.kind) {
         case StmtKind.VAR_DECL:
         case StmtKind.CONST_DECL:
-        case StmtKind.FUNC_DECL:
             this.buf.append("~~ %s;\n", sym.name)
             break;
+        case StmtKind.FUNC_DECL: {
+            this.emitNotes(decl.attributes)
+            this.emitln()
+
+            var name = this.cName(decl.sym)
+            var funcInfo = decl.sym.type as (*FuncTypeInfo)
+            if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
+                var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+                buf.append("%s (*%s(", this.cType(funcPtrInfo.returnType), name)
+            }
+            else {
+                buf.append("%s %s(", this.cType(funcInfo.returnType), name)
+            }
+
+            var decayArrays = true
+            var isCast = false
+            var i = 0
+            for(; i < funcInfo.decl.params.size(); i += 1) {
+                if(i > 0) {
+                    buf.append(",")
+                }
+
+                var param = funcInfo.decl.params.get(i)
+                buf.append("%s", this.cType(param.sym.type, isCast, decayArrays))
+            }
+
+            if(funcInfo.decl.flags & FuncFlags.HAS_VARARGS) {
+                if(i > 0) {
+                    buf.append(",")
+                }
+                buf.append("...")
+            }
+
+            buf.append(")")
+
+            if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
+                var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+                buf.append(")  (")
+
+                var j = 0
+                for(; j < funcPtrInfo.paramDecls.size(); j+=1) {
+                    if(j > 0) {
+                        buf.append(",")
+                    }
+
+                    buf.append("%s", this.cType(funcPtrInfo.paramDecls.get(j)))
+                }
+                if(funcPtrInfo.hasVarargs) {
+                    if(j > 0) {
+                        buf.append(",")
+                    }
+                    buf.append("...")
+                }
+                buf.append(")")
+            }
+
+            buf.append(";\n")
+            break;
+        }
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
-            this.buf.append("struct %s;\n", sym.name)
+            var aggDecl = decl as (*AggregateDecl)
+            if(!(aggDecl.flags & AggregateFlags.IS_EMBEDDED)) {
+                this.buf.append("typedef %s %s;\n", aggDecl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", sym.name)
+            }
             break;
         }
         case StmtKind.ENUM_DECL: {
@@ -184,6 +254,7 @@ func (this: using *CGen) baseTypeName(name: *const char) : StringView {
 
 func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
     // TODO
+    //this.emitln()
 }
 
 /**
@@ -621,8 +692,12 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emit(";")
             return;*/
         }
+        case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var decl = s as (*AggregateDecl)
+            this.emitAggregateDecl(decl)
+            return;
+            /*
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
                     this.emitStmt(decl.attributes.notes.get(i))
@@ -669,6 +744,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             this.emit("}")
             return;
+            
         }
         case StmtKind.UNION_DECL: {
             var decl = s as (*AggregateDecl)
@@ -718,9 +794,13 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             this.emit("}")
             return;
+        }*/
         }
         case StmtKind.ENUM_DECL: {
             var decl = s as (*EnumDecl)
+            this.emitEnumDecl(decl)
+            return;
+            /*
             if(!decl.attributes.notes.empty()) {
                 for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
                     this.emitStmt(decl.attributes.notes.get(i))
@@ -740,7 +820,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emit(",\n")
             }
             this.emit("}")
-            return;
+            return;*/
         }
         case StmtKind.FUNC_DECL: {
             var decl = s as (*FuncDecl)
@@ -893,10 +973,10 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emit("\n")
             return;
         }
-        case StmtKind.ENUM_FIELD_ENTRY_STMT: {
-            var stmt = s as (*EnumFieldEntryStmt)
+        case StmtKind.ENUM_FIELD_ENTRY_DECL: {
+            var stmt = s as (*EnumFieldEntryDecl)
             this.emit("")
-            this.emitName(stmt.fieldName)
+            this.emitName(stmt.name)
             if(stmt.value) {
                 this.emit(" = ")
                 this.emitStmt(stmt.value)
@@ -931,7 +1011,6 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.FUNC_BODY_STMT: {
             var stmt = s as (*FuncBodyStmt)
-           // this.emit("{")
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
                 this.emitStmt(n)
@@ -942,7 +1021,6 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     this.emit("\n")
                 }
             }
-            //this.emit("}")
             return;
         }
         case StmtKind.GOTO_STMT: {
@@ -1061,8 +1139,25 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             stmt.decl = null
             return stmt as (*Stmt)
         }*/
-        case StmtKind.VAR_FIELD_STMT: {
-            var stmt = s as (*VarFieldStmt)
+        case StmtKind.VAR_FIELD_DECL: {
+            var decl = s as (*VarFieldDecl)
+            this.emitLineInfo(decl)
+
+            var name: [MAX_SYMBOL_NAME]char;
+            var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+            nameStr.format("%.*s", decl.name.str.length, decl.name.str.buffer)
+
+            var aliasNote = decl.getNote("alias")
+            if(aliasNote && !aliasNote.attributes.empty()) {
+                var aliasName = aliasNote.attributes.get(0)
+
+                nameStr.clear()
+                nameStr.format("%.*s", aliasName.str.length, aliasName.str.buffer)
+            }
+
+            this.emit("%s;\n", this.cTypeDecl(decl.type.typeInfo, nameStr.cStrConst()))
+            return;
+            /*
             if(!stmt.attributes.notes.empty()) {
                 for(var i = 0; i < stmt.attributes.notes.size(); i += 1) {
                     this.emitStmt(stmt.attributes.notes.get(i))
@@ -1073,7 +1168,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitName(stmt.fieldName)
             this.emit(": ")
             this.emitTypeSpec(stmt.type)
-            return;
+            return;*/
+            
         }
         case StmtKind.WHILE_STMT: {
             var stmt = s as (*WhileStmt)            

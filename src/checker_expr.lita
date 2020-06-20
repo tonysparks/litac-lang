@@ -437,7 +437,7 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
     
     for(var position = 0; position < aggInfo.decl.fields.size(); position += 1) {
         var field = aggInfo.decl.fields.get(position)
-        if(field.kind != StmtKind.VAR_FIELD_STMT) {
+        if(field.kind != StmtKind.VAR_FIELD_DECL) {
             continue
         }
 
@@ -453,7 +453,7 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
             if(arg.fieldName.type == TokenType.IDENTIFIER) {
                 hasNamedArgs = true
 
-                if(arg.fieldName.str.equalsStringView(field.varField.fieldName.str)) {
+                if(arg.fieldName.str.equalsStringView(field.varField.name.str)) {
                     byName = true
                     break
                 }
@@ -465,7 +465,7 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
         }
 
         if(!byName && !(!hasNamedArgs && byPos)) {
-            var arg = NewInitArgExpr(expr.startPos, expr.endPos, field.varField.fieldName, position, field.varField.defaultExpr, this.allocator) as (*InitArgExpr)
+            var arg = NewInitArgExpr(expr.startPos, expr.endPos, field.varField.name, position, field.varField.defaultExpr, this.allocator) as (*InitArgExpr)
             expr.node.becomeParentOf(arg)
             defaultArgs.add(arg)
         }
