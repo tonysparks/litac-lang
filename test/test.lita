@@ -9,12 +9,13 @@ func test2<  (x: bool, ...) : i32 {
 //const z:i32;
 //var x:bool = "hi"
 //var y = null
-
+/*
 const c = 2;
 var x = 4;
 var y = "hi"
 var z = [2]i32 {1, 2}
 var w = &x
+*/
 /*
 @foreign
 enum EnumTest {
@@ -47,14 +48,21 @@ func TestV(i: i32, ...) {
 }
 */
 
+/*
 enum TypeKind {
     Array = 1,
     Const = 2 + 3,
     Ptr
 }
+*/
+
+
 
 struct Person {
-    name: *const char
+    //name: *const char
+    email: Email
+
+    /*
     struct Address {
         line: *const char
         zip: i32
@@ -63,17 +71,38 @@ struct Person {
     union Value {
         t: [2]i32
         m: [2]*const char
-    }
+    }*/
 }
 
-func AnotherFunc() : i32 {
+
+struct Email {
+    email: *const char
+    //person: Person
+    address: Address
+}
+
+struct Address {
+    street: *const char
+    zip: i32
+    city: *const char
+}
+
+func AnotherFunc(n:i32, args: **char, a: *Address) : i32 {
 
 }
 
-func FuncTest() {
-    var x = 123;
+func AnotherFunc1(n:i32, args: **char) : i32 {
+
+}
+
+func FuncTest(len: i32, args: **char) {
+    var address = Address{.street = """tonysparks""", 54, .city = "MKE"}
+    //var x = &address
+    AnotherFunc(len, args, &address)
+    //AnotherFunc1(len, args)//, &address)
+    /*var x = 123;
     var y = 4 + 5;
-    var z: [2]*const char;
+    var z: [2]*const char;*/
     /*
     Test1()
     Test1(4, 5)

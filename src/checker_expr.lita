@@ -782,10 +782,12 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
     if(!this.resolveExpr(expr.unaryExpr)) {
         return false
     }
-    
+        
     var type = expr.unaryExpr.operand.typeInfo
+    assert(type != null)
+
     switch(expr.operator) {
-        case TokenType.STAR: {            
+        case TokenType.STAR: {
             switch(type.kind) {
                 case TypeKind.PTR: {
                     var info = type as (*PtrTypeInfo)
@@ -1229,7 +1231,7 @@ func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) : bool {
 
 func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
     assert(expr != null)    
-    if(expr.operand.isRightValue) {        
+    if(expr.operand.isRightValue) {
         this.result.addError(expr.startPos, "rvalue can't be assigned to")
         return false
     }
@@ -1248,6 +1250,5 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     expr.operand.typeInfo = sym.type
     expr.operand.isConst = sym.flags & SymbolFlags.IS_CONSTANT
     expr.sym = sym
-
     return true;
 }

@@ -29,29 +29,44 @@ func main(len: i32, args: **char) {
     defer lita.free()
 
     var root = Parse(lita)
-    if(root) {
-        TypeCheck(lita, root)
+    if(!root) {
+        goto report
     }
-
-    if(!lita.result.errors.empty()) {
-        printf("Total errors: %d\n", lita.result.errors.size())
-        for(var i = 0; i < lita.result.errors.size(); i += 1) {
-            PrintError(lita.result.errors.get(i))
-            printf("\n")
-        }
-
-        goto report;
+    
+    if(!TypeCheck(lita, root)) {
+        goto report
     }
 
     if(options.checkerOnly) {
         goto report;
     }
 
-    if(root) {
-        GenerateC(lita, root)
+    
+    if(!GenerateC(lita, root)) {
+        goto report;
+    }
+    
+    if(options.cOutputOnly) {
+        goto report;
+    }
+
+    if(!CompileC(lita, root)) {
+        goto report;
+    }
+
+    if(options.run) {
+        Run(lita)
     }
 
 report:
+    if(!lita.result.errors.empty()) {
+        printf("Total errors: %d\n", lita.result.errors.size())
+        for(var i = 0; i < lita.result.errors.size(); i += 1) {
+            PrintError(lita.result.errors.get(i))
+            printf("\n")
+        }
+    }
+
     var endTime = SystemTimeMSec()
     if(options.showProfileInfo) {
         var allocator: *LinearAllocator = lita.allocator as (*LinearAllocator)
@@ -86,10 +101,12 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
 
     //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
     strncpy(options.inputFile, "../test/test.lita", MAX_PATH) // TEMP
+    strncpy(options.outputFile, "test", MAX_PATH) // TEMP
+    strncpy(options.outputPath, "../test/output/", MAX_PATH) // TEMP
 // TEMP end
 
     if(n > 1) {
-        strncpy(options.inputFile, args[1], MAX_PATH)        
+        strncpy(options.inputFile, args[1], MAX_PATH)
     }
 
     FilePath(options.inputFile, options.srcPath)
@@ -218,7 +235,7 @@ func Parse(lita: *Lita) : *Module {
     return root
 }
 
-func TypeCheck(lita: *Lita, module: *Module) {
+func TypeCheck(lita: *Lita, module: *Module) : bool {
     BuiltinsInit(lita)
 
     lita.startCapture(MetricType.TYPE_CHECKING)
@@ -228,16 +245,41 @@ func TypeCheck(lita: *Lita, module: *Module) {
     checker.init(lita)
 
     lita.programSymbols = checker.typeCheck(module)
+
+    return lita.result.errors.empty()
 }
 
-func GenerateC(lita: *Lita, module: *Module) {
+func GenerateC(lita: *Lita, module: *Module) : bool {
     lita.startCapture(MetricType.CGEN)
     defer lita.endCapture(MetricType.CGEN)
 
     var cgen = CGen{}
     cgen.init(lita)
-
     cgen.emitProgram(module)
+    //printf("Generated: \n%s", cgen.buf.cStr())
+    
+    var filename: [MAX_PATH]char;
+    strcat(filename, lita.options.outputPath)
+    if(!Mkdir(filename)) {
+        printf("Unable to create directory: '%s'", filename)
+        return false
+    }
 
-    printf("Generated: \n%s", cgen.buf.cStr())
+    strcat(filename, lita.options.outputFile)
+    strcat(filename, ".c")
+    
+    var status = WriteFile(filename, cgen.buf.cStrConst(), cgen.buf.length)
+    if(status != FileStatus.Ok) {
+        return false
+    }
+
+    return lita.result.errors.empty()
+}
+
+func CompileC(lita: *Lita, module: *Module) : bool {
+    return lita.result.errors.empty()
+}
+
+func Run(lita: *Lita) {
+
 }

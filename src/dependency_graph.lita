@@ -1,3 +1,234 @@
-public struct DependencyGraph {
+import "lita"
+import "map"
+import "array"
+import "symbols"
+import "types"
+import "assert"
+import "ast"
+import "mem"
+import "libc"
 
+@doc("""
+    Creates an ordering for C to handle compilation unit correction.  LitaC allows for 
+    out of order declarations -- but C does not -- this will order the symbols in C for
+    proper compilation in C.
+
+    The general algorithm is:
+    1) Constant global primitives
+    2) sort any Structs or Unions based on:
+       Depends of their fields:
+       a) if an aggregate has no aggregate types as fields (NOTE: Pointers to aggregates do not count, 
+          because C can calculate the size of the structure with pointers), it is considered 'resolved'
+       b) otherwise create a list of 'dependencies' for this aggregate and place on 'unresolved' list
+    3) take the aggregates in the 'unresolved' list and iterate thru them to see if they can be resolved
+    4) Any global variables not in #1
+    5) Functions
+""")
+public struct DependencyGraph {
+    sortedPrimitives: Array<*Symbol>  // primitive const globals
+    sortedGlobals: Array<*Symbol>     // all other global variables    
+    sortedAggregates: Array<*Symbol>  // aggregates
+    sortedFuncs: Array<*Symbol>       // functions 
+
+    sortedSymbols: Array<*Symbol>      // final sorted symbols
+    dependencies: Map<*Symbol, Dependency>
+    lita: *Lita
+}
+
+enum State {
+    EMPTY = 0,
+    PENDING  = 1,
+    RESOLVED = 2,
+}
+
+struct Dependency {
+    state: State = State.PENDING
+    sym: *Symbol
+    dependsOn: Array<*Dependency>
+}
+
+const EmptyDependency = Dependency{
+    .state = State.EMPTY
+};
+
+public func (this: *DependencyGraph) init(lita: *Lita) {
+    var symbols = &lita.programSymbols
+    this.lita = lita
+
+    // over allocate so that we don't have to realloc -- TODO: should we
+    // use our own arena allocator for this??
+    this.sortedPrimitives.init(symbols.values.size(), lita.allocator)
+    this.sortedGlobals.init(symbols.values.size(), lita.allocator)
+    this.sortedAggregates.init(symbols.symbolTypes.size(), lita.allocator)
+    this.sortedFuncs.init(symbols.symbolFuncs.size(), lita.allocator)
+
+    this.sortedSymbols.init(symbols.values.size() +
+                            symbols.symbolTypes.size() +
+                            symbols.symbolFuncs.size(),
+                            lita.allocator)
+
+    this.dependencies.init(EmptyDependency, 
+                           symbols.symbolTypes.size(),
+                           PtrHashFn<*Symbol>,
+                           PtrEqualFn<*Symbol>,
+                           lita.allocator)
+}
+
+func (this: *DependencyGraph) markDependencies(dependency: *Dependency) {
+    assert(dependency != null)
+    assert(dependency.sym != null)
+    assert(dependency.state != State.RESOLVED)
+
+    var sym = dependency.sym
+    if(!IsAggregate(sym.type)) {
+        dependency.state = State.RESOLVED
+        return;
+    }
+
+    var aggInfo = sym.type as (*AggregateTypeInfo)
+    for(var i = 0; i < aggInfo.decl.fields.size(); i+=1) {
+        var field = aggInfo.decl.fields.get(i);
+        assert(field.typeInfo != null)
+
+        var dependentSym: *Symbol = null;
+        if(IsAggregate(field.typeInfo)) {
+            dependentSym = field.typeInfo.sym
+        }
+        else if(field.typeInfo.kind == TypeKind.ARRAY) {
+            var arrayInfo = field.typeInfo as (*ArrayTypeInfo)
+            var baseInfo = arrayInfo.getBaseType()
+            if(IsAggregate(baseInfo)) {
+                dependentSym = baseInfo.sym
+            }
+        }
+
+        if(dependentSym) {
+            var other = this.dependencies.getPtr(dependentSym)
+            assert(other != null)
+
+            dependency.dependsOn.add(other)
+        }
+    }
+}
+
+func (this: *DependencyGraph) buildGraph(program: *ProgramSymbols) {
+    for(var i = 0; i < program.values.size(); i+=1) {
+        var sym = program.values.get(i)
+        if(sym.flags & SymbolFlags.IS_CONSTANT && IsPrimitive(sym.type))  {
+            this.sortedPrimitives.add(sym)
+        }
+        else {
+            this.sortedGlobals.add(sym)
+        }
+    }
+
+    for(var i = 0; i < program.symbolFuncs.size(); i += 1) {
+        var sym = program.symbolFuncs.get(i)
+        this.sortedFuncs.add(sym)
+    }
+
+    for(var i = 0; i < program.symbolTypes.size(); i += 1) {
+        var sym = program.symbolTypes.get(i)
+        var dep = Dependency{
+            .state = State.PENDING,
+            .sym = sym
+        }
+        dep.dependsOn.init(64, this.lita.allocator)
+        this.dependencies.put(sym, dep)
+    }
+
+    for(var it = this.dependencies.iter(); it.hasNext();) {
+        var entry = it.next()
+
+        var dep = entry.valuePtr
+        this.markDependencies(dep)
+    }
+
+}
+
+func (this: *DependencyGraph) resolveDependency(dependency: *Dependency) : *Dependency {
+    if(dependency.state == State.RESOLVED) {
+        return null
+    }
+
+    for(var i = 0; i < dependency.dependsOn.size(); i+=1) {
+        var dep = dependency.dependsOn.get(i)
+        if(dep.state != State.RESOLVED) {
+            return dep
+        }
+    }
+
+    dependency.state = State.RESOLVED
+    this.sortedAggregates.add(dependency.sym)
+    return null
+}
+
+func (this: *DependencyGraph) sortAggregates() {
+    var pending = Array<*Dependency>{}
+    pending.init(this.dependencies.size(), this.lita.allocator)
+
+    for(var it = this.dependencies.iter(); it.hasNext();) {
+        var entry = it.next()
+
+        var dep = entry.valuePtr
+        if(this.resolveDependency(dep) != null) {
+            pending.add(dep)
+        }
+    }
+
+    pending = this.sortAggregatesDependencies(pending)
+
+    for(var i = 0; i < pending.size(); i+=1) {
+        var dep = pending.get(i)
+
+        var cause = this.resolveDependency(dep)
+        if(cause) {
+            this.lita.result.addError(dep.sym.decl.startPos, 
+                    "could not resolve dependency order for '%s' because of cyclic dependency with '%s'", dep.sym.name, cause.sym.name)
+        }
+    }
+}
+
+func (this: *DependencyGraph) sortAggregatesDependencies(deps: *Array<*Dependency>) : Array<*Dependency> {
+    var pending = Array<*Dependency>{}
+    var isInit = false
+
+    for(var i = 0; i < deps.size(); i+=1) {
+        var dep = deps.get(i)
+        if(this.resolveDependency(dep) != null) {
+            var result = this.sortAggregatesDependencies(dep.dependsOn)
+            if(!result.empty()) {
+                if(!isInit) {
+                    pending.init(deps.size(), this.lita.allocator)
+                    isInit = true
+                }
+            }
+
+            pending.addAll(result)
+            if(this.resolveDependency(dep) != null) {
+                if(!isInit) {
+                    pending.init(deps.size(), this.lita.allocator)
+                    isInit = true
+                }
+
+                pending.add(dep)
+            }
+        }
+    }
+
+    return pending
+}
+
+public func (this: *DependencyGraph) sort() : Array<*Symbol> {
+    this.buildGraph(this.lita.programSymbols)
+    
+    this.sortAggregates()
+
+    this.sortedSymbols.clear()
+    this.sortedSymbols.addAll(this.sortedPrimitives)
+    this.sortedSymbols.addAll(this.sortedAggregates)
+    this.sortedSymbols.addAll(this.sortedGlobals)
+    this.sortedSymbols.addAll(this.sortedFuncs)
+
+    return this.sortedSymbols
 }

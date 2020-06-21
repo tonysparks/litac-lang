@@ -27,6 +27,10 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
             var type = this.resolveValueDecl(decl as (*VarDecl))
+            if(!type) {
+                return false
+            }
+
             this.addSymbol(decl, type)
             return true;
         }
@@ -63,7 +67,7 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     return false
 }
 
-public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {    
+public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
     if(!decl.expr && decl.kind == StmtKind.CONST_DECL) {
         if(!decl.hasNote("foreign")) {
             this.result.addError(decl.startPos, "const declaration must have an assignment (unless it is '@foreign')")

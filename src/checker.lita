@@ -212,7 +212,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         this.randomNameIndex+=1
     }
 
-    printf("Creating Decl: %s\n", name)
+    //printf("Creating Decl: %s\n", name)
 
     var sym: *Symbol = null
     if(decl.kind != StmtKind.FUNC_DECL) {
@@ -626,7 +626,9 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             var body = stmt as (*BlockStmt)
             for(var i = 0; i < body.stmts.size(); i+=1) {
                 var s = body.stmts.get(i)
-                this.resolveStmt(s)
+                if(!this.resolveStmt(s)) {
+                    return false
+                }
             }
             return true
         }
@@ -641,16 +643,25 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.DEFER_STMT: {
             var deferStmt = stmt as (*DeferStmt)
-            this.resolveStmt(deferStmt.deferedStmt)
+            if(!this.resolveStmt(deferStmt.deferedStmt)) {
+                return false
+            }
             return true
         }
         case StmtKind.DO_WHILE_STMT: {
             var whileStmt = stmt as (*DoWhileStmt)
-            this.pushScope(&Scope{})
-            this.resolveStmt(whileStmt.body)
-            this.popScope()
+            {
+                this.pushScope(&Scope{})
+                defer this.popScope()
+                if(!this.resolveStmt(whileStmt.body)) {
+                    return false
+                }
+            }
 
-            this.resolveExpr(whileStmt.cond)            
+            if(!this.resolveExpr(whileStmt.cond)) {
+                return false
+            }
+
             return true
         }
         case StmtKind.EMPTY_STMT: {
@@ -659,18 +670,29 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.FOR_STMT: {
             var forStmt = stmt as (*ForStmt)
             this.pushScope(&Scope{})
-            if(forStmt.init) this.resolveStmt(forStmt.init)
-            if(forStmt.cond) this.resolveExpr(forStmt.cond)
-            if(forStmt.post) this.resolveStmt(forStmt.post)
-            this.resolveStmt(forStmt.body)
-            this.popScope()
+            defer this.popScope()
+
+            if(forStmt.init && !this.resolveStmt(forStmt.init)) {
+                return false
+            }
+            if(forStmt.cond && !this.resolveExpr(forStmt.cond)) {
+                return false
+            }
+            if(forStmt.post && !this.resolveStmt(forStmt.post)) {
+                return false
+            }
+            if(!this.resolveStmt(forStmt.body)) {
+                return false
+            }
             return true
         }
         case StmtKind.FUNC_BODY_STMT: {
             var body = stmt as (*FuncBodyStmt)
             for(var i = 0; i < body.stmts.size(); i+=1) {
                 var s = body.stmts.get(i)
-                this.resolveStmt(s)
+                if(!this.resolveStmt(s)) {
+                    return false
+                }
             }
             return true
         }
@@ -701,16 +723,26 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.IF_STMT: {
             var ifStmt = stmt as (*IfStmt)
-            this.resolveExpr(ifStmt.cond)
+            if(!this.resolveExpr(ifStmt.cond)) {
+                return false
+            }
             
-            this.pushScope(&Scope{})
-            this.resolveStmt(ifStmt.then)
-            this.popScope()
+            {
+                this.pushScope(&Scope{})
+                defer this.popScope()
+
+                if(!this.resolveStmt(ifStmt.then)) {
+                    return false
+                }
+            }
 
             if(ifStmt.elseStmt) {
                 this.pushScope(&Scope{})
-                this.resolveStmt(ifStmt.elseStmt)
-                this.popScope()
+                defer this.popScope()
+
+                if(!this.resolveStmt(ifStmt.elseStmt)) {
+                    return false
+                }
             }
             return true
         }
@@ -752,7 +784,9 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             var hasDefault = false
             for(var i = 0; i < params.size(); i += 1) {
                 var param = params.get(i)
-                this.resolveParamDecl(param)
+                if(!this.resolveParamDecl(param)) {
+                    return false
+                }
 
                 if(param.defaultExpr) {
                     hasDefault = true
@@ -786,19 +820,29 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.SWITCH_CASE_STMT: {
             var caseStmt = stmt as (*SwitchCaseStmt)
-            this.resolveExpr(caseStmt.cond)
-            this.resolveStmt(caseStmt.body)
+            if(!this.resolveExpr(caseStmt.cond)) {
+                return false
+            }
+            if(!this.resolveStmt(caseStmt.body)) {
+                return false
+            }
             return true
         }
         case StmtKind.SWITCH_STMT:{
             var switchStmt = stmt as (*SwitchStmt)
-            this.resolveExpr(switchStmt.cond)
+            if(!this.resolveExpr(switchStmt.cond)) {
+                return false
+            }
             for(var i = 0; i < switchStmt.cases.size(); i+=1) {
                 var caseStmt = switchStmt.cases.get(i)
-                this.resolveStmt(caseStmt)
+                if(!this.resolveStmt(caseStmt)) {
+                    return false
+                }
             }
             if(switchStmt.defaultStmt) {
-                this.resolveStmt(switchStmt.defaultStmt)
+                if(!this.resolveStmt(switchStmt.defaultStmt)) {
+                    return false
+                }
             }
             return true
         }
@@ -814,11 +858,15 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.WHILE_STMT: {
             var whileStmt = stmt as (*WhileStmt)
-            this.resolveExpr(whileStmt.cond)
+            if(!this.resolveExpr(whileStmt.cond)) {
+                return false
+            }
             
             this.pushScope(&Scope{})
-            this.resolveStmt(whileStmt.body)
-            this.popScope()
+            defer this.popScope()
+            if(!this.resolveStmt(whileStmt.body)) {
+                return false
+            }
             return true
         }
 

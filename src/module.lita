@@ -64,7 +64,7 @@ func AddBuiltin(lita: *Lita, type: *TypeInfo) {
     var sym = builtins.symbols.addSymbol(type.name, 
                                         &builtins, 
                                         NewBuiltinDecl(SrcPos{}, SrcPos{}, type, lita.allocator), 
-                                        SymbolFlags.IS_BUILTIN|SymbolFlags.IS_TYPE)
+                                        SymbolFlags.IS_BUILTIN|SymbolFlags.IS_TYPE|SymbolFlags.IS_FOREIGN)
 
     sym.state = SymbolState.RESOLVED
     sym.type = type

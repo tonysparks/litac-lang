@@ -48,6 +48,8 @@ public struct LitaOptions {
     litaPath: [MAX_PATH]char       // the LITAC_HOME environment variable for standard lita modules
 
     inputFile: [MAX_PATH]char      // the input source file
+    outputFile: [MAX_PATH]char     // the C output file
+    outputPath: [MAX_PATH]char     // the C output directory
 
     checkerOnly: bool              // only do the checker
     cOutputOnly: bool              // generates C file only, does not compile it
