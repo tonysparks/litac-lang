@@ -150,7 +150,8 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
         return;
     }
-
+    
+    var name = this.cName(decl.sym)
     switch(decl.kind) {
         case StmtKind.VAR_DECL:
         case StmtKind.CONST_DECL:
@@ -159,8 +160,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
         case StmtKind.FUNC_DECL: {
             this.emitNotes(decl.attributes)
             this.emitln()
-
-            var name = this.cName(decl.sym)
+            
             var funcInfo = decl.sym.type as (*FuncTypeInfo)
             if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
                 var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
@@ -219,7 +219,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
         case StmtKind.STRUCT_DECL: {
             var aggDecl = decl as (*AggregateDecl)
             if(!(aggDecl.flags & AggregateFlags.IS_EMBEDDED)) {
-                this.buf.append("typedef %s %s;\n", aggDecl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", sym.name)
+                this.buf.append("typedef %s %s %s;\n", aggDecl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", name, name)
             }
             break;
         }

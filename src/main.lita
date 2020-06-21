@@ -40,22 +40,9 @@ func main(len: i32, args: **char) {
     if(options.checkerOnly) {
         goto report;
     }
-
     
-    if(!GenerateC(lita, root)) {
+    if(!Transpile(lita, root)) {
         goto report;
-    }
-    
-    if(options.cOutputOnly) {
-        goto report;
-    }
-
-    if(!CompileC(lita, root)) {
-        goto report;
-    }
-
-    if(options.run) {
-        Run(lita)
     }
 
 report:
@@ -96,7 +83,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
 
 // TEMP start
     options.checkerOnly = false
-    options.cOutputOnly = true
+    options.cOutputOnly = false
     options.showProfileInfo = true
 
     //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
@@ -249,15 +236,7 @@ func TypeCheck(lita: *Lita, module: *Module) : bool {
     return lita.result.errors.empty()
 }
 
-func GenerateC(lita: *Lita, module: *Module) : bool {
-    lita.startCapture(MetricType.CGEN)
-    defer lita.endCapture(MetricType.CGEN)
-
-    var cgen = CGen{}
-    cgen.init(lita)
-    cgen.emitProgram(module)
-    //printf("Generated: \n%s", cgen.buf.cStr())
-    
+func Transpile(lita: *Lita, module: *Module) : bool {
     var filename: [MAX_PATH]char;
     strcat(filename, lita.options.outputPath)
     if(!Mkdir(filename)) {
@@ -267,6 +246,34 @@ func GenerateC(lita: *Lita, module: *Module) : bool {
 
     strcat(filename, lita.options.outputFile)
     strcat(filename, ".c")
+
+    if(!GenerateC(lita, module, filename)) {
+        return false
+    }
+
+    if(lita.options.cOutputOnly) {
+        return false
+    }
+
+    if(!CompileC(lita, module, filename)) {
+        return false
+    }
+
+    if(lita.options.run) {
+        Run(lita, filename)
+    }
+
+    return true
+}
+
+func GenerateC(lita: *Lita, module: *Module, filename: *const char) : bool {
+    lita.startCapture(MetricType.CGEN)
+    defer lita.endCapture(MetricType.CGEN)
+
+    var cgen = CGen{}
+    cgen.init(lita)
+    cgen.emitProgram(module)
+    //printf("Generated: \n%s", cgen.buf.cStr())
     
     var status = WriteFile(filename, cgen.buf.cStrConst(), cgen.buf.length)
     if(status != FileStatus.Ok) {
@@ -276,10 +283,16 @@ func GenerateC(lita: *Lita, module: *Module) : bool {
     return lita.result.errors.empty()
 }
 
-func CompileC(lita: *Lita, module: *Module) : bool {
-    return lita.result.errors.empty()
+func CompileC(lita: *Lita, module: *Module, filename: *const char) : bool {
+    var command: [512]char;
+    var commandStr = StringInit(command, 512)
+    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", lita.options.outputFile, filename)
+    if(!system(commandStr.cStrConst())) {
+        return false
+    }
+    return true
 }
 
-func Run(lita: *Lita) {
+func Run(lita: *Lita, filename: *const char) {
 
 }

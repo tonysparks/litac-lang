@@ -51,6 +51,8 @@ public struct LitaOptions {
     outputFile: [MAX_PATH]char     // the C output file
     outputPath: [MAX_PATH]char     // the C output directory
 
+    compileCmd: *const char        // the C compile system command
+
     checkerOnly: bool              // only do the checker
     cOutputOnly: bool              // generates C file only, does not compile it
     run: bool                      // runs after successful compilation

@@ -1,5 +1,5 @@
 
-// Generated on Sat Jun 20 21:39:37 2020
+// Generated on Sat Jun 20 21:57:46 2020
 
 #include <stdint.h>
 #include <stddef.h>
@@ -19,9 +19,9 @@ typedef size_t    usize;
 #define false (0)
 #define void void
 
-typedef struct Person;
-typedef struct Email;
-typedef struct Address;
+typedef struct test__Person test__Person;
+typedef struct test__Email test__Email;
+typedef struct test__Address test__Address;
 
 i32 test__AnotherFunc(i32,char**,test__Address*);
 
