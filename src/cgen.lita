@@ -20,7 +20,6 @@ public struct CGen {
     lita: using *Lita
     buf: StringBuffer
     line: StringBuffer
-    tmp: StringBuffer
     indent: i32
     aggregateLevel: i32
 }
@@ -29,7 +28,6 @@ public func (this: *CGen) init(lita: *Lita) {
     this.lita = lita
     this.buf.init(4096, lita.allocator)
     this.line.init(1024, lita.allocator)
-    this.tmp.init(1024, lita.allocator)
     this.aggregateLevel = 0
 }
 
@@ -39,6 +37,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 
     this.emitForward()
     this.emitPrimitiveConstDecls()
+    this.emitModuleNotes()
     this.emitForwardDecls()
 
     buf.append("\n\n")
@@ -46,21 +45,40 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     buf.append("// translated code begins\n")
     buf.append("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
     buf.append("\n\n")
-    //this.emitStmt(module.ast)
-
+    
     var graph = DependencyGraph{}
     graph.init(this.lita)
     var declarations = graph.sort()
 
+    var mainSym: *Symbol = null
+
     for(var i = 0; i < declarations.size(); i += 1) {
         var sym = declarations.get(i)
         assert(sym.decl)
+
+        if(sym.decl.kind == StmtKind.FUNC_DECL &&
+           strcmp(sym.name, "main") == 0) {
+           mainSym = sym
+           continue
+        }
 
         this.emitStmt(sym.decl)
         this.emitln()
     }
 
     this.emitln()
+
+    if(mainSym) {
+        this.emitMain(mainSym)
+    }
+}
+
+func (this: using *CGen) emitMain(sym: *Symbol) {
+    var decl = sym.decl as (*FuncDecl)
+    this.emitFuncDeclSignature(decl, "main");
+    this.emit(" {")
+    this.emitStmt(decl.body)
+    this.emit("}")
 }
 
 func (this: using *CGen) emitForward() {
@@ -83,7 +101,7 @@ typedef int8_t    %s%s;
 typedef size_t    %s%s;
 #define %s%s (1)
 #define %s%s (0)
-#define %s%s void
+
 
 """, 
     CurrentDateTime(),
@@ -105,6 +123,7 @@ typedef size_t    %s%s;
     );
 
     if(strlen(this.options.cPrefix) > 0) {
+        buf.append("#define %s%s void\n", this.options.cPrefix, "void")
         buf.append("typedef char   %s%s;\n", this.options.cPrefix, "char")
     }
 }
@@ -131,6 +150,11 @@ func (this: using *CGen) emitPrimitiveConstDecls() {
     }
 }
 
+func (this: using *CGen) emitModuleNotes() {
+    // for(var it = this.lita.module)
+    // TODO
+}
+
 func (this: using *CGen) emitForwardDecls() {
     var program = &this.lita.programSymbols
     for(var i = 0; i < program.symbolTypes.size(); i += 1) {
@@ -155,63 +179,9 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     switch(decl.kind) {
         case StmtKind.VAR_DECL:
         case StmtKind.CONST_DECL:
-            this.buf.append("~~ %s;\n", sym.name)
             break;
         case StmtKind.FUNC_DECL: {
-            this.emitNotes(decl.attributes)
-            this.emitln()
-            
-            var funcInfo = decl.sym.type as (*FuncTypeInfo)
-            if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
-                var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
-                buf.append("%s (*%s(", this.cType(funcPtrInfo.returnType), name)
-            }
-            else {
-                buf.append("%s %s(", this.cType(funcInfo.returnType), name)
-            }
-
-            var decayArrays = true
-            var isCast = false
-            var i = 0
-            for(; i < funcInfo.decl.params.size(); i += 1) {
-                if(i > 0) {
-                    buf.append(",")
-                }
-
-                var param = funcInfo.decl.params.get(i)
-                buf.append("%s", this.cType(param.sym.type, isCast, decayArrays))
-            }
-
-            if(funcInfo.decl.flags & FuncFlags.HAS_VARARGS) {
-                if(i > 0) {
-                    buf.append(",")
-                }
-                buf.append("...")
-            }
-
-            buf.append(")")
-
-            if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
-                var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
-                buf.append(")  (")
-
-                var j = 0
-                for(; j < funcPtrInfo.paramDecls.size(); j+=1) {
-                    if(j > 0) {
-                        buf.append(",")
-                    }
-
-                    buf.append("%s", this.cType(funcPtrInfo.paramDecls.get(j)))
-                }
-                if(funcPtrInfo.hasVarargs) {
-                    if(j > 0) {
-                        buf.append(",")
-                    }
-                    buf.append("...")
-                }
-                buf.append(")")
-            }
-
+            this.emitFuncDeclSignature(decl as (*FuncDecl), name)
             buf.append(";\n")
             break;
         }
@@ -234,31 +204,31 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
 }
 
 func (this: using *CGen) escapeNameStr(name: *const char) : *char {
-    tmp.clear()
-    tmp.appendStr(name, strlen(name))
-    for(var i = 0; i < tmp.length; i+=1) {
-        var c = tmp.buffer[i]
+    var sb = StringBufferInit(256, this.allocator)
+    sb.appendStr(name, strlen(name))
+    for(var i = 0; i < sb.length; i+=1) {
+        var c = sb.buffer[i]
         switch(c) {
-            case '*': tmp.replace(i, i+1, "_ptr_"); i+=6; break;
-            case '<': tmp.replace(i, i+1, "_cb_");  i+=4; break;
-            case '>': tmp.replace(i, i+1, "_ce_");  i+=4; break;
-            case '[': tmp.replace(i, i+1, "_bb_");  i+=4; break;
-            case ']': tmp.replace(i, i+1, "_be_");  i+=4; break;
-            case '(': tmp.replace(i, i+1, "_pb_");  i+=4; break;
-            case ')': tmp.replace(i, i+1, "_pe_");  i+=4; break;
-            case ',': tmp.replace(i, i+1, "_c_");   i+=3; break;
-            case ' ': tmp.replace(i, i+1, "_");     i+=1; break;
+            case '*': sb.replace(i, i+1, "_ptr_"); i+=6; break;
+            case '<': sb.replace(i, i+1, "_cb_");  i+=4; break;
+            case '>': sb.replace(i, i+1, "_ce_");  i+=4; break;
+            case '[': sb.replace(i, i+1, "_bb_");  i+=4; break;
+            case ']': sb.replace(i, i+1, "_be_");  i+=4; break;
+            case '(': sb.replace(i, i+1, "_pb_");  i+=4; break;
+            case ')': sb.replace(i, i+1, "_pe_");  i+=4; break;
+            case ',': sb.replace(i, i+1, "_c_");   i+=3; break;
+            case ' ': sb.replace(i, i+1, "_");     i+=1; break;
             case ':': {
                 var n = i + 1;
-                if(n < tmp.length) {
-                    var nc = tmp.buffer[n]
+                if(n < sb.length) {
+                    var nc = sb.buffer[n]
                     if(nc == ':') {
-                        tmp.replace(i, i+1, "__")
+                        sb.replace(i, i+1, "__")
                         i+=2;
                         break;
                     }
                 }
-                tmp.replace(i, i+1, "_r_")
+                sb.replace(i, i+1, "_r_")
                 i+=3;
                 break;
             }
@@ -269,7 +239,7 @@ func (this: using *CGen) escapeNameStr(name: *const char) : *char {
         }
     }
 
-    return tmp.cStr()
+    return sb.cStr()
 }
 
 func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
@@ -364,13 +334,15 @@ func (this: using *CGen) cType(type: *TypeInfo,
             var baseName = this.cType(baseInfo)
 
             var buf = StringBufferInit(256, this.allocator)
+            var line = StringBufferInit(256, this.allocator)
             do {
                 if(arrayInfo.length < 0) {
                     if(arrayInfo.numOfElements) {
                         buf.append("[")
                         var cgen = CGen {
                             .lita = this.lita,
-                            .buf = buf
+                            .buf = buf,
+                            .line = line
                         }
                         cgen.emitStmt(arrayInfo.numOfElements)
                         buf.append("]")
@@ -533,19 +505,20 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     Outputs the C name for the symbol
 */    
 func (this: using *CGen) cName(sym: *Symbol) : *const char {
+    var sb = StringBufferInit(256, this.allocator)
     var declName:*const char = (sym.flags & SymbolFlags.IS_TYPE) 
                                     ? this.escapeName(sym.type) : sym.name;
 
-    var sb = StringBufferInit(256, this.allocator)
     if(sym.flags & SymbolFlags.IS_LOCAL) {
         return this.prefix(declName, sb)
     }
 
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
         if(sym.flags & SymbolFlags.IS_BUILTIN) {
-
+            return declName
         }
         // TODO: Get the foreign override name
+        return sym.name
     }
 
     // TODO: Get a non-collision based module name
@@ -559,8 +532,8 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     assert(type != null)
 
-    var typeName = this.escapeName(type)
     var sb = StringBufferInit(256, this.allocator)
+    var typeName = this.escapeName(type)
 
     if(!type.sym) {
         return this.prefix(typeName, sb)
@@ -572,6 +545,7 @@ func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
             return typeName
         }
         // TODO: Get the foreign override name
+        return sym.name
     }
 
     // TODO: Get a non-collision based module name
@@ -702,6 +676,14 @@ func (this: using *CGen) emitNotes(attributes: *Attributes) {
             //this.emit("\n")
         }
     }
+}
+
+func (this: using *CGen) emitSymbol(sym: *Symbol) {
+    if(!sym) {
+        return;
+    }
+
+    this.emit("%s", this.cName(sym))
 }
 
 func (this: using *CGen) emitStmt(s: *Stmt) {
@@ -982,6 +964,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emit(" ")
                 this.emitStmt(stmt.expr)
             }
+            this.emit(";")
             return;
         }/*
         case StmtKind.STRUCT_FIELD_STMT: {
@@ -1107,7 +1090,17 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
-            this.emit("%s", expr.type.name)
+            
+            var type = expr.type.typeInfo
+            var sym: *Symbol = (type) ? type.sym : expr.sym;
+
+            if(!sym) {
+                this.emit("%s%s", this.options.cPrefix, expr.type.name)
+            }
+            else {
+                this.emitSymbol(sym)
+            }
+
             return;
         }
         case StmtKind.GET_EXPR: {
@@ -1142,7 +1135,16 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.INIT_EXPR: {
             var expr = s as (*InitExpr)
-            this.emit("%s", expr.type.name)
+
+            var requiresCast = false
+            if(expr.parent) {
+                requiresCast = expr.parent.kind == StmtKind.RETURN_STMT ||
+                               expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
+            }
+
+            if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {                
+                this.emit("(%s)", this.cType(expr.type.typeInfo))
+            }
             this.emit(" {")
             for(var i = 0; i < expr.arguments.size(); i += 1) {
                 if(i > 0) {

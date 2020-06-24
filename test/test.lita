@@ -55,8 +55,13 @@ enum TypeKind {
     Ptr
 }
 */
+@include("<stdio.h>");
+@foreign public func printf(s:*const char, ...) : void;
 
-
+func main(len: i32, args: **char) : i32 {
+    FuncTest(len, args)
+    printf("%s", "hello world!")
+}
 
 struct Person {
     //name: *const char
@@ -88,11 +93,11 @@ struct Address {
 }
 
 func AnotherFunc(n:i32, args: **char, a: *Address) : i32 {
-
+    return 4
 }
 
 func AnotherFunc1(n:i32, args: **char) : i32 {
-
+    return 4
 }
 
 func FuncTest(len: i32, args: **char) {

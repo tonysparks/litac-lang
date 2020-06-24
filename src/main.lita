@@ -88,7 +88,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
 
     //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
     strncpy(options.inputFile, "../test/test.lita", MAX_PATH) // TEMP
-    strncpy(options.outputFile, "test", MAX_PATH) // TEMP
+    strncpy(options.outputFile, "test.exe", MAX_PATH) // TEMP
     strncpy(options.outputPath, "../test/output/", MAX_PATH) // TEMP
 // TEMP end
 

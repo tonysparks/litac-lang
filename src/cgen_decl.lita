@@ -45,7 +45,7 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
     }
 }
 
-public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
+public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *const char) {
     assert(decl.sym != null)
 
     if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
@@ -54,8 +54,7 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
 
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
-
-    var name = this.cName(decl.sym)
+    
     var funcInfo = decl.sym.type as (*FuncTypeInfo)
     if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
         var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
@@ -106,7 +105,17 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
         }
         buf.append(")")
     }
+}
 
+public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
+    assert(decl != null)
+
+    if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
+        return;
+    }
+    
+    var name = this.cName(decl.sym)
+    this.emitFuncDeclSignature(decl, name)
     this.emit(" {")
     if(decl.body) {
         this.emitStmt(decl.body)
