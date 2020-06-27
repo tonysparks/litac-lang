@@ -641,18 +641,31 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
             return false
         }
 
-        if(first.type.kind != TypeSpecKind.NAME) {
+        var typeSpec = first.type
+
+        retry:
+        if(typeSpec.kind != TypeSpecKind.NAME) {
+            if(typeSpec.kind == TypeSpecKind.PTR) {
+                var ptrSpec = typeSpec as (*PtrTypeSpec)
+                typeSpec = ptrSpec.base
+                goto retry;
+            }
+            else if(typeSpec.kind == TypeSpecKind.CONST) {
+                var constSpec = typeSpec as (*ConstTypeSpec)
+                typeSpec = constSpec.base
+                goto retry;
+            }
             return false
         }
 
-        var type = first.type as (*NameTypeSpec)
+        var type = typeSpec as (*NameTypeSpec)
         var totalLen = f.name.str.length + strlen(type.name) + 2 // _ and \0
         if(totalLen > MAX_SYMBOL_NAME) {
             return false
         }
 
         var nameStr = StringInit(name, MAX_SYMBOL_NAME)
-        nameStr.format("%.*s_%s", f.name.str.length, f.name.str.buffer, type.name)
+        nameStr.format("%s_%.*s", type.name, f.name.str.length, f.name.str.buffer)
         return true
     }
 

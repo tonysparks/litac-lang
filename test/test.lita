@@ -58,6 +58,11 @@ enum TypeKind {
 struct TEMP {
     x:i32
 }
+
+func (this: *TEMP) test(i: i32 = 10) : i32 {
+    return this.x
+}
+
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
@@ -82,11 +87,23 @@ func main(len: i32, args: **char) : i32 {
     tt.x = 4
     var xx = tt.x
 */
-    var z = 0
+    var tmp = TEMP{}
+    tmp.test()
+
+    //var z = 0
+   /*
     if(true) {
         z += 1
     }
     else z -= 1
+
+    {
+        defer printf("exit!\n")
+
+        if(true) {
+            return 0
+        }
+    }
 
     for(var i = 0; i < 10; i += 1) {
         defer printf("%d\n", i)
@@ -109,7 +126,7 @@ func main(len: i32, args: **char) : i32 {
         default: {
             var x = 1 + 0
         }
-    }
+    }*/
 }
 
 var text = """

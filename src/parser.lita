@@ -347,7 +347,6 @@ func (p: *Parser) funcDeclaration() : *Decl {
         }
     }
 
-    
     var parameters = p.parametersStatement();
     if(!parameters) {
         goto err;
@@ -424,7 +423,7 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
         .type = TokenType.VOID
     }
 
-    if(p.check(TokenType.IDENTIFIER)) {            
+    if(p.check(TokenType.IDENTIFIER)) {
         name = p.identifier();
     }
     else {        
@@ -446,7 +445,7 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
             goto err;
         }
 
-        fields.init(8, p.allocator)              
+        fields.init(8, p.allocator)
         do {
             if(p.check(TokenType.RIGHT_BRACE)) {
                 break;

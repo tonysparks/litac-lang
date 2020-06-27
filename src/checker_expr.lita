@@ -9,6 +9,7 @@ import "lex"
 import "lita"
 import "map"
 import "string_buffer"
+import "string_view"
 import "string"
 import "array"
 import "checker"
@@ -170,6 +171,59 @@ func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, funcPtr: *FuncPtrT
     return true
 }
 
+func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr, 
+                                         funcPtr: *FuncPtrTypeInfo, 
+                                         suppliedArgs: *Array<*Expr>) : bool {
+
+    
+    for(var i = 0; i < funcPtr.paramDecls.size() && i < suppliedArgs.size(); i += 1) {
+        var argExpr = suppliedArgs.get(i)
+        if(!this.resolveExpr(argExpr)) {
+            return false
+        }
+
+        var paramInfo = funcPtr.paramDecls.get(i)
+        var argInfo = argExpr.operand.typeInfo
+
+        if(argInfo.kind == TypeKind.ARRAY) {
+            continue
+        }
+
+        if(!IsAggregate(argInfo) && !IsPtrAggregate(argInfo)) {
+            continue
+        }
+
+        var aggInfo = argInfo.getBaseType() as (*AggregateTypeInfo)
+        // TODO: Check using parameter
+
+        // promote the argument to a pointer
+        if(IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) {
+            // can't take the address of a right value
+            if(argExpr.operand.isRightValue) {
+                continue
+            }
+
+            var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
+            argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.BAND, groupExpr, this.allocator)
+            if(!this.resolveExpr(argExpr)) {
+                return false
+            }
+        }
+        else if(IsAggregate(paramInfo) && IsPtrAggregate(argInfo)) {
+            var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
+            argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.STAR, groupExpr, this.allocator)
+            if(!this.resolveExpr(argExpr)) {
+                return false
+            }
+        }
+
+        expr.node.becomeParentOf(argExpr)
+        suppliedArgs.set(i, argExpr)
+    }
+
+    return true
+}
+
 func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr, 
                                             funcName: *const char, 
                                             funcPtr: *FuncPtrTypeInfo, 
@@ -244,6 +298,9 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     var numberOfSuppliedArgs = suppliedArgs.size()
     this.checkNumberOfArgs(expr, objectType.name, funcPtr, numberOfSuppliedArgs, numberOfDefaultArgs)
 
+    if(!this.coerceFuncArgs(expr, funcPtr, suppliedArgs)) {
+        return false
+    }
 
     var i = 0;
     for(; i < funcPtr.paramDecls.size(); i+=1) {
@@ -758,13 +815,56 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
 
         var aggInfo = info as (*AggregateTypeInfo)
         var field = aggInfo.getField(expr.field.type.name)
+
+        // this isn't a field in the aggregate -- now check to see if this
+        // is a method
         if(field.kind == StmtKind.POISON_EXPR) {
+            for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
+                var sym = this.symbolFuncs.get(i)
+                var decl = sym.decl as (*FuncDecl)
+                if(!(decl.flags & FuncFlags.IS_METHOD)) {
+                    continue
+                }
+
+                if(strncmp(decl.name.str.buffer, expr.field.type.name, decl.name.str.length) != 0) {
+                    continue
+                }
+
+                var methodName: [MAX_SYMBOL_NAME]char;
+                if(!decl.getName(methodName)) {
+                    continue
+                }
+
+                var methodStr = StringViewInit(methodName, MAX_SYMBOL_NAME)
+                var index = methodStr.indexOf("_")
+                assert(index >= 0)
+                
+                if(strncmp(methodName, aggInfo.name, index) == 0) {
+                    
+                    if(decl.params.params.empty()) {
+                        continue
+                    }
+
+                    var objectParam = decl.params.get(0).typeInfo
+                    var baseType: *TypeInfo = objectParam
+
+                    if(objectParam.kind == TypeKind.PTR) {
+                        var ptrType = objectParam as (*PtrTypeInfo)
+                        baseType = ptrType.getBaseType()
+                    }
+
+                    if(baseType.strictEquals(aggInfo)) {
+                        expr.field.operand.typeInfo = sym.type
+                        expr.operand.typeInfo = sym.type
+                        return true
+                    }
+                }
+            }
             return false
         }
 
         expr.field.operand.typeInfo = field.typeInfo
         expr.operand.typeInfo = field.typeInfo
-        // TODO: Account for method look ups
     }
 
     return true

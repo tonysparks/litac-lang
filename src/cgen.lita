@@ -123,9 +123,13 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 func (this: using *CGen) emitMain(sym: *Symbol) {
     var decl = sym.decl as (*FuncDecl)
     this.emitFuncDeclSignature(decl, "main");
+    this.currentFunc = sym.type as (*FuncTypeInfo)
+    defer this.currentFunc = null
+
     this.emit(" {")
     this.emitStmt(decl.body)
     this.emit("}")
+
 }
 
 func (this: using *CGen) emitForward() {
@@ -301,11 +305,14 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
 
     if(IsFuncLike(type)) {
         if(type.kind == TypeKind.FUNC) {
-            // TODO: Get method name
             var funcInfo = type as (*FuncTypeInfo)
             if(funcInfo.decl.flags & FuncFlags.IS_METHOD) {
-                //var methodName = funcInfo.getMethodName()
-                assert(false)
+                var methodName:[MAX_SYMBOL_NAME]char;
+                if(!funcInfo.decl.getName(methodName)) {
+                    assert(false)
+                }
+
+                return this.escapeNameStr(methodName)
             }
         }
         return this.escapeNameStr(type.name)
@@ -383,6 +390,14 @@ func (this: using *CGen) hasPendingDefers() : bool {
     }
 
     return false
+}
+
+func (this: using *CGen) emitDefers() {
+    var scope = this.currentScope
+    while(scope) {        
+        this.leaveScope(scope)
+        scope = scope.parent
+    }
 }
 
 func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
@@ -1106,23 +1121,20 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
-            var scope = this.currentScope
-            while(scope) {        
-                this.leaveScope(scope)
-                scope = scope.parent
-            }
+            
 
             if(stmt.expr && this.hasPendingDefers()) {
                 assert(this.currentFunc != null)
-                this.emit("{ %s = ", this.cTypeDecl(this.currentFunc.returnType, "___result"))
+                this.emit("{%s = ", this.cTypeDecl(this.currentFunc.returnType, "___result"))
                 this.emitStmt(stmt.expr)
                 this.emit(";\n")
 
-                
-
+                this.emitDefers()
                 this.emit("return ___result;\n}\n")
             }
             else {
+                this.emitDefers()
+
                 this.emit("return");
                 if(stmt.expr) {
                     this.emit(" ")
@@ -1259,11 +1271,26 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*FuncCallExpr)
             this.emitStmt(expr.object)
             this.emit("(")
-            for(var i = 0; i < expr.arguments.size(); i+=1) {
+
+            var i = 0;
+            for(; i < expr.arguments.size(); i+=1) {
                 if(i > 0) {
                     this.emit(", ")
                 }
                 this.emitStmt(expr.arguments.get(i))
+            }
+            var objectType = expr.object.operand.typeInfo
+            if(objectType.kind == TypeKind.FUNC) {
+                var funcType = objectType as (*FuncTypeInfo)
+                for(; i < funcType.decl.params.size(); i+=1) {
+                    var param = funcType.decl.params.get(i)
+                    if(param.defaultExpr) {
+                        if(i > 0) {
+                            this.emit(", ")
+                        }
+                        this.emitStmt(param.defaultExpr)
+                    }
+                }
             }
             this.emit(")")
             return;
@@ -1287,6 +1314,12 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.GET_EXPR: {
             var expr = s as (*GetExpr)
 
+            // handled by funcCallExpr
+            if(expr.isMethodCall) {
+                this.emit("%s", this.cTypeName(expr.field.operand.typeInfo))
+                return;
+            }
+
             var objectType = expr.object.operand.typeInfo
             if(objectType.kind == TypeKind.ENUM) {
                 if(objectType.sym && objectType.sym.flags & SymbolFlags.IS_FOREIGN) {
@@ -1298,7 +1331,14 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             else {
                 this.emitStmt(expr.object)
-                this.emit(".")
+                
+                if(objectType.kind == TypeKind.PTR) {
+                    buf.append("->")
+                }
+                else {
+                    buf.append(".")
+                }
+
                 this.emitStmt(expr.field)
             }
             return;

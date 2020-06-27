@@ -316,7 +316,6 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
 
             // TODO: Generate primitive constants ordering
             var typeInfo = field.value.operand.typeInfo
-            //printf("Is Type Info null? %d\n", typeInfo == null)
             this.checkTypeCompatibility(field.value.startPos, typeInfo, &I32_TYPE)
         }
 
