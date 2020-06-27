@@ -82,6 +82,22 @@ func main(len: i32, args: **char) : i32 {
     tt.x = 4
     var xx = tt.x
 */
+    var z = 0
+    if(true) {
+        z += 1
+    }
+    else z -= 1
+
+    for(var i = 0; i < 10; i += 1) {
+        defer printf("%d\n", i)
+        if(i % 2) {
+            continue
+        }
+        else if(i == 7) {
+            break
+        }
+    }
+
     switch(1) {
         case 2:
         case 4:

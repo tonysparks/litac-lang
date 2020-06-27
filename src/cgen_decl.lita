@@ -118,7 +118,9 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     this.emitFuncDeclSignature(decl, name)
     this.emit(" {")
     if(decl.body) {
+        this.currentFunc = decl.sym.type as (*FuncTypeInfo)
         this.emitStmt(decl.body)
+        this.currentFunc = null
     }
     this.emit("}\n")
 }

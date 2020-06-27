@@ -5,6 +5,7 @@ import "lex"
 import "lita"
 import "types"
 import "ast"
+import "ast_new"
 import "ast_print"
 import "parser"
 import "phase_result"
@@ -130,9 +131,10 @@ func FindModulePath(lita: *Lita,
     return false
 }
 
-func ReadModuleText(lita: *Lita, 
-                    module: *Module, 
-                    pos: SrcPos) : bool {    
+func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
+    if(!module) {
+        return false
+    }
 
     var status = ReadFile(module.id.filename, &module.text, lita.allocator) 
     if(status == FileStatus.FileNotFoundError) {
@@ -145,28 +147,13 @@ func ReadModuleText(lita: *Lita,
         return false
     }
 
-    return true
-}
-
-func ParseModule(lita: *Lita, 
-                 module: *Module,
-                 pos: SrcPos) {
-
     var parser = ParserInit(module.id.filename, module.text, lita)
     var moduleStmt = parser.parseModule()
     module.ast = moduleStmt
     lita.totalSourceLines += parser.totalLines
-}
 
-func ParseImport(lita: *Lita, root: *Module) {
-    if(!root) {
-        return;
-    }
-
-    //printf("Parsing Imports for '%s'\n", root.id.filename)
-
-    for(var i = 0; i < root.ast.imports.size(); i += 1) {
-        var importStmt = root.ast.imports.get(i)
+    for(var i = 0; i < module.ast.imports.size(); i += 1) {
+        var importStmt = module.ast.imports.get(i)
         if(importStmt.name.type == TokenType.ERROR) {
             lita.result.addError(importStmt.pos, "Could not parse import statement")
             continue
@@ -179,53 +166,49 @@ func ParseImport(lita: *Lita, root: *Module) {
             continue
         }
 
-        var module = lita.modules.get(filename)
-        if(module) {
-            importStmt.moduleId = &module.id
+        var importModule = lita.modules.get(filename)
+        if(importModule) {
+            importStmt.moduleId = &importModule.id
             continue;
         }        
 
-        //printf("Parsing file: '%s' with error count: %d\n", filename, lita.result.errors.size())
-        
-        module = NewModule(lita.result, lita.allocator)
-        module.id.fromFile(lita, filename)
-        importStmt.moduleId = &module.id
+        importModule = NewModule(lita, filename)
+        importStmt.moduleId = &importModule.id
 
-        lita.addModule(module)
+        lita.addModule(importModule)
 
-        if(!ReadModuleText(lita, module, importStmt.pos)) {
-            continue
-        }
-
-        ParseModule(lita, module, importStmt.pos)
-        ParseImport(lita, module)
+        ParseModule(lita, importModule, importStmt.pos)
     }
+
+    return true
 }
 
 func Parse(lita: *Lita) : *Module {
     lita.startCapture(MetricType.PARSING)
     defer lita.endCapture(MetricType.PARSING)
 
-    var root = NewModule(lita.result, lita.allocator)
-    root.id.fromFile(lita, lita.options.inputFile)
+    var builtin = BuiltinsInit(lita)
+    lita.addModule(builtin)
 
+    if(!ParseModule(lita, builtin, SrcPos{})) {
+        lita.result.addError(SrcPos{}, "unable to parse builtins.lita")
+        return null;
+    }
+    
+    var root = NewModule(lita, lita.options.inputFile)
     lita.addModule(root)
     
-    var pos = SrcPos{}
-
-    if(!ReadModuleText(lita, root, pos)) {
+    if(!ParseModule(lita, root, SrcPos{})) {
         return null;
     }
 
-    ParseModule(lita, root, pos)
-    ParseImport(lita, root)
+    var builtinImport = NewImportDecl(SrcPos{}, SrcPos{}, BUILTIN_IMPORT_TOKEN, Token{.type = TokenType.VOID}, false, lita.allocator) as (*ImportDecl)
+    root.ast.imports.add(builtinImport)
 
     return root
 }
 
 func TypeCheck(lita: *Lita, module: *Module) : bool {
-    BuiltinsInit(lita)
-
     lita.startCapture(MetricType.TYPE_CHECKING)
     defer lita.endCapture(MetricType.TYPE_CHECKING)
 
@@ -274,7 +257,6 @@ func GenerateC(lita: *Lita, module: *Module, filename: *const char) : bool {
     var cgen = CGen{}
     cgen.init(lita)
     cgen.emitProgram(module)
-    //printf("Generated: \n%s", cgen.buf.cStr())
     
     var status = WriteFile(filename, cgen.buf.cStrConst(), cgen.buf.length)
     if(status != FileStatus.Ok) {

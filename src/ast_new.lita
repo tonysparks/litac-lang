@@ -78,7 +78,7 @@ public func NewImportDecl(startPos: SrcPos,
                           name: Token,
                           alias: Token,
                           isUsing: bool,
-                          allocator: *const Allocator) : *Decl {                              
+                          allocator: *const Allocator) : *Decl {
     var decl = new<ImportDecl>(allocator)
     decl.kind = StmtKind.IMPORT_DECL;
     decl.startPos = startPos

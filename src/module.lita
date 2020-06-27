@@ -35,13 +35,27 @@ public struct Module {
     allocator: *const Allocator
 }
 
+public const BUILTIN_IMPORT_TOKEN = Token {
+    .type = TokenType.STRING,
+    .value = Value {
+        .str = StringView {
+            .buffer = "builtin",
+            .length = 7
+        }
+    }
+}
 public const builtins = Module{}
-public func BuiltinsInit(lita: *Lita) {
+public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.text = null
     builtins.ast = null
     builtins.flags = 0
     builtins.allocator = lita.allocator
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
+
+    var filename: [MAX_PATH]char;
+    var pathStr = StringInit(filename, MAX_PATH);
+    pathStr.format("%s/lib/builtins.lita", lita.options.litaPath)
+    builtins.id.fromFile(lita, pathStr.cStr())
 
     AddBuiltin(lita, &BOOL_TYPE)
     AddBuiltin(lita, &CHAR_TYPE)
@@ -58,6 +72,8 @@ public func BuiltinsInit(lita: *Lita) {
     AddBuiltin(lita, &USIZE_TYPE)
     AddBuiltin(lita, &NULL_TYPE)
     AddBuiltin(lita, &VOID_TYPE)
+
+    return &builtins
 }
 
 func AddBuiltin(lita: *Lita, type: *TypeInfo) {
@@ -71,11 +87,12 @@ func AddBuiltin(lita: *Lita, type: *TypeInfo) {
     type.sym = sym
 }
 
-public func NewModule(result: *PhaseResult, 
-                      allocator: *const Allocator) : *Module {
+public func NewModule(lita: *Lita,
+                      filename: *const char) : *Module {
 
-    var mod = new<Module>(allocator)    
-    mod.init(result, allocator)
+    var mod = new<Module>(lita.allocator)
+    mod.init(lita.result, lita.allocator)
+    mod.id.fromFile(lita, filename)
     return mod
 }
 

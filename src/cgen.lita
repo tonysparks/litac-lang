@@ -23,8 +23,16 @@ public struct CGen {
     line: StringBuffer
     indent: i32
     aggregateLevel: i32
+
+    currentFunc: *FuncTypeInfo
+    currentScope: *CGenScope
 }
 
+struct CGenScope {
+    parent: *CGenScope
+    defers: Array<*Stmt>
+    isLoop: bool
+}
 
 const escapeStrings = [256]*const char {
     ['\b'] = "\\b",
@@ -66,6 +74,8 @@ public func (this: *CGen) init(lita: *Lita) {
     this.buf.init(4096, lita.allocator)
     this.line.init(1024, lita.allocator)
     this.aggregateLevel = 0
+    this.currentFunc = null
+    this.currentScope = null
 }
 
 public func (this: using *CGen) emitProgram(module: *Module) {
@@ -320,6 +330,59 @@ func (this: using *CGen) baseTypeName(name: *const char) : StringView {
     }
     
     return str
+}
+
+func (this: using *CGen) pushScope(scope: *CGenScope) {
+    scope.parent = this.currentScope
+    this.currentScope = scope
+}
+
+func (this: using *CGen) popScope() : *CGenScope {
+    var scope = this.currentScope
+    if(!scope) {
+        return null
+    }
+
+    this.currentScope = scope.parent
+    this.leaveScope(scope)
+    return scope
+}
+
+func (this: using *CGen) popLoopScope() {
+    var scope = this.currentScope
+    while(scope) {
+        this.leaveScope(scope)
+        if(!scope || scope.isLoop) {
+            break;
+        }
+
+        scope = scope.parent
+    }
+}
+
+func (this: using *CGen) leaveScope(scope: *CGenScope) {
+    if(!scope || scope.defers.empty()) {
+        return;
+    }
+
+    for(var i = scope.defers.size() - 1; i >= 0; i-=1) {
+        var deferStmt = scope.defers.get(i)
+        this.emitStmt(deferStmt)
+        this.emit(";\n")
+    }
+}
+
+func (this: using *CGen) hasPendingDefers() : bool {
+    var scope = this.currentScope
+    while(scope) {
+        if(!scope.defers.empty()) {
+            return true
+        }
+
+        scope = scope.parent
+    }
+
+    return false
 }
 
 func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
@@ -842,6 +905,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.BLOCK_STMT: {
             var stmt = s as (*BlockStmt)
+            this.pushScope(&CGenScope{})
+            defer this.popScope()
+
             this.emit("{")
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
@@ -859,6 +925,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.BREAK_STMT: {
             var stmt = s as (*BreakStmt)
+            this.popLoopScope()
             this.emit("break;")
             return;
         }/*
@@ -875,21 +942,32 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }*/
         case StmtKind.CONTINUE_STMT: {
             var stmt = s as (*ContinueStmt)
+            this.popLoopScope()
             this.emit("continue;")
             return;
         }
         case StmtKind.DEFER_STMT: {
             var stmt = s as (*DeferStmt)
-            // TODO
-            this.emit("defer ")
-            this.emitStmt(stmt.deferedStmt)
+            if(this.currentScope.defers.empty()) {
+                this.currentScope.defers.init(16, this.lita.allocator)
+            }
+
+            this.currentScope.defers.add(stmt.deferedStmt)
             return;
         }
         case StmtKind.DO_WHILE_STMT: {
             var stmt = s as (*DoWhileStmt)
-            this.emit("do\n")
-            this.emitStmt(stmt.body)
-            this.emit("\nwhile(")
+            this.emit("do {")
+            {
+                this.pushScope(&CGenScope{.isLoop = true})
+                defer this.popScope()
+
+                this.emitStmt(stmt.body)
+                if(IsExpr(stmt.body)) {
+                    this.emit(";\n")
+                }
+            }            
+            this.emit("}\nwhile(")
             this.emitStmt(stmt.cond)
             this.emit(")")
             return;
@@ -906,23 +984,46 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emit("for(")
             if(stmt.init) {
                 this.emitStmt(stmt.init)
+                if(IsExpr(stmt.init)) {
+                    this.emit(";\n")
+                }
             }
-            this.emit(";")
+            else {
+                this.emit(";")
+            }
+
             if(stmt.cond) {
                 this.emitStmt(stmt.cond)
             }
+            
             this.emit(";")
+            
             if(stmt.post) {
                 this.emitStmt(stmt.post)
             }
-            this.emit(")\n")
+            this.emit(") {")
+            
             if(stmt.body) {
+                this.pushScope(&CGenScope{.isLoop = true})
+                defer this.popScope()
+
                 this.emitStmt(stmt.body)
+
+                if(IsExpr(stmt.body)) {
+                    this.emit(";\n")
+                }
             }
+            else {
+                this.emit(";")
+            }
+            this.emit("}")
             return;
         }
         case StmtKind.FUNC_BODY_STMT: {
             var stmt = s as (*FuncBodyStmt)
+            this.pushScope(&CGenScope{})
+            defer this.popScope()
+
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
                 this.emitStmt(n)
@@ -945,12 +1046,30 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var stmt = s as (*IfStmt)
             this.emit("if(")
             this.emitStmt(stmt.cond)
-            this.emit(") \n")
-            this.emitStmt(stmt.then)
-            this.emit("\n")
+            this.emit(") {")
+            {
+                this.pushScope(&CGenScope{})
+                defer this.popScope()
+
+                this.emitStmt(stmt.then)
+                if(IsExpr(stmt.then)) {
+                    this.emit(";")
+                }
+                this.emit("\n")
+            }
+            this.emit("} ")
             if(stmt.elseStmt) {
-                this.emit("else \n")
-                this.emitStmt(stmt.elseStmt)
+                this.emit("else {")
+                {
+                    this.pushScope(&CGenScope{})
+                    defer this.popScope()
+
+                    this.emitStmt(stmt.elseStmt)
+                    if(IsExpr(stmt.elseStmt)) {
+                        this.emit(";")
+                    }
+                }
+                this.emit("} ")
             }
             this.emit("\n")
             return;
@@ -987,12 +1106,30 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
-            this.emit("return");
-            if(stmt.expr) {
-                this.emit(" ")
-                this.emitStmt(stmt.expr)
+            var scope = this.currentScope
+            while(scope) {        
+                this.leaveScope(scope)
+                scope = scope.parent
             }
-            this.emit(";")
+
+            if(stmt.expr && this.hasPendingDefers()) {
+                assert(this.currentFunc != null)
+                this.emit("{ %s = ", this.cTypeDecl(this.currentFunc.returnType, "___result"))
+                this.emitStmt(stmt.expr)
+                this.emit(";\n")
+
+                
+
+                this.emit("return ___result;\n}\n")
+            }
+            else {
+                this.emit("return");
+                if(stmt.expr) {
+                    this.emit(" ")
+                    this.emitStmt(stmt.expr)
+                }
+                this.emit(";\n")
+            }
             return;
         }
         
@@ -1045,8 +1182,17 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var stmt = s as (*WhileStmt)
             this.emit("while(")
             this.emitStmt(stmt.cond)
-            this.emit(")\n")
-            this.emitStmt(stmt.body)
+            this.emit(") {")
+            {
+                this.pushScope(&CGenScope{.isLoop = true})
+                defer this.popScope()
+                
+                this.emitStmt(stmt.body)
+                if(IsExpr(stmt.body)) {
+                    this.emit(";\n")
+                }
+            }
+            this.emit("}")
             return;
         }
         
