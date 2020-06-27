@@ -139,7 +139,6 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
     this.aggregateLevel += 1
     defer this.aggregateLevel -= 1
 
-    // TODO: Prelude notes and Postlude notes
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
 
@@ -168,6 +167,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         }
     }
     this.emit("};\n")
+    this.emitNotes(decl.attributes, false)
 }
 
 

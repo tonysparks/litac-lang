@@ -624,6 +624,9 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         // --------------------------------------------------
         case StmtKind.BLOCK_STMT: {
             var body = stmt as (*BlockStmt)
+            this.pushScope(&Scope{})
+            defer this.popScope()
+            
             for(var i = 0; i < body.stmts.size(); i+=1) {
                 var s = body.stmts.get(i)
                 if(!this.resolveStmt(s)) {

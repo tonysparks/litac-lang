@@ -335,11 +335,11 @@ func (this: *TypeChecker) resolveSubscriptSetExpr(expr: *SubscriptSetExpr) : boo
 
     var baseObj: *TypeInfo = null
 
-    var objectType = expr.object.operand.typeInfo    
+    var objectType = expr.object.operand.typeInfo
     switch(objectType.kind) {
         case TypeKind.STR: {
-            baseObj = &CHAR_TYPE
-            break;
+            this.errorSetIndexingConstType(expr.object, objectType)
+            return false
         }
         case TypeKind.PTR: {
             var ptrInfo = objectType as (*PtrTypeInfo)
@@ -355,6 +355,11 @@ func (this: *TypeChecker) resolveSubscriptSetExpr(expr: *SubscriptSetExpr) : boo
             this.errorNonIndexableType(expr.object, objectType)
             return false
         }
+    }
+
+    if(baseObj.kind == TypeKind.CONST) {
+        this.errorSetIndexingConstType(expr.object, objectType)
+        return false
     }
 
     var indexType = expr.index.operand.typeInfo
@@ -699,7 +704,7 @@ func (this: *TypeChecker) resolveOffsetOfExpr(expr: *OffsetOfExpr) : bool {
     
     expr.operand.typeInfo = &USIZE_TYPE
     expr.operand.isRightValue = true
-    expr.operand.isConst = true    
+    expr.operand.isConst = true
     return true
 }
 
@@ -711,7 +716,7 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
 
     expr.operand.typeInfo = &USIZE_TYPE
     expr.operand.isRightValue = true
-    expr.operand.isConst = true    
+    expr.operand.isConst = true
     return true
 }
 
@@ -1076,7 +1081,19 @@ func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("invalid index into '")    
+    sb.append("invalid index into '")
+    type.toString(sb)
+    sb.append("'")
+
+    this.result.addErrorStr(expr.startPos, sb)
+}
+
+func (this: *TypeChecker) errorSetIndexingConstType(expr: *Expr, type: *TypeInfo) {
+    assert(expr != null)
+    assert(type != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("invalid read-only assignment to '")
     type.toString(sb)
     sb.append("'")
 

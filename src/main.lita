@@ -85,6 +85,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
     options.checkerOnly = false
     options.cOutputOnly = false
     options.showProfileInfo = true
+    options.run = true
 
     //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
     strncpy(options.inputFile, "../test/test.lita", MAX_PATH) // TEMP
@@ -97,8 +98,8 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
     }
 
     FilePath(options.inputFile, options.srcPath)
-    printf("Reading in: '%s'\n", options.inputFile)
-    printf("Source Path: '%s'\n", options.srcPath)
+    //printf("Reading in: '%s'\n", options.inputFile)
+    //printf("Source Path: '%s'\n", options.srcPath)
 }
 
 func FindModulePath(lita: *Lita, 
@@ -260,7 +261,7 @@ func Transpile(lita: *Lita, module: *Module) : bool {
     }
 
     if(lita.options.run) {
-        Run(lita, filename)
+        Run(lita, lita.options.outputFile)
     }
 
     return true
@@ -287,12 +288,12 @@ func CompileC(lita: *Lita, module: *Module, filename: *const char) : bool {
     var command: [512]char;
     var commandStr = StringInit(command, 512)
     commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", lita.options.outputFile, filename)
-    if(!system(commandStr.cStrConst())) {
-        return false
+    if(system(commandStr.cStrConst()) == 0) {
+        return true
     }
-    return true
+    return false
 }
 
 func Run(lita: *Lita, filename: *const char) {
-
+    system(filename)
 }

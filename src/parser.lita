@@ -1491,7 +1491,7 @@ func (p: *Parser) switchCaseStatement() : *Stmt {
             break;
         }
 
-        var stmt = p.statement()        
+        var stmt = p.statement()
         p.eatSemicolon()
 
         stmts.add(stmt)

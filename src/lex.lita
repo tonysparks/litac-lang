@@ -120,7 +120,7 @@ public enum TokenType {
     INT_NUMBER,
     FLOAT_NUMBER,
     ERROR,
-    END_OF_FILE,    
+    END_OF_FILE,
 
     MAX_TOKEN_TYPES
 }
@@ -428,8 +428,14 @@ public union Value {
     str: StringView
 }
 
+public enum Mod {
+    NONE = 0,
+    MULTISTR,
+}
+
 public struct Token {
     type: TokenType
+    mod: Mod
     typeInfo: *TypeInfo
     pos: SrcPos
     value: using Value
@@ -933,10 +939,10 @@ func (l: *Lexer) scanChar() : Token {
     return l.token
 }
 
-func (l: *Lexer) scanString() : Token {    
+func (l: *Lexer) scanString() : Token {
     var length = 0
+    var isVerbatim = false
     if(l.stream[0] == '"') {
-        var isVerbatim = false        
         if(l.stream[1] == '"' && l.stream[2] == '"') {
             isVerbatim = true
             l.nextChar()
@@ -953,7 +959,7 @@ func (l: *Lexer) scanString() : Token {
                     length += 1
                 }
             }
-            else if(l.stream[0] == '"') {        
+            else if(l.stream[0] == '"') {
                 if(!isVerbatim) {
                     l.nextChar()
                     break;
@@ -972,7 +978,9 @@ func (l: *Lexer) scanString() : Token {
     l.token.type = TokenType.STRING
     l.token.value.str.length = length
     l.token.pos.end = l.stream
-    //l.token.pos.lineNumber = l.lineNumber
+    if(isVerbatim) {
+        l.token.mod = Mod.MULTISTR
+    }
     return l.token
 }
 

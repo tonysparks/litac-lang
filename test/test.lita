@@ -48,20 +48,58 @@ func TestV(i: i32, ...) {
 }
 */
 
-/*
+
 enum TypeKind {
     Array = 1,
     Const = 2 + 3,
     Ptr
 }
-*/
+
+struct TEMP {
+    x:i32
+}
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
 func main(len: i32, args: **char) : i32 {
-    FuncTest(len, args)
-    printf("%s", "hello world!")
+    
+    /*FuncTest(len, args)
+    var i:i32 = 10.001_f32 as (i32)
+    printf("%s\n", "hello world!")
+
+    var x = sizeof(:i32)
+    var y = sizeof(i)
+
+    printf("Raw: '%s'\n", text)
+
+    var wq = offsetof(TEMP, x)
+    var z = text[0]
+    var w = [2]i32 {0,0}
+    w[0] = 2
+
+    var zz = TypeKind.Array
+    var tt = TEMP{}
+    tt.x = 4
+    var xx = tt.x
+*/
+    switch(1) {
+        case 2:
+        case 4:
+        case 5: break;
+        case 6: {
+            var i = 1
+            break;
+        }
+        default: {
+            var x = 1 + 0
+        }
+    }
 }
+
+var text = """
+ Because I can!
+ \\ \n\r\ 
+"""
 
 struct Person {
     //name: *const char
