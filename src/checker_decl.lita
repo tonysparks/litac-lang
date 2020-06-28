@@ -155,6 +155,24 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
     return true
 }
 
+func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
+    if(aggDecl.name.str.length) {
+        this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types allowed", 
+                                        fieldName.length, fieldName.buffer, 
+                                        aggDecl.name.str.length, aggDecl.name.str.buffer)
+    }
+    else {
+        this.result.addError(pos, "invalid 'using' member '%.*s', only aggregate types allowed", 
+                                fieldName.length, fieldName.buffer)
+    }    
+}
+
+func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
+    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types allowed", 
+                         paramDecl.name.str.length, paramDecl.name.str.buffer)
+        
+}
+
 func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
     if(aggDecl.name.str.length) {
         this.result.addError(pos, "duplicate member '%.*s' in '%.*s'", 
@@ -239,6 +257,11 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 if(varField.defaultExpr) {
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
+                    }
+                }
+                if(varField.attributes.isUsing) {
+                    if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
+                        this.errorUsingMember(aggDecl, varField.name.str, varField.startPos)
                     }
                 }
                 this.checkAggregateFieldDuplicate(aggDecl, varField.name.str, i)
@@ -341,14 +364,20 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     this.pushScope(Scope{})
     defer this.popScope()
 
-    this.resolveStmt(funcDecl.params)
+    if(!this.resolveStmt(funcDecl.params)) {
+        return false
+    }
+
     if(funcDecl.body) {
         // keep track of which function we are currently parsing
         this.currentFuncDecl = funcDecl.sym.type as (*FuncTypeInfo)
         defer this.currentFuncDecl = null
 
         this.numOfLabels = 0
-        this.resolveStmt(funcDecl.body)
+        if(!this.resolveStmt(funcDecl.body)) {
+            return false
+        }
+
         this.checkLabels()
     }
 
@@ -359,13 +388,30 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
     assert(paramDecl != null)
 
     if(paramDecl.defaultExpr) {
-        this.resolveExpr(paramDecl.defaultExpr)
+        if(!this.resolveExpr(paramDecl.defaultExpr)) {
+            return false
+        }
     }
 
     var typeInfo = this.resolveTypeSpec(paramDecl.type)
+    if(!typeInfo) {
+        return false
+    }
+
     paramDecl.sym = this.addSymbol(paramDecl, typeInfo)
 
-    // TODO: Handle using parameters
+    if(paramDecl.attributes.isUsing) {
+        if(!IsAggregate(typeInfo) && !IsPtrAggregate(typeInfo)) {
+            this.errorUsingParameter(paramDecl)
+        }
+        else {
+            var baseType = typeInfo.getBaseType()
+            var aggType = baseType as (*AggregateTypeInfo)
+
+            this.addTypeToScope(paramDecl, this.currentScope, aggType, aggType)
+        }
+    }
+
     return true
 }
 

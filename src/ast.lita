@@ -426,11 +426,18 @@ public struct FuncCallExpr {
     arguments: Array<*Expr>
 }
 
+public enum GetExprFlags {
+    IS_NORMAL      = 0,
+    IS_METHOD_CALL = (1<<0),
+    IS_ENUM        = (1<<1),
+    IS_USING       = (1<<2),
+}
+
 public struct GetExpr {
     expr: using Expr
     object: *Expr
     field: *IdentifierExpr
-    isMethodCall: bool
+    flags: i32
 }
 
 public struct GroupExpr {
@@ -480,6 +487,7 @@ public struct SetExpr {
     field: *IdentifierExpr
     operator: TokenType
     value: *Expr
+    flags: i32
 }
 
 public struct SizeOfExpr {

@@ -4,6 +4,7 @@ import "symbols"
 import "phase_result"
 import "module"
 import "ast"
+import "ast_new"
 import "lex"
 import "lita"
 import "map"
@@ -597,6 +598,49 @@ func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol 
     return sym
 }
 
+func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *AggregateTypeInfo) {
+    for(var i = 0; i < currentType.decl.fields.size(); i += 1) {
+        var field = currentType.decl.fields.get(i)
+
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                if(varField.name.type != TokenType.IDENTIFIER) {
+                    break
+                }
+                
+                var varDecl = NewVarDecl(decl.startPos, decl.endPos, decl.name, varField.type, null, this.allocator)
+
+                var name:[MAX_SYMBOL_NAME]char;
+                varField.name.str.copyTo(name, MAX_SYMBOL_NAME)
+
+                varDecl.sym = scope.addSymbol(name as (*const char), this.current, varDecl, SymbolFlags.IS_USING)
+                varDecl.sym.type = field.typeInfo
+                varDecl.sym.usingParent = decl.sym
+                
+                this.resolveSymbol(varDecl.sym)
+
+                if(varField.attributes.isUsing) {
+                    var fieldBaseType = field.typeInfo.getBaseType()
+                    assert(IsAggregate(fieldBaseType))
+                    this.addTypeToScope(decl, scope, baseType, fieldBaseType as (*AggregateTypeInfo))
+                }
+                break;
+            }
+            case StmtKind.ENUM_FIELD_DECL: 
+            case StmtKind.UNION_FIELD_DECL:
+            case StmtKind.STRUCT_FIELD_DECL:
+                // TODO: Should Union/Struct be placed in scope?
+            case StmtKind.POISON_EXPR: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+}
+
 
 func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
     if(!stmt) return true;
@@ -626,7 +670,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             var body = stmt as (*BlockStmt)
             this.pushScope(&Scope{})
             defer this.popScope()
-            
+
             for(var i = 0; i < body.stmts.size(); i+=1) {
                 var s = body.stmts.get(i)
                 if(!this.resolveStmt(s)) {

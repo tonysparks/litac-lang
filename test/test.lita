@@ -55,6 +55,28 @@ enum TypeKind {
     Ptr
 }
 
+struct X {
+    y: using Y
+    z: using Z
+    w2: using W
+}
+
+struct Y {
+    w: i32
+}
+
+struct Z {
+    m: i32
+}
+
+struct W {
+    v: using *V
+}
+
+struct V {
+    b: i32
+}
+
 struct TEMP {
     x:i32
 }
@@ -63,11 +85,45 @@ func (this: *TEMP) test(i: i32 = 10) : i32 {
     return this.x
 }
 
+func (x: using *X) call() : i32{
+    return m
+}
+
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
 func main(len: i32, args: **char) : i32 {
-    
+    var x = X{
+        .y = Y {
+            .w = 4
+        },
+        .z = Z {
+            .m = 8
+        },
+        .w2 = W {
+            .v = &V {
+                .b = 12
+            }
+        }
+    }
+
+    printf("%d = %d\n", x.w, x.y.w)
+    printf("%d = %d\n", x.m, x.z.m)
+    printf("%d = %d\n", x.b, x.w2.v.b)
+
+    printf("%d = %d\n", x.call(), x.m)
+
+
+    x.w *= 2
+    x.m *= 2
+    x.b *= 2
+
+    printf("%d = %d\n", x.w, x.y.w)
+    printf("%d = %d\n", x.m, x.z.m)
+    printf("%d = %d\n", x.b, x.w2.v.b)
+
+    //var xx = x.w
+
     /*FuncTest(len, args)
     var i:i32 = 10.001_f32 as (i32)
     printf("%s\n", "hello world!")
@@ -87,8 +143,8 @@ func main(len: i32, args: **char) : i32 {
     tt.x = 4
     var xx = tt.x
 */
-    var tmp = TEMP{}
-    tmp.test()
+   // var tmp = TEMP{}
+   // tmp.test()
 
     //var z = 0
    /*

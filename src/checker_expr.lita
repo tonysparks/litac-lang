@@ -162,12 +162,7 @@ func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, funcPtr: *FuncPtrT
         return false
     }
 
-    if(getExpr.isMethodCall) {
-        return true
-    }
-
-    getExpr.isMethodCall = true
-    suppliedArgs.insertAt(0, getExpr.object)
+    suppliedArgs.insertAt(0, getExpr.object)    
     return true
 }
 
@@ -658,7 +653,12 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
     var aggInfo = info as (*AggregateTypeInfo)
     var field = aggInfo.getField(expr.field.type.name)
     if(field.kind == StmtKind.POISON_EXPR) {
-        return false
+        field = aggInfo.getFieldWithUsing(expr.field.type.name)
+        if(field.kind == StmtKind.POISON_EXPR) {
+            this.errorNoField(expr.field, objectTypeInfo, expr.field.type.name)
+            return false
+        }
+        expr.flags |= GetExprFlags.IS_USING
     }
 
     expr.field.operand.typeInfo = field.typeInfo
@@ -803,6 +803,7 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
             return false
         }
 
+        expr.flags |= GetExprFlags.IS_ENUM
         expr.operand.typeInfo = &I32_TYPE
         expr.operand.isConst = true
         expr.operand.isRightValue = true
@@ -814,60 +815,72 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         assert(info.kind == TypeKind.STRUCT || info.kind == TypeKind.UNION)
 
         var aggInfo = info as (*AggregateTypeInfo)
+
+        // is this a vanilla field access?
         var field = aggInfo.getField(expr.field.type.name)
+        if(field.kind != StmtKind.POISON_EXPR) {
+            expr.field.operand.typeInfo = field.typeInfo
+            expr.operand.typeInfo = field.typeInfo
+            return true
+        }
+        
+        // is this a using field access?
+        field = aggInfo.getFieldWithUsing(expr.field.type.name)
+        if(field.kind != StmtKind.POISON_EXPR) {
+            expr.flags |= GetExprFlags.IS_USING
+            expr.field.operand.typeInfo = field.typeInfo
+            expr.operand.typeInfo = field.typeInfo
+            return true
+        }
+        
 
-        // this isn't a field in the aggregate -- now check to see if this
-        // is a method
-        if(field.kind == StmtKind.POISON_EXPR) {
-            for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
-                var sym = this.symbolFuncs.get(i)
-                var decl = sym.decl as (*FuncDecl)
-                if(!(decl.flags & FuncFlags.IS_METHOD)) {
+        // is this a method lookup?
+        for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
+            var sym = this.symbolFuncs.get(i)
+            var decl = sym.decl as (*FuncDecl)
+            if(!(decl.flags & FuncFlags.IS_METHOD)) {
+                continue
+            }
+
+            if(strncmp(decl.name.str.buffer, expr.field.type.name, decl.name.str.length) != 0) {
+                continue
+            }
+
+            var methodName: [MAX_SYMBOL_NAME]char;
+            if(!decl.getName(methodName)) {
+                continue
+            }
+
+            var methodStr = StringViewInit(methodName, MAX_SYMBOL_NAME)
+            var index = methodStr.indexOf("_")
+            assert(index >= 0)
+            
+            if(strncmp(methodName, aggInfo.name, index) == 0) {
+                if(decl.params.params.empty()) {
                     continue
                 }
 
-                if(strncmp(decl.name.str.buffer, expr.field.type.name, decl.name.str.length) != 0) {
-                    continue
+                var objectParam = decl.params.get(0).typeInfo
+                var baseType: *TypeInfo = objectParam
+
+                if(objectParam.kind == TypeKind.PTR) {
+                    var ptrType = objectParam as (*PtrTypeInfo)
+                    baseType = ptrType.getBaseType()
                 }
 
-                var methodName: [MAX_SYMBOL_NAME]char;
-                if(!decl.getName(methodName)) {
-                    continue
-                }
-
-                var methodStr = StringViewInit(methodName, MAX_SYMBOL_NAME)
-                var index = methodStr.indexOf("_")
-                assert(index >= 0)
-                
-                if(strncmp(methodName, aggInfo.name, index) == 0) {
-                    
-                    if(decl.params.params.empty()) {
-                        continue
-                    }
-
-                    var objectParam = decl.params.get(0).typeInfo
-                    var baseType: *TypeInfo = objectParam
-
-                    if(objectParam.kind == TypeKind.PTR) {
-                        var ptrType = objectParam as (*PtrTypeInfo)
-                        baseType = ptrType.getBaseType()
-                    }
-
-                    if(baseType.strictEquals(aggInfo)) {
-                        expr.field.operand.typeInfo = sym.type
-                        expr.operand.typeInfo = sym.type
-                        return true
-                    }
+                if(baseType.strictEquals(aggInfo)) {
+                    expr.flags |= GetExprFlags.IS_METHOD_CALL
+                    expr.field.operand.typeInfo = sym.type
+                    expr.operand.typeInfo = sym.type
+                    return true
                 }
             }
-            return false
         }
-
-        expr.field.operand.typeInfo = field.typeInfo
-        expr.operand.typeInfo = field.typeInfo
+        
     }
 
-    return true
+    this.errorNoField(expr.field, objectTypeInfo, expr.field.type.name)
+    return false
 }
 
 func (this: *TypeChecker) resolveGroupExpr(expr: *GroupExpr) : bool {

@@ -871,7 +871,33 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
         return;
     }
 
-    this.emit("%s", this.cName(sym))
+    if(!(sym.flags & SymbolFlags.IS_USING)) {
+        this.emit("%s", this.cName(sym))
+        return;
+    }
+
+    var paramInfo = sym.usingParent
+    assert(paramInfo != null)
+
+    var aggType = paramInfo.type.getBaseType() as (*AggregateTypeInfo)
+    this.emit("%s", this.cName(paramInfo))
+    
+    var path = FieldPath{}
+    var isFound = aggType.getFieldPath(sym.name, &path)
+    assert(isFound)
+
+    var nextType = paramInfo.type
+    for(var i = 0; i < path.numOfFields; i+=1) {
+        var field = path.fields[i]
+        if(nextType.kind == TypeKind.PTR) {
+            buf.append("->")
+        }
+        else {
+            buf.append(".")
+        }
+        this.emit("%.*s", field.varField.name.str.length, field.varField.name.str.buffer)
+        nextType = field.typeInfo
+    }
 }
 
 func (this: using *CGen) emitStmt(s: *Stmt) {
@@ -1315,23 +1341,50 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*GetExpr)
 
             // handled by funcCallExpr
-            if(expr.isMethodCall) {
+            if(expr.flags & GetExprFlags.IS_METHOD_CALL) {
                 this.emit("%s", this.cTypeName(expr.field.operand.typeInfo))
                 return;
             }
 
             var objectType = expr.object.operand.typeInfo
-            if(objectType.kind == TypeKind.ENUM) {
+
+            if(expr.flags & GetExprFlags.IS_ENUM) {
                 if(objectType.sym && objectType.sym.flags & SymbolFlags.IS_FOREIGN) {
                     buf.append("%s", expr.field.type.name)
                 }
                 else {
                     buf.append("%s_%s", this.cName(objectType.sym), expr.field.type.name)
                 }
+                return;
+            }
+            
+            this.emitStmt(expr.object)
+            
+            if(expr.flags & GetExprFlags.IS_USING) {
+                var baseInfo = objectType.getBaseType()
+                assert(baseInfo != null)
+                assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
+
+                var aggInfo = baseInfo as (*AggregateTypeInfo)
+
+                var path = FieldPath{}
+                var isFound = aggInfo.getFieldPath(expr.field.type.name, &path)
+                assert(isFound)
+
+                var nextType = objectType
+                for(var i = 0; i < path.numOfFields; i+=1) {
+                    var field = path.fields[i]
+                    if(nextType.kind == TypeKind.PTR) {
+                        buf.append("->")
+                    }
+                    else {
+                        buf.append(".")
+                    }
+                    this.emit("%.*s", field.varField.name.str.length, field.varField.name.str.buffer)
+                    nextType = field.typeInfo
+                }
             }
             else {
-                this.emitStmt(expr.object)
-                
                 if(objectType.kind == TypeKind.PTR) {
                     buf.append("->")
                 }
@@ -1341,6 +1394,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
                 this.emitStmt(expr.field)
             }
+            
             return;
         }
         case StmtKind.GROUP_EXPR: {
@@ -1447,11 +1501,39 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitStmt(expr.object)
 
             var objectType = expr.object.operand.typeInfo
-            if(objectType.kind == TypeKind.PTR) {
-                buf.append("->%s %s ", expr.field.type.name, tokenText[expr.operator])
+            if(expr.flags & GetExprFlags.IS_USING) {
+                var baseInfo = objectType.getBaseType()
+                assert(baseInfo != null)
+                assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
+
+                var aggInfo = baseInfo as (*AggregateTypeInfo)
+
+                var path = FieldPath{}
+                var isFound = aggInfo.getFieldPath(expr.field.type.name, &path)
+                assert(isFound)
+
+                var nextType = objectType
+                for(var i = 0; i < path.numOfFields; i+=1) {
+                    var field = path.fields[i]
+                    if(nextType.kind == TypeKind.PTR) {
+                        buf.append("->")
+                    }
+                    else {
+                        buf.append(".")
+                    }
+                    this.emit("%.*s", field.varField.name.str.length, field.varField.name.str.buffer)
+                    nextType = field.typeInfo
+                }
+
+                this.emit(" %s ", tokenText[expr.operator])
             }
             else {
-                buf.append(".%s %s ", expr.field.type.name, tokenText[expr.operator])
+                if(objectType.kind == TypeKind.PTR) {
+                    buf.append("->%s %s ", expr.field.type.name, tokenText[expr.operator])
+                }
+                else {
+                    buf.append(".%s %s ", expr.field.type.name, tokenText[expr.operator])
+                }
             }
 
             this.emitStmt(expr.value)

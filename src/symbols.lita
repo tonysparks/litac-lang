@@ -44,6 +44,8 @@ public struct Symbol {
     state: SymbolState
     decl: *Decl
     type: *TypeInfo
+    //usingParent: *TypeInfo
+    usingParent: *Symbol
     declared: *Module
     flags: i32
 }

@@ -887,6 +887,108 @@ err:
     }    
 }
 
+public func (this: *AggregateTypeInfo) getFieldWithUsing(name: *const char) : FieldStmt {
+    assert(this != null)
+
+    var fieldStmt = this.getField(name)
+    if(fieldStmt.kind != StmtKind.POISON_EXPR) {
+        return fieldStmt
+    }
+
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                if(!varField.attributes.isUsing) {
+                    continue;
+                }
+
+                if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
+                    continue;
+                }
+
+                var baseType = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
+                assert(baseType.kind == TypeKind.STRUCT || baseType.kind == TypeKind.UNION)
+
+                fieldStmt = baseType.getFieldWithUsing(name)
+                if(fieldStmt.kind != StmtKind.POISON_EXPR) {
+                    return fieldStmt
+                }
+
+                break;
+            }
+            default: {
+                continue;
+            }
+        }
+    }
+err:
+    return FieldStmt {
+        .kind = StmtKind.POISON_EXPR
+    }    
+}
+
+public const MAX_FIELD_PATH = 256
+public struct FieldPath {
+    fields: [MAX_FIELD_PATH]FieldStmt
+    numOfFields: i32
+}
+
+func (this: *FieldPath) add(field: FieldStmt) {
+    this.fields[this.numOfFields] = field
+    this.numOfFields += 1
+}
+
+func (this: *FieldPath) pop() {
+    this.numOfFields -= 1
+}
+
+
+public func (this: *AggregateTypeInfo) getFieldPath(name: *const char, path: *FieldPath) : bool {
+    assert(this != null)
+
+    var fieldStmt = this.getField(name)
+    if(fieldStmt.kind != StmtKind.POISON_EXPR) {
+        path.add(fieldStmt)
+        return true
+    }
+
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                if(!varField.attributes.isUsing) {
+                    continue;
+                }
+
+                if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
+                    continue;
+                }
+
+                var baseType = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
+                assert(baseType.kind == TypeKind.STRUCT || baseType.kind == TypeKind.UNION)
+
+                path.add(field)
+
+                if(baseType.getFieldPath(name, path)) {
+                    return true
+                }
+
+                path.pop()
+
+                break;
+            }
+            default: {
+                continue;
+            }
+        }
+    }
+
+    return false
+}
+
 public typedef i64 as Typeid;
 var idGen: Typeid = TypeKind.MAX_TYPE_KINDS as (i64);
 
