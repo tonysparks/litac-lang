@@ -735,13 +735,15 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.FUNC_BODY_STMT: {
             var body = stmt as (*FuncBodyStmt)
+
+            var success = true
             for(var i = 0; i < body.stmts.size(); i+=1) {
                 var s = body.stmts.get(i)
                 if(!this.resolveStmt(s)) {
-                    return false
+                    success = false
                 }
             }
-            return true
+            return success
         }
         case StmtKind.GOTO_STMT: {
             var gotoStmt = stmt as (*GotoStmt)

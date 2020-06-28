@@ -59,6 +59,7 @@ struct X {
     y: using Y
     z: using Z
     w2: using W
+    r: using *R
 }
 
 struct Y {
@@ -72,6 +73,16 @@ struct Z {
 struct W {
     v: using *V
 }
+
+struct R {
+    j: using *J
+}
+
+
+struct J {
+    c: i32
+}
+
 
 struct V {
     b: i32
@@ -89,6 +100,30 @@ func (x: using *X) call() : i32{
     return m
 }
 
+func (y: Y) call2() : i32 {
+    return y.w
+}
+
+func (y: *Y) call3() : i32 {
+    return y.w
+}
+
+func (v: V) call4() : i32 {
+    return v.b
+}
+
+func (v: *V) call5() : i32 {
+    return v.b
+}
+
+func (j: J) call6() : i32 {
+    return j.c
+}
+
+func (j: *J) call7() : i32 {
+    return j.c
+}
+
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
@@ -104,12 +139,19 @@ func main(len: i32, args: **char) : i32 {
             .v = &V {
                 .b = 12
             }
+        },
+        .r = &R {
+            .j = &J {
+                .c = 16
+            }
         }
     }
 
     printf("%d = %d\n", x.w, x.y.w)
     printf("%d = %d\n", x.m, x.z.m)
     printf("%d = %d\n", x.b, x.w2.v.b)
+    printf("%d = %d\n", x.b, x.w2.v.b)
+    printf("%d = %d\n", x.c, x.r.j.c)
 
     printf("%d = %d\n", x.call(), x.m)
 
@@ -117,10 +159,21 @@ func main(len: i32, args: **char) : i32 {
     x.w *= 2
     x.m *= 2
     x.b *= 2
+    x.c *= 2
 
     printf("%d = %d\n", x.w, x.y.w)
     printf("%d = %d\n", x.m, x.z.m)
     printf("%d = %d\n", x.b, x.w2.v.b)
+    printf("%d = %d\n", x.c, x.r.j.c)
+
+    printf("%d = %d\n", x.call2(), x.y.w)
+    printf("%d = %d\n", x.call3(), x.y.w)
+
+    printf("%d = %d\n", x.call4(), x.w2.v.b)
+    printf("%d = %d\n", x.call5(), x.w2.v.b)
+
+    printf("%d = %d\n", x.call6(), x.r.j.c)
+    printf("%d = %d\n", x.call7(), x.r.j.c)
 
     //var xx = x.w
 

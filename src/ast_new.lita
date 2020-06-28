@@ -14,6 +14,16 @@ public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpe
     return voidSpec as (*TypeSpec)
 }
 
+public func NewNameTypeSpec(pos: SrcPos, name: *const char, allocator: *const Allocator) : *NameTypeSpec {    
+    var result = new<NameTypeSpec>(allocator)
+    result.kind = TypeSpecKind.NAME
+    result.pos = pos
+    result.base = null
+    result.name = name
+    result.genericArgs.init(0, allocator)
+    return result
+}
+
 public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
     switch(kind) {
         case TypeSpecKind.NONE: {

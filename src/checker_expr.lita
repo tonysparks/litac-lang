@@ -184,12 +184,43 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
             continue
         }
 
-        if(!IsAggregate(argInfo) && !IsPtrAggregate(argInfo)) {
+        if(!IsAggregateLike(argInfo)) {
             continue
         }
 
-        var aggInfo = argInfo.getBaseType() as (*AggregateTypeInfo)
-        // TODO: Check using parameter
+        if(!IsAggregateLike(paramInfo)) {
+            continue
+        }
+
+        var argAggInfo = argInfo.getBaseType() as (*AggregateTypeInfo)
+        var paramAggInfo = paramInfo.getBaseType() as (*AggregateTypeInfo)
+
+        // coerce any arguments that match via using fields
+        if(argAggInfo.typeid != paramAggInfo.typeid) {
+            var path = FieldPath{}
+            if(!argAggInfo.getFieldPathByType(paramAggInfo, &path)) {
+                continue
+            }
+
+            for(var i = 0; i < path.numOfFields; i+=1) {
+                var field = path.fields[i]
+                assert(field.kind == StmtKind.VAR_FIELD_DECL)
+
+                var name = this.allocator.alloc((field.varField.name.str.length + 1) * sizeof(:char)) as (*char)
+                field.varField.name.str.copyTo(name, field.varField.name.str.length)
+
+                var nameTypeSpec = NewNameTypeSpec(argExpr.startPos, name, this.allocator)
+                var idExpr = NewIdentifierExpr(argExpr.startPos, argExpr.endPos, nameTypeSpec, this.allocator) as (*IdentifierExpr)
+                argExpr = NewGetExpr(argExpr.startPos, argExpr.endPos, argExpr, idExpr, this.allocator)
+            }
+
+            if(!this.resolveExpr(argExpr)) {
+                return false
+            }
+
+            argInfo = argExpr.operand.typeInfo
+        }
+        
 
         // promote the argument to a pointer
         if(IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) {
@@ -777,6 +808,68 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
     return true
 }
 
+func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTypeInfo) : bool {
+    assert(expr != null)
+
+    // TODO: We shouldn't be looking thru all possible functions - performance!!
+    for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
+        var sym = this.symbolFuncs.get(i)
+        var decl = sym.decl as (*FuncDecl)
+        if(!(decl.flags & FuncFlags.IS_METHOD)) {
+            continue
+        }
+
+        if(!decl.name.str.equals(expr.field.type.name)) {
+            continue
+        }
+
+        var methodName: [MAX_SYMBOL_NAME]char;
+        if(!decl.getName(methodName)) {
+            continue
+        }
+
+        var methodStr = StringViewInit(methodName, MAX_SYMBOL_NAME)
+        var index = methodStr.indexOf("_")
+        assert(index >= 0)
+        
+        if(strncmp(methodName, aggInfo.name, index) == 0) {
+            if(decl.params.params.empty()) {
+                continue
+            }
+
+            var objectParam = decl.params.get(0).typeInfo
+            var baseType: *TypeInfo = objectParam
+
+            if(objectParam.kind == TypeKind.PTR) {
+                var ptrType = objectParam as (*PtrTypeInfo)
+                baseType = ptrType.getBaseType()
+            }
+
+            if(baseType.strictEquals(aggInfo)) {
+                expr.flags |= GetExprFlags.IS_METHOD_CALL
+                expr.field.operand.typeInfo = sym.type
+                expr.operand.typeInfo = sym.type
+                return true
+            }
+        }
+    }
+
+    for(var i = 0; i < aggInfo.decl.fields.size(); i += 1) {
+        var field = aggInfo.decl.fields.get(i)
+        if(field.kind == StmtKind.VAR_FIELD_DECL) {
+            var varField = field.varField
+            if(varField.attributes.isUsing) {
+                var baseType = field.typeInfo.getBaseType()
+                if(this.checkMethodExpr(expr, baseType as (*AggregateTypeInfo))) {
+                    return true
+                }
+            }
+        }
+    }
+
+    return false
+}
+
 func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
     assert(expr != null)
 
@@ -833,48 +926,8 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
             return true
         }
         
-
-        // is this a method lookup?
-        for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
-            var sym = this.symbolFuncs.get(i)
-            var decl = sym.decl as (*FuncDecl)
-            if(!(decl.flags & FuncFlags.IS_METHOD)) {
-                continue
-            }
-
-            if(strncmp(decl.name.str.buffer, expr.field.type.name, decl.name.str.length) != 0) {
-                continue
-            }
-
-            var methodName: [MAX_SYMBOL_NAME]char;
-            if(!decl.getName(methodName)) {
-                continue
-            }
-
-            var methodStr = StringViewInit(methodName, MAX_SYMBOL_NAME)
-            var index = methodStr.indexOf("_")
-            assert(index >= 0)
-            
-            if(strncmp(methodName, aggInfo.name, index) == 0) {
-                if(decl.params.params.empty()) {
-                    continue
-                }
-
-                var objectParam = decl.params.get(0).typeInfo
-                var baseType: *TypeInfo = objectParam
-
-                if(objectParam.kind == TypeKind.PTR) {
-                    var ptrType = objectParam as (*PtrTypeInfo)
-                    baseType = ptrType.getBaseType()
-                }
-
-                if(baseType.strictEquals(aggInfo)) {
-                    expr.flags |= GetExprFlags.IS_METHOD_CALL
-                    expr.field.operand.typeInfo = sym.type
-                    expr.operand.typeInfo = sym.type
-                    return true
-                }
-            }
+        if(this.checkMethodExpr(expr, aggInfo)) {
+            return true
         }
         
     }

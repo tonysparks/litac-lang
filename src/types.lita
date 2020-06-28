@@ -272,6 +272,10 @@ public func IsBooleanable(type: *TypeInfo) : bool {
     }
 }
 
+public func IsAggregateLike(type: *TypeInfo) : bool {
+    return IsAggregate(type) || IsPtrAggregate(type)
+}
+
 public func IsAggregate(type: *TypeInfo) : bool {
     if(!type) {
         return false;
@@ -887,6 +891,55 @@ err:
     }    
 }
 
+@doc("""
+Gets the first field of the supplied type.  This should only be used for finding 'using'
+fields to match against and the supplied type should be an aggregate (i.e., not a pointer)
+""")
+public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) : FieldStmt {
+    assert(this != null)
+
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)
+
+        if(!IsAggregateLike(field.typeInfo)) {
+            continue
+        }
+
+        var fieldBaseType = field.typeInfo.getBaseType()
+        if(fieldBaseType.typeid == type.typeid) {
+            return field
+        }
+
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                break;
+            }
+            case StmtKind.ENUM_FIELD_DECL: {
+                break;
+            }
+            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.STRUCT_FIELD_DECL: {
+                var aggField = field.aggregateField
+
+                // if this is an anonymous aggregate, the fields
+                // should be looked at for matching
+                if(aggField.name.type == TokenType.VOID) {
+                    var aggType = aggField.sym.type as (*AggregateTypeInfo)
+                    return aggType.getFieldByType(type)
+                }
+                break;
+            }
+            default: {
+            }
+        }
+    }
+err:
+    return FieldStmt {
+        .kind = StmtKind.POISON_EXPR
+    }    
+}
+
+
 public func (this: *AggregateTypeInfo) getFieldWithUsing(name: *const char) : FieldStmt {
     assert(this != null)
 
@@ -938,10 +991,14 @@ public struct FieldPath {
 func (this: *FieldPath) add(field: FieldStmt) {
     this.fields[this.numOfFields] = field
     this.numOfFields += 1
+    assert(this.numOfFields < MAX_FIELD_PATH)
 }
 
 func (this: *FieldPath) pop() {
     this.numOfFields -= 1
+    if(this.numOfFields < 0) {
+        this.numOfFields = 0
+    }
 }
 
 
@@ -979,6 +1036,55 @@ public func (this: *AggregateTypeInfo) getFieldPath(name: *const char, path: *Fi
                 path.pop()
 
                 break;
+            }
+            default: {
+                continue;
+            }
+        }
+    }
+
+    return false
+}
+
+public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeInfo, path: *FieldPath) : bool {
+    assert(this != null)
+
+    var fieldStmt = this.getFieldByType(type)
+    if(fieldStmt.kind != StmtKind.POISON_EXPR) {
+        path.add(fieldStmt)
+        return true
+    }
+
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                if(!varField.attributes.isUsing) {
+                    continue;
+                }
+
+                if(!IsAggregateLike(field.typeInfo)) {
+                    continue;
+                }
+
+                var baseType = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
+                assert(baseType.kind == TypeKind.STRUCT || baseType.kind == TypeKind.UNION)
+
+                path.add(field)
+
+                if(baseType.getFieldPathByType(type, path)) {
+                    return true
+                }
+
+                path.pop()
+
+                break;
+            }
+            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.STRUCT_FIELD_DECL: {
+                //var aggField = field.aggregateField
+                // TODO: ?
             }
             default: {
                 continue;
