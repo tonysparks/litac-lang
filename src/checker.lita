@@ -859,11 +859,14 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                     return false
                 }
 
-                this.checkTypeCompatibility(ret.expr.startPos, ret.expr.operand.typeInfo, this.currentFuncDecl.returnType)
+                // allow for types to be coerced via using members if necessary
+                ret.expr = this.coerceTypeWithUsing(ret.expr, ret.expr.operand.typeInfo, this.currentFuncDecl.returnType)
+
+                this.checkTypeCompatibility(ret.expr.startPos, this.currentFuncDecl.returnType, ret.expr.operand.typeInfo)
                 ret.expr.expectedType = this.currentFuncDecl.returnType
             }
             else {
-                this.checkTypeCompatibility(ret.startPos, &VOID_TYPE, this.currentFuncDecl.returnType)
+                this.checkTypeCompatibility(ret.startPos, this.currentFuncDecl.returnType, &VOID_TYPE)
             }
             return true;
         }

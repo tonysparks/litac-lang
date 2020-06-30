@@ -166,6 +166,56 @@ func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, funcPtr: *FuncPtrT
     return true
 }
 
+public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr, 
+                                              sourceType: *TypeInfo,
+                                              targetType: *TypeInfo) : *Expr {
+
+    if(!IsAggregateLike(targetType)) {
+        return expr
+    }
+
+    if(!IsAggregateLike(sourceType)) {
+        return expr
+    }
+
+    var source = sourceType.getBaseType() as (*AggregateTypeInfo)
+    var target = targetType.getBaseType() as (*AggregateTypeInfo)
+
+    if(source.typeid == target.typeid) {
+        return expr
+    }
+
+
+    var path = FieldPath{}
+    if(!source.getFieldPathByType(target, &path)) {
+        return expr
+    }
+
+    var originalExpr = expr;
+    for(var i = 0; i < path.numOfFields; i+=1) {
+        var field = path.fields[i]
+        assert(field.kind == StmtKind.VAR_FIELD_DECL)
+
+        var name = this.allocator.alloc((field.varField.name.str.length + 1) * sizeof(:char)) as (*char)
+        field.varField.name.str.copyTo(name, field.varField.name.str.length)
+
+        var nameTypeSpec = NewNameTypeSpec(expr.startPos, name, this.allocator)
+        var idExpr = NewIdentifierExpr(expr.startPos, expr.endPos, nameTypeSpec, this.allocator) as (*IdentifierExpr)
+
+        var parentExpr = expr.parent
+        expr = NewGetExpr(expr.startPos, expr.endPos, expr, idExpr, this.allocator)
+        if(parentExpr) {
+            parentExpr.becomeParentOf(expr)
+        }
+    }
+
+    if(!this.resolveExpr(expr)) {
+        return originalExpr
+    }
+
+    return expr
+}
+
 func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr, 
                                          funcPtr: *FuncPtrTypeInfo, 
                                          suppliedArgs: *Array<*Expr>) : bool {
@@ -192,35 +242,8 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
             continue
         }
 
-        var argAggInfo = argInfo.getBaseType() as (*AggregateTypeInfo)
-        var paramAggInfo = paramInfo.getBaseType() as (*AggregateTypeInfo)
-
-        // coerce any arguments that match via using fields
-        if(argAggInfo.typeid != paramAggInfo.typeid) {
-            var path = FieldPath{}
-            if(!argAggInfo.getFieldPathByType(paramAggInfo, &path)) {
-                continue
-            }
-
-            for(var i = 0; i < path.numOfFields; i+=1) {
-                var field = path.fields[i]
-                assert(field.kind == StmtKind.VAR_FIELD_DECL)
-
-                var name = this.allocator.alloc((field.varField.name.str.length + 1) * sizeof(:char)) as (*char)
-                field.varField.name.str.copyTo(name, field.varField.name.str.length)
-
-                var nameTypeSpec = NewNameTypeSpec(argExpr.startPos, name, this.allocator)
-                var idExpr = NewIdentifierExpr(argExpr.startPos, argExpr.endPos, nameTypeSpec, this.allocator) as (*IdentifierExpr)
-                argExpr = NewGetExpr(argExpr.startPos, argExpr.endPos, argExpr, idExpr, this.allocator)
-            }
-
-            if(!this.resolveExpr(argExpr)) {
-                return false
-            }
-
-            argInfo = argExpr.operand.typeInfo
-        }
-        
+        argExpr = this.coerceTypeWithUsing(argExpr, argInfo, paramInfo)
+        argInfo = argExpr.operand.typeInfo
 
         // promote the argument to a pointer
         if(IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) {

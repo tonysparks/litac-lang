@@ -554,30 +554,15 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return other.kind == TypeKind.VOID
         }
 
-        case TypeKind.STR: {            
+        case TypeKind.STR: {
             return other.kind == TypeKind.STR ||
                    IsPtrOf(other, TypeKind.CHAR)
         }
         case TypeKind.ARRAY: {
-            return false
+            return this.isDeclarable(other)
         }
-        // TODO
         case TypeKind.PTR: {
-            var thisInfo = this as (*PtrTypeInfo)
-            if(thisInfo.ptrOf.kind == TypeKind.VOID) {
-                return IsPtrLike(other)
-            }
-
-            if(other.kind == TypeKind.STR) {
-                return thisInfo.ptrOf.isAssignable(&CHAR_TYPE)
-            }
-
-            if(other.kind != TypeKind.PTR) {
-                return false
-            }
-
-            var otherInfo = other as (*PtrTypeInfo)
-            return thisInfo.ptrOf.isAssignable(otherInfo.ptrOf)
+            return this.isDeclarable(other)
         }        
         case TypeKind.CONST: {
             var thisInfo = this as (*ConstTypeInfo)
@@ -590,35 +575,24 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             var otherInfo = other as (*ConstTypeInfo)
             return thisInfo.constOf.isAssignable(otherInfo.constOf)
         }
-        case TypeKind.UNION:
         case TypeKind.STRUCT: {
-            if(this.kind != other.kind) {
+            if(other.kind != TypeKind.STRUCT) {
                 return false
             }
-            var thisInfo = this as (*AggregateTypeInfo)
-            var otherInfo = other as (*AggregateTypeInfo)
-
-            if(thisInfo.sym == otherInfo.sym) {
-                return true
-            }
-
-            if(thisInfo.decl.fields.size() != otherInfo.decl.fields.size()) {
+            return this.typeid == other.typeid
+        }
+        case TypeKind.UNION: {
+            if(other.kind != TypeKind.UNION) {
                 return false
             }
-
-            for(var i = 0; i < thisInfo.decl.fields.size(); i+=1) {
-                var thisField = thisInfo.decl.fields.get(i)
-                var otherField = otherInfo.decl.fields.get(i)
-                if(!thisField.typeInfo.isAssignable(otherField.typeInfo)) {
-                    return false
-                }
-            }
-
-            return true
+            return this.typeid == other.typeid
         }
         case TypeKind.ENUM: {
-            break;
-        }        
+            if(other.kind != TypeKind.ENUM) {
+                return false
+            }
+            return this.typeid == other.typeid
+        }
         case TypeKind.FUNC_PTR: {
             break;
         }
@@ -704,28 +678,121 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             }
             return thisArray.length == otherArray.length
         }
-        // TODO
         case TypeKind.PTR: {
-            break;
+            if(!IsPtrLike(other)) {
+                return false
+            }
+            
+            var thisPtr = this as (*PtrTypeInfo)
+            var isVoidPtr = false
+            var isConst = false
+
+            var ptrOf = thisPtr.ptrOf
+            if(thisPtr.ptrOf.kind == TypeKind.CONST) {
+                var thisConst = thisPtr.ptrOf as (*ConstTypeInfo)
+                ptrOf = thisConst.constOf
+                isConst = true
+            }
+
+            if(ptrOf.kind == TypeKind.VOID) {
+                isVoidPtr = true
+            }
+
+            switch(other.kind) {
+                case TypeKind.PTR: {
+                    var otherPtr = other as (*PtrTypeInfo)
+
+                    // can't assign const to a non const: *x = *const x
+                    if(otherPtr.ptrOf.kind == TypeKind.CONST) {
+                        if(!isConst) {
+                            return false
+                        }
+                    }
+
+                    // *void or *const void can be assigned any ptr
+                    if(isVoidPtr) {
+                        return true
+                    }
+
+                    // determine if we can do a using coersion
+                    if(IsPtrAggregate(this) && IsPtrAggregate(other)) {
+                        var otherAgg = other.getBaseType() as (*AggregateTypeInfo)
+                        var thisAgg = this.getBaseType() as (*AggregateTypeInfo)
+
+                        if(otherAgg.typeid == thisAgg.typeid) {
+                            return true
+                        }
+
+                        // if a using field can be found, this can be assigned
+                        var field = otherAgg.getFieldByType(thisAgg)
+                        return (field.kind == StmtKind.VAR_FIELD_DECL);
+                    }
+
+                    return thisPtr.ptrOf.isDeclarable(otherPtr.ptrOf)
+                }
+                case TypeKind.ARRAY: {
+                    if(isVoidPtr) {
+                        return true
+                    }
+
+                    var otherArray = other as (*ArrayTypeInfo)
+                    return thisPtr.ptrOf.isDeclarable(otherArray.arrayOf)
+                }
+                case TypeKind.STR: {
+                    if(!isConst) {
+                        return false
+                    }
+
+                    if(isVoidPtr) {
+                        return true
+                    }
+
+                    return thisPtr.ptrOf.isDeclarable(&CHAR_TYPE)
+                }
+                case TypeKind.CONST: {
+                    return false; // can't assign const to non const
+                }
+                default: {
+                    return false
+                }
+            }
+            
         }        
         case TypeKind.CONST: {
-            break;
+            var constInfo = this as (*ConstTypeInfo)
+            
+            if(other.kind == TypeKind.CONST) {
+                var otherConst = other as (*ConstTypeInfo)
+                other = otherConst.constOf
+            }
+            return constInfo.constOf.isDeclarable(other)
         }
 
         case TypeKind.FUNC_PTR: {
+            // TODO
             break;
         }
 
         case TypeKind.STRUCT: {
-            break;
+            if(other.kind != TypeKind.STRUCT) {
+                return false
+            }
+            return this.typeid == other.typeid
         }
         case TypeKind.UNION: {
-            break;
+            if(other.kind != TypeKind.UNION) {
+                return false
+            }
+            return this.typeid == other.typeid
         }
         case TypeKind.ENUM: {
-            break;
+            if(other.kind != TypeKind.ENUM) {
+                return false
+            }
+            return this.typeid == other.typeid
         }
         case TypeKind.FUNC: {
+            // TODO
             break;
         }
         default: {

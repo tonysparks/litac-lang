@@ -16,6 +16,7 @@ import "ast_print"
 import "libc"
 
 import "checker"
+import "checker_expr"
 
 public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     assert(decl != null)
@@ -98,12 +99,15 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         }
         else {
             inferredType = TypeDecay(op.typeInfo, this.allocator)
+            if(declaredType) {
+                decl.expr = this.coerceTypeWithUsing(decl.expr, inferredType, declaredType)
+            }
         }
 
         decl.expr.expectedType = declaredType ? declaredType : inferredType;
     }
 
-    if(declaredType && inferredType) {        
+    if(declaredType && inferredType) {
         this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)
     }
 
@@ -401,7 +405,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
     paramDecl.sym = this.addSymbol(paramDecl, typeInfo)
 
     if(paramDecl.attributes.isUsing) {
-        if(!IsAggregate(typeInfo) && !IsPtrAggregate(typeInfo)) {
+        if(!IsAggregateLike(typeInfo)) {
             this.errorUsingParameter(paramDecl)
         }
         else {

@@ -124,6 +124,23 @@ func (j: *J) call7() : i32 {
     return j.c
 }
 
+func CallUsing(j: *J) : i32 {
+    return j.call7()
+}
+
+func TestResult(x: *X) : *J {
+    return x
+}
+
+/*
+func TestResult2(x: *X) : i32 {
+    return x
+}*/
+
+func TestResult2(x: *X) : Y {
+    return x
+}
+
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
@@ -174,6 +191,14 @@ func main(len: i32, args: **char) : i32 {
 
     printf("%d = %d\n", x.call6(), x.r.j.c)
     printf("%d = %d\n", x.call7(), x.r.j.c)
+    printf("%d = %d\n", CallUsing(x), x.r.j.c)
+
+    var j = TestResult(x)
+    printf("J = %d\n", j.c)
+
+    var j2:*J = x.j
+    var jj = TestResult(x).c
+    var jj2 = TestResult2(x).w
 
     //var xx = x.w
 
