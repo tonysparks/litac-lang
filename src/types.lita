@@ -401,8 +401,8 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
             if(!funcPtrInfo.genericParams.empty()) {
                 sb.append("<")
                 for(var i = 0; i < funcPtrInfo.genericParams.size(); i += 1) {
-                    if(i > 0) sb.append(",")                    
-                    var t = funcPtrInfo.genericParams.get(i).name                    
+                    if(i > 0) sb.append(",")
+                    var t = funcPtrInfo.genericParams.get(i).name
                     sb.append("%.*s", t.value.str.length, t.value.str.buffer)
                 }
                 sb.append(">")
@@ -423,8 +423,8 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
             if(!funcInfo.genericParams.empty()) {
                 sb.append("<")
                 for(var i = 0; i < funcInfo.genericParams.size(); i += 1) {
-                    if(i > 0) sb.append(",")                    
-                    var t = funcInfo.genericParams.get(i).name                    
+                    if(i > 0) sb.append(",")
+                    var t = funcInfo.genericParams.get(i).name
                     sb.append("%.*s", t.value.str.length, t.value.str.buffer)
                 }
                 sb.append(">")
@@ -446,7 +446,15 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
 }
 
 public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
-    if(!other) {
+    if(this == other) {
+        return true
+    }
+
+    if(this && !other) {
+        return false
+    }
+
+    if(!this && other) {
         return false
     }
 
@@ -492,7 +500,7 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
             return true
         }
         default: {
-            return true
+            return this.typeid == other.typeid
         }
     }
 
@@ -679,6 +687,10 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             return thisArray.length == otherArray.length
         }
         case TypeKind.PTR: {
+            if(other.kind == TypeKind.NULL) {
+                return true
+            }
+            
             if(!IsPtrLike(other)) {
                 return false
             }

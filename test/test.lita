@@ -196,7 +196,9 @@ func main(len: i32, args: **char) : i32 {
     var j = TestResult(x)
     printf("J = %d\n", j.c)
 
-    var j2:*J = x.j
+    var j2:*J = x
+    var j3:*J = null
+    j3 = x
     var jj = TestResult(x).c
     var jj2 = TestResult2(x).w
 

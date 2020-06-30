@@ -1171,6 +1171,9 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
 
     switch(expr.operator) {
         case TokenType.EQUALS: {
+            expr.right = this.coerceTypeWithUsing(expr.right, rightType, leftType)
+            rightType = expr.right.operand.typeInfo
+            
             this.checkConstant(expr.left)
             this.checkAssignability(expr.right.startPos, leftType, rightType)
             this.checkRightValue(expr.left)

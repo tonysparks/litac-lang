@@ -1439,7 +1439,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.NULL_EXPR: {
             var expr = s as (*NullExpr)
-            this.emit("null")
+            this.emit("NULL")
             return;
         }
         case StmtKind.NUMBER_EXPR: {
