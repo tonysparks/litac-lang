@@ -6,6 +6,7 @@ import "types"
 import "mem"
 import "array"
 import "common"
+import "assert"
 
 public func NewTokenName(token: Token, allocator: *const Allocator) : *const char {
     if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
@@ -65,9 +66,10 @@ public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSp
             var copyName = copy as (*NameTypeSpec)
             copyName.name = originalName.name
             copyName.genericArgs = CopyTypeSpecs(originalName.genericArgs, allocator)
+            return copy
         }
         default: {
-            Panic("Invalid TypeSpecKind: '%d'\n", spec.kind)
+            assert(false)
         }
     }
 
@@ -80,9 +82,85 @@ public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
 
 
 public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
-    return null
+    // TODO:
+    return expr
 }
 
 public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
-    return null;
+    // TODO:
+    return stmt
+}
+
+public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator) : *AggregateDecl {
+    var copy = NewAggregateDecl(decl.startPos, decl.endPos, decl.kind, decl.name, decl.genericParams, decl.fields, decl.flags, allocator) as (*AggregateDecl)
+    copy.fields = Array<FieldStmt>{}
+    copy.fields.init(decl.fields.size(), allocator)
+
+    for(var i = 0; i < decl.fields.size(); i+=1) {
+        var field = decl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var o = field.varField
+                var varField = NewVarFieldDecl(o.startPos, 
+                                               o.endPos, 
+                                               o.name, 
+                                               CopyTypeSpec(o.type, allocator), 
+                                               o.attributes, 
+                                               CopyExpr(o.defaultExpr, allocator), 
+                                               allocator) as (*VarFieldDecl)
+
+                var copyField = FieldStmt {
+                    .kind = StmtKind.VAR_FIELD_DECL,
+                    .varField = varField
+                }
+                copy.fields.add(copyField)
+                break;
+            }
+            case StmtKind.ENUM_FIELD_DECL: {
+                var copyField = FieldStmt {
+                    .kind = StmtKind.ENUM_FIELD_DECL,
+                    .enumField = field.enumField
+                }
+                copy.fields.add(copyField)
+                break;
+            }
+            case StmtKind.UNION_FIELD_DECL:
+            case StmtKind.STRUCT_FIELD_DECL: {
+                var aggField = field.aggregateField
+                var copyField = FieldStmt {
+                    .kind = field.kind,
+                    .aggregateField = CopyAggregateDecl(aggField, allocator)
+                }
+                copy.fields.add(copyField)
+                break;
+            }
+            case StmtKind.POISON_EXPR: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+    return copy;
+}
+
+
+public func CopyFuncDecl(decl: *FuncDecl, allocator: *const Allocator) : *FuncDecl {
+    var copy = NewFuncDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams, CopyParameters(decl.params, allocator), CopyStmt(decl.body, allocator), CopyTypeSpec(decl.returnType, allocator), decl.flags, allocator) 
+    return copy as (*FuncDecl)
+}
+
+public func CopyParameters(params: ParametersStmt, allocator: *const Allocator) : *ParametersStmt {
+    var paramDecls = Array<*ParameterDecl>{}
+    paramDecls.init(params.params.size(), allocator)
+
+    for(var i = 0; i < params.params.size(); i+=1) {
+        var decl = params.params.get(i)
+        var copy = NewParameterDecl(decl.startPos, decl.endPos, decl.name, CopyTypeSpec(decl.type, allocator), CopyExpr(decl.defaultExpr, allocator), decl.attributes.isUsing, allocator) as (*ParameterDecl)
+        paramDecls.add(copy)
+    }
+
+    var paramsCopy = NewParametersStmt(params.startPos, params.endPos, paramDecls, params.isVararg, allocator)
+    return paramsCopy as (*ParametersStmt)
 }

@@ -1049,7 +1049,7 @@ func (p: *Parser) functionCall() : *Expr {
             expr = NewInitExpr(expr.startPos, p.pos(), idExpr.type, arguments, p.allocator)
         }
         else if(p.match(TokenType.LEFT_BRACKET)) {
-            var index = p.expression()            
+            var index = p.expression()
             if(!p.consume(TokenType.RIGHT_BRACKET, ErrorCode.MISSING_RIGHT_BRACKET)) {
                 goto err;
             }
@@ -1134,7 +1134,7 @@ func (p: *Parser) primary() : *Expr {
     }
 
     if(p.check(TokenType.IDENTIFIER)) {
-        var name = p.identifierType(true)        
+        var name = p.identifierType(true)
         if(!name) {
             goto err;
         }
@@ -1142,7 +1142,6 @@ func (p: *Parser) primary() : *Expr {
     }
 
 err:
-    //printf("Err Token: %d %s\n", token.pos.lineNumber, tokenText[token.type])
     p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
     return p.poisonExpr(pos)
 }
@@ -1761,15 +1760,14 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
     var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.allocator) as (*NameTypeSpec)
     spec.name = sb.cStr()
 
-    if(p.check(TokenType.LESS_THAN)) {         
-        spec.genericArgs = p.tryGenericArguments(disambiguate)        
+    if(p.check(TokenType.LESS_THAN)) {
+        spec.genericArgs = p.tryGenericArguments(disambiguate)
     }
-
 
     return spec;
 
 err:
-    sb.free()    
+    sb.free()
     return null
 }
 
@@ -1989,7 +1987,7 @@ func (p: *Parser) genericParameters(arguments: *Array<GenericParam>) : bool {
     return true
 
 err:
-    return false    
+    return false
 }
 
 func (p: *Parser) genericArguments() : Array<*TypeSpec> {
@@ -2001,17 +1999,16 @@ func (p: *Parser) genericArguments() : Array<*TypeSpec> {
             var type = p.type(false)
 
             // we've failed for parse a type
-            if(!type) {                
+            if(!type) {
                 return arguments
             }
             
             arguments.add(type)
-            
         }
         while(p.match(TokenType.COMMA))
     }
 
-    p.consume(TokenType.GREATER_THAN, ErrorCode.MISSING_GENERIC_END)
+    p.consume(TokenType.GREATER_THAN, ErrorCode.MISSING_GENERIC_END) 
     return arguments
 }
 
@@ -2048,7 +2045,7 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
                 case TokenType.XOR:
                 case TokenType.STAR:
                     return arguments;
-                default: {                  
+                default: {
                     isFailed = true;
                     break;
                 }
@@ -2056,7 +2053,7 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
         }
     }
 
-    if(p.tryErrorCounter > numOfErrors) {        
+    if(p.tryErrorCounter > numOfErrors) {
         p.rewindTo(backtrack, numOfErrors)
         isFailed = true;
     }
@@ -2479,7 +2476,7 @@ func (p: *Parser) errorAtPos(pos: SrcPos, errorCode: ErrorCode) {
 
 
 func (p: *Parser) errorUnexpectedToken(token: *Token, errorCode: ErrorCode) {    
-    if(token) {        
+    if(token) {
         defer p.advance()
 
         if(p.tryLevel > 0) {

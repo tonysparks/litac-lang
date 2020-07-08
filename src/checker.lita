@@ -15,6 +15,7 @@ import "assert"
 import "string"
 import "ast_print"
 import "libc"
+import "generics"
 
 import "checker_decl"
 import "checker_expr"
@@ -46,6 +47,9 @@ public struct TypeChecker {
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
 
+    genericTypes: Map<*const char, *Symbol>
+    genericTemplates: Array<*Symbol>
+
     labels: [MAX_LABELS]LabelInfo;
     numOfLabels: i32
 
@@ -57,9 +61,11 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.prev = null
     this.current = null
     this.currentScope = null
-    this.pendingValues.init(64, lita.allocator)
-    this.symbolTypes.init(64, lita.allocator)
-    this.symbolFuncs.init(32, lita.allocator)
+    this.pendingValues.init(128, lita.allocator)
+    this.symbolTypes.init(256, lita.allocator)
+    this.symbolFuncs.init(256, lita.allocator)
+    this.genericTemplates.init(64, lita.allocator)
+    this.genericTypes = StrMap<*Symbol>(null, 64, lita.allocator)
 
     memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
     this.numOfLabels = 0
@@ -75,6 +81,17 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
 
     this.createModuleSymbols(root)
     this.resolveSymbols()
+
+    for(var it = this.genericTypes.iter(); it.hasNext();) {
+        var entry = it.next()
+        var sym = entry.value
+        if(sym.decl.kind == StmtKind.FUNC_DECL) {
+            this.symbolFuncs.add(sym)
+        }
+        else {
+            this.symbolTypes.add(sym)
+        }
+    }
 
 exit:
     return ProgramSymbols {
@@ -236,12 +253,17 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 if(!funcDecl.getName(name)) {
                     this.result.addError(decl.startPos, "invalid function name")
                     goto err;
-                }                
+                }
             }
 
             sym = this.current.symbols.addSymbol(name as (*const char), this.current, decl, SymbolFlags.IS_INCOMPLETE)
             if(!sym) {
                 goto err;
+            }
+
+            if(!funcDecl.genericParams.empty()) {
+                sym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
+                this.genericTemplates.add(sym)
             }
 
             sym.type = NewFuncTypeInfo(sym, funcDecl, this.allocator) as (*TypeInfo)
@@ -254,6 +276,11 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         }
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
+            var aggDecl = decl as (*AggregateDecl)
+            if(!aggDecl.genericParams.empty()) {
+                sym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
+                this.genericTemplates.add(sym)
+            }
             this.symbolTypes.add(sym)
             break;
         }
@@ -261,7 +288,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             this.symbolTypes.add(sym)
             break;
         }     
-        case StmtKind.POISON_DECL: {            
+        case StmtKind.POISON_DECL: {
             break; // Ignore, as this will already have a parsing error
         }   
         default: {
@@ -444,9 +471,10 @@ err:
     return;
 }
 
-func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {    
-    // check to see if this symbol is completed
-    if(!(sym.flags & SymbolFlags.IS_INCOMPLETE)) {
+func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
+    // check to see if this symbol is completed or a generic template
+    if(!(sym.flags & SymbolFlags.IS_INCOMPLETE) || 
+        (sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
         return;
     }
 
@@ -506,7 +534,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
 
     switch(spec.kind) {
         case TypeSpecKind.NAME: {
-            var nameSpec = spec as (*NameTypeSpec)            
+            var nameSpec = spec as (*NameTypeSpec)
             var sym = this.getType(nameSpec)
             if(!sym) {
                 this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
@@ -519,6 +547,14 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             }
 
             this.resolveSymbol(sym)
+
+            if(!nameSpec.genericArgs.empty()) {
+                sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
+                if(!sym) {
+                    goto err;
+                }
+            }
+
             spec.typeInfo = sym.type
             return spec.typeInfo
         }

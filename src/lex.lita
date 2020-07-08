@@ -1091,19 +1091,18 @@ func (l: *Lexer) scanSymbol() : Token {
             }
             break;
         }
+        // Special consideration for >> because this may be end of a generics
+        // definition
         case '>': {
             l.token.type = TokenType.GREATER_THAN
             if(l.stream[0] == '=') {
                 l.nextChar()
                 l.token.type = TokenType.GREATER_EQUALS
             }
-            else if(l.stream[0] == '>') {
+            else if(l.stream[0] == '>' && l.stream[1] == '=') {
                 l.nextChar()
-                l.token.type = TokenType.RSHIFT
-                if( l.stream[0] == '=') {
-                    l.nextChar()
-                    l.token.type = TokenType.RSHIFT_EQ
-                }
+                l.nextChar()
+                l.token.type = TokenType.RSHIFT_EQ
             }
             break;
         }

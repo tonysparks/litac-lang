@@ -48,7 +48,7 @@ func TestV(i: i32, ...) {
 }
 */
 
-
+/*
 enum TypeKind {
     Array = 1,
     Const = 2 + 3,
@@ -132,19 +132,20 @@ func TestResult(x: *X) : *J {
     return x
 }
 
-/*
-func TestResult2(x: *X) : i32 {
-    return x
-}*/
+
+//func TestResult2(x: *X) : i32 {
+//    return x
+//}
 
 func TestResult2(x: *X) : Y {
     return x
-}
+}*/
 
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
 func main(len: i32, args: **char) : i32 {
+    /*
     var x = X{
         .y = Y {
             .w = 4
@@ -201,6 +202,7 @@ func main(len: i32, args: **char) : i32 {
     j3 = x
     var jj = TestResult(x).c
     var jj2 = TestResult2(x).w
+    */
 
     //var xx = x.w
 
@@ -265,14 +267,17 @@ func main(len: i32, args: **char) : i32 {
     }*/
 }
 
+/*
 var text = """
  Because I can!
  \\ \n\r\ 
 """
+*/
 
-struct Person {
+
+//struct Person {
     //name: *const char
-    email: Email
+    //email: Email
 
     /*
     struct Address {
@@ -284,9 +289,9 @@ struct Person {
         t: [2]i32
         m: [2]*const char
     }*/
-}
+//}
 
-
+/*
 struct Email {
     email: *const char
     //person: Person
@@ -305,12 +310,12 @@ func AnotherFunc(n:i32, args: **char, a: *Address) : i32 {
 
 func AnotherFunc1(n:i32, args: **char) : i32 {
     return 4
-}
+}*/
 
-func FuncTest(len: i32, args: **char) {
-    var address = Address{.street = """tonysparks""", 54, .city = "MKE"}
+//func FuncTest(len: i32, args: **char) {
+  //  var address = Address{.street = """tonysparks""", 54, .city = "MKE"}
     //var x = &address
-    AnotherFunc(len, args, &address)
+//    AnotherFunc(len, args, &address)
     //AnotherFunc1(len, args)//, &address)
     /*var x = 123;
     var y = 4 + 5;
@@ -399,4 +404,4 @@ l4:
 l2:
     goto l3;
     goto l4*/
-}
+//}

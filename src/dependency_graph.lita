@@ -124,11 +124,19 @@ func (this: *DependencyGraph) buildGraph(program: *ProgramSymbols) {
 
     for(var i = 0; i < program.symbolFuncs.size(); i += 1) {
         var sym = program.symbolFuncs.get(i)
+        if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            continue
+        }
+
         this.sortedFuncs.add(sym)
     }
 
     for(var i = 0; i < program.symbolTypes.size(); i += 1) {
         var sym = program.symbolTypes.get(i)
+        if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            continue
+        }
+        
         var dep = Dependency{
             .state = State.PENDING,
             .sym = sym

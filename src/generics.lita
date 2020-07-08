@@ -1,0 +1,278 @@
+import "symbols"
+import "ast"
+import "ast_copy"
+import "types"
+import "map"
+import "array"
+import "lita"
+import "string"
+import "libc"
+import "assert"
+import "mem"
+import "module"
+import "checker"
+
+public const MAX_GENERIC_NAME = 1024;
+
+func GetGenericName(type: *TypeSpec, str: *String) {
+    switch(type.kind) {
+        case TypeSpecKind.ARRAY: {
+            str.append("[]")
+            GetGenericName(type.base, str)
+            return;
+        }
+        case TypeSpecKind.PTR: {
+            str.append("*")
+            GetGenericName(type.base, str)
+            return;
+        }
+        case TypeSpecKind.CONST: {
+            str.append("const ")
+            GetGenericName(type.base, str)
+            return;
+        }
+        case TypeSpecKind.NAME: {
+            var name = type as (*NameTypeSpec)
+            str.append(name.name)
+            
+            if(name.genericArgs.empty()) {
+                return;
+            }
+
+            // TODO: Check we fit the whole name!
+            str.append("<")
+            for(var i = 0; i < name.genericArgs.size(); i+=1) {
+                if(i > 0) {
+                    str.append(",")
+                }
+                var arg = name.genericArgs.get(i)
+                GetGenericName(arg, str)
+            }
+            str.append(">")
+            return;
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            // TODO: 
+        }
+        case TypeSpecKind.NONE:
+        default:
+    }
+
+}
+
+public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
+                                          sym: *Symbol, 
+                                          name: *NameTypeSpec) : *Symbol {
+    assert(sym != null)
+    var buffer: [MAX_GENERIC_NAME]char;
+    var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
+    
+    GetGenericName(name, genericName)
+    
+    var newName = genericName.cStrConst()
+    var genericSym = checker.genericTypes.get(newName)
+
+    if(!genericSym) {
+        switch(sym.decl.kind) {
+            case StmtKind.FUNC_DECL: {
+                var funcDecl = CreateFuncDecl(sym.decl as (*FuncDecl), name.genericArgs, checker.allocator)
+                genericSym = checker.current.symbols.addSymbol(newName, checker.current, funcDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
+
+                if(!genericSym) {
+                    goto err;
+                }
+
+                checker.genericTypes.put(newName, genericSym)
+                break;
+            }
+            case StmtKind.UNION_DECL:
+            case StmtKind.STRUCT_DECL: {
+                //printf("Generic Name: %s\n", newName)
+                var aggDecl = CreateAggregateDecl(sym.decl as (*AggregateDecl), name.genericArgs, checker.allocator)
+                //printf("Generic Name: %s\n", newName)
+                // TODO: replace genericParams
+                genericSym = checker.current.symbols.addSymbol(newName, checker.current, aggDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
+                if(!genericSym) {
+                    goto err;
+                }
+
+                checker.genericTypes.put(newName, genericSym)
+                break;
+            }
+            case StmtKind.TYPEDEF_DECL: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+
+    assert(genericSym != null)
+
+    checker.resolveSymbol(genericSym)
+    checker.finishResolveSymbol(genericSym)
+
+    name.typeInfo = genericSym.type
+    return genericSym
+
+err:
+    return null
+}
+
+func CreateAggregateDecl(aggDecl: *AggregateDecl, 
+                       //  name: *const char, 
+                         genericArgs: *Array<*TypeSpec>,
+                         allocator: *const Allocator) : *AggregateDecl {
+    var copy = CopyAggregateDecl(aggDecl, allocator)
+
+    var template = Template {
+        .genericParams = &aggDecl.genericParams,
+        .genericArgs = genericArgs
+    }
+
+    ReplaceTypes(&template, copy.node)
+
+    return copy
+}
+
+
+func CreateFuncDecl(funcDecl: *FuncDecl, 
+                    //  name: *const char, 
+                    genericArgs: *Array<*TypeSpec>,
+                    allocator: *const Allocator) : *FuncDecl {
+    var copy = CopyFuncDecl(funcDecl, allocator)
+
+    var template = Template {
+        .genericParams = &funcDecl.genericParams,
+        .genericArgs = genericArgs
+    }
+
+    ReplaceTypes(&template, copy.node)
+
+    return copy
+}
+
+struct Template {
+    genericParams: *Array<GenericParam>
+    genericArgs: *Array<*TypeSpec>
+}
+
+func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
+    if(!type) {
+        return null
+    }
+
+    switch(type.kind) {
+        case TypeSpecKind.NONE: {
+            return null
+        }
+        case TypeSpecKind.ARRAY: {
+            type.base = this.replaceTypeSpec(type.base)
+            return type
+        }
+        case TypeSpecKind.CONST: {
+            type.base = this.replaceTypeSpec(type.base)
+            return type
+        }
+        case TypeSpecKind.PTR: {
+            type.base = this.replaceTypeSpec(type.base)
+            return type
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            // TODO
+            break;
+        }
+        case TypeSpecKind.NAME: {
+            var name = type as (*NameTypeSpec)
+            for(var i = 0; i < name.genericArgs.size(); i+=1) {
+                name.genericArgs.set(i, this.replaceTypeSpec(name.genericArgs.get(i)))
+            }
+
+            for(var i = 0; i < this.genericParams.size(); i+=1) {
+                var param = this.genericParams.get(i)
+                if(param.name.str.equals(name.name)) {
+                    if(i < this.genericArgs.size()) {
+                        return this.genericArgs.get(i)
+                    }
+                }
+            }
+            return &name.spec
+        }
+        default: {
+            assert(false)
+        }
+    }
+    
+    return null
+}
+
+
+func ReplaceTypes(template: *Template, ast: *Node) : bool {
+    if(!ast) return true;
+
+    switch(ast.kind) {
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL: {
+            var aggDecl = ast as (*AggregateDecl)
+            for(var i = 0; i < aggDecl.fields.size(); i+=1) {
+                var field = aggDecl.fields.get(i)
+                switch(field.kind) {
+                    case StmtKind.VAR_FIELD_DECL: {
+                        var varField = field.varField
+                        varField.type = template.replaceTypeSpec(varField.type)
+                        break;
+                    }
+                    case StmtKind.ENUM_FIELD_DECL: {
+                        break;
+                    }
+                    case StmtKind.UNION_FIELD_DECL:
+                    case StmtKind.STRUCT_FIELD_DECL: {
+                        var aggField = field.aggregateField
+                        ReplaceTypes(template, aggField.node)
+                        break;
+                    }
+                    case StmtKind.POISON_EXPR: {
+                        break;
+                    }
+                    default: {
+                        assert(false)
+                    }
+                }
+            }
+            break;
+        }
+        case StmtKind.FUNC_DECL: {
+            var funcDecl = ast as (*FuncDecl)
+            var params = funcDecl.params
+            for(var i = 0; i < funcDecl.params.size(); i+=1) {
+                var param = funcDecl.params.get(i)
+                param.type = template.replaceTypeSpec(param.type)
+                if(param.defaultExpr) {
+                    ReplaceTypes(template, param.defaultExpr.node)
+                }
+            }
+
+            funcDecl.returnType = template.replaceTypeSpec(funcDecl.returnType)
+            // TODO: ReplaceTypes(template, funcDecl.body)
+            break;
+        }
+        case StmtKind.IMPORT_DECL: {
+            break;
+        }
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL:
+        case StmtKind.ENUM_DECL:
+        case StmtKind.TYPEDEF_DECL:
+        case StmtKind.PARAM_DECL:
+        case StmtKind.NATIVE_DECL:
+        case StmtKind.POISON_DECL: {
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+
+    return true
+}

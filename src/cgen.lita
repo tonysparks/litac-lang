@@ -103,6 +103,10 @@ public func (this: using *CGen) emitProgram(module: *Module) {
         var sym = declarations.get(i)
         assert(sym.decl)
 
+        if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            continue
+        }
+
         if(sym.decl.kind == StmtKind.FUNC_DECL &&
            strcmp(sym.name, "main") == 0) {
            mainSym = sym
@@ -227,7 +231,7 @@ func (this: using *CGen) emitForwardDecls() {
 func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     var decl = sym.decl
 
-    if(sym.flags & SymbolFlags.IS_FOREIGN) {
+    if(sym.flags & SymbolFlags.IS_FOREIGN || sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
         return;
     }
     
@@ -262,10 +266,11 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
 func (this: using *CGen) escapeNameStr(name: *const char) : *char {
     var sb = StringBufferInit(256, this.allocator)
     sb.appendStr(name, strlen(name))
-    for(var i = 0; i < sb.length; i+=1) {
+    for(var i = 0; i < sb.length;) {
         var c = sb.buffer[i]
+
         switch(c) {
-            case '*': sb.replace(i, i+1, "_ptr_"); i+=6; break;
+            case '*': sb.replace(i, i+1, "_ptr_"); i+=5; break;
             case '<': sb.replace(i, i+1, "_cb_");  i+=4; break;
             case '>': sb.replace(i, i+1, "_ce_");  i+=4; break;
             case '[': sb.replace(i, i+1, "_bb_");  i+=4; break;

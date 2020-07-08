@@ -648,6 +648,8 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
         return false
     }
 
+    printf("Type is: %s has args %s %d\n", type.name, TypeKindAsStr(type.kind), expr.type.genericArgs.size())
+
     if(!IsAggregate(type) && type.kind != TypeKind.ARRAY) {
         this.result.addError(expr.startPos, "only struct, union or array can use initialization syntax")
         return false
@@ -1173,7 +1175,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
         case TokenType.EQUALS: {
             expr.right = this.coerceTypeWithUsing(expr.right, rightType, leftType)
             rightType = expr.right.operand.typeInfo
-            
+
             this.checkConstant(expr.left)
             this.checkAssignability(expr.right.startPos, leftType, rightType)
             this.checkRightValue(expr.left)

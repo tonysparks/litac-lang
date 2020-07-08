@@ -147,7 +147,7 @@ public func NewAggregateDecl(startPos: SrcPos,
                       genericParams: Array<GenericParam>,
                       fields: Array<FieldStmt>,
                       flags: i32,
-                      allocator: *const Allocator) : *Decl {                              
+                      allocator: *const Allocator) : *Decl {
     var decl = new<AggregateDecl>(allocator)    
     decl.kind = kind
     decl.startPos = startPos
@@ -852,7 +852,7 @@ public func NewNoteStmt(startPos: SrcPos,
 }
 
 public func NewEmptyStmt(startPos: SrcPos,
-                         endPos: SrcPos,                                                     
+                         endPos: SrcPos,
                          allocator: *const Allocator) : *Stmt {
     var stmt = new<EmptyStmt>(allocator)
     stmt.kind = StmtKind.EMPTY_STMT
