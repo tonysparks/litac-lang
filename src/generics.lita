@@ -71,18 +71,20 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     
     var newName = genericName.cStrConst()
     var genericSym = checker.genericTypes.get(newName)
-
+    
     if(!genericSym) {
+        var newNameStr = genericName.copy(checker.allocator).str
+
         switch(sym.decl.kind) {
             case StmtKind.FUNC_DECL: {
                 var funcDecl = CreateFuncDecl(sym.decl as (*FuncDecl), name.genericArgs, checker.allocator)
-                genericSym = checker.current.symbols.addSymbol(newName, checker.current, funcDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
+                genericSym = checker.current.symbols.addSymbol(newNameStr, checker.current, funcDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
 
                 if(!genericSym) {
                     goto err;
                 }
 
-                checker.genericTypes.put(newName, genericSym)
+                checker.genericTypes.put(newNameStr, genericSym)
                 break;
             }
             case StmtKind.UNION_DECL:
@@ -91,12 +93,12 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
                 var aggDecl = CreateAggregateDecl(sym.decl as (*AggregateDecl), name.genericArgs, checker.allocator)
                 //printf("Generic Name: %s\n", newName)
                 // TODO: replace genericParams
-                genericSym = checker.current.symbols.addSymbol(newName, checker.current, aggDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
+                genericSym = checker.current.symbols.addSymbol(newNameStr, checker.current, aggDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
                 if(!genericSym) {
                     goto err;
                 }
 
-                checker.genericTypes.put(newName, genericSym)
+                checker.genericTypes.put(newNameStr, genericSym)
                 break;
             }
             case StmtKind.TYPEDEF_DECL: {

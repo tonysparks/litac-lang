@@ -4,6 +4,17 @@ import "symbols"
 import "array"
 import "ast"
 
+public func NewGenericParamTypeInfo(name: *const char,
+                                    allocator: *const Allocator) : *TypeInfo {
+
+    var type = new<TypeInfo>(allocator)
+    type.kind = TypeKind.GENERIC_PARAM
+    type.typeid = NextTypeId()
+    type.name = name
+    type.sym = null
+    return type;
+}
+
 public func NewFuncTypeInfo(sym: *Symbol,
                             funcDecl: *FuncDecl,
                             allocator: *const Allocator) : *FuncTypeInfo {
@@ -14,7 +25,8 @@ public func NewFuncTypeInfo(sym: *Symbol,
     type.name = sym.name
     type.sym = sym
     type.decl = funcDecl
-    type.returnType = null    
+    type.returnType = null
+    type.genericParams = funcDecl.genericParams
     return type;
 }
 

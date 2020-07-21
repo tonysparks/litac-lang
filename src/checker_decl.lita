@@ -369,15 +369,15 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     this.pushScope(Scope{})
     defer this.popScope()
 
+    // keep track of which function we are currently parsing
+    this.currentFuncDecl = funcDecl.sym.type as (*FuncTypeInfo)
+    defer this.currentFuncDecl = null
+
     if(!this.resolveStmt(funcDecl.params)) {
         return false
     }
 
     if(funcDecl.body) {
-        // keep track of which function we are currently parsing
-        this.currentFuncDecl = funcDecl.sym.type as (*FuncTypeInfo)
-        defer this.currentFuncDecl = null
-
         this.numOfLabels = 0
         if(!this.resolveStmt(funcDecl.body)) {
             return false

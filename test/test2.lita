@@ -1,5 +1,5 @@
 @include("<stdio.h>");
-@foreign public func printf(s:*const char, ...) : void;
+//@foreign public func printf(s:*const char, ...) : void;
 
 struct Vector<T> {
     capacity: usize
@@ -16,9 +16,14 @@ func TestX<T>(a: T) : T {
     return a
 }
 
+
 func main(len:i32, args: **char) : i32 {
-    TestX<i32>(4)
+    
     var v = Vector<i32>{}
     var v3 = Vector<i32>{}
     var v2 = Vector<Pair<i32, *const char>>{}
+
+    TestX<i32>(4)
+    TestX<Vector<i32>>(v)
+    TestX<Vector<Pair<i32, *const char>>>(v2)
 }

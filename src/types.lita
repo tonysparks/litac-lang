@@ -1190,7 +1190,7 @@ public struct TypeInfo {
 }
 
 public struct FuncTypeInfo {
-    info: using TypeInfo   
+    info: using TypeInfo
     genericParams: Array<GenericParam> 
     returnType: *TypeInfo
     decl: *FuncDecl

@@ -215,6 +215,28 @@ func (this: *TypeChecker) popScope() {
     this.currentScope = this.currentScope.parent
 }
 
+func (this: *TypeChecker) isTemplate() : bool {
+    return this.currentFuncDecl != null &&
+           this.currentFuncDecl.decl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+}
+
+func (this: *TypeChecker) isGenericParamType(name: *NameTypeSpec) : bool {
+    if(!this.isTemplate()) {
+        return false
+    }
+
+    for(var i = 0; i < this.currentFuncDecl.genericParams.size(); i+=1) {
+        var param = this.currentFuncDecl.genericParams.get(i)
+        assert(param.name.type == TokenType.IDENTIFIER)
+
+        if(param.name.str.equals(name.name)) {
+            return true;
+        }
+    }
+
+    return false
+}
+
 
 func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     assert(decl != null)
@@ -444,13 +466,17 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         }
         case SymbolKind.FUNC: {
             var funcDecl = sym.decl as (*FuncDecl)
+            var funcInfo = sym.type != null ? 
+                                sym.type as (*FuncTypeInfo) :
+                                NewFuncTypeInfo(sym, funcDecl, this.allocator)
+
+            this.currentFuncDecl = funcInfo
+            defer this.currentFuncDecl = null
+
             for(var i = 0; i < funcDecl.params.size() ; i += 1) {
                 var param = funcDecl.params.get(i)
                 param.typeInfo = this.resolveTypeSpec(param.type)
             }
-            var funcInfo = sym.type != null ? 
-                                sym.type as (*FuncTypeInfo) :
-                                NewFuncTypeInfo(sym, funcDecl, this.allocator)
 
             var retType = this.resolveTypeSpec(funcDecl.returnType)
             funcInfo.returnType = TypeDecay(retType, this.allocator)
@@ -466,7 +492,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
     sym.state = SymbolState.RESOLVED
     return;
 
-err:    
+err:
     sym.state = SymbolState.ERROR
     return;
 }
@@ -535,6 +561,12 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
     switch(spec.kind) {
         case TypeSpecKind.NAME: {
             var nameSpec = spec as (*NameTypeSpec)
+
+            if(this.isGenericParamType(nameSpec)) {
+                nameSpec.typeInfo = NewGenericParamTypeInfo(nameSpec.name, this.allocator)
+                return nameSpec.typeInfo
+            }
+
             var sym = this.getType(nameSpec)
             if(!sym) {
                 this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
