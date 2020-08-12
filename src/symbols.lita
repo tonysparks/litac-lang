@@ -48,6 +48,9 @@ public struct Symbol {
     usingParent: *Symbol
     declared: *Module
     flags: i32
+
+    genericArgs: Array<*TypeInfo>
+    genericParams: Array<GenericParam>
 }
 
 public enum ScopeKind {

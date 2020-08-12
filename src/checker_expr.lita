@@ -126,6 +126,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
 
 func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
+
     var type = this.resolveTypeSpec(expr.type)
     if(!type) {
         this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
@@ -306,6 +307,190 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
     return true
 }
 
+func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expectedType: *TypeInfo) : *TypeInfo {
+
+    if(name.str.equals(paramType.name)) {
+        return expectedType
+    }
+
+    if(paramType.kind != expectedType.kind) {
+        return null
+    }
+
+    var index = 0;
+    if(paramType.sym && (paramType.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
+        var genericArgs = paramType.sym.genericArgs
+        for(; index < genericArgs.size(); index += 1) {
+            var arg = genericArgs.get(index)
+            if(name.str.equals(arg.name)) {
+                break;
+            }
+        }
+    }
+    else if(paramType.kind == TypeKind.FUNC_PTR) {
+        // TODO
+        assert(false)
+    }
+    
+    switch(paramType.kind) {
+        case TypeKind.ARRAY: {
+            var arrayInfo = paramType as (*ArrayTypeInfo)
+            var expectedArrayInfo = expectedType as (*ArrayTypeInfo)
+            return this.inferredType(name, arrayInfo.arrayOf, expectedArrayInfo.arrayOf)
+        }
+        case TypeKind.CONST: {
+            var constInfo = paramType as (*ConstTypeInfo)
+            var expectedConstInfo = expectedType as (*ConstTypeInfo)
+            return this.inferredType(name, constInfo.constOf, expectedConstInfo.constOf)
+        }
+        case TypeKind.PTR: {
+            var ptrInfo = paramType as (*PtrTypeInfo)
+            var expectedPtrInfo = expectedType as (*PtrTypeInfo)
+            return this.inferredType(name, ptrInfo.ptrOf, expectedPtrInfo.ptrOf)
+        }
+        case TypeKind.UNION:
+        case TypeKind.STRUCT: {
+            var aggInfo = paramType as (*AggregateTypeInfo)
+
+            var size = aggInfo.decl.genericParams.size()
+            if(size == 0 || size <= index) {
+                break;
+            }
+
+            var genericName = aggInfo.decl.genericParams.get(index).name
+            var expectedAggInfo = expectedType as (*AggregateTypeInfo)
+
+            var aggBaseName: [MAX_SYMBOL_NAME]char;
+            var expectedBaseName: [MAX_SYMBOL_NAME]char;
+
+            aggInfo.getBaseName(aggBaseName);
+            expectedAggInfo.getBaseName(expectedBaseName)
+
+            if(strcmp(aggBaseName, expectedBaseName) == 0) {
+                var sym = expectedAggInfo.sym; // expectedAggInfo.decl.genericParams?
+                var pSize = sym.genericParams.size()
+                if(pSize) {
+                    for(var i = 0; i < pSize; i += 1) {
+                        var param = sym.genericParams.get(i)
+                        if(param.name.str.equalsStringView(genericName.str)) {
+                            return sym.genericArgs.get(i)
+                        }
+                    }
+                }
+            }
+
+            var fieldName: [MAX_SYMBOL_NAME]char;
+            for(var i = 0; i < aggInfo.decl.fields.size(); i += 1) {
+                var field = aggInfo.decl.fields.get(i)
+                switch(field.kind) {
+                    case StmtKind.VAR_FIELD_DECL: {
+                        var varField = field.varField
+                        varField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        break;
+                    }
+                    case StmtKind.ENUM_FIELD_DECL: {
+                        var enumField = field.enumField
+                        enumField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        break;
+                    }
+                    case StmtKind.UNION_FIELD_DECL: 
+                    case StmtKind.STRUCT_FIELD_DECL: {
+                        var aggField = field.aggregateField
+                        aggField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        break;
+                    }
+                    default: {
+                        continue
+                    }
+                }
+
+                var argumentField = expectedAggInfo.getFieldWithUsing(fieldName)
+                if(argumentField.kind != StmtKind.POISON_EXPR) {
+                    var fieldType = this.inferredType(genericName, field.typeInfo, argumentField.typeInfo)
+                    if(fieldType) {
+                        return fieldType
+                    }
+                }
+            }
+            break;
+        }
+        case TypeKind.FUNC_PTR: {
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    return null
+}
+
+func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncPtrTypeInfo, suppliedArgs: *Array<*Expr>, isMethodCall: bool) : *FuncPtrTypeInfo {
+    for(var i = 0; i < expr.arguments.size(); i += 1) {
+        var arg = expr.arguments.get(i)
+        if(!this.resolveExpr(arg)) {
+            goto err;
+        }
+    }
+
+    var objectExpr: *Expr = expr.object
+    if(isMethodCall) {
+        var getExpr: *GetExpr = expr.object as (*GetExpr);
+        objectExpr = &getExpr.field.expr;
+    }
+
+    if(objectExpr.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+        return funcPtr
+    }
+
+    var funcExpr = objectExpr as (*IdentifierExpr);
+    var nameSpec = funcExpr.type
+    nameSpec.typeInfo = null // clear out the cached value, so it can be created with the generic types
+    var size = funcPtr.genericParams.size()
+    nameSpec.genericArgs.init(size, this.allocator)
+
+    expr.genericArgs.init(size, this.allocator)
+
+    var suppliedArgsSize = suppliedArgs.size()
+    for(var i = 0; i < size; i+=1) {
+        var genericParam = funcPtr.genericParams.get(i)
+
+        for(var j = 0; j < funcPtr.paramDecls.size(); j+=1) {
+            var paramType = funcPtr.paramDecls.get(j)
+
+            if(j >= suppliedArgsSize) {
+                break
+            }
+
+            var argType = suppliedArgs.get(j).operand.typeInfo
+            assert(argType != null)
+
+            var inferredType = this.inferredType(genericParam.name, paramType, argType)
+            if(inferredType) {
+                nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
+                break
+            }
+        }
+    }
+
+    if(!this.resolveExpr(expr.object)) {
+        goto err;
+    }
+
+    // TODO: Check for errors in inferrence
+
+    var type = expr.object.operand.typeInfo
+    if(type.kind == TypeKind.FUNC) {
+        var funcInfo = type as (*FuncTypeInfo)
+        return funcInfo.asPtr(this.allocator)
+    }
+
+    return type as (*FuncPtrTypeInfo)
+
+err:
+    return null    
+}
+
 func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     assert(expr != null)
 
@@ -349,6 +534,16 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
 
     if(!this.coerceFuncArgs(expr, funcPtr, suppliedArgs)) {
         return false
+    }
+
+    // to generic type inference
+    if(!funcPtr.genericParams.empty() && expr.genericArgs.empty()) {
+        funcPtr = this.inferFuncCallExpr(expr, funcPtr, suppliedArgs, isMethodCall)
+
+        // unable to infer types
+        if(!funcPtr) {
+            return false
+        }
     }
 
     var i = 0;

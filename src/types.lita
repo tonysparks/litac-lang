@@ -5,6 +5,8 @@ import "ast"
 import "lex"
 import "array"
 import "assert"
+import "mem"
+import "ast_new"
 import "libc"
 
 @asStr
@@ -608,6 +610,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             break;
         }
         default: {
+            printf("Type: %s\n", typeKindText[this.kind])
             assert(false)
         }
     }    
@@ -899,10 +902,133 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
     return false
 }
 
+
+public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpec {
+    var pos = (this.sym) ? this.sym.decl.startPos : SrcPos{};
+
+    switch(this.kind) {
+        case TypeKind.BOOL: {
+            return NewNameTypeSpec(pos, "bool", allocator) as (*TypeSpec)
+        }
+        case TypeKind.CHAR: {
+            return NewNameTypeSpec(pos, "char", allocator) as (*TypeSpec)
+        }
+        case TypeKind.I8: {
+            return NewNameTypeSpec(pos, "i8", allocator) as (*TypeSpec)
+        }
+        case TypeKind.U8: {
+            return NewNameTypeSpec(pos, "u8", allocator) as (*TypeSpec)
+        }
+        case TypeKind.I16: {
+            return NewNameTypeSpec(pos, "i16", allocator) as (*TypeSpec)
+        }
+        case TypeKind.U16: {
+            return NewNameTypeSpec(pos, "u16", allocator) as (*TypeSpec)
+        }
+        case TypeKind.I32: {
+            return NewNameTypeSpec(pos, "i32", allocator) as (*TypeSpec)
+        }
+        case TypeKind.U32: {
+            return NewNameTypeSpec(pos, "u32", allocator) as (*TypeSpec)
+        }
+        case TypeKind.I64: {
+            return NewNameTypeSpec(pos, "i64", allocator) as (*TypeSpec)
+        }
+        case TypeKind.U64: {
+            return NewNameTypeSpec(pos, "u64", allocator) as (*TypeSpec)
+        }
+        case TypeKind.F32: {
+            return NewNameTypeSpec(pos, "f32", allocator) as (*TypeSpec)
+        }
+        case TypeKind.F64: {
+            return NewNameTypeSpec(pos, "f64", allocator) as (*TypeSpec)
+        }
+        case TypeKind.USIZE: {
+            return NewNameTypeSpec(pos, "usize", allocator) as (*TypeSpec)
+        }
+        case TypeKind.NULL: {
+            return NewNameTypeSpec(pos, "null", allocator) as (*TypeSpec)
+        }
+        case TypeKind.VOID: {
+            return NewNameTypeSpec(pos, "void", allocator) as (*TypeSpec)
+        }
+        case TypeKind.STR: {
+            return NewNameTypeSpec(pos, "*const char", allocator) as (*TypeSpec)
+        }
+        case TypeKind.ARRAY: {
+            var arrayInfo = this as (*ArrayTypeInfo)
+            var arrayTypeSpec = NewTypeSpec(TypeSpecKind.ARRAY, pos, allocator) as (*ArrayTypeSpec)
+            arrayTypeSpec.base = arrayInfo.arrayOf.asTypeSpec(allocator)
+            arrayTypeSpec.numElements = arrayInfo.numOfElements
+            return arrayTypeSpec as (*TypeSpec)
+        }
+        case TypeKind.PTR: {
+            var ptrInfo = this as (*PtrTypeInfo)
+            var ptrTypeSpec = NewTypeSpec(TypeSpecKind.PTR, pos, allocator) as (*PtrTypeSpec)
+            ptrTypeSpec.base = ptrInfo.ptrOf.asTypeSpec(allocator)
+            return ptrTypeSpec as (*TypeSpec)
+        }
+        case TypeKind.CONST: {
+            var constInfo = this as (*ConstTypeInfo)
+            var constTypeSpec = NewTypeSpec(TypeSpecKind.CONST, pos, allocator) as (*ConstTypeSpec)
+            constTypeSpec.base = constInfo.constOf.asTypeSpec(allocator)
+            return constTypeSpec as (*TypeSpec)
+        }
+        case TypeKind.FUNC_PTR: {
+            var funcInfo = this as (*FuncPtrTypeInfo)
+            var args = Array<*TypeSpec>{}
+            args.init(funcInfo.paramDecls.size(), allocator)
+            for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
+                var param = funcInfo.paramDecls.get(i)
+                args.add(param.asTypeSpec(allocator))
+            }
+
+            var result = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, allocator) as (*FuncPtrTypeSpec)
+            result.ret = funcInfo.returnType.asTypeSpec(allocator)
+            result.args = args
+            result.hasVarargs = funcInfo.hasVarargs
+            result.genericParams = funcInfo.genericParams
+            return result as (*TypeSpec)
+        }
+
+        case TypeKind.UNION: 
+        case TypeKind.STRUCT: {
+            var aggInfo = this as (*AggregateTypeInfo)
+            var result = NewNameTypeSpec(pos, aggInfo.name, allocator)
+
+            var args = Array<*TypeSpec>{}
+            args.init(aggInfo.decl.genericParams.size(), allocator)
+            for(var i = 0; i < aggInfo.decl.genericParams.size(); i += 1) {
+                var param = aggInfo.decl.genericParams.get(i)
+                var name = allocator.alloc((param.name.str.length+1) * sizeof(:char)) as (*char)
+                param.name.str.copyTo(name, param.name.str.length)
+
+                args.add(NewNameTypeSpec(pos, name, allocator) as (*TypeSpec))
+            }
+
+            result.genericArgs = args;
+            return result as (*TypeSpec)
+        }
+        case TypeKind.ENUM: {
+            var info = this as (*EnumTypeInfo)
+            return NewNameTypeSpec(pos, info.name, allocator) as (*TypeSpec)
+        }
+        case TypeKind.FUNC: {
+            var info = this as (*FuncTypeInfo)
+            return NewNameTypeSpec(pos, info.name, allocator) as (*TypeSpec)
+        }
+        default: {
+            assert(false)
+        }
+    }
+    return null
+}
+
+
 public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryDecl {
     assert(this != null)
     for(var i = 0; i < this.decl.fields.size(); i+=1) {
-        var field = this.decl.fields.get(i)        
+        var field = this.decl.fields.get(i)
         if(field.name.str.equals(name)) {
             return field
         }
@@ -910,6 +1036,30 @@ public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryD
 
     return null
 }
+
+public func (this: *AggregateTypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) : *const char {
+    assert(this != null)
+
+    var index = 0
+    var n = this.name
+
+    while(n) {
+        defer index += 1;
+
+        var c = *n
+        if(c == '<') {
+            break;
+        }
+
+        name[index] = c
+        n+=1;
+    }
+
+    name[index] = '\0'
+
+    return name
+}
+
 
 public func (this: *AggregateTypeInfo) getFieldByPosition(position: i32) : FieldStmt {
     assert(this != null)

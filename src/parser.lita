@@ -1155,10 +1155,12 @@ func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
 
     var genericArgs = Array<*TypeSpec>{}
     if(expr.isIdentifier()) {
+        var idExpr = expr as (*IdentifierExpr)
         expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
+        genericArgs = idExpr.type.genericArgs
     }
     else if(expr.kind == StmtKind.GET_EXPR) {
-        var getExpr = expr as (*GetExpr)        
+        var getExpr = expr as (*GetExpr)
         var idExpr = getExpr.field
         idExpr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
         genericArgs = idExpr.type.genericArgs

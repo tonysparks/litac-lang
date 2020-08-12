@@ -43,7 +43,7 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Alloc
         }
         case TypeSpecKind.PTR: {
             var result = new<PtrTypeSpec>(allocator)
-            result.kind = TypeSpecKind.PTR            
+            result.kind = TypeSpecKind.PTR
             result.pos = pos
             result.base = null
             return result as (*TypeSpec)

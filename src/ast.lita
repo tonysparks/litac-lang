@@ -232,7 +232,7 @@ public struct EnumDecl {
 public struct TypedefDecl {
     decl: using Decl
     genericParams: Array<GenericParam>
-    type: *TypeSpec    
+    type: *TypeSpec
 }
 
 public struct NativeDecl {
