@@ -1162,10 +1162,10 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) 
             }
         }
     }
-err:
+
     return FieldStmt {
         .kind = StmtKind.POISON_EXPR
-    }    
+    }
 }
 
 
@@ -1205,10 +1205,10 @@ public func (this: *AggregateTypeInfo) getFieldWithUsing(name: *const char) : Fi
             }
         }
     }
-err:
+
     return FieldStmt {
         .kind = StmtKind.POISON_EXPR
-    }    
+    }
 }
 
 public const MAX_FIELD_PATH = 256

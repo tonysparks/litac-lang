@@ -753,8 +753,6 @@ func (l: *Lexer) scanTypeInfo() {
             return;
         }
 
-        var isSigned = (c == 'i');
-        
         var start = l.stream
         var len = 0
         do {
@@ -905,13 +903,13 @@ func (l: *Lexer) scanNumber() : Token {
 }
 
 func (l: *Lexer) scanChar() : Token {
-    var c = l.nextChar() // eat the '
+    var c = l.nextChar() as (u32)// eat the '
     var value: char = '\0';
 
-    if(c == '\\') {                
+    if(c == '\\') {
         c = l.nextChar() // eat the \
         
-        if(escapeToChar[c] == 0 && c != '0') {            
+        if(escapeToChar[c] == 0 && c != '0') {
             return l.errorToken()
         }
         l.nextChar() // eat the character
@@ -922,7 +920,7 @@ func (l: *Lexer) scanChar() : Token {
         value = escapeToChar[c]
     }
     else {
-        value = c
+        value = c as (char)
         l.nextChar() // eat the character
     }
 
@@ -933,7 +931,7 @@ func (l: *Lexer) scanChar() : Token {
 
     l.nextChar() // eat the closing '
 
-    l.token.type = TokenType.CHAR    
+    l.token.type = TokenType.CHAR
     l.token.pos.end = l.stream
     l.token.intValue = value
     return l.token

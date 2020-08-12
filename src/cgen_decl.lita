@@ -145,7 +145,6 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
     this.emitLineInfo(decl.stmt)
 
     var name = this.cName(decl.sym)
-    var aggInfo = decl.sym.type as (*AggregateTypeInfo)
 
     this.emit("%s %s {", decl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", name)
     for(var i = 0; i < decl.fields.size(); i+=1) {
@@ -185,7 +184,7 @@ public func (this: using *CGen) emitEnumDecl(decl: *EnumDecl) {
     this.emitLineInfo(decl.stmt)
 
     var name = this.cName(decl.sym)
-    var enumInfo = decl.sym.type as (*EnumTypeInfo)
+    
     this.emit("typedef enum %s {", name)
     for(var i = 0; i < decl.fields.size(); i+=1) {
         if(i > 0) {

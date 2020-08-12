@@ -140,8 +140,9 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             moduleStmt.imports.add(importDecl)
         }
     }
-    else if(p.match(TokenType.HASH)) {        
+    else if(p.match(TokenType.HASH)) {
         var comp = p.compStatement()
+        assert(comp)
         // TODO: Eval the compile time statement
     }
     else {      
@@ -152,7 +153,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
 
         var isPublic = p.match(TokenType.PUBLIC)
         if(p.match(TokenType.VAR)) {
-            var decl = p.varDeclaration()            
+            var decl = p.varDeclaration()
             moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.CONST)) {
@@ -223,7 +224,7 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
             goto err;
         }
 
-        var alias = *identifier
+        alias = *identifier
     }
 
     return NewImportDecl(pos, p.pos(), moduleName, alias, isUsing, p.allocator) as (*ImportDecl)
@@ -238,7 +239,7 @@ func (p: *Parser) notes(notes: *Array<*NoteStmt>) : bool {
     }
 
     notes.init(4, p.allocator)
-    while(p.match(TokenType.AT)) {        
+    while(p.match(TokenType.AT)) {
         var pos = p.prevPos()
 
         var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
@@ -1592,7 +1593,9 @@ err:
 }
 
 
-func (p: *Parser) breakStatement() : *Stmt {
+func (p: *Parser) breakStatement() : *Stmt {    
+    var pos = p.prevPos()
+
     if(p.loopLevel < 1 && p.switchLevel < 1) {
         p.errorAtToken(p.previous(), ErrorCode.INVALID_BREAK)
         goto err;
@@ -1602,24 +1605,24 @@ func (p: *Parser) breakStatement() : *Stmt {
         p.breakLevel += 1
     }
 
-    var pos = p.prevPos()
     return NewBreakStmt(pos, p.pos(), p.allocator)
 
-err:    
-    return p.poisonStatement(pos)    
+err:
+    return p.poisonStatement(pos)
 }
 
 func (p: *Parser) continueStatement() : *Stmt {
+    var pos = p.prevPos()
+
     if(p.loopLevel < 1) {
         p.errorAtToken(p.previous(), ErrorCode.INVALID_CONTINUE)
         goto err;
     }
 
-    var pos = p.prevPos()
     return NewContinueStmt(pos, p.pos(), p.allocator)
 
-err:    
-    return p.poisonStatement(pos)    
+err:
+    return p.poisonStatement(pos)
 }
 
 func (p: *Parser) returnStatement() : *Stmt {    
@@ -1795,8 +1798,7 @@ err:
 }
 
 func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec { 
-    var pos = p.prevPos()  
-    var token = p.peek()
+    var pos = p.prevPos()
     var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.allocator) as (*FuncPtrTypeSpec)    
 
     if(p.match(TokenType.LESS_THAN))  {
@@ -2020,7 +2022,6 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
 
     var backtrack = p.current
     var numOfErrors = p.tryErrorCounter
-    var pos = p.pos()
 
     p.advance()
 

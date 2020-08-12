@@ -363,7 +363,6 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             return;
         }
         case StmtKind.BREAK_STMT: {
-            var stmt = s as (*BreakStmt)
             Printf(indent, "break")
             return;
         }/*
@@ -379,7 +378,6 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             // return stmt as (*Stmt)
         }*/
         case StmtKind.CONTINUE_STMT: {            
-            var stmt = s as (*ContinueStmt)
             Printf(indent, "continue")
             return;
         }
@@ -695,7 +693,6 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             return expr as (*Stmt)
         }*/
         case StmtKind.NULL_EXPR: {
-            var expr = s as (*NullExpr)
             printf("null")
             return;
         }

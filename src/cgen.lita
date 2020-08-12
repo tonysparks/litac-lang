@@ -970,7 +970,6 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.BREAK_STMT: {
-            var stmt = s as (*BreakStmt)
             this.popLoopScope()
             this.emit("break;")
             return;
@@ -987,7 +986,6 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             // return stmt as (*Stmt)
         }*/
         case StmtKind.CONTINUE_STMT: {
-            var stmt = s as (*ContinueStmt)
             this.popLoopScope()
             this.emit("continue;")
             return;
@@ -1443,7 +1441,6 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.NULL_EXPR: {
-            var expr = s as (*NullExpr)
             this.emit("NULL")
             return;
         }
@@ -1558,14 +1555,14 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.buf.appendChar('"') // "
                 for(var i = 0; i < expr.string.str.length; i += 1) {
                     var c:char = expr.string.str.buffer[i]
-                    var escaped = escapeStrings[c]
+                    var escaped = escapeStrings[c as (u32)]
                     if(escaped) {
                         buf.append("%s", escaped)
                         continue
                     }
 
                     if(c == '\\') {
-                        var n:char = expr.string.str.buffer[i+1]
+                        var n = expr.string.str.buffer[i+1] as (u32)
                         var escapedChar = escapeChars[n]
                         if(escapedChar) {
                             var chars = escapeChars[n]
