@@ -1,0 +1,37 @@
+/*
+    Test Suite Application
+*/
+import "libc"
+import "json"
+import "io"
+import "string_buffer"
+
+func main(len: i32, args: **char) : i32 {
+
+    var data:*char;
+    if(ReadFile("../test/tests/var_decl.json", &data) != FileStatus.Ok) {
+        goto err;
+    }
+
+    var parser = Parser{}
+    parser.init()
+    defer parser.free()
+
+    var node = parser.parseJson(data)
+    //defer if(node) node.free()
+
+    printf("File: \n%s\n", data)
+    if(node) {
+        var sb = StringBufferInit()
+        //defer sb.free()
+
+        
+        printf("Json: \n%s\n", node.print(sb))
+    }
+
+    return 0;
+
+err:
+    printf("Error running test suite.\n")
+    return -1
+}

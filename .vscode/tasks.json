@@ -29,7 +29,7 @@
                 "kind": "build",
                 "isDefault": true
             }
-        },/*        
+        },
         {
             "label": "BuildTest",
             "type": "shell",
@@ -57,7 +57,7 @@
                 "kind": "build",
                 "isDefault": true
             }
-        },
+        },/*
         {
             "label": "BuildDocs",
             "type": "shell",
@@ -84,7 +84,7 @@
                 "kind": "build",
                 "isDefault": true
             }
-        },
+        },*/
         {
             "label": "BuildRelease",
             "type": "shell",
@@ -111,6 +111,6 @@
                 "kind": "build",
                 "isDefault": true
             }
-        },*/
+        },
     ]
 }

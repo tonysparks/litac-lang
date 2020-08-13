@@ -1,0 +1,11 @@
+{
+    "description": "Tests Declarations",
+    "enabled": true,
+    "tests": [
+        {
+            "program": "",
+            "output": "",
+            "error": ""
+        }
+    ]
+}
