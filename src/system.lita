@@ -65,7 +65,7 @@ var systemStart: u64;
 @foreign
 func getenv(varname: *const char) : *char;
 
-public func SystemInit() : bool {    
+public func SystemInit() : bool {
     var freq: LARGE_INTEGER;
     if(!QueryPerformanceFrequency(&freq)) {
         return false
@@ -115,10 +115,20 @@ end:
     return out
 }
 
+// TODO
+public func IsFile(filename: *const char) : bool {
+    return false
+}
+
+// TODO
+public func DirectoryContents(dirname: *const char) {
+
+}
+
 public func SystemTimeMSec() : f64 {
     var time: LARGE_INTEGER;
     QueryPerformanceCounter(&time);
-    
+
     return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;
 }
 

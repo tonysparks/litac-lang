@@ -14,7 +14,7 @@ public struct Lita {
     result: PhaseResult
     modules: Map<*const char, *Module>
     metrics: [MetricType.MAX_METRIC_TYPES]Metric
-    
+
     totalSourceLines: u32
     totalAllocations: u32
 
@@ -39,7 +39,7 @@ public struct Metric {
     allocationCount: u32
     executionTime: f64
 
-    startTime: f64    
+    startTime: f64
 }
 
 public struct LitaOptions {
@@ -63,7 +63,7 @@ public struct LitaOptions {
 
 var linearAllocator = LinearAllocator{}
 
-public func LitaInit(options: *LitaOptions) : Lita {    
+public func LitaInit(options: *LitaOptions) : Lita {
     var size: usize = 1024 * 1024 * 500;
     linearAllocator.init(defaultAllocator.alloc(size), size)
 
@@ -71,16 +71,16 @@ public func LitaInit(options: *LitaOptions) : Lita {
         .allocator = (&linearAllocator) as (*const Allocator),
         .options = options,
         .totalSourceLines = 0,
-        .totalAllocations = 0,        
-        
+        .totalAllocations = 0,
+
     }
     c.result = PhaseResultInit(c.allocator)
     c.modules = StrMap<*Module>(null, 32, c.allocator)
     return c
 }
 
-public func (lita: *Lita) free() {    
-    var allocator = lita.allocator as (*LinearAllocator)    
+public func (lita: *Lita) free() {
+    var allocator = lita.allocator as (*LinearAllocator)
     defaultAllocator.free(allocator.mem)
     /*
     for(var i = 0; i < allocator.allocations.size(); i += 1) {
@@ -93,13 +93,13 @@ public func (lita: *Lita) free() {
 }
 
 public func (lita: *Lita) addModule(module: *Module) {
-    lita.modules.put(module.id.filename, module)        
+    lita.modules.put(module.id.filename, module)
 }
 
 public func (lita: *Lita) startCapture(type: MetricType) {
     var metric = &lita.metrics[type]
-    
-    var allocator = lita.allocator as (*LinearAllocator)    
+
+    var allocator = lita.allocator as (*LinearAllocator)
     metric.bytesAllocated = allocator.totalBytesAllocated
     metric.allocationCount = allocator.totalAllocations
     metric.startTime = SystemTimeMSec()
@@ -108,7 +108,7 @@ public func (lita: *Lita) startCapture(type: MetricType) {
 public func (lita: *Lita) endCapture(type: MetricType) {
     var metric = &lita.metrics[type]
 
-    var allocator = lita.allocator as (*LinearAllocator)    
+    var allocator = lita.allocator as (*LinearAllocator)
     metric.bytesAllocated = allocator.totalBytesAllocated - metric.bytesAllocated
     metric.allocationCount = allocator.totalAllocations - metric.allocationCount
     metric.executionTime = SystemTimeMSec() - metric.executionTime

@@ -54,7 +54,7 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
 
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
-    
+
     var funcInfo = decl.sym.type as (*FuncTypeInfo)
     if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
         var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
@@ -113,7 +113,7 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
         return;
     }
-    
+
     var name = this.cName(decl.sym)
     this.emitFuncDeclSignature(decl, name)
     this.emit(" {")
@@ -129,7 +129,7 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
 public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
     assert(decl.sym != null)
 
-    
+
     if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
         return;
     }
@@ -154,9 +154,9 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
                 this.emitStmt(field.varField)
                 break;
             }
-            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
-                this.emitStmt(field.aggregateField)
+                this.emitStmt(field.aggregateField.decl)
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
@@ -175,7 +175,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
 public func (this: using *CGen) emitEnumDecl(decl: *EnumDecl) {
     assert(decl.sym != null)
 
-    
+
     if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
         return;
     }
@@ -184,7 +184,7 @@ public func (this: using *CGen) emitEnumDecl(decl: *EnumDecl) {
     this.emitLineInfo(decl.stmt)
 
     var name = this.cName(decl.sym)
-    
+
     this.emit("typedef enum %s {", name)
     for(var i = 0; i < decl.fields.size(); i+=1) {
         if(i > 0) {

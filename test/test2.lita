@@ -16,6 +16,10 @@ func TestX<T>(a: T) : T {
     return a
 }
 
+func TestT<T>() : T {
+    var x: T = 4 as (T)
+    return x
+}
 
 func main(len:i32, args: **char) : i32 {
     /*
@@ -27,6 +31,13 @@ func main(len:i32, args: **char) : i32 {
     TestX<Vector<i32>>(v)
     TestX<Vector<Pair<i32, *const char>>>(v2)*/
 
-    var x = TestX(10_f32)
-    printf("X = %f\n", x)
+    var x = TestX(10.04_f32)
+    printf("X = %.2f\n", x)
+
+    var y = TestX(100_i32)
+    printf("Y = %d\n", y)
+
+
+    var t = TestT()
+    printf("T = %d\n", t)
 }

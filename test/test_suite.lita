@@ -18,14 +18,14 @@ func main(len: i32, args: **char) : i32 {
     defer parser.free()
 
     var node = parser.parseJson(data)
-    //defer if(node) node.free()
+    defer if(node) node.free()
 
     printf("File: \n%s\n", data)
     if(node) {
         var sb = StringBufferInit()
-        //defer sb.free()
+        defer sb.free()
 
-        
+
         printf("Json: \n%s\n", node.print(sb))
     }
 

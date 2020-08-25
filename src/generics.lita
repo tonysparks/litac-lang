@@ -34,7 +34,7 @@ func GetGenericName(type: *TypeSpec, str: *String) {
         case TypeSpecKind.NAME: {
             var name = type as (*NameTypeSpec)
             str.append(name.name)
-            
+
             if(name.genericArgs.empty()) {
                 return;
             }
@@ -52,7 +52,7 @@ func GetGenericName(type: *TypeSpec, str: *String) {
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
-            // TODO: 
+            // TODO:
         }
         case TypeSpecKind.NONE:
         default:
@@ -61,17 +61,17 @@ func GetGenericName(type: *TypeSpec, str: *String) {
 }
 
 public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
-                                          sym: *Symbol, 
+                                          sym: *Symbol,
                                           name: *NameTypeSpec) : *Symbol {
     assert(sym != null)
     var buffer: [MAX_GENERIC_NAME]char;
     var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
-    
+
     GetGenericName(name, genericName)
-    
+
     var newName = genericName.cStrConst()
     var genericSym = checker.genericTypes.get(newName)
-    
+
     if(!genericSym) {
         var newNameStr = genericName.copy(checker.allocator).str
 
@@ -84,6 +84,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
                     goto err;
                 }
 
+                genericSym.genericParams = funcDecl.genericParams
                 checker.genericTypes.put(newNameStr, genericSym)
                 break;
             }
@@ -98,6 +99,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
                     goto err;
                 }
 
+                genericSym.genericParams = aggDecl.genericParams
                 checker.genericTypes.put(newNameStr, genericSym)
                 break;
             }
@@ -122,8 +124,8 @@ err:
     return null
 }
 
-func CreateAggregateDecl(aggDecl: *AggregateDecl, 
-                       //  name: *const char, 
+func CreateAggregateDecl(aggDecl: *AggregateDecl,
+                       //  name: *const char,
                          genericArgs: *Array<*TypeSpec>,
                          allocator: *const Allocator) : *AggregateDecl {
     var copy = CopyAggregateDecl(aggDecl, allocator)
@@ -139,8 +141,8 @@ func CreateAggregateDecl(aggDecl: *AggregateDecl,
 }
 
 
-func CreateFuncDecl(funcDecl: *FuncDecl, 
-                    //  name: *const char, 
+func CreateFuncDecl(funcDecl: *FuncDecl,
+                    //  name: *const char,
                     genericArgs: *Array<*TypeSpec>,
                     allocator: *const Allocator) : *FuncDecl {
     var copy = CopyFuncDecl(funcDecl, allocator)
@@ -205,7 +207,7 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
             assert(false)
         }
     }
-    
+
     return null
 }
 
