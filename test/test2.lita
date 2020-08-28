@@ -1,3 +1,5 @@
+import "test_module"
+
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
@@ -20,8 +22,19 @@ func TestT<T>() : T {
     var x: T = 4 as (T)
     return x
 }
+/*
+struct Arena {
+    decorated: *void
+}
 
+public func (arena: *Arena) free() {
+    var alloc = arena.decorated
+}
+*/
 func main(len:i32, args: **char) : i32 {
+    functionA();
+    var a = A
+    var s = StructA{4}
     /*
     var v = Vector<i32>{}
     var v3 = Vector<i32>{}
@@ -30,14 +43,16 @@ func main(len:i32, args: **char) : i32 {
     TestX<i32>(4)
     TestX<Vector<i32>>(v)
     TestX<Vector<Pair<i32, *const char>>>(v2)*/
-
+/*
     var x = TestX(10.04_f32)
     printf("X = %.2f\n", x)
 
     var y = TestX(100_i32)
     printf("Y = %d\n", y)
+*/
+    //var t = TestT()
+    //printf("T = %d\n", t)
 
-
-    var t = TestT()
-    printf("T = %d\n", t)
+    var t = TestT<i32>();
+    printf("t = %d\n", t)
 }

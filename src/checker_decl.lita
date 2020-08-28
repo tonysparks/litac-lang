@@ -88,7 +88,7 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         }
 
         var op = decl.expr.operand
-        if(decl.expr.kind == StmtKind.ARRAY_INIT_EXPR || 
+        if(decl.expr.kind == StmtKind.ARRAY_INIT_EXPR ||
            decl.expr.kind == StmtKind.INIT_EXPR) {
             inferredType = op.typeInfo
         }
@@ -162,30 +162,30 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
 
 func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
     if(aggDecl.name.str.length) {
-        this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types allowed", 
-                                        fieldName.length, fieldName.buffer, 
+        this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types allowed",
+                                        fieldName.length, fieldName.buffer,
                                         aggDecl.name.str.length, aggDecl.name.str.buffer)
     }
     else {
-        this.result.addError(pos, "invalid 'using' member '%.*s', only aggregate types allowed", 
+        this.result.addError(pos, "invalid 'using' member '%.*s', only aggregate types allowed",
                                 fieldName.length, fieldName.buffer)
-    }    
+    }
 }
 
 func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
-    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types allowed", 
+    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types allowed",
                          paramDecl.name.str.length, paramDecl.name.str.buffer)
-        
+
 }
 
 func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
     if(aggDecl.name.str.length) {
-        this.result.addError(pos, "duplicate member '%.*s' in '%.*s'", 
-                                        fieldName.length, fieldName.buffer, 
+        this.result.addError(pos, "duplicate member '%.*s' in '%.*s'",
+                                        fieldName.length, fieldName.buffer,
                                         aggDecl.name.str.length, aggDecl.name.str.buffer)
     }
     else {
-        this.result.addError(pos, "duplicate member '%.*s'", 
+        this.result.addError(pos, "duplicate member '%.*s'",
                                 fieldName.length, fieldName.buffer)
     }
 }
@@ -209,7 +209,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
                     this.errorDuplicateMember(aggDecl, fieldName, varField.startPos)
                     isValid = false
                 }
-                
+
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
@@ -325,7 +325,7 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
 
         var other = enumDecl.fields.get(i)
         if(other.name.str.equalsStringView(field.name.str)) {
-            this.result.addError(other.startPos, "duplicate member '%.*s'", 
+            this.result.addError(other.startPos, "duplicate member '%.*s'",
                                 field.name.str.length, field.name.str.buffer)
             hasDuplicates = true
         }

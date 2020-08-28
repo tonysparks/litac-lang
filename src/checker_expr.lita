@@ -857,7 +857,7 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
         return false
     }
 
-    printf("Type is: %s has args %s %d\n", type.name, TypeKindAsStr(type.kind), expr.type.genericArgs.size())
+    //printf("Type is: %s has args %s %d\n", type.name, TypeKindAsStr(type.kind), expr.type.genericArgs.size())
 
     if(!IsAggregate(type) && type.kind != TypeKind.ARRAY) {
         this.result.addError(expr.startPos, "only struct, union or array can use initialization syntax")

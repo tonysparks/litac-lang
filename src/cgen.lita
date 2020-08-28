@@ -67,7 +67,7 @@ const escapeChars = [256]*const char {
     ['"'] = "\\\\\"",
     ['\0'] = "\\0",
 }
- 
+
 
 public func (this: *CGen) init(lita: *Lita) {
     this.lita = lita
@@ -92,7 +92,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     buf.append("// translated code begins\n")
     buf.append("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
     buf.append("\n\n")
-    
+
     var graph = DependencyGraph{}
     graph.init(this.lita)
     var declarations = graph.sort()
@@ -158,7 +158,7 @@ typedef size_t    %s%s;
 #define %s%s (0)
 
 
-""", 
+""",
     CurrentDateTime(),
     this.options.cPrefix, "i8",
     this.options.cPrefix, "i16",
@@ -234,7 +234,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     if(sym.flags & SymbolFlags.IS_FOREIGN || sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
         return;
     }
-    
+
     var name = this.cName(decl.sym)
     switch(decl.kind) {
         case StmtKind.VAR_DECL:
@@ -328,7 +328,7 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
 
 func (this: using *CGen) baseTypeName(name: *const char) : StringView {
     var str = StringViewInit(name)
-    
+
     // strip module name
     var index = str.indexOf("::")
     if(index >= 0) {
@@ -340,7 +340,7 @@ func (this: using *CGen) baseTypeName(name: *const char) : StringView {
     if(index >= 0) {
         str = str.substring(0, index)
     }
-    
+
     return str
 }
 
@@ -399,7 +399,7 @@ func (this: using *CGen) hasPendingDefers() : bool {
 
 func (this: using *CGen) emitDefers() {
     var scope = this.currentScope
-    while(scope) {        
+    while(scope) {
         this.leaveScope(scope)
         scope = scope.parent
     }
@@ -413,8 +413,8 @@ func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
 /**
     Outputs a type in C for the supplied symbol
 */
-func (this: using *CGen) cType(type: *TypeInfo, 
-                               isCast: bool = false, 
+func (this: using *CGen) cType(type: *TypeInfo,
+                               isCast: bool = false,
                                decay: bool = false) : *const char {
     var sb = StringBufferInit(256, this.allocator)
     switch(type.kind) {
@@ -491,7 +491,7 @@ func (this: using *CGen) cType(type: *TypeInfo,
 
             sb.append("%s%s", baseName, buf.cStrConst())
             return sb.cStrConst()
-        }        
+        }
         case TypeKind.FUNC_PTR: {
             var funcInfo = type as (*FuncPtrTypeInfo)
             var params = StringBufferInit(512, this.allocator)
@@ -504,7 +504,7 @@ func (this: using *CGen) cType(type: *TypeInfo,
                 params.append("%s", this.cType(param, isCast, true))
             }
 
-            sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, isCast, decay), 
+            sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, isCast, decay),
                 isCast ? "" : this.cTypeName(funcInfo), params.cStrConst())
             return sb.cStrConst()
         }
@@ -517,8 +517,8 @@ func (this: using *CGen) cType(type: *TypeInfo,
 /**
     Outputs a type declaration in C for the supplied symbol
 */
-func (this: using *CGen) cTypeDecl(type: *TypeInfo, 
-                                   name: *const char, 
+func (this: using *CGen) cTypeDecl(type: *TypeInfo,
+                                   name: *const char,
                                    decay: bool = false) : *const char {
 
     var sb = StringBufferInit(256, this.allocator)
@@ -595,10 +595,10 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                 buf.insert(0, "%s", name)
                 return this.cTypeDecl(baseInfo, buf.cStrConst(), decay)
             }
-            
+
             sb.append("%s %s%s", baseName, name, buf.cStrConst())
             return sb.cStrConst()
-        }        
+        }
         case TypeKind.STR: {
             sb.append("const char* %s", name)
             return sb.cStrConst()
@@ -628,10 +628,10 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
 
 /**
     Outputs the C name for the symbol
-*/    
+*/
 func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
-    var declName:*const char = (sym.flags & SymbolFlags.IS_TYPE) 
+    var declName:*const char = (sym.flags & SymbolFlags.IS_TYPE)
                                     ? this.escapeName(sym.type) : sym.name;
 
     if(sym.flags & SymbolFlags.IS_LOCAL) {
@@ -653,7 +653,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 
 /**
     Outputs the C name for the symbol
-*/    
+*/
 func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     assert(type != null)
 
@@ -810,7 +810,7 @@ func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bool = tr
             this.emit("\n")
         }
     }
-    
+
 }
 
 func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
@@ -823,7 +823,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             else {
                 this.emit("#include \"%.*s\"\n", attr.str.length, attr.str.buffer)
             }
-            
+
         }
     }
     else if(strncmp(note.name.str.buffer, "raw", note.name.str.length) == 0) {
@@ -886,7 +886,7 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
 
     var aggType = paramInfo.type.getBaseType() as (*AggregateTypeInfo)
     this.emit("%s", this.cName(paramInfo))
-    
+
     var path = FieldPath{}
     var isFound = aggType.getFieldPath(sym.name, &path)
     assert(isFound)
@@ -1010,7 +1010,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 if(IsExpr(stmt.body)) {
                     this.emit(";\n")
                 }
-            }            
+            }
             this.emit("}\nwhile(")
             this.emitStmt(stmt.cond)
             this.emit(")")
@@ -1039,14 +1039,14 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             if(stmt.cond) {
                 this.emitStmt(stmt.cond)
             }
-            
+
             this.emit(";")
-            
+
             if(stmt.post) {
                 this.emitStmt(stmt.post)
             }
             this.emit(") {")
-            
+
             if(stmt.body) {
                 this.pushScope(&CGenScope{.isLoop = true})
                 defer this.popScope()
@@ -1150,7 +1150,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
-            
+
 
             if(stmt.expr && this.hasPendingDefers()) {
                 assert(this.currentFunc != null)
@@ -1173,7 +1173,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             return;
         }
-        
+
         case StmtKind.SWITCH_CASE_STMT: {
             var stmt = s as (*SwitchCaseStmt)
             this.emit("case ")
@@ -1227,7 +1227,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             {
                 this.pushScope(&CGenScope{.isLoop = true})
                 defer this.popScope()
-                
+
                 this.emitStmt(stmt.body)
                 if(IsExpr(stmt.body)) {
                     this.emit(";\n")
@@ -1236,7 +1236,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emit("}")
             return;
         }
-        
+
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = s as (*ArrayDesignationExpr)
             this.emit("[")
@@ -1257,10 +1257,10 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                                 expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
                 }
 
-                if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {                
+                if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {
                     this.emit("(%s)", this.cType(expr.type.typeInfo))
                 }
-                
+
                 this.emit(" {")
                 for(var i = 0; i < expr.values.size(); i+=1) {
                     if(i > 0) {
@@ -1268,7 +1268,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     }
                     this.emitStmt(expr.values.get(i))
                 }
-                
+
                 this.emit("}")
             }
             return;
@@ -1327,7 +1327,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.IDENTIFIER_EXPR:
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
-            
+
             var type = expr.type.typeInfo
             var sym: *Symbol = (type) ? type.sym : expr.sym;
 
@@ -1360,9 +1360,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
                 return;
             }
-            
+
             this.emitStmt(expr.object)
-            
+
             if(expr.flags & GetExprFlags.IS_USING) {
                 var baseInfo = objectType.getBaseType()
                 assert(baseInfo != null)
@@ -1397,7 +1397,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
                 this.emitStmt(expr.field)
             }
-            
+
             return;
         }
         case StmtKind.GROUP_EXPR: {
@@ -1427,7 +1427,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                                expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
             }
 
-            if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {                
+            if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {
                 this.emit("(%s)", this.cType(expr.type.typeInfo))
             }
             this.emit(" {")
@@ -1450,7 +1450,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var hasDecimal = false
             for(var start = expr.startPos.start; start != expr.startPos.end; start += 1) {
                 var c = *start
-                
+
                 if(c == '.') {
                     hasDecimal = true
                 }
@@ -1460,7 +1460,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 else if(c == 'f' || c == 'u' || c == 'i') {
                     break;
                 }
-                
+
                 this.emit("%c", *start)
             }
 
@@ -1550,7 +1550,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.STRING_EXPR: {
             var expr = s as (*StringExpr)
-            
+
             if(expr.string.mod == Mod.MULTISTR) {
                 this.buf.appendChar('"') // "
                 for(var i = 0; i < expr.string.str.length; i += 1) {
@@ -1643,5 +1643,5 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emit("<%s Not Implemented>", StmtKindAsStr(s.kind))
             return;
         }
-    }    
+    }
 }

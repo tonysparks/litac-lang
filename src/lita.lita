@@ -111,5 +111,5 @@ public func (lita: *Lita) endCapture(type: MetricType) {
     var allocator = lita.allocator as (*LinearAllocator)
     metric.bytesAllocated = allocator.totalBytesAllocated - metric.bytesAllocated
     metric.allocationCount = allocator.totalAllocations - metric.allocationCount
-    metric.executionTime = SystemTimeMSec() - metric.executionTime
+    metric.executionTime = SystemTimeMSec() - metric.startTime
 }

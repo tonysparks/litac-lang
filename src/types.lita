@@ -223,7 +223,7 @@ public func IsInteger(type: *TypeInfo) : bool {
         case TypeKind.I32:
         case TypeKind.U32:
         case TypeKind.I64:
-        case TypeKind.U64:        
+        case TypeKind.U64:
         case TypeKind.USIZE:
         case TypeKind.ENUM: {
             return true;
@@ -365,8 +365,8 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
         case TypeKind.USIZE:
         case TypeKind.NULL:
         case TypeKind.VOID:
-        case TypeKind.STRUCT: 
-        case TypeKind.UNION: 
+        case TypeKind.STRUCT:
+        case TypeKind.UNION:
         case TypeKind.ENUM:
             sb.append(this.name)
             break;
@@ -513,7 +513,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
     assert(this != null)
     assert(other != null)
 
-    // this = other    
+    // this = other
     switch(this.kind) {
         case TypeKind.BOOL: {
             return other.kind == TypeKind.BOOL
@@ -553,7 +553,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
                    other.kind == TypeKind.F64
         }
         case TypeKind.USIZE: {
-            return other.kind <= TypeKind.USIZE || 
+            return other.kind <= TypeKind.USIZE ||
                    other.kind == TypeKind.NULL ||
                    IsPtrLike(other);
         }
@@ -573,7 +573,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
         }
         case TypeKind.PTR: {
             return this.isDeclarable(other)
-        }        
+        }
         case TypeKind.CONST: {
             var thisInfo = this as (*ConstTypeInfo)
 
@@ -613,12 +613,12 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             printf("Type: %s\n", typeKindText[this.kind])
             assert(false)
         }
-    }    
+    }
     return false
 }
 
 public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
-    // this = other    
+    // this = other
     switch(this.kind) {
         case TypeKind.BOOL: {
             return other.kind == TypeKind.BOOL
@@ -658,7 +658,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
                    other.kind == TypeKind.F64
         }
         case TypeKind.USIZE: {
-            return other.kind == TypeKind.USIZE || 
+            return other.kind == TypeKind.USIZE ||
                    other.kind == TypeKind.NULL ||
                    IsPtrLike(other);
         }
@@ -693,11 +693,11 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             if(other.kind == TypeKind.NULL) {
                 return true
             }
-            
+
             if(!IsPtrLike(other)) {
                 return false
             }
-            
+
             var thisPtr = this as (*PtrTypeInfo)
             var isVoidPtr = false
             var isConst = false
@@ -771,11 +771,11 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
                     return false
                 }
             }
-            
-        }        
+
+        }
         case TypeKind.CONST: {
             var constInfo = this as (*ConstTypeInfo)
-            
+
             if(other.kind == TypeKind.CONST) {
                 var otherConst = other as (*ConstTypeInfo)
                 other = otherConst.constOf
@@ -813,7 +813,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
         default: {
             assert(false)
         }
-    }    
+    }
     return false
 }
 
@@ -991,7 +991,7 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
             return result as (*TypeSpec)
         }
 
-        case TypeKind.UNION: 
+        case TypeKind.UNION:
         case TypeKind.STRUCT: {
             var aggInfo = this as (*AggregateTypeInfo)
             var result = NewNameTypeSpec(pos, aggInfo.name, allocator)
@@ -1081,6 +1081,9 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 if(varField.name.str.equals(name)) {
+                    if(!varField.typeInfo) {
+                        goto err;
+                    }
                     return field
                 }
                 break;
@@ -1092,7 +1095,7 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
                 }
                 break;
             }
-            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 var aggField = field.aggregateField
 
@@ -1117,7 +1120,7 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
 err:
     return FieldStmt {
         .kind = StmtKind.POISON_EXPR
-    }    
+    }
 }
 
 @doc("""
@@ -1146,7 +1149,7 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) 
             case StmtKind.ENUM_FIELD_DECL: {
                 break;
             }
-            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 var aggField = field.aggregateField
 
@@ -1310,7 +1313,7 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
 
                 break;
             }
-            case StmtKind.UNION_FIELD_DECL: 
+            case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 //var aggField = field.aggregateField
                 // TODO: ?
@@ -1341,7 +1344,7 @@ public struct TypeInfo {
 
 public struct FuncTypeInfo {
     info: using TypeInfo
-    genericParams: Array<GenericParam> 
+    genericParams: Array<GenericParam>
     returnType: *TypeInfo
     decl: *FuncDecl
 }

@@ -17,3 +17,6 @@ bin/litaC.pdb
 test/output/*.c
 bin/litac_tests.exp
 bin/litac_tests.lib
+bin/output/*.c
+bin/output/*.exe
+bin/output/*.pdb

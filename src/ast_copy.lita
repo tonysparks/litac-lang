@@ -8,6 +8,8 @@ import "array"
 import "common"
 import "assert"
 
+import "libc"
+
 public func NewTokenName(token: Token, allocator: *const Allocator) : *const char {
     if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
         return tokenText[token.type]
@@ -57,7 +59,7 @@ public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSp
             }
             return copyArray as (*TypeSpec)
         }
-        case TypeSpecKind.PTR: 
+        case TypeSpecKind.PTR:
         case TypeSpecKind.CONST: {
             return copy
         }
@@ -67,6 +69,19 @@ public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSp
             copyName.name = originalName.name
             copyName.genericArgs = CopyTypeSpecs(originalName.genericArgs, allocator)
             return copy
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            var original = spec as (*FuncPtrTypeSpec)
+            var copyFunc = copy as (*FuncPtrTypeSpec)
+            copyFunc.args = CopyTypeSpecs(original.args, allocator)
+            copyFunc.ret = CopyTypeSpec(original.ret, allocator)
+            copyFunc.hasVarargs = original.hasVarargs
+            copyFunc.genericParams.init(original.genericParams.size(), allocator)
+            for(var i = 0; i < original.genericParams.size(); i+=1) {
+                var param = original.genericParams.get(i)
+                copyFunc.genericParams.add(param)
+            }
+            return copy;
         }
         default: {
             assert(false)
@@ -101,12 +116,12 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
         switch(field.kind) {
             case StmtKind.VAR_FIELD_DECL: {
                 var o = field.varField
-                var varField = NewVarFieldDecl(o.startPos, 
-                                               o.endPos, 
-                                               o.name, 
-                                               CopyTypeSpec(o.type, allocator), 
-                                               o.attributes, 
-                                               CopyExpr(o.defaultExpr, allocator), 
+                var varField = NewVarFieldDecl(o.startPos,
+                                               o.endPos,
+                                               o.name,
+                                               CopyTypeSpec(o.type, allocator),
+                                               o.attributes,
+                                               CopyExpr(o.defaultExpr, allocator),
                                                allocator) as (*VarFieldDecl)
 
                 var copyField = FieldStmt {
@@ -147,7 +162,7 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
 
 
 public func CopyFuncDecl(decl: *FuncDecl, allocator: *const Allocator) : *FuncDecl {
-    var copy = NewFuncDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams, CopyParameters(decl.params, allocator), CopyStmt(decl.body, allocator), CopyTypeSpec(decl.returnType, allocator), decl.flags, allocator) 
+    var copy = NewFuncDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams, CopyParameters(decl.params, allocator), CopyStmt(decl.body, allocator), CopyTypeSpec(decl.returnType, allocator), decl.flags, allocator)
     return copy as (*FuncDecl)
 }
 
@@ -163,4 +178,10 @@ public func CopyParameters(params: ParametersStmt, allocator: *const Allocator) 
 
     var paramsCopy = NewParametersStmt(params.startPos, params.endPos, paramDecls, params.isVararg, allocator)
     return paramsCopy as (*ParametersStmt)
+}
+
+
+public func CopyTypedefDecl(decl: *TypedefDecl, allocator: *const Allocator) : *TypedefDecl {
+    var copy = NewTypedefDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams, CopyTypeSpec(decl.type, allocator), allocator)
+    return copy as (*TypedefDecl)
 }

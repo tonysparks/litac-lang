@@ -18,10 +18,10 @@ public enum ModuleFlags {
     TYPE_RESOLVED = (1<<1),
 }
 
-public struct ModuleId {    
+public struct ModuleId {
     filename: [MAX_PATH]char   // full path the file of this module
     packageName: StringView    // relative path from the main module's directory
-    name: StringView           // the name of the module 
+    name: StringView           // the name of the module
 }
 
 public struct Module {
@@ -77,9 +77,9 @@ public func BuiltinsInit(lita: *Lita) : *Module {
 }
 
 func AddBuiltin(lita: *Lita, type: *TypeInfo) {
-    var sym = builtins.symbols.addSymbol(type.name, 
-                                        &builtins, 
-                                        NewBuiltinDecl(SrcPos{}, SrcPos{}, type, lita.allocator), 
+    var sym = builtins.symbols.addSymbol(type.name,
+                                        &builtins,
+                                        NewBuiltinDecl(SrcPos{}, SrcPos{}, type, lita.allocator),
                                         SymbolFlags.IS_BUILTIN|SymbolFlags.IS_TYPE|SymbolFlags.IS_FOREIGN)
 
     sym.state = SymbolState.RESOLVED
@@ -96,7 +96,7 @@ public func NewModule(lita: *Lita,
     return mod
 }
 
-public func (this: *Module) init(result: *PhaseResult, 
+public func (this: *Module) init(result: *PhaseResult,
                                  allocator: *const Allocator) {
     this.text = null
     this.ast = null
@@ -147,8 +147,8 @@ func (this: *Module) importModuleAlias(alias: StringView, module: *Module) {
 }
 
 public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {
-    var pathStr = StringViewInit(filename);    
-    pathStr.copyTo(moduleId.filename, pathStr.length)
+    strcpy(moduleId.filename, filename)
+    var pathStr = StringViewInit(moduleId.filename);
 
     moduleId.packageName = StringViewInit(moduleId.filename, 0)
     moduleId.name = GetModuleName(pathStr)

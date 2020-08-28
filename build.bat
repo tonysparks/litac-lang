@@ -4,7 +4,9 @@ if [%LITAC_HOME%] == [] goto error_exit
 del ".\bin\litac.*" /q
 
 set BUILD_CMD="clang.exe -std=c99 -g -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib"
-java -jar %LITAC_HOME%/target/litac.jar -profile -run -buildCmd %BUILD_CMD% -outputDir "./bin" -output "litaC" "./src/main.lita" -types "none" -debug
+java -jar %LITAC_HOME%/target/litac.jar -buildCmd %BUILD_CMD% -outputDir "./bin" -output "litaC" "./src/main.lita" -types "none" -debug
+cd bin
+litaC.exe -run -profile "../test/test2.lita"
 goto end
 
 :error_exit

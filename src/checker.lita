@@ -21,7 +21,9 @@ import "checker_decl"
 import "checker_expr"
 
 /**
+===================================================================
     Type Checker
+===================================================================
 */
 
 // max number of labels in a function scope -- this should be enough :S
@@ -36,7 +38,7 @@ struct LabelInfo {
 
 public struct TypeChecker {
     lita: using *Lita
-    
+
     prev: *Module
     current: *Module
 
@@ -206,7 +208,7 @@ func (this: *TypeChecker) leaveModule() {
     }
 }
 
-func (this: *TypeChecker) pushScope(scope: *Scope) {    
+func (this: *TypeChecker) pushScope(scope: *Scope) {
     scope.init(ScopeKind.FUNC, this.currentScope, this.result, this.allocator);
     this.currentScope = scope
 }
@@ -309,10 +311,10 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         case StmtKind.TYPEDEF_DECL: {
             this.symbolTypes.add(sym)
             break;
-        }     
+        }
         case StmtKind.POISON_DECL: {
             break; // Ignore, as this will already have a parsing error
-        }   
+        }
         default: {
             PrintStmt(decl as (*Stmt), 0)
             assert(false)
@@ -326,9 +328,9 @@ err:
 }
 
 func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
-    printf("Resolving Import: ")
+    /*printf("Resolving Import: ")
     PrintName(imp.name)
-    printf("\n")
+    printf("\n")*/
 
     for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
         var other = this.current.ast.imports.get(i)
@@ -337,7 +339,7 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
         }
 
         if(other.name.str.equalsStringView(imp.name.str)) {
-            this.result.addError(imp.startPos, "duplicate import of module '%.*s'", 
+            this.result.addError(imp.startPos, "duplicate import of module '%.*s'",
                 imp.name.str.length, imp.name.str.buffer)
             goto err;
         }
@@ -349,7 +351,7 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
 
     var module = this.lita.modules.get(imp.moduleId.filename)
     if(!module) {
-        this.result.addError(imp.startPos, "could not find module '%s'", 
+        this.result.addError(imp.startPos, "could not find module '%s'",
                 imp.moduleId.filename)
         goto err;
     }
@@ -364,12 +366,12 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
     this.current.importModule(imp, module)
 
 err:
-    return;    
+    return;
 }
 
 
 func (this: *TypeChecker) resolveSymbols() {
-    
+
     {   // Start resolving the symbol types
         for(var i = 0; i < this.symbolTypes.size(); i += 1) {
             var symbol = this.symbolTypes.get(i)
@@ -438,12 +440,12 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     }
 
                     if(typedefDecl.hasNote("foreign") && aliasedType.kind == TypeKind.VOID) {
-                        aliasedType = NewForeignTypeInfo(sym, this.allocator)                        
+                        aliasedType = NewForeignTypeInfo(sym, this.allocator)
                     }
                     sym.type = aliasedType
                     break;
                 }
-                case StmtKind.STRUCT_DECL: 
+                case StmtKind.STRUCT_DECL:
                 case StmtKind.UNION_DECL: {
                     var aggregateDecl = sym.decl as (*AggregateDecl)
                     sym.type = NewAggregateTypeInfo(sym, aggregateDecl, this.allocator) as (*TypeInfo)
@@ -466,7 +468,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         }
         case SymbolKind.FUNC: {
             var funcDecl = sym.decl as (*FuncDecl)
-            var funcInfo = sym.type != null ? 
+            var funcInfo = sym.type != null ?
                                 sym.type as (*FuncTypeInfo) :
                                 NewFuncTypeInfo(sym, funcDecl, this.allocator)
 
@@ -499,7 +501,7 @@ err:
 
 func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     // check to see if this symbol is completed or a generic template
-    if(!(sym.flags & SymbolFlags.IS_INCOMPLETE) || 
+    if(!(sym.flags & SymbolFlags.IS_INCOMPLETE) ||
         (sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
         return;
     }
@@ -526,7 +528,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
             this.resolveTypedefDecl(typedefDecl)
             break;
         }
-        case StmtKind.FUNC_DECL: {            
+        case StmtKind.FUNC_DECL: {
             var funcDecl = sym.decl as (*FuncDecl)
             this.resolveFuncDecl(funcDecl)
             break;
@@ -611,7 +613,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                 if(!this.resolveConstExpr(expr)) {
                     goto err;
                 }
-                
+
                 if(!IsInteger(expr.operand.typeInfo)) {
                     this.result.addError(expr.startPos,
                         "array size expression must be an integer type")
@@ -654,9 +656,9 @@ err:
 
 func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
     var name:[MAX_SYMBOL_NAME]char;
-    assert(decl.name.type == TokenType.IDENTIFIER) 
+    assert(decl.name.type == TokenType.IDENTIFIER)
     decl.name.str.copyTo(name, MAX_SYMBOL_NAME)
-    
+
     var sym = this.currentScope.addSymbol(name as (*const char), this.current, decl, 0)
     if(sym) {
         sym.type = typeInfo
@@ -676,7 +678,7 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
                 if(varField.name.type != TokenType.IDENTIFIER) {
                     break
                 }
-                
+
                 var varDecl = NewVarDecl(decl.startPos, decl.endPos, decl.name, varField.type, null, this.allocator)
 
                 var name:[MAX_SYMBOL_NAME]char;
@@ -685,7 +687,7 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
                 varDecl.sym = scope.addSymbol(name as (*const char), this.current, varDecl, SymbolFlags.IS_USING)
                 varDecl.sym.type = field.typeInfo
                 varDecl.sym.usingParent = decl.sym
-                
+
                 this.resolveSymbol(varDecl.sym)
 
                 if(varField.attributes.isUsing) {
@@ -695,7 +697,7 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
                 }
                 break;
             }
-            case StmtKind.ENUM_FIELD_DECL: 
+            case StmtKind.ENUM_FIELD_DECL:
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL:
                 // TODO: Should Union/Struct be placed in scope?
@@ -835,7 +837,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             labelName.defined = false
 
             this.numOfLabels += 1
-            
+
             return false;
         }
         case StmtKind.IF_STMT: {
@@ -843,7 +845,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             if(!this.resolveExpr(ifStmt.cond)) {
                 return false
             }
-            
+
             {
                 this.pushScope(&Scope{})
                 defer this.popScope()
@@ -875,7 +877,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
 
             for(var i = 0; i < this.numOfLabels; i+=1) {
-                var label = &this.labels[i]                
+                var label = &this.labels[i]
                 if(labelStmt.label.str.equalsStringView(label.name)) {
                     label.defined = true
                     return true
@@ -912,7 +914,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                     var parentDecl = params.parent as (*FuncDecl)
                     assert(parentDecl != null)
                     assert(parentDecl.kind == StmtKind.FUNC_DECL)
-                    this.result.addError(parentDecl.startPos, "'%.*s' must have default arguments defined last", 
+                    this.result.addError(parentDecl.startPos, "'%.*s' must have default arguments defined last",
                                     parentDecl.name.str.length, parentDecl.name.str.buffer)
                     return false;
                 }
@@ -966,13 +968,13 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true
         }
-        case StmtKind.ENUM_FIELD_DECL: 
+        case StmtKind.ENUM_FIELD_DECL:
             // handled in resolveEnumDecl
         case StmtKind.ENUM_FIELD_ENTRY_DECL:
         case StmtKind.STRUCT_FIELD_DECL:
         case StmtKind.UNION_FIELD_DECL:
         case StmtKind.VAR_FIELD_DECL:{
-            // handled in the resolveAggregateDecl 
+            // handled in the resolveAggregateDecl
             assert(false)
             return false;
         }
@@ -981,7 +983,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             if(!this.resolveExpr(whileStmt.cond)) {
                 return false
             }
-            
+
             this.pushScope(&Scope{})
             defer this.popScope()
             if(!this.resolveStmt(whileStmt.body)) {
@@ -1009,9 +1011,9 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.NULL_EXPR:
         case StmtKind.NUMBER_EXPR:
         case StmtKind.OFFSET_OF_EXPR:
-        case StmtKind.SET_EXPR: 
+        case StmtKind.SET_EXPR:
         case StmtKind.SIZE_OF_EXPR:
-        case StmtKind.STRING_EXPR:   
+        case StmtKind.STRING_EXPR:
         case StmtKind.SUBSCRIPT_GET_EXPR:
         case StmtKind.SUBSCRIPT_SET_EXPR:
         case StmtKind.TERNARY_EXPR:

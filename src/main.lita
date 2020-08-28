@@ -51,6 +51,8 @@ func main(len: i32, args: **char) : i32 {
     }
 
 report:
+    var totalTime = SystemTimeMSec() - startTime
+
     if(!lita.result.errors.empty()) {
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
             PrintError(lita.result.errors.get(i))
@@ -59,23 +61,23 @@ report:
         printf("Total errors: %d\n", lita.result.errors.size())
     }
 
-    var endTime = SystemTimeMSec()
     if(options.showProfileInfo) {
         var allocator: *LinearAllocator = lita.allocator as (*LinearAllocator)
 
+        printf("\n\n")
         printf("%-30s %-17s %-6s %-14s %-5s\n", "Segment", "Time", "%", "Mem", "#")
         printf("====================================================================================\n")
         for(var i = 0; i < MetricType.MAX_METRIC_TYPES; i+=1) {
             var metric = &lita.metrics[i]
-            printf("%-30s %-15.6f   %-6d %-14zu %-5u\n",
+            printf("%-30s %-15.6f   %3.0f%% %-14zu %-5u\n",
                 MetricTypeAsStr(i),
                 metric.executionTime,
-                0,
+                (metric.executionTime / totalTime) * 100f,
                 metric.bytesAllocated,
                 metric.allocationCount)
         }
         printf("\n")
-        printf("Total time:         %f\n", endTime - startTime)
+        printf("Total time:         %f\n", totalTime)
         printf("Total memory:       %llu\n", allocator.totalBytesAllocated)
         printf("Total allocations:  %u\n", allocator.totalAllocations)
         printf("Total source lines: %u\n", lita.totalSourceLines)
@@ -117,6 +119,12 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
         goto err_print;
     }
 
+    if(parser.args.size() < 2) {
+        printf("Missing input file\n")
+        goto err;
+    }
+
+    strncpy(options.inputFile, parser.args.get(1), MAX_PATH)
     strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
 
     if(parser.hasOption("help")) {
@@ -132,24 +140,13 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     options.showProfileInfo = parser.hasOption("profile")
     options.run = parser.hasOption("run")
 
-    //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
-    if(parser.args.size() < 2) {
-        printf("Missing input file\n")
-        goto err;
-    }
-
-    strncpy(options.inputFile, parser.args.get(1), MAX_PATH)
-
     var outputFile = parser.hasOption("output") ? parser.getOption("output").value : "a"
     strncpy(options.outputFile, outputFile, MAX_PATH)
 
-    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "./output"
+    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "output"
     strncpy(options.outputPath, outputPath, MAX_PATH)
 
     FilePath(options.inputFile, options.srcPath)
-    //printf("Reading in: '%s'\n", options.inputFile)
-    //printf("Source Path: '%s'\n", options.srcPath)
-
     return true
 
 err_print:
@@ -282,17 +279,31 @@ func TypeCheck(lita: *Lita, module: *Module) : bool {
 }
 
 func Transpile(lita: *Lita, module: *Module) : bool {
-    var filename: [MAX_PATH]char;
-    strcat(filename, lita.options.outputPath)
-    if(!Mkdir(filename)) {
-        printf("Unable to create directory: '%s'", filename)
+
+    if(!Mkdir(lita.options.outputPath)) {
+        printf("Unable to create directory: '%s'", lita.options.outputPath)
         return false
     }
 
-    strcat(filename, lita.options.outputFile)
-    strcat(filename, ".c")
+    var cFilename: [MAX_PATH]char;
+    var binaryFilename: [MAX_PATH]char;
 
-    if(!GenerateC(lita, module, filename)) {
+    strcat(cFilename, lita.options.outputPath)
+    var len = strlen(lita.options.outputPath)
+    if(len > 0) {
+        if(lita.options.outputPath[len-1] != '/') {
+            strcat(cFilename, "/")
+        }
+    }
+
+    strcat(cFilename, lita.options.outputFile)
+
+    strcpy(binaryFilename, cFilename)
+
+    strcat(binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
+    strcat(cFilename, ".c")
+
+    if(!GenerateC(lita, module, cFilename)) {
         return false
     }
 
@@ -300,18 +311,18 @@ func Transpile(lita: *Lita, module: *Module) : bool {
         return false
     }
 
-    if(!CompileC(lita, module, filename)) {
+    if(!CompileC(lita, module, cFilename, binaryFilename)) {
         return false
     }
 
     if(lita.options.run) {
-        Run(lita, lita.options.outputFile)
+        Run(lita, binaryFilename)
     }
 
     return true
 }
 
-func GenerateC(lita: *Lita, module: *Module, filename: *const char) : bool {
+func GenerateC(lita: *Lita, module: *Module, cFilename: *const char) : bool {
     lita.startCapture(MetricType.CGEN)
     var cgen = CGen{}
     cgen.init(lita)
@@ -319,7 +330,7 @@ func GenerateC(lita: *Lita, module: *Module, filename: *const char) : bool {
     lita.endCapture(MetricType.CGEN)
 
     lita.startCapture(MetricType.CWRITE)
-    var status = WriteFile(filename, cgen.buf.cStrConst(), cgen.buf.length)
+    var status = WriteFile(cFilename, cgen.buf.cStrConst(), cgen.buf.length)
     lita.endCapture(MetricType.CWRITE)
     if(status != FileStatus.Ok) {
         return false
@@ -328,54 +339,30 @@ func GenerateC(lita: *Lita, module: *Module, filename: *const char) : bool {
     return lita.result.errors.empty()
 }
 
-func CompileC(lita: *Lita, module: *Module, filename: *const char) : bool {
+func CompileC(lita: *Lita, module: *Module, cFilename: *const char, binaryFilename: *const char) : bool {
     lita.startCapture(MetricType.CCOMPILE)
     defer lita.endCapture(MetricType.CCOMPILE)
 
     var command: [512]char;
     var commandStr = StringInit(command, 512)
-    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", lita.options.outputFile, filename)
+    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", binaryFilename, cFilename)
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }
     return false
 }
 
-func Run(lita: *Lita, filename: *const char) {
-    system(filename)
-}
+func Run(lita: *Lita, binaryFilename: *const char) {
+    var sb = StringBufferInit(256, lita.allocator)
+    defer sb.free()
 
-func PrintHelp() {
-    printf("""
-<usage> litac [options] [source file to compile]
-OPTIONS:
-  -languageServer      Start the LitaC language server
-  -lib <arg>           The LitaC library path
-  -cPrefix <arg>       The symbol prefix to use on the generated C code output
-  -run                 Runs the program after a successful compile
-  -checkerOnly         Only runs the type checker, does not compile
-  -cOnly               Only creates the C output file, does not compile the generated C code
-  -profile             Reports profile metrics of the compiler
-  -disableLine         Disables #line directive in C output
-  -debug               Enables debug mode
-  -verbose             Enables verbose output
-  -srcDir              Specifies the source code directory, defaults to the parent folder of the supplied source file
-  -doc                 Generates document output
-  -docDir <arg>        Directory where the generated documents are written to, defaults to './output'
-  -docAll              Includes non-public types in the documentation generation
-  -o, -output <arg>    The name of the compiled binary
-  -outpuDir <arg>      The directory in which the C output files are stored
-  -v, -version         Displays the LitaC version
-  -h, -help            Displays this help
-  -t, -types <arg>     Includes TypeInfo for reflection
-                       <arg> can be:
-                       all         Means all types will have reflection values
-                       tagged      Means only basic types and types annoted with @typeinfo will have reflection values
-   -test <arg>          Runs functions annotated with @test.  <arg> is a regex of which tests should be run
-   -testFile            Runs functions annotated with @test in the supplied source file only
-   -buildCmd            The underlying C compiler build and compile command.  Variables will
-                        be substituted if found:
-                        %%output%%         The executable name
-                        %%input%%          The C file(s) generated
-""")
+    var path: [MAX_PATH]char;
+    FilePath(binaryFilename, path)
+
+    var len = strlen(path)
+    sb.append("cd ")
+    sb.appendStr(path, len)
+    sb.append(" && %s", &binaryFilename[len + 1])
+
+    system(sb.cStr())
 }
