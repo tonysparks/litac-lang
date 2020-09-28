@@ -162,7 +162,15 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
 
 
 public func CopyFuncDecl(decl: *FuncDecl, allocator: *const Allocator) : *FuncDecl {
-    var copy = NewFuncDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams, CopyParameters(decl.params, allocator), CopyStmt(decl.body, allocator), CopyTypeSpec(decl.returnType, allocator), decl.flags, allocator)
+    var copy = NewFuncDecl(decl.startPos,
+                           decl.endPos,
+                           decl.name,
+                           decl.genericParams,
+                           CopyParameters(decl.params, allocator),
+                           CopyStmt(decl.body, allocator),
+                           CopyTypeSpec(decl.returnType, allocator),
+                           decl.flags,
+                           allocator)
     return copy as (*FuncDecl)
 }
 
@@ -172,7 +180,12 @@ public func CopyParameters(params: ParametersStmt, allocator: *const Allocator) 
 
     for(var i = 0; i < params.params.size(); i+=1) {
         var decl = params.params.get(i)
-        var copy = NewParameterDecl(decl.startPos, decl.endPos, decl.name, CopyTypeSpec(decl.type, allocator), CopyExpr(decl.defaultExpr, allocator), decl.attributes.isUsing, allocator) as (*ParameterDecl)
+        var copy = NewParameterDecl(decl.startPos,
+                                    decl.endPos,
+                                    decl.name,
+                                    CopyTypeSpec(decl.type, allocator),
+                                    CopyExpr(decl.defaultExpr, allocator),
+                                    decl.attributes.isUsing, allocator) as (*ParameterDecl)
         paramDecls.add(copy)
     }
 

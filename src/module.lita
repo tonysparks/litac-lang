@@ -2,6 +2,7 @@ import "ast"
 import "ast_new"
 import "lex"
 import "array"
+import "map"
 import "phase_result"
 import "string"
 import "string_view"
@@ -30,6 +31,8 @@ public struct Module {
     ast: *ModuleStmt
     result: *PhaseResult
     symbols: Scope
+    currentScope: *Scope
+    genericSymbols: *Map<*const char, *Symbol>
     flags: i32
 
     allocator: *const Allocator
@@ -45,12 +48,16 @@ public const BUILTIN_IMPORT_TOKEN = Token {
     }
 }
 public const builtins = Module{}
+const genericSymbols = Map<*const char, *Symbol>{}
 public func BuiltinsInit(lita: *Lita) : *Module {
+    genericSymbols.init(null, 128, StrHashFn, StrEqualFn, lita.allocator)
+
     builtins.text = null
     builtins.ast = null
     builtins.flags = 0
     builtins.allocator = lita.allocator
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
+    builtins.genericSymbols = &genericSymbols
 
     var filename: [MAX_PATH]char;
     var pathStr = StringInit(filename, MAX_PATH);
@@ -103,23 +110,36 @@ public func (this: *Module) init(result: *PhaseResult,
     this.symbols.init(ScopeKind.MODULE, &builtins.symbols, result, allocator)
     this.flags = 0
     this.allocator = allocator
+    this.currentScope = &this.symbols
+    this.genericSymbols = &genericSymbols
+
+    this.symbols.module = this // TEMP
 }
 
 public func (this: *Module) getType(type: *const char) : *Symbol {
-    return this.symbols.lookup(type)
+    var sym = this.symbols.lookup(type)
+    if(sym) {
+        return sym
+    }
+
+    return this.genericSymbols.get(type)
 }
 
 public func (this: *Module) importModule(importDecl: *ImportDecl, module: *Module) {
+    var moduleName: *StringView = null;
+
     if(importDecl.alias.type == TokenType.IDENTIFIER) {
-        this.importModuleAlias(importDecl.alias.str, module)
+        moduleName = &importDecl.alias.str;
     }
     else {
-        this.importModuleNormal(module)
+        //moduleName = module.id.name;
     }
+    this.importModuleSymbols(module, moduleName)
+
 }
 
 
-func (this: *Module) importModuleNormal(module: *Module) {
+func (this: *Module) importModuleSymbols(module: *Module, moduleName: *StringView) {
     for(var i = 0; i < module.symbols.capacity; i += 1) {
         var symName = module.symbols.keys[i]
         var symbol = module.symbols.values[i]
@@ -127,23 +147,56 @@ func (this: *Module) importModuleNormal(module: *Module) {
             continue
         }
 
-        this.symbols.importSymbol(symName, symbol)
-    }
-}
-
-func (this: *Module) importModuleAlias(alias: StringView, module: *Module) {
-    for(var i = 0; i < module.symbols.capacity; i += 1) {
-        var symName = module.symbols.keys[i]
-        var symbol = module.symbols.values[i]
-        if(!symName || !symbol) {
+        // only import public symbols
+        if(!(symbol.flags & SymbolFlags.IS_PUBLIC)) {
             continue
         }
 
-        var name = StringBufferInit(MAX_SYMBOL_NAME, this.allocator)
-        name.appendStr(alias.buffer, alias.length)
-        name.append("::%s", symbol.name)
-        this.symbols.importSymbol(name.cStrConst(), symbol)
+        // only import symbols that are declared in the import module
+        if(!symbol.declared.equals(module)) {
+            continue
+        }
+
+        // don't import symbols already defined in this module
+        if(symbol.declared.equals(this)) {
+            continue
+        }
+
+        if(moduleName) {
+
+            var name = StringBufferInit(MAX_SYMBOL_NAME, this.allocator)
+            name.appendStr(moduleName.buffer, moduleName.length)
+            name.append("::%s", symbol.name)
+
+            // TEMP
+            //printf("%s importing type '%s' from %s\n", this.id.filename, name.cStrConst(), module.id.filename)
+            this.symbols.importSymbol(name.cStrConst(), symbol)
+        }
+        else {
+            //printf("%s importing type '%s' from %s\n", this.id.filename, symName, module.id.filename)
+            this.symbols.importSymbol(symName, symbol)
+        }
     }
+}
+
+public func (this: *Module) equals(other: *Module) : bool {
+    if(!other) return false
+
+    return strcmp(this.id.filename, other.id.filename) == 0
+}
+
+public func (this: *Module) print(header: *const char) {
+    printf("Module %s %.*s {\n", header, this.id.name.length, this.id.name.buffer)
+    for(var i = 0; i < this.symbols.capacity; i+=1) {
+        var symName = this.symbols.keys[i]
+        var symbol = this.symbols.values[i]
+        if(!symName || !symbol) {
+            printf("   %d null\n", i)
+            continue
+        }
+        printf("   %d '%s' %s\n", i, symName, SymbolKindAsStr(symbol.kind))
+    }
+    printf("}\n")
 }
 
 public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {

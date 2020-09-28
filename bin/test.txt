@@ -1,0 +1,2441 @@
+CreateModule ../src/main.lita
+Create Decl for: main in ../src/main.lita
+Create Decl for: ParseArgs in ../src/main.lita
+Create Decl for: FindModulePath in ../src/main.lita
+Create Decl for: ParseModule in ../src/main.lita
+Create Decl for: Parse in ../src/main.lita
+Create Decl for: TypeCheck in ../src/main.lita
+Create Decl for: Transpile in ../src/main.lita
+Create Decl for: GenerateC in ../src/main.lita
+Create Decl for: CompileC in ../src/main.lita
+Create Decl for: Run in ../src/main.lita
+Importing: 'libc' for ../src/main.lita
+Resolving Import: libc
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: malloc in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: realloc in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: calloc in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: memset in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: memcpy in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: memmove in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: FILE in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: stderr in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: stdout in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: printf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fopen in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fgets in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fread in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fwrite in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fclose in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fseek in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: ftell in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: ferror in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: SEEK_SET in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: SEEK_CUR in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: SEEK_END in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: MIN in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: ABS in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: sqrt in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: sqrtf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: cos in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: cosf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: sin in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: sinf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: asinf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fabs in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: tan in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: M_PI in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: va_list in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: va_start in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: va_end in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: va_copy in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: vprintf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: vfprintf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: vsprintf_s in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: vsnprintf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: vsnprintf_s in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: fputs in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: exit in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: system in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strcat in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strncat in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strncpy in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strcpy in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strlen in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strnlen in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strncmp in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strcmp in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: snprintf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: sprintf in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strtok in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strtol in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strtoul in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: strtod in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: isdigit in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: tolower in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: toupper in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: isalnum in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: isspace in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: isalpha in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: CHAR_BIT in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: SCHAR_MIN in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: SCHAR_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: CHAR_MIN in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: CHAR_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: SHRT_MIN in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: SHRT_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: USHRT_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: INT_MIN in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: INT_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: UINT_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: LONG_MIN in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: LONG_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: ULLONG_MAX in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Create Decl for: HUGE_VAL in C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Resolving Import: ~libc
+../src/main.lita importing type 'LONG_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'stdout' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'CHAR_MIN' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'CHAR_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fopen' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'LONG_MIN' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strncmp' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'sqrt' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'sprintf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fgets' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'sqrtf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'UINT_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'SHRT_MIN' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'SHRT_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fclose' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'asinf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strcpy' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'ferror' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'tolower' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strtok' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fputs' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'va_end' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'isalnum' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strcat' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strtol' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'memcpy' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'calloc' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'snprintf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strtod' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'memmove' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'isspace' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'vprintf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'SCHAR_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strtoul' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'cos' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'SCHAR_MIN' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'SEEK_SET' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'FILE' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'malloc' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'SEEK_CUR' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'exit' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'MIN' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fabs' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strncpy' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strlen' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'vsnprintf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'CHAR_BIT' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fwrite' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'system' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'stderr' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'INT_MIN' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'va_copy' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strncat' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'isdigit' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'sin' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'printf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'ABS' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'sinf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'vsprintf_s' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'INT_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'ULLONG_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'HUGE_VAL' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'USHRT_MAX' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'va_start' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strcmp' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'ftell' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'vsnprintf_s' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fseek' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'cosf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'toupper' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'realloc' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'memset' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'vfprintf' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'isalpha' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'SEEK_END' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'M_PI' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'va_list' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'free' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'fread' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'strnlen' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+../src/main.lita importing type 'tan' from C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+Importing: 'mem' for ../src/main.lita
+Resolving Import: mem
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: new in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: memduplicate in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: isPowerOfTwo in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: alignForward in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: Allocator in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: alloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: calloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: realloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: cAllocator in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: cMalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: cCalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: cRealloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: cFree in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: Arena in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: PAGE_SIZE in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: init in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: malloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: ArenaMalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: ArenaCalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: ArenaRealloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: ArenaFree in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: LinearAllocator in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: init in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: LITAC_DEFAULT_ALIGNMENT in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: malloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: LinearMalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: LinearCalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: LinearRealloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: LinearFree in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: MAX_PATH in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Finishing symbol: MAX_PATH
+FinishSym MAX_PATH C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: Allocation in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: DebugAllocator in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: debugAllocator in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: init in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: report in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: malloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: DebugMalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: DebugCalloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: DebugRealloc in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: DebugFree in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Create Decl for: defaultAllocator in C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Resolving Import: libc
+Importing: 'array' for C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Resolving Import: array
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: Array in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: ArrayInit in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: init in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: add in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: push in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: get in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: set in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: first in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: last in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: pop in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: removeAt in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: insertAt in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: addAll in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: forEach in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: empty in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: size in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: clear in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Create Decl for: ArrayGrow in C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Importing: 'mem' for C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Resolving Import: mem
+Importing: 'assert' for C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Resolving Import: assert
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/assert.lita
+Create Decl for: assert in C:\Users\antho\eclipse-workspace\litac/lib/assert.lita
+Resolving Import: ~assert
+C:\Users\antho\eclipse-workspace\litac/lib/array.lita importing type 'assert' from C:\Users\antho\eclipse-workspace\litac/lib/assert.lita
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Resolving Import: libc
+Resolving Import: ~array
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_insertAt' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_add' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_addAll' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_forEach' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_init' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_first' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_set' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'ArrayInit' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_size' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_last' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_pop' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_removeAt' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_get' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_empty' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_free' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_clear' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+C:\Users\antho\eclipse-workspace\litac/lib/mem.lita importing type 'Array_push' from C:\Users\antho\eclipse-workspace\litac/lib/array.lita
+Importing: 'assert' for C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Resolving Import: assert
+Resolving Import: ~mem
+../src/main.lita importing type 'LinearAllocator_malloc' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Allocator_realloc' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Allocation' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Arena_free' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'LinearAllocator_init' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'DebugAllocator_report' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Arena_malloc' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'DebugAllocator_malloc' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'debugAllocator' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Allocator_alloc' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'alignForward' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'DebugAllocator_init' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Arena_init' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'LinearAllocator' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Allocator' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Allocator_calloc' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'DebugAllocator' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'memduplicate' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'DebugAllocator_free' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'cAllocator' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Allocator_free' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'defaultAllocator' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'new' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+../src/main.lita importing type 'Arena' from C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Importing: 'io' for ../src/main.lita
+Resolving Import: io
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Create Decl for: FileStatus in C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Create Decl for: FileLength in C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Create Decl for: ReadFile in C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Create Decl for: WriteFile in C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Create Decl for: WriteBytes in C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Importing: 'mem' for C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Resolving Import: mem
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Resolving Import: libc
+Resolving Import: ~io
+../src/main.lita importing type 'ReadFile' from C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+../src/main.lita importing type 'WriteBytes' from C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+../src/main.lita importing type 'FileStatus' from C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+../src/main.lita importing type 'WriteFile' from C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+../src/main.lita importing type 'FileLength' from C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+Importing: 'lex' for ../src/main.lita
+Resolving Import: lex
+CreateModule ../src/lex.lita
+Create Decl for: TokenType in ../src/lex.lita
+Create Decl for: tokenText in ../src/lex.lita
+Create Decl for: charToDigit in ../src/lex.lita
+Create Decl for: escapeToChar in ../src/lex.lita
+Create Decl for: MAX_KEYWORD_CACHE in ../src/lex.lita
+Finishing symbol: MAX_KEYWORD_CACHE
+FinishSym MAX_KEYWORD_CACHE ../src/lex.lita
+Create Decl for: keywordCache in ../src/lex.lita
+Create Decl for: keywordCacheIndex in ../src/lex.lita
+Create Decl for: SrcPos in ../src/lex.lita
+Create Decl for: Value in ../src/lex.lita
+Create Decl for: Mod in ../src/lex.lita
+Create Decl for: Token in ../src/lex.lita
+Create Decl for: nameEquals in ../src/lex.lita
+Create Decl for: getLineLength in ../src/lex.lita
+Create Decl for: asString in ../src/lex.lita
+Create Decl for: print in ../src/lex.lita
+Create Decl for: Lexer in ../src/lex.lita
+Create Decl for: LexerInit in ../src/lex.lita
+Create Decl for: hasError in ../src/lex.lita
+Create Decl for: error in ../src/lex.lita
+Create Decl for: nextChar in ../src/lex.lita
+Create Decl for: eofToken in ../src/lex.lita
+Create Decl for: errorToken in ../src/lex.lita
+Create Decl for: skipWhitespace in ../src/lex.lita
+Create Decl for: skipComments in ../src/lex.lita
+Create Decl for: isValidIdentifierStart in ../src/lex.lita
+Create Decl for: isValidIdentifierChar in ../src/lex.lita
+Create Decl for: isSymbolStart in ../src/lex.lita
+Create Decl for: checkKeyword in ../src/lex.lita
+Create Decl for: scanWord in ../src/lex.lita
+Create Decl for: scanInt in ../src/lex.lita
+Create Decl for: scanFloat in ../src/lex.lita
+Create Decl for: scanTypeInfo in ../src/lex.lita
+Create Decl for: scanNumber in ../src/lex.lita
+Create Decl for: scanChar in ../src/lex.lita
+Create Decl for: scanString in ../src/lex.lita
+Create Decl for: scanSymbol in ../src/lex.lita
+Create Decl for: eof in ../src/lex.lita
+Create Decl for: nextToken in ../src/lex.lita
+Importing: 'string_view' for ../src/lex.lita
+Resolving Import: string_view
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: StringView in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: StringViewInit in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: hash in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: substring in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: startsWith in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: endsWith in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: equals in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: equalsStringView in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: contains in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: indexOf in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: indexOfAt in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: copyTo in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: forEach in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: empty in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: size in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: clear in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: get in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: testEquals in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: testContains in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: testStartsWith in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Create Decl for: testIndexOf in C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Resolving Import: libc
+Importing: 'mem' for C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Resolving Import: mem
+Importing: 'assert' for C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Resolving Import: assert
+Resolving Import: ~string_view
+../src/lex.lita importing type 'StringView_size' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_hash' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_substring' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_forEach' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_endsWith' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_indexOfAt' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_contains' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_equalsStringView' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringViewInit' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_startsWith' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_get' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_indexOf' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_empty' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_clear' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_copyTo' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+../src/lex.lita importing type 'StringView_equals' from C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+Importing: 'string_buffer' for ../src/lex.lita
+Resolving Import: string_buffer
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: StringBuffer in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: StringBufferInit in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: init in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendStr in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendFloat in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendI32 in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendI64 in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendU32 in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendU64 in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendChar in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: append in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: appendArgs in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: delete in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: contains in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: indexOf in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: indexOfAt in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: replace in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: insert in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: copyTo in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: forEach in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: empty in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: size in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: clear in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: cStrConst in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: cStr in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: asStringView in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: get in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Create Decl for: BufferGrow in C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Importing: 'mem' for C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Resolving Import: mem
+Importing: 'io' for C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Resolving Import: io
+Importing: 'assert' for C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Resolving Import: assert
+Importing: 'string_view' for C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Resolving Import: string_view
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Resolving Import: libc
+Resolving Import: ~string_buffer
+../src/lex.lita importing type 'StringBuffer_replace' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendArgs' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendI64' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_contains' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_copyTo' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendStr' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_init' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendU64' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_delete' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_insert' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendChar' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_cStr' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_forEach' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_append' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_asStringView' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendI32' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBufferInit' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_size' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_indexOfAt' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendFloat' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_appendU32' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_clear' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_indexOf' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_get' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_empty' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_free' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+../src/lex.lita importing type 'StringBuffer_cStrConst' from C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+Importing: 'libc' for ../src/lex.lita
+Resolving Import: libc
+Importing: 'mem' for ../src/lex.lita
+Resolving Import: mem
+Importing: 'types' for ../src/lex.lita
+Resolving Import: types
+CreateModule ../src/types.lita
+Create Decl for: TypeKind in ../src/types.lita
+Create Decl for: typeKindText in ../src/types.lita
+Create Decl for: TypeKindFromString in ../src/types.lita
+Create Decl for: IsPtr in ../src/types.lita
+Create Decl for: IsPtrLike in ../src/types.lita
+Create Decl for: IsPtrOf in ../src/types.lita
+Create Decl for: IsFuncLike in ../src/types.lita
+Create Decl for: IsPrimitive in ../src/types.lita
+Create Decl for: IsNumberLike in ../src/types.lita
+Create Decl for: IsInteger in ../src/types.lita
+Create Decl for: IsBooleanable in ../src/types.lita
+Create Decl for: IsAggregateLike in ../src/types.lita
+Create Decl for: IsAggregate in ../src/types.lita
+Create Decl for: IsPtrAggregate in ../src/types.lita
+Create Decl for: IsFieldAccessible in ../src/types.lita
+Create Decl for: getBaseType in ../src/types.lita
+Create Decl for: getTypeOf in ../src/types.lita
+Create Decl for: toString in ../src/types.lita
+Create Decl for: strictEquals in ../src/types.lita
+Create Decl for: isAssignable in ../src/types.lita
+Create Decl for: isDeclarable in ../src/types.lita
+Create Decl for: canCastTo in ../src/types.lita
+Create Decl for: asTypeSpec in ../src/types.lita
+Create Decl for: getField in ../src/types.lita
+Create Decl for: getBaseName in ../src/types.lita
+Create Decl for: getFieldByPosition in ../src/types.lita
+Create Decl for: getField in ../src/types.lita
+Create Decl for: getFieldByType in ../src/types.lita
+Create Decl for: getFieldWithUsing in ../src/types.lita
+Create Decl for: MAX_FIELD_PATH in ../src/types.lita
+Finishing symbol: MAX_FIELD_PATH
+FinishSym MAX_FIELD_PATH ../src/types.lita
+Create Decl for: FieldPath in ../src/types.lita
+Create Decl for: add in ../src/types.lita
+Create Decl for: pop in ../src/types.lita
+Create Decl for: getFieldPath in ../src/types.lita
+Create Decl for: getFieldPathByType in ../src/types.lita
+Create Decl for: Typeid in ../src/types.lita
+Create Decl for: idGen in ../src/types.lita
+Create Decl for: NextTypeId in ../src/types.lita
+Create Decl for: TypeInfo in ../src/types.lita
+Create Decl for: FuncTypeInfo in ../src/types.lita
+Create Decl for: ConstTypeInfo in ../src/types.lita
+Create Decl for: PtrTypeInfo in ../src/types.lita
+Create Decl for: ArrayTypeInfo in ../src/types.lita
+Create Decl for: FuncPtrTypeInfo in ../src/types.lita
+Create Decl for: EnumTypeInfo in ../src/types.lita
+Create Decl for: AggregateTypeInfo in ../src/types.lita
+Create Decl for: BOOL_TYPE in ../src/types.lita
+Create Decl for: CHAR_TYPE in ../src/types.lita
+Create Decl for: I8_TYPE in ../src/types.lita
+Create Decl for: U8_TYPE in ../src/types.lita
+Create Decl for: I16_TYPE in ../src/types.lita
+Create Decl for: U16_TYPE in ../src/types.lita
+Create Decl for: I32_TYPE in ../src/types.lita
+Create Decl for: U32_TYPE in ../src/types.lita
+Create Decl for: I64_TYPE in ../src/types.lita
+Create Decl for: U64_TYPE in ../src/types.lita
+Create Decl for: F32_TYPE in ../src/types.lita
+Create Decl for: F64_TYPE in ../src/types.lita
+Create Decl for: USIZE_TYPE in ../src/types.lita
+Create Decl for: NULL_TYPE in ../src/types.lita
+Create Decl for: VOID_TYPE in ../src/types.lita
+Create Decl for: STR_TYPE in ../src/types.lita
+Importing: 'string_view' for ../src/types.lita
+Resolving Import: string_view
+Importing: 'string_buffer' for ../src/types.lita
+Resolving Import: string_buffer
+Importing: 'symbols' for ../src/types.lita
+Resolving Import: symbols
+CreateModule ../src/symbols.lita
+Create Decl for: SymbolKind in ../src/symbols.lita
+Create Decl for: SymbolState in ../src/symbols.lita
+Create Decl for: SymbolFlags in ../src/symbols.lita
+Create Decl for: MAX_SYMBOL_NAME in ../src/symbols.lita
+Finishing symbol: MAX_SYMBOL_NAME
+FinishSym MAX_SYMBOL_NAME ../src/symbols.lita
+Create Decl for: Symbol in ../src/symbols.lita
+Create Decl for: ScopeKind in ../src/symbols.lita
+Create Decl for: ProgramSymbols in ../src/symbols.lita
+Create Decl for: Scope in ../src/symbols.lita
+Create Decl for: NewScope in ../src/symbols.lita
+Create Decl for: init in ../src/symbols.lita
+Create Decl for: lookup in ../src/symbols.lita
+Create Decl for: lookupByToken in ../src/symbols.lita
+Create Decl for: importSymbol in ../src/symbols.lita
+Create Decl for: addSymbol in ../src/symbols.lita
+Create Decl for: print in ../src/symbols.lita
+Importing: 'array' for ../src/symbols.lita
+Resolving Import: array
+Importing: 'map' for ../src/symbols.lita
+Resolving Import: map
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: HashFn in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: EqualFn in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: StrHashFn in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: PtrHashFn in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: PtrEqualFn in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: StrEqualFn in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: StrMap in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: StringViewMap in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: Map in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: MapIterator in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: MapEntry in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: init in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: size in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: empty in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: put in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: get in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: getPtr in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: remove in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: contains in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: MapGrow in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: iter in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: hasNext in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Create Decl for: next in C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Importing: 'mem' for C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Resolving Import: mem
+Importing: 'io' for C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Resolving Import: io
+Importing: 'assert' for C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Resolving Import: assert
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Resolving Import: libc
+Importing: 'string_view' for C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Resolving Import: string_view
+Resolving Import: ~map
+../src/symbols.lita importing type 'Map_remove' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'EqualFn' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'StringViewMap' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_size' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'MapIterator_next' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'PtrHashFn' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'StrHashFn' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'StrMap' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_free' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'StrEqualFn' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_contains' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_getPtr' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_iter' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'MapEntry' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_get' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_empty' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'PtrEqualFn' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_put' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'MapIterator_hasNext' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'MapIterator' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'Map_init' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+../src/symbols.lita importing type 'HashFn' from C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+Importing: 'ast' for ../src/symbols.lita
+Resolving Import: ast
+CreateModule ../src/ast.lita
+Create Decl for: StmtKind in ../src/ast.lita
+Create Decl for: TypeSpecKind in ../src/ast.lita
+Create Decl for: FuncFlags in ../src/ast.lita
+Create Decl for: AggregateFlags in ../src/ast.lita
+Create Decl for: TypeSpec in ../src/ast.lita
+Create Decl for: NameTypeSpec in ../src/ast.lita
+Create Decl for: ArrayTypeSpec in ../src/ast.lita
+Create Decl for: PtrTypeSpec in ../src/ast.lita
+Create Decl for: ConstTypeSpec in ../src/ast.lita
+Create Decl for: FuncPtrTypeSpec in ../src/ast.lita
+Create Decl for: GenericParam in ../src/ast.lita
+Create Decl for: Attributes in ../src/ast.lita
+Create Decl for: Node in ../src/ast.lita
+Create Decl for: setSrcPos in ../src/ast.lita
+Create Decl for: becomeParentOf in ../src/ast.lita
+Create Decl for: becomeParentOfChildren in ../src/ast.lita
+Create Decl for: Decl in ../src/ast.lita
+Create Decl for: GenericDecl in ../src/ast.lita
+Create Decl for: ImportDecl in ../src/ast.lita
+Create Decl for: VarDecl in ../src/ast.lita
+Create Decl for: ParameterDecl in ../src/ast.lita
+Create Decl for: FuncDecl in ../src/ast.lita
+Create Decl for: AggregateDecl in ../src/ast.lita
+Create Decl for: EnumDecl in ../src/ast.lita
+Create Decl for: TypedefDecl in ../src/ast.lita
+Create Decl for: NativeDecl in ../src/ast.lita
+Create Decl for: NotesDecl in ../src/ast.lita
+Create Decl for: PoisonDecl in ../src/ast.lita
+Create Decl for: BlockStmt in ../src/ast.lita
+Create Decl for: BreakStmt in ../src/ast.lita
+Create Decl for: CompStmt in ../src/ast.lita
+Create Decl for: ContinueStmt in ../src/ast.lita
+Create Decl for: DeferStmt in ../src/ast.lita
+Create Decl for: DoWhileStmt in ../src/ast.lita
+Create Decl for: EmptyStmt in ../src/ast.lita
+Create Decl for: EnumFieldEntryDecl in ../src/ast.lita
+Create Decl for: ForStmt in ../src/ast.lita
+Create Decl for: FuncBodyStmt in ../src/ast.lita
+Create Decl for: GotoStmt in ../src/ast.lita
+Create Decl for: IfStmt in ../src/ast.lita
+Create Decl for: LabelStmt in ../src/ast.lita
+Create Decl for: ModuleStmt in ../src/ast.lita
+Create Decl for: NoteStmt in ../src/ast.lita
+Create Decl for: ParametersStmt in ../src/ast.lita
+Create Decl for: ReturnStmt in ../src/ast.lita
+Create Decl for: SwitchCaseStmt in ../src/ast.lita
+Create Decl for: SwitchStmt in ../src/ast.lita
+Create Decl for: VarFieldDecl in ../src/ast.lita
+Create Decl for: FieldStmt in ../src/ast.lita
+Create Decl for: WhileStmt in ../src/ast.lita
+Create Decl for: Stmt in ../src/ast.lita
+Create Decl for: ArrayDesignationExpr in ../src/ast.lita
+Create Decl for: ArrayInitExpr in ../src/ast.lita
+Create Decl for: BinaryExpr in ../src/ast.lita
+Create Decl for: BooleanExpr in ../src/ast.lita
+Create Decl for: CastExpr in ../src/ast.lita
+Create Decl for: CharExpr in ../src/ast.lita
+Create Decl for: FuncCallExpr in ../src/ast.lita
+Create Decl for: GetExprFlags in ../src/ast.lita
+Create Decl for: GetExpr in ../src/ast.lita
+Create Decl for: GroupExpr in ../src/ast.lita
+Create Decl for: IdentifierExpr in ../src/ast.lita
+Create Decl for: InitArgExpr in ../src/ast.lita
+Create Decl for: InitExpr in ../src/ast.lita
+Create Decl for: NullExpr in ../src/ast.lita
+Create Decl for: NumberExpr in ../src/ast.lita
+Create Decl for: OffsetOfExpr in ../src/ast.lita
+Create Decl for: SetExpr in ../src/ast.lita
+Create Decl for: SizeOfExpr in ../src/ast.lita
+Create Decl for: StringExpr in ../src/ast.lita
+Create Decl for: SubscriptGetExpr in ../src/ast.lita
+Create Decl for: SubscriptSetExpr in ../src/ast.lita
+Create Decl for: TernaryExpr in ../src/ast.lita
+Create Decl for: TypeIdentifierExpr in ../src/ast.lita
+Create Decl for: TypeOfExpr in ../src/ast.lita
+Create Decl for: UnaryExpr in ../src/ast.lita
+Create Decl for: PoisonExpr in ../src/ast.lita
+Create Decl for: Expr in ../src/ast.lita
+Create Decl for: Operand in ../src/ast.lita
+Create Decl for: IsExpr in ../src/ast.lita
+Create Decl for: IsDecl in ../src/ast.lita
+Create Decl for: hasNote in ../src/ast.lita
+Create Decl for: getNote in ../src/ast.lita
+Create Decl for: getName in ../src/ast.lita
+Create Decl for: isIdentifier in ../src/ast.lita
+Create Decl for: isConstNumberExpr in ../src/ast.lita
+Create Decl for: isConstExpr in ../src/ast.lita
+Importing: 'symbols' for ../src/ast.lita
+Resolving Import: symbols
+Importing: 'types' for ../src/ast.lita
+Resolving Import: types
+Importing: 'lex' for ../src/ast.lita
+Resolving Import: lex
+Importing: 'array' for ../src/ast.lita
+Resolving Import: array
+Importing: 'mem' for ../src/ast.lita
+Resolving Import: mem
+Importing: 'common' for ../src/ast.lita
+Resolving Import: common
+CreateModule ../src/common.lita
+Create Decl for: LogLevel in ../src/common.lita
+Create Decl for: Log in ../src/common.lita
+Create Decl for: Info in ../src/common.lita
+Create Decl for: Debug in ../src/common.lita
+Create Decl for: Error in ../src/common.lita
+Create Decl for: Panic in ../src/common.lita
+Importing: 'libc' for ../src/common.lita
+Resolving Import: libc
+Resolving Import: ~common
+../src/ast.lita importing type 'Panic' from ../src/common.lita
+../src/ast.lita importing type 'Log' from ../src/common.lita
+../src/ast.lita importing type 'Debug' from ../src/common.lita
+../src/ast.lita importing type 'LogLevel' from ../src/common.lita
+../src/ast.lita importing type 'Info' from ../src/common.lita
+../src/ast.lita importing type 'Error' from ../src/common.lita
+Importing: 'module' for ../src/ast.lita
+Resolving Import: module
+CreateModule ../src/module.lita
+Create Decl for: ModuleFlags in ../src/module.lita
+Create Decl for: ModuleId in ../src/module.lita
+Create Decl for: Module in ../src/module.lita
+Create Decl for: BUILTIN_IMPORT_TOKEN in ../src/module.lita
+Create Decl for: builtins in ../src/module.lita
+Create Decl for: BuiltinsInit in ../src/module.lita
+Create Decl for: AddBuiltin in ../src/module.lita
+Create Decl for: NewModule in ../src/module.lita
+Create Decl for: init in ../src/module.lita
+Create Decl for: getType in ../src/module.lita
+Create Decl for: importModule in ../src/module.lita
+Create Decl for: importModuleSymbols in ../src/module.lita
+Create Decl for: equals in ../src/module.lita
+Create Decl for: print in ../src/module.lita
+Create Decl for: fromFile in ../src/module.lita
+Create Decl for: GetModuleName in ../src/module.lita
+Importing: 'ast' for ../src/module.lita
+Resolving Import: ast
+Importing: 'ast_new' for ../src/module.lita
+Resolving Import: ast_new
+CreateModule ../src/ast_new.lita
+Create Decl for: NewVoidTypeSpec in ../src/ast_new.lita
+Create Decl for: NewNameTypeSpec in ../src/ast_new.lita
+Create Decl for: NewTypeSpec in ../src/ast_new.lita
+Create Decl for: NewImportDecl in ../src/ast_new.lita
+Create Decl for: NewVarDecl in ../src/ast_new.lita
+Create Decl for: NewFuncDecl in ../src/ast_new.lita
+Create Decl for: NewAggregateDecl in ../src/ast_new.lita
+Create Decl for: NewStructDecl in ../src/ast_new.lita
+Create Decl for: NewUnionDecl in ../src/ast_new.lita
+Create Decl for: NewEnumDecl in ../src/ast_new.lita
+Create Decl for: NewTypedefDecl in ../src/ast_new.lita
+Create Decl for: NewParameterDecl in ../src/ast_new.lita
+Create Decl for: NewNotesDecl in ../src/ast_new.lita
+Create Decl for: NewBuiltinDecl in ../src/ast_new.lita
+Create Decl for: NewPoisonDecl in ../src/ast_new.lita
+Create Decl for: NewTernaryExpr in ../src/ast_new.lita
+Create Decl for: NewBinaryExpr in ../src/ast_new.lita
+Create Decl for: NewUnaryExpr in ../src/ast_new.lita
+Create Decl for: NewInitExpr in ../src/ast_new.lita
+Create Decl for: NewFuncCallExpr in ../src/ast_new.lita
+Create Decl for: NewSubscriptGetExpr in ../src/ast_new.lita
+Create Decl for: NewSubscriptSetExpr in ../src/ast_new.lita
+Create Decl for: NewGetExpr in ../src/ast_new.lita
+Create Decl for: NewSetExpr in ../src/ast_new.lita
+Create Decl for: NewIdentifierExpr in ../src/ast_new.lita
+Create Decl for: NewTypeIdentifierExpr in ../src/ast_new.lita
+Create Decl for: NewCastExpr in ../src/ast_new.lita
+Create Decl for: NewArrayDesignationExpr in ../src/ast_new.lita
+Create Decl for: NewInitArgExpr in ../src/ast_new.lita
+Create Decl for: NewBooleanExpr in ../src/ast_new.lita
+Create Decl for: NewNullExpr in ../src/ast_new.lita
+Create Decl for: NewNumberExpr in ../src/ast_new.lita
+Create Decl for: NewStringExpr in ../src/ast_new.lita
+Create Decl for: NewCharExpr in ../src/ast_new.lita
+Create Decl for: NewGroupExpr in ../src/ast_new.lita
+Create Decl for: NewArrayInitExpr in ../src/ast_new.lita
+Create Decl for: NewSizeOfExpr in ../src/ast_new.lita
+Create Decl for: NewTypeOfExpr in ../src/ast_new.lita
+Create Decl for: NewOffsetOfExpr in ../src/ast_new.lita
+Create Decl for: NewPoisonExpr in ../src/ast_new.lita
+Create Decl for: NewModuleStmt in ../src/ast_new.lita
+Create Decl for: NewCompStmt in ../src/ast_new.lita
+Create Decl for: NewBlockStmt in ../src/ast_new.lita
+Create Decl for: NewIfStmt in ../src/ast_new.lita
+Create Decl for: NewWhileStmt in ../src/ast_new.lita
+Create Decl for: NewDoWhileStmt in ../src/ast_new.lita
+Create Decl for: NewForStmt in ../src/ast_new.lita
+Create Decl for: NewSwitchCaseStmt in ../src/ast_new.lita
+Create Decl for: NewSwitchStmt in ../src/ast_new.lita
+Create Decl for: NewBreakStmt in ../src/ast_new.lita
+Create Decl for: NewContinueStmt in ../src/ast_new.lita
+Create Decl for: NewReturnStmt in ../src/ast_new.lita
+Create Decl for: NewDeferStmt in ../src/ast_new.lita
+Create Decl for: NewGotoStmt in ../src/ast_new.lita
+Create Decl for: NewLabelStmt in ../src/ast_new.lita
+Create Decl for: NewNoteStmt in ../src/ast_new.lita
+Create Decl for: NewEmptyStmt in ../src/ast_new.lita
+Create Decl for: NewParametersStmt in ../src/ast_new.lita
+Create Decl for: NewVarFieldDecl in ../src/ast_new.lita
+Create Decl for: NewEnumFieldEntryDecl in ../src/ast_new.lita
+Importing: 'ast' for ../src/ast_new.lita
+Resolving Import: ast
+Importing: 'lex' for ../src/ast_new.lita
+Resolving Import: lex
+Importing: 'symbols' for ../src/ast_new.lita
+Resolving Import: symbols
+Importing: 'types' for ../src/ast_new.lita
+Resolving Import: types
+Importing: 'mem' for ../src/ast_new.lita
+Resolving Import: mem
+Importing: 'array' for ../src/ast_new.lita
+Resolving Import: array
+Importing: 'common' for ../src/ast_new.lita
+Resolving Import: common
+Importing: 'assert' for ../src/ast_new.lita
+Resolving Import: assert
+Importing: 'module' for ../src/ast_new.lita
+Resolving Import: module
+Resolving Import: ~ast_new
+../src/module.lita importing type 'NewTernaryExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewSwitchCaseStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewUnionDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewTypedefDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewSubscriptSetExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewVarDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewEnumFieldEntryDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewCompStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewNoteStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewWhileStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewSubscriptGetExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewStructDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewPoisonExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewEnumDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewFuncDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewArrayDesignationExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewEmptyStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewPoisonDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewGotoStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewSwitchStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewUnaryExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewTypeOfExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewFuncCallExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewInitExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewTypeIdentifierExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewParameterDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewModuleStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewForStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewLabelStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewParametersStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewNameTypeSpec' from ../src/ast_new.lita
+../src/module.lita importing type 'NewTypeSpec' from ../src/ast_new.lita
+../src/module.lita importing type 'NewSetExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewIdentifierExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewInitArgExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewImportDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewSizeOfExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewReturnStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewVoidTypeSpec' from ../src/ast_new.lita
+../src/module.lita importing type 'NewGetExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewStringExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewDoWhileStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewDeferStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewGroupExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewBooleanExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewCastExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewOffsetOfExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewNumberExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewArrayInitExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewContinueStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewIfStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewBinaryExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewBlockStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewVarFieldDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewNotesDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewAggregateDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewBuiltinDecl' from ../src/ast_new.lita
+../src/module.lita importing type 'NewBreakStmt' from ../src/ast_new.lita
+../src/module.lita importing type 'NewNullExpr' from ../src/ast_new.lita
+../src/module.lita importing type 'NewCharExpr' from ../src/ast_new.lita
+Importing: 'lex' for ../src/module.lita
+Resolving Import: lex
+Importing: 'array' for ../src/module.lita
+Resolving Import: array
+Importing: 'phase_result' for ../src/module.lita
+Resolving Import: phase_result
+CreateModule ../src/phase_result.lita
+Create Decl for: ErrorType in ../src/phase_result.lita
+Create Decl for: PhaseError in ../src/phase_result.lita
+Create Decl for: PhaseResult in ../src/phase_result.lita
+Create Decl for: PhaseResultInit in ../src/phase_result.lita
+Create Decl for: addError in ../src/phase_result.lita
+Create Decl for: addErrorStr in ../src/phase_result.lita
+Importing: 'lex' for ../src/phase_result.lita
+Resolving Import: lex
+Importing: 'common' for ../src/phase_result.lita
+Resolving Import: common
+Importing: 'array' for ../src/phase_result.lita
+Resolving Import: array
+Importing: 'string_buffer' for ../src/phase_result.lita
+Resolving Import: string_buffer
+Importing: 'mem' for ../src/phase_result.lita
+Resolving Import: mem
+Importing: 'libc' for ../src/phase_result.lita
+Resolving Import: libc
+Resolving Import: ~phase_result
+../src/module.lita importing type 'PhaseResult_addErrorStr' from ../src/phase_result.lita
+../src/module.lita importing type 'PhaseError' from ../src/phase_result.lita
+../src/module.lita importing type 'PhaseResult' from ../src/phase_result.lita
+../src/module.lita importing type 'ErrorType' from ../src/phase_result.lita
+../src/module.lita importing type 'PhaseResult_addError' from ../src/phase_result.lita
+../src/module.lita importing type 'PhaseResultInit' from ../src/phase_result.lita
+Importing: 'string' for ../src/module.lita
+Resolving Import: string
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: String in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: StringInit in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: format in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: append in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: substring in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: asView in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: memset in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: toLower in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: toUpper in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: copy in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: clear in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: empty in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: size in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: cStr in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Create Decl for: cStrConst in C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Importing: 'mem' for C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Resolving Import: mem
+Importing: 'io' for C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Resolving Import: io
+Importing: 'assert' for C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Resolving Import: assert
+Importing: 'string_view' for C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Resolving Import: string_view
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Resolving Import: libc
+Resolving Import: ~string
+../src/module.lita importing type 'String_append' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_memset' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'StringInit' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_copy' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_format' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_size' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_asView' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_toUpper' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_toLower' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_clear' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_cStr' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_empty' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_cStrConst' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+../src/module.lita importing type 'String_substring' from C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+Importing: 'string_view' for ../src/module.lita
+Resolving Import: string_view
+Importing: 'string_buffer' for ../src/module.lita
+Resolving Import: string_buffer
+Importing: 'system' for ../src/module.lita
+Resolving Import: system
+CreateModule ../src/system.lita
+Create Decl for: MAX_PATH in ../src/system.lita
+Create Decl for: FileStat in ../src/system.lita
+Create Decl for: LARGE_INTEGER in ../src/system.lita
+Create Decl for: time_t in ../src/system.lita
+Create Decl for: tm in ../src/system.lita
+Create Decl for: time in ../src/system.lita
+Create Decl for: localtime in ../src/system.lita
+Create Decl for: asctime in ../src/system.lita
+Create Decl for: stat in ../src/system.lita
+Create Decl for: CreateDirectoryA in ../src/system.lita
+Create Decl for: QueryPerformanceFrequency in ../src/system.lita
+Create Decl for: QueryPerformanceCounter in ../src/system.lita
+Create Decl for: systemFreq in ../src/system.lita
+Create Decl for: systemStart in ../src/system.lita
+Create Decl for: getenv in ../src/system.lita
+Create Decl for: SystemInit in ../src/system.lita
+Create Decl for: GetEnv in ../src/system.lita
+Create Decl for: FileExists in ../src/system.lita
+Create Decl for: Mkdir in ../src/system.lita
+Create Decl for: FilePath in ../src/system.lita
+Create Decl for: IsFile in ../src/system.lita
+Create Decl for: DirectoryContents in ../src/system.lita
+Create Decl for: SystemTimeMSec in ../src/system.lita
+Create Decl for: CurrentDateTime in ../src/system.lita
+Importing: 'libc' for ../src/system.lita
+Resolving Import: libc
+Resolving Import: ~system
+../src/module.lita importing type 'FileExists' from ../src/system.lita
+../src/module.lita importing type 'SystemTimeMSec' from ../src/system.lita
+../src/module.lita importing type 'FilePath' from ../src/system.lita
+../src/module.lita importing type 'DirectoryContents' from ../src/system.lita
+../src/module.lita importing type 'MAX_PATH' from ../src/system.lita
+../src/module.lita importing type 'CurrentDateTime' from ../src/system.lita
+../src/module.lita importing type 'GetEnv' from ../src/system.lita
+../src/module.lita importing type 'IsFile' from ../src/system.lita
+../src/module.lita importing type 'SystemInit' from ../src/system.lita
+../src/module.lita importing type 'Mkdir' from ../src/system.lita
+Importing: 'lita' for ../src/module.lita
+Resolving Import: lita
+CreateModule ../src/lita.lita
+Create Decl for: MAX_PREFIX_SIZE in ../src/lita.lita
+Finishing symbol: MAX_PREFIX_SIZE
+FinishSym MAX_PREFIX_SIZE ../src/lita.lita
+Create Decl for: Lita in ../src/lita.lita
+Create Decl for: MetricType in ../src/lita.lita
+Create Decl for: Metric in ../src/lita.lita
+Create Decl for: LitaOptions in ../src/lita.lita
+Create Decl for: linearAllocator in ../src/lita.lita
+Create Decl for: init in ../src/lita.lita
+Create Decl for: free in ../src/lita.lita
+Create Decl for: addModule in ../src/lita.lita
+Create Decl for: startCapture in ../src/lita.lita
+Create Decl for: endCapture in ../src/lita.lita
+Importing: 'mem' for ../src/lita.lita
+Resolving Import: mem
+Importing: 'phase_result' for ../src/lita.lita
+Resolving Import: phase_result
+Importing: 'array' for ../src/lita.lita
+Resolving Import: array
+Importing: 'map' for ../src/lita.lita
+Resolving Import: map
+Importing: 'module' for ../src/lita.lita
+Resolving Import: module
+Importing: 'string_view' for ../src/lita.lita
+Resolving Import: string_view
+Importing: 'system' for ../src/lita.lita
+Resolving Import: system
+Importing: 'symbols' for ../src/lita.lita
+Resolving Import: symbols
+Importing: 'preprocessor' for ../src/lita.lita
+Resolving Import: preprocessor
+CreateModule ../src/preprocessor.lita
+Create Decl for: Preprocessor in ../src/preprocessor.lita
+Create Decl for: PreprocessorInit in ../src/preprocessor.lita
+Create Decl for: init in ../src/preprocessor.lita
+Create Decl for: evaluateForModule in ../src/preprocessor.lita
+Create Decl for: evaluateForFunction in ../src/preprocessor.lita
+Importing: 'ast' for ../src/preprocessor.lita
+Resolving Import: ast
+Importing: 'ast_new' for ../src/preprocessor.lita
+Resolving Import: ast_new
+Importing: 'array' for ../src/preprocessor.lita
+Resolving Import: array
+Importing: 'mem' for ../src/preprocessor.lita
+Resolving Import: mem
+Importing: 'lita' for ../src/preprocessor.lita
+Resolving Import: lita
+Importing: 'libc' for ../src/preprocessor.lita
+Resolving Import: libc
+Importing: 'assert' for ../src/preprocessor.lita
+Resolving Import: assert
+Resolving Import: ~preprocessor
+../src/lita.lita importing type 'Preprocessor_init' from ../src/preprocessor.lita
+../src/lita.lita importing type 'Preprocessor_evaluateForModule' from ../src/preprocessor.lita
+../src/lita.lita importing type 'Preprocessor' from ../src/preprocessor.lita
+../src/lita.lita importing type 'Preprocessor_evaluateForFunction' from ../src/preprocessor.lita
+../src/lita.lita importing type 'PreprocessorInit' from ../src/preprocessor.lita
+Resolving Import: ~lita
+../src/module.lita importing type 'Metric' from ../src/lita.lita
+../src/module.lita importing type 'Lita_endCapture' from ../src/lita.lita
+../src/module.lita importing type 'MAX_PREFIX_SIZE' from ../src/lita.lita
+../src/module.lita importing type 'LitaOptions' from ../src/lita.lita
+../src/module.lita importing type 'Lita_startCapture' from ../src/lita.lita
+../src/module.lita importing type 'Lita_init' from ../src/lita.lita
+../src/module.lita importing type 'Lita_addModule' from ../src/lita.lita
+../src/module.lita importing type 'Lita' from ../src/lita.lita
+../src/module.lita importing type 'MetricType' from ../src/lita.lita
+../src/module.lita importing type 'Lita_free' from ../src/lita.lita
+Importing: 'libc' for ../src/module.lita
+Resolving Import: libc
+Importing: 'mem' for ../src/module.lita
+Resolving Import: mem
+Importing: 'symbols' for ../src/module.lita
+Resolving Import: symbols
+Importing: 'types' for ../src/module.lita
+Resolving Import: types
+Resolving Import: ~module
+../src/ast.lita importing type 'NewModule' from ../src/module.lita
+../src/ast.lita importing type 'Module_init' from ../src/module.lita
+../src/ast.lita importing type 'Module_getType' from ../src/module.lita
+../src/ast.lita importing type 'GetModuleName' from ../src/module.lita
+../src/ast.lita importing type 'Module_equals' from ../src/module.lita
+../src/ast.lita importing type 'ModuleId' from ../src/module.lita
+../src/ast.lita importing type 'ModuleId_fromFile' from ../src/module.lita
+../src/ast.lita importing type 'Module' from ../src/module.lita
+../src/ast.lita importing type 'BUILTIN_IMPORT_TOKEN' from ../src/module.lita
+../src/ast.lita importing type 'BuiltinsInit' from ../src/module.lita
+../src/ast.lita importing type 'ModuleFlags' from ../src/module.lita
+../src/ast.lita importing type 'Module_importModule' from ../src/module.lita
+../src/ast.lita importing type 'Module_print' from ../src/module.lita
+../src/ast.lita importing type 'builtins' from ../src/module.lita
+Importing: 'string_view' for ../src/ast.lita
+Resolving Import: string_view
+Importing: 'libc' for ../src/ast.lita
+Resolving Import: libc
+Importing: 'string' for ../src/ast.lita
+Resolving Import: string
+Resolving Import: ~ast
+../src/symbols.lita importing type 'WhileStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'SubscriptGetExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'Decl' from ../src/ast.lita
+../src/symbols.lita importing type 'NoteStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'SubscriptSetExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'TypedefDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'GenericParam' from ../src/ast.lita
+../src/symbols.lita importing type 'ModuleStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'ParameterDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'TypeIdentifierExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'SwitchStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'TypeOfExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'EmptyStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'PoisonDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'FieldStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'Stmt' from ../src/ast.lita
+../src/symbols.lita importing type 'Node_becomeParentOfChildren' from ../src/ast.lita
+../src/symbols.lita importing type 'ArrayTypeSpec' from ../src/ast.lita
+../src/symbols.lita importing type 'GroupExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'Expr_isConstExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'DeferStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'DoWhileStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'TypeSpecKind' from ../src/ast.lita
+../src/symbols.lita importing type 'FuncPtrTypeSpec' from ../src/ast.lita
+../src/symbols.lita importing type 'ReturnStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'InitArgExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'GenericDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'AggregateFlags' from ../src/ast.lita
+../src/symbols.lita importing type 'LabelStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'CharExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'Operand' from ../src/ast.lita
+../src/symbols.lita importing type 'Expr_isConstNumberExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'Attributes' from ../src/ast.lita
+../src/symbols.lita importing type 'AggregateDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'VarFieldDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'BlockStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'GetExprFlags' from ../src/ast.lita
+../src/symbols.lita importing type 'FuncBodyStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'BinaryExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'NumberExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'CastExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'IsExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'CompStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'VarDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'EnumFieldEntryDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'IsDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'Decl_getNote' from ../src/ast.lita
+../src/symbols.lita importing type 'Expr' from ../src/ast.lita
+../src/symbols.lita importing type 'SwitchCaseStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'TernaryExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'ForStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'ParametersStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'InitExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'FuncFlags' from ../src/ast.lita
+../src/symbols.lita importing type 'Node' from ../src/ast.lita
+../src/symbols.lita importing type 'FuncCallExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'GotoStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'NativeDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'UnaryExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'Node_becomeParentOf' from ../src/ast.lita
+../src/symbols.lita importing type 'ArrayDesignationExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'PtrTypeSpec' from ../src/ast.lita
+../src/symbols.lita importing type 'FuncDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'EnumDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'Expr_isIdentifier' from ../src/ast.lita
+../src/symbols.lita importing type 'ConstTypeSpec' from ../src/ast.lita
+../src/symbols.lita importing type 'PoisonExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'GetExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'StringExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'ImportDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'SizeOfExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'TypeSpec' from ../src/ast.lita
+../src/symbols.lita importing type 'IdentifierExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'SetExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'FuncDecl_getName' from ../src/ast.lita
+../src/symbols.lita importing type 'Decl_hasNote' from ../src/ast.lita
+../src/symbols.lita importing type 'NameTypeSpec' from ../src/ast.lita
+../src/symbols.lita importing type 'NullExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'BreakStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'NotesDecl' from ../src/ast.lita
+../src/symbols.lita importing type 'StmtKind' from ../src/ast.lita
+../src/symbols.lita importing type 'IfStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'Node_setSrcPos' from ../src/ast.lita
+../src/symbols.lita importing type 'ArrayInitExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'ContinueStmt' from ../src/ast.lita
+../src/symbols.lita importing type 'BooleanExpr' from ../src/ast.lita
+../src/symbols.lita importing type 'OffsetOfExpr' from ../src/ast.lita
+Importing: 'lex' for ../src/symbols.lita
+Resolving Import: lex
+Importing: 'types' for ../src/symbols.lita
+Resolving Import: types
+Importing: 'module' for ../src/symbols.lita
+Resolving Import: module
+Importing: 'lita' for ../src/symbols.lita
+Resolving Import: lita
+Importing: 'mem' for ../src/symbols.lita
+Resolving Import: mem
+Importing: 'phase_result' for ../src/symbols.lita
+Resolving Import: phase_result
+Importing: 'libc' for ../src/symbols.lita
+Resolving Import: libc
+Resolving Import: ~symbols
+../src/types.lita importing type 'SymbolKind' from ../src/symbols.lita
+../src/types.lita importing type 'Scope' from ../src/symbols.lita
+../src/types.lita importing type 'NewScope' from ../src/symbols.lita
+../src/types.lita importing type 'MAX_SYMBOL_NAME' from ../src/symbols.lita
+../src/types.lita importing type 'Scope_print' from ../src/symbols.lita
+../src/types.lita importing type 'Scope_importSymbol' from ../src/symbols.lita
+../src/types.lita importing type 'SymbolFlags' from ../src/symbols.lita
+../src/types.lita importing type 'Symbol' from ../src/symbols.lita
+../src/types.lita importing type 'ScopeKind' from ../src/symbols.lita
+../src/types.lita importing type 'Scope_init' from ../src/symbols.lita
+../src/types.lita importing type 'Scope_lookup' from ../src/symbols.lita
+../src/types.lita importing type 'Scope_lookupByToken' from ../src/symbols.lita
+../src/types.lita importing type 'SymbolState' from ../src/symbols.lita
+../src/types.lita importing type 'Scope_addSymbol' from ../src/symbols.lita
+../src/types.lita importing type 'ProgramSymbols' from ../src/symbols.lita
+Importing: 'ast' for ../src/types.lita
+Resolving Import: ast
+Importing: 'lex' for ../src/types.lita
+Resolving Import: lex
+Importing: 'array' for ../src/types.lita
+Resolving Import: array
+Importing: 'assert' for ../src/types.lita
+Resolving Import: assert
+Importing: 'mem' for ../src/types.lita
+Resolving Import: mem
+Importing: 'ast_new' for ../src/types.lita
+Resolving Import: ast_new
+Importing: 'libc' for ../src/types.lita
+Resolving Import: libc
+Resolving Import: ~types
+../src/lex.lita importing type 'F32_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'IsBooleanable' from ../src/types.lita
+../src/lex.lita importing type 'ConstTypeInfo' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_isAssignable' from ../src/types.lita
+../src/lex.lita importing type 'IsPrimitive' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_canCastTo' from ../src/types.lita
+../src/lex.lita importing type 'MAX_FIELD_PATH' from ../src/types.lita
+../src/lex.lita importing type 'IsPtr' from ../src/types.lita
+../src/lex.lita importing type 'IsFuncLike' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_getTypeOf' from ../src/types.lita
+../src/lex.lita importing type 'I16_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'USIZE_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'TypeKind' from ../src/types.lita
+../src/lex.lita importing type 'IsAggregateLike' from ../src/types.lita
+../src/lex.lita importing type 'U32_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'IsInteger' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo_getField' from ../src/types.lita
+../src/lex.lita importing type 'IsFieldAccessible' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo_getFieldByPosition' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo_getFieldWithUsing' from ../src/types.lita
+../src/lex.lita importing type 'CHAR_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'PtrTypeInfo' from ../src/types.lita
+../src/lex.lita importing type 'F64_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'IsPtrAggregate' from ../src/types.lita
+../src/lex.lita importing type 'BOOL_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo' from ../src/types.lita
+../src/lex.lita importing type 'VOID_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo_getFieldPathByType' from ../src/types.lita
+../src/lex.lita importing type 'NULL_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'IsPtrLike' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo' from ../src/types.lita
+../src/lex.lita importing type 'U64_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'IsAggregate' from ../src/types.lita
+../src/lex.lita importing type 'EnumTypeInfo' from ../src/types.lita
+../src/lex.lita importing type 'Typeid' from ../src/types.lita
+../src/lex.lita importing type 'NextTypeId' from ../src/types.lita
+../src/lex.lita importing type 'IsPtrOf' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_isDeclarable' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_asTypeSpec' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo_getBaseName' from ../src/types.lita
+../src/lex.lita importing type 'ArrayTypeInfo' from ../src/types.lita
+../src/lex.lita importing type 'EnumTypeInfo_getField' from ../src/types.lita
+../src/lex.lita importing type 'I32_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'U16_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_getBaseType' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_strictEquals' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo_getFieldByType' from ../src/types.lita
+../src/lex.lita importing type 'TypeInfo_toString' from ../src/types.lita
+../src/lex.lita importing type 'FuncTypeInfo' from ../src/types.lita
+../src/lex.lita importing type 'U8_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'I8_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'AggregateTypeInfo_getFieldPath' from ../src/types.lita
+../src/lex.lita importing type 'I64_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'FieldPath' from ../src/types.lita
+../src/lex.lita importing type 'TypeKindFromString' from ../src/types.lita
+../src/lex.lita importing type 'IsNumberLike' from ../src/types.lita
+../src/lex.lita importing type 'STR_TYPE' from ../src/types.lita
+../src/lex.lita importing type 'FuncPtrTypeInfo' from ../src/types.lita
+Resolving Import: ~lex
+../src/main.lita importing type 'SrcPos' from ../src/lex.lita
+../src/main.lita importing type 'SrcPos_getLineLength' from ../src/lex.lita
+../src/main.lita importing type 'Lexer_eof' from ../src/lex.lita
+../src/main.lita importing type 'Lexer_nextToken' from ../src/lex.lita
+../src/main.lita importing type 'tokenText' from ../src/lex.lita
+../src/main.lita importing type 'Token_nameEquals' from ../src/lex.lita
+../src/main.lita importing type 'Token' from ../src/lex.lita
+../src/main.lita importing type 'Mod' from ../src/lex.lita
+../src/main.lita importing type 'LexerInit' from ../src/lex.lita
+../src/main.lita importing type 'TokenType' from ../src/lex.lita
+../src/main.lita importing type 'Value' from ../src/lex.lita
+../src/main.lita importing type 'Token_asString' from ../src/lex.lita
+../src/main.lita importing type 'Lexer' from ../src/lex.lita
+../src/main.lita importing type 'Token_print' from ../src/lex.lita
+../src/main.lita importing type 'Lexer_hasError' from ../src/lex.lita
+Importing: 'lita' for ../src/main.lita
+Resolving Import: lita
+Importing: 'types' for ../src/main.lita
+Resolving Import: types
+Importing: 'ast' for ../src/main.lita
+Resolving Import: ast
+Importing: 'ast_new' for ../src/main.lita
+Resolving Import: ast_new
+Importing: 'ast_print' for ../src/main.lita
+Resolving Import: ast_print
+CreateModule ../src/ast_print.lita
+Create Decl for: PrintTypeSpec in ../src/ast_print.lita
+Create Decl for: PrintName in ../src/ast_print.lita
+Create Decl for: Printf in ../src/ast_print.lita
+Create Decl for: PrintStmt in ../src/ast_print.lita
+Importing: 'libc' for ../src/ast_print.lita
+Resolving Import: libc
+Importing: 'ast' for ../src/ast_print.lita
+Resolving Import: ast
+Importing: 'lex' for ../src/ast_print.lita
+Resolving Import: lex
+Importing: 'array' for ../src/ast_print.lita
+Resolving Import: array
+Importing: 'common' for ../src/ast_print.lita
+Resolving Import: common
+Resolving Import: ~ast_print
+../src/main.lita importing type 'PrintName' from ../src/ast_print.lita
+../src/main.lita importing type 'PrintTypeSpec' from ../src/ast_print.lita
+../src/main.lita importing type 'PrintStmt' from ../src/ast_print.lita
+Importing: 'parser' for ../src/main.lita
+Resolving Import: parser
+CreateModule ../src/parser.lita
+Create Decl for: DECL_ADJUST_TOKENS_COUNT in ../src/parser.lita
+Finishing symbol: DECL_ADJUST_TOKENS_COUNT
+FinishSym DECL_ADJUST_TOKENS_COUNT ../src/parser.lita
+Create Decl for: DECL_ADJUST_TOKENS in ../src/parser.lita
+Create Decl for: STMT_ADJUST_TOKENS in ../src/parser.lita
+Create Decl for: Parser in ../src/parser.lita
+Create Decl for: ParserInit in ../src/parser.lita
+Create Decl for: parseModule in ../src/parser.lita
+Create Decl for: parseModuleDeclaration in ../src/parser.lita
+Create Decl for: parseCompileTimeBody in ../src/parser.lita
+Create Decl for: importDeclaration in ../src/parser.lita
+Create Decl for: notes in ../src/parser.lita
+Create Decl for: varDeclaration in ../src/parser.lita
+Create Decl for: constDeclaration in ../src/parser.lita
+Create Decl for: funcDeclaration in ../src/parser.lita
+Create Decl for: structDeclaration in ../src/parser.lita
+Create Decl for: unionDeclaration in ../src/parser.lita
+Create Decl for: aggregateDeclaration in ../src/parser.lita
+Create Decl for: enumDeclaration in ../src/parser.lita
+Create Decl for: typedefDeclaration in ../src/parser.lita
+Create Decl for: paramDeclaration in ../src/parser.lita
+Create Decl for: expression in ../src/parser.lita
+Create Decl for: constExpression in ../src/parser.lita
+Create Decl for: group in ../src/parser.lita
+Create Decl for: arrayInit in ../src/parser.lita
+Create Decl for: aggregateInit in ../src/parser.lita
+Create Decl for: sizeOf in ../src/parser.lita
+Create Decl for: typeOf in ../src/parser.lita
+Create Decl for: offsetOf in ../src/parser.lita
+Create Decl for: assignment in ../src/parser.lita
+Create Decl for: ternary in ../src/parser.lita
+Create Decl for: or in ../src/parser.lita
+Create Decl for: and in ../src/parser.lita
+Create Decl for: bitOr in ../src/parser.lita
+Create Decl for: bitXor in ../src/parser.lita
+Create Decl for: bitAnd in ../src/parser.lita
+Create Decl for: equality in ../src/parser.lita
+Create Decl for: comparison in ../src/parser.lita
+Create Decl for: bitShift in ../src/parser.lita
+Create Decl for: term in ../src/parser.lita
+Create Decl for: factor in ../src/parser.lita
+Create Decl for: unary in ../src/parser.lita
+Create Decl for: functionCall in ../src/parser.lita
+Create Decl for: primary in ../src/parser.lita
+Create Decl for: finishFunctionCall in ../src/parser.lita
+Create Decl for: cast in ../src/parser.lita
+Create Decl for: statement in ../src/parser.lita
+Create Decl for: tryStatement in ../src/parser.lita
+Create Decl for: compStatement in ../src/parser.lita
+Create Decl for: blockStatement in ../src/parser.lita
+Create Decl for: ifStatement in ../src/parser.lita
+Create Decl for: whileStatement in ../src/parser.lita
+Create Decl for: doWhileStatement in ../src/parser.lita
+Create Decl for: forStatement in ../src/parser.lita
+Create Decl for: switchCaseStatement in ../src/parser.lita
+Create Decl for: switchDefaultStatement in ../src/parser.lita
+Create Decl for: switchStatement in ../src/parser.lita
+Create Decl for: breakStatement in ../src/parser.lita
+Create Decl for: continueStatement in ../src/parser.lita
+Create Decl for: returnStatement in ../src/parser.lita
+Create Decl for: deferStatement in ../src/parser.lita
+Create Decl for: gotoStatement in ../src/parser.lita
+Create Decl for: tryLabelStatement in ../src/parser.lita
+Create Decl for: type in ../src/parser.lita
+Create Decl for: identifierType in ../src/parser.lita
+Create Decl for: arrayType in ../src/parser.lita
+Create Decl for: funcPtrType in ../src/parser.lita
+Create Decl for: parametersStatement in ../src/parser.lita
+Create Decl for: structArguments in ../src/parser.lita
+Create Decl for: arguments in ../src/parser.lita
+Create Decl for: genericParameters in ../src/parser.lita
+Create Decl for: genericArguments in ../src/parser.lita
+Create Decl for: tryGenericArguments in ../src/parser.lita
+Create Decl for: arrayArguments in ../src/parser.lita
+Create Decl for: tryArrayDesignationExpr in ../src/parser.lita
+Create Decl for: fieldStatement in ../src/parser.lita
+Create Decl for: enumFieldEntryDecl in ../src/parser.lita
+Create Decl for: rewindTo in ../src/parser.lita
+Create Decl for: tryBitShiftRight in ../src/parser.lita
+Create Decl for: eatSemicolon in ../src/parser.lita
+Create Decl for: identifier in ../src/parser.lita
+Create Decl for: checkConstExpr in ../src/parser.lita
+Create Decl for: poisonStatement in ../src/parser.lita
+Create Decl for: poisonExpr in ../src/parser.lita
+Create Decl for: poisonDecl in ../src/parser.lita
+Create Decl for: pos in ../src/parser.lita
+Create Decl for: prevPos in ../src/parser.lita
+Create Decl for: peek in ../src/parser.lita
+Create Decl for: rewind in ../src/parser.lita
+Create Decl for: previous in ../src/parser.lita
+Create Decl for: atEnd in ../src/parser.lita
+Create Decl for: advance in ../src/parser.lita
+Create Decl for: check in ../src/parser.lita
+Create Decl for: match in ../src/parser.lita
+Create Decl for: matches in ../src/parser.lita
+Create Decl for: consume in ../src/parser.lita
+Create Decl for: adjust in ../src/parser.lita
+Create Decl for: errorAtToken in ../src/parser.lita
+Create Decl for: errorAtPos in ../src/parser.lita
+Create Decl for: errorUnexpectedToken in ../src/parser.lita
+Create Decl for: numOfErrors in ../src/parser.lita
+Importing: 'ast' for ../src/parser.lita
+Resolving Import: ast
+Importing: 'ast_new' for ../src/parser.lita
+Resolving Import: ast_new
+Importing: 'ast_copy' for ../src/parser.lita
+Resolving Import: ast_copy
+CreateModule ../src/ast_copy.lita
+Create Decl for: NewTokenName in ../src/ast_copy.lita
+Create Decl for: CopyTypeSpecs in ../src/ast_copy.lita
+Create Decl for: CopyTypeSpec in ../src/ast_copy.lita
+Create Decl for: CopyDecl in ../src/ast_copy.lita
+Create Decl for: CopyExpr in ../src/ast_copy.lita
+Create Decl for: CopyStmt in ../src/ast_copy.lita
+Create Decl for: CopyAggregateDecl in ../src/ast_copy.lita
+Create Decl for: CopyFuncDecl in ../src/ast_copy.lita
+Create Decl for: CopyParameters in ../src/ast_copy.lita
+Create Decl for: CopyTypedefDecl in ../src/ast_copy.lita
+Importing: 'ast' for ../src/ast_copy.lita
+Resolving Import: ast
+Importing: 'ast_new' for ../src/ast_copy.lita
+Resolving Import: ast_new
+Importing: 'lex' for ../src/ast_copy.lita
+Resolving Import: lex
+Importing: 'symbols' for ../src/ast_copy.lita
+Resolving Import: symbols
+Importing: 'types' for ../src/ast_copy.lita
+Resolving Import: types
+Importing: 'mem' for ../src/ast_copy.lita
+Resolving Import: mem
+Importing: 'array' for ../src/ast_copy.lita
+Resolving Import: array
+Importing: 'common' for ../src/ast_copy.lita
+Resolving Import: common
+Importing: 'assert' for ../src/ast_copy.lita
+Resolving Import: assert
+Importing: 'libc' for ../src/ast_copy.lita
+Resolving Import: libc
+Resolving Import: ~ast_copy
+../src/parser.lita importing type 'NewTokenName' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyTypeSpecs' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyAggregateDecl' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyFuncDecl' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyDecl' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyTypedefDecl' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyParameters' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyTypeSpec' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyStmt' from ../src/ast_copy.lita
+../src/parser.lita importing type 'CopyExpr' from ../src/ast_copy.lita
+Importing: 'lex' for ../src/parser.lita
+Resolving Import: lex
+Importing: 'symbols' for ../src/parser.lita
+Resolving Import: symbols
+Importing: 'types' for ../src/parser.lita
+Resolving Import: types
+Importing: 'mem' for ../src/parser.lita
+Resolving Import: mem
+Importing: 'array' for ../src/parser.lita
+Resolving Import: array
+Importing: 'phase_result' for ../src/parser.lita
+Resolving Import: phase_result
+Importing: 'error_codes' for ../src/parser.lita
+Resolving Import: error_codes
+CreateModule ../src/error_codes.lita
+Create Decl for: ErrorCode in ../src/error_codes.lita
+Create Decl for: errorCodeText in ../src/error_codes.lita
+Create Decl for: PrintError in ../src/error_codes.lita
+Importing: 'phase_result' for ../src/error_codes.lita
+Resolving Import: phase_result
+Importing: 'libc' for ../src/error_codes.lita
+Resolving Import: libc
+Resolving Import: ~error_codes
+../src/parser.lita importing type 'ErrorCode' from ../src/error_codes.lita
+../src/parser.lita importing type 'PrintError' from ../src/error_codes.lita
+../src/parser.lita importing type 'errorCodeText' from ../src/error_codes.lita
+Importing: 'lita' for ../src/parser.lita
+Resolving Import: lita
+Importing: 'common' for ../src/parser.lita
+Resolving Import: common
+Importing: 'libc' for ../src/parser.lita
+Resolving Import: libc
+Importing: 'assert' for ../src/parser.lita
+Resolving Import: assert
+Importing: 'module' for ../src/parser.lita
+Resolving Import: module
+Importing: 'string_buffer' for ../src/parser.lita
+Resolving Import: string_buffer
+Importing: 'string' for ../src/parser.lita
+Resolving Import: string
+Importing: 'ast_print' for ../src/parser.lita
+Resolving Import: ast_print
+Resolving Import: ~parser
+../src/main.lita importing type 'Parser' from ../src/parser.lita
+../src/main.lita importing type 'ParserInit' from ../src/parser.lita
+../src/main.lita importing type 'Parser_parseModule' from ../src/parser.lita
+Importing: 'phase_result' for ../src/main.lita
+Resolving Import: phase_result
+Importing: 'system' for ../src/main.lita
+Resolving Import: system
+Importing: 'array' for ../src/main.lita
+Resolving Import: array
+Importing: 'map' for ../src/main.lita
+Resolving Import: map
+Importing: 'error_codes' for ../src/main.lita
+Resolving Import: error_codes
+Importing: 'module' for ../src/main.lita
+Resolving Import: module
+Importing: 'string' for ../src/main.lita
+Resolving Import: string
+Importing: 'string_view' for ../src/main.lita
+Resolving Import: string_view
+Importing: 'string_buffer' for ../src/main.lita
+Resolving Import: string_buffer
+Importing: 'checker' for ../src/main.lita
+Resolving Import: checker
+CreateModule ../src/checker.lita
+Create Decl for: MAX_LABELS in ../src/checker.lita
+Finishing symbol: MAX_LABELS
+FinishSym MAX_LABELS ../src/checker.lita
+Create Decl for: MAX_LABEL_NAME in ../src/checker.lita
+Finishing symbol: MAX_LABEL_NAME
+FinishSym MAX_LABEL_NAME ../src/checker.lita
+Create Decl for: LabelInfo in ../src/checker.lita
+Create Decl for: TypeChecker in ../src/checker.lita
+Create Decl for: init in ../src/checker.lita
+Create Decl for: typeCheck in ../src/checker.lita
+Create Decl for: checkCastability in ../src/checker.lita
+Create Decl for: checkAssignability in ../src/checker.lita
+Create Decl for: checkDeclarability in ../src/checker.lita
+Create Decl for: checkTypeCompatibility in ../src/checker.lita
+Create Decl for: createModuleSymbols in ../src/checker.lita
+Create Decl for: enterModule in ../src/checker.lita
+Create Decl for: leaveModule in ../src/checker.lita
+Create Decl for: currentScope in ../src/checker.lita
+Create Decl for: pushScope in ../src/checker.lita
+Create Decl for: popScope in ../src/checker.lita
+Create Decl for: isGenericParamType in ../src/checker.lita
+Create Decl for: createDeclSymbol in ../src/checker.lita
+Create Decl for: createImportSymbols in ../src/checker.lita
+Create Decl for: resolveSymbols in ../src/checker.lita
+Create Decl for: resolveSymbol in ../src/checker.lita
+Create Decl for: finishResolveSymbol in ../src/checker.lita
+Create Decl for: getType in ../src/checker.lita
+Create Decl for: resolveTypeSpec in ../src/checker.lita
+Create Decl for: addSymbol in ../src/checker.lita
+Create Decl for: addTypeToScope in ../src/checker.lita
+Create Decl for: resolveStmt in ../src/checker.lita
+Importing: 'types' for ../src/checker.lita
+Resolving Import: types
+Importing: 'types_new' for ../src/checker.lita
+Resolving Import: types_new
+CreateModule ../src/types_new.lita
+Create Decl for: NewGenericParamTypeInfo in ../src/types_new.lita
+Create Decl for: NewFuncTypeInfo in ../src/types_new.lita
+Create Decl for: NewArrayTypeInfo in ../src/types_new.lita
+Create Decl for: NewFuncPtrTypeInfo in ../src/types_new.lita
+Create Decl for: NewAggregateTypeInfo in ../src/types_new.lita
+Create Decl for: NewEnumTypeInfo in ../src/types_new.lita
+Create Decl for: NewForeignTypeInfo in ../src/types_new.lita
+Create Decl for: NewConstTypeInfo in ../src/types_new.lita
+Create Decl for: NewPtrTypeInfo in ../src/types_new.lita
+Create Decl for: asPtr in ../src/types_new.lita
+Create Decl for: TypeDecay in ../src/types_new.lita
+Importing: 'mem' for ../src/types_new.lita
+Resolving Import: mem
+Importing: 'types' for ../src/types_new.lita
+Resolving Import: types
+Importing: 'symbols' for ../src/types_new.lita
+Resolving Import: symbols
+Importing: 'array' for ../src/types_new.lita
+Resolving Import: array
+Importing: 'ast' for ../src/types_new.lita
+Resolving Import: ast
+Resolving Import: ~types_new
+../src/checker.lita importing type 'NewFuncPtrTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'TypeDecay' from ../src/types_new.lita
+../src/checker.lita importing type 'NewConstTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'NewAggregateTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'NewGenericParamTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'NewFuncTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'NewForeignTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'NewArrayTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'FuncTypeInfo_asPtr' from ../src/types_new.lita
+../src/checker.lita importing type 'NewPtrTypeInfo' from ../src/types_new.lita
+../src/checker.lita importing type 'NewEnumTypeInfo' from ../src/types_new.lita
+Importing: 'symbols' for ../src/checker.lita
+Resolving Import: symbols
+Importing: 'phase_result' for ../src/checker.lita
+Resolving Import: phase_result
+Importing: 'module' for ../src/checker.lita
+Resolving Import: module
+Importing: 'ast' for ../src/checker.lita
+Resolving Import: ast
+Importing: 'ast_new' for ../src/checker.lita
+Resolving Import: ast_new
+Importing: 'lex' for ../src/checker.lita
+Resolving Import: lex
+Importing: 'lita' for ../src/checker.lita
+Resolving Import: lita
+Importing: 'map' for ../src/checker.lita
+Resolving Import: map
+Importing: 'string_buffer' for ../src/checker.lita
+Resolving Import: string_buffer
+Importing: 'string_view' for ../src/checker.lita
+Resolving Import: string_view
+Importing: 'array' for ../src/checker.lita
+Resolving Import: array
+Importing: 'assert' for ../src/checker.lita
+Resolving Import: assert
+Importing: 'string' for ../src/checker.lita
+Resolving Import: string
+Importing: 'ast_print' for ../src/checker.lita
+Resolving Import: ast_print
+Importing: 'libc' for ../src/checker.lita
+Resolving Import: libc
+Importing: 'generics' for ../src/checker.lita
+Resolving Import: generics
+CreateModule ../src/generics.lita
+Create Decl for: MAX_GENERIC_NAME in ../src/generics.lita
+Finishing symbol: MAX_GENERIC_NAME
+FinishSym MAX_GENERIC_NAME ../src/generics.lita
+Create Decl for: GetGenericName in ../src/generics.lita
+Create Decl for: CreateTypeFromGenericTemplate in ../src/generics.lita
+Create Decl for: CreateAggregateDecl in ../src/generics.lita
+Create Decl for: CreateFuncDecl in ../src/generics.lita
+Create Decl for: CreateTypedefDecl in ../src/generics.lita
+Create Decl for: Template in ../src/generics.lita
+Create Decl for: replaceTypeSpec in ../src/generics.lita
+Create Decl for: ReplaceTypes in ../src/generics.lita
+Importing: 'symbols' for ../src/generics.lita
+Resolving Import: symbols
+Importing: 'ast' for ../src/generics.lita
+Resolving Import: ast
+Importing: 'ast_copy' for ../src/generics.lita
+Resolving Import: ast_copy
+Importing: 'types' for ../src/generics.lita
+Resolving Import: types
+Importing: 'map' for ../src/generics.lita
+Resolving Import: map
+Importing: 'array' for ../src/generics.lita
+Resolving Import: array
+Importing: 'lita' for ../src/generics.lita
+Resolving Import: lita
+Importing: 'string' for ../src/generics.lita
+Resolving Import: string
+Importing: 'libc' for ../src/generics.lita
+Resolving Import: libc
+Importing: 'assert' for ../src/generics.lita
+Resolving Import: assert
+Importing: 'mem' for ../src/generics.lita
+Resolving Import: mem
+Importing: 'module' for ../src/generics.lita
+Resolving Import: module
+Importing: 'checker' for ../src/generics.lita
+Resolving Import: checker
+Resolving Import: ~generics
+../src/checker.lita importing type 'MAX_GENERIC_NAME' from ../src/generics.lita
+../src/checker.lita importing type 'CreateTypeFromGenericTemplate' from ../src/generics.lita
+Importing: 'checker_decl' for ../src/checker.lita
+Resolving Import: checker_decl
+CreateModule ../src/checker_decl.lita
+Create Decl for: resolveDecl in ../src/checker_decl.lita
+Create Decl for: resolveValueDecl in ../src/checker_decl.lita
+Create Decl for: checkAnonAggregateFieldDuplicate in ../src/checker_decl.lita
+Create Decl for: errorUsingMember in ../src/checker_decl.lita
+Create Decl for: errorUsingParameter in ../src/checker_decl.lita
+Create Decl for: errorDuplicateMember in ../src/checker_decl.lita
+Create Decl for: checkAggregateFieldDuplicate in ../src/checker_decl.lita
+Create Decl for: resolveAggregateDecl in ../src/checker_decl.lita
+Create Decl for: checkEnumFieldDuplicate in ../src/checker_decl.lita
+Create Decl for: resolveEnumDecl in ../src/checker_decl.lita
+Create Decl for: checkLabels in ../src/checker_decl.lita
+Create Decl for: resolveFuncDecl in ../src/checker_decl.lita
+Create Decl for: resolveParamDecl in ../src/checker_decl.lita
+Create Decl for: resolveTypedefDecl in ../src/checker_decl.lita
+Importing: 'types' for ../src/checker_decl.lita
+Resolving Import: types
+Importing: 'types_new' for ../src/checker_decl.lita
+Resolving Import: types_new
+Importing: 'symbols' for ../src/checker_decl.lita
+Resolving Import: symbols
+Importing: 'phase_result' for ../src/checker_decl.lita
+Resolving Import: phase_result
+Importing: 'module' for ../src/checker_decl.lita
+Resolving Import: module
+Importing: 'ast' for ../src/checker_decl.lita
+Resolving Import: ast
+Importing: 'lex' for ../src/checker_decl.lita
+Resolving Import: lex
+Importing: 'lita' for ../src/checker_decl.lita
+Resolving Import: lita
+Importing: 'map' for ../src/checker_decl.lita
+Resolving Import: map
+Importing: 'string_buffer' for ../src/checker_decl.lita
+Resolving Import: string_buffer
+Importing: 'array' for ../src/checker_decl.lita
+Resolving Import: array
+Importing: 'string_view' for ../src/checker_decl.lita
+Resolving Import: string_view
+Importing: 'assert' for ../src/checker_decl.lita
+Resolving Import: assert
+Importing: 'ast_print' for ../src/checker_decl.lita
+Resolving Import: ast_print
+Importing: 'libc' for ../src/checker_decl.lita
+Resolving Import: libc
+Importing: 'checker' for ../src/checker_decl.lita
+Resolving Import: checker
+Importing: 'checker_expr' for ../src/checker_decl.lita
+Resolving Import: checker_expr
+CreateModule ../src/checker_expr.lita
+Create Decl for: resolveConstExpr in ../src/checker_expr.lita
+Create Decl for: resolveExpr in ../src/checker_expr.lita
+Create Decl for: resolveFuncIdentifierExpr in ../src/checker_expr.lita
+Create Decl for: isMethodSyntax in ../src/checker_expr.lita
+Create Decl for: coerceTypeWithUsing in ../src/checker_expr.lita
+Create Decl for: coerceFuncArgs in ../src/checker_expr.lita
+Create Decl for: checkNumberOfArgs in ../src/checker_expr.lita
+Create Decl for: inferredType in ../src/checker_expr.lita
+Create Decl for: inferFuncCallExpr in ../src/checker_expr.lita
+Create Decl for: resolveFuncCallExpr in ../src/checker_expr.lita
+Create Decl for: resolveBooleanExpr in ../src/checker_expr.lita
+Create Decl for: resolveCharExpr in ../src/checker_expr.lita
+Create Decl for: resolveNullExpr in ../src/checker_expr.lita
+Create Decl for: resolveNumberExpr in ../src/checker_expr.lita
+Create Decl for: resolveStringExpr in ../src/checker_expr.lita
+Create Decl for: resolveSubscriptSetExpr in ../src/checker_expr.lita
+Create Decl for: resolveSubscriptGetExpr in ../src/checker_expr.lita
+Create Decl for: resolveInitArgExpr in ../src/checker_expr.lita
+Create Decl for: addDefaultArguments in ../src/checker_expr.lita
+Create Decl for: checkInitArguments in ../src/checker_expr.lita
+Create Decl for: resolveInitExpr in ../src/checker_expr.lita
+Create Decl for: resolveSetExpr in ../src/checker_expr.lita
+Create Decl for: resolveTernaryExpr in ../src/checker_expr.lita
+Create Decl for: resolveTypeIdentifierExpr in ../src/checker_expr.lita
+Create Decl for: resolveTypeOfExpr in ../src/checker_expr.lita
+Create Decl for: resolveOffsetOfExpr in ../src/checker_expr.lita
+Create Decl for: resolveSizeOfExpr in ../src/checker_expr.lita
+Create Decl for: checkMethodExpr in ../src/checker_expr.lita
+Create Decl for: resolveGetExpr in ../src/checker_expr.lita
+Create Decl for: resolveGroupExpr in ../src/checker_expr.lita
+Create Decl for: resolveUnaryExpr in ../src/checker_expr.lita
+Create Decl for: resolveCastExpr in ../src/checker_expr.lita
+Create Decl for: resolveArrayDesignationExpr in ../src/checker_expr.lita
+Create Decl for: resolveArrayInitExpr in ../src/checker_expr.lita
+Create Decl for: resolveBinaryExpr in ../src/checker_expr.lita
+Create Decl for: errorNonIndexableType in ../src/checker_expr.lita
+Create Decl for: errorSetIndexingConstType in ../src/checker_expr.lita
+Create Decl for: errorIndexType in ../src/checker_expr.lita
+Create Decl for: errorNonAggregateType in ../src/checker_expr.lita
+Create Decl for: errorNonFuncType in ../src/checker_expr.lita
+Create Decl for: errorOperand in ../src/checker_expr.lita
+Create Decl for: errorEnumFieldSet in ../src/checker_expr.lita
+Create Decl for: errorNoField in ../src/checker_expr.lita
+Create Decl for: errorNoFieldAt in ../src/checker_expr.lita
+Create Decl for: errorNoFieldAccess in ../src/checker_expr.lita
+Create Decl for: errorInferGenericParameter in ../src/checker_expr.lita
+Create Decl for: errorMissingGenericArguments in ../src/checker_expr.lita
+Create Decl for: checkConstant in ../src/checker_expr.lita
+Create Decl for: checkTruthyness in ../src/checker_expr.lita
+Create Decl for: checkRightValue in ../src/checker_expr.lita
+Create Decl for: resolveIdentiferExpr in ../src/checker_expr.lita
+Importing: 'types' for ../src/checker_expr.lita
+Resolving Import: types
+Importing: 'types_new' for ../src/checker_expr.lita
+Resolving Import: types_new
+Importing: 'symbols' for ../src/checker_expr.lita
+Resolving Import: symbols
+Importing: 'phase_result' for ../src/checker_expr.lita
+Resolving Import: phase_result
+Importing: 'module' for ../src/checker_expr.lita
+Resolving Import: module
+Importing: 'ast' for ../src/checker_expr.lita
+Resolving Import: ast
+Importing: 'ast_new' for ../src/checker_expr.lita
+Resolving Import: ast_new
+Importing: 'lex' for ../src/checker_expr.lita
+Resolving Import: lex
+Importing: 'lita' for ../src/checker_expr.lita
+Resolving Import: lita
+Importing: 'map' for ../src/checker_expr.lita
+Resolving Import: map
+Importing: 'string_buffer' for ../src/checker_expr.lita
+Resolving Import: string_buffer
+Importing: 'string_view' for ../src/checker_expr.lita
+Resolving Import: string_view
+Importing: 'string' for ../src/checker_expr.lita
+Resolving Import: string
+Importing: 'array' for ../src/checker_expr.lita
+Resolving Import: array
+Importing: 'checker' for ../src/checker_expr.lita
+Resolving Import: checker
+Importing: 'assert' for ../src/checker_expr.lita
+Resolving Import: assert
+Importing: 'ast_print' for ../src/checker_expr.lita
+Resolving Import: ast_print
+Importing: 'libc' for ../src/checker_expr.lita
+Resolving Import: libc
+Importing: 'error_codes' for ../src/checker_expr.lita
+Resolving Import: error_codes
+Resolving Import: ~checker_expr
+../src/checker_decl.lita importing type 'TypeChecker_coerceTypeWithUsing' from ../src/checker_expr.lita
+../src/checker_decl.lita importing type 'TypeChecker_resolveConstExpr' from ../src/checker_expr.lita
+../src/checker_decl.lita importing type 'TypeChecker_resolveExpr' from ../src/checker_expr.lita
+Resolving Import: ~checker_decl
+../src/checker.lita importing type 'TypeChecker_resolveDecl' from ../src/checker_decl.lita
+../src/checker.lita importing type 'TypeChecker_resolveTypedefDecl' from ../src/checker_decl.lita
+../src/checker.lita importing type 'TypeChecker_resolveValueDecl' from ../src/checker_decl.lita
+../src/checker.lita importing type 'TypeChecker_resolveParamDecl' from ../src/checker_decl.lita
+../src/checker.lita importing type 'TypeChecker_resolveAggregateDecl' from ../src/checker_decl.lita
+../src/checker.lita importing type 'TypeChecker_resolveFuncDecl' from ../src/checker_decl.lita
+../src/checker.lita importing type 'TypeChecker_resolveEnumDecl' from ../src/checker_decl.lita
+Importing: 'checker_expr' for ../src/checker.lita
+Resolving Import: checker_expr
+Resolving Import: ~checker
+../src/main.lita importing type 'TypeChecker_init' from ../src/checker.lita
+../src/main.lita importing type 'TypeChecker_typeCheck' from ../src/checker.lita
+../src/main.lita importing type 'TypeChecker' from ../src/checker.lita
+Importing: 'cgen' for ../src/main.lita
+Resolving Import: cgen
+CreateModule ../src/cgen.lita
+Create Decl for: CGen in ../src/cgen.lita
+Create Decl for: CGenScope in ../src/cgen.lita
+Create Decl for: escapeStrings in ../src/cgen.lita
+Create Decl for: escapeChars in ../src/cgen.lita
+Create Decl for: init in ../src/cgen.lita
+Create Decl for: emitProgram in ../src/cgen.lita
+Create Decl for: emitMain in ../src/cgen.lita
+Create Decl for: emitForward in ../src/cgen.lita
+Create Decl for: emitPrimitiveConstDecls in ../src/cgen.lita
+Create Decl for: emitModuleNotes in ../src/cgen.lita
+Create Decl for: emitForwardDecls in ../src/cgen.lita
+Create Decl for: emitTypeForwardDecl in ../src/cgen.lita
+Create Decl for: escapeNameStr in ../src/cgen.lita
+Create Decl for: escapeName in ../src/cgen.lita
+Create Decl for: baseTypeName in ../src/cgen.lita
+Create Decl for: pushScope in ../src/cgen.lita
+Create Decl for: popScope in ../src/cgen.lita
+Create Decl for: popLoopScope in ../src/cgen.lita
+Create Decl for: leaveScope in ../src/cgen.lita
+Create Decl for: hasPendingDefers in ../src/cgen.lita
+Create Decl for: emitDefers in ../src/cgen.lita
+Create Decl for: emitLineInfo in ../src/cgen.lita
+Create Decl for: cType in ../src/cgen.lita
+Create Decl for: cTypeDecl in ../src/cgen.lita
+Create Decl for: cName in ../src/cgen.lita
+Create Decl for: cTypeName in ../src/cgen.lita
+Create Decl for: prefix in ../src/cgen.lita
+Create Decl for: emitTypeSpec in ../src/cgen.lita
+Create Decl for: emitName in ../src/cgen.lita
+Create Decl for: emitln in ../src/cgen.lita
+Create Decl for: emit in ../src/cgen.lita
+Create Decl for: emitNotes in ../src/cgen.lita
+Create Decl for: emitPreludeNote in ../src/cgen.lita
+Create Decl for: emitPostludeNote in ../src/cgen.lita
+Create Decl for: emitSymbol in ../src/cgen.lita
+Create Decl for: emitStmt in ../src/cgen.lita
+Importing: 'ast' for ../src/cgen.lita
+Resolving Import: ast
+Importing: 'string_buffer' for ../src/cgen.lita
+Resolving Import: string_buffer
+Importing: 'string_view' for ../src/cgen.lita
+Resolving Import: string_view
+Importing: 'string' for ../src/cgen.lita
+Resolving Import: string
+Importing: 'types' for ../src/cgen.lita
+Resolving Import: types
+Importing: 'module' for ../src/cgen.lita
+Resolving Import: module
+Importing: 'symbols' for ../src/cgen.lita
+Resolving Import: symbols
+Importing: 'lita' for ../src/cgen.lita
+Resolving Import: lita
+Importing: 'phase_result' for ../src/cgen.lita
+Resolving Import: phase_result
+Importing: 'lex' for ../src/cgen.lita
+Resolving Import: lex
+Importing: 'libc' for ../src/cgen.lita
+Resolving Import: libc
+Importing: 'array' for ../src/cgen.lita
+Resolving Import: array
+Importing: 'map' for ../src/cgen.lita
+Resolving Import: map
+Importing: 'common' for ../src/cgen.lita
+Resolving Import: common
+Importing: 'dependency_graph' for ../src/cgen.lita
+Resolving Import: dependency_graph
+CreateModule ../src/dependency_graph.lita
+Create Decl for: DependencyGraph in ../src/dependency_graph.lita
+Create Decl for: State in ../src/dependency_graph.lita
+Create Decl for: Dependency in ../src/dependency_graph.lita
+Create Decl for: EmptyDependency in ../src/dependency_graph.lita
+Create Decl for: init in ../src/dependency_graph.lita
+Create Decl for: markDependencies in ../src/dependency_graph.lita
+Create Decl for: buildGraph in ../src/dependency_graph.lita
+Create Decl for: resolveDependency in ../src/dependency_graph.lita
+Create Decl for: sortAggregates in ../src/dependency_graph.lita
+Create Decl for: sortAggregatesDependencies in ../src/dependency_graph.lita
+Create Decl for: sort in ../src/dependency_graph.lita
+Importing: 'lita' for ../src/dependency_graph.lita
+Resolving Import: lita
+Importing: 'map' for ../src/dependency_graph.lita
+Resolving Import: map
+Importing: 'array' for ../src/dependency_graph.lita
+Resolving Import: array
+Importing: 'symbols' for ../src/dependency_graph.lita
+Resolving Import: symbols
+Importing: 'types' for ../src/dependency_graph.lita
+Resolving Import: types
+Importing: 'assert' for ../src/dependency_graph.lita
+Resolving Import: assert
+Importing: 'ast' for ../src/dependency_graph.lita
+Resolving Import: ast
+Importing: 'mem' for ../src/dependency_graph.lita
+Resolving Import: mem
+Importing: 'libc' for ../src/dependency_graph.lita
+Resolving Import: libc
+Resolving Import: ~dependency_graph
+../src/cgen.lita importing type 'DependencyGraph_init' from ../src/dependency_graph.lita
+../src/cgen.lita importing type 'DependencyGraph' from ../src/dependency_graph.lita
+../src/cgen.lita importing type 'DependencyGraph_sort' from ../src/dependency_graph.lita
+Importing: 'assert' for ../src/cgen.lita
+Resolving Import: assert
+Importing: 'system' for ../src/cgen.lita
+Resolving Import: system
+Importing: 'cgen_decl' for ../src/cgen.lita
+Resolving Import: cgen_decl
+CreateModule ../src/cgen_decl.lita
+Create Decl for: emitVarDecl in ../src/cgen_decl.lita
+Create Decl for: emitFuncDeclSignature in ../src/cgen_decl.lita
+Create Decl for: emitFuncDecl in ../src/cgen_decl.lita
+Create Decl for: emitAggregateDecl in ../src/cgen_decl.lita
+Create Decl for: emitEnumDecl in ../src/cgen_decl.lita
+Importing: 'ast' for ../src/cgen_decl.lita
+Resolving Import: ast
+Importing: 'string_buffer' for ../src/cgen_decl.lita
+Resolving Import: string_buffer
+Importing: 'types' for ../src/cgen_decl.lita
+Resolving Import: types
+Importing: 'module' for ../src/cgen_decl.lita
+Resolving Import: module
+Importing: 'symbols' for ../src/cgen_decl.lita
+Resolving Import: symbols
+Importing: 'lita' for ../src/cgen_decl.lita
+Resolving Import: lita
+Importing: 'phase_result' for ../src/cgen_decl.lita
+Resolving Import: phase_result
+Importing: 'lex' for ../src/cgen_decl.lita
+Resolving Import: lex
+Importing: 'libc' for ../src/cgen_decl.lita
+Resolving Import: libc
+Importing: 'array' for ../src/cgen_decl.lita
+Resolving Import: array
+Importing: 'common' for ../src/cgen_decl.lita
+Resolving Import: common
+Importing: 'assert' for ../src/cgen_decl.lita
+Resolving Import: assert
+Importing: 'cgen' for ../src/cgen_decl.lita
+Resolving Import: cgen
+Resolving Import: ~cgen_decl
+../src/cgen.lita importing type 'CGen_emitFuncDecl' from ../src/cgen_decl.lita
+../src/cgen.lita importing type 'CGen_emitFuncDeclSignature' from ../src/cgen_decl.lita
+../src/cgen.lita importing type 'CGen_emitVarDecl' from ../src/cgen_decl.lita
+../src/cgen.lita importing type 'CGen_emitEnumDecl' from ../src/cgen_decl.lita
+../src/cgen.lita importing type 'CGen_emitAggregateDecl' from ../src/cgen_decl.lita
+Resolving Import: ~cgen
+../src/main.lita importing type 'CGen' from ../src/cgen.lita
+../src/main.lita importing type 'CGen_init' from ../src/cgen.lita
+../src/main.lita importing type 'CGen_emitProgram' from ../src/cgen.lita
+Importing: 'cmdline' for ../src/main.lita
+Resolving Import: cmdline
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: MAX_MESSAGE_SIZE in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Finishing symbol: MAX_MESSAGE_SIZE
+FinishSym MAX_MESSAGE_SIZE C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: CmdParserStatus in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: OptionFlag in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: Option in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: CmdParser in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: CmdParserInit in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: init in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: free in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: addOption in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: getOption in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: getOptionShort in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: hasOption in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: hasOptionShort in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: parse in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Create Decl for: printHelp in C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Importing: 'array' for C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Resolving Import: array
+Importing: 'io' for C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Resolving Import: io
+Importing: 'mem' for C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Resolving Import: mem
+Importing: 'string_buffer' for C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Resolving Import: string_buffer
+Importing: 'libc' for C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Resolving Import: libc
+Resolving Import: ~cmdline
+../src/main.lita importing type 'CmdParser_getOption' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_free' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_parse' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'Option' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'OptionFlag' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_init' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_hasOption' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_getOptionShort' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParserInit' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_addOption' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_printHelp' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParserStatus' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+../src/main.lita importing type 'CmdParser_hasOptionShort' from C:\Users\antho\eclipse-workspace\litac/lib/cmdline.lita
+Importing: 'builtin' for ../src/main.lita
+Resolving Import: builtin
+CreateModule C:\Users\antho\eclipse-workspace\litac/lib/builtins.lita
+Resolving Import: ~builtin
+../src/main.lita importing type 'u8' from C:\Users\antho\eclipse-workspace\litac/lib/builtins.lita
+../src/main.lita importing type 'bool' from C:\Users\antho\eclipse-workspace\litac/lib/builtins.lita
+../src/main.lita importing type 'i8' from C:\Users\antho\eclipse-workspace\litac/lib/builtins.lita
+../src/main.lita importing type 'char' from C:\Users\antho\eclipse-workspace\litac/lib/builtins.lita
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+ResolveSym
+FinishSym FILE C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+FinishSym va_list C:\Users\antho\eclipse-workspace\litac/lib/libc.lita
+FinishSym Allocator C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+FinishSym Arena C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+FinishSym LinearAllocator C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+FinishSym Allocation C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Resolving array index: C:\Users\antho\eclipse-workspace\litac/lib/mem.lita @ 556
+Current scope: C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+FinishSym DebugAllocator C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+Creating generic type: Array
+ResolveSym
+FinishSym Array<*Allocation> C:\Users\antho\eclipse-workspace\litac/lib/mem.lita
+FinishSym FileStatus C:\Users\antho\eclipse-workspace\litac/lib/io.lita
+FinishSym TokenType ../src/lex.lita
+FinishSym SrcPos ../src/lex.lita
+FinishSym Value ../src/lex.lita
+FinishSym Mod ../src/lex.lita
+FinishSym Token ../src/lex.lita
+FinishSym Lexer ../src/lex.lita
+FinishSym StringView C:\Users\antho\eclipse-workspace\litac/lib/string_view.lita
+FinishSym StringBuffer C:\Users\antho\eclipse-workspace\litac/lib/string_buffer.lita
+FinishSym TypeKind ../src/types.lita
+FinishSym FieldPath ../src/types.lita
+Resolving array index: ../src/types.lita @ 1274
+Current scope: ../src/types.lita
+FinishSym Typeid ../src/types.lita
+FinishSym TypeInfo ../src/types.lita
+FinishSym FuncTypeInfo ../src/types.lita
+FinishSym ConstTypeInfo ../src/types.lita
+FinishSym PtrTypeInfo ../src/types.lita
+FinishSym ArrayTypeInfo ../src/types.lita
+FinishSym FuncPtrTypeInfo ../src/types.lita
+FinishSym EnumTypeInfo ../src/types.lita
+FinishSym AggregateTypeInfo ../src/types.lita
+FinishSym SymbolKind ../src/symbols.lita
+FinishSym SymbolState ../src/symbols.lita
+FinishSym SymbolFlags ../src/symbols.lita
+FinishSym Symbol ../src/symbols.lita
+Resolving array index: ../src/symbols.lita @ 44
+Current scope: ../src/symbols.lita
+FinishSym ScopeKind ../src/symbols.lita
+FinishSym ProgramSymbols ../src/symbols.lita
+FinishSym Scope ../src/symbols.lita
+Creating generic type: Map
+ResolveSym
+FinishSym Map<*const char,*Symbol> ../src/symbols.lita
+Creating generic type: HashFn
+ResolveSym
+FinishSym HashFn<*const char> ../src/symbols.lita
+FinishSym HashFn C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+FinishSym EqualFn C:\Users\antho\eclipse-workspace\litac/lib/map.lita
+FinishSym StmtKind ../src/ast.lita
+FinishSym TypeSpecKind ../src/ast.lita
+FinishSym FuncFlags ../src/ast.lita
+FinishSym AggregateFlags ../src/ast.lita
+FinishSym TypeSpec ../src/ast.lita
+FinishSym NameTypeSpec ../src/ast.lita
+FinishSym ArrayTypeSpec ../src/ast.lita
+FinishSym PtrTypeSpec ../src/ast.lita
+FinishSym ConstTypeSpec ../src/ast.lita
+FinishSym FuncPtrTypeSpec ../src/ast.lita
+FinishSym GenericParam ../src/ast.lita
+FinishSym Attributes ../src/ast.lita
+FinishSym Node ../src/ast.lita
+FinishSym Decl ../src/ast.lita
+FinishSym GenericDecl ../src/ast.lita
+FinishSym ImportDecl ../src/ast.lita
+FinishSym VarDecl ../src/ast.lita
+FinishSym ParameterDecl ../src/ast.lita
+FinishSym FuncDecl ../src/ast.lita
+FinishSym AggregateDecl ../src/ast.lita
+FinishSym EnumDecl ../src/ast.lita
+FinishSym TypedefDecl ../src/ast.lita
+FinishSym NativeDecl ../src/ast.lita
+FinishSym NotesDecl ../src/ast.lita
+FinishSym PoisonDecl ../src/ast.lita
+FinishSym BlockStmt ../src/ast.lita
+FinishSym BreakStmt ../src/ast.lita
+FinishSym CompStmt ../src/ast.lita
+FinishSym ContinueStmt ../src/ast.lita
+FinishSym DeferStmt ../src/ast.lita
+FinishSym DoWhileStmt ../src/ast.lita
+FinishSym EmptyStmt ../src/ast.lita
+FinishSym EnumFieldEntryDecl ../src/ast.lita
+FinishSym ForStmt ../src/ast.lita
+FinishSym FuncBodyStmt ../src/ast.lita
+FinishSym GotoStmt ../src/ast.lita
+FinishSym IfStmt ../src/ast.lita
+FinishSym LabelStmt ../src/ast.lita
+FinishSym ModuleStmt ../src/ast.lita
+FinishSym NoteStmt ../src/ast.lita
+FinishSym ParametersStmt ../src/ast.lita
+FinishSym ReturnStmt ../src/ast.lita
+FinishSym SwitchCaseStmt ../src/ast.lita
+FinishSym SwitchStmt ../src/ast.lita
+FinishSym VarFieldDecl ../src/ast.lita
+FinishSym FieldStmt ../src/ast.lita
+Create Decl for:  in ../src/ast.lita
+ResolveSym
+FinishSym WhileStmt ../src/ast.lita
+FinishSym Stmt ../src/ast.lita
+FinishSym ArrayDesignationExpr ../src/ast.lita
+FinishSym ArrayInitExpr ../src/ast.lita
+FinishSym BinaryExpr ../src/ast.lita
+FinishSym BooleanExpr ../src/ast.lita
+FinishSym CastExpr ../src/ast.lita
+FinishSym CharExpr ../src/ast.lita
+FinishSym FuncCallExpr ../src/ast.lita
+FinishSym GetExprFlags ../src/ast.lita
+FinishSym GetExpr ../src/ast.lita
+FinishSym GroupExpr ../src/ast.lita
+FinishSym IdentifierExpr ../src/ast.lita
+FinishSym InitArgExpr ../src/ast.lita
+FinishSym InitExpr ../src/ast.lita
+FinishSym NullExpr ../src/ast.lita
+FinishSym NumberExpr ../src/ast.lita
+FinishSym OffsetOfExpr ../src/ast.lita
+FinishSym SetExpr ../src/ast.lita
+FinishSym SizeOfExpr ../src/ast.lita
+FinishSym StringExpr ../src/ast.lita
+FinishSym SubscriptGetExpr ../src/ast.lita
+FinishSym SubscriptSetExpr ../src/ast.lita
+FinishSym TernaryExpr ../src/ast.lita
+FinishSym TypeIdentifierExpr ../src/ast.lita
+FinishSym TypeOfExpr ../src/ast.lita
+FinishSym UnaryExpr ../src/ast.lita
+FinishSym PoisonExpr ../src/ast.lita
+FinishSym Expr ../src/ast.lita
+FinishSym Operand ../src/ast.lita
+FinishSym LogLevel ../src/common.lita
+FinishSym ModuleFlags ../src/module.lita
+FinishSym ModuleId ../src/module.lita
+Resolving array index: ../src/module.lita @ 22
+Current scope: ../src/module.lita
+FinishSym Module ../src/module.lita
+FinishSym ErrorType ../src/phase_result.lita
+FinishSym PhaseError ../src/phase_result.lita
+FinishSym PhaseResult ../src/phase_result.lita
+FinishSym String C:\Users\antho\eclipse-workspace\litac/lib/string.lita
+FinishSym FileStat ../src/system.lita
+FinishSym LARGE_INTEGER ../src/system.lita
+FinishSym time_t ../src/system.lita
+FinishSym tm ../src/system.lita
+FinishSym Lita ../src/lita.lita
+FinishSym MetricType ../src/lita.lita
+FinishSym Metric ../src/lita.lita
+FinishSym LitaOptions ../src/lita.lita
+Resolving array index: ../src/lita.lita @ 48
+Current scope: ../src/lita.lita
+unknown variable 'MAX_PATH' in module: '../src/lita.lita' @ 48
+Module ***Module*** lita {
+   'Metric'
+   'Lita_endCapture'
+   'MAX_PREFIX_SIZE'
+   'LitaOptions'
+   'Preprocessor_evaluateForFunction'
+   'Lita_startCapture'
+   'PreprocessorInit'
+   'Lita_init'
+   'Lita_addModule'
+   'Preprocessor_init'
+   'Preprocessor_evaluateForModule'
+   'Preprocessor'
+   'Lita'
+   'MetricType'
+   'linearAllocator'
+   'Lita_free'
+}
+Scope Current {
+   'Metric'
+   'Lita_endCapture'
+   'MAX_PREFIX_SIZE'
+   'LitaOptions'
+   'Preprocessor_evaluateForFunction'
+   'Lita_startCapture'
+   'PreprocessorInit'
+   'Lita_init'
+   'Lita_addModule'
+   'Preprocessor_init'
+   'Preprocessor_evaluateForModule'
+   'Preprocessor'
+   'Lita'
+   'MetricType'
+   'linearAllocator'
+   'Lita_free'
+}
+EXITING!!

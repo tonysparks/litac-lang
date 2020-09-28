@@ -6,11 +6,13 @@ import "module"
 import "string_view"
 import "system"
 import "symbols"
+import "preprocessor"
 
 public const MAX_PREFIX_SIZE = 32
 
 public struct Lita {
     allocator: *const Allocator // TODO proper arena allocator
+    preprocessor: Preprocessor
     result: PhaseResult
     modules: Map<*const char, *Module>
     metrics: [MetricType.MAX_METRIC_TYPES]Metric
@@ -63,20 +65,19 @@ public struct LitaOptions {
 
 var linearAllocator = LinearAllocator{}
 
-public func LitaInit(options: *LitaOptions) : Lita {
+public func (this: *Lita) init(options: *LitaOptions) {
     var size: usize = 1024 * 1024 * 500;
     linearAllocator.init(defaultAllocator.alloc(size), size)
 
-    var c = Lita {
-        .allocator = (&linearAllocator) as (*const Allocator),
-        .options = options,
-        .totalSourceLines = 0,
-        .totalAllocations = 0,
+    var allocator = (&linearAllocator) as (*const Allocator)
 
-    }
-    c.result = PhaseResultInit(c.allocator)
-    c.modules = StrMap<*Module>(null, 32, c.allocator)
-    return c
+    this.allocator = allocator
+    this.options = options
+    this.totalSourceLines = 0
+    this.totalAllocations = 0
+    this.preprocessor.init(this)
+    this.result = PhaseResultInit(allocator)
+    this.modules = StrMap<*Module>(null, 32, allocator)
 }
 
 public func (lita: *Lita) free() {

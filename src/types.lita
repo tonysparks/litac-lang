@@ -8,6 +8,7 @@ import "assert"
 import "mem"
 import "ast_new"
 import "libc"
+import "module"
 
 @asStr
 public enum TypeKind {
@@ -319,6 +320,22 @@ public func IsFieldAccessible(type: *TypeInfo) : bool {
     return false
 }
 
+public func IsGenericCapable(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.FUNC:
+        case TypeKind.FUNC_PTR:
+        case TypeKind.STRUCT:
+        case TypeKind.UNION:
+            return true
+        default:
+            return false
+    }
+}
+
 public func (this: *TypeInfo) getBaseType() : *TypeInfo {
     if(!this) return null;
     switch(this.kind) {
@@ -342,6 +359,31 @@ public func (this: *TypeInfo) getBaseType() : *TypeInfo {
         }
         default: {
             return this
+        }
+    }
+}
+
+public func (this: *TypeInfo) getTypeOf() : *TypeInfo {
+    if(!this) return null;
+
+    switch(this.kind) {
+        case TypeKind.PTR: {
+            var info = this as (*PtrTypeInfo)
+            return info.ptrOf
+        }
+        case TypeKind.CONST: {
+            var info = this as (*ConstTypeInfo)
+            return info.constOf
+        }
+        case TypeKind.ARRAY: {
+            var info = this as (*ArrayTypeInfo)
+            return info.arrayOf
+        }
+        case TypeKind.STR: {
+            return &CHAR_TYPE
+        }
+        default: {
+            return null
         }
     }
 }
@@ -422,11 +464,11 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
         case TypeKind.FUNC: {
             var funcInfo = this as (*FuncTypeInfo)
             sb.append("func")
-            if(!funcInfo.genericParams.empty()) {
+            if(!funcInfo.decl.genericParams.empty()) {
                 sb.append("<")
-                for(var i = 0; i < funcInfo.genericParams.size(); i += 1) {
+                for(var i = 0; i < funcInfo.decl.genericParams.size(); i += 1) {
                     if(i > 0) sb.append(",")
-                    var t = funcInfo.genericParams.get(i).name
+                    var t = funcInfo.decl.genericParams.get(i).name
                     sb.append("%.*s", t.value.str.length, t.value.str.buffer)
                 }
                 sb.append(">")
@@ -604,7 +646,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return this.typeid == other.typeid
         }
         case TypeKind.FUNC_PTR: {
-            break;
+            return true; // TODO
         }
         case TypeKind.FUNC: {
             break;
@@ -792,13 +834,32 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             if(other.kind != TypeKind.STRUCT) {
                 return false
             }
-            return this.typeid == other.typeid
+            if(this.typeid == other.typeid) {
+                return true
+            }
+            var aggInfo = other as (*AggregateTypeInfo)
+            if(aggInfo.decl.fields.empty()) {
+                return false
+            }
+
+            var field = aggInfo.getFieldByPosition(0)
+            return this.isDeclarable(field.typeInfo)
         }
         case TypeKind.UNION: {
             if(other.kind != TypeKind.UNION) {
                 return false
             }
-            return this.typeid == other.typeid
+
+            if(this.typeid == other.typeid) {
+                return true
+            }
+            var aggInfo = other as (*AggregateTypeInfo)
+            if(aggInfo.decl.fields.empty()) {
+                return false
+            }
+
+            var field = aggInfo.getFieldByPosition(0)
+            return this.isDeclarable(field.typeInfo)
         }
         case TypeKind.ENUM: {
             if(other.kind != TypeKind.ENUM) {
@@ -819,6 +880,14 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
 
 
 public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
+    if(IsPtrOf(castTo, TypeKind.VOID)) {
+        return true
+    }
+
+    if(castTo.kind == TypeKind.NULL) {
+        return false
+    }
+
     switch(this.kind) {
         case TypeKind.BOOL: {
             return IsNumberLike(castTo)
@@ -867,33 +936,36 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
         }
         // TODO
         case TypeKind.STR: {
-            break;
+            return this.isDeclarable(castTo)
         }
         case TypeKind.ARRAY: {
-            break;
+            return this.isDeclarable(castTo)
         }
         case TypeKind.PTR: {
-            break;
+            return this.isDeclarable(castTo)
         }
         case TypeKind.FUNC_PTR: {
-            break;
+            return this.isDeclarable(castTo)
         }
 
         case TypeKind.STRUCT: {
-            break;
+            return this.isDeclarable(castTo)
         }
         case TypeKind.UNION: {
-            break;
+            return this.isDeclarable(castTo)
         }
         case TypeKind.ENUM: {
-            break;
+            return this.isDeclarable(castTo)
         }
         case TypeKind.FUNC: {
-            break;
+            return this.isDeclarable(castTo)
         }
 
         case TypeKind.CONST: {
-            break;
+            if(castTo.kind != TypeKind.CONST) {
+                return false
+            }
+            return this.isDeclarable(castTo)
         }
         default: {
             assert(false)
@@ -1043,7 +1115,7 @@ public func (this: *AggregateTypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) 
     var index = 0
     var n = this.name
 
-    while(n) {
+    while(*n) {
         defer index += 1;
 
         var c = *n
@@ -1054,6 +1126,7 @@ public func (this: *AggregateTypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) 
         name[index] = c
         n+=1;
     }
+
 
     name[index] = '\0'
 
@@ -1081,7 +1154,7 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 if(varField.name.str.equals(name)) {
-                    if(!varField.typeInfo) {
+                    if(!field.typeInfo) {
                         goto err;
                     }
                     return field
@@ -1327,6 +1400,69 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
     return false
 }
 
+public func (this: *AggregateTypeInfo) getMethodName(result: [MAX_SYMBOL_NAME]char, funcName: *const char) : *const char {
+    memset(result, 0, MAX_SYMBOL_NAME)
+    this.getBaseName(result);
+
+    strcat(result, "_")
+    strcat(result, funcName)
+
+    return (result)
+}
+
+public func (this: *AggregateTypeInfo) getMethod(module: *Module, funcName: *const char) : *Symbol {
+    var methodName = [MAX_SYMBOL_NAME]char {0};
+    this.getMethodName(methodName, funcName)
+
+    // first see if the aggregate declaration module has the method
+    var methodSym = this.sym.declared.getType(methodName)
+    if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
+        // otherwise look in the current module
+        methodSym = module.getType(methodName)
+    }
+
+    if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
+        return null;
+    }
+
+    var decl = methodSym.decl as (*FuncDecl)
+    if(!(decl.flags & FuncFlags.IS_METHOD)) {
+        return null
+    }
+
+    if(decl.params.empty()) {
+        return null
+    }
+
+    var base = decl.params.first().typeInfo.getBaseType()
+
+    /*
+    var sb = StringBufferInit(256)
+    sb.append("Method types: ")
+    this.toString(sb)
+    sb.append(" vs ")
+    base.toString(sb)
+    sb.append("\n")
+    printf("%s", sb.cStr())*/
+
+    // If this is a generic type, we need to compare against the original
+    // template types for equality
+    if(methodSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+        var thisGenericType = this as (*GenericTypeInfo)
+        var baseGenericType = base as (*GenericTypeInfo)
+        if(thisGenericType.genericTypeid == baseGenericType.genericTypeid) {
+            return methodSym;
+        }
+    }
+
+    if(this.strictEquals(base)) {
+        return methodSym;
+    }
+
+    // TODO: Check if this is 'using' base
+    return null
+}
+
 public typedef i64 as Typeid;
 var idGen: Typeid = TypeKind.MAX_TYPE_KINDS as (i64);
 
@@ -1342,9 +1478,13 @@ public struct TypeInfo {
     sym: *Symbol
 }
 
+public struct GenericTypeInfo {
+    typeInfo: using TypeInfo
+    genericTypeid: Typeid       // The typeid of the original Generic Template
+}
+
 public struct FuncTypeInfo {
-    info: using TypeInfo
-    genericParams: Array<GenericParam>
+    info: using GenericTypeInfo
     returnType: *TypeInfo
     decl: *FuncDecl
 }
@@ -1367,7 +1507,7 @@ public struct ArrayTypeInfo {
 }
 
 public struct FuncPtrTypeInfo {
-    info: using TypeInfo
+    info: using GenericTypeInfo
     genericParams: Array<GenericParam>
     returnType: *TypeInfo
     paramDecls: Array<*TypeInfo>
@@ -1380,7 +1520,7 @@ public struct EnumTypeInfo {
 }
 
 public struct AggregateTypeInfo {
-    info: using TypeInfo
+    info: using GenericTypeInfo
     decl: *AggregateDecl
 }
 

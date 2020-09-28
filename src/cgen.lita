@@ -32,6 +32,7 @@ struct CGenScope {
     parent: *CGenScope
     defers: Array<*Stmt>
     isLoop: bool
+    isSwitch: bool
 }
 
 const escapeStrings = [256]*const char {
@@ -360,9 +361,13 @@ func (this: using *CGen) popScope() : *CGenScope {
     return scope
 }
 
-func (this: using *CGen) popLoopScope() {
+func (this: using *CGen) popLoopScope(checkSwitch: bool = false) {
     var scope = this.currentScope
     while(scope) {
+        if(checkSwitch && scope.isSwitch) {
+            break;
+        }
+
         this.leaveScope(scope)
         if(!scope || scope.isLoop) {
             break;
@@ -970,7 +975,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.BREAK_STMT: {
-            this.popLoopScope()
+            this.popLoopScope(true)
             this.emit("break;")
             return;
         }/*
@@ -1184,6 +1189,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.SWITCH_STMT: {
             var stmt = s as (*SwitchStmt)
+
+            this.pushScope(&CGenScope{.isSwitch = true})
+            defer this.popScope()
 
             this.emit("switch(")
             this.emitStmt(stmt.cond)

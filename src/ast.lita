@@ -21,6 +21,7 @@ public enum StmtKind {
     TYPEDEF_DECL,
     PARAM_DECL,
     NATIVE_DECL,
+    NOTES_DECL,
     VAR_FIELD_DECL,
     ENUM_FIELD_ENTRY_DECL,
     ENUM_FIELD_DECL,
@@ -242,6 +243,11 @@ public struct NativeDecl {
     typeInfo: *TypeInfo
 }
 
+public struct NotesDecl {
+    decl: using Decl
+    notes: Array<*NoteStmt>
+}
+
 public struct PoisonDecl {
     decl: using Decl
 }
@@ -259,9 +265,9 @@ public struct CompStmt {
     stmt: using Stmt
     type: *const char
     expr: *const char
-    body: Array<*Stmt>
     end: *CompStmt
     evaluatedStmt: *Stmt
+    body: Array<*Stmt>
 }
 
 public struct ContinueStmt {
@@ -708,9 +714,13 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
         case StmtKind.GET_EXPR: {
             return true
         }
+        case StmtKind.SIZE_OF_EXPR: {
+            var sizeofExpr = expr as (*SizeOfExpr)
+            return sizeofExpr.sizeOfExpr.isConstNumberExpr()
+        }
         case StmtKind.GROUP_EXPR: {
             var groupExpr = expr as (*GroupExpr)
-            return groupExpr.expr.isConstNumberExpr()
+            return groupExpr.groupedExpr.isConstNumberExpr()
         }
         case StmtKind.BINARY_EXPR: {
             var binExpr = expr as (*BinaryExpr)
@@ -720,6 +730,44 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
         case StmtKind.UNARY_EXPR: {
             var unaryExpr = expr as (*UnaryExpr)
             return unaryExpr.unaryExpr.isConstNumberExpr()
+        }
+        default: {
+            return false
+        }
+    }
+    return false
+}
+
+public func (expr: *Expr) isConstExpr() : bool {
+    if(!expr) {
+        return false;
+    }
+
+    switch(expr.kind) {
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.BOOLEAN_EXPR:
+        case StmtKind.CHAR_EXPR:
+        case StmtKind.IDENTIFIER_EXPR:
+        case StmtKind.STRING_EXPR:
+        case StmtKind.GET_EXPR: {
+            return true
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var sizeofExpr = expr as (*SizeOfExpr)
+            return sizeofExpr.sizeOfExpr.isConstExpr()
+        }
+        case StmtKind.GROUP_EXPR: {
+            var groupExpr = expr as (*GroupExpr)
+            return groupExpr.groupedExpr.isConstExpr()
+        }
+        case StmtKind.BINARY_EXPR: {
+            var binExpr = expr as (*BinaryExpr)
+            return binExpr.left.isConstExpr() &&
+                   binExpr.right.isConstExpr()
+        }
+        case StmtKind.UNARY_EXPR: {
+            var unaryExpr = expr as (*UnaryExpr)
+            return unaryExpr.unaryExpr.isConstExpr()
         }
         default: {
             return false

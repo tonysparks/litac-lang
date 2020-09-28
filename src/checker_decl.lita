@@ -112,6 +112,9 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)
     }
 
+//printf("Resolved: %.*s as declared: %s inferred: %s\n", decl.name.str.length, decl.name.str.buffer,
+//            TypeKindAsStr(declaredType?declaredType.kind:0),  TypeKindAsStr(inferredType?inferredType.kind:0))
+
     return declaredType ? declaredType : inferredType
 }
 
@@ -249,6 +252,15 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
 }
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
+    var hasGenerics = aggDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+    if(hasGenerics) {
+        this.genericParamStack.add(aggDecl.genericParams)
+    }
+
+    defer if(hasGenerics) {
+        this.genericParamStack.pop()
+    }
+
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 
@@ -256,6 +268,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 field.typeInfo = this.resolveTypeSpec(varField.type)
+
                 if(!field.typeInfo) {
                     return false
                 }
@@ -363,6 +376,7 @@ func (this: *TypeChecker) checkLabels() {
 }
 
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
+//printf("ResolveFunc %s\n", funcDecl.sym.name)
     this.enterModule(funcDecl.sym.declared)
     defer this.leaveModule()
 
@@ -370,8 +384,17 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     defer this.popScope()
 
     // keep track of which function we are currently parsing
-    this.currentFuncDecl = funcDecl.sym.type as (*FuncTypeInfo)
-    defer this.currentFuncDecl = null
+    this.funcDeclStack.add(funcDecl.sym.type as (*FuncTypeInfo))
+    defer this.funcDeclStack.pop()
+
+    var hasGenerics = funcDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+    if(hasGenerics) {
+        this.genericParamStack.add(funcDecl.genericParams)
+    }
+
+    defer if(hasGenerics) {
+        this.genericParamStack.pop()
+    }
 
     if(!this.resolveStmt(funcDecl.params)) {
         return false
@@ -413,7 +436,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
             var baseType = typeInfo.getBaseType()
             var aggType = baseType as (*AggregateTypeInfo)
 
-            this.addTypeToScope(paramDecl, this.currentScope, aggType, aggType)
+            this.addTypeToScope(paramDecl, this.current.currentScope, aggType, aggType)
         }
     }
 

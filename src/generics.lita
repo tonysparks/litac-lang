@@ -53,6 +53,7 @@ func GetGenericName(type: *TypeSpec, str: *String) {
         }
         case TypeSpecKind.FUNC_PTR: {
             // TODO:
+            str.append("TODO-FuncPtr<>")
         }
         case TypeSpecKind.NONE:
         default:
@@ -70,7 +71,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     GetGenericName(name, genericName)
 
     var newName = genericName.cStrConst()
-    var genericSym = checker.genericTypes.get(newName)
+    var genericSym = checker.current.genericSymbols.get(newName)
 
     if(!genericSym) {
         var newNameStr = genericName.copy(checker.allocator).str
@@ -99,15 +100,39 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             goto err;
         }
 
-        genericSym = checker.current.symbols.addSymbol(newNameStr, checker.current, genericDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
+        genericSym = checker.current.symbols.addSymbol(newNameStr,
+                                                       sym.declared,
+                                                       genericDecl,
+                                                       SymbolFlags.IS_INCOMPLETE|
+                                                       SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
+
         if(!genericSym) {
             goto err;
         }
 
+        //printf("Generic %s Declaration Module: %s created in %s\n", newNameStr, sym.declared.id.filename, checker.current.id.filename)
+        genericSym.genericCallsiteModule = checker.current
         genericSym.genericParams = genericDecl.genericParams
-        checker.genericTypes.put(newNameStr, genericSym)
-    }
+        checker.current.genericSymbols.put(newNameStr, genericSym)
 
+        var numOfGenericArgs = name.genericArgs.size();
+        genericSym.genericArgs.init(numOfGenericArgs, checker.allocator)
+
+        var isValidArgs = true
+        for(var i = 0; i < numOfGenericArgs; i+=1) {
+            var arg = name.genericArgs.get(i)
+            if(!checker.resolveTypeSpec(arg)) {
+                isValidArgs = false
+            }
+
+            genericSym.genericArgs.add(arg.typeInfo)
+        }
+
+        if(!isValidArgs) {
+            goto err;
+        }
+        printf("Created Generic: %s\n", genericSym.name)
+    }
 
     assert(genericSym != null)
 
@@ -115,6 +140,10 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     checker.finishResolveSymbol(genericSym)
 
     name.typeInfo = genericSym.type
+    if(IsGenericCapable(genericSym.type)) {
+        var genericType = genericSym.type as (*GenericTypeInfo)
+        genericType.genericTypeid = sym.type.typeid
+    }
     return genericSym
 
 err:
@@ -122,7 +151,6 @@ err:
 }
 
 func CreateAggregateDecl(aggDecl: *AggregateDecl,
-                       //  name: *const char,
                          genericArgs: *Array<*TypeSpec>,
                          allocator: *const Allocator) : *GenericDecl {
     var copy = CopyAggregateDecl(aggDecl, allocator)
@@ -139,7 +167,6 @@ func CreateAggregateDecl(aggDecl: *AggregateDecl,
 
 
 func CreateFuncDecl(funcDecl: *FuncDecl,
-                    //  name: *const char,
                     genericArgs: *Array<*TypeSpec>,
                     allocator: *const Allocator) : *GenericDecl {
     var copy = CopyFuncDecl(funcDecl, allocator)

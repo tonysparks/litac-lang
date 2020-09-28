@@ -14,7 +14,7 @@ public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpe
     return voidSpec as (*TypeSpec)
 }
 
-public func NewNameTypeSpec(pos: SrcPos, name: *const char, allocator: *const Allocator) : *NameTypeSpec {    
+public func NewNameTypeSpec(pos: SrcPos, name: *const char, allocator: *const Allocator) : *NameTypeSpec {
     var result = new<NameTypeSpec>(allocator)
     result.kind = TypeSpecKind.NAME
     result.pos = pos
@@ -83,8 +83,8 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Alloc
     return null
 }
 
-public func NewImportDecl(startPos: SrcPos, 
-                          endPos: SrcPos, 
+public func NewImportDecl(startPos: SrcPos,
+                          endPos: SrcPos,
                           name: Token,
                           alias: Token,
                           isUsing: bool,
@@ -100,12 +100,12 @@ public func NewImportDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewVarDecl(startPos: SrcPos, 
-                       endPos: SrcPos, 
+public func NewVarDecl(startPos: SrcPos,
+                       endPos: SrcPos,
                        name: Token,
                        type: *TypeSpec,
                        expr: *Expr,
-                       allocator: *const Allocator) : *Decl {                              
+                       allocator: *const Allocator) : *Decl {
     var decl = new<VarDecl>(allocator)
     decl.kind = StmtKind.VAR_DECL;
     decl.startPos = startPos
@@ -117,7 +117,7 @@ public func NewVarDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewFuncDecl(startPos: SrcPos, 
+public func NewFuncDecl(startPos: SrcPos,
                          endPos: SrcPos,
                          name: Token,
                          genericParams: Array<GenericParam>,
@@ -125,7 +125,7 @@ public func NewFuncDecl(startPos: SrcPos,
                          body: *Stmt,
                          returnType: *TypeSpec,
                          flags: i32,
-                         allocator: *const Allocator) : *Decl {                              
+                         allocator: *const Allocator) : *Decl {
     var decl = new<FuncDecl>(allocator)
     decl.kind = StmtKind.FUNC_DECL;
     decl.startPos = startPos
@@ -140,7 +140,7 @@ public func NewFuncDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewAggregateDecl(startPos: SrcPos, 
+public func NewAggregateDecl(startPos: SrcPos,
                       endPos: SrcPos,
                       kind: StmtKind,
                       name: Token,
@@ -148,7 +148,7 @@ public func NewAggregateDecl(startPos: SrcPos,
                       fields: Array<FieldStmt>,
                       flags: i32,
                       allocator: *const Allocator) : *Decl {
-    var decl = new<AggregateDecl>(allocator)    
+    var decl = new<AggregateDecl>(allocator)
     decl.kind = kind
     decl.startPos = startPos
     decl.endPos = endPos
@@ -186,73 +186,73 @@ public func NewAggregateDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewStructDecl(startPos: SrcPos, 
+public func NewStructDecl(startPos: SrcPos,
                           endPos: SrcPos,
                           name: Token,
                           genericParams: Array<GenericParam>,
                           fields: Array<FieldStmt>,
                           flags: i32,
-                          allocator: *const Allocator) : *Decl {  
-    return NewAggregateDecl(startPos, endPos, StmtKind.STRUCT_DECL, 
-                                name, genericParams, fields, flags, allocator)    
+                          allocator: *const Allocator) : *Decl {
+    return NewAggregateDecl(startPos, endPos, StmtKind.STRUCT_DECL,
+                                name, genericParams, fields, flags, allocator)
 }
 
-public func NewUnionDecl(startPos: SrcPos, 
+public func NewUnionDecl(startPos: SrcPos,
                          endPos: SrcPos,
                          name: Token,
                          genericParams: Array<GenericParam>,
                          fields: Array<FieldStmt>,
                          flags: i32,
-                         allocator: *const Allocator) : *Decl {                                  
-    
-    return NewAggregateDecl(startPos, endPos, StmtKind.UNION_DECL, 
+                         allocator: *const Allocator) : *Decl {
+
+    return NewAggregateDecl(startPos, endPos, StmtKind.UNION_DECL,
                                 name, genericParams, fields, flags, allocator)
 }
 
-public func NewEnumDecl(startPos: SrcPos, 
+public func NewEnumDecl(startPos: SrcPos,
                          endPos: SrcPos,
                          name: Token,
                          fields: Array<*EnumFieldEntryDecl>,
-                         allocator: *const Allocator) : *Decl {                              
+                         allocator: *const Allocator) : *Decl {
     var decl = new<EnumDecl>(allocator)
     decl.kind = StmtKind.ENUM_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
-    decl.name = name    
+    decl.name = name
     decl.fields = *decl.node.becomeParentOfChildren(fields)
 
     return decl as (*Decl)
 }
 
-public func NewTypedefDecl(startPos: SrcPos, 
+public func NewTypedefDecl(startPos: SrcPos,
                          endPos: SrcPos,
                          name: Token,
                          genericParams: Array<GenericParam>,
-                         type: *TypeSpec,                         
-                         allocator: *const Allocator) : *Decl {                              
+                         type: *TypeSpec,
+                         allocator: *const Allocator) : *Decl {
     var decl = new<TypedefDecl>(allocator)
     decl.kind = StmtKind.TYPEDEF_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
-    decl.name = name    
+    decl.name = name
     decl.genericParams = genericParams
     decl.type = type
 
     return decl as (*Decl)
 }
 
-public func NewParameterDecl(startPos: SrcPos, 
+public func NewParameterDecl(startPos: SrcPos,
                          endPos: SrcPos,
                          name: Token,
                          type: *TypeSpec,
                          defaultExpr: *Expr,
                          isUsing: bool,
-                         allocator: *const Allocator) : *Decl {                              
+                         allocator: *const Allocator) : *Decl {
     var decl = new<ParameterDecl>(allocator)
     decl.kind = StmtKind.PARAM_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
-    decl.name = name    
+    decl.name = name
     decl.type = type
     decl.defaultExpr = decl.node.becomeParentOf(defaultExpr)
     decl.attributes.isUsing = isUsing
@@ -260,10 +260,22 @@ public func NewParameterDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewBuiltinDecl(startPos: SrcPos, 
-                           endPos: SrcPos,                      
+public func NewNotesDecl(startPos: SrcPos,
+                         endPos: SrcPos,
+                         notes: Array<*NoteStmt>,
+                         allocator: *const Allocator) : *Decl {
+    var decl = new<NotesDecl>(allocator)
+    decl.kind = StmtKind.NOTES_DECL;
+    decl.startPos = startPos
+    decl.endPos = endPos
+    decl.notes = notes
+    return decl as (*Decl)
+}
+
+public func NewBuiltinDecl(startPos: SrcPos,
+                           endPos: SrcPos,
                            type: *TypeInfo,
-                           allocator: *const Allocator) : *Decl {                              
+                           allocator: *const Allocator) : *Decl {
     var decl = new<NativeDecl>(allocator)
     decl.kind = StmtKind.NATIVE_DECL;
     decl.startPos = startPos
@@ -272,9 +284,9 @@ public func NewBuiltinDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewPoisonDecl(startPos: SrcPos, 
-                          endPos: SrcPos,                      
-                          allocator: *const Allocator) : *Decl {                              
+public func NewPoisonDecl(startPos: SrcPos,
+                          endPos: SrcPos,
+                          allocator: *const Allocator) : *Decl {
     var decl = new<PoisonDecl>(allocator)
     decl.kind = StmtKind.POISON_DECL;
     decl.startPos = startPos
@@ -282,29 +294,29 @@ public func NewPoisonDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
-public func NewTernaryExpr(startPos: SrcPos, 
-                           endPos: SrcPos, 
-                           cond: *Expr,                            
-                           then: *Expr, 
+public func NewTernaryExpr(startPos: SrcPos,
+                           endPos: SrcPos,
+                           cond: *Expr,
+                           then: *Expr,
                            other: *Expr,
-                           allocator: *const Allocator) : *Expr {                              
+                           allocator: *const Allocator) : *Expr {
     var expr = new<TernaryExpr>(allocator)
     expr.kind = StmtKind.TERNARY_EXPR;
     expr.startPos = startPos
     expr.endPos = endPos
-    expr.cond = expr.node.becomeParentOf(cond)    
-    expr.then = expr.node.becomeParentOf(then)    
+    expr.cond = expr.node.becomeParentOf(cond)
+    expr.then = expr.node.becomeParentOf(then)
     expr.other = expr.node.becomeParentOf(other)
 
     return expr as (*Expr)
 }
 
-public func NewBinaryExpr(startPos: SrcPos, 
-                          endPos: SrcPos, 
-                          left: *Expr, 
+public func NewBinaryExpr(startPos: SrcPos,
+                          endPos: SrcPos,
+                          left: *Expr,
                           operator: TokenType,
-                          right: *Expr, 
-                          allocator: *const Allocator) : *Expr {                              
+                          right: *Expr,
+                          allocator: *const Allocator) : *Expr {
     var binExpr = new<BinaryExpr>(allocator)
     binExpr.kind = StmtKind.BINARY_EXPR;
     binExpr.startPos = startPos
@@ -316,16 +328,16 @@ public func NewBinaryExpr(startPos: SrcPos,
     return binExpr as (*Expr)
 }
 
-public func NewUnaryExpr(startPos: SrcPos, 
-                         endPos: SrcPos, 
+public func NewUnaryExpr(startPos: SrcPos,
+                         endPos: SrcPos,
                          operator: TokenType,
                          expr: *Expr,
-                         allocator: *const Allocator) : *Expr {                              
+                         allocator: *const Allocator) : *Expr {
     var unaryExpr = new<UnaryExpr>(allocator)
     unaryExpr.kind = StmtKind.UNARY_EXPR;
     unaryExpr.startPos = startPos
     unaryExpr.unaryExpr = unaryExpr.node.becomeParentOf(expr)
-    unaryExpr.operator = operator    
+    unaryExpr.operator = operator
     unaryExpr.endPos = endPos
 
     return unaryExpr as (*Expr)
@@ -433,7 +445,7 @@ public func NewSetExpr(startPos: SrcPos,
 }
 
 public func NewIdentifierExpr(startPos: SrcPos,
-                              endPos: SrcPos,                              
+                              endPos: SrcPos,
                               type: *NameTypeSpec,
                               allocator: *const Allocator) : *Expr {
     var expr = new<IdentifierExpr>(allocator)
@@ -446,7 +458,7 @@ public func NewIdentifierExpr(startPos: SrcPos,
 }
 
 public func NewTypeIdentifierExpr(startPos: SrcPos,
-                                  endPos: SrcPos,                              
+                                  endPos: SrcPos,
                                   //genericArgs: Array<*TypeSpec>,
                                   type: *TypeSpec,
                                   allocator: *const Allocator) : *Expr {
@@ -520,7 +532,7 @@ public func NewBooleanExpr(startPos: SrcPos,
 }
 
 public func NewNullExpr(startPos: SrcPos,
-                        endPos: SrcPos,                          
+                        endPos: SrcPos,
                         allocator: *const Allocator) : *Expr {
     var expr = new<NullExpr>(allocator)
     expr.kind = StmtKind.NULL_EXPR
@@ -530,7 +542,7 @@ public func NewNullExpr(startPos: SrcPos,
 }
 
 public func NewNumberExpr(startPos: SrcPos,
-                          endPos: SrcPos,                          
+                          endPos: SrcPos,
                           number: Token,
                           allocator: *const Allocator) : *Expr {
     var expr = new<NumberExpr>(allocator)
@@ -631,7 +643,7 @@ public func NewOffsetOfExpr(startPos: SrcPos,
     var expr = new<OffsetOfExpr>(allocator)
     expr.kind = StmtKind.OFFSET_OF_EXPR
     expr.startPos = startPos
-    expr.endPos = endPos    
+    expr.endPos = endPos
     expr.type = type
     expr.field = field
 
@@ -639,7 +651,7 @@ public func NewOffsetOfExpr(startPos: SrcPos,
 }
 
 public func NewPoisonExpr(startPos: SrcPos,
-                          endPos: SrcPos,                          
+                          endPos: SrcPos,
                           allocator: *const Allocator) : *Expr {
     var expr = new<PoisonExpr>(allocator)
     expr.kind = StmtKind.POISON_EXPR
@@ -663,6 +675,26 @@ public func NewModuleStmt(startPos: SrcPos,
     stmt.declarations = declarations
     return stmt as (*Stmt)
 }
+
+public func NewCompStmt(startPos: SrcPos,
+                        endPos: SrcPos,
+                        type: *const char,
+                        expr: *const char,
+                        body: Array<*Stmt>,
+                        end: *CompStmt,
+                        allocator: *const Allocator) : *Stmt {
+    var stmt = new<CompStmt>(allocator)
+    stmt.kind = StmtKind.COMP_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.type = type
+    stmt.expr = expr
+    stmt.end = end
+    stmt.body = body
+    stmt.evaluatedStmt = null
+    return stmt as (*Stmt)
+}
+
 
 public func NewBlockStmt(startPos: SrcPos,
                          endPos: SrcPos,
@@ -695,7 +727,7 @@ public func NewIfStmt(startPos: SrcPos,
 
 public func NewWhileStmt(startPos: SrcPos,
                          endPos: SrcPos,
-                         cond: *Expr,                          
+                         cond: *Expr,
                          body: *Stmt,
                          allocator: *const Allocator) : *Stmt {
     var stmt = new<WhileStmt>(allocator)
@@ -703,13 +735,13 @@ public func NewWhileStmt(startPos: SrcPos,
     stmt.startPos = startPos
     stmt.endPos = endPos
     stmt.cond = stmt.node.becomeParentOf(cond)
-    stmt.body = stmt.node.becomeParentOf(body)    
+    stmt.body = stmt.node.becomeParentOf(body)
     return stmt as (*Stmt)
 }
 
 public func NewDoWhileStmt(startPos: SrcPos,
                            endPos: SrcPos,
-                           cond: *Expr,                          
+                           cond: *Expr,
                            body: *Stmt,
                            allocator: *const Allocator) : *Stmt {
     var stmt = new<DoWhileStmt>(allocator)
@@ -717,7 +749,7 @@ public func NewDoWhileStmt(startPos: SrcPos,
     stmt.startPos = startPos
     stmt.endPos = endPos
     stmt.cond = stmt.node.becomeParentOf(cond)
-    stmt.body = stmt.node.becomeParentOf(body)    
+    stmt.body = stmt.node.becomeParentOf(body)
     return stmt as (*Stmt)
 }
 
@@ -725,7 +757,7 @@ public func NewForStmt(startPos: SrcPos,
                        endPos: SrcPos,
                        init: *Stmt,
                        cond: *Expr,
-                       post: *Stmt,                          
+                       post: *Stmt,
                        body: *Stmt,
                        allocator: *const Allocator) : *Stmt {
     var stmt = new<ForStmt>(allocator)
@@ -735,26 +767,26 @@ public func NewForStmt(startPos: SrcPos,
     stmt.init = stmt.node.becomeParentOf(init)
     stmt.cond = stmt.node.becomeParentOf(cond)
     stmt.post = stmt.node.becomeParentOf(post)
-    stmt.body = stmt.node.becomeParentOf(body)    
+    stmt.body = stmt.node.becomeParentOf(body)
     return stmt as (*Stmt)
 }
 
 public func NewSwitchCaseStmt(startPos: SrcPos,
-                              endPos: SrcPos,                              
-                              cond: *Expr,                                               
+                              endPos: SrcPos,
+                              cond: *Expr,
                               body: *Stmt,
                               allocator: *const Allocator) : *Stmt {
     var stmt = new<SwitchCaseStmt>(allocator)
     stmt.kind = StmtKind.SWITCH_CASE_STMT
     stmt.startPos = startPos
-    stmt.endPos = endPos    
-    stmt.cond = stmt.node.becomeParentOf(cond)    
-    stmt.body = stmt.node.becomeParentOf(body)    
+    stmt.endPos = endPos
+    stmt.cond = stmt.node.becomeParentOf(cond)
+    stmt.body = stmt.node.becomeParentOf(body)
     return stmt as (*Stmt)
 }
 
 public func NewSwitchStmt(startPos: SrcPos,
-                              endPos: SrcPos,                              
+                              endPos: SrcPos,
                               cond: *Expr,
                               cases: Array<*SwitchCaseStmt>,
                               defaultStmt: *Stmt,
@@ -762,15 +794,15 @@ public func NewSwitchStmt(startPos: SrcPos,
     var stmt = new<SwitchStmt>(allocator)
     stmt.kind = StmtKind.SWITCH_STMT
     stmt.startPos = startPos
-    stmt.endPos = endPos    
+    stmt.endPos = endPos
     stmt.cond = stmt.node.becomeParentOf(cond)
     stmt.cases = *stmt.node.becomeParentOfChildren(cases)
-    stmt.defaultStmt = stmt.node.becomeParentOf(defaultStmt)    
+    stmt.defaultStmt = stmt.node.becomeParentOf(defaultStmt)
     return stmt as (*Stmt)
 }
 
 public func NewBreakStmt(startPos: SrcPos,
-                         endPos: SrcPos,                                                  
+                         endPos: SrcPos,
                          allocator: *const Allocator) : *Stmt {
     var stmt = new<BreakStmt>(allocator)
     stmt.kind = StmtKind.BREAK_STMT
@@ -780,7 +812,7 @@ public func NewBreakStmt(startPos: SrcPos,
 }
 
 public func NewContinueStmt(startPos: SrcPos,
-                            endPos: SrcPos,                                                     
+                            endPos: SrcPos,
                             allocator: *const Allocator) : *Stmt {
     var stmt = new<ContinueStmt>(allocator)
     stmt.kind = StmtKind.CONTINUE_STMT
@@ -790,13 +822,13 @@ public func NewContinueStmt(startPos: SrcPos,
 }
 
 public func NewReturnStmt(startPos: SrcPos,
-                          endPos: SrcPos,                              
+                          endPos: SrcPos,
                           expr: *Expr,
                           allocator: *const Allocator) : *Stmt {
     var stmt = new<ReturnStmt>(allocator)
     stmt.kind = StmtKind.RETURN_STMT
     stmt.startPos = startPos
-    stmt.endPos = endPos    
+    stmt.endPos = endPos
     stmt.expr = stmt.node.becomeParentOf(expr)
     return stmt as (*Stmt)
 }
@@ -808,13 +840,13 @@ public func NewDeferStmt(startPos: SrcPos,
     var stmt = new<DeferStmt>(allocator)
     stmt.kind = StmtKind.DEFER_STMT
     stmt.startPos = startPos
-    stmt.endPos = endPos    
+    stmt.endPos = endPos
     stmt.deferedStmt = stmt.node.becomeParentOf(defered)
     return stmt as (*Stmt)
 }
 
 public func NewGotoStmt(startPos: SrcPos,
-                        endPos: SrcPos,                              
+                        endPos: SrcPos,
                         label: Token,
                         allocator: *const Allocator) : *Stmt {
     var stmt = new<GotoStmt>(allocator)
@@ -918,7 +950,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             var decl = new<ImportDecl>(allocator)
             decl.kind = StmtKind.IMPORT_DECL;
             decl.startPos = startPos
-            decl.moduleName.type = TokenType.END_OF_FILE            
+            decl.moduleName.type = TokenType.END_OF_FILE
             decl.alias.type = TokenType.END_OF_FILE
             decl.isUsing = false
             //stmt.moduleId ??
@@ -961,8 +993,8 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
         case StmtKind.ENUM_DECL: {
             var decl = new<EnumDecl>(allocator)
             decl.kind = StmtKind.ENUM_DECL;
-            decl.startPos = startPos            
-            decl.fields.init(16, allocator)            
+            decl.startPos = startPos
+            decl.fields.init(16, allocator)
             return decl as (*Stmt)
         }
         case StmtKind.FUNC_DECL: {
@@ -1215,7 +1247,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
         case StmtKind.BOOLEAN_EXPR: {
             var expr = new<BooleanExpr>(allocator)
             expr.kind = StmtKind.BOOLEAN_EXPR;
-            expr.startPos = startPos            
+            expr.startPos = startPos
             return expr as (*Stmt)
         }
         case StmtKind.CAST_EXPR: {
@@ -1247,7 +1279,7 @@ public func NewStmt(kind: StmtKind, startPos: SrcPos, allocator: *const Allocato
             expr.startPos = startPos
             //expr.genericArgs.init(2, allocator)
             expr.type = null
-            //expr.sym///            
+            //expr.sym///
             return expr as (*Stmt)
         }
         case StmtKind.GET_EXPR: {

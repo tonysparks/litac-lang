@@ -39,17 +39,17 @@ struct LabelInfo {
 public struct TypeChecker {
     lita: using *Lita
 
-    prev: *Module
     current: *Module
+    moduleStack: Array<*Module>
 
-    currentScope: *Scope            // for function scopes
-    currentFuncDecl: *FuncTypeInfo
+    funcDeclStack: Array<*FuncTypeInfo>
 
     pendingValues: Array<*Symbol>
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
 
-    genericTypes: Map<*const char, *Symbol>
+    genericParamStack: Array<Array<GenericParam>>
+    //genericTypes: Map<*const char, *Symbol>
     genericTemplates: Array<*Symbol>
 
     labels: [MAX_LABELS]LabelInfo;
@@ -60,14 +60,16 @@ public struct TypeChecker {
 
 public func (this: *TypeChecker) init(lita: *Lita) {
     this.lita = lita
-    this.prev = null
     this.current = null
-    this.currentScope = null
+    //this.currentScope = null
+    this.moduleStack.init(64, lita.allocator)
+    this.funcDeclStack.init(64, lita.allocator)
     this.pendingValues.init(128, lita.allocator)
     this.symbolTypes.init(256, lita.allocator)
     this.symbolFuncs.init(256, lita.allocator)
+    this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
-    this.genericTypes = StrMap<*Symbol>(null, 64, lita.allocator)
+    //this.genericTypes = StrMap<*Symbol>(null, 64, lita.allocator)
 
     memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
     this.numOfLabels = 0
@@ -79,14 +81,14 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     }
 
     root.flags |= ModuleFlags.TYPE_CHECKED
-    this.currentScope = &root.symbols
 
     this.createModuleSymbols(root)
     this.resolveSymbols()
 
-    for(var it = this.genericTypes.iter(); it.hasNext();) {
+    for(var it = this.current.genericSymbols.iter(); it.hasNext();) {
         var entry = it.next()
         var sym = entry.value
+
         if(sym.decl.kind == StmtKind.FUNC_DECL) {
             this.symbolFuncs.add(sym)
         }
@@ -183,6 +185,10 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
         return;
     }
 
+    // if(module.flags & ModuleFlags.TYPE_RESOLVED) {
+    //     return;
+    // }
+//printf("CreateModule %s\n", module.id.filename)
     this.enterModule(module)
     defer this.leaveModule()
 
@@ -193,46 +199,59 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var imp = module.ast.imports.get(i)
+        /*printf("Importing: '")
+        PrintName(imp.name)
+        printf("' for %s\n", module.id.filename)*/
         this.createImportSymbols(imp)
     }
+
 }
 
 func (this: *TypeChecker) enterModule(module: *Module) {
-    this.prev = this.current
+    this.moduleStack.push(module)
     this.current = module
+//    printf("Enter scope: %s\n", this.current.id.filename)
 }
 
 func (this: *TypeChecker) leaveModule() {
-    if(this.prev) {
-        this.current = this.prev
+    var oldScope = this.current;
+
+    if(this.moduleStack.size()) {
+        this.moduleStack.pop()
+        if(this.moduleStack.size()) {
+            this.current = this.moduleStack.last()
+        }
     }
+    //printf("Leave scope: %s -> %s\n", oldScope.id.filename, this.current.id.filename)
+}
+
+func (this: *TypeChecker) currentScope() : *Scope {
+    return this.current.currentScope
 }
 
 func (this: *TypeChecker) pushScope(scope: *Scope) {
-    scope.init(ScopeKind.FUNC, this.currentScope, this.result, this.allocator);
-    this.currentScope = scope
+    scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.allocator);
+    scope.module = this.current
+    this.current.currentScope = scope
 }
 
 func (this: *TypeChecker) popScope() {
-    this.currentScope = this.currentScope.parent
-}
-
-func (this: *TypeChecker) isTemplate() : bool {
-    return this.currentFuncDecl != null &&
-           this.currentFuncDecl.decl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+    if(this.currentScope()) {
+        this.current.currentScope = this.current.currentScope.parent
+    }
 }
 
 func (this: *TypeChecker) isGenericParamType(name: *NameTypeSpec) : bool {
-    if(!this.isTemplate()) {
-        return false
-    }
+    for(var k = 0; k < this.genericParamStack.size(); k += 1) {
+        var params = &this.genericParamStack.elements[k]
 
-    for(var i = 0; i < this.currentFuncDecl.genericParams.size(); i+=1) {
-        var param = this.currentFuncDecl.genericParams.get(i)
-        assert(param.name.type == TokenType.IDENTIFIER)
+        for(var i = 0; i < params.size(); i+=1) {
+            var param = params.get(i)
+            assert(param.name.type == TokenType.IDENTIFIER)
 
-        if(param.name.str.equals(name.name)) {
-            return true;
+            if(param.name.str.equals(name.name)) {
+                return true;
+            }
         }
     }
 
@@ -242,7 +261,11 @@ func (this: *TypeChecker) isGenericParamType(name: *NameTypeSpec) : bool {
 
 func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     assert(decl != null)
-    assert(!decl.sym)
+//printf("Create Decl for: %.*s in %s\n", decl.name.str.length, decl.name.str.buffer, this.current.id.filename)
+
+    if(decl.sym) {
+        return decl.sym
+    }
 
     var name:[MAX_SYMBOL_NAME]char;
     if(decl.name.type == TokenType.IDENTIFIER) {
@@ -253,8 +276,6 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         nameStr.format("anon_%d", this.randomNameIndex)
         this.randomNameIndex+=1
     }
-
-    //printf("Creating Decl: %s\n", name)
 
     var sym: *Symbol = null
     if(decl.kind != StmtKind.FUNC_DECL) {
@@ -267,7 +288,22 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     switch(decl.kind) {
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
-            // TODO: resolve value if const primitive expr
+            var varDecl = decl as (*VarDecl)
+
+            if(varDecl.expr.isConstExpr()) {
+                this.result.enabled = false
+                var isValid = this.resolveExpr(varDecl.expr)
+                this.result.enabled = true
+
+                // if this is resolvable, this means it
+                // is a valid constant expression and we don't need
+                // to resolve it later
+                if(isValid) {
+                    //printf("Finishing symbol: %s\n", sym.name)
+                    this.finishResolveSymbol(sym)
+                    //break;
+                }
+            }
             this.pendingValues.add(sym)
             break;
         }
@@ -328,9 +364,9 @@ err:
 }
 
 func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
-    /*printf("Resolving Import: ")
+    printf("Resolving Import: ")
     PrintName(imp.name)
-    printf("\n")*/
+    printf("\n")
 
     for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
         var other = this.current.ast.imports.get(i)
@@ -356,13 +392,19 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
         goto err;
     }
 
-    if(module.flags & ModuleFlags.TYPE_RESOLVED) {
+    if(module == this.current) {
+        printf("Premature exit for: %s\n", module.id.filename)
         return;
     }
 
-    module.flags |= ModuleFlags.TYPE_RESOLVED
+    if(!(module.flags & ModuleFlags.TYPE_RESOLVED)) {
+        module.flags |= ModuleFlags.TYPE_RESOLVED
+        this.createModuleSymbols(module)
+    }
 
-    this.createModuleSymbols(module)
+    printf("Resolved Importing: ~")
+    PrintName(imp.name)
+    printf("\n")
     this.current.importModule(imp, module)
 
 err:
@@ -405,6 +447,7 @@ func (this: *TypeChecker) resolveSymbols() {
             this.finishResolveSymbol(symbol)
         }
     }
+
 }
 
 
@@ -434,6 +477,16 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                 }
                 case StmtKind.TYPEDEF_DECL: {
                     var typedefDecl = sym.decl as (*TypedefDecl)
+
+                    var hasGenerics = sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+                    if(hasGenerics) {
+                        this.genericParamStack.add(typedefDecl.genericParams)
+                    }
+
+                    defer if(hasGenerics) {
+                        this.genericParamStack.pop()
+                    }
+
                     var aliasedType = this.resolveTypeSpec(typedefDecl.type)
                     if(!aliasedType) {
                         goto err;
@@ -472,8 +525,14 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                                 sym.type as (*FuncTypeInfo) :
                                 NewFuncTypeInfo(sym, funcDecl, this.allocator)
 
-            this.currentFuncDecl = funcInfo
-            defer this.currentFuncDecl = null
+            var hasGenerics = sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+            if(hasGenerics) {
+                this.genericParamStack.add(funcDecl.genericParams)
+            }
+
+            defer if(hasGenerics) {
+                this.genericParamStack.pop()
+            }
 
             for(var i = 0; i < funcDecl.params.size() ; i += 1) {
                 var param = funcDecl.params.get(i)
@@ -505,9 +564,9 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
         (sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
         return;
     }
-
+//printf("FinishSym %s %s\n", sym.name, sym.declared.id.filename)
     this.enterModule(sym.declared)
-    this.leaveModule()
+    defer this.leaveModule()
 
     sym.flags &= ~SymbolFlags.IS_INCOMPLETE
 
@@ -583,6 +642,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             this.resolveSymbol(sym)
 
             if(!nameSpec.genericArgs.empty()) {
+                printf("Creating generic type: %s\n", sym.name)
                 sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
                 if(!sym) {
                     goto err;
@@ -610,13 +670,19 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             var length: usize = 0
             if(arraySpec.numElements) {
                 var expr = arraySpec.numElements
+
+                printf("Resolving array index: %s @ %d\n",
+                    expr.startPos.filename, expr.startPos.lineNumber)
+
+                printf("Current scope: %s\n", this.current.id.filename)
+
                 if(!this.resolveConstExpr(expr)) {
                     goto err;
                 }
 
                 if(!IsInteger(expr.operand.typeInfo)) {
                     this.result.addError(expr.startPos,
-                        "array size expression must be an integer type")
+                            "array size expression must be an integer type")
                     goto err;
                 }
 
@@ -659,7 +725,7 @@ func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol 
     assert(decl.name.type == TokenType.IDENTIFIER)
     decl.name.str.copyTo(name, MAX_SYMBOL_NAME)
 
-    var sym = this.currentScope.addSymbol(name as (*const char), this.current, decl, 0)
+    var sym = this.current.currentScope.addSymbol(name as (*const char), this.current, decl, 0)
     if(sym) {
         sym.type = typeInfo
         this.resolveSymbol(sym)
@@ -753,7 +819,12 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             return true;
         }
         case StmtKind.COMP_STMT: {
-            return false; // TODO
+            var compStmt = stmt as (*CompStmt)
+            var stmt = this.lita.preprocessor.evaluateForFunction(compStmt)
+            if(!stmt) {
+                return false;
+            }
+            return true
         }
         case StmtKind.CONTINUE_STMT: {
             return true;
@@ -811,6 +882,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 var s = body.stmts.get(i)
                 if(!this.resolveStmt(s)) {
                     success = false
+                    break // TODO: Do we want to allow this to proceed?
                 }
             }
             return success
@@ -924,19 +996,19 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.RETURN_STMT: {
             var ret = stmt as (*ReturnStmt)
+            var currentFuncDecl = this.funcDeclStack.last()
             if(ret.expr) {
                 if(!this.resolveExpr(ret.expr)) {
                     return false
                 }
 
-                // allow for types to be coerced via using members if necessary
-                ret.expr = this.coerceTypeWithUsing(ret.expr, ret.expr.operand.typeInfo, this.currentFuncDecl.returnType)
+                ret.expr = this.coerceTypeWithUsing(ret.expr, ret.expr.operand.typeInfo, currentFuncDecl.returnType)
 
-                this.checkTypeCompatibility(ret.expr.startPos, this.currentFuncDecl.returnType, ret.expr.operand.typeInfo)
-                ret.expr.expectedType = this.currentFuncDecl.returnType
+                this.checkTypeCompatibility(ret.expr.startPos, currentFuncDecl.returnType, ret.expr.operand.typeInfo)
+                ret.expr.expectedType = currentFuncDecl.returnType
             }
             else {
-                this.checkTypeCompatibility(ret.startPos, this.currentFuncDecl.returnType, &VOID_TYPE)
+                this.checkTypeCompatibility(ret.startPos, currentFuncDecl.returnType, &VOID_TYPE)
             }
             return true;
         }

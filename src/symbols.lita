@@ -9,6 +9,7 @@ import "mem"
 import "phase_result"
 import "libc"
 
+@asStr
 public enum SymbolKind {
     TYPE,
     VAR,
@@ -16,6 +17,7 @@ public enum SymbolKind {
     FUNC,
 }
 
+@asStr
 public enum SymbolState {
     UNRESOLVED = 0,
     RESOLVING,
@@ -34,6 +36,7 @@ public enum SymbolFlags {
     IS_BUILTIN              = (1<<8),
     IS_FROM_GENERIC_TEMPLATE= (1<<9),
     IS_IMPORTED             = (1<<10),
+    IS_PUBLIC               = (1<<11),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -49,6 +52,8 @@ public struct Symbol {
     declared: *Module
     flags: i32
 
+    // TODO: put in struct
+    genericCallsiteModule: *Module
     genericArgs: Array<*TypeInfo>
     genericParams: Array<GenericParam>
 }
@@ -70,6 +75,8 @@ public struct Scope {
     result: *PhaseResult
     parent: *Scope
     symbols: using Map<*const char, *Symbol>
+
+    module: *Module // TEMP
 }
 
 public func NewScope(kind: ScopeKind, parent: *Scope, result: *PhaseResult, allocator: *const Allocator) : *Scope {
@@ -78,14 +85,14 @@ public func NewScope(kind: ScopeKind, parent: *Scope, result: *PhaseResult, allo
     return scope
 }
 
-public func (scope: *Scope) init(kind: ScopeKind, 
-                                 parent: *Scope, 
+public func (scope: *Scope) init(kind: ScopeKind,
+                                 parent: *Scope,
                                  result: *PhaseResult,
-                                 allocator: *const Allocator) {    
+                                 allocator: *const Allocator) {
     scope.kind = kind
     scope.allocator = allocator
     scope.parent = parent
-    scope.result = result    
+    scope.result = result
     scope.symbols = StrMap<*Symbol>(null, 16, allocator)
 }
 
@@ -110,23 +117,24 @@ public func (s: *Scope) lookupByToken(name: Token) : *Symbol {
 
     var buf:[MAX_SYMBOL_NAME]char
     name.str.copyTo(buf, MAX_SYMBOL_NAME)
-    return s.lookup(buf)    
+    return s.lookup(buf)
 }
 
-public func (this: *Scope) importSymbol(name:[MAX_SYMBOL_NAME]const char, 
+public func (this: *Scope) importSymbol(name:[MAX_SYMBOL_NAME]const char,
                                         symbol: *Symbol) {
 
     if(this.symbols.contains(name) && !symbol.decl.hasNote("generated")) {
-        this.result.addError(symbol.decl.startPos, "symbol '%s' already defined", name)
+        printf("%s already defines '%s' from '%s'\n", this.module.id.filename, name, symbol.declared.id.filename)
+        this.result.addError(symbol.decl.startPos, "can't import symbol '%s' because it is already defined", name)
         return;
     }
 
     this.symbols.put(name, symbol)
 }
 
-public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char, 
-                                     module: *Module, 
-                                     decl: *Decl, 
+public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
+                                     module: *Module,
+                                     decl: *Decl,
                                      flags: i32) : *Symbol {
 
     if(this.symbols.contains(name) && !decl.hasNote("generated")) {
@@ -139,7 +147,7 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
                      decl.kind == StmtKind.UNION_DECL  ||
                      decl.kind == StmtKind.TYPEDEF_DECL||
                      decl.kind == StmtKind.ENUM_DECL)
-    
+
     if(this.kind == ScopeKind.FUNC) {
         if(!isNewType) {
             flags |= SymbolFlags.IS_LOCAL
@@ -148,6 +156,10 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
 
     if(decl.hasNote("foreign")) {
         flags |= SymbolFlags.IS_FOREIGN
+    }
+
+    if(decl.attributes.isPublic) {
+        flags |= SymbolFlags.IS_PUBLIC
     }
 
     if(isNewType) {
@@ -191,4 +203,19 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
 
     this.symbols.put(sym.name, sym)
     return sym
+}
+
+
+// TEMP
+public func (this: *Scope) print(header: *const char) {
+    printf("Scope %s {\n", header)
+    for(var i = 0; i < this.symbols.capacity; i+=1) {
+        var symName = this.symbols.keys[i]
+        var symbol = this.symbols.values[i]
+        if(!symName || !symbol) {
+            continue
+        }
+        printf("   '%s'\n", symName)
+    }
+    printf("}\n")
 }

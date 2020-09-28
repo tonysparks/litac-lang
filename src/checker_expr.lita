@@ -126,7 +126,10 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
 
 func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
-
+printf("Resolving function: %s\n", expr.type.name)
+printf("Trying: '")
+PrintTypeSpec(expr.type)
+printf("'\n")
     var type = this.resolveTypeSpec(expr.type)
     if(!type) {
         this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
@@ -445,6 +448,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
 
     var funcExpr = objectExpr as (*IdentifierExpr);
     var nameSpec = funcExpr.type
+
     nameSpec.typeInfo = null // clear out the cached value, so it can be created with the generic types
     var size = funcPtr.genericParams.size()
     nameSpec.genericArgs.init(size, this.allocator)
@@ -473,6 +477,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
         }
     }
 
+printf("Re-resolving expr-object %s\n", nameSpec.name)
     if(!this.resolveExpr(expr.object)) {
         for(var i = expr.genericArgs.size(); i < funcPtr.genericParams.size(); i += 1) {
             var param = funcPtr.genericParams.get(i)
@@ -489,6 +494,13 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
     // generic parameters
     if(type.sym && type.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
         var decl = type.sym.decl as (*GenericDecl)
+        printf("ERROR missing generic arguments: %s @ %d -- %s\n", expr.startPos.filename, expr.startPos.lineNumber, type.sym.name)
+        for(var i = 0; i < nameSpec.genericArgs.size(); i+=1) {
+            var arg = nameSpec.genericArgs.get(i)
+            printf("Generic Arg: \n")
+            PrintTypeSpec(arg)
+            printf("\n")
+        }
         this.errorMissingGenericArguments(funcExpr, nameSpec.name, decl.genericParams)
         goto err;
     }
@@ -929,7 +941,7 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
     expr.field.operand.typeInfo = field.typeInfo
     expr.operand.typeInfo = field.typeInfo
 
-    this.checkTypeCompatibility(expr.startPos, expr.value.operand.typeInfo, field.typeInfo)
+    this.checkTypeCompatibility(expr.startPos, field.typeInfo, expr.value.operand.typeInfo)
     return true
 }
 
@@ -1045,7 +1057,41 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
 func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTypeInfo) : bool {
     assert(expr != null)
 
+    if(expr.flags & GetExprFlags.IS_METHOD_CALL) {
+        return true;
+    }
+
+printf("Searching method: %s_%s\n", aggInfo.name, expr.field.type.name)
+    var funcSym = aggInfo.getMethod(this.current, expr.field.type.name)
+    if(funcSym) {
+        var decl = funcSym.decl as (*FuncDecl)
+
+
+
+        // We need to update the get expression with the method name
+        var oldName = expr.field.type
+        var methodName = this.allocator.alloc(MAX_SYMBOL_NAME * sizeof(:char)) as (*char)
+        aggInfo.getMethodName(methodName, oldName.name)
+printf("MethodName: %s from type %s with genArgs: %d\n", methodName, aggInfo.name, expr.field.type.genericArgs.size())
+
+        expr.field.type.name = methodName // = NewNameTypeSpec(oldName.pos, methodName, this.allocator)
+        if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            // TODO: Create NameTypeSpec and resolveTypeSpec
+            //var methodName
+            printf("Resolving generic type: %s\n", methodName)
+            if(!this.resolveTypeSpec(expr.field.type)) {
+                // TODO: mark an error?
+            }
+        }
+        expr.flags |= GetExprFlags.IS_METHOD_CALL
+        expr.field.operand.typeInfo = funcSym.type
+        expr.operand.typeInfo = funcSym.type
+//        printf("Found method: %s\n", funcSym.name)
+        return true
+    }
+
     // TODO: We shouldn't be looking thru all possible functions - performance!!
+    /*
     for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
         var sym = this.symbolFuncs.get(i)
         var decl = sym.decl as (*FuncDecl)
@@ -1086,7 +1132,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
                 return true
             }
         }
-    }
+    }*/
 
     for(var i = 0; i < aggInfo.decl.fields.size(); i += 1) {
         var field = aggInfo.decl.fields.get(i)
@@ -1106,13 +1152,13 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
 
 func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
     assert(expr != null)
-
+printf("Resolving GetExpr\n")
     if(!this.resolveExpr(expr.object)) {
         return false
     }
 
     // should we resolve field?
-    if(!expr.field) {
+    if(!expr.field /*|| !this.resolveExpr(expr.field)*/) {
         return false
     }
 
@@ -1163,6 +1209,58 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         if(this.checkMethodExpr(expr, aggInfo)) {
             return true
         }
+        /*
+        else {
+            printf("~No method for: %s.%s\n", aggInfo.name, expr.field.type.name)
+
+            var methodName: [MAX_SYMBOL_NAME]char;
+            var nameStr = StringInit(methodName, MAX_SYMBOL_NAME)
+            nameStr.format("%s_%s", aggInfo.name, expr.field.type.name)
+            var funcSym = aggInfo.getMethod(this.current, expr.field.type.name)
+            if(funcSym) {
+                printf("~Found function: %s\n", funcSym.name)
+            }
+
+            //for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
+            for(var it = this.current.genericSymbols.iter();it.hasNext();) {
+                var entry = it.next()
+                var sym = entry.value
+                printf("~Checking %s\n", sym.name)
+                if(sym.decl.kind != StmtKind.FUNC_DECL) {
+                    continue
+                }
+
+                var decl = sym.decl as (*FuncDecl)
+                if(!(decl.flags & FuncFlags.IS_METHOD)) {
+                    continue
+                }
+                var methodName: [MAX_SYMBOL_NAME]char;
+                decl.getName(methodName);
+                printf("~FuncName: %.*s ~> %s vs %s\n", decl.name.str.length, decl.name.str.buffer, methodName, sym.name)
+            }
+printf("~~~~~~~~~~~~~~~~\n")
+            for(var it = aggInfo.sym.declared.symbols.iter();it.hasNext();) {
+                var entry = it.next()
+                var sym = entry.value
+            //for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
+              //  var sym = this.symbolFuncs.get(i)
+                //printf("~Checking %s\n", sym.name)
+                if(sym.decl.kind != StmtKind.FUNC_DECL) {
+                    continue
+                }
+
+                var decl = sym.decl as (*FuncDecl)
+                if(!(decl.flags & FuncFlags.IS_METHOD)) {
+                    continue
+                }
+                var methodName: [MAX_SYMBOL_NAME]char;
+                decl.getName(methodName);
+                printf("~FuncName: %.*s ~> %s vs %s  (%s)\n",
+                    decl.name.str.length, decl.name.str.buffer, methodName, sym.name, entry.key)
+            }
+
+            //exit(0)
+        }*/
 
     }
 
@@ -1686,9 +1784,19 @@ func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
 func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
 
-    var sym = this.currentScope.lookup(expr.type.name)
+    var sym = this.currentScope().lookup(expr.type.name)
     if(!sym) {
         this.result.addError(expr.startPos, "unknown variable '%s'", expr.type.name)
+
+        var sb = StringBufferInit(512, this.allocator)
+        printf("unknown variable '%s' in module: '%s' @ %d\n", expr.type.name,
+            //this.current.currentScope.module.id.filename
+            expr.startPos.filename
+            , expr.startPos.lineNumber)
+        this.current.print("***Module***")
+        this.currentScope().print("Current")
+        printf("EXITING!!\n")
+        exit(1)
         return false
     }
 

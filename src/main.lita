@@ -30,7 +30,8 @@ func main(len: i32, args: **char) : i32 {
         return -1;
     }
 
-    var lita = LitaInit(&options)
+    var lita = Lita{}
+    lita.init(&options)
     defer lita.free()
 
     var root = Parse(lita)
@@ -261,6 +262,7 @@ func Parse(lita: *Lita) : *Module {
     }
 
     var builtinImport = NewImportDecl(SrcPos{}, SrcPos{}, BUILTIN_IMPORT_TOKEN, Token{.type = TokenType.VOID}, false, lita.allocator) as (*ImportDecl)
+    builtinImport.moduleId = &builtin.id
     root.ast.imports.add(builtinImport)
 
     return root

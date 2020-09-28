@@ -14,6 +14,7 @@ import "libc"
 import "assert"
 import "module"
 import "string_buffer"
+import "string"
 
 import "ast_print"
 
@@ -141,9 +142,16 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
         }
     }
     else if(p.match(TokenType.HASH)) {
-        var comp = p.compStatement()
-        assert(comp)
-        // TODO: Eval the compile time statement
+        var compStmt = p.compStatement()
+        assert(compStmt)
+
+        if(!compStmt || compStmt.kind != StmtKind.COMP_STMT) {
+            // TODO: Mark error?
+            printf("*** ERROR!!\n")
+            return;
+        }
+
+        p.lita.preprocessor.evaluateForModule(moduleStmt, compStmt as (*CompStmt))
     }
     else {
         var notes = Array<*NoteStmt>{}
@@ -192,10 +200,72 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
         }
 
         var decl = moduleStmt.declarations.last()
-        //printf("Decl: %.*s\n", decl.name.str.length, decl.name.str.buffer)
         decl.attributes.notes = notes
         decl.attributes.isPublic = isPublic
         decl.attributes.isGlobal = true
+    }
+}
+
+func (p: *Parser) parseCompileTimeBody() : *Stmt {
+
+    if(p.match(TokenType.IMPORT)) {
+        var importDecl = p.importDeclaration()
+        if(!importDecl) {
+            goto err;
+        }
+
+        return importDecl as (*Stmt)
+    }
+    else {
+        var pos = p.pos()
+
+        var notes = Array<*NoteStmt>{}
+        if(!p.notes(&notes)) {
+            goto err;
+        }
+
+        var isPublic = p.match(TokenType.PUBLIC)
+        var decl: *Decl = null
+
+        if(p.match(TokenType.VAR)) {
+            decl = p.varDeclaration()
+        }
+        else if(p.match(TokenType.CONST)) {
+            decl = p.constDeclaration()
+        }
+        else if(p.match(TokenType.FUNC)) {
+            decl = p.funcDeclaration()
+        }
+        else if(p.match(TokenType.STRUCT)) {
+            decl = p.structDeclaration()
+        }
+        else if(p.match(TokenType.UNION)) {
+            decl = p.unionDeclaration()
+        }
+        else if(p.match(TokenType.ENUM)) {
+            decl = p.enumDeclaration()
+        }
+        else if(p.match(TokenType.TYPEDEF)) {
+            decl = p.typedefDeclaration()
+        }
+        else if(p.match(TokenType.SEMICOLON)) {
+            if(!notes.empty()) {
+                return NewNotesDecl(pos, p.pos(), notes, p.allocator) as (*Stmt)
+            }
+            return null;
+        }
+        else {
+            // TODO: What to do about notes?
+            return p.statement()
+        }
+
+        decl.attributes.notes = notes
+        decl.attributes.isPublic = isPublic
+        decl.attributes.isGlobal = true
+
+        return decl as (*Stmt);
+err:
+        return NewPoisonDecl(pos, p.pos(), p.allocator) as (*Stmt)
     }
 }
 
@@ -1314,21 +1384,104 @@ err:
 }
 
 func (p: *Parser) compStatement() : *Stmt {
-    // TODO: really support this!!
-    var pos = p.prevPos()
-    while(!p.atEnd()) {
-        if(p.match(TokenType.HASH)) {
-            if(p.check(TokenType.IDENTIFIER)) {
-                var identifier = p.identifier()
-                if(identifier.value.str.equals("end")) {
-                    break;
-                }
+    var pos = p.pos()
+
+    var type: *const char = null
+    var scriptExpr: *const char = null
+
+    if(p.match(TokenType.IF)) {
+        type = "if"
+    }
+    else if(p.match(TokenType.ELSE)) {
+        type = "else"
+    }
+    else {
+        var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+        if(!identifier) {
+            goto err;
+        }
+
+        type = NewTokenName(*identifier, p.allocator)
+    }
+
+    if(strcmp(type, "if") == 0 ||
+       strcmp(type, "elseif") == 0) {
+        // read the expression
+        var pos = p.pos()
+        var currentLine = pos.lineNumber
+        var script = StringBufferInit(128, p.allocator)
+        while(!p.atEnd()) {
+            var token = p.peek()
+
+            var nextLine = token.pos.lineNumber
+            if(nextLine != currentLine) {
+                // TODO: Escape
+                break
+            }
+            else {
+                script.append("%.*s ", token.str.length, token.str.buffer)
+                p.advance()
             }
         }
 
-        p.advance()
+        scriptExpr = script.cStr()
+      //  printf("Script is: %s and next token is: %.*s\n", scriptExpr, p.peek().str.length, p.peek().str.buffer)
+
+        var body = ArrayInit<*Stmt>(32, p.allocator)
+        while(!p.atEnd()) {
+            if(p.check(TokenType.HASH)) {
+                break;
+            }
+
+            var stmt = p.parseCompileTimeBody()
+            if(stmt) {
+                body.add(stmt)
+            }
+        }
+
+        if(!p.consume(TokenType.HASH, ErrorCode.MISSING_COMP_STMT_END)) {
+            goto err;
+        }
+
+        var end = p.compStatement()
+        if(end && end.kind != StmtKind.COMP_STMT) {
+            goto err;
+        }
+        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
+
+    }
+    else if(strcmp(type, "else") == 0) {
+        var body = ArrayInit<*Stmt>(32, p.allocator)
+        while(!p.atEnd()) {
+            if(p.check(TokenType.HASH)) {
+                break;
+            }
+
+            var stmt = p.parseCompileTimeBody()
+            if(stmt) {
+                body.add(stmt)
+            }
+        }
+
+        if(!p.consume(TokenType.HASH, ErrorCode.MISSING_COMP_STMT_END)) {
+            goto err;
+        }
+
+        var end = p.compStatement()
+        if(end && end.kind != StmtKind.COMP_STMT) {
+            goto err;
+        }
+        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
+    }
+    else if(strcmp(type, "end") == 0) {
+        return NewCompStmt(pos, p.pos(), type, null, Array<*Stmt>{}, null, p.allocator)
+    }
+    else {
+        p.errorAtToken(p.peek(), ErrorCode.INVALID_COMP_STMT)
+        goto err;
     }
 
+err:
     return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
 }
 

@@ -23,8 +23,7 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
     this.emitLineInfo(decl.stmt)
 
     var name = this.cName(decl.sym)
-    if(decl.sym.flags & SymbolFlags.IS_CONSTANT) {
-        // TODO: check if primitive expr
+    if(decl.sym.flags & SymbolFlags.IS_CONSTANT && decl.expr.isConstExpr()) {
         assert(decl.expr != null)
         buf.append("#define ")
         this.emit(name)
