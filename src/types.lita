@@ -1400,25 +1400,29 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
     return false
 }
 
-public func (this: *AggregateTypeInfo) getMethodName(result: [MAX_SYMBOL_NAME]char, funcName: *const char) : *const char {
+@doc("""
+Given a method name, this will return the function name equivalent, which is:
+AggregateName_MethodName
+""")
+public func (this: *AggregateTypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, methodName: *const char) : *const char {
     memset(result, 0, MAX_SYMBOL_NAME)
     this.getBaseName(result);
 
     strcat(result, "_")
-    strcat(result, funcName)
+    strcat(result, methodName)
 
     return (result)
 }
 
-public func (this: *AggregateTypeInfo) getMethod(module: *Module, funcName: *const char) : *Symbol {
-    var methodName = [MAX_SYMBOL_NAME]char {0};
-    this.getMethodName(methodName, funcName)
+public func (this: *AggregateTypeInfo) getMethod(module: *Module, methodName: *const char) : *Symbol {
+    var funcName = [MAX_SYMBOL_NAME]char {0};
+    this.getFunctionName(funcName, methodName)
 
     // first see if the aggregate declaration module has the method
-    var methodSym = this.sym.declared.getType(methodName)
+    var methodSym = this.sym.declared.getType(funcName)
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
         // otherwise look in the current module
-        methodSym = module.getType(methodName)
+        methodSym = module.getType(funcName)
     }
 
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
@@ -1436,14 +1440,6 @@ public func (this: *AggregateTypeInfo) getMethod(module: *Module, funcName: *con
 
     var base = decl.params.first().typeInfo.getBaseType()
 
-    /*
-    var sb = StringBufferInit(256)
-    sb.append("Method types: ")
-    this.toString(sb)
-    sb.append(" vs ")
-    base.toString(sb)
-    sb.append("\n")
-    printf("%s", sb.cStr())*/
 
     // If this is a generic type, we need to compare against the original
     // template types for equality

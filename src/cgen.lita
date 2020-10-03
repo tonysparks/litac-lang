@@ -651,7 +651,6 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
         return sym.name
     }
 
-    // TODO: Get a non-collision based module name
     sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, declName)
     return sb.cStrConst()
 }
@@ -678,7 +677,6 @@ func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
         return sym.name
     }
 
-    // TODO: Get a non-collision based module name
     sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, typeName)
     return sb.cStrConst()
 }
@@ -867,6 +865,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     }
     else if(strncmp(note.name.str.buffer, "cFile", note.name.str.length) == 0) {
         // TODO
+        assert(false)
     }
 }
 

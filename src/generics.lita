@@ -124,6 +124,9 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             if(!checker.resolveTypeSpec(arg)) {
                 isValidArgs = false
             }
+            if(arg.typeInfo.kind == TypeKind.GENERIC_PARAM) {
+                genericSym.flags = SymbolFlags.IS_GENERIC_TEMPLATE
+            }
 
             genericSym.genericArgs.add(arg.typeInfo)
         }
@@ -140,7 +143,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     checker.finishResolveSymbol(genericSym)
 
     name.typeInfo = genericSym.type
-    if(IsGenericCapable(genericSym.type)) {
+    if(IsGenericCapable(genericSym.type) && sym.type) {
         var genericType = genericSym.type as (*GenericTypeInfo)
         genericType.genericTypeid = sym.type.typeid
     }

@@ -480,7 +480,7 @@ public struct NullExpr {
 
 public struct NumberExpr {
     expr: using Expr
-    number: Token // TODO: should this be the number value? or Token
+    number: Token
 }
 
 public struct OffsetOfExpr {
