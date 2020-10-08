@@ -126,10 +126,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
 
 func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
-printf("Resolving function: %s\n", expr.type.name)
-printf("Trying: '")
-PrintTypeSpec(expr.type)
-printf("'\n")
+
     var type = this.resolveTypeSpec(expr.type)
     if(!type) {
         this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
@@ -1055,8 +1052,6 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
 func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTypeInfo) : bool {
     assert(expr != null)
 
-    printf("Searching method: %s_%s genArgs: %d\n", aggInfo.name, expr.field.type.name, expr.field.type.genericArgs.size())
-
     // If this was already processed as a method, we'll need to determine
     // if this is a generic symbol and must be re-resolved - this happens
     // during type inference for methods -- @see resolveFuncCallExpr and inferFuncCallExpr
@@ -1713,16 +1708,6 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     var sym = this.currentScope().lookup(expr.type.name)
     if(!sym) {
         this.result.addError(expr.startPos, "unknown variable '%s'", expr.type.name)
-
-        var sb = StringBufferInit(512, this.allocator)
-        printf("unknown variable '%s' in module: '%s' @ %d\n", expr.type.name,
-            //this.current.currentScope.module.id.filename
-            expr.startPos.filename
-            , expr.startPos.lineNumber)
-        this.current.print("***Module***")
-        this.currentScope().print("Current")
-        printf("EXITING!!\n")
-        exit(1)
         return false
     }
 

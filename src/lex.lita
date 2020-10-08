@@ -16,10 +16,10 @@ public enum TokenType {
     TYPEDEF,
     VAR,
     CONST,
-    
+
     NULL,
     VOID,
-    TRUE, 
+    TRUE,
     FALSE,
     BOOL,
     CHAR,
@@ -49,7 +49,7 @@ public enum TokenType {
     CONTINUE,
     RETURN,
     GOTO,
-    
+
     SIZEOF,
     TYPEOF,
     OFFSETOF,
@@ -76,7 +76,7 @@ public enum TokenType {
     COLON,
     COLON_COLON,
     DOUBLE_QUOTE,
-    
+
     LESS_THAN,
     LESS_EQUALS,
     GREATER_THAN,
@@ -135,10 +135,10 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.TYPEDEF] = "typedef",
     [TokenType.VAR] = "var",
     [TokenType.CONST] = "const",
-    
+
     [TokenType.NULL] = "null",
     [TokenType.VOID] = "void",
-    [TokenType.TRUE] = "true", 
+    [TokenType.TRUE] = "true",
     [TokenType.FALSE] = "false",
     [TokenType.BOOL] = "bool",
     [TokenType.CHAR] = "char",
@@ -168,7 +168,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.CONTINUE] = "continue",
     [TokenType.RETURN] = "return",
     [TokenType.GOTO] = "goto",
-    
+
     [TokenType.SIZEOF] = "sizeof",
     [TokenType.TYPEOF] = "typeof",
     [TokenType.OFFSETOF] = "offsetof",
@@ -196,7 +196,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.COLON] = ":",
     [TokenType.COLON_COLON] = "::",
     [TokenType.DOUBLE_QUOTE] = "\"",
-    
+
     [TokenType.LESS_THAN] = "<",
     [TokenType.LESS_EQUALS] = "<=",
     [TokenType.GREATER_THAN] = ">",
@@ -239,7 +239,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.INT_NUMBER] = "INT_NUMBER",
     [TokenType.FLOAT_NUMBER] = "FLOAT_NUMBER",
     [TokenType.ERROR] = "ERROR",
-    [TokenType.END_OF_FILE] = "\0",   
+    [TokenType.END_OF_FILE] = "\0",
 };
 
 const charToDigit = [256]i32 {
@@ -262,13 +262,16 @@ const charToDigit = [256]i32 {
 };
 
 const escapeToChar = [256]char {
-    ['0'] = '\0',
-    ['\''] = '\'',
-    ['"'] = '"',  // "
-    ['\\'] = '\\',
+    ['b'] = 'b',
+    ['f'] = 'f',
     ['n'] = '\n',
     ['r'] = '\r',
     ['t'] = '\t',
+    ['\\'] = '\\',
+    ['\''] = '\'',
+    ['"'] = '"',  // "
+    ['0'] = '\0',
+
     ['/'] = '/',
     //['v'] = '\v',
   //  ['b'] = '\b',
@@ -276,7 +279,7 @@ const escapeToChar = [256]char {
 };
 
 const MAX_KEYWORD_CACHE = 9
-const keywordCache = [MAX_KEYWORD_CACHE]**const char {    
+const keywordCache = [MAX_KEYWORD_CACHE]**const char {
     [0] = []*const char {
         null
     },
@@ -335,19 +338,19 @@ const keywordCache = [MAX_KEYWORD_CACHE]**const char {
         "return",
         "sizeof",
         "typeof",
-        "public",    
+        "public",
         null
     },
     [7] = []*const char {
         "typedef",
-        "default",    
+        "default",
         null
     },
     [8] = []*const char {
         "continue",
-        "offsetof",    
+        "offsetof",
         null
-    },    
+    },
 }
 
 const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
@@ -402,11 +405,11 @@ const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
         TokenType.PUBLIC,
     },
     [7] = []TokenType {
-        TokenType.TYPEDEF,    
+        TokenType.TYPEDEF,
         TokenType.DEFAULT,
     },
     [8] = []TokenType {
-        TokenType.CONTINUE,    
+        TokenType.CONTINUE,
         TokenType.OFFSETOF,
     }
 }
@@ -468,7 +471,7 @@ public func (t: *Token) asString() : *const char {
     return tokenText[t.type]
 }
 
-public func (token: *Token) print() {    
+public func (token: *Token) print() {
     printf("%s: '%s' '%.*s' ", TokenTypeAsStr(token.type), token.asString(), (token.pos.end - token.pos.start) as (i32), token.pos.start)
     if(token.type == TokenType.INT_NUMBER) {
         printf("value: '%llu'", token.value.intValue)
@@ -501,7 +504,7 @@ public struct Lexer {
     errorMsg: *const char
 }
 
-public func LexerInit(filename: *const char, 
+public func LexerInit(filename: *const char,
                       text: *const char,
                       allocator: *const Allocator) : Lexer {
     return Lexer {
@@ -512,8 +515,8 @@ public func LexerInit(filename: *const char,
             .pos = SrcPos {
                 .filename = filename,
                 .start = text,
-                .end = null,   
-            }         
+                .end = null,
+            }
         },
         .stream = text,
         .lineStart = text,
@@ -529,7 +532,7 @@ public func (l: *Lexer) hasError() : bool {
 
 func (l: *Lexer) error(format: *const char, ...) {
     var sb = StringBufferInit(256, l.allocator)
-    
+
     var args: va_list;
     va_start(args, format);
     sb.append(format, args)
@@ -561,7 +564,7 @@ func (l: *Lexer) eofToken() : Token {
 }
 
 func (l: *Lexer) errorToken() : Token {
-    l.token.type = TokenType.ERROR    
+    l.token.type = TokenType.ERROR
     l.token.pos.lineStart = l.lineStart
     l.token.pos.lineNumber = l.lineNumber
     l.token.pos.position = l.position
@@ -574,17 +577,17 @@ func (l: *Lexer) skipWhitespace() {
     }
 }
 
-func (l: *Lexer) skipComments() {    
-    if(*l.stream == '/') {        
-        if(l.stream[1] == '/') {            
+func (l: *Lexer) skipComments() {
+    if(*l.stream == '/') {
+        if(l.stream[1] == '/') {
             l.nextChar() // eat /
             do {
                 l.nextChar()
-                if(*l.stream == '\n') {                    
+                if(*l.stream == '\n') {
                     break;
                 }
             }
-            while(!l.eof())             
+            while(!l.eof())
         }
         else if(l.stream[1] == '*') {
             l.nextChar() // eat /
@@ -596,7 +599,7 @@ func (l: *Lexer) skipComments() {
                     break;
                 }
             }
-            while(!l.eof())            
+            while(!l.eof())
         }
     }
 }
@@ -613,14 +616,14 @@ func (l: *Lexer) isValidIdentifierChar(c: char) : bool {
             (isalpha(c)))
 }
 
-func (l: *Lexer) isSymbolStart(c: char) : bool {    
+func (l: *Lexer) isSymbolStart(c: char) : bool {
     return((c > ' ' && c < '0') ||
            (c > '9' && c < 'A') ||
            (c > 'Z' && c < '_') ||
            (c > 'z' && c < 127));
 }
 
-func (l: *Lexer) checkKeyword() : bool {    
+func (l: *Lexer) checkKeyword() : bool {
     var len = l.token.str.length
     if(len < MAX_KEYWORD_CACHE) {
         var keywords = keywordCache[len]
@@ -641,7 +644,7 @@ func (l: *Lexer) checkKeyword() : bool {
 
 func (l: *Lexer) scanWord() : Token {
     var length = 0
-    while(l.isValidIdentifierChar(*l.stream)) {    
+    while(l.isValidIdentifierChar(*l.stream)) {
         l.stream += 1
         length += 1
     }
@@ -676,7 +679,7 @@ func (l: *Lexer) scanInt(stream: *char) {
         }
     }
     var val: i64 = 0;
-    for (;;) {        
+    for (;;) {
         var digit = charToDigit[(*stream) as (i32)];
         if (digit == 0 && *stream != '0') {
             break;
@@ -708,7 +711,7 @@ func (l: *Lexer) scanInt(stream: *char) {
     l.token.value.intValue = val
 }
 
-func (l: *Lexer) scanFloat(stream: *char) {    
+func (l: *Lexer) scanFloat(stream: *char) {
     var start = stream;
 
     while (isdigit(*stream)) {
@@ -761,9 +764,9 @@ func (l: *Lexer) scanTypeInfo() {
 
             if(!isdigit(*l.stream)) {
                 break;
-            }            
+            }
         } while(!l.eof())
-        
+
         var kind = TypeKindFromString(start, len)
         switch(kind) {
             case TypeKind.I8: {
@@ -813,7 +816,7 @@ func (l: *Lexer) scanTypeInfo() {
 
             if(!isdigit(*l.stream)) {
                 break;
-            }            
+            }
         } while(!l.eof())
 
         if(len == 1) {
@@ -824,7 +827,7 @@ func (l: *Lexer) scanTypeInfo() {
                 l.token.typeInfo = &F64_TYPE
             }
         }
-        else {            
+        else {
             var kind = TypeKindFromString(start, len)
             switch(kind) {
                 case TypeKind.F32: {
@@ -846,7 +849,7 @@ func (l: *Lexer) scanTypeInfo() {
 func (l: *Lexer) scanNumber() : Token {
     var start = l.stream
 
-    var numBuf = [256]char
+    var numBuf: [256]char;
     var numIndex = 0
 
     var hasDecimal = false
@@ -893,7 +896,7 @@ func (l: *Lexer) scanNumber() : Token {
     if(l.hasError()) {
         return l.errorToken()
     }
-    
+
     l.scanTypeInfo()
 
     l.token.pos.end = l.stream
@@ -908,7 +911,7 @@ func (l: *Lexer) scanChar() : Token {
 
     if(c == '\\') {
         c = l.nextChar() // eat the \
-        
+
         if(escapeToChar[c] == 0 && c != '0') {
             return l.errorToken()
         }
@@ -946,9 +949,9 @@ func (l: *Lexer) scanString() : Token {
             l.nextChar()
             l.nextChar()
         }
-                
+
         l.nextChar()
-        
+
         l.token.value.str.buffer = l.stream
         while(!l.eof()) {
             if(l.stream[0] == '\\') {
@@ -1160,27 +1163,27 @@ func (l: *Lexer) scanSymbol() : Token {
             }
             break;
         }
-        case '(': { 
+        case '(': {
             l.token.type = TokenType.LEFT_PAREN
             break;
         }
-        case ')': { 
+        case ')': {
             l.token.type = TokenType.RIGHT_PAREN
             break;
         }
-        case '[': { 
+        case '[': {
             l.token.type = TokenType.LEFT_BRACKET
             break;
         }
-        case ']': { 
+        case ']': {
             l.token.type = TokenType.RIGHT_BRACKET
             break;
         }
-        case '{': { 
+        case '{': {
             l.token.type = TokenType.LEFT_BRACE
             break;
         }
-        case '}': { 
+        case '}': {
             l.token.type = TokenType.RIGHT_BRACE
             break;
         }
@@ -1188,7 +1191,7 @@ func (l: *Lexer) scanSymbol() : Token {
             return l.errorToken();
         }
     }
-    
+
     l.token.pos.end = l.stream
     //l.token.pos.lineNumber = l.lineNumber
     return l.token
@@ -1214,16 +1217,16 @@ repeat:
 
     var c = *l.stream
     switch(c) {
-        case '\0': {            
+        case '\0': {
             return l.eofToken()
         }
-        case ' ': 
-        case '\n': 
-        case '\r': 
+        case ' ':
+        case '\n':
+        case '\r':
         case '\t': {
         //case '\v':
-            l.skipWhitespace()        
-            goto repeat;        
+            l.skipWhitespace()
+            goto repeat;
         }
         case '"': { // "
             return l.scanString()

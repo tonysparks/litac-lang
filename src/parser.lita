@@ -148,6 +148,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
         if(!compStmt || compStmt.kind != StmtKind.COMP_STMT) {
             // TODO: Mark error?
             printf("*** ERROR!!\n")
+            assert(false)
             return;
         }
 

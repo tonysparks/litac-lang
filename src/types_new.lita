@@ -112,21 +112,6 @@ public func NewPtrTypeInfo(base: *TypeInfo, allocator: *const Allocator) : *PtrT
     return type
 }
 
-public func (this: *FuncTypeInfo) asPtr(allocator: *const Allocator) : *FuncPtrTypeInfo {
-    var genericParams = Array<GenericParam>{}
-    genericParams.init(this.decl.genericParams.size(), allocator)
-    genericParams.addAll(this.decl.genericParams)
-
-    var paramDecls = Array<*TypeInfo>{}
-    paramDecls.init(this.decl.params.size(), allocator)
-    for(var i = 0; i < this.decl.params.size() ; i += 1) {
-        var p = this.decl.params.get(i)
-        paramDecls.add(p.typeInfo)
-    }
-
-    return NewFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.decl.flags & FuncFlags.HAS_VARARGS, allocator)
-}
-
 public func TypeDecay(type: *TypeInfo, allocator: *const Allocator) : *TypeInfo {
     if(!type) return null;
 

@@ -11,7 +11,7 @@ import "preprocessor"
 public const MAX_PREFIX_SIZE = 32
 
 public struct Lita {
-    allocator: *const Allocator // TODO proper arena allocator
+    allocator: *const Allocator
     preprocessor: Preprocessor
     result: PhaseResult
     modules: Map<*const char, *Module>
@@ -66,7 +66,7 @@ public struct LitaOptions {
 var linearAllocator = LinearAllocator{}
 
 public func (this: *Lita) init(options: *LitaOptions) {
-    var size: usize = 1024 * 1024 * 500;
+    var size: usize = 1024 * 1024 * 1000;
     linearAllocator.init(defaultAllocator.alloc(size), size)
 
     var allocator = (&linearAllocator) as (*const Allocator)

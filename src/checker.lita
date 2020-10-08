@@ -185,10 +185,6 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
         return;
     }
 
-    // if(module.flags & ModuleFlags.TYPE_RESOLVED) {
-    //     return;
-    // }
-//printf("CreateModule %s\n", module.id.filename)
     this.enterModule(module)
     defer this.leaveModule()
 
@@ -199,9 +195,6 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var imp = module.ast.imports.get(i)
-        /*printf("Importing: '")
-        PrintName(imp.name)
-        printf("' for %s\n", module.id.filename)*/
         this.createImportSymbols(imp)
     }
 
@@ -210,7 +203,6 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
 func (this: *TypeChecker) enterModule(module: *Module) {
     this.moduleStack.push(module)
     this.current = module
-//    printf("Enter scope: %s\n", this.current.id.filename)
 }
 
 func (this: *TypeChecker) leaveModule() {
@@ -222,7 +214,6 @@ func (this: *TypeChecker) leaveModule() {
             this.current = this.moduleStack.last()
         }
     }
-    //printf("Leave scope: %s -> %s\n", oldScope.id.filename, this.current.id.filename)
 }
 
 func (this: *TypeChecker) currentScope() : *Scope {
@@ -261,7 +252,6 @@ func (this: *TypeChecker) isGenericParamType(name: *NameTypeSpec) : bool {
 
 func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     assert(decl != null)
-//printf("Create Decl for: %.*s in %s\n", decl.name.str.length, decl.name.str.buffer, this.current.id.filename)
 
     if(decl.sym) {
         return decl.sym
@@ -299,9 +289,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 // is a valid constant expression and we don't need
                 // to resolve it later
                 if(isValid) {
-                    //printf("Finishing symbol: %s\n", sym.name)
                     this.finishResolveSymbol(sym)
-                    //break;
                 }
             }
             this.pendingValues.add(sym)
@@ -364,9 +352,6 @@ err:
 }
 
 func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
-    printf("Resolving Import: ")
-    PrintName(imp.name)
-    printf("\n")
 
     for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
         var other = this.current.ast.imports.get(i)
@@ -393,7 +378,6 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
     }
 
     if(module == this.current) {
-        printf("Premature exit for: %s\n", module.id.filename)
         return;
     }
 
@@ -402,9 +386,6 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
         this.createModuleSymbols(module)
     }
 
-    printf("Resolved Importing: ~")
-    PrintName(imp.name)
-    printf("\n")
     this.current.importModule(imp, module)
 
 err:
@@ -564,7 +545,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
         (sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
         return;
     }
-//printf("FinishSym %s %s\n", sym.name, sym.declared.id.filename)
+
     this.enterModule(sym.declared)
     defer this.leaveModule()
 
@@ -642,7 +623,6 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             this.resolveSymbol(sym)
 
             if(!nameSpec.genericArgs.empty()) {
-                printf("Creating generic type: %s\n", sym.name)
                 sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
                 if(!sym) {
                     goto err;
@@ -670,12 +650,6 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             var length: usize = 0
             if(arraySpec.numElements) {
                 var expr = arraySpec.numElements
-
-                printf("Resolving array index: %s @ %d\n",
-                    expr.startPos.filename, expr.startPos.lineNumber)
-
-                printf("Current scope: %s\n", this.current.id.filename)
-
                 if(!this.resolveConstExpr(expr)) {
                     goto err;
                 }
@@ -824,7 +798,8 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             if(!stmt) {
                 return false;
             }
-            return true
+
+            return this.resolveStmt(stmt)
         }
         case StmtKind.CONTINUE_STMT: {
             return true;

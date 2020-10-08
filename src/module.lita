@@ -26,10 +26,10 @@ public struct ModuleId {
 }
 
 public struct Module {
-    id: ModuleId       // TODO: don't make a separate allocation
+    id: ModuleId        // TODO: don't make a separate allocation
     text: *char         // text of modules file
     ast: *ModuleStmt
-    result: *PhaseResult
+    //result: *PhaseResult
     symbols: Scope
     currentScope: *Scope
     genericSymbols: *Map<*const char, *Symbol>

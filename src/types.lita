@@ -9,6 +9,7 @@ import "mem"
 import "ast_new"
 import "libc"
 import "module"
+import "types_new"
 
 @asStr
 public enum TypeKind {
@@ -646,6 +647,17 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return this.typeid == other.typeid
         }
         case TypeKind.FUNC_PTR: {
+            if(!IsFuncLike(other)) {
+                return false
+            }
+            var otherFuncDecl: *FuncPtrTypeInfo = null
+            if(other.kind == TypeKind.FUNC) {
+                var funcInfo = other as (*FuncTypeInfo)
+                //otherFuncDecl = funcInfo.asPtr()
+            }
+            else {
+                otherFuncDecl = other as (*FuncPtrTypeInfo)
+            }
             return true; // TODO
         }
         case TypeKind.FUNC: {
@@ -827,6 +839,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
 
         case TypeKind.FUNC_PTR: {
             // TODO
+            assert(false)
             break;
         }
 
@@ -869,6 +882,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
         }
         case TypeKind.FUNC: {
             // TODO
+            assert(false)
             break;
         }
         default: {
@@ -1094,6 +1108,21 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
         }
     }
     return null
+}
+
+public func (this: *FuncTypeInfo) asPtr(allocator: *const Allocator) : *FuncPtrTypeInfo {
+    var genericParams = Array<GenericParam>{}
+    genericParams.init(this.decl.genericParams.size(), allocator)
+    genericParams.addAll(this.decl.genericParams)
+
+    var paramDecls = Array<*TypeInfo>{}
+    paramDecls.init(this.decl.params.size(), allocator)
+    for(var i = 0; i < this.decl.params.size() ; i += 1) {
+        var p = this.decl.params.get(i)
+        paramDecls.add(p.typeInfo)
+    }
+
+    return NewFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.decl.flags & FuncFlags.HAS_VARARGS, allocator)
 }
 
 

@@ -108,6 +108,14 @@ public func (this: using *CGen) emitProgram(module: *Module) {
             continue
         }
 
+        if(sym.flags & SymbolFlags.IS_EMITTED) {
+            continue
+        }
+
+        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+            continue
+        }
+
         if(sym.decl.kind == StmtKind.FUNC_DECL &&
            strcmp(sym.name, "main") == 0) {
            mainSym = sym
@@ -327,22 +335,20 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
     return type.name
 }
 
-func (this: using *CGen) baseTypeName(name: *const char) : StringView {
-    var str = StringViewInit(name)
-
+func (this: using *CGen) baseTypeName(name: StringView) : StringView {
     // strip module name
-    var index = str.indexOf("::")
+    var index = name.indexOf("::")
     if(index >= 0) {
-        str = str.substring(index + 2)
+        name = name.substring(index + 2)
     }
 
     // strip generics
-    index = str.indexOf("<")
+    index = name.indexOf("<")
     if(index >= 0) {
-        str = str.substring(0, index)
+        name = name.substring(0, index)
     }
 
-    return str
+    return name
 }
 
 func (this: using *CGen) pushScope(scope: *CGenScope) {
@@ -631,6 +637,24 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     }
 }
 
+func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : StringView {
+    if(!decl) {
+        return defaultName
+    }
+
+    var note = decl.getNote("foreign")
+    if(!note) {
+        return defaultName
+    }
+
+    if(note.attributes.empty()) {
+        return defaultName
+    }
+
+    var arg = note.attributes.get(0)
+    return arg.str;
+}
+
 /**
     Outputs the C name for the symbol
 */
@@ -645,10 +669,15 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
         if(sym.flags & SymbolFlags.IS_BUILTIN) {
-            return declName
+            var name = this.baseTypeName(sym.decl.name.str)
+            sb.append("%s%.*s", this.options.cPrefix, name.length, name.buffer)
+            printf("Foreign: %s vs %s\n", declName, sb.cStrConst())
+            return sb.cStrConst()
         }
-        // TODO: Get the foreign override name
-        return sym.name
+
+        var name = this.foreignName(sym.decl, this.baseTypeName(sym.decl.name.str))
+        sb.append("%.*s", name.length, name.buffer)
+        return sb.cStrConst()
     }
 
     sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, declName)
@@ -977,18 +1006,15 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.popLoopScope(true)
             this.emit("break;")
             return;
-        }/*
+        }
         case StmtKind.COMP_STMT: {
-            // var stmt = new<CompStmt>(allocator)
-            // stmt.kind = StmtKind.COMP_STMT;
-            // stmt.startPos = startPos
-            // stmt.type = null
-            // stmt.expr = null
-            // stmt.body.init(16, allocator)
-            // stmt.end = null
-            // stmt.evaluatedStmt = null
-            // return stmt as (*Stmt)
-        }*/
+            var stmt = s as (*CompStmt)
+            var result = this.lita.preprocessor.evaluateForFunction(stmt)
+            if(result) {
+                this.emitStmt(result)
+            }
+            return;
+        }
         case StmtKind.CONTINUE_STMT: {
             this.popLoopScope()
             this.emit("continue;")
@@ -1017,7 +1043,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             this.emit("}\nwhile(")
             this.emitStmt(stmt.cond)
-            this.emit(")")
+            this.emit(");")
             return;
         }
         case StmtKind.EMPTY_STMT: {
@@ -1623,7 +1649,20 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
             var expr = s as (*TypeIdentifierExpr)
-            this.emitTypeSpec(expr.type)
+            // TODO: Simplify this...
+            if(expr.type.typeInfo) {
+                this.emit("%s", this.cType(expr.type.typeInfo))
+            }
+            else {
+                if(expr.sym) {
+                    // TODO: Visit symbol (accounting for using path...)
+                    this.emitSymbol(expr.sym)
+                    //this.emit("%s", this.cName(expr.sym))
+                }
+                else {
+                    this.emitTypeSpec(expr.type)
+                }
+            }
             return;
         }/*
         case StmtKind.TYPE_OF_EXPR: {
@@ -1648,7 +1687,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         default: {
             //Panic("Unknown statement kind: %d", s.kind)
             this.emit("<%s Not Implemented>", StmtKindAsStr(s.kind))
-            return;
+            assert(false)
         }
     }
 }

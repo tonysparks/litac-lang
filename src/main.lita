@@ -287,8 +287,8 @@ func Transpile(lita: *Lita, module: *Module) : bool {
         return false
     }
 
-    var cFilename: [MAX_PATH]char;
-    var binaryFilename: [MAX_PATH]char;
+    var cFilename = [MAX_PATH]char{};
+    var binaryFilename = [MAX_PATH]char{};
 
     strcat(cFilename, lita.options.outputPath)
     var len = strlen(lita.options.outputPath)

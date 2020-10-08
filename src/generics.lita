@@ -53,7 +53,7 @@ func GetGenericName(type: *TypeSpec, str: *String) {
         }
         case TypeSpecKind.FUNC_PTR: {
             // TODO:
-            str.append("TODO-FuncPtr<>")
+            assert(false)
         }
         case TypeSpecKind.NONE:
         default:
@@ -125,7 +125,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
                 isValidArgs = false
             }
             if(arg.typeInfo.kind == TypeKind.GENERIC_PARAM) {
-                genericSym.flags = SymbolFlags.IS_GENERIC_TEMPLATE
+                genericSym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
             }
 
             genericSym.genericArgs.add(arg.typeInfo)
@@ -228,6 +228,7 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
         }
         case TypeSpecKind.FUNC_PTR: {
             // TODO
+            assert(false)
             break;
         }
         case TypeSpecKind.NAME: {
@@ -335,7 +336,18 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             break;
         }
         case StmtKind.COMP_STMT: {
-            break; // TODO
+            var comp = ast as (*CompStmt)
+            if(comp.evaluatedStmt) {
+                ReplaceTypes(template, comp.evaluatedStmt)
+            }
+            if(comp.end) {
+                ReplaceTypes(template, comp.end)
+            }
+            for(var i = 0; i < comp.body.size(); i+=1) {
+                var s = comp.body.get(i)
+                ReplaceTypes(template, s)
+            }
+            break;
         }
         case StmtKind.CONTINUE_STMT: {
             break;

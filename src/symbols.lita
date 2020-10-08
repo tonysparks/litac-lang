@@ -37,6 +37,7 @@ public enum SymbolFlags {
     IS_FROM_GENERIC_TEMPLATE= (1<<9),
     IS_IMPORTED             = (1<<10),
     IS_PUBLIC               = (1<<11),
+    IS_EMITTED              = (1<<12),
 }
 
 public const MAX_SYMBOL_NAME = 256;

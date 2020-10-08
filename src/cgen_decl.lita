@@ -19,6 +19,8 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         return;
     }
 
+    decl.sym.flags |= SymbolFlags.IS_EMITTED
+
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
 
@@ -113,6 +115,8 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
         return;
     }
 
+    decl.sym.flags |= SymbolFlags.IS_EMITTED
+
     var name = this.cName(decl.sym)
     this.emitFuncDeclSignature(decl, name)
     this.emit(" {")
@@ -136,6 +140,8 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
     if(decl.flags & AggregateFlags.IS_EMBEDDED && this.aggregateLevel < 1) {
         return;
     }
+
+    decl.sym.flags |= SymbolFlags.IS_EMITTED
 
     this.aggregateLevel += 1
     defer this.aggregateLevel -= 1
@@ -178,6 +184,8 @@ public func (this: using *CGen) emitEnumDecl(decl: *EnumDecl) {
     if(decl.sym.flags & SymbolFlags.IS_FOREIGN) {
         return;
     }
+
+    decl.sym.flags |= SymbolFlags.IS_EMITTED
 
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
