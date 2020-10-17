@@ -41,29 +41,19 @@ const escapeStrings = [256]*const char {
     ['\n'] = "\\n",
     ['\r'] = "\\r",
     ['\t'] = "\\t",
-    //['\\'] = "\\\\",
-    //['\''] = "\\'",
+    ['\\'] = "\\\\",
+    ['\''] = "\\'",
     //['"'] = "\\\"",
     ['\0'] = "\\0",
 }
 
 const escapeChars = [256]*const char {
-    /*['b'] = true,
-    ['f'] = true,
-    ['n'] = true,
-    ['r'] = true,
-    ['t'] = true,
-    ['\\'] = true,
-    ['\''] = true,
-    ['"'] = true, //"
-    ['0'] = true,*/
-
     ['b'] = "\\\\b",
     ['f'] = "\\\\f",
     ['n'] = "\\\\n",
     ['r'] = "\\\\r",
     ['t'] = "\\\\t",
-   // ['\\'] = "\\\\",
+    ['\\'] = "\\\\",
     ['\''] = "\\'",
     ['"'] = "\\\\\"",
     ['\0'] = "\\0",
@@ -1319,7 +1309,13 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.CHAR_EXPR: {
             var expr = s as (*CharExpr)
-            this.emit("'%c'", expr.character.intValue as (char))
+            var c = escapeStrings[expr.character.intValue]
+            if(c != 0) {
+                this.emit("'%s'", c)
+            }
+            else {
+                this.emit("'%c'", expr.character.intValue as (char))
+            }
             return;
         }
         case StmtKind.FUNC_CALL_EXPR: {

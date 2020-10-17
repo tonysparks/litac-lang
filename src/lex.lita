@@ -262,8 +262,8 @@ const charToDigit = [256]i32 {
 };
 
 const escapeToChar = [256]char {
-    ['b'] = 'b',
-    ['f'] = 'f',
+    ['b'] = '\b',
+    ['f'] = '\f',
     ['n'] = '\n',
     ['r'] = '\r',
     ['t'] = '\t',
@@ -955,10 +955,13 @@ func (l: *Lexer) scanString() : Token {
         l.token.value.str.buffer = l.stream
         while(!l.eof()) {
             if(l.stream[0] == '\\') {
-                if(l.stream[1] == '"') {
-                    l.nextChar()
-                    length += 1
+                var c: char = l.stream[1]
+                if(escapeToChar[c] == 0 && c != '0') {
+                    return l.errorToken()
                 }
+
+                l.nextChar()
+                length += 1
             }
             else if(l.stream[0] == '"') {
                 if(!isVerbatim) {

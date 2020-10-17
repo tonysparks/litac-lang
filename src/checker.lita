@@ -702,7 +702,10 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
     }
 
 err:
-printf("ResolveTypeSpec error!\n")
+    if(!spec.typeInfo) {
+        spec.typeInfo = &POISON_TYPE
+    }
+
     return &POISON_TYPE
 }
 

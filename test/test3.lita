@@ -18,9 +18,36 @@ struct Test {
     //x:Array<i32>
 }
 
+const escapeStrings = [256]*const char {
+    ['\b'] = "\\b",
+    ['\f'] = "\\f",
+    ['\n'] = "\\n",
+    ['\r'] = "\\r",
+    ['\t'] = "\\t",
+    ['\\'] = "\\\\",
+    ['\''] = "\\'",
+    ['"'] = "\\\"",
+    ['\0'] = "\\0",
+}
+
 func main(len:i32, args: **char) : i32 {
     var t = Test{}
     t.size()
+    /*
+    var c = []char {
+        '\n',
+        '\b',
+        '\f',
+        '\r',
+        '\t',
+        '\\',
+        '\'',
+        '"',   // "
+        '\0',
+    }
+    if(c[0] == '"') { // "
+        printf("Char: [%c]", c[0])
+    }*/
 
     /*
     t.params = ArrayInit<i32>()

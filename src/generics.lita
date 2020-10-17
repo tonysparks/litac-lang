@@ -123,6 +123,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             if(!checker.resolveTypeSpec(arg)) {
                 isValidArgs = false
             }
+
             if(arg.typeInfo.kind == TypeKind.GENERIC_PARAM) {
                 genericSym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
             }
