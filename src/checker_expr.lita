@@ -186,7 +186,6 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
         return expr
     }
 
-
     var path = FieldPath{}
     if(!source.getFieldPathByType(target, &path)) {
         return expr
@@ -406,9 +405,11 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
                     }
                 }
 
-                var argumentField = expectedAggInfo.getFieldWithUsing(fieldName)
+                //var argumentField = expectedAggInfo.getFieldWithUsing(fieldName)
+                var argumentField = expectedAggInfo.getField(fieldName)
                 if(argumentField.kind != StmtKind.POISON_EXPR) {
                     assert(field.typeInfo != null)
+
                     var fieldType = this.inferredType(genericName, field.typeInfo, argumentField.typeInfo)
                     if(fieldType) {
                         return fieldType
@@ -527,8 +528,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
 
     var isMethod = false
     var numberOfDefaultArgs = 0
-    var suppliedArgs = Array<*Expr>{}
-    suppliedArgs.init(expr.arguments.size() + 1, this.allocator)
+    var suppliedArgs = ArrayInit<*Expr>(expr.arguments.size() + 1, this.allocator)
     suppliedArgs.addAll(expr.arguments)
 
     var funcPtr: *FuncPtrTypeInfo = null

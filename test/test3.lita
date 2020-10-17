@@ -1,8 +1,32 @@
-import "mem"
+//import "mem"
+//import "array"
 
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
+struct Array<T> {
+    values: T
+    length: i32
+}
+
+func (this: *Array<T>) size<T>() : i32 {
+    return this.length
+}
+
+struct Test {
+    params: using Array<i32>
+    //x:Array<i32>
+}
+
 func main(len:i32, args: **char) : i32 {
-    printf("Hello world!\n")
+    var t = Test{}
+    t.size()
+
+    /*
+    t.params = ArrayInit<i32>()
+    t.add(1)
+    t.add(2)
+    for(var i = 0; i < t.size(); i+=1) {
+        printf("Hello world! %d\n", t.get(i))
+    }*/
 }

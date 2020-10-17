@@ -6,8 +6,8 @@ import "mem"
 import "common"
 import "module"
 import "string_view"
-import "libc"
 import "string"
+import "libc"
 
 @asStr
 public enum StmtKind {
@@ -642,6 +642,78 @@ public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
     }
     return null;
 }
+
+/*
+public func (this: *TypeSpec) toString(sb: *String) {
+    if(!this) return;
+
+    switch(this.kind) {
+        case TypeSpecKind.NONE: {
+            break;
+        }
+        case TypeSpecKind.NAME: {
+            var name = this as (*NameTypeSpec)
+            sb.append("%s", name.name)
+            if(!name.genericArgs.empty()) {
+                sb.append("<")
+                for(var i = 0; i < name.genericArgs.size(); i += 1) {
+                    if(i > 0) printf(",")
+                    name.genericArgs.get(i).toString(sb)
+                }
+                sb.append(">")
+            }
+            break;
+        }
+        case TypeSpecKind.ARRAY: {
+            var arrayInfo = this as (*ArrayTypeInfo)
+            if(arrayInfo.length) {
+                sb.append("[%llu]", arrayInfo.length)
+            }
+            else {
+                sb.append("[]")
+            }
+            arrayInfo.arrayOf.toString(sb)
+            break;
+        }
+        case TypeSpecKind.PTR: {
+            var ptrInfo = this as (*PtrTypeInfo)
+            sb.append("*")
+            ptrInfo.ptrOf.toString(sb)
+            break;
+        }
+        case TypeSpecKind.CONST: {
+            var constInfo = this as (*ConstTypeInfo)
+            sb.append("const ")
+            constInfo.constOf.toString(sb)
+            break;
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            var funcPtrInfo = this as (*FuncPtrTypeInfo)
+            sb.append("func")
+            if(!funcPtrInfo.genericParams.empty()) {
+                sb.append("<")
+                for(var i = 0; i < funcPtrInfo.genericParams.size(); i += 1) {
+                    if(i > 0) sb.append(",")
+                    var t = funcPtrInfo.genericParams.get(i).name
+                    sb.append("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                sb.append(">")
+            }
+            sb.append("(")
+            for(var i = 0; i < funcPtrInfo.paramDecls.size(); i += 1) {
+                if(i > 0) sb.append(",")
+                var paramType = funcPtrInfo.paramDecls.get(i)
+                paramType.toString(sb)
+            }
+            sb.append(") : ")
+            funcPtrInfo.returnType.toString(sb)
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+}*/
 
 public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
     if(f.name.type != TokenType.IDENTIFIER) {

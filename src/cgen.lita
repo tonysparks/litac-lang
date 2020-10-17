@@ -660,8 +660,14 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
 */
 func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
-    var declName:*const char = (sym.flags & SymbolFlags.IS_TYPE)
-                                    ? this.escapeName(sym.type) : sym.name;
+
+    var declName:*const char = sym.name
+    if(sym.type.kind == TypeKind.FUNC) {
+        declName = this.escapeNameStr(sym.name)
+    }
+    else if (sym.flags & SymbolFlags.IS_TYPE) {
+        declName = this.escapeName(sym.type)
+    }
 
     if(sym.flags & SymbolFlags.IS_LOCAL) {
         return this.prefix(declName, sb)
@@ -669,10 +675,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
         if(sym.flags & SymbolFlags.IS_BUILTIN) {
-            var name = this.baseTypeName(sym.decl.name.str)
-            sb.append("%s%.*s", this.options.cPrefix, name.length, name.buffer)
-            printf("Foreign: %s vs %s\n", declName, sb.cStrConst())
-            return sb.cStrConst()
+            return sym.name
         }
 
         var name = this.foreignName(sym.decl, this.baseTypeName(sym.decl.name.str))
@@ -690,24 +693,14 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
     var typeName = this.escapeName(type)
 
     if(!type.sym) {
+        var sb = StringBufferInit(256, this.allocator)
         return this.prefix(typeName, sb)
     }
 
-    var sym = type.sym
-    if(sym.flags & SymbolFlags.IS_FOREIGN) {
-        if(sym.flags & SymbolFlags.IS_BUILTIN) {
-            return typeName
-        }
-        // TODO: Get the foreign override name
-        return sym.name
-    }
-
-    sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, typeName)
-    return sb.cStrConst()
+    return this.cName(type.sym)
 }
 
 func (this: using *CGen) prefix(name: *const char, sb: *StringBuffer) : *const char {

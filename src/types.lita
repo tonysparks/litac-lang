@@ -42,6 +42,8 @@ public enum TypeKind {
     CONST,
     GENERIC_PARAM,
 
+    POISON,
+
     MAX_TYPE_KINDS
 }
 
@@ -74,6 +76,7 @@ const typeKindText = []*const char {
 
     [TypeKind.CONST] = "const",
     [TypeKind.GENERIC_PARAM] = "generic_param",
+    [TypeKind.POISON] = "poison",
 
     [TypeKind.MAX_TYPE_KINDS] = "",
 }
@@ -484,6 +487,10 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
             funcInfo.returnType.toString(sb)
             break;
         }
+        case TypeKind.POISON: {
+            sb.append("<poison>")
+            break;
+        }
         default: {
             assert(false)
         }
@@ -662,6 +669,9 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
         }
         case TypeKind.FUNC: {
             break;
+        }
+        case TypeKind.POISON: {
+            return false;
         }
         default: {
             printf("Type: %s\n", typeKindText[this.kind])
@@ -885,6 +895,9 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             assert(false)
             break;
         }
+        case TypeKind.POISON: {
+            return false;
+        }
         default: {
             assert(false)
         }
@@ -980,6 +993,9 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
                 return false
             }
             return this.isDeclarable(castTo)
+        }
+        case TypeKind.POISON: {
+            return false;
         }
         default: {
             assert(false)
@@ -1103,6 +1119,9 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
             var info = this as (*FuncTypeInfo)
             return NewNameTypeSpec(pos, info.name, allocator) as (*TypeSpec)
         }
+        case TypeKind.POISON: {
+            return NewNameTypeSpec(pos, "<poison>", allocator) as (*TypeSpec)
+        }
         default: {
             assert(false)
         }
@@ -1111,12 +1130,10 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
 }
 
 public func (this: *FuncTypeInfo) asPtr(allocator: *const Allocator) : *FuncPtrTypeInfo {
-    var genericParams = Array<GenericParam>{}
-    genericParams.init(this.decl.genericParams.size(), allocator)
+    var genericParams = ArrayInit<GenericParam>(this.decl.genericParams.size(), allocator)
     genericParams.addAll(this.decl.genericParams)
 
-    var paramDecls = Array<*TypeInfo>{}
-    paramDecls.init(this.decl.params.size(), allocator)
+    var paramDecls = ArrayInit<*TypeInfo>(this.decl.params.size(), allocator)
     for(var i = 0; i < this.decl.params.size() ; i += 1) {
         var p = this.decl.params.get(i)
         paramDecls.add(p.typeInfo)
@@ -1145,8 +1162,6 @@ public func (this: *AggregateTypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) 
     var n = this.name
 
     while(*n) {
-        defer index += 1;
-
         var c = *n
         if(c == '<') {
             break;
@@ -1154,6 +1169,7 @@ public func (this: *AggregateTypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) 
 
         name[index] = c
         n+=1;
+        index += 1;
     }
 
 
@@ -1232,6 +1248,8 @@ fields to match against and the supplied type should be an aggregate (i.e., not 
 public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) : FieldStmt {
     assert(this != null)
 
+    var isGenericCapable = type.sym.isGenericCapable()
+
     for(var i = 0; i < this.decl.fields.size(); i+=1) {
         var field = this.decl.fields.get(i)
 
@@ -1239,7 +1257,14 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) 
             continue
         }
 
-        var fieldBaseType = field.typeInfo.getBaseType()
+        var fieldBaseType = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
+
+        if(fieldBaseType.sym.isGenericCapable() && isGenericCapable) {
+            if(fieldBaseType.genericTypeid == type.genericTypeid) {
+                return field
+            }
+        }
+
         if(fieldBaseType.typeid == type.typeid) {
             return field
         }
@@ -1419,6 +1444,7 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
             case StmtKind.STRUCT_FIELD_DECL: {
                 //var aggField = field.aggregateField
                 // TODO: ?
+                assert(false)
             }
             default: {
                 continue;
@@ -1658,5 +1684,12 @@ public const STR_TYPE = TypeInfo {
     .kind = TypeKind.STR,
     .typeid = TypeKind.STR as (Typeid),
     .name = "*char",
+    .sym = null
+}
+
+public const POISON_TYPE = TypeInfo {
+    .kind = TypeKind.POISON,
+    .typeid = TypeKind.POISON as (Typeid),
+    .name = "<poison>",
     .sym = null
 }

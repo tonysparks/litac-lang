@@ -268,10 +268,8 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 field.typeInfo = this.resolveTypeSpec(varField.type)
+                assert(field.typeInfo)
 
-                if(!field.typeInfo) {
-                    return false
-                }
                 if(varField.defaultExpr) {
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
@@ -294,6 +292,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 this.resolveSymbol(sym)
 
                 field.typeInfo = sym.type
+                if(!field.typeInfo) {
+                    return false
+                }
+
                 if(field.enumField.name.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.enumField.name.str, i)
                 }
@@ -309,6 +311,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 this.resolveSymbol(sym)
 
                 field.typeInfo = sym.type
+                if(!field.typeInfo) {
+                    return false
+                }
+
                 if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.aggregateField.name.str, i)
                 }

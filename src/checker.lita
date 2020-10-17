@@ -440,7 +440,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
 
     if(sym.state == SymbolState.RESOLVING) {
         this.result.addError(sym.decl.startPos, "cyclic dependency found with '%s'", sym.name)
-        return;
+        goto err;
     }
 
     this.enterModule(sym.declared)
@@ -518,11 +518,17 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
             for(var i = 0; i < funcDecl.params.size() ; i += 1) {
                 var param = funcDecl.params.get(i)
                 param.typeInfo = this.resolveTypeSpec(param.type)
+                if(!param.typeInfo) {
+                    goto err;
+                }
             }
 
             var retType = this.resolveTypeSpec(funcDecl.returnType)
-            funcInfo.returnType = TypeDecay(retType, this.allocator)
+            if(!retType) {
+                goto err;
+            }
 
+            funcInfo.returnType = TypeDecay(retType, this.allocator)
             sym.type = funcInfo as (*TypeInfo)
             break
         }
@@ -536,6 +542,10 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
 
 err:
     sym.state = SymbolState.ERROR
+    if(!sym.type) {
+        sym.type = &POISON_TYPE
+    }
+    printf("ERROR!! error count: %d\n", this.lita.result.errors.size())
     return;
 }
 
@@ -611,11 +621,13 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
 
             var sym = this.getType(nameSpec)
             if(!sym) {
+                printf("Typespec No Type\n")
                 this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
                 goto err;
             }
 
             if(!(sym.flags & SymbolFlags.IS_TYPE)) {
+                printf("Typespec Not a Type\n")
                 this.result.addError(spec.pos, "'%s' must be a type", nameSpec.name)
                 goto err;
             }
@@ -625,6 +637,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             if(!nameSpec.genericArgs.empty()) {
                 sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
                 if(!sym) {
+                    printf("Typespec Could not create Generic\n")
                     goto err;
                 }
             }
@@ -651,10 +664,12 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             if(arraySpec.numElements) {
                 var expr = arraySpec.numElements
                 if(!this.resolveConstExpr(expr)) {
+                    printf("Typespec array const error\n")
                     goto err;
                 }
 
                 if(!IsInteger(expr.operand.typeInfo)) {
+                    printf("Typespec array error\n")
                     this.result.addError(expr.startPos,
                             "array size expression must be an integer type")
                     goto err;
@@ -674,10 +689,6 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                 for(var i = 0; i < funcPtrSpec.args.size(); i+=1) {
                     var arg = funcPtrSpec.args.get(i)
                     var typeInfo = this.resolveTypeSpec(arg)
-                    if(!typeInfo) {
-                        goto err;
-                    }
-
                     paramDecls.add(typeInfo)
                 }
             }
@@ -691,7 +702,8 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
     }
 
 err:
-    return null
+printf("ResolveTypeSpec error!\n")
+    return &POISON_TYPE
 }
 
 func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {

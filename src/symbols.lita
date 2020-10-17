@@ -59,6 +59,11 @@ public struct Symbol {
     genericParams: Array<GenericParam>
 }
 
+public func (this: *Symbol) isGenericCapable() : bool {
+    return this.flags & SymbolFlags.IS_GENERIC_TEMPLATE ||
+           this.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE
+}
+
 public enum ScopeKind {
     MODULE,
     FUNC,

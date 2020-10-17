@@ -412,12 +412,17 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
         }
         case StmtKind.COMP_STMT: {
             var original = stmt as (*CompStmt)
+            var end: *Stmt = null
+            if(original.end != null) {
+                end = &original.end.stmt
+            }
+
             var copy = NewCompStmt(original.startPos,
                                    original.endPos,
                                    original.type,
                                    original.expr,
                                    CopyStmts(original.body, allocator),
-                                   CopyStmt(original.end, allocator) as (*CompStmt),
+                                   CopyStmt(end, allocator) as (*CompStmt),
                                    allocator)
             return copy
         }
@@ -572,10 +577,9 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
 }
 
 public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator) : *AggregateDecl {
-    var copy = NewAggregateDecl(decl.startPos, decl.endPos, decl.kind, decl.name, decl.genericParams, decl.fields, decl.flags, allocator) as (*AggregateDecl)
+    var copy = NewAggregateDecl(decl.startPos, decl.endPos, decl.kind, decl.name, decl.genericParams, Array<FieldStmt>{}, decl.flags, allocator) as (*AggregateDecl)
     copy.attributes = decl.attributes
-    copy.fields = Array<FieldStmt>{}
-    copy.fields.init(decl.fields.size(), allocator)
+    copy.fields = ArrayInit<FieldStmt>(decl.fields.size(), allocator)
 
     for(var i = 0; i < decl.fields.size(); i+=1) {
         var field = decl.fields.get(i)
@@ -595,6 +599,7 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
                     .varField = varField
                 }
                 copy.fields.add(copyField)
+                copy.node.becomeParentOf(varField)
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
@@ -603,6 +608,7 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
                     .enumField = field.enumField
                 }
                 copy.fields.add(copyField)
+                copy.node.becomeParentOf(field.enumField)
                 break;
             }
             case StmtKind.UNION_FIELD_DECL:
@@ -613,6 +619,7 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
                     .aggregateField = CopyAggregateDecl(aggField, allocator)
                 }
                 copy.fields.add(copyField)
+                copy.node.becomeParentOf(copyField.aggregateField)
                 break;
             }
             case StmtKind.POISON_EXPR: {

@@ -110,7 +110,6 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             goto err;
         }
 
-        //printf("Generic %s Declaration Module: %s created in %s\n", newNameStr, sym.declared.id.filename, checker.current.id.filename)
         genericSym.genericCallsiteModule = checker.current
         genericSym.genericParams = genericDecl.genericParams
         checker.current.genericSymbols.put(newNameStr, genericSym)
@@ -134,7 +133,6 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         if(!isValidArgs) {
             goto err;
         }
-        printf("Created Generic: %s\n", genericSym.name)
     }
 
     assert(genericSym != null)
@@ -296,7 +294,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                 var param = funcDecl.params.get(i)
                 param.type = template.replaceTypeSpec(param.type)
                 if(param.defaultExpr) {
-                    ReplaceTypes(template, param.defaultExpr.node)
+                    ReplaceTypes(template, param.defaultExpr)
                 }
             }
 
@@ -311,7 +309,10 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
         case StmtKind.VAR_DECL: {
             var decl = ast as (*VarDecl)
             decl.typeSpec = template.replaceTypeSpec(decl.typeSpec)
-            ReplaceTypes(template, decl.expr)
+
+            if(decl.expr) {
+                ReplaceTypes(template, decl.expr)
+            }
             break;
         }
         case StmtKind.ENUM_DECL:
@@ -368,10 +369,18 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
         }
         case StmtKind.FOR_STMT: {
             var forStmt = ast as (*ForStmt)
-            ReplaceTypes(template, forStmt.init)
-            ReplaceTypes(template, forStmt.cond)
-            ReplaceTypes(template, forStmt.post)
-            ReplaceTypes(template, forStmt.body)
+            if(forStmt.init) {
+                ReplaceTypes(template, forStmt.init)
+            }
+            if(forStmt.cond) {
+                ReplaceTypes(template, forStmt.cond)
+            }
+            if(forStmt.post) {
+                ReplaceTypes(template, forStmt.post)
+            }
+            if(forStmt.body) {
+                ReplaceTypes(template, forStmt.body)
+            }
             break;
         }
         case StmtKind.FUNC_BODY_STMT: {
@@ -390,7 +399,9 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             var ifStmt = ast as (*IfStmt)
             ReplaceTypes(template, ifStmt.cond)
             ReplaceTypes(template, ifStmt.then)
-            ReplaceTypes(template, ifStmt.elseStmt)
+            if(ifStmt.elseStmt) {
+                ReplaceTypes(template, ifStmt.elseStmt)
+            }
             break;
         }
         case StmtKind.LABEL_STMT: {
@@ -412,7 +423,9 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
         }
         case StmtKind.RETURN_STMT: {
             var stmt = ast as (*ReturnStmt)
-            ReplaceTypes(template, stmt.expr)
+            if(stmt.expr) {
+                ReplaceTypes(template, stmt.expr)
+            }
             break;
         }
         case StmtKind.SWITCH_CASE_STMT: {
@@ -428,7 +441,9 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                 var caseStmt = switchStmt.cases.get(i)
                 ReplaceTypes(template, caseStmt as (*Node))
             }
-            ReplaceTypes(template, switchStmt.defaultStmt)
+            if(switchStmt.defaultStmt) {
+                ReplaceTypes(template, switchStmt.defaultStmt)
+            }
             break;
         }
         case StmtKind.ENUM_FIELD_DECL:
