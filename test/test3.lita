@@ -1,0 +1,85 @@
+//import "mem"
+//import "array"
+
+import "map"
+
+@include("<stdio.h>");
+@foreign public func printf(s:*const char, ...) : void;
+
+/*
+func test(fn: func() : void) {
+    fn();
+}*/
+
+/*
+struct Array<T> {
+    values: T
+    length: i32
+}
+
+func (this: *Array<T>) size<T>() : i32 {
+    return this.length
+}
+
+struct Test {
+    params: using Array<i32>
+    //x:Array<i32>
+}
+
+const escapeStrings = [256]*const char {
+    ['\b'] = "\\b",
+    ['\f'] = "\\f",
+    ['\n'] = "\\n",
+    ['\r'] = "\\r",
+    ['\t'] = "\\t",
+    ['\\'] = "\\\\",
+    ['\''] = "\\'",
+    ['"'] = "\\\"",
+    ['\0'] = "\\0",
+}*/
+
+//public typedef func<K>(K) : u32 as HashFn<K>;
+
+
+func test<T>(a: HashFn<T>, t: T) : u32 {
+    return a(t)
+}
+
+func fn(a: i32) : u32 {
+    return (a + 10) as (u32)
+}
+
+func main(len:i32, args: **char) : i32 {
+    var f: HashFn<i32> = &fn;
+
+    printf("%d\n", test(fn, 4))
+    var map = StrMap<i32>(0)
+    map.put("Hi", 4)
+    var x = map.get("Hi")
+    printf("X = %d\n", x)
+    //var t = Test{}
+    //t.size()
+    /*
+    var c = []char {
+        '\n',
+        '\b',
+        '\f',
+        '\r',
+        '\t',
+        '\\',
+        '\'',
+        '"',   // "
+        '\0',
+    }
+    if(c[0] == '"') { // "
+        printf("Char: [%c]", c[0])
+    }*/
+
+    /*
+    t.params = ArrayInit<i32>()
+    t.add(1)
+    t.add(2)
+    for(var i = 0; i < t.size(); i+=1) {
+        printf("Hello world! %d\n", t.get(i))
+    }*/
+}

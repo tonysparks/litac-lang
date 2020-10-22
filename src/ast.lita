@@ -6,8 +6,8 @@ import "mem"
 import "common"
 import "module"
 import "string_view"
-import "libc"
 import "string"
+import "libc"
 
 @asStr
 public enum StmtKind {
@@ -21,7 +21,8 @@ public enum StmtKind {
     TYPEDEF_DECL,
     PARAM_DECL,
     NATIVE_DECL,
-    VAR_FIELD_DECL,    
+    NOTES_DECL,
+    VAR_FIELD_DECL,
     ENUM_FIELD_ENTRY_DECL,
     ENUM_FIELD_DECL,
     STRUCT_FIELD_DECL,
@@ -65,9 +66,9 @@ public enum StmtKind {
     NULL_EXPR,
     NUMBER_EXPR,
     OFFSET_OF_EXPR,
-    SET_EXPR, 
+    SET_EXPR,
     SIZE_OF_EXPR,
-    STRING_EXPR,   
+    STRING_EXPR,
     SUBSCRIPT_GET_EXPR,
     SUBSCRIPT_SET_EXPR,
     TERNARY_EXPR,
@@ -185,6 +186,11 @@ public struct Decl {
     attributes: Attributes
 }
 
+public struct GenericDecl {
+    declaration: using Decl
+    genericParams: Array<GenericParam>
+}
+
 public struct ImportDecl {
     decl: using Decl
     alias: Token // Identifier?
@@ -207,19 +213,17 @@ public struct ParameterDecl {
     typeInfo: *TypeInfo
 }
 
+
 public struct FuncDecl {
-    decl: using Decl
-    genericParams: Array<GenericParam>
+    decl: using GenericDecl
     params: *ParametersStmt
     body: *Stmt
     returnType: *TypeSpec
     flags: i32
-
 }
 
 public struct AggregateDecl {
-    decl: using Decl
-    genericParams: Array<GenericParam>
+    decl: using GenericDecl
     fields: Array<FieldStmt>
     flags: i32
 }
@@ -230,14 +234,18 @@ public struct EnumDecl {
 }
 
 public struct TypedefDecl {
-    decl: using Decl
-    genericParams: Array<GenericParam>
+    decl: using GenericDecl
     type: *TypeSpec
 }
 
 public struct NativeDecl {
     decl: using Decl
     typeInfo: *TypeInfo
+}
+
+public struct NotesDecl {
+    decl: using Decl
+    notes: Array<*NoteStmt>
 }
 
 public struct PoisonDecl {
@@ -257,9 +265,9 @@ public struct CompStmt {
     stmt: using Stmt
     type: *const char
     expr: *const char
-    body: Array<*Stmt>
     end: *CompStmt
     evaluatedStmt: *Stmt
+    body: Array<*Stmt>
 }
 
 public struct ContinueStmt {
@@ -472,7 +480,7 @@ public struct NullExpr {
 
 public struct NumberExpr {
     expr: using Expr
-    number: Token // TODO: should this be the number value? or Token
+    number: Token
 }
 
 public struct OffsetOfExpr {
@@ -492,7 +500,7 @@ public struct SetExpr {
 
 public struct SizeOfExpr {
     expr: using Expr
-    sizeOfExpr: *Expr 
+    sizeOfExpr: *Expr
 }
 
 public struct StringExpr {
@@ -577,9 +585,9 @@ public func IsExpr(node: *Node) : bool {
         case StmtKind.NULL_EXPR:
         case StmtKind.NUMBER_EXPR:
         case StmtKind.OFFSET_OF_EXPR:
-        case StmtKind.SET_EXPR: 
+        case StmtKind.SET_EXPR:
         case StmtKind.SIZE_OF_EXPR:
-        case StmtKind.STRING_EXPR:   
+        case StmtKind.STRING_EXPR:
         case StmtKind.SUBSCRIPT_GET_EXPR:
         case StmtKind.SUBSCRIPT_SET_EXPR:
         case StmtKind.TERNARY_EXPR:
@@ -588,7 +596,7 @@ public func IsExpr(node: *Node) : bool {
         case StmtKind.UNARY_EXPR:
         case StmtKind.POISON_EXPR:
             return true;
-        default: 
+        default:
             return false;
     }
 }
@@ -609,7 +617,7 @@ public func IsDecl(node: *Node) : bool {
         case StmtKind.NATIVE_DECL:
         case StmtKind.POISON_DECL:
             return true;
-        default: 
+        default:
             return false;
     }
 }
@@ -634,6 +642,78 @@ public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
     }
     return null;
 }
+
+/*
+public func (this: *TypeSpec) toString(sb: *String) {
+    if(!this) return;
+
+    switch(this.kind) {
+        case TypeSpecKind.NONE: {
+            break;
+        }
+        case TypeSpecKind.NAME: {
+            var name = this as (*NameTypeSpec)
+            sb.append("%s", name.name)
+            if(!name.genericArgs.empty()) {
+                sb.append("<")
+                for(var i = 0; i < name.genericArgs.size(); i += 1) {
+                    if(i > 0) printf(",")
+                    name.genericArgs.get(i).toString(sb)
+                }
+                sb.append(">")
+            }
+            break;
+        }
+        case TypeSpecKind.ARRAY: {
+            var arrayInfo = this as (*ArrayTypeInfo)
+            if(arrayInfo.length) {
+                sb.append("[%llu]", arrayInfo.length)
+            }
+            else {
+                sb.append("[]")
+            }
+            arrayInfo.arrayOf.toString(sb)
+            break;
+        }
+        case TypeSpecKind.PTR: {
+            var ptrInfo = this as (*PtrTypeInfo)
+            sb.append("*")
+            ptrInfo.ptrOf.toString(sb)
+            break;
+        }
+        case TypeSpecKind.CONST: {
+            var constInfo = this as (*ConstTypeInfo)
+            sb.append("const ")
+            constInfo.constOf.toString(sb)
+            break;
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            var funcPtrInfo = this as (*FuncPtrTypeInfo)
+            sb.append("func")
+            if(!funcPtrInfo.genericParams.empty()) {
+                sb.append("<")
+                for(var i = 0; i < funcPtrInfo.genericParams.size(); i += 1) {
+                    if(i > 0) sb.append(",")
+                    var t = funcPtrInfo.genericParams.get(i).name
+                    sb.append("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                sb.append(">")
+            }
+            sb.append("(")
+            for(var i = 0; i < funcPtrInfo.paramDecls.size(); i += 1) {
+                if(i > 0) sb.append(",")
+                var paramType = funcPtrInfo.paramDecls.get(i)
+                paramType.toString(sb)
+            }
+            sb.append(") : ")
+            funcPtrInfo.returnType.toString(sb)
+            break;
+        }
+        default: {
+            assert(false)
+        }
+    }
+}*/
 
 public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
     if(f.name.type != TokenType.IDENTIFIER) {
@@ -697,7 +777,7 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
     if(!expr) {
         return false;
     }
-    
+
     switch(expr.kind) {
         case StmtKind.NUMBER_EXPR:
         case StmtKind.BOOLEAN_EXPR:
@@ -706,9 +786,13 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
         case StmtKind.GET_EXPR: {
             return true
         }
+        case StmtKind.SIZE_OF_EXPR: {
+            var sizeofExpr = expr as (*SizeOfExpr)
+            return sizeofExpr.sizeOfExpr.isConstNumberExpr()
+        }
         case StmtKind.GROUP_EXPR: {
             var groupExpr = expr as (*GroupExpr)
-            return groupExpr.expr.isConstNumberExpr()
+            return groupExpr.groupedExpr.isConstNumberExpr()
         }
         case StmtKind.BINARY_EXPR: {
             var binExpr = expr as (*BinaryExpr)
@@ -718,6 +802,44 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
         case StmtKind.UNARY_EXPR: {
             var unaryExpr = expr as (*UnaryExpr)
             return unaryExpr.unaryExpr.isConstNumberExpr()
+        }
+        default: {
+            return false
+        }
+    }
+    return false
+}
+
+public func (expr: *Expr) isConstExpr() : bool {
+    if(!expr) {
+        return false;
+    }
+
+    switch(expr.kind) {
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.BOOLEAN_EXPR:
+        case StmtKind.CHAR_EXPR:
+        case StmtKind.IDENTIFIER_EXPR:
+        case StmtKind.STRING_EXPR:
+        case StmtKind.GET_EXPR: {
+            return true
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var sizeofExpr = expr as (*SizeOfExpr)
+            return sizeofExpr.sizeOfExpr.isConstExpr()
+        }
+        case StmtKind.GROUP_EXPR: {
+            var groupExpr = expr as (*GroupExpr)
+            return groupExpr.groupedExpr.isConstExpr()
+        }
+        case StmtKind.BINARY_EXPR: {
+            var binExpr = expr as (*BinaryExpr)
+            return binExpr.left.isConstExpr() &&
+                   binExpr.right.isConstExpr()
+        }
+        case StmtKind.UNARY_EXPR: {
+            var unaryExpr = expr as (*UnaryExpr)
+            return unaryExpr.unaryExpr.isConstExpr()
         }
         default: {
             return false

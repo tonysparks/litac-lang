@@ -16,24 +16,29 @@ import "error_codes"
 import "module"
 import "string"
 import "string_view"
+import "string_buffer"
 import "checker"
 import "cgen"
+import "cmdline"
 
-func main(len: i32, args: **char) {
+func main(len: i32, args: **char) : i32 {
     SystemInit()
     var startTime = SystemTimeMSec()
 
     var options = LitaOptions{}
-    ParseArgs(len, args, &options)
+    if(!ParseArgs(len, args, &options)) {
+        return -1;
+    }
 
-    var lita = LitaInit(&options)
+    var lita = Lita{}
+    lita.init(&options)
     defer lita.free()
 
     var root = Parse(lita)
     if(!root) {
         goto report
     }
-    
+
     if(!TypeCheck(lita, root)) {
         goto report
     }
@@ -41,80 +46,134 @@ func main(len: i32, args: **char) {
     if(options.checkerOnly) {
         goto report;
     }
-    
+
     if(!Transpile(lita, root)) {
         goto report;
     }
 
 report:
+    var totalTime = SystemTimeMSec() - startTime
+
     if(!lita.result.errors.empty()) {
-        printf("Total errors: %d\n", lita.result.errors.size())
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
             PrintError(lita.result.errors.get(i))
             printf("\n")
         }
+        printf("Total errors: %d\n", lita.result.errors.size())
     }
 
-    var endTime = SystemTimeMSec()
     if(options.showProfileInfo) {
         var allocator: *LinearAllocator = lita.allocator as (*LinearAllocator)
 
+        printf("\n\n")
         printf("%-30s %-17s %-6s %-14s %-5s\n", "Segment", "Time", "%", "Mem", "#")
         printf("====================================================================================\n")
         for(var i = 0; i < MetricType.MAX_METRIC_TYPES; i+=1) {
             var metric = &lita.metrics[i]
-            printf("%-30s %-15.6f   %-6d %-14zu %-5u\n", 
-                MetricTypeAsStr(i), 
-                metric.executionTime, 
-                0, 
-                metric.bytesAllocated, 
+            printf("%-30s %-15.6f   %3.0f%% %-14zu %-5u\n",
+                MetricTypeAsStr(i),
+                metric.executionTime,
+                (metric.executionTime / totalTime) * 100f,
+                metric.bytesAllocated,
                 metric.allocationCount)
         }
         printf("\n")
-        printf("Total time:         %f\n", endTime - startTime)
+        printf("Total time:         %f\n", totalTime)
         printf("Total memory:       %llu\n", allocator.totalBytesAllocated)
         printf("Total allocations:  %u\n", allocator.totalAllocations)
         printf("Total source lines: %u\n", lita.totalSourceLines)
         printf("\n")
     }
+
+    return 0
 }
 
-func ParseArgs(n: i32, args: **char, options: *LitaOptions) {
-    strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
+func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
+    var parser = CmdParserInit()
+    defer parser.free()
 
-// TEMP start
-    options.checkerOnly = false
-    options.cOutputOnly = false
-    options.showProfileInfo = true
-    options.run = true
+    parser.header = "<usage> litac [options] [source file to compile]\nOPTIONS:";
+    parser.addOption("languageServer", '\0', "Start the LitaC language server", 0, null);
+    parser.addOption("lib", '\0', "The LitaC library path", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("cPrefx", '\0', "The symbol prefix to use on the generated C code output", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("run", '\0', "Runs the program after a successful compile", 0, null);
+    parser.addOption("checkerOnly", '\0', "Only runs the type checker, does not compile", 0, null);
+    parser.addOption("cOnly", '\0', "Only creates the C output file, does not cimple the generated C code", 0, null);
+    parser.addOption("profile", '\0', "Reports profile metrics of the compiler", 0, null);
+    parser.addOption("disableLine", '\0', "Disables #line dorective in C output", 0, null);
+    parser.addOption("debug", '\0', "Enables debug mode", 0, null);
+    parser.addOption("verbose", '\0', "Enables verbose output", 0, null);
+    parser.addOption("srcDir", '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("doc", '\0', "Generates document output", 0, null);
+    parser.addOption("docDir", '\0', "Directory where the generated documents are written to, defaults to './output'", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("docAll", '\0', "Includes non-public types in the documentation generation", 0, null);
+    parser.addOption("output", 'o', "The name of the compiled binary", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("outputDir", '\0', "The directory in which the C ouput files are stored", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("version", 'v', "Displays the LitaC version", 0, null);
+    parser.addOption("help", 'h', "Displays this help", 0, null);
+    parser.addOption("types", 't', "Includes TypeInfo for reflection\n<arg> can be:\nall       Means all types will have reflection values\ntagged    Means only basic types and types annotated with @typeinfo will have reflection values", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("test", '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("testFile", '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
+    parser.addOption("buildCmd", 'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated", 0, null);
 
-    //strncpy(options.srcPath, "../test", MAX_PATH) // TEMP
-    strncpy(options.inputFile, "../test/test2.lita", MAX_PATH) // TEMP
-    strncpy(options.outputFile, "test.exe", MAX_PATH) // TEMP
-    strncpy(options.outputPath, "../test/output/", MAX_PATH) // TEMP
-// TEMP end
-
-    if(n > 1) {
-        strncpy(options.inputFile, args[1], MAX_PATH)
+    if(parser.parse(n, args) != CmdParserStatus.OK) {
+        goto err_print;
     }
 
+    if(parser.args.size() < 2) {
+        printf("Missing input file\n")
+        goto err;
+    }
+
+    strncpy(options.inputFile, parser.args.get(1), MAX_PATH)
+    strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
+
+    if(parser.hasOption("help")) {
+        var sb = StringBufferInit()
+        defer sb.free()
+
+        parser.printHelp(sb)
+        printf("%s", sb.cStr())
+    }
+
+    options.checkerOnly = parser.hasOption("checkerOnly")
+    options.cOutputOnly = parser.hasOption("cOnly")
+    options.showProfileInfo = parser.hasOption("profile")
+    options.run = parser.hasOption("run")
+
+    var outputFile = parser.hasOption("output") ? parser.getOption("output").value : "a"
+    strncpy(options.outputFile, outputFile, MAX_PATH)
+
+    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "output"
+    strncpy(options.outputPath, outputPath, MAX_PATH)
+
     FilePath(options.inputFile, options.srcPath)
-    //printf("Reading in: '%s'\n", options.inputFile)
-    //printf("Source Path: '%s'\n", options.srcPath)
+    return true
+
+err_print:
+    {
+        var sb = StringBufferInit()
+        defer sb.free()
+
+        parser.printHelp(sb)
+        printf("%s", sb.cStr())
+    }
+err:
+    return false
 }
 
-func FindModulePath(lita: *Lita, 
-                    moduleName: StringView, 
-                    filename: [MAX_PATH]char) : bool {    
+func FindModulePath(lita: *Lita,
+                    moduleName: StringView,
+                    filename: [MAX_PATH]char) : bool {
 
     var pathStr = StringInit(filename, MAX_PATH);
-    
+
     pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
     //printf("Check: '%s'\n", pathStr.cStr())
     if(FileExists(pathStr.cStrConst())) {
         return true
     }
-    
+
     pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
     //printf("Check: '%s'\n", pathStr.cStr())
     if(FileExists(pathStr.cStrConst())) {
@@ -136,7 +195,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         return false
     }
 
-    var status = ReadFile(module.id.filename, &module.text, lita.allocator) 
+    var status = ReadFile(module.id.filename, &module.text, lita.allocator)
     if(status == FileStatus.FileNotFoundError) {
         lita.result.addError(pos, "Could not open file '%s'\n", module.id.filename)
         return false
@@ -160,8 +219,8 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         }
 
         var filename: [MAX_PATH]char
-        if(!FindModulePath(lita, importStmt.name.str, filename)) {  
-            lita.result.addError(importStmt.pos, "Could not find module '%.*s'", 
+        if(!FindModulePath(lita, importStmt.name.str, filename)) {
+            lita.result.addError(importStmt.pos, "Could not find module '%.*s'",
                     importStmt.name.str.length, importStmt.name.str.buffer)
             continue
         }
@@ -170,7 +229,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         if(importModule) {
             importStmt.moduleId = &importModule.id
             continue;
-        }        
+        }
 
         importModule = NewModule(lita, filename)
         importStmt.moduleId = &importModule.id
@@ -194,15 +253,16 @@ func Parse(lita: *Lita) : *Module {
         lita.result.addError(SrcPos{}, "unable to parse builtins.lita")
         return null;
     }
-    
+
     var root = NewModule(lita, lita.options.inputFile)
     lita.addModule(root)
-    
+
     if(!ParseModule(lita, root, SrcPos{})) {
         return null;
     }
 
     var builtinImport = NewImportDecl(SrcPos{}, SrcPos{}, BUILTIN_IMPORT_TOKEN, Token{.type = TokenType.VOID}, false, lita.allocator) as (*ImportDecl)
+    builtinImport.moduleId = &builtin.id
     root.ast.imports.add(builtinImport)
 
     return root
@@ -221,17 +281,31 @@ func TypeCheck(lita: *Lita, module: *Module) : bool {
 }
 
 func Transpile(lita: *Lita, module: *Module) : bool {
-    var filename: [MAX_PATH]char;
-    strcat(filename, lita.options.outputPath)
-    if(!Mkdir(filename)) {
-        printf("Unable to create directory: '%s'", filename)
+
+    if(!Mkdir(lita.options.outputPath)) {
+        printf("Unable to create directory: '%s'", lita.options.outputPath)
         return false
     }
 
-    strcat(filename, lita.options.outputFile)
-    strcat(filename, ".c")
+    var cFilename = [MAX_PATH]char{};
+    var binaryFilename = [MAX_PATH]char{};
 
-    if(!GenerateC(lita, module, filename)) {
+    strcat(cFilename, lita.options.outputPath)
+    var len = strlen(lita.options.outputPath)
+    if(len > 0) {
+        if(lita.options.outputPath[len-1] != '/') {
+            strcat(cFilename, "/")
+        }
+    }
+
+    strcat(cFilename, lita.options.outputFile)
+
+    strcpy(binaryFilename, cFilename)
+
+    strcat(binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
+    strcat(cFilename, ".c")
+
+    if(!GenerateC(lita, module, cFilename)) {
         return false
     }
 
@@ -239,26 +313,27 @@ func Transpile(lita: *Lita, module: *Module) : bool {
         return false
     }
 
-    if(!CompileC(lita, module, filename)) {
+    if(!CompileC(lita, module, cFilename, binaryFilename)) {
         return false
     }
 
     if(lita.options.run) {
-        Run(lita, lita.options.outputFile)
+        Run(lita, binaryFilename)
     }
 
     return true
 }
 
-func GenerateC(lita: *Lita, module: *Module, filename: *const char) : bool {
+func GenerateC(lita: *Lita, module: *Module, cFilename: *const char) : bool {
     lita.startCapture(MetricType.CGEN)
-    defer lita.endCapture(MetricType.CGEN)
-
     var cgen = CGen{}
     cgen.init(lita)
     cgen.emitProgram(module)
-    
-    var status = WriteFile(filename, cgen.buf.cStrConst(), cgen.buf.length)
+    lita.endCapture(MetricType.CGEN)
+
+    lita.startCapture(MetricType.CWRITE)
+    var status = WriteFile(cFilename, cgen.buf.cStrConst(), cgen.buf.length)
+    lita.endCapture(MetricType.CWRITE)
     if(status != FileStatus.Ok) {
         return false
     }
@@ -266,16 +341,30 @@ func GenerateC(lita: *Lita, module: *Module, filename: *const char) : bool {
     return lita.result.errors.empty()
 }
 
-func CompileC(lita: *Lita, module: *Module, filename: *const char) : bool {
+func CompileC(lita: *Lita, module: *Module, cFilename: *const char, binaryFilename: *const char) : bool {
+    lita.startCapture(MetricType.CCOMPILE)
+    defer lita.endCapture(MetricType.CCOMPILE)
+
     var command: [512]char;
     var commandStr = StringInit(command, 512)
-    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", lita.options.outputFile, filename)
+    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", binaryFilename, cFilename)
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }
     return false
 }
 
-func Run(lita: *Lita, filename: *const char) {
-    system(filename)
+func Run(lita: *Lita, binaryFilename: *const char) {
+    var sb = StringBufferInit(256, lita.allocator)
+    defer sb.free()
+
+    var path: [MAX_PATH]char;
+    FilePath(binaryFilename, path)
+
+    var len = strlen(path)
+    sb.append("cd ")
+    sb.appendStr(path, len)
+    sb.append(" && %s", &binaryFilename[len + 1])
+
+    system(sb.cStr())
 }

@@ -88,7 +88,7 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         }
 
         var op = decl.expr.operand
-        if(decl.expr.kind == StmtKind.ARRAY_INIT_EXPR || 
+        if(decl.expr.kind == StmtKind.ARRAY_INIT_EXPR ||
            decl.expr.kind == StmtKind.INIT_EXPR) {
             inferredType = op.typeInfo
         }
@@ -162,30 +162,30 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
 
 func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
     if(aggDecl.name.str.length) {
-        this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types allowed", 
-                                        fieldName.length, fieldName.buffer, 
+        this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types allowed",
+                                        fieldName.length, fieldName.buffer,
                                         aggDecl.name.str.length, aggDecl.name.str.buffer)
     }
     else {
-        this.result.addError(pos, "invalid 'using' member '%.*s', only aggregate types allowed", 
+        this.result.addError(pos, "invalid 'using' member '%.*s', only aggregate types allowed",
                                 fieldName.length, fieldName.buffer)
-    }    
+    }
 }
 
 func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
-    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types allowed", 
+    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types allowed",
                          paramDecl.name.str.length, paramDecl.name.str.buffer)
-        
+
 }
 
 func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
     if(aggDecl.name.str.length) {
-        this.result.addError(pos, "duplicate member '%.*s' in '%.*s'", 
-                                        fieldName.length, fieldName.buffer, 
+        this.result.addError(pos, "duplicate member '%.*s' in '%.*s'",
+                                        fieldName.length, fieldName.buffer,
                                         aggDecl.name.str.length, aggDecl.name.str.buffer)
     }
     else {
-        this.result.addError(pos, "duplicate member '%.*s'", 
+        this.result.addError(pos, "duplicate member '%.*s'",
                                 fieldName.length, fieldName.buffer)
     }
 }
@@ -209,7 +209,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
                     this.errorDuplicateMember(aggDecl, fieldName, varField.startPos)
                     isValid = false
                 }
-                
+
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
@@ -249,6 +249,15 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
 }
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
+    var hasGenerics = aggDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+    if(hasGenerics) {
+        this.genericParamStack.add(aggDecl.genericParams)
+    }
+
+    defer if(hasGenerics) {
+        this.genericParamStack.pop()
+    }
+
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 
@@ -256,9 +265,8 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 field.typeInfo = this.resolveTypeSpec(varField.type)
-                if(!field.typeInfo) {
-                    return false
-                }
+                assert(field.typeInfo)
+
                 if(varField.defaultExpr) {
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
@@ -281,6 +289,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 this.resolveSymbol(sym)
 
                 field.typeInfo = sym.type
+                if(!field.typeInfo) {
+                    return false
+                }
+
                 if(field.enumField.name.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.enumField.name.str, i)
                 }
@@ -296,6 +308,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 this.resolveSymbol(sym)
 
                 field.typeInfo = sym.type
+                if(!field.typeInfo) {
+                    return false
+                }
+
                 if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.aggregateField.name.str, i)
                 }
@@ -325,7 +341,7 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
 
         var other = enumDecl.fields.get(i)
         if(other.name.str.equalsStringView(field.name.str)) {
-            this.result.addError(other.startPos, "duplicate member '%.*s'", 
+            this.result.addError(other.startPos, "duplicate member '%.*s'",
                                 field.name.str.length, field.name.str.buffer)
             hasDuplicates = true
         }
@@ -363,6 +379,7 @@ func (this: *TypeChecker) checkLabels() {
 }
 
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
+//printf("ResolveFunc %s\n", funcDecl.sym.name)
     this.enterModule(funcDecl.sym.declared)
     defer this.leaveModule()
 
@@ -370,8 +387,17 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     defer this.popScope()
 
     // keep track of which function we are currently parsing
-    this.currentFuncDecl = funcDecl.sym.type as (*FuncTypeInfo)
-    defer this.currentFuncDecl = null
+    this.funcDeclStack.add(funcDecl.sym.type as (*FuncTypeInfo))
+    defer this.funcDeclStack.pop()
+
+    var hasGenerics = funcDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+    if(hasGenerics) {
+        this.genericParamStack.add(funcDecl.genericParams)
+    }
+
+    defer if(hasGenerics) {
+        this.genericParamStack.pop()
+    }
 
     if(!this.resolveStmt(funcDecl.params)) {
         return false
@@ -413,7 +439,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
             var baseType = typeInfo.getBaseType()
             var aggType = baseType as (*AggregateTypeInfo)
 
-            this.addTypeToScope(paramDecl, this.currentScope, aggType, aggType)
+            this.addTypeToScope(paramDecl, this.current.currentScope, aggType, aggType)
         }
     }
 

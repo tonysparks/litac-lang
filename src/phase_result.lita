@@ -20,11 +20,13 @@ public struct PhaseError {
 public struct PhaseResult {
     allocator: *const Allocator
     errors: Array<PhaseError>
+    enabled: bool
 }
 
 public func PhaseResultInit(allocator: *const Allocator) : PhaseResult {
     var result = PhaseResult {
-        .allocator = allocator,        
+        .allocator = allocator,
+        .enabled = true
     }
 
     result.errors.init(16, allocator)
@@ -34,14 +36,18 @@ public func PhaseResultInit(allocator: *const Allocator) : PhaseResult {
 public func (r: *PhaseResult) addError(pos: SrcPos, format: *const char, ...) {
     var sb = StringBufferInit(256, r.allocator)
     var args: va_list;
-    va_start(args, format);    
+    va_start(args, format);
     sb.appendArgs(format, args)
     va_end(args)
-    
+
     r.addErrorStr(pos, sb)
 }
 
-public func (r: *PhaseResult) addErrorStr(pos: SrcPos, sb: *StringBuffer) {        
+public func (r: *PhaseResult) addErrorStr(pos: SrcPos, sb: *StringBuffer) {
+    if(!r.enabled) {
+        return;
+    }
+
     r.errors.add(PhaseError {
         .type = ErrorType.ERROR,
         .message = sb.cStr(),

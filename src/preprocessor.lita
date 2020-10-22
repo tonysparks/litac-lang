@@ -1,0 +1,110 @@
+import "ast"
+import "ast_new"
+import "array"
+import "mem"
+import "lita"
+import "libc"
+import "assert"
+
+/*
+================================================
+    Compile time processing
+================================================
+*/
+
+
+public struct Preprocessor {
+    lita: *Lita
+}
+
+public func PreprocessorInit(lita: *Lita) : Preprocessor {
+    var pp = Preprocessor{}
+    pp.init(lita)
+
+    return pp
+}
+
+public func (this: *Preprocessor) init(lita: *Lita) {
+    this.lita = lita
+}
+
+
+/*
+    type: *const char
+    expr: *const char
+    body: Array<*Stmt>
+    end: *CompStmt
+    evaluatedStmt: *Stmt
+*/
+public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, comp: *CompStmt) {
+    assert(comp != null)
+
+    if(strcmp(comp.type, "if")     == 0 ||
+       strcmp(comp.type, "elseif") == 0 ||
+       strcmp(comp.type, "else")   == 0) {
+        // TODO: Do actual evaluation of expression
+        if(strcmp(comp.type, "else") == 0) {
+            for(var i = 0; i < comp.body.size(); i += 1) {
+                var stmt = comp.body.get(i)
+                switch(stmt.kind) {
+                    case StmtKind.IMPORT_DECL: {
+                        moduleStmt.imports.add(stmt as (*ImportDecl))
+                        break;
+                    }
+                    case StmtKind.NOTE_STMT: {
+                        moduleStmt.notes.add(stmt as (*NoteStmt))
+                        break;
+                    }
+                    case StmtKind.NOTES_DECL: {
+                        var notes = stmt as (*NotesDecl)
+                        moduleStmt.notes.addAll(notes.notes)
+                        break;
+                    }
+                    case StmtKind.BLOCK_STMT: {
+                        var block = stmt as (*BlockStmt)
+                        for(var i = 0; i < block.stmts.size(); i += 1) {
+                            var s = block.stmts.get(i)
+                            if(s.kind == StmtKind.NOTE_STMT) {
+                                moduleStmt.notes.add(s as (*NoteStmt))
+                            }
+                        }
+                    }
+                    default: {
+                        if(IsDecl(stmt)) {
+                            moduleStmt.declarations.add(stmt as (*Decl))
+                        }
+                    }
+                }
+            }
+        }
+        else if(comp.end) {
+            this.evaluateForModule(moduleStmt, comp.end)
+        }
+    }
+}
+
+public func (this: *Preprocessor) evaluateForFunction(comp: *CompStmt) : *Stmt {
+    assert(comp != null)
+
+    if(comp.evaluatedStmt) {
+        return comp.evaluatedStmt
+    }
+
+    if(strcmp(comp.type, "if")     == 0 ||
+       strcmp(comp.type, "elseif") == 0 ||
+       strcmp(comp.type, "else")   == 0) {
+        // TODO: Do actual evaluation of expression
+        if(strcmp(comp.type, "else") == 0) {
+            comp.evaluatedStmt = NewBlockStmt(comp.startPos, comp.endPos, comp.body, this.lita.allocator)
+        }
+        else if(comp.end) {
+            comp.evaluatedStmt = this.evaluateForFunction(comp.end)
+        }
+    }
+
+    if(!comp.evaluatedStmt) {
+        comp.evaluatedStmt = NewEmptyStmt(comp.startPos, comp.endPos, this.lita.allocator)
+    }
+
+    return comp.evaluatedStmt
+}

@@ -2,6 +2,8 @@ bin/*.c
 bin/*.exe
 bin/*.json
 bin/*.pdb
+bin/*.rdbg
+bin/test.txt
 lib/*.lib
 .vscode/ipch
 bin/litaC.exp
@@ -17,3 +19,7 @@ bin/litaC.pdb
 test/output/*.c
 bin/litac_tests.exp
 bin/litac_tests.lib
+bin/output/*.c
+bin/output/*.exe
+bin/output/*.pdb
+vstudio/**

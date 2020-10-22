@@ -34,7 +34,7 @@ func GetGenericName(type: *TypeSpec, str: *String) {
         case TypeSpecKind.NAME: {
             var name = type as (*NameTypeSpec)
             str.append(name.name)
-            
+
             if(name.genericArgs.empty()) {
                 return;
             }
@@ -52,7 +52,8 @@ func GetGenericName(type: *TypeSpec, str: *String) {
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
-            // TODO: 
+            // TODO:
+            assert(false)
         }
         case TypeSpecKind.NONE:
         default:
@@ -61,52 +62,84 @@ func GetGenericName(type: *TypeSpec, str: *String) {
 }
 
 public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
-                                          sym: *Symbol, 
+                                          sym: *Symbol,
                                           name: *NameTypeSpec) : *Symbol {
     assert(sym != null)
     var buffer: [MAX_GENERIC_NAME]char;
     var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
-    
+
     GetGenericName(name, genericName)
-    
+
     var newName = genericName.cStrConst()
-    var genericSym = checker.genericTypes.get(newName)
-    
+    var genericSym = checker.current.genericSymbols.get(newName)
+
     if(!genericSym) {
         var newNameStr = genericName.copy(checker.allocator).str
+        var genericDecl: *GenericDecl = null;
 
         switch(sym.decl.kind) {
             case StmtKind.FUNC_DECL: {
-                var funcDecl = CreateFuncDecl(sym.decl as (*FuncDecl), name.genericArgs, checker.allocator)
-                genericSym = checker.current.symbols.addSymbol(newNameStr, checker.current, funcDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
-
-                if(!genericSym) {
-                    goto err;
-                }
-
-                checker.genericTypes.put(newNameStr, genericSym)
+                genericDecl = CreateFuncDecl(sym.decl as (*FuncDecl), name.genericArgs, checker.allocator)
                 break;
             }
             case StmtKind.UNION_DECL:
             case StmtKind.STRUCT_DECL: {
-                //printf("Generic Name: %s\n", newName)
-                var aggDecl = CreateAggregateDecl(sym.decl as (*AggregateDecl), name.genericArgs, checker.allocator)
-                //printf("Generic Name: %s\n", newName)
-                // TODO: replace genericParams
-                genericSym = checker.current.symbols.addSymbol(newNameStr, checker.current, aggDecl, SymbolFlags.IS_INCOMPLETE|SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
-                if(!genericSym) {
-                    goto err;
-                }
-
-                checker.genericTypes.put(newNameStr, genericSym)
+                genericDecl = CreateAggregateDecl(sym.decl as (*AggregateDecl), name.genericArgs, checker.allocator)
                 break;
             }
             case StmtKind.TYPEDEF_DECL: {
+                genericDecl = CreateTypedefDecl(sym.decl as (*TypedefDecl), name.genericArgs, checker.allocator)
                 break;
             }
             default: {
                 assert(false)
             }
+        }
+
+        if(!genericDecl) {
+            goto err;
+        }
+
+        genericSym = checker.current.symbols.addSymbol(newNameStr,
+                                                       sym.declared,
+                                                       genericDecl,
+                                                       SymbolFlags.IS_INCOMPLETE|
+                                                       SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
+
+        if(!genericSym) {
+            goto err;
+        }
+
+        genericSym.genericCallsiteModule = checker.current
+        genericSym.genericParams = genericDecl.genericParams
+        checker.current.genericSymbols.put(newNameStr, genericSym)
+
+        var numOfGenericArgs = name.genericArgs.size();
+        genericSym.genericArgs.init(numOfGenericArgs, checker.allocator)
+
+        var isValidArgs = true
+        for(var i = 0; i < numOfGenericArgs; i+=1) {
+            var arg = name.genericArgs.get(i)
+            if(!checker.resolveTypeSpec(arg)) {
+                isValidArgs = false
+            }
+
+            if(arg.typeInfo.kind == TypeKind.GENERIC_PARAM) {
+                genericSym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
+            }
+
+            genericSym.genericArgs.add(arg.typeInfo)
+        }
+
+        // if this still has generic parameters, add in the original
+        // parameters
+        if(genericSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            //var originalDecl = sym.decl as (*GenericDecl)
+            //genericDecl.genericParams = originalDecl.genericParams
+        }
+
+        if(!isValidArgs) {
+            goto err;
         }
     }
 
@@ -116,16 +149,19 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     checker.finishResolveSymbol(genericSym)
 
     name.typeInfo = genericSym.type
+    if(IsGenericCapable(genericSym.type) && sym.type) {
+        var genericType = genericSym.type as (*GenericTypeInfo)
+        genericType.genericTypeid = sym.type.typeid
+    }
     return genericSym
 
 err:
     return null
 }
 
-func CreateAggregateDecl(aggDecl: *AggregateDecl, 
-                       //  name: *const char, 
+func CreateAggregateDecl(aggDecl: *AggregateDecl,
                          genericArgs: *Array<*TypeSpec>,
-                         allocator: *const Allocator) : *AggregateDecl {
+                         allocator: *const Allocator) : *GenericDecl {
     var copy = CopyAggregateDecl(aggDecl, allocator)
 
     var template = Template {
@@ -135,14 +171,13 @@ func CreateAggregateDecl(aggDecl: *AggregateDecl,
 
     ReplaceTypes(&template, copy.node)
 
-    return copy
+    return copy as (*GenericDecl)
 }
 
 
-func CreateFuncDecl(funcDecl: *FuncDecl, 
-                    //  name: *const char, 
+func CreateFuncDecl(funcDecl: *FuncDecl,
                     genericArgs: *Array<*TypeSpec>,
-                    allocator: *const Allocator) : *FuncDecl {
+                    allocator: *const Allocator) : *GenericDecl {
     var copy = CopyFuncDecl(funcDecl, allocator)
 
     var template = Template {
@@ -152,8 +187,24 @@ func CreateFuncDecl(funcDecl: *FuncDecl,
 
     ReplaceTypes(&template, copy.node)
 
-    return copy
+    return copy as (*GenericDecl)
 }
+
+func CreateTypedefDecl(typedefDecl: *TypedefDecl,
+                       genericArgs: *Array<*TypeSpec>,
+                       allocator: *const Allocator) : *GenericDecl {
+    var copy = CopyTypedefDecl(typedefDecl, allocator)
+
+    var template = Template {
+        .genericParams = &typedefDecl.genericParams,
+        .genericArgs = genericArgs
+    }
+
+    ReplaceTypes(&template, copy.node)
+
+    return copy as (*GenericDecl)
+}
+
 
 struct Template {
     genericParams: *Array<GenericParam>
@@ -182,8 +233,33 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
             return type
         }
         case TypeSpecKind.FUNC_PTR: {
-            // TODO
-            break;
+            var funcPtr = type as (*FuncPtrTypeSpec)
+
+            for(var i = 0; i < funcPtr.args.size(); i+=1) {
+                funcPtr.args.set(i, this.replaceTypeSpec(funcPtr.args.get(i)))
+            }
+
+            funcPtr.ret = this.replaceTypeSpec(funcPtr.ret)
+
+            for(var i = 0; i < funcPtr.genericParams.size();) {
+                var isRemoved = false
+                var genParam = funcPtr.genericParams.get(i)
+                for(var j = 0; j < this.genericParams.size(); j+=1) {
+                    var param = this.genericParams.get(j)
+
+                    if(param.name.str.equalsStringView(genParam.name.str)) {
+                        funcPtr.genericParams.removeAt(i)
+                        isRemoved = true
+                        break;
+                    }
+                }
+
+                if(!isRemoved) {
+                    i+=1
+                }
+            }
+
+            return type
         }
         case TypeSpecKind.NAME: {
             var name = type as (*NameTypeSpec)
@@ -205,7 +281,7 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
             assert(false)
         }
     }
-    
+
     return null
 }
 
@@ -250,27 +326,335 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                 var param = funcDecl.params.get(i)
                 param.type = template.replaceTypeSpec(param.type)
                 if(param.defaultExpr) {
-                    ReplaceTypes(template, param.defaultExpr.node)
+                    ReplaceTypes(template, param.defaultExpr)
                 }
             }
 
             funcDecl.returnType = template.replaceTypeSpec(funcDecl.returnType)
-            // TODO: ReplaceTypes(template, funcDecl.body)
+            ReplaceTypes(template, funcDecl.body)
             break;
         }
         case StmtKind.IMPORT_DECL: {
             break;
         }
         case StmtKind.CONST_DECL:
-        case StmtKind.VAR_DECL:
+        case StmtKind.VAR_DECL: {
+            var decl = ast as (*VarDecl)
+            decl.typeSpec = template.replaceTypeSpec(decl.typeSpec)
+
+            if(decl.expr) {
+                ReplaceTypes(template, decl.expr)
+            }
+            break;
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            var decl = ast as (*TypedefDecl)
+            decl.type = template.replaceTypeSpec(decl.type)
+            break;
+        }
         case StmtKind.ENUM_DECL:
-        case StmtKind.TYPEDEF_DECL:
         case StmtKind.PARAM_DECL:
         case StmtKind.NATIVE_DECL:
         case StmtKind.POISON_DECL: {
             break;
         }
+
+
+
+        case StmtKind.BLOCK_STMT: {
+            var body = ast as (*BlockStmt)
+            for(var i = 0; i < body.stmts.size(); i+=1) {
+                var s = body.stmts.get(i)
+                ReplaceTypes(template, s)
+            }
+            break;
+        }
+        case StmtKind.BREAK_STMT: {
+            break;
+        }
+        case StmtKind.COMP_STMT: {
+            var comp = ast as (*CompStmt)
+            if(comp.evaluatedStmt) {
+                ReplaceTypes(template, comp.evaluatedStmt)
+            }
+            if(comp.end) {
+                ReplaceTypes(template, comp.end)
+            }
+            for(var i = 0; i < comp.body.size(); i+=1) {
+                var s = comp.body.get(i)
+                ReplaceTypes(template, s)
+            }
+            break;
+        }
+        case StmtKind.CONTINUE_STMT: {
+            break;
+        }
+        case StmtKind.DEFER_STMT: {
+            var deferStmt = ast as (*DeferStmt)
+            ReplaceTypes(template, deferStmt.deferedStmt)
+            break;
+        }
+        case StmtKind.DO_WHILE_STMT: {
+            var whileStmt = ast as (*DoWhileStmt)
+            ReplaceTypes(template, whileStmt.body)
+            ReplaceTypes(template, whileStmt.cond)
+            break;
+        }
+        case StmtKind.EMPTY_STMT: {
+            return true;
+        }
+        case StmtKind.FOR_STMT: {
+            var forStmt = ast as (*ForStmt)
+            if(forStmt.init) {
+                ReplaceTypes(template, forStmt.init)
+            }
+            if(forStmt.cond) {
+                ReplaceTypes(template, forStmt.cond)
+            }
+            if(forStmt.post) {
+                ReplaceTypes(template, forStmt.post)
+            }
+            if(forStmt.body) {
+                ReplaceTypes(template, forStmt.body)
+            }
+            break;
+        }
+        case StmtKind.FUNC_BODY_STMT: {
+            var body = ast as (*FuncBodyStmt)
+
+            for(var i = 0; i < body.stmts.size(); i+=1) {
+                var s = body.stmts.get(i)
+                ReplaceTypes(template, s)
+            }
+            break;
+        }
+        case StmtKind.GOTO_STMT: {
+            break;
+        }
+        case StmtKind.IF_STMT: {
+            var ifStmt = ast as (*IfStmt)
+            ReplaceTypes(template, ifStmt.cond)
+            ReplaceTypes(template, ifStmt.then)
+            if(ifStmt.elseStmt) {
+                ReplaceTypes(template, ifStmt.elseStmt)
+            }
+            break;
+        }
+        case StmtKind.LABEL_STMT: {
+            break;
+        }
+        case StmtKind.MODULE_STMT: {
+            break;
+        }
+        case StmtKind.NOTE_STMT: {
+            break;
+        }
+        case StmtKind.PARAMETERS_STMT: {
+            var params = ast as (*ParametersStmt)
+            for(var i = 0; i < params.size(); i += 1) {
+                var param = params.get(i)
+                ReplaceTypes(template, param as (*Node))
+            }
+            break;
+        }
+        case StmtKind.RETURN_STMT: {
+            var stmt = ast as (*ReturnStmt)
+            if(stmt.expr) {
+                ReplaceTypes(template, stmt.expr)
+            }
+            break;
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            var caseStmt = ast as (*SwitchCaseStmt)
+            ReplaceTypes(template, caseStmt.cond)
+            ReplaceTypes(template, caseStmt.body)
+            break;
+        }
+        case StmtKind.SWITCH_STMT:{
+            var switchStmt = ast as (*SwitchStmt)
+            ReplaceTypes(template, switchStmt.cond)
+            for(var i = 0; i < switchStmt.cases.size(); i+=1) {
+                var caseStmt = switchStmt.cases.get(i)
+                ReplaceTypes(template, caseStmt as (*Node))
+            }
+            if(switchStmt.defaultStmt) {
+                ReplaceTypes(template, switchStmt.defaultStmt)
+            }
+            break;
+        }
+        case StmtKind.ENUM_FIELD_DECL:
+        case StmtKind.ENUM_FIELD_ENTRY_DECL:
+        case StmtKind.STRUCT_FIELD_DECL:
+        case StmtKind.UNION_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL:{
+            // TODO: Is this needed??
+            break;
+        }
+        case StmtKind.WHILE_STMT: {
+            var whileStmt = ast as (*WhileStmt)
+            ReplaceTypes(template, whileStmt.cond)
+            ReplaceTypes(template, whileStmt.body)
+            break;
+        }
+
+
+        /*--------------------------------------
+            Expressions
+        ----------------------------------------*/
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            var expr = ast as (*ArrayDesignationExpr)
+            ReplaceTypes(template, expr.index)
+            ReplaceTypes(template, expr.value)
+            break;
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            var expr = ast as (*ArrayInitExpr)
+            expr.type = template.replaceTypeSpec(expr.type)
+            for(var i = 0; i < expr.values.size(); i += 1) {
+                ReplaceTypes(template, expr.values.get(i))
+            }
+            break;
+        }
+        case StmtKind.BINARY_EXPR: {
+            var expr = ast as (*BinaryExpr)
+            ReplaceTypes(template, expr.left)
+            ReplaceTypes(template, expr.right)
+            break;
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            break;
+        }
+        case StmtKind.CAST_EXPR: {
+            var expr = ast as (*CastExpr)
+            ReplaceTypes(template, expr.exprToCast)
+            expr.castTo = template.replaceTypeSpec(expr.castTo)
+            break;
+        }
+        case StmtKind.CHAR_EXPR: {
+            break;
+        }
+        case StmtKind.FUNC_CALL_EXPR: {
+            var expr = ast as (*FuncCallExpr)
+            ReplaceTypes(template, expr.object)
+            for(var i = 0; i < expr.genericArgs.size(); i += 1) {
+                var arg = expr.genericArgs.get(i)
+                arg = template.replaceTypeSpec(arg)
+                expr.genericArgs.set(i, arg)
+            }
+
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                ReplaceTypes(template, expr.arguments.get(i))
+            }
+            break;
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            var expr = ast as (*IdentifierExpr)
+            expr.type = template.replaceTypeSpec(expr.type as (*TypeSpec)) as (*NameTypeSpec)
+            break;
+        }
+        case StmtKind.GET_EXPR: {
+            var expr = ast as (*GetExpr)
+            ReplaceTypes(template, expr.object)
+            ReplaceTypes(template, expr.field as (*Node))
+            break;
+        }
+        case StmtKind.GROUP_EXPR: {
+            var expr = ast as (*GroupExpr)
+            ReplaceTypes(template, expr.groupedExpr)
+            break;
+        }
+        case StmtKind.IDENTIFIER_EXPR: {
+            var expr = ast as (*IdentifierExpr)
+            expr.type = template.replaceTypeSpec(expr.type as (*TypeSpec)) as (*NameTypeSpec)
+            break;
+        }
+        case StmtKind.INIT_EXPR: {
+            var expr = ast as (*InitExpr)
+            expr.type = template.replaceTypeSpec(expr.type as (*TypeSpec)) as (*NameTypeSpec)
+
+            for(var i = 0; i < expr.genericArgs.size(); i += 1) {
+                var arg = expr.genericArgs.get(i)
+                arg = template.replaceTypeSpec(arg)
+                expr.genericArgs.set(i, arg)
+            }
+
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                ReplaceTypes(template, expr.arguments.get(i) as (*Node))
+            }
+            break;
+        }
+        case StmtKind.INIT_ARG_EXPR: {
+            var expr = ast as (*InitArgExpr)
+            ReplaceTypes(template, expr.value)
+            break;
+        }
+        case StmtKind.NULL_EXPR: {
+            break;
+        }
+        case StmtKind.NUMBER_EXPR: {
+            break;
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            var expr = ast as (*OffsetOfExpr)
+            expr.type = template.replaceTypeSpec(expr.type)
+            break;
+        }
+        case StmtKind.SET_EXPR: {
+            var expr = ast as (*SetExpr)
+            ReplaceTypes(template, expr.object)
+            ReplaceTypes(template, expr.field as (*Node))
+            ReplaceTypes(template, expr.value)
+            break;
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var expr = ast as (*SizeOfExpr)
+            ReplaceTypes(template, expr.sizeOfExpr)
+            break;
+        }
+        case StmtKind.STRING_EXPR: {
+            break;
+        }
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            var expr = ast as (*SubscriptGetExpr)
+            ReplaceTypes(template, expr.object)
+            ReplaceTypes(template, expr.index)
+            break;
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            var expr = ast as (*SubscriptSetExpr)
+            ReplaceTypes(template, expr.object)
+            ReplaceTypes(template, expr.index)
+            ReplaceTypes(template, expr.value)
+            break;
+        }
+        case StmtKind.TERNARY_EXPR: {
+            var expr = ast as (*TernaryExpr)
+            ReplaceTypes(template, expr.cond)
+            ReplaceTypes(template, expr.then)
+            ReplaceTypes(template, expr.other)
+            break;
+        }
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            var expr = ast as (*TypeIdentifierExpr)
+            expr.type = template.replaceTypeSpec(expr.type)
+            break;
+        }
+        case StmtKind.TYPE_OF_EXPR: {
+            var expr = ast as (*TypeOfExpr)
+            ReplaceTypes(template, expr.typeOfExpr)
+            expr.type = template.replaceTypeSpec(expr.type)
+            break;
+        }
+        case StmtKind.UNARY_EXPR: {
+            var expr = ast as (*UnaryExpr)
+            ReplaceTypes(template, expr.unaryExpr)
+            break;
+        }
+        case StmtKind.POISON_EXPR: {
+            break;
+        }
         default: {
+            printf("Statement Kind: %s\n", StmtKindAsStr(ast.kind))
             assert(false)
         }
     }
