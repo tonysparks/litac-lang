@@ -9,7 +9,7 @@ import "mem"
 import "libc"
 
 @doc("""
-    Creates an ordering for C to handle compilation unit correction.  LitaC allows for 
+    Creates an ordering for C to handle compilation unit correction.  LitaC allows for
     out of order declarations -- but C does not -- this will order the symbols in C for
     proper compilation in C.
 
@@ -17,7 +17,7 @@ import "libc"
     1) Constant global primitives
     2) sort any Structs or Unions based on:
        Depends of their fields:
-       a) if an aggregate has no aggregate types as fields (NOTE: Pointers to aggregates do not count, 
+       a) if an aggregate has no aggregate types as fields (NOTE: Pointers to aggregates do not count,
           because C can calculate the size of the structure with pointers), it is considered 'resolved'
        b) otherwise create a list of 'dependencies' for this aggregate and place on 'unresolved' list
     3) take the aggregates in the 'unresolved' list and iterate thru them to see if they can be resolved
@@ -26,9 +26,9 @@ import "libc"
 """)
 public struct DependencyGraph {
     sortedPrimitives: Array<*Symbol>  // primitive const globals
-    sortedGlobals: Array<*Symbol>     // all other global variables    
+    sortedGlobals: Array<*Symbol>     // all other global variables
     sortedAggregates: Array<*Symbol>  // aggregates
-    sortedFuncs: Array<*Symbol>       // functions 
+    sortedFuncs: Array<*Symbol>       // functions
 
     sortedSymbols: Array<*Symbol>      // final sorted symbols
     dependencies: Map<*Symbol, Dependency>
@@ -67,7 +67,7 @@ public func (this: *DependencyGraph) init(lita: *Lita) {
                             symbols.symbolFuncs.size(),
                             lita.allocator)
 
-    this.dependencies.init(EmptyDependency, 
+    this.dependencies.init(EmptyDependency,
                            symbols.symbolTypes.size(),
                            PtrHashFn<*Symbol>,
                            PtrEqualFn<*Symbol>,
@@ -114,7 +114,7 @@ func (this: *DependencyGraph) markDependencies(dependency: *Dependency) {
 func (this: *DependencyGraph) buildGraph(program: *ProgramSymbols) {
     for(var i = 0; i < program.values.size(); i+=1) {
         var sym = program.values.get(i)
-        if(sym.flags & SymbolFlags.IS_CONSTANT && IsPrimitive(sym.type))  {
+        if(sym.flags & SymbolFlags.IS_CONSTANT && IsPrimitive(sym.type)) {
             this.sortedPrimitives.add(sym)
         }
         else {
@@ -136,7 +136,7 @@ func (this: *DependencyGraph) buildGraph(program: *ProgramSymbols) {
         if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
             continue
         }
-        
+
         var dep = Dependency{
             .state = State.PENDING,
             .sym = sym
@@ -191,7 +191,7 @@ func (this: *DependencyGraph) sortAggregates() {
 
         var cause = this.resolveDependency(dep)
         if(cause) {
-            this.lita.result.addError(dep.sym.decl.startPos, 
+            this.lita.result.addError(dep.sym.decl.startPos,
                     "could not resolve dependency order for '%s' because of cyclic dependency with '%s'", dep.sym.name, cause.sym.name)
         }
     }
@@ -229,7 +229,7 @@ func (this: *DependencyGraph) sortAggregatesDependencies(deps: *Array<*Dependenc
 
 public func (this: *DependencyGraph) sort() : Array<*Symbol> {
     this.buildGraph(this.lita.programSymbols)
-    
+
     this.sortAggregates()
 
     this.sortedSymbols.clear()

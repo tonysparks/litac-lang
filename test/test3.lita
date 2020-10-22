@@ -1,7 +1,7 @@
 //import "mem"
 //import "array"
 
-//import "map"
+import "map"
 
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
@@ -38,7 +38,7 @@ const escapeStrings = [256]*const char {
     ['\0'] = "\\0",
 }*/
 
-public typedef func<K>(K) : u32 as HashFn<K>;
+//public typedef func<K>(K) : u32 as HashFn<K>;
 
 
 func test<T>(a: HashFn<T>, t: T) : u32 {
@@ -53,7 +53,10 @@ func main(len:i32, args: **char) : i32 {
     var f: HashFn<i32> = &fn;
 
     printf("%d\n", test(fn, 4))
-    //var map = StrMap<i32>(0)
+    var map = StrMap<i32>(0)
+    map.put("Hi", 4)
+    var x = map.get("Hi")
+    printf("X = %d\n", x)
     //var t = Test{}
     //t.size()
     /*
