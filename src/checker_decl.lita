@@ -112,9 +112,6 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)
     }
 
-//printf("Resolved: %.*s as declared: %s inferred: %s\n", decl.name.str.length, decl.name.str.buffer,
-//            TypeKindAsStr(declaredType?declaredType.kind:0),  TypeKindAsStr(inferredType?inferredType.kind:0))
-
     return declaredType ? declaredType : inferredType
 }
 

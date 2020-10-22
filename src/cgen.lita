@@ -256,6 +256,11 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
             this.emitEnumDecl(decl as (*EnumDecl))
             break;
         }
+        case StmtKind.TYPEDEF_DECL: {
+            // we don't emit any other typedefs because we just use the
+            // raw types
+            break;
+        }
         default: {
             assert(false)
         }
@@ -652,7 +657,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
 
     var declName:*const char = sym.name
-    if(sym.type.kind == TypeKind.FUNC) {
+    if(IsFuncLike(sym.type)) {//}.kind == TypeKind.FUNC) {
         declName = this.escapeNameStr(sym.name)
     }
     else if (sym.flags & SymbolFlags.IS_TYPE) {

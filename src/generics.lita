@@ -131,6 +131,13 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             genericSym.genericArgs.add(arg.typeInfo)
         }
 
+        // if this still has generic parameters, add in the original
+        // parameters
+        if(genericSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            //var originalDecl = sym.decl as (*GenericDecl)
+            //genericDecl.genericParams = originalDecl.genericParams
+        }
+
         if(!isValidArgs) {
             goto err;
         }
@@ -226,9 +233,33 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
             return type
         }
         case TypeSpecKind.FUNC_PTR: {
-            // TODO
-            assert(false)
-            break;
+            var funcPtr = type as (*FuncPtrTypeSpec)
+
+            for(var i = 0; i < funcPtr.args.size(); i+=1) {
+                funcPtr.args.set(i, this.replaceTypeSpec(funcPtr.args.get(i)))
+            }
+
+            funcPtr.ret = this.replaceTypeSpec(funcPtr.ret)
+
+            for(var i = 0; i < funcPtr.genericParams.size();) {
+                var isRemoved = false
+                var genParam = funcPtr.genericParams.get(i)
+                for(var j = 0; j < this.genericParams.size(); j+=1) {
+                    var param = this.genericParams.get(j)
+
+                    if(param.name.str.equalsStringView(genParam.name.str)) {
+                        funcPtr.genericParams.removeAt(i)
+                        isRemoved = true
+                        break;
+                    }
+                }
+
+                if(!isRemoved) {
+                    i+=1
+                }
+            }
+
+            return type
         }
         case TypeSpecKind.NAME: {
             var name = type as (*NameTypeSpec)
@@ -316,8 +347,12 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             }
             break;
         }
+        case StmtKind.TYPEDEF_DECL: {
+            var decl = ast as (*TypedefDecl)
+            decl.type = template.replaceTypeSpec(decl.type)
+            break;
+        }
         case StmtKind.ENUM_DECL:
-        case StmtKind.TYPEDEF_DECL:
         case StmtKind.PARAM_DECL:
         case StmtKind.NATIVE_DECL:
         case StmtKind.POISON_DECL: {

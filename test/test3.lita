@@ -1,9 +1,17 @@
 //import "mem"
 //import "array"
 
+//import "map"
+
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
+/*
+func test(fn: func() : void) {
+    fn();
+}*/
+
+/*
 struct Array<T> {
     values: T
     length: i32
@@ -28,11 +36,26 @@ const escapeStrings = [256]*const char {
     ['\''] = "\\'",
     ['"'] = "\\\"",
     ['\0'] = "\\0",
+}*/
+
+public typedef func<K>(K) : u32 as HashFn<K>;
+
+
+func test<T>(a: HashFn<T>, t: T) : u32 {
+    return a(t)
+}
+
+func fn(a: i32) : u32 {
+    return (a + 10) as (u32)
 }
 
 func main(len:i32, args: **char) : i32 {
-    var t = Test{}
-    t.size()
+    var f: HashFn<i32> = &fn;
+
+    printf("%d\n", test(fn, 4))
+    //var map = StrMap<i32>(0)
+    //var t = Test{}
+    //t.size()
     /*
     var c = []char {
         '\n',

@@ -135,7 +135,7 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
 
     var sym = type.sym
     if(type.kind == TypeKind.FUNC_PTR) {
-        var funcSym = this.current.getType(expr.type.name)
+        var funcSym = this.currentScope().lookup(expr.type.name)
         if(funcSym && funcSym.type && funcSym.type.kind == TypeKind.FUNC_PTR) {
             sym = funcSym
         }
@@ -207,6 +207,7 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
         if(parentExpr) {
             parentExpr.becomeParentOf(expr)
         }
+
     }
 
     if(!this.resolveExpr(expr)) {
@@ -572,9 +573,6 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         var p = funcPtr.paramDecls.get(i)
         if(i < numberOfSuppliedArgs) {
             var arg = suppliedArgs.get(i)
-            if(!this.resolveExpr(arg)) {
-                return false
-            }
 
             this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo)
             arg.expectedType = p;
@@ -717,11 +715,19 @@ func (this: *TypeChecker) resolveSubscriptGetExpr(expr: *SubscriptGetExpr) : boo
         case TypeKind.PTR: {
             var ptrInfo = objectType as (*PtrTypeInfo)
             baseObj = ptrInfo.ptrOf
+            if(baseObj.kind == TypeKind.CONST) {
+                var constInfo = baseObj as (*ConstTypeInfo)
+                baseObj = constInfo.constOf
+            }
             break;
         }
         case TypeKind.ARRAY: {
             var arrayInfo = objectType as (*ArrayTypeInfo)
             baseObj = arrayInfo.arrayOf
+            if(baseObj.kind == TypeKind.CONST) {
+                var constInfo = baseObj as (*ConstTypeInfo)
+                baseObj = constInfo.constOf
+            }
             break;
         }
         default: {

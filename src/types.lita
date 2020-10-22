@@ -414,6 +414,7 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
         case TypeKind.STRUCT:
         case TypeKind.UNION:
         case TypeKind.ENUM:
+        case TypeKind.GENERIC_PARAM:
             sb.append(this.name)
             break;
         case TypeKind.STR: {
@@ -615,13 +616,25 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
         }
 
         case TypeKind.STR: {
+            // Allow for pointer arithmetic
+            if(IsInteger(other)) {
+                return true
+            }
             return other.kind == TypeKind.STR ||
                    IsPtrOf(other, TypeKind.CHAR)
         }
         case TypeKind.ARRAY: {
+            // Allow for pointer arithmetic
+            if(IsInteger(other)) {
+                return true
+            }
             return this.isDeclarable(other)
         }
         case TypeKind.PTR: {
+            // Allow for pointer arithmetic
+            if(IsInteger(other)) {
+                return true
+            }
             return this.isDeclarable(other)
         }
         case TypeKind.CONST: {
@@ -648,6 +661,9 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return this.typeid == other.typeid
         }
         case TypeKind.ENUM: {
+            if(IsInteger(other)) {
+                return true
+            }
             if(other.kind != TypeKind.ENUM) {
                 return false
             }
@@ -848,9 +864,34 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
         }
 
         case TypeKind.FUNC_PTR: {
-            // TODO
-            assert(false)
-            break;
+            if(other.kind != TypeKind.FUNC_PTR) {
+                return false
+            }
+
+            var fnPtrInfo = this as (*FuncPtrTypeInfo)
+            var otherFnPtrInfo = other as (*FuncPtrTypeInfo)
+
+            if(fnPtrInfo.paramDecls.size() != otherFnPtrInfo.paramDecls.size()) {
+                return false;
+            }
+
+            if(fnPtrInfo.hasVarargs != otherFnPtrInfo.hasVarargs) {
+                return false;
+            }
+
+            if(!fnPtrInfo.returnType.strictEquals(otherFnPtrInfo.returnType)) {
+                return false;
+            }
+
+            for(var i = 0; i < fnPtrInfo.paramDecls.size(); i += 1) {
+                var a = fnPtrInfo.paramDecls.get(i)
+                var b = otherFnPtrInfo.paramDecls.get(i)
+                if(!a.strictEquals(b)) {
+                    return false
+                }
+            }
+
+            return true;
         }
 
         case TypeKind.STRUCT: {
