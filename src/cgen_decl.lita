@@ -67,14 +67,15 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
 
     var decayArrays = true
     var i = 0
+    var tmp = StringBufferInit(256, this.allocator)
     for(; i < funcInfo.decl.params.size(); i += 1) {
         if(i > 0) {
             buf.append(",")
         }
 
         var param = funcInfo.decl.params.get(i)
-        var tmp = StringBufferInit(256, this.allocator)
         buf.append("%s", this.cTypeDecl(param.sym.type, this.prefix(param.sym.name, &tmp), decayArrays))
+        tmp.clear()
     }
 
     if(funcInfo.decl.flags & FuncFlags.HAS_VARARGS) {

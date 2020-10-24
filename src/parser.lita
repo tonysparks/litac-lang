@@ -1908,7 +1908,7 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
         goto err;
     }
 
-    var sb = StringBufferInit(name.str.length, p.allocator)
+    var sb = StringBufferInit(MAX_SYMBOL_NAME, p.allocator)
     sb.append("%.*s", name.str.length, name.str.buffer)
 
     if(p.match(TokenType.COLON_COLON)) {

@@ -280,9 +280,9 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         case StmtKind.VAR_DECL: {
             var varDecl = decl as (*VarDecl)
 
-            if(varDecl.expr.isConstExpr()) {
+            if(varDecl.expr.isConstExpr() || varDecl.hasNote("foreign")) {
                 this.result.enabled = false
-                var isValid = this.resolveExpr(varDecl.expr)
+                var isValid = this.resolveValueDecl(varDecl)
                 this.result.enabled = true
 
                 // if this is resolvable, this means it

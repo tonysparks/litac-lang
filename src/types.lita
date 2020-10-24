@@ -567,7 +567,12 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
     // this = other
     switch(this.kind) {
         case TypeKind.BOOL: {
-            return other.kind == TypeKind.BOOL
+            if(other.kind == TypeKind.VOID) {
+                return false
+            }
+
+            return true
+            //return other.kind == TypeKind.BOOL
         }
         case TypeKind.CHAR: {
             return other.kind <= TypeKind.CHAR

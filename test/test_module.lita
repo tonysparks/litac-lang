@@ -1,6 +1,9 @@
 public const A = 32
 const B = 64
 
+@foreign
+public const MAX_PATH: i32;
+
 public struct StructA {
     a: i32
 }

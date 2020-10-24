@@ -62,7 +62,7 @@ const escapeChars = [256]*const char {
 
 public func (this: *CGen) init(lita: *Lita) {
     this.lita = lita
-    this.buf.init(4096, lita.allocator)
+    this.buf.init(4096*4, lita.allocator)
     this.line.init(1024, lita.allocator)
     this.aggregateLevel = 0
     this.currentFunc = null

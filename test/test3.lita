@@ -1,10 +1,15 @@
-//import "mem"
-//import "array"
+/*import "mem"
+import "array"
 
+import "test_module"
 import "map"
-
+*/
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
+
+@foreign
+public const MAX_PATH: i32;
+
 
 /*
 func test(fn: func() : void) {
@@ -39,24 +44,35 @@ const escapeStrings = [256]*const char {
 }*/
 
 //public typedef func<K>(K) : u32 as HashFn<K>;
+//const MAX_PATH = 260
 
+struct M {
+    srcPath: [MAX_PATH]char
+}
 
+/*
 func test<T>(a: HashFn<T>, t: T) : u32 {
     return a(t)
 }
 
 func fn(a: i32) : u32 {
     return (a + 10) as (u32)
+}*/
+
+func test() : bool {
+    return 1 & 1
 }
 
 func main(len:i32, args: **char) : i32 {
-    var f: HashFn<i32> = &fn;
+    /*var f: HashFn<i32> = &fn;
 
     printf("%d\n", test(fn, 4))
     var map = StrMap<i32>(0)
     map.put("Hi", 4)
     var x = map.get("Hi")
     printf("X = %d\n", x)
+
+    var m = M{}*/
     //var t = Test{}
     //t.size()
     /*

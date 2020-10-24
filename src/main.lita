@@ -214,13 +214,13 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var importStmt = module.ast.imports.get(i)
         if(importStmt.name.type == TokenType.ERROR) {
-            lita.result.addError(importStmt.pos, "Could not parse import statement")
+            lita.result.addError(importStmt.startPos, "Could not parse import statement")
             continue
         }
 
         var filename: [MAX_PATH]char
         if(!FindModulePath(lita, importStmt.name.str, filename)) {
-            lita.result.addError(importStmt.pos, "Could not find module '%.*s'",
+            lita.result.addError(importStmt.startPos, "Could not find module '%.*s'",
                     importStmt.name.str.length, importStmt.name.str.buffer)
             continue
         }
@@ -236,7 +236,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 
         lita.addModule(importModule)
 
-        ParseModule(lita, importModule, importStmt.pos)
+        ParseModule(lita, importModule, importStmt.startPos)
     }
 
     return true
