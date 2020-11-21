@@ -11,6 +11,7 @@ bin/litaC.lib
 bin/litaC.pdb
 litac-lsp.log
 bin/litaC
+bin/test_output
 bin/litaC_test.*
 bin/litaC_test
 bin_release/litaC.c

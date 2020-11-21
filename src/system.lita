@@ -1,4 +1,5 @@
 @raw("""
+#include <stdlib.h>
 #include <windows.h>
 #include <libloaderapi.h>
 #include <stdio.h>
@@ -141,3 +142,30 @@ public func CurrentDateTime() : *const char {
     timeinfo = localtime(&rawtime)
     return asctime(timeinfo)
 }
+
+
+
+@foreign("_popen")
+func popen(command: *const char, mode: *const char) : *FILE;
+@foreign("_pclose")
+func pclose(pipe: *FILE) : void;
+
+public struct Process {
+    pipe: *FILE
+}
+
+public func (this: *Process) readOutput(buffer: *char, length: usize) : i64 {
+    if(!this.pipe) {
+        return -1;
+    }
+
+    return fread(buffer, sizeof(:char), length, this.pipe)
+}
+
+public func SystemExec(command: *const char) : Process {
+    var pipe = popen(command, "rt")
+    return Process{
+        .pipe = pipe
+    }
+}
+

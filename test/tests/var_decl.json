@@ -1,11 +1,70 @@
 {
     "description": "Tests Declarations",
     "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    @include("stdio.h");
+    @foreign func printf(...):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
     "tests": [
         {
-            "program": "",
-            "output": "",
-            "error": ""
+            "name" : "Declarations",
+            "definitions": `
+                struct Struct {
+                    a: i32
+                }
+
+                union Union {
+                    a: i32
+                    b: f32
+                }
+            `,
+            "code": `
+                var a = Struct{4}
+                assert(a.a == 4)
+
+                var b = Union{.a = 8}
+                assert(b.a == 8)
+
+                var aPtr: *Struct = &a
+                assert(aPtr != null)
+
+                var a2Ptr = &a
+                assert(a2Ptr == aPtr)
+            `,
+        },
+        {
+            "name" : "Invalid Declaration Wrong type",
+            "definitions": `
+                struct Struct {
+                    a: i32
+                }
+            `,
+            "code": `
+                var a: i32 = Struct{4}
+            `,
+            "error": "'Struct' can't be assigned to 'i32'"
+        },
+        {
+            "name" : "Invalid Declaration Missing 'var'",
+            "disabled": true,
+            "definitions": `
+                struct Struct {
+                    a: i32
+                }
+            `,
+            "code": `
+                theVariable: Struct = Struct{4}
+            `,
+            "error": "'Struct' can't be assigned to 'i32'"
         }
     ]
 }

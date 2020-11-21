@@ -1,0 +1,42 @@
+{
+    "description": "Tests Syntax Errors",
+    "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    @include("stdio.h");
+    @foreign func printf(...):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
+    "tests": [
+        {
+            "name" : "Invalid Member Syntax Error",
+            "definitions": `
+                struct Struct {
+                    a: i32:
+                }
+            `,
+            "code": `
+                var a = Struct{4}
+                assert(a.a == 4)
+            `,
+            "error": "Invalid field member"
+        },
+        {
+            "name" : "Invalid Array Syntax Error",
+            "definitions": `
+
+            `,
+            "code": `
+                var a = i32[]{1,2,3}
+            `,
+            "error": "Unexpected token"
+        }
+    ]
+}

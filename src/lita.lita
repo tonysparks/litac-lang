@@ -3,15 +3,27 @@ import "phase_result"
 import "array"
 import "map"
 import "module"
+import "libc"
 import "string_view"
 import "system"
 import "symbols"
 import "preprocessor"
+import "string"
+import "string_buffer"
+import "lex"
+import "parser"
+import "ast"
+import "ast_new"
+import "checker"
+import "cgen"
+import "io"
 
 public const MAX_PREFIX_SIZE = 32
 
 public struct Lita {
     allocator: *const Allocator
+    linearAllocator: LinearAllocator
+
     preprocessor: Preprocessor
     result: PhaseResult
     modules: Map<*const char, *Module>
@@ -21,6 +33,8 @@ public struct Lita {
     totalAllocations: u32
 
     options: *LitaOptions
+    binaryFilename: [MAX_PATH]char
+    sourceFilename: [MAX_PATH]char
 
     programSymbols: ProgramSymbols
 }
@@ -63,34 +77,29 @@ public struct LitaOptions {
     cPrefix: [MAX_PREFIX_SIZE]char // Prefix for types/variables defined in C
 }
 
-var linearAllocator = LinearAllocator{}
 
 public func (this: *Lita) init(options: *LitaOptions) {
     var size: usize = 1024 * 1024 * 1000;
-    linearAllocator.init(defaultAllocator.alloc(size), size)
+    this.linearAllocator.init(defaultAllocator.alloc(size), size)
 
-    var allocator = (&linearAllocator) as (*const Allocator)
+    var allocator = (&this.linearAllocator) as (*const Allocator)
 
     this.allocator = allocator
     this.options = options
     this.totalSourceLines = 0
     this.totalAllocations = 0
+    memset(this.binaryFilename, 0, MAX_PATH)
+    memset(this.sourceFilename, 0, MAX_PATH)
+
     this.preprocessor.init(this)
     this.result = PhaseResultInit(allocator)
     this.modules = StrMap<*Module>(null, 32, allocator)
 }
 
 public func (lita: *Lita) free() {
-    var allocator = lita.allocator as (*LinearAllocator)
-    defaultAllocator.free(allocator.mem)
-    /*
-    for(var i = 0; i < allocator.allocations.size(); i += 1) {
-        var a = allocator.allocations.get(i)
-        allocator.decorated.free(a.addr)
-        allocator.decorated.free(a)
+    if(lita.linearAllocator.mem) {
+        defaultAllocator.free(lita.linearAllocator.mem)
     }
-    debugAllocator.free()
-    */
 }
 
 public func (lita: *Lita) addModule(module: *Module) {
@@ -113,4 +122,211 @@ public func (lita: *Lita) endCapture(type: MetricType) {
     metric.bytesAllocated = allocator.totalBytesAllocated - metric.bytesAllocated
     metric.allocationCount = allocator.totalAllocations - metric.allocationCount
     metric.executionTime = SystemTimeMSec() - metric.startTime
+}
+
+
+
+public func (this: *Lita) parse() : *Module {
+    this.startCapture(MetricType.PARSING)
+    defer this.endCapture(MetricType.PARSING)
+
+    var builtin = BuiltinsInit(this)
+    this.addModule(builtin)
+
+    if(!ParseModule(this, builtin, SrcPos{})) {
+        this.result.addError(SrcPos{}, "unable to parse builtins.lita")
+        return null;
+    }
+
+    var root = NewModule(this, this.options.inputFile)
+    this.addModule(root)
+
+    if(!ParseModule(this, root, SrcPos{})) {
+        return null;
+    }
+
+    var builtinImport = NewImportDecl(SrcPos{}, SrcPos{}, BUILTIN_IMPORT_TOKEN, Token{.type = TokenType.VOID}, false, this.allocator) as (*ImportDecl)
+    builtinImport.moduleId = &builtin.id
+    root.ast.imports.add(builtinImport)
+
+    return root
+}
+
+public func (this: *Lita) typeCheck(module: *Module) : bool {
+    this.startCapture(MetricType.TYPE_CHECKING)
+    defer this.endCapture(MetricType.TYPE_CHECKING)
+
+    var checker = TypeChecker{}
+    checker.init(this)
+
+    this.programSymbols = checker.typeCheck(module)
+
+    return this.result.errors.empty()
+}
+
+public func (this: *Lita) transpile(module: *Module) : bool {
+
+    if(!Mkdir(this.options.outputPath)) {
+        printf("Unable to create directory: '%s'", this.options.outputPath)
+        return false
+    }
+
+    memset(this.binaryFilename, 0, MAX_PATH)
+    memset(this.sourceFilename, 0, MAX_PATH)
+
+    strcat(this.sourceFilename, this.options.outputPath)
+    var len = strlen(this.options.outputPath)
+    if(len > 0) {
+        if(this.options.outputPath[len-1] != '/') {
+            strcat(this.sourceFilename, "/")
+        }
+    }
+
+    strcat(this.sourceFilename, this.options.outputFile)
+
+    strcpy(this.binaryFilename, this.sourceFilename)
+
+    strcat(this.binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
+    strcat(this.sourceFilename, ".c")
+
+    if(!this.emitC(module, this.sourceFilename)) {
+        return false
+    }
+
+    if(this.options.cOutputOnly) {
+        return false
+    }
+
+    if(!this.compileC(module, this.sourceFilename, this.binaryFilename)) {
+        return false
+    }
+
+    if(this.options.run) {
+        this.run(this.binaryFilename)
+    }
+
+    return true
+}
+
+public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool {
+    this.startCapture(MetricType.CGEN)
+    var cgen = CGen{}
+    cgen.init(this)
+    cgen.emitProgram(module)
+    this.endCapture(MetricType.CGEN)
+
+    this.startCapture(MetricType.CWRITE)
+    var status = WriteFile(cFilename, cgen.buf.cStrConst(), cgen.buf.length)
+    this.endCapture(MetricType.CWRITE)
+    if(status != FileStatus.Ok) {
+        return false
+    }
+
+    return this.result.errors.empty()
+}
+
+public func (this: *Lita) compileC(module: *Module, cFilename: *const char, binaryFilename: *const char) : bool {
+    this.startCapture(MetricType.CCOMPILE)
+    defer this.endCapture(MetricType.CCOMPILE)
+
+    var command: [512]char;
+    var commandStr = StringInit(command, 512)
+    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", binaryFilename, cFilename)
+    if(system(commandStr.cStrConst()) == 0) {
+        return true
+    }
+    return false
+}
+
+public func (this: *Lita) run(binaryFilename: *const char) {
+    var sb = StringBufferInit(256, this.allocator)
+    defer sb.free()
+
+    var path: [MAX_PATH]char;
+    FilePath(binaryFilename, path)
+
+    var len = strlen(path)
+    sb.append("cd ")
+    sb.appendStr(path, len)
+    sb.append(" && %s", &binaryFilename[len + 1])
+
+    system(sb.cStr())
+}
+
+
+func FindModulePath(lita: *Lita,
+                    moduleName: StringView,
+                    filename: [MAX_PATH]char) : bool {
+
+    var pathStr = StringInit(filename, MAX_PATH);
+
+    pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
+    if(FileExists(pathStr.cStrConst())) {
+        return true
+    }
+
+    pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
+    if(FileExists(pathStr.cStrConst())) {
+        return true
+    }
+
+    pathStr.format("%s/lib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
+    if(FileExists(pathStr.cStrConst())) {
+        return true
+    }
+
+    pathStr.clear()
+    return false
+}
+
+func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
+    if(!module) {
+        return false
+    }
+
+    var status = ReadFile(module.id.filename, &module.text, lita.allocator)
+    if(status == FileStatus.FileNotFoundError) {
+        lita.result.addError(pos, "Could not open file '%s'\n", module.id.filename)
+        return false
+    }
+
+    if(status == FileStatus.IOError) {
+        lita.result.addError(pos, "Could not read file '%s'\n", module.id.filename)
+        return false
+    }
+
+    var parser = ParserInit(module.id.filename, module.text, lita)
+    var moduleStmt = parser.parseModule()
+    module.ast = moduleStmt
+    lita.totalSourceLines += parser.totalLines
+
+    for(var i = 0; i < module.ast.imports.size(); i += 1) {
+        var importStmt = module.ast.imports.get(i)
+        if(importStmt.name.type == TokenType.ERROR) {
+            lita.result.addError(importStmt.startPos, "Could not parse import statement")
+            continue
+        }
+
+        var filename: [MAX_PATH]char
+        if(!FindModulePath(lita, importStmt.name.str, filename)) {
+            lita.result.addError(importStmt.startPos, "Could not find module '%.*s'",
+                    importStmt.name.str.length, importStmt.name.str.buffer)
+            continue
+        }
+
+        var importModule = lita.modules.get(filename)
+        if(importModule) {
+            importStmt.moduleId = &importModule.id
+            continue;
+        }
+
+        importModule = NewModule(lita, filename)
+        importStmt.moduleId = &importModule.id
+
+        lita.addModule(importModule)
+
+        ParseModule(lita, importModule, importStmt.startPos)
+    }
+
+    return true
 }

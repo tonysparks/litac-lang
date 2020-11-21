@@ -4,34 +4,290 @@
 import "libc"
 import "json"
 import "io"
+import "array"
+import "mem"
 import "string_buffer"
+import "../src/system"
+import "../src/lita"
+import "../src/phase_result"
+import "../src/error_codes"
+
+struct TestSuite {
+    allocator: *const Allocator
+    buffer: StringBuffer
+
+    filename: *const char
+    description: *const char
+    disabled: bool
+    programTemplate: *const char
+    tests: Array<Test>
+}
+
+struct Test {
+    allocator: *const Allocator
+    programText: StringBuffer
+    name: *const char
+
+    //definitions: *const char
+    //code: *const char
+    disabled: bool
+    expectedOutput: *const char
+    expectedErrorOutput: *const char
+}
+
+enum TestResult {
+    SUCCESS,
+    LOADING_ERROR,
+    OUTPUT_MISMATCH,
+    ERROR_MISMATCH,
+}
 
 func main(len: i32, args: **char) : i32 {
+    SystemInit()
 
+    var testFiles = []*const char {
+        "../test/tests/var_decl.json",
+        "../test/tests/syntax_errors.json",
+        null
+    }
+
+    var sb = StringBufferInit(1024, defaultAllocator)
+
+    for(var i = 0; testFiles[i] != null; i+=1) {
+        var filename = testFiles[i]
+
+        var suite = TestSuite{
+            .allocator = defaultAllocator,
+            .buffer = sb,
+            .disabled = false,
+            .filename = filename,
+            .description = null,
+            .programTemplate = """
+            @include("assert.h");
+            @foreign func assert(e:bool):void;
+
+            %definitions%
+
+            func main(len:i32, args:**char):i32 {
+                %code%
+            }
+            """
+        }
+
+
+        printf("Testing Suite: '%s'\n", filename)
+        if(!RunTestSuite(suite, filename)) {
+            printf("***FAILED Loading test suite: '%s'***\n", filename)
+        }
+    }
+
+    return 0;
+}
+
+func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     var data:*char;
-    if(ReadFile("../test/tests/var_decl.json", &data) != FileStatus.Ok) {
+    if(ReadFile(filename, &data) != FileStatus.Ok) {
         goto err;
     }
 
     var parser = Parser{}
-    parser.init()
+    parser.init(suite.allocator)
     defer parser.free()
 
     var node = parser.parseJson(data)
     defer if(node) node.free()
 
-    printf("File: \n%s\n", data)
-    if(node) {
-        var sb = StringBufferInit()
-        defer sb.free()
-
-
-        printf("Json: \n%s\n", node.print(sb))
+    if(!node) {
+        if(parser.hasError()) {
+            printf("Test Json Syntax error: %s", parser.errorMsg)
+        }
+        goto err;
     }
 
-    return 0;
+    suite.description = node.getStr("description", suite.description)
+    suite.disabled = node.getBool("disabled", false)
+    suite.programTemplate = node.getStr("program", suite.programTemplate)
+
+    var tests = node.getArray("tests")
+    if(!tests) {
+        return 0
+    }
+
+    suite.tests.init(tests.size(), suite.allocator)
+    for(var i = 0; i < tests.size(); i += 1) {
+        var testNode = tests.at(i)
+        if(!testNode) {
+            continue
+        }
+
+        var test = CreateTest(suite, testNode, &suite.tests.elements[i])
+        if(!test) {
+            printf("FAILED to load test\n")
+        }
+        else {
+            if(test.disabled) {
+                printf("    %-65s ......%s\n", test.name, "SKIPPED!")
+            }
+            else {
+                var result = RunTest(suite, test)
+                var passed = result == TestResult.SUCCESS;
+                printf("    %-65s ......%s\n", test.name, passed ? "SUCCESS" : "***FAILED***")
+                if(!passed) {
+                    switch(result) {
+                        case TestResult.LOADING_ERROR: {
+                            printf("        Error with the test case\n")
+                            break
+                        }
+                        case TestResult.OUTPUT_MISMATCH: {
+                            printf("        The expected output did not match the actual output:\n")
+                            printf("\n%s\n\n", suite.buffer.cStr())
+                            break
+                        }
+                        case TestResult.ERROR_MISMATCH: {
+                            printf("        The expected ERROR output did not match the actual output:\n")
+                            printf("\n%s\n\n", suite.buffer.cStr())
+                            break
+                        }
+                        default: {}
+                    }
+                }
+            }
+        }
+    }
 
 err:
-    printf("Error running test suite.\n")
-    return -1
+    return 1
+}
+
+func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
+    var programText = StringBufferInit(2048, suite.allocator)
+    programText.append("%s\n", suite.programTemplate)
+
+    const defsTemplate = "%definitions%"
+    var defsLen = strlen(defsTemplate)
+    var defsIndex = programText.indexOf(defsTemplate)
+    if(defsIndex > -1) {
+        programText.replace(defsIndex, defsIndex + defsLen, testNode.getStr("definitions", ""))
+    }
+
+    const codeTemplate = "%code%"
+    var codeLen = strlen(codeTemplate)
+    var codeIndex = programText.indexOf(codeTemplate)
+    if(codeIndex > -1) {
+        programText.replace(codeIndex, codeIndex + codeLen, testNode.getStr("code", ""))
+    }
+
+    output.allocator = suite.allocator
+    output.programText = programText
+    output.name = testNode.getStr("name", "")
+    output.expectedOutput = testNode.getStr("output", null)
+    output.expectedErrorOutput = testNode.getStr("error", null)
+    output.disabled = testNode.getBool("disabled", false)
+
+    return output
+}
+
+func RunTest(suite: *TestSuite, test: *Test) : TestResult {
+    suite.buffer.clear() // clear previous run
+
+    var tmpSrcFile = "test_output/lita_test.lita"
+    if(WriteFile(tmpSrcFile, test.programText.cStrConst(), test.programText.length) != FileStatus.Ok) {
+        return TestResult.LOADING_ERROR
+    }
+
+    var options = LitaOptions{}
+    options.checkerOnly = false
+    options.cOutputOnly = false
+    options.showProfileInfo = false
+    options.run = false // we run outselves
+
+    strncpy(options.inputFile, tmpSrcFile, MAX_PATH)
+    strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
+
+    var outputFile = "test"
+    strncpy(options.outputFile, outputFile, MAX_PATH)
+
+    var outputPath = "test_output"
+    strncpy(options.outputPath, outputPath, MAX_PATH)
+
+    FilePath(options.inputFile, options.srcPath)
+
+    var lita = Lita{}
+    lita.init(&options)
+    defer lita.free()
+
+    var root = lita.parse()
+    if(!root) {
+        goto report
+    }
+
+    if(!lita.typeCheck(root)) {
+        goto report
+    }
+
+    if(!lita.transpile(root)) {
+        goto report
+    }
+
+    lita.runCaptureOutput(suite.buffer)
+
+    if(test.expectedOutput) {
+        if(strcmp(test.expectedOutput, suite.buffer.cStr())  != 0) {
+            goto err
+        }
+    }
+
+report:
+    if(!lita.result.errors.empty()) {
+        suite.buffer.clear() // clear program output
+
+        for(var i = 0; i < lita.result.errors.size(); i += 1) {
+            PrintError(suite.buffer, lita.result.errors.get(i))
+            suite.buffer.append("\n")
+        }
+        suite.buffer.append("Total errors: %d\n", lita.result.errors.size())
+
+        if(test.expectedErrorOutput) {
+            if(suite.buffer.contains(test.expectedErrorOutput)) {
+                return TestResult.SUCCESS
+            }
+            else {
+                return TestResult.ERROR_MISMATCH
+            }
+        }
+
+        goto err
+    }
+    else if(test.expectedErrorOutput) {
+        return TestResult.ERROR_MISMATCH
+    }
+
+
+    return TestResult.SUCCESS
+
+err:
+    return TestResult.OUTPUT_MISMATCH
+}
+
+
+public func (this: *Lita) runCaptureOutput(sb: *StringBuffer) : *const char {
+    var path: [MAX_PATH]char;
+    FilePath(this.binaryFilename, path)
+
+    var len = strlen(path)
+    sb.append("cd ")
+    sb.appendStr(path, len)
+    sb.append(" && %s", &this.binaryFilename[len + 1])
+
+    var process = SystemExec(sb.cStr())
+
+    sb.clear()
+
+    var buffer = [1024]char{};
+    var bytesRead = -1
+    while((bytesRead = process.readOutput(buffer, 1024)) > 0) {
+        sb.append("%s", buffer)
+    }
+
+    return sb.cStrConst()
 }

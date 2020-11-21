@@ -34,12 +34,12 @@ func main(len: i32, args: **char) : i32 {
     lita.init(&options)
     defer lita.free()
 
-    var root = Parse(lita)
+    var root = lita.parse()
     if(!root) {
         goto report
     }
 
-    if(!TypeCheck(lita, root)) {
+    if(!lita.typeCheck(root)) {
         goto report
     }
 
@@ -47,17 +47,22 @@ func main(len: i32, args: **char) : i32 {
         goto report;
     }
 
-    if(!Transpile(lita, root)) {
+    if(!lita.transpile(root)) {
         goto report;
     }
 
 report:
     var totalTime = SystemTimeMSec() - startTime
 
+    var sb = StringBufferInit(1024)
+    defer sb.free()
+
     if(!lita.result.errors.empty()) {
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
-            PrintError(lita.result.errors.get(i))
-            printf("\n")
+            PrintError(sb, lita.result.errors.get(i))
+
+            printf("%s\n", sb.cStr())
+            sb.clear()
         }
         printf("Total errors: %d\n", lita.result.errors.size())
     }
@@ -160,211 +165,4 @@ err_print:
     }
 err:
     return false
-}
-
-func FindModulePath(lita: *Lita,
-                    moduleName: StringView,
-                    filename: [MAX_PATH]char) : bool {
-
-    var pathStr = StringInit(filename, MAX_PATH);
-
-    pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
-    //printf("Check: '%s'\n", pathStr.cStr())
-    if(FileExists(pathStr.cStrConst())) {
-        return true
-    }
-
-    pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
-    //printf("Check: '%s'\n", pathStr.cStr())
-    if(FileExists(pathStr.cStrConst())) {
-        return true
-    }
-
-    pathStr.format("%s/lib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
-    //printf("Check: '%s'\n", pathStr.cStr())
-    if(FileExists(pathStr.cStrConst())) {
-        return true
-    }
-
-    pathStr.clear()
-    return false
-}
-
-func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
-    if(!module) {
-        return false
-    }
-
-    var status = ReadFile(module.id.filename, &module.text, lita.allocator)
-    if(status == FileStatus.FileNotFoundError) {
-        lita.result.addError(pos, "Could not open file '%s'\n", module.id.filename)
-        return false
-    }
-
-    if(status == FileStatus.IOError) {
-        lita.result.addError(pos, "Could not read file '%s'\n", module.id.filename)
-        return false
-    }
-
-    var parser = ParserInit(module.id.filename, module.text, lita)
-    var moduleStmt = parser.parseModule()
-    module.ast = moduleStmt
-    lita.totalSourceLines += parser.totalLines
-
-    for(var i = 0; i < module.ast.imports.size(); i += 1) {
-        var importStmt = module.ast.imports.get(i)
-        if(importStmt.name.type == TokenType.ERROR) {
-            lita.result.addError(importStmt.startPos, "Could not parse import statement")
-            continue
-        }
-
-        var filename: [MAX_PATH]char
-        if(!FindModulePath(lita, importStmt.name.str, filename)) {
-            lita.result.addError(importStmt.startPos, "Could not find module '%.*s'",
-                    importStmt.name.str.length, importStmt.name.str.buffer)
-            continue
-        }
-
-        var importModule = lita.modules.get(filename)
-        if(importModule) {
-            importStmt.moduleId = &importModule.id
-            continue;
-        }
-
-        importModule = NewModule(lita, filename)
-        importStmt.moduleId = &importModule.id
-
-        lita.addModule(importModule)
-
-        ParseModule(lita, importModule, importStmt.startPos)
-    }
-
-    return true
-}
-
-func Parse(lita: *Lita) : *Module {
-    lita.startCapture(MetricType.PARSING)
-    defer lita.endCapture(MetricType.PARSING)
-
-    var builtin = BuiltinsInit(lita)
-    lita.addModule(builtin)
-
-    if(!ParseModule(lita, builtin, SrcPos{})) {
-        lita.result.addError(SrcPos{}, "unable to parse builtins.lita")
-        return null;
-    }
-
-    var root = NewModule(lita, lita.options.inputFile)
-    lita.addModule(root)
-
-    if(!ParseModule(lita, root, SrcPos{})) {
-        return null;
-    }
-
-    var builtinImport = NewImportDecl(SrcPos{}, SrcPos{}, BUILTIN_IMPORT_TOKEN, Token{.type = TokenType.VOID}, false, lita.allocator) as (*ImportDecl)
-    builtinImport.moduleId = &builtin.id
-    root.ast.imports.add(builtinImport)
-
-    return root
-}
-
-func TypeCheck(lita: *Lita, module: *Module) : bool {
-    lita.startCapture(MetricType.TYPE_CHECKING)
-    defer lita.endCapture(MetricType.TYPE_CHECKING)
-
-    var checker = TypeChecker{}
-    checker.init(lita)
-
-    lita.programSymbols = checker.typeCheck(module)
-
-    return lita.result.errors.empty()
-}
-
-func Transpile(lita: *Lita, module: *Module) : bool {
-
-    if(!Mkdir(lita.options.outputPath)) {
-        printf("Unable to create directory: '%s'", lita.options.outputPath)
-        return false
-    }
-
-    var cFilename = [MAX_PATH]char{};
-    var binaryFilename = [MAX_PATH]char{};
-
-    strcat(cFilename, lita.options.outputPath)
-    var len = strlen(lita.options.outputPath)
-    if(len > 0) {
-        if(lita.options.outputPath[len-1] != '/') {
-            strcat(cFilename, "/")
-        }
-    }
-
-    strcat(cFilename, lita.options.outputFile)
-
-    strcpy(binaryFilename, cFilename)
-
-    strcat(binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
-    strcat(cFilename, ".c")
-
-    if(!GenerateC(lita, module, cFilename)) {
-        return false
-    }
-
-    if(lita.options.cOutputOnly) {
-        return false
-    }
-
-    if(!CompileC(lita, module, cFilename, binaryFilename)) {
-        return false
-    }
-
-    if(lita.options.run) {
-        Run(lita, binaryFilename)
-    }
-
-    return true
-}
-
-func GenerateC(lita: *Lita, module: *Module, cFilename: *const char) : bool {
-    lita.startCapture(MetricType.CGEN)
-    var cgen = CGen{}
-    cgen.init(lita)
-    cgen.emitProgram(module)
-    lita.endCapture(MetricType.CGEN)
-
-    lita.startCapture(MetricType.CWRITE)
-    var status = WriteFile(cFilename, cgen.buf.cStrConst(), cgen.buf.length)
-    lita.endCapture(MetricType.CWRITE)
-    if(status != FileStatus.Ok) {
-        return false
-    }
-
-    return lita.result.errors.empty()
-}
-
-func CompileC(lita: *Lita, module: *Module, cFilename: *const char, binaryFilename: *const char) : bool {
-    lita.startCapture(MetricType.CCOMPILE)
-    defer lita.endCapture(MetricType.CCOMPILE)
-
-    var command: [512]char;
-    var commandStr = StringInit(command, 512)
-    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", binaryFilename, cFilename)
-    if(system(commandStr.cStrConst()) == 0) {
-        return true
-    }
-    return false
-}
-
-func Run(lita: *Lita, binaryFilename: *const char) {
-    var sb = StringBufferInit(256, lita.allocator)
-    defer sb.free()
-
-    var path: [MAX_PATH]char;
-    FilePath(binaryFilename, path)
-
-    var len = strlen(path)
-    sb.append("cd ")
-    sb.appendStr(path, len)
-    sb.append(" && %s", &binaryFilename[len + 1])
-
-    system(sb.cStr())
 }

@@ -1,14 +1,14 @@
-/*import "mem"
+//import "mem"
 import "array"
 
-import "test_module"
+//import "test_module"
 import "map"
-*/
+
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
 
-@foreign
-public const MAX_PATH: i32;
+//@foreign
+//public const MAX_PATH: i32;
 
 
 /*
@@ -46,9 +46,9 @@ const escapeStrings = [256]*const char {
 //public typedef func<K>(K) : u32 as HashFn<K>;
 //const MAX_PATH = 260
 
-struct M {
-    srcPath: [MAX_PATH]char
-}
+//struct M {
+    //srcPath: [MAX_PATH]char
+//}
 
 /*
 func test<T>(a: HashFn<T>, t: T) : u32 {
@@ -59,11 +59,62 @@ func fn(a: i32) : u32 {
     return (a + 10) as (u32)
 }*/
 
-func test() : bool {
-    return 1 & 1
+//func test() : bool {
+    //return 1 & 1
+//}
+/*
+struct Array<T> {
+    t: *T
+    size: usize
 }
 
+func (a: *Array<T>) init<T>() {
+    var elements = []T {}
+    a.t = elements as (*T)
+    a.size = sizeof(:T)
+}
+
+func ArrayInit<T>(i: i32) : Array<T> {
+    var r = Array<T>{}
+    r.init()
+    return r
+}*/
+
+struct TypeInfo {
+    a: i32
+}
+
+struct FuncTypeInfo {
+    paramDecls: Array<*TypeInfo>
+}
+
+func init<Z>(a: Array<Z>, size: i32) {
+
+}
+
+
+
 func main(len:i32, args: **char) : i32 {
+    var t = TypeInfo{4}
+    var a = ArrayInit<*TypeInfo>(12)
+    //var a = Array<*TypeInfo>{}
+
+    //a.init()
+    a.add(&t)
+    var f = FuncTypeInfo{a}
+    //var s = f.paramDecls.size()
+    init(f.paramDecls, f.paramDecls.size())
+    printf("Result: %d\n", f.paramDecls.size())
+
+    var m = StrMap<i32>(0)
+    m.put("Hi Bye", 4)
+    printf("Map: %d\n", m.get("Hi Bye"))
+
+    /*var x = []const char{'a', 'b'}
+    var y = []const char{'c', 'd'}
+    var z: i32 = y - x
+    printf("Size: %llu\n", z)*/
+
     /*var f: HashFn<i32> = &fn;
 
     printf("%d\n", test(fn, 4))

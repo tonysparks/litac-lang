@@ -36,6 +36,10 @@ struct LabelInfo {
     stmt: *Stmt
 }
 
+struct GenericContext {
+    callsite: *Module
+}
+
 public struct TypeChecker {
     lita: using *Lita
 
@@ -48,6 +52,7 @@ public struct TypeChecker {
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
 
+    genericContext: GenericContext
     genericParamStack: Array<Array<GenericParam>>
     //genericTypes: Map<*const char, *Symbol>
     genericTemplates: Array<*Symbol>
@@ -70,6 +75,7 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
     //this.genericTypes = StrMap<*Symbol>(null, 64, lita.allocator)
+    this.genericContext.callsite = null
 
     memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
     this.numOfLabels = 0
@@ -525,6 +531,43 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                 if(!param.typeInfo) {
                     goto err;
                 }
+                /*
+                if(hasGenerics) {
+
+                    PrintTypeSpec(param.type)
+                    var sb = StringBufferInit()
+                    param.typeInfo.toString(sb)
+                    printf(" => %s [", sb.cStr())
+                    var base = param.typeInfo.getBaseType()
+                    switch(base.kind) {
+                        case TypeKind.FUNC:
+                        case TypeKind.FUNC_PTR:
+                            break
+                        case TypeKind.STRUCT:
+                        case TypeKind.UNION: {
+                            var aggInfo = base as (*AggregateTypeInfo)
+                            for(var i = 0; i < aggInfo.decl.genericParams.size(); i += 1) {
+                                var p = aggInfo.decl.genericParams.get(i)
+                                printf("%.*s ", p.name.str.length, p.name.str.buffer)
+                            }
+                            printf(" vs. ")
+                            for(var i = 0; i < aggInfo.sym.genericParams.size(); i += 1) {
+                                var p = aggInfo.sym.genericParams.get(i)
+                                printf("%.*s ", p.name.str.length, p.name.str.buffer)
+                            }
+
+                            printf(" vs. ")
+                            for(var i = 0; i < aggInfo.sym.genericArgs.size(); i += 1) {
+                                var p = aggInfo.sym.genericArgs.get(i)
+                                sb.clear()
+                                p.toString(sb)
+                                printf("%s ", sb.cStr())
+                            }
+                        }
+                        default:
+                    }
+                    printf("]\n")
+                }*/
             }
 
             var retType = this.resolveTypeSpec(funcDecl.returnType)
@@ -601,7 +644,14 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
 
 func (this: *TypeChecker) getType(spec: *NameTypeSpec) : *Symbol {
     assert(spec != null)
-    return this.current.getType(spec.name)
+    var type = this.current.getType(spec.name)
+    if(!type) {
+        if(this.genericContext.callsite) {
+            return this.genericContext.callsite.getType(spec.name)
+        }
+    }
+
+    return type
 }
 
 func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {

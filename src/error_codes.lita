@@ -1,4 +1,5 @@
 import "phase_result"
+import "string_buffer"
 import "libc"
 
 public enum ErrorCode {
@@ -10,7 +11,7 @@ public enum ErrorCode {
     INVALID_FIELD,
     INVALID_IMPORT_ACCESS,
     INVALID_CONTINUE,
-    INVALID_BREAK,    
+    INVALID_BREAK,
     INVALID_OBJECT_INIT,
     INVALID_MODULE_ACCESS,
     INVALID_VARARG_POSITION,
@@ -18,7 +19,7 @@ public enum ErrorCode {
     INVALID_LABEL_STMT,
     INVALID_COMP_STMT,
     INVALID_DEFAULT_ASSIGNMENT,
-    
+
     MISSING_COMMA,
     MISSING_SEMICOLON,
     MISSING_RIGHT_BRACE,
@@ -34,7 +35,7 @@ public enum ErrorCode {
     MISSING_AS,
     MISSING_GENERIC_END,
     MISSING_COMP_STMT_END,
-    
+
     RANGE_INTEGER,
     RANGE_LONG,
     RANGE_REAL,
@@ -60,7 +61,7 @@ public const errorCodeText = []*const char {
     [ErrorCode.INVALID_FIELD] = "Invalid field member",
     [ErrorCode.INVALID_IMPORT_ACCESS] = "Invalid import access",
     [ErrorCode.INVALID_CONTINUE] = "Invalid continue statement",
-    [ErrorCode.INVALID_BREAK] = "Invalid break statement",    
+    [ErrorCode.INVALID_BREAK] = "Invalid break statement",
     [ErrorCode.INVALID_OBJECT_INIT] = "Invalid structure initializer",
     [ErrorCode.INVALID_MODULE_ACCESS] = "Invalid module access",
     [ErrorCode.INVALID_VARARG_POSITION] = "Invalid variable argument position",
@@ -68,7 +69,7 @@ public const errorCodeText = []*const char {
     [ErrorCode.INVALID_LABEL_STMT] = "Invalid label statement, goto labels are only valid in functions",
     [ErrorCode.INVALID_COMP_STMT] = "Invalid compile time statement",
     [ErrorCode.INVALID_DEFAULT_ASSIGNMENT] = "Invalid default assignment statement, only allowed for 'struct'",
-    
+
     [ErrorCode.MISSING_COMMA] = "Missing ,",
     [ErrorCode.MISSING_SEMICOLON] = "Missing ;",
     [ErrorCode.MISSING_RIGHT_BRACE] = "Missing }",
@@ -84,8 +85,8 @@ public const errorCodeText = []*const char {
     [ErrorCode.MISSING_AS] = "Missing 'as'",
     [ErrorCode.MISSING_GENERIC_END] = "Missing >",
     [ErrorCode.MISSING_COMP_STMT_END] = "Missing #end",
-    
-    
+
+
     [ErrorCode.RANGE_INTEGER] = "Integer literal out of range",
     [ErrorCode.RANGE_LONG] = "Long literal out of range",
     [ErrorCode.RANGE_REAL] = "Real literal out of range",
@@ -101,14 +102,14 @@ public const errorCodeText = []*const char {
 }
 
 
-public func PrintError(error: PhaseError) {    
+public func PrintError(sb: *StringBuffer, error: PhaseError) {
     if(!error.pos.lineStart) {
-        printf("%s\n", error.message)
+        sb.append("%s\n", error.message)
         return;
     }
 
-    printf("error at line %d in '%s'\n", error.pos.lineNumber, error.pos.filename)    
-    printf("%.*s\n", error.pos.getLineLength(), error.pos.lineStart)
+    sb.append("error at line %d in '%s'\n", error.pos.lineNumber, error.pos.filename)
+    sb.append("%.*s\n", error.pos.getLineLength(), error.pos.lineStart)
     var spaceCount = 0
     while(true) {
         var c = error.pos.lineStart[spaceCount]
@@ -122,7 +123,7 @@ public func PrintError(error: PhaseError) {
         spaceCount += 1
     }
     for(var i = 0; i < spaceCount; i += 1) {
-        printf(" ")
+        sb.append(" ")
     }
-    printf("^\n*** %s\n", error.message)
+    sb.append("^\n*** %s\n", error.message)
 }

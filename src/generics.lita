@@ -65,9 +65,20 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
                                           sym: *Symbol,
                                           name: *NameTypeSpec) : *Symbol {
     assert(sym != null)
+
+    // Setup the generic context to support proper type look up
+    // for generic types recursively creating other generic types -
+    // which need the appropriate callsite module to properly resolve
+    // the types
+    var isNewContext = checker.genericContext.callsite == null
+    if(isNewContext) {
+        checker.genericContext.callsite = checker.current
+    }
+    defer if(isNewContext) checker.genericContext.callsite = null
+
+
     var buffer: [MAX_GENERIC_NAME]char;
     var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
-
     GetGenericName(name, genericName)
 
     var newName = genericName.cStrConst()
@@ -114,6 +125,29 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         genericSym.genericParams = genericDecl.genericParams
         checker.current.genericSymbols.put(newNameStr, genericSym)
 
+
+        // if this still has generic parameters, add in the original
+        // parameters
+        if(HasGenericParam(checker, name.genericArgs)) {
+            genericSym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
+
+            var originalDecl = sym.decl as (*GenericDecl)
+            genericDecl.genericParams = originalDecl.genericParams
+        }
+        else {
+
+            // Remove any generic parameters from the declaration that
+            // have been defined a type
+            var removed = 0
+            for(var i = 0; i < name.genericArgs.size(); i+=1) {
+                var index = i - removed
+                if(index < genericDecl.genericParams.size()) {
+                    genericDecl.genericParams.removeAt(index)
+                    removed+=1;
+                }
+            }
+        }
+
         var numOfGenericArgs = name.genericArgs.size();
         genericSym.genericArgs.init(numOfGenericArgs, checker.allocator)
 
@@ -124,18 +158,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
                 isValidArgs = false
             }
 
-            if(arg.typeInfo.kind == TypeKind.GENERIC_PARAM) {
-                genericSym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
-            }
-
             genericSym.genericArgs.add(arg.typeInfo)
-        }
-
-        // if this still has generic parameters, add in the original
-        // parameters
-        if(genericSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
-            //var originalDecl = sym.decl as (*GenericDecl)
-            //genericDecl.genericParams = originalDecl.genericParams
         }
 
         if(!isValidArgs) {
@@ -660,4 +683,18 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
     }
 
     return true
+}
+
+func HasGenericParam(checker: *TypeChecker, genericArgs: *Array<*TypeSpec>) : bool {
+    for(var i = 0; i < genericArgs.size(); i += 1) {
+        var arg = genericArgs.get(i)
+        var name = arg.getBaseType()
+        if(name && name.kind == TypeSpecKind.NAME) {
+            if(checker.isGenericParamType(name as (*NameTypeSpec))) {
+                return true
+            }
+        }
+    }
+
+    return false
 }
