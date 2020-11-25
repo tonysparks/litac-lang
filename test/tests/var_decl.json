@@ -55,7 +55,6 @@
         },
         {
             "name" : "Invalid Declaration Missing 'var'",
-            "disabled": true,
             "definitions": `
                 struct Struct {
                     a: i32
@@ -64,7 +63,7 @@
             "code": `
                 theVariable: Struct = Struct{4}
             `,
-            "error": "'Struct' can't be assigned to 'i32'"
+            "error": "can't reassign type 'Struct'"
         }
     ]
 }

@@ -685,15 +685,38 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             if(!IsFuncLike(other)) {
                 return false
             }
-            var otherFuncDecl: *FuncPtrTypeInfo = null
-            if(other.kind == TypeKind.FUNC) {
-                var funcInfo = other as (*FuncTypeInfo)
-                //otherFuncDecl = funcInfo.asPtr()
+
+            var thisInfo = this as (*FuncPtrTypeInfo)
+            if(other.kind != TypeKind.FUNC) {
+                return this.isDeclarable(other)
             }
-            else {
-                otherFuncDecl = other as (*FuncPtrTypeInfo)
+
+            var funcInfo = other as (*FuncTypeInfo)
+
+            if(funcInfo.decl.params.size() != thisInfo.paramDecls.size()) {
+                return false
             }
-            return true; // TODO
+
+            if(funcInfo.decl.params.isVararg  != thisInfo.hasVarargs) {
+                return false
+            }
+            if(!funcInfo.returnType.strictEquals(thisInfo.returnType)) {
+                return false
+            }
+
+            for(var i = 0; i < thisInfo.paramDecls.size(); i += 1) {
+                var a = thisInfo.paramDecls.get(i)
+
+                var b = funcInfo.decl.params.get(i)
+                if(!b.typeInfo) {
+                    return false
+                }
+
+                if(!a.strictEquals(b.typeInfo)) {
+                    return false
+                }
+            }
+            return true
         }
         case TypeKind.FUNC: {
             break;

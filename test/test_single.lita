@@ -1,16 +1,8 @@
 import "assert"
 
-struct X<T> {
-    a: T
+struct Struct {
+    a: i32
 }
-
-func (x: *X<T>) method<T>() : T {
-    return x.a
-}
-
-
 func main(len:i32, args:**char) : i32 {
-    var x = X{4}
-    assert(x.method() == 4)
-
+    theVariable: Struct = Struct{4}
 }

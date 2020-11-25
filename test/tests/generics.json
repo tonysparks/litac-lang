@@ -262,7 +262,6 @@
         }, ///
         {
             "name": "Generic Func Ptr in Func",
-            "disabled" : true,
             "definitions": `
                 func test(a:i32) : i32 {
                     return a;
@@ -281,7 +280,6 @@
         },
         {
             "name": "Invalid Generic Func Ptr in Func",
-            "disabled" : true,
             "definitions": `
                 func test(a:f32) : f32 {
                     return a;
@@ -297,7 +295,7 @@
                 var t = gen<i32>(&test, 24)
                 assert(t == 24)
             `,
-            "error": "'func(i32) : i32' is not of type 'func(f32) : f32'"
+            "error": "'func(f32) : f32' is not of type 'func(i32) : i32'"
         },
         {
             "name": "Generic of Generic",
@@ -437,7 +435,6 @@
         },
         {
             "name": "Generics embedded",
-            "disabled" : true,
             "definitions": `
                 typedef func<T>(T):T as Test<T>;
 

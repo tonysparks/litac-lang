@@ -335,7 +335,8 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
         }
     }
     else if(paramType.kind == TypeKind.FUNC_PTR) {
-        // TODO
+        // TODO: Is this even necessary? Build a test case for
+        // this..
         assert(false)
     }
 
@@ -425,8 +426,27 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
             break;
         }
         case TypeKind.FUNC_PTR: {
-            // TODO:
-            assert(false)
+            var funcInfo = paramType as (*FuncPtrTypeInfo)
+            if(funcInfo.genericParams.empty() || funcInfo.genericParams.size() <= index) {
+                break;
+            }
+            var genericName = funcInfo.genericParams.get(index).name
+            var argumentFuncInfo = expectedType as (*FuncPtrTypeInfo)
+
+            var retType = this.inferredType(genericName, funcInfo.returnType, argumentFuncInfo.returnType)
+            if(retType) {
+                return retType
+            }
+
+            for(var i = 0; i < funcInfo.paramDecls.size(); i+=1) {
+                if(i < argumentFuncInfo.paramDecls.size()) {
+                    var pType = this.inferredType(genericName, funcInfo.paramDecls.get(i), argumentFuncInfo.paramDecls.get(i))
+                    if(pType) {
+                        return pType
+                    }
+
+                }
+            }
             break;
         }
         default: {
@@ -1768,9 +1788,15 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
         }
     }
 
+    if(sym.flags & SymbolFlags.IS_TYPE) {
+        this.result.addError(expr.startPos, "can't reassign type '%s'", sym.name)
+        return false
+    }
+
+
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
-       this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)
-       return false
+        this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)
+        return false
     }
 
     return true

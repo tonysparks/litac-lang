@@ -655,6 +655,11 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                     this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
                     goto err;
                 }
+                // account for function pointers in parameter declarations
+                else if(sym.type && IsFuncLike(sym.type)) {
+                    spec.typeInfo = sym.type
+                    return spec.typeInfo
+                }
             }
 
             if(!(sym.flags & SymbolFlags.IS_TYPE) && !IsFuncLike(sym.type)) {
