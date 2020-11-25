@@ -997,7 +997,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.COMP_STMT: {
             var stmt = s as (*CompStmt)
-            var result = this.lita.preprocessor.evaluateForFunction(stmt)
+
+            var result = stmt.evaluatedStmt
             if(result) {
                 this.emitStmt(result)
             }
@@ -1649,9 +1650,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             else {
                 if(expr.sym) {
-                    // TODO: Visit symbol (accounting for using path...)
                     this.emitSymbol(expr.sym)
-                    //this.emit("%s", this.cName(expr.sym))
                 }
                 else {
                     this.emitTypeSpec(expr.type)

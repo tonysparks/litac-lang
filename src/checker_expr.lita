@@ -315,7 +315,7 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
 func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expectedType: *TypeInfo) : *TypeInfo {
     assert(paramType != null)
     assert(expectedType != null)
-printf("*** Name: %.*s\n", name.str.length, name.str.buffer)
+
     if(name.str.equals(paramType.name)) {
         return expectedType
     }
@@ -330,14 +330,14 @@ printf("*** Name: %.*s\n", name.str.length, name.str.buffer)
         for(; index < genericArgs.size(); index += 1) {
             var arg = genericArgs.get(index)
             if(name.str.equals(arg.name)) {
-                //printf("Checking names: %.*s == %s %d of %d\n", name.str.length, name.str.buffer,
+               /* //printf("Checking names: %.*s == %s %d of %d\n", name.str.length, name.str.buffer,
                     //arg.name, index+1, genericArgs.size())
                     var sb = StringBufferInit()
                 arg.toString(sb)
                 printf("Checking names: %.*s == %s %d of %d\n", name.str.length, name.str.buffer,
-                    sb.cStr(), index+1, genericArgs.size())
+                    sb.cStr(), index+1, genericArgs.size())*/
                 break;
-            }
+            }/*
             else {
                 var sb = StringBufferInit()
                 arg.toString(sb)
@@ -348,7 +348,7 @@ printf("*** Name: %.*s\n", name.str.length, name.str.buffer)
                     var p = paramType.sym.genericParams.get(i)
                     printf("Param: %.*s\n", p.name.str.length, p.name.str.buffer)
                 }
-            }
+            }*/
         }
     }
     else if(paramType.kind == TypeKind.FUNC_PTR) {
@@ -495,7 +495,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
             var argType = suppliedArgs.get(j).operand.typeInfo
             assert(argType != null)
             assert(paramType != null)
-
+/*
 /////
             {
                 var param = paramType
@@ -535,13 +535,13 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
                     printf("]\n")
                 }
 ////
-
+*/
 
             var inferredType = this.inferredType(genericParam.name, paramType, argType)
             if(inferredType) {
                 nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
                 break
-            }
+            }/*
             // temp
             else {
                 var sb = StringBufferInit()
@@ -550,7 +550,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
                 argType.toString(sb)
                 printf("Couldn't Infer Type: %s for %.*s\n",
                     sb.cStr(), genericParam.name.str.length, genericParam.name.str.buffer)
-            }
+            }*/
         }
     }
 
@@ -892,6 +892,7 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
     if(IsAggregate(type)) {
         var fieldName:[MAX_SYMBOL_NAME]char;
         var fieldNameStr = StringInit(fieldName, MAX_SYMBOL_NAME)
+
         var aggInfo = type as (*AggregateTypeInfo)
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
@@ -934,6 +935,66 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
     return isSuccessful
 }
 
+func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *AggregateTypeInfo) : *TypeInfo {
+    var size = aggInfo.decl.genericParams.size()
+    expr.genericArgs.init(size, this.allocator)
+    var suppliedArgs = ArrayInit<*TypeInfo>(expr.arguments.size(), this.allocator)
+    for(var i = 0; i < expr.arguments.size(); i += 1) {
+        var arg = expr.arguments.get(i)
+        var type = arg.operand.typeInfo
+        if(!type) {
+            this.errorInferGenericParameters(expr, aggInfo.decl.genericParams)
+            goto err
+        }
+
+        suppliedArgs.add(type)
+    }
+
+    if(!expr.type) {
+        return aggInfo as (*TypeInfo)
+    }
+
+    expr.type.genericArgs.init(size, this.allocator)
+    expr.type.typeInfo = null // clear out the cached value, so it can be created with the generic types
+
+    for(var genericIndex = 0; genericIndex < size; genericIndex += 1) {
+        var genericParam = aggInfo.decl.genericParams.get(genericIndex)
+
+        for(var fieldIndex = 0; fieldIndex < aggInfo.decl.fields.size(); fieldIndex += 1) {
+            var paramType = aggInfo.decl.fields.get(fieldIndex).typeInfo
+            if(!paramType) {
+                this.errorInferGenericParameter(expr, genericParam)
+                goto err
+            }
+
+            if(fieldIndex >= suppliedArgs.size()) {
+                break
+            }
+
+            var inferredType = this.inferredType(genericParam.name, paramType, suppliedArgs.get(fieldIndex))
+            if(inferredType) {
+                expr.type.genericArgs.add(inferredType.asTypeSpec(this.allocator))
+                break
+            }
+        }
+    }
+
+    var type = this.resolveTypeSpec(expr.type)
+    if(!type) {
+        goto err
+    }
+
+    if(type.sym && (type.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
+        var decl = type.sym.decl as (*GenericDecl)
+        this.errorMissingGenericArguments(expr, expr.type.name, decl.genericParams)
+        goto err;
+    }
+    return type
+
+err:
+    return &POISON_TYPE
+}
+
 func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
     assert(expr != null)
 
@@ -941,8 +1002,6 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
     if(!type) {
         return false
     }
-
-    //printf("Type is: %s has args %s %d\n", type.name, TypeKindAsStr(type.kind), expr.type.genericArgs.size())
 
     if(!IsAggregate(type) && type.kind != TypeKind.ARRAY) {
         this.result.addError(expr.startPos, "only struct, union or array can use initialization syntax")
@@ -961,7 +1020,19 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
             return false
         }
     }
-    // TODO: Infer generic types
+
+    // If this aggregate type has generics and there are no generic arguments supplied,
+    // we attempt to infer the generic arguments
+    if(IsAggregate(type)) {
+        var aggInfo = type as (*AggregateTypeInfo)
+
+        if(!aggInfo.decl.genericParams.empty() && expr.genericArgs.empty()) {
+            type = this.inferInitExpr(expr, aggInfo)
+            if(type.kind == TypeKind.POISON) {
+                return false
+            }
+        }
+    }
 
     expr.operand.typeInfo = type
     return this.checkInitArguments(type, expr)
@@ -1475,7 +1546,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
     var leftType = expr.left.operand.typeInfo
     var rightType = expr.right.operand.typeInfo
 
-    var targetType = leftType
+    var targetType = (leftType.typeid > rightType.typeid) ? leftType : rightType
 
     switch(expr.operator) {
         case TokenType.EQUALS: {
@@ -1705,7 +1776,24 @@ func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field
 func (this: *TypeChecker) errorInferGenericParameter(expr: *Expr, param: *GenericParam) {
     assert(expr != null)
     assert(param != null)
-    this.result.addError(expr.startPos, "unable to infer generic parameter '%s'", param.name)
+    this.result.addError(expr.startPos, "unable to infer generic parameter '%.*s'", param.name.str.length, param.name.str.buffer)
+}
+
+func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Array<GenericParam>) {
+    assert(expr != null)
+    assert(params != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("unable to infer generic parameters [")
+    for(var i = 0; i < params.size(); i += 1) {
+        if(i > 0) {
+            sb.append(", ")
+        }
+        var p = params.get(i)
+        sb.append("'%.*s'", p.name.str.length, p.name.str.buffer)
+    }
+    sb.append("]")
+    this.result.addErrorStr(expr.startPos, sb)
 }
 
 func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: *const char, genericParams: *Array<GenericParam>) {
@@ -1714,15 +1802,15 @@ func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: *c
     assert(genericParams != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'%s' is missing generic arguments '", typeName)
+    sb.append("'%s' is missing generic arguments [", typeName)
     for(var i = 0; i < genericParams.size(); i += 1) {
         var param = genericParams.get(i)
         if(i > 0) {
             sb.append(", ")
         }
-        sb.append("%.*s", param.name.str.length, param.name.str.buffer)
+        sb.append("'%.*s'", param.name.str.length, param.name.str.buffer)
     }
-    sb.append("'")
+    sb.append("]")
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1789,7 +1877,21 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
         return false
     }
 
-    expr.operand.typeInfo = sym.type
+    // Account for Type Expressions such as sizeof(Array<i32>) which should
+    // really be sizeof(:Array<i32>)  ...Do we still want to support the former
+    // syntax?
+    var typeInfo: *TypeInfo = sym.type
+    if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE &&
+       !expr.type.genericArgs.empty()) {
+        typeInfo = this.resolveTypeSpec(expr.type)
+        if(!typeInfo) {
+            this.result.addError(expr.startPos, "unknown type '%s'", expr.type.name)
+            return false
+        }
+        sym = typeInfo.sym
+    }
+
+    expr.operand.typeInfo = typeInfo
     expr.operand.isConst = sym.flags & SymbolFlags.IS_CONSTANT
     expr.sym = sym
     return true;

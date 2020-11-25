@@ -108,7 +108,7 @@ public func PrintError(sb: *StringBuffer, error: PhaseError) {
         return;
     }
 
-    sb.append("error at line %d in '%s'\n", error.pos.lineNumber, error.pos.filename)
+    sb.append("%s:%d error: %s\n", error.pos.filename, error.pos.lineNumber, error.message)
     sb.append("%.*s\n", error.pos.getLineLength(), error.pos.lineStart)
     var spaceCount = 0
     while(true) {

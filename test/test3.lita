@@ -1,8 +1,8 @@
 //import "mem"
-import "array"
+//import "array"
 
 //import "test_module"
-import "map"
+//import "map"
 
 @include("<stdio.h>");
 @foreign public func printf(s:*const char, ...) : void;
@@ -80,6 +80,7 @@ func ArrayInit<T>(i: i32) : Array<T> {
     return r
 }*/
 
+/*
 struct TypeInfo {
     a: i32
 }
@@ -91,11 +92,28 @@ struct FuncTypeInfo {
 func init<Z>(a: Array<Z>, size: i32) {
 
 }
+*/
 
+struct Test<First, Second> {
+    first: First
+    second: Second
+}
 
+func function<Third, Fourth>(test: Test<Fourth, Third>) : Third {
+    return test.second
+}
 
 func main(len:i32, args: **char) : i32 {
-    var t = TypeInfo{4}
+    var test = Test<i32, *const char>{
+        .first = 45_i32,
+        .second = "This Works!"
+    }
+    function(test)
+    function(test)
+    //function<*const char, i32>(test)
+   // printf("%s\n", function<*const char, i32>(test))
+   // printf("%s\n", function(test))
+    /*var t = TypeInfo{4}
     var a = ArrayInit<*TypeInfo>(12)
     //var a = Array<*TypeInfo>{}
 
@@ -104,11 +122,12 @@ func main(len:i32, args: **char) : i32 {
     var f = FuncTypeInfo{a}
     //var s = f.paramDecls.size()
     init(f.paramDecls, f.paramDecls.size())
-    printf("Result: %d\n", f.paramDecls.size())
+    printf("Result: %d\n", f.paramDecls.size())*/
 
+/*
     var m = StrMap<i32>(0)
     m.put("Hi Bye", 4)
-    printf("Map: %d\n", m.get("Hi Bye"))
+    printf("Map: %d\n", m.get("Hi Bye"))*/
 
     /*var x = []const char{'a', 'b'}
     var y = []const char{'c', 'd'}

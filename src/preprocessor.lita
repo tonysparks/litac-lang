@@ -1,11 +1,16 @@
 import "ast"
 import "ast_new"
 import "array"
+import "string_buffer"
+import "phase_result"
+import "checker"
+import "lex"
 import "mem"
 import "lita"
+import "types"
 import "libc"
 import "assert"
-
+import "ape/ape"
 /*
 ================================================
     Compile time processing
@@ -15,6 +20,14 @@ import "assert"
 
 public struct Preprocessor {
     lita: *Lita
+    ape: *ape_t
+    callContext: CallContext
+}
+
+struct CallContext {
+    pp: *Preprocessor
+    checker: *TypeChecker
+    comp: *CompStmt
 }
 
 public func PreprocessorInit(lita: *Lita) : Preprocessor {
@@ -26,6 +39,19 @@ public func PreprocessorInit(lita: *Lita) : Preprocessor {
 
 public func (this: *Preprocessor) init(lita: *Lita) {
     this.lita = lita
+    this.ape = ape_make();
+    this.callContext.pp = this
+    this.callContext.checker = null
+    this.callContext.comp = null
+
+    ape_set_repl_mode(this.ape, false) // allows redefinition of symbols if true
+
+    // TODO: Make this properties actually respect the litaOptions...
+    ape_set_global_constant(this.ape, "OS", ape_object_make_string(this.ape, "WINDOWS")) // TODO: Make this respect the platform...
+    ape_set_global_constant(this.ape, "DEBUG", ape_object_make_bool(true))
+    ape_set_global_constant(this.ape, "REFLECTION", ape_object_make_bool(false))
+
+    ape_set_external_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
 }
 
 
@@ -39,11 +65,14 @@ public func (this: *Preprocessor) init(lita: *Lita) {
 public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, comp: *CompStmt) {
     assert(comp != null)
 
+    // TODO: we need a checker...
+    this.callContext.comp = comp
+
     if(strcmp(comp.type, "if")     == 0 ||
        strcmp(comp.type, "elseif") == 0 ||
        strcmp(comp.type, "else")   == 0) {
-        // TODO: Do actual evaluation of expression
-        if(strcmp(comp.type, "else") == 0) {
+
+        if(strcmp(comp.type, "else") == 0 || ape_object_get_bool(ape_execute(this.ape, comp.expr))) {
             for(var i = 0; i < comp.body.size(); i += 1) {
                 var stmt = comp.body.get(i)
                 switch(stmt.kind) {
@@ -83,22 +112,25 @@ public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, com
     }
 }
 
-public func (this: *Preprocessor) evaluateForFunction(comp: *CompStmt) : *Stmt {
+public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, comp: *CompStmt) : *Stmt {
     assert(comp != null)
 
     if(comp.evaluatedStmt) {
         return comp.evaluatedStmt
     }
 
+    this.callContext.checker = checker
+    this.callContext.comp = comp
+
     if(strcmp(comp.type, "if")     == 0 ||
        strcmp(comp.type, "elseif") == 0 ||
        strcmp(comp.type, "else")   == 0) {
-        // TODO: Do actual evaluation of expression
-        if(strcmp(comp.type, "else") == 0) {
+
+        if(strcmp(comp.type, "else") == 0 || ape_object_get_bool(ape_execute(this.ape, comp.expr))) {
             comp.evaluatedStmt = NewBlockStmt(comp.startPos, comp.endPos, comp.body, this.lita.allocator)
         }
         else if(comp.end) {
-            comp.evaluatedStmt = this.evaluateForFunction(comp.end)
+            comp.evaluatedStmt = this.evaluateForFunction(checker, comp.end)
         }
     }
 
@@ -107,4 +139,48 @@ public func (this: *Preprocessor) evaluateForFunction(comp: *CompStmt) : *Stmt {
     }
 
     return comp.evaluatedStmt
+}
+
+
+func ApeGetTypeKind(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(!element) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        return ape_object_make_null()
+    }
+
+    var symbol = context.checker.current.currentScope.lookup(element)
+    if(!symbol) {
+        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, TypeKindAsStr(symbol.type.kind))
+}
+
+func (this: *CallContext) logErrors() : bool {
+    if(!ape_has_errors(this.pp.ape)) {
+        return false;
+    }
+
+    //ConsolePrintf("Script Error: \n")
+    var sb = StringBufferInit(1024, this.pp.lita.allocator)
+    var pos = SrcPos{}
+
+    for (var i = 0; i < ape_errors_count(this.pp.ape); i+=1) {
+        var err = ape_get_error(this.pp.ape, i);
+        var errStr = ape_error_serialize(err);
+        defer if(errStr) free(errStr)
+
+        //ConsolePrintf("%s\n", errStr)
+        this.pp.lita.result.addErrorStr(pos, sb)
+    }
+
+    return true
 }

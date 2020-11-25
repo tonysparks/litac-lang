@@ -231,7 +231,7 @@ public func (this: *Lita) compileC(module: *Module, cFilename: *const char, bina
 
     var command: [512]char;
     var commandStr = StringInit(command, 512)
-    commandStr.format("clang -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", binaryFilename, cFilename)
+    commandStr.format("gcc -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", binaryFilename, cFilename)
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }

@@ -12,10 +12,14 @@ import "../src/lita"
 import "../src/phase_result"
 import "../src/error_codes"
 
-struct TestSuite {
+struct TestHarness {
     allocator: *const Allocator
     buffer: StringBuffer
+    numberOfTests: i32
+    numberOfFailures: i32
+}
 
+struct TestSuite {
     filename: *const char
     description: *const char
     disabled: bool
@@ -24,7 +28,6 @@ struct TestSuite {
 }
 
 struct Test {
-    allocator: *const Allocator
     programText: StringBuffer
     name: *const char
 
@@ -42,23 +45,28 @@ enum TestResult {
     ERROR_MISMATCH,
 }
 
+const testHarness = TestHarness{}
+
 func main(len: i32, args: **char) : i32 {
     SystemInit()
 
     var testFiles = []*const char {
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
+        "../test/tests/generics.json",
+        "../test/tests/generics_inference.json",
         null
     }
 
-    var sb = StringBufferInit(1024, defaultAllocator)
+    testHarness.allocator = defaultAllocator
+    testHarness.buffer = StringBufferInit(1024, defaultAllocator)
+    testHarness.numberOfTests = 0
+    testHarness.numberOfFailures = 0
 
     for(var i = 0; testFiles[i] != null; i+=1) {
         var filename = testFiles[i]
 
         var suite = TestSuite{
-            .allocator = defaultAllocator,
-            .buffer = sb,
             .disabled = false,
             .filename = filename,
             .description = null,
@@ -81,6 +89,8 @@ func main(len: i32, args: **char) : i32 {
         }
     }
 
+    printf("Ran %d tests with %d failures\n", testHarness.numberOfTests, testHarness.numberOfFailures)
+    printf("Complete.\n")
     return 0;
 }
 
@@ -91,7 +101,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     }
 
     var parser = Parser{}
-    parser.init(suite.allocator)
+    parser.init(testHarness.allocator)
     defer parser.free()
 
     var node = parser.parseJson(data)
@@ -113,7 +123,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
         return 0
     }
 
-    suite.tests.init(tests.size(), suite.allocator)
+    suite.tests.init(tests.size(), testHarness.allocator)
     for(var i = 0; i < tests.size(); i += 1) {
         var testNode = tests.at(i)
         if(!testNode) {
@@ -126,13 +136,16 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
         }
         else {
             if(test.disabled) {
-                printf("    %-65s ......%s\n", test.name, "SKIPPED!")
+                printf("    %-85s ......%s\n", test.name, "SKIPPED!")
             }
             else {
+                testHarness.numberOfTests += 1
+
                 var result = RunTest(suite, test)
                 var passed = result == TestResult.SUCCESS;
-                printf("    %-65s ......%s\n", test.name, passed ? "SUCCESS" : "***FAILED***")
+                printf("    %-85s ......%s\n", test.name, passed ? "SUCCESS" : "***FAILED***")
                 if(!passed) {
+                    testHarness.numberOfFailures += 1
                     switch(result) {
                         case TestResult.LOADING_ERROR: {
                             printf("        Error with the test case\n")
@@ -140,12 +153,12 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
                         }
                         case TestResult.OUTPUT_MISMATCH: {
                             printf("        The expected output did not match the actual output:\n")
-                            printf("\n%s\n\n", suite.buffer.cStr())
+                            printf("\n%s\n\n", testHarness.buffer.cStr())
                             break
                         }
                         case TestResult.ERROR_MISMATCH: {
                             printf("        The expected ERROR output did not match the actual output:\n")
-                            printf("\n%s\n\n", suite.buffer.cStr())
+                            printf("\n%s\n\n", testHarness.buffer.cStr())
                             break
                         }
                         default: {}
@@ -160,7 +173,7 @@ err:
 }
 
 func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
-    var programText = StringBufferInit(2048, suite.allocator)
+    var programText = StringBufferInit(2048, testHarness.allocator)
     programText.append("%s\n", suite.programTemplate)
 
     const defsTemplate = "%definitions%"
@@ -177,7 +190,6 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
         programText.replace(codeIndex, codeIndex + codeLen, testNode.getStr("code", ""))
     }
 
-    output.allocator = suite.allocator
     output.programText = programText
     output.name = testNode.getStr("name", "")
     output.expectedOutput = testNode.getStr("output", null)
@@ -188,7 +200,7 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
 }
 
 func RunTest(suite: *TestSuite, test: *Test) : TestResult {
-    suite.buffer.clear() // clear previous run
+    testHarness.buffer.clear() // clear previous run
 
     var tmpSrcFile = "test_output/lita_test.lita"
     if(WriteFile(tmpSrcFile, test.programText.cStrConst(), test.programText.length) != FileStatus.Ok) {
@@ -229,26 +241,28 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
         goto report
     }
 
-    lita.runCaptureOutput(suite.buffer)
-
+    lita.runCaptureOutput(testHarness.buffer)
     if(test.expectedOutput) {
-        if(strcmp(test.expectedOutput, suite.buffer.cStr())  != 0) {
+        if(strcmp(test.expectedOutput, testHarness.buffer.cStr())  != 0) {
             goto err
         }
+    }
+    else if(testHarness.buffer.length) {
+        goto err
     }
 
 report:
     if(!lita.result.errors.empty()) {
-        suite.buffer.clear() // clear program output
+        testHarness.buffer.clear() // clear program output
 
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
-            PrintError(suite.buffer, lita.result.errors.get(i))
-            suite.buffer.append("\n")
+            PrintError(testHarness.buffer, lita.result.errors.get(i))
+            testHarness.buffer.append("\n")
         }
-        suite.buffer.append("Total errors: %d\n", lita.result.errors.size())
+        testHarness.buffer.append("Total errors: %d\n", lita.result.errors.size())
 
         if(test.expectedErrorOutput) {
-            if(suite.buffer.contains(test.expectedErrorOutput)) {
+            if(testHarness.buffer.contains(test.expectedErrorOutput)) {
                 return TestResult.SUCCESS
             }
             else {
@@ -277,7 +291,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuffer) : *const char {
     var len = strlen(path)
     sb.append("cd ")
     sb.appendStr(path, len)
-    sb.append(" && %s", &this.binaryFilename[len + 1])
+    sb.append(" && %s 2>&1", &this.binaryFilename[len + 1])
 
     var process = SystemExec(sb.cStr())
 

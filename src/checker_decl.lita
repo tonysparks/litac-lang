@@ -4,12 +4,15 @@ import "symbols"
 import "phase_result"
 import "module"
 import "ast"
+import "ast_new"
 import "lex"
 import "lita"
 import "map"
-import "string_buffer"
 import "array"
+import "string_buffer"
 import "string_view"
+import "string"
+import "generics"
 import "assert"
 
 import "ast_print"
@@ -271,6 +274,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
                     }
+                    this.checkDeclarability(varField.defaultExpr.startPos, varField.defaultExpr.operand.typeInfo, field.typeInfo)
                 }
                 if(varField.attributes.isUsing) {
                     if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
@@ -300,12 +304,55 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
-                var sym = this.createDeclSymbol(field.aggregateField)
+                // if this is from a generic template, we must make sure
+                // any generic arguments are accounted for
+                var sym: *Symbol = null
+                if(aggDecl.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+
+                    var name = [MAX_SYMBOL_NAME]char{}
+                    var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+                    nameStr.format("%.*s", field.aggregateField.name.str.length, field.aggregateField.name.str.buffer)
+
+                    // determine if this symbol has already been created
+                    sym = this.getTypeByName(nameStr.cStr())
+                    if(!sym) {
+                        // if it hasn't, create it from the template
+                        sym = this.createDeclSymbol(field.aggregateField)
+                    }
+
+                    // build up the new Declaration Name with the appropriate generic arguments supplemented in
+                    // from the parent declaration
+                    var nameSpec = NewNameTypeSpec(field.aggregateField.startPos, nameStr.cStr(), this.allocator)
+                    nameSpec.genericArgs.init(field.aggregateField.genericParams.size(), this.allocator)
+                    for(var i = 0; i < field.aggregateField.genericParams.size(); i += 1) {
+                        var genericParam = field.aggregateField.genericParams.get(i)
+
+                        for(var j = 0; j < aggDecl.sym.genericParams.size(); j += 1) {
+                            var parentGenericParam = aggDecl.sym.genericParams.get(j)
+
+                            if(parentGenericParam.name.str.equalsStringView(genericParam.name.str)) {
+                                nameSpec.genericArgs.add(aggDecl.sym.genericArgs.get(j).asTypeSpec(this.allocator))
+                                break
+                            }
+                        }
+                    }
+
+                    // using the appropriate generic arguments create the concrete
+                    // symbol
+                    sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
+                }
+                else {
+                    sym = this.createDeclSymbol(field.aggregateField)
+                }
+
                 if(!sym) {
                     return false
                 }
+
+                field.aggregateField.sym = sym
                 sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
+                this.finishResolveSymbol(sym)
 
                 field.typeInfo = sym.type
                 if(!field.typeInfo) {

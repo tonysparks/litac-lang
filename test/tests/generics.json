@@ -1,0 +1,514 @@
+{
+    "description": "Tests Generics",
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+
+        {
+            "name": "Generics struct with union",
+            "definitions": `
+                struct Person<T> {
+                    union X<T> {
+                        v: T
+                    }
+                }
+
+            `,
+            "code": `
+                var x = Person<i32> { .X: X<i32>{4} }
+                assert(x.X.v == 4)
+
+            `
+        },
+        {
+            "name": "Generics struct within union and generic field",
+            "definitions": `
+                struct Person<T> {
+                    union X<T> {
+                        v: T
+                    }
+                    age: T
+                }
+
+            `,
+            "code": `
+                var x = Person<i32> { .X: X<i32>{4}, .age:56 }
+                assert(x.X.v == 4)
+                assert(x.age == 56)
+            `
+        },
+        {
+            "name": "Generics struct within union and field",
+            "definitions": `
+                struct Person<T> {
+                    union X<T> {
+                        v: T
+                    }
+                    age: i64
+                }
+
+            `,
+            "code": `
+                var x = Person<i32> { .X: X<i32>{4}, .age:56_i64 }
+                assert(x.X.v == 4)
+                assert(x.age == 56_i64)
+            `
+        },
+        {
+            "name": "Generics struct and function",
+            "definitions": `
+                @include("stdlib.h");
+
+                @foreign func malloc(size: usize) : *void;
+
+                struct Array<T> {
+                    size: i32
+                    capacity: i32
+                    elements: *T
+                }
+
+                func ArrayInit<T>(a: **Array<T>, initialSize: i32) {
+                    var size = sizeof(Array<T>) + (sizeof(T) * initialSize as (u64));
+                    *a = malloc(size) as (*Array<T>);
+                    (*a).size = 0;
+                    (*a).capacity = initialSize;
+                    (*a).elements = (*a + sizeof(Array<T>)) as (*T)
+                }
+
+                func ArrayAdd<T>(a: *Array<T>, element: T) {
+                 //   a.elements[a.size] = element;
+                    a.size += 1
+                }
+
+            `,
+            "code": `
+                var a : *Array<i32> = null;
+                ArrayInit<i32>(&a, 23);
+
+                assert(a);
+                assert(a.capacity == 23)
+                assert(a.size == 0);
+
+                ArrayAdd<i32>(a, 4)
+                //assert(a.elements[0] == 4)
+
+            `
+        },
+        {
+            "name": "Generics with greaterthan sign",
+            "definitions": `
+                func test<T>(a: T) : T {
+                    return a
+                }
+
+            `,
+            "code": `
+                var x = test<i32> (4) < 5;
+                assert(x)
+            `
+        },
+        {
+            "name": "Generics with greaterthan sign cast",
+            "definitions": `
+                struct Test<T> {
+                    u: T
+                }
+
+            `,
+            "code": `
+                var a: Test<f32>{}
+                var b: Test<f32>{}
+                var x = a as (Test<f32>) > 0
+                assert(x)
+            `,
+            "error": "illegal, left operand has type 'Test<f32>'"
+        },
+        {
+            "name": "Break Generics via Expression",
+            "code": `
+                var a = 1
+                var b = 2
+                var c = a < b > 2
+                assert(!c)
+            `,
+        },
+        {
+            "name": "Break Generics via Cast",
+            "definitions": `
+                struct Test {
+                    u: i32
+                }
+
+            `,
+            "code": `
+                var a = Test {}
+                var b = 2
+                var c = a as (Test) < b > 2
+                assert(!c)
+            `,
+            "error": "illegal, left operand has type 'Test'"
+        },
+        {
+            "name": "Generics via Sizeof with lt expr",
+            "definitions": `
+                struct Test {
+                    u: i32
+                }
+
+            `,
+            "code": `
+                var b = 1
+                var c = sizeof(:Test) < b > 0
+                assert(c == false)
+            `,
+        },
+        {
+            "name": "Break Generics via Sizeof",
+            "definitions": `
+                struct Test {
+                    u: i32
+                }
+
+            `,
+            "code": `
+                var b = 1
+                var c = sizeof (Test < b > 0)
+                assert(c == false)
+            `,
+            "error": "Missing )"
+        },
+        {
+            "name": "ReadME Generics",
+            "definitions": `
+
+                // Defines a generic structure
+                struct Vec2<T> {
+                    x: T
+                    y: T
+                }
+
+                // Defines a generic function
+                func Vec2Add<T>(a: Vec2<T>, b: Vec2<T>, out: Vec2<T>) : Vec2<T> {
+                    out.x = a.x + b.x
+                    out.y = a.y + b.y
+                    return out
+                }
+
+                // You alias this type
+                typedef Vec2<i32> as Vec2i
+
+            `,
+            "code": `
+
+                var origin = Vec2<f32> { 0.0f, 0.0f }  // using generics syntax
+                var vel    = Vec2i { 0,0 }           // using the alias
+
+                Vec2Add<i32>(vel, vel, vel)
+                Vec2Add<f32>(origin, origin, origin)
+
+            `
+        },
+        {
+            "name": "Generic Func Ptr in Struct",
+            "definitions": `
+
+                // Defines a generic structure
+                struct Test<T> {
+                    y: func<T>(T):T
+                }
+
+                func test(a:i32) : i32 {
+                    return a;
+                }
+
+            `,
+            "code": `
+
+                var t = Test<i32> { &test }
+                assert(t.y(1) == 1)
+            `
+        },
+        {
+            "name": "Generic Func Ptr in Struct x2",
+            "definitions": `
+
+                struct Test<T> {
+                    y: func<T>(T):T
+                }
+
+                func test(a:i32) : i32 {
+                    return a;
+                }
+                func test2(a:f32) : f32 {
+                    return a;
+                }
+            `,
+            "code": `
+
+                var t = Test<i32> { &test }
+                assert(t.y(1) == 1)
+
+                var t2 = Test<f32> { &test2 }
+                assert(t2.y(1.4f) == 1.4f)
+            `
+        }, ///
+        {
+            "name": "Generic Func Ptr in Func",
+            "disabled" : true,
+            "definitions": `
+                func test(a:i32) : i32 {
+                    return a;
+                }
+
+                func gen<T>(a: func<T>(T):T, b: T) : T {
+                    return a<T>(b);
+                }
+
+            `,
+            "code": `
+
+                var t = gen<i32>(&test, 24)
+                assert(t == 24)
+            `
+        },
+        {
+            "name": "Invalid Generic Func Ptr in Func",
+            "disabled" : true,
+            "definitions": `
+                func test(a:f32) : f32 {
+                    return a;
+                }
+
+                func gen<T>(a: func<T>(T):T, b: T) : T {
+                    return a<T>(b);
+                }
+
+            `,
+            "code": `
+
+                var t = gen<i32>(&test, 24)
+                assert(t == 24)
+            `,
+            "error": "'func(i32) : i32' is not of type 'func(f32) : f32'"
+        },
+        {
+            "name": "Generic of Generic",
+            "definitions": `
+                struct B<T> {
+                    y : T
+                }
+
+                struct A<T> {
+                    x : *T
+                }
+            `,
+            "code": `
+                var b = B<i32> {4};
+                var a = A<B<i32>> {
+                    .x: &b
+                }
+
+                assert(a.x.y == 4)
+            `,
+        },
+        {
+            "name": "Generics Struct with No GenArgs",
+            "definitions": `
+                struct X<T> {
+                    y: T
+                }
+            `,
+            "code": `
+                var t = X{}
+            `,
+            "error": "'X' is missing generic arguments ['T']"
+        },
+        {
+            "name": "Generics Union with No GenArgs",
+            "definitions": `
+                union X<T> {
+                    y: T
+                }
+            `,
+            "code": `
+                var t = X{}
+            `,
+            "error": "'X' is missing generic arguments ['T']"
+        },
+        {
+            "name": "Generics Func with No GenArgs",
+            "definitions": `
+                func test<T>() {
+                }
+            `,
+            "code": `
+                test()
+            `,
+            "error": "'test' is missing generic arguments ['T']"
+        },
+        {
+            "name": "Generics Var mismatch Types",
+            "definitions": `
+                struct X<T> {
+                    y : T
+                }
+            `,
+            "code": `
+                var x : X<i32> = X<f32>{}
+            `,
+            "error": "'X<f32>' can't be assigned to 'X<i32>'"
+        },
+        {
+            "name": "Generics Var mismatch Types no GenArgs",
+            "definitions": `
+                struct X<T> {
+                    y : T
+                }
+            `,
+            "code": `
+                var x : X = X<f32>{}
+            `,
+            "error": "'X<f32>' can't be assigned to 'X'"
+        },
+        {
+            "name": "Generics Var mismatch Types no GenArgs Init",
+            "definitions": `
+                struct X<T> {
+                    y : T
+                }
+            `,
+            "code": `
+                var x : X<f32> = X{}
+            `,
+            "error": "'X' is missing generic arguments ['T']"
+        },
+        {
+            "name": "Generics call generic func ptr in struct field",
+            "definitions": `
+                struct Person<T> {
+                    f : func<T>(T): T
+                }
+
+                func test(a:i32) : i32 {
+                    return a
+                }
+
+                func call<T>(p : Person<T>) : T {
+                    return p.f<T>(4)
+                }
+
+            `,
+            "code": `
+                var x = Person<i32> {
+                    .f: &test
+                }
+                assert(call<i32>(x) == 4)
+
+            `
+        },
+        {
+            "name": "Func Independent declaration Generics",
+            "definitions": `
+                func test<T>(a: T) : i32 {
+                    return a.x.y;
+                }
+
+                struct A {
+                    x : B
+                }
+                struct B {
+                    y : i32
+                }
+            `,
+            "code": `
+                var a = A {
+                    .x: B {4}
+                }
+                assert(test<A>(a) == 4)
+            `,
+        },
+        {
+            "name": "Generics embedded",
+            "disabled" : true,
+            "definitions": `
+                typedef func<T>(T):T as Test<T>;
+
+                func test<T>(t: Test<T>, a: T) : T {
+                    if(!t) {
+                        return a + 1
+                    }
+                    return t<T>(a)
+                }
+
+                func z(a: i32) : i32 {
+                    return a
+                }
+
+            `,
+            "code": `
+                assert(test<i32>(&z, 4) == 4)
+            `,
+        },
+
+        {
+            "name": "TypeCheck struct ptr",
+            "definitions": `
+
+
+                struct X {
+                    a: i32
+                }
+
+                struct Y {
+                    b: i32
+                }
+
+                func (x: *X) method(y: Y) : i32 {
+                    return call(y)
+                }
+
+                func call(y: *Y) : i32 {
+                    return y.b
+                }
+
+            `,
+            "code": `
+                var x = X{4}
+                var y = &Y{8}
+
+                assert(x.method(y) == 8)
+                assert(call(*y) == 8)
+            `,
+        },
+        {
+            "name": "Generics Test missing generics",
+            "definitions": `
+
+
+                struct X<T> {
+                    a: T
+                }
+
+                func (x: *X<T>) method(t: T) : T {
+                    return x.a
+                }
+
+
+            `,
+            "code": `
+                var x = X<i32>{4}
+                x.method(8)
+            `,
+            "error": "unknown type 'T'"
+        },
+
+    ]
+}

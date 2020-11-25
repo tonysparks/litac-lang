@@ -2214,7 +2214,7 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
         }
     }
 
-    if(p.tryErrorCounter > numOfErrors) {
+    if(p.tryErrorCounter > numOfErrors || isFailed) {
         p.rewindTo(backtrack, numOfErrors)
         isFailed = true;
     }
@@ -2225,6 +2225,7 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
             p.allocator.free(type)
         }
         arguments.free()
+        arguments.clear()
     }
 
     return arguments
@@ -2407,7 +2408,7 @@ err:
 }
 
 func (p: *Parser) rewindTo(backtrack: i32, numOfErrors: u64) {
-    assert(p.tryErrorCounter > numOfErrors)
+    assert(p.tryErrorCounter >= numOfErrors)
     {
         // rewind the parser and errors
         p.current = backtrack

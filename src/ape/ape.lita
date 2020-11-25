@@ -1,0 +1,338 @@
+@include("<ape.h>");
+@cFile("./ape.c");
+
+@foreign
+public struct ape {
+}
+@foreign public typedef void as ape_t;
+
+@foreign
+public struct ape_object {
+   _internal: u64
+}
+@foreign public typedef void as ape_object_t;
+@foreign public typedef void as ape_error_t;
+
+@foreign
+public struct ape_program {
+}
+@foreign public typedef void as ape_program_t;
+
+@foreign
+public struct ape_traceback {
+}
+@foreign public typedef void as ape_traceback_t;
+
+@foreign
+public enum ape_error_type {
+   APE_ERROR_NONE
+  ,APE_ERROR_PARSING
+  ,APE_ERROR_COMPILATION
+  ,APE_ERROR_RUNTIME
+  ,APE_ERROR_USER
+}
+@foreign public typedef void as ape_error_type_t;
+
+@foreign
+public enum ape_object_type {
+   APE_OBJECT_NONE
+  ,APE_OBJECT_ERROR
+  ,APE_OBJECT_NUMBER
+  ,APE_OBJECT_BOOL
+  ,APE_OBJECT_STRING
+  ,APE_OBJECT_NULL
+  ,APE_OBJECT_BUILTIN
+  ,APE_OBJECT_ARRAY
+  ,APE_OBJECT_MAP
+  ,APE_OBJECT_FUNCTION
+  ,APE_OBJECT_EXTERNAL
+  ,APE_OBJECT_ANY
+}
+@foreign public typedef void as ape_object_type_t;
+
+@foreign public typedef func(*ape_t, *void, i32, *ape_object_t) : ape_object_t as ape_external_fn;
+@foreign public typedef func(u64) : *void as ape_malloc_fn;
+@foreign public typedef func(*void) : void as ape_free_fn;
+@foreign public typedef func(*void) : void as ape_data_destroy_fn;
+@foreign public typedef func(*void) : *void as ape_data_copy_fn;
+@foreign public typedef func(*void, *const void, u64) : u64 as ape_stdout_write_fn;
+@foreign public typedef func(*void, *const char) : *char as ape_read_file_fn;
+@foreign public typedef func(*void, *const char, *const char, u64) : u64 as ape_write_file_fn;
+
+@foreign
+public func ape_set_memory_functions(p0: ape_malloc_fn, p1: ape_free_fn) : void;
+
+@foreign
+public func ape_make() : *ape_t;
+
+@foreign
+public func ape_destroy(p0: *ape_t) : void;
+
+@foreign
+public func ape_set_repl_mode(p0: *ape_t, p1: bool) : void;
+
+@foreign
+public func ape_set_gc_interval(p0: *ape_t, p1: i32) : void;
+
+@foreign
+public func ape_set_stdout_write_function(p0: *ape_t, p1: ape_stdout_write_fn, p2: *void) : void;
+
+@foreign
+public func ape_set_file_write_function(p0: *ape_t, p1: ape_write_file_fn, p2: *void) : void;
+
+@foreign
+public func ape_set_file_read_function(p0: *ape_t, p1: ape_read_file_fn, p2: *void) : void;
+
+@foreign
+public func ape_compile(p0: *ape_t, p1: *const char) : *ape_program_t;
+
+@foreign
+public func ape_compile_file(p0: *ape_t, p1: *const char) : *ape_program_t;
+
+@foreign
+public func ape_execute_program(p0: *ape_t, p1: *const ape_program_t) : ape_object_t;
+
+@foreign
+public func ape_program_destroy(p0: *ape_program_t) : void;
+
+@foreign
+public func ape_execute(p0: *ape_t, p1: *const char) : ape_object_t;
+
+@foreign
+public func ape_execute_file(p0: *ape_t, p1: *const char) : ape_object_t;
+
+@foreign
+public func ape_call(p0: *ape_t, p1: *const char, p2: i32, p3: *ape_object_t) : ape_object_t;
+
+@foreign
+public func ape_add_error(p0: *ape_t, p1: *const char) : void;
+
+@foreign
+public func ape_add_errorf(p0: *ape_t, p1: *const char, ...) : void;
+
+@foreign
+public func ape_has_errors(p0: *const ape_t) : bool;
+
+@foreign
+public func ape_errors_count(p0: *const ape_t) : i32;
+
+@foreign
+public func ape_get_error(p0: *const ape_t, p1: i32) : *const ape_error_t;
+
+@foreign
+public func ape_set_external_function(p0: *ape_t, p1: *const char, p2: ape_external_fn, p3: *void) : bool;
+
+@foreign
+public func ape_set_global_constant(p0: *ape_t, p1: *const char, p2: ape_object_t) : bool;
+
+@foreign
+public func ape_get_object(p0: *ape_t, p1: *const char) : ape_object_t;
+
+@foreign
+public func ape_check_args(p0: *ape_t, p1: bool, p2: i32, p3: *ape_object_t, p4: i32, p5: *i32) : bool;
+
+@foreign
+public func ape_object_make_number(p0: f64) : ape_object_t;
+
+@foreign
+public func ape_object_make_bool(p0: bool) : ape_object_t;
+
+@foreign
+public func ape_object_make_null() : ape_object_t;
+
+@foreign
+public func ape_object_make_string(p0: *ape_t, p1: *const char) : ape_object_t;
+
+@foreign
+public func ape_object_make_stringf(p0: *ape_t, p1: *const char, ...) : ape_object_t;
+
+@foreign
+public func ape_object_make_array(p0: *ape_t) : ape_object_t;
+
+@foreign
+public func ape_object_make_map(p0: *ape_t) : ape_object_t;
+
+@foreign
+public func ape_object_make_error(p0: *ape_t, p1: *const char) : ape_object_t;
+
+@foreign
+public func ape_object_make_errorf(p0: *ape_t, p1: *const char, ...) : ape_object_t;
+
+@foreign
+public func ape_object_make_external(p0: *ape_t, p1: *void) : ape_object_t;
+
+@foreign
+public func ape_object_serialize(p0: ape_object_t) : *char;
+
+@foreign
+public func ape_object_get_type(p0: ape_object_t) : ape_object_type_t;
+
+@foreign
+public func ape_object_get_type_string(p0: ape_object_t) : *const char;
+
+@foreign
+public func ape_object_get_type_name(p0: ape_object_type_t) : *const char;
+
+@foreign
+public func ape_object_get_number(p0: ape_object_t) : f64;
+
+@foreign
+public func ape_object_get_bool(p0: ape_object_t) : bool;
+
+@foreign
+public func ape_object_get_string(p0: ape_object_t) : *const char;
+
+@foreign
+public func ape_object_get_error_message(p0: ape_object_t) : *const char;
+
+@foreign
+public func ape_object_get_error_traceback(p0: ape_object_t) : *const ape_traceback_t;
+
+@foreign
+public func ape_object_set_external_destroy_function(p0: ape_object_t, p1: ape_data_destroy_fn) : bool;
+
+@foreign
+public func ape_object_set_external_copy_function(p0: ape_object_t, p1: ape_data_copy_fn) : bool;
+
+@foreign
+public func ape_object_get_array_length(p0: ape_object_t) : i32;
+
+@foreign
+public func ape_object_get_array_value(p0: ape_object_t, p1: i32) : ape_object_t;
+
+@foreign
+public func ape_object_get_array_string(p0: ape_object_t, p1: i32) : *const char;
+
+@foreign
+public func ape_object_get_array_number(p0: ape_object_t, p1: i32) : f64;
+
+@foreign
+public func ape_object_get_array_bool(p0: ape_object_t, p1: i32) : bool;
+
+@foreign
+public func ape_object_set_array_value(p0: ape_object_t, p1: i32, p2: ape_object_t) : bool;
+
+@foreign
+public func ape_object_set_array_string(p0: ape_object_t, p1: i32, p2: *const char) : bool;
+
+@foreign
+public func ape_object_set_array_number(p0: ape_object_t, p1: i32, p2: f64) : bool;
+
+@foreign
+public func ape_object_set_array_bool(p0: ape_object_t, p1: i32, p2: bool) : bool;
+
+@foreign
+public func ape_object_add_array_value(p0: ape_object_t, p1: ape_object_t) : bool;
+
+@foreign
+public func ape_object_add_array_string(p0: ape_object_t, p1: *const char) : bool;
+
+@foreign
+public func ape_object_add_array_number(p0: ape_object_t, p1: f64) : bool;
+
+@foreign
+public func ape_object_add_array_bool(p0: ape_object_t, p1: bool) : bool;
+
+@foreign
+public func ape_object_get_map_length(p0: ape_object_t) : i32;
+
+@foreign
+public func ape_object_get_map_key_at(p0: ape_object_t, p1: i32) : ape_object_t;
+
+@foreign
+public func ape_object_get_map_value_at(p0: ape_object_t, p1: i32) : ape_object_t;
+
+@foreign
+public func ape_object_set_map_value(p0: ape_object_t, p1: ape_object_t, p2: ape_object_t) : bool;
+
+@foreign
+public func ape_object_set_map_value_with_string_key(p0: ape_object_t, p1: *const char, p2: ape_object_t) : bool;
+
+@foreign
+public func ape_object_set_map_string_with_string_key(p0: ape_object_t, p1: *const char, p2: *const char) : bool;
+
+@foreign
+public func ape_object_set_map_number_with_string_key(p0: ape_object_t, p1: *const char, p2: f64) : bool;
+
+@foreign
+public func ape_object_set_map_bool_with_string_key(p0: ape_object_t, p1: *const char, p2: bool) : bool;
+
+@foreign
+public func ape_object_get_map_value(p0: ape_object_t, p1: ape_object_t) : ape_object_t;
+
+@foreign
+public func ape_object_get_map_value_with_string_key(p0: ape_object_t, p1: *const char) : ape_object_t;
+
+@foreign
+public func ape_object_get_map_string_with_string_key(p0: ape_object_t, p1: *const char) : *const char;
+
+@foreign
+public func ape_object_get_map_number_with_string_key(p0: ape_object_t, p1: *const char) : f64;
+
+@foreign
+public func ape_object_get_map_bool_with_string_key(p0: ape_object_t, p1: *const char) : bool;
+
+@foreign
+public func ape_error_get_message(p0: *const ape_error_t) : *const char;
+
+@foreign
+public func ape_error_get_filename(p0: *const ape_error_t) : *const char;
+
+@foreign
+public func ape_error_get_line(p0: *const ape_error_t) : *const char;
+
+@foreign
+public func ape_error_get_line_number(p0: *const ape_error_t) : i32;
+
+@foreign
+public func ape_error_get_column_number(p0: *const ape_error_t) : i32;
+
+@foreign
+public func ape_error_get_type(p0: *const ape_error_t) : ape_error_type_t;
+
+@foreign
+public func ape_error_get_type_string(p0: *const ape_error_t) : *const char;
+
+@foreign
+public func ape_error_type_to_string(p0: ape_error_type_t) : *const char;
+
+@foreign
+public func ape_error_serialize(p0: *const ape_error_t) : *char;
+
+@foreign
+public func ape_error_get_traceback(p0: *const ape_error_t) : *const ape_traceback_t;
+
+@foreign
+public func ape_traceback_get_depth(p0: *const ape_traceback_t) : i32;
+
+@foreign
+public func ape_traceback_get_filename(p0: *const ape_traceback_t, p1: i32) : *const char;
+
+@foreign
+public func ape_traceback_get_line(p0: *const ape_traceback_t, p1: i32) : *const char;
+
+@foreign
+public func ape_traceback_get_line_number(p0: *const ape_traceback_t, p1: i32) : i32;
+
+@foreign
+public func ape_traceback_get_column_number(p0: *const ape_traceback_t, p1: i32) : i32;
+
+@foreign
+public func ape_traceback_get_function_name(p0: *const ape_traceback_t, p1: i32) : *const char;
+
+// empty macro!!
+// empty macro!!
+@foreign public const APE_VERSION_MAJOR: i32;
+@foreign public const APE_VERSION_MINOR: i32;
+@foreign public const APE_VERSION_PATCH: i32;
+@foreign public const APE_VERSION_STRING: i32;
+///@foreign public const APE_CALL: i32;
+///@foreign public const APE_CHECK_ARGS: i32;
+
+
+@foreign("APE_CALL")
+public func ape_callx(ape: *ape_t, name: *const char, ...);
+
+
+@foreign("APE_CHECK_ARGS")
+public func ape_check_argsx(ape: *ape_t, errors: bool, argc: i32, args: *ape_object_t, ...);

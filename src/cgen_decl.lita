@@ -173,7 +173,11 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
             }
         }
     }
-    this.emit("};\n")
+    this.emit("}")
+    if(this.aggregateLevel > 1) {
+        this.emit(" %.*s", decl.name.str.length, decl.name.str.buffer)
+    }
+    this.emit(";\n")
     this.emitNotes(decl.attributes, false)
 }
 

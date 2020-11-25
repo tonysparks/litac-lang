@@ -266,6 +266,7 @@ public func IsBooleanable(type: *TypeInfo) : bool {
         case TypeKind.STR:
         case TypeKind.ARRAY:
         case TypeKind.NULL:
+        case TypeKind.FUNC_PTR:
         case TypeKind.ENUM: {
             return true;
         }
@@ -390,6 +391,12 @@ public func (this: *TypeInfo) getTypeOf() : *TypeInfo {
             return null
         }
     }
+}
+
+public func (this: *TypeInfo) toStringDebug() : *const char {
+    var sb = StringBufferInit(256)
+    this.toString(sb)
+    return sb.cStr()
 }
 
 public func (this: *TypeInfo) toString(sb: *StringBuffer) {

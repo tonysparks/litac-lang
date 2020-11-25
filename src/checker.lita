@@ -596,9 +596,9 @@ err:
 }
 
 func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
-    // check to see if this symbol is completed or a generic template
-    if(!(sym.flags & SymbolFlags.IS_INCOMPLETE) ||
-        (sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
+    // check to see if this symbol is completed; if it is
+    // we don't need to finish resolving this
+    if(!(sym.flags & SymbolFlags.IS_INCOMPLETE)) {
         return;
     }
 
@@ -625,6 +625,14 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
             break;
         }
         case StmtKind.FUNC_DECL: {
+            // we don't want to process the function bodies of
+            // generic types because they are not resolvable with
+            // template types - this will happen once the template types
+            // are supplemented with real types
+            if((sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
+                return;
+            }
+
             var funcDecl = sym.decl as (*FuncDecl)
             this.resolveFuncDecl(funcDecl)
             break;
@@ -644,10 +652,15 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
 
 func (this: *TypeChecker) getType(spec: *NameTypeSpec) : *Symbol {
     assert(spec != null)
-    var type = this.current.getType(spec.name)
+    return this.getTypeByName(spec.name)
+}
+
+func (this: *TypeChecker) getTypeByName(typeName: *const char) : *Symbol {
+    assert(typeName != null)
+    var type = this.current.getType(typeName)
     if(!type) {
         if(this.genericContext.callsite) {
-            return this.genericContext.callsite.getType(spec.name)
+            return this.genericContext.callsite.getType(typeName)
         }
     }
 
@@ -860,7 +873,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.COMP_STMT: {
             var compStmt = stmt as (*CompStmt)
-            var stmt = this.lita.preprocessor.evaluateForFunction(compStmt)
+            var stmt = this.lita.preprocessor.evaluateForFunction(this, compStmt)
             if(!stmt) {
                 return false;
             }

@@ -1,0 +1,16 @@
+import "assert"
+
+struct X<T> {
+    a: T
+}
+
+func (x: *X<T>) method<T>() : T {
+    return x.a
+}
+
+
+func main(len:i32, args:**char) : i32 {
+    var x = X{4}
+    assert(x.method() == 4)
+
+}
