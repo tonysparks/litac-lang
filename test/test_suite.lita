@@ -51,6 +51,8 @@ func main(len: i32, args: **char) : i32 {
     SystemInit()
 
     var testFiles = []*const char {
+        "../test/tests/array.json",
+        "../test/tests/arrays.json",
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
@@ -89,7 +91,7 @@ func main(len: i32, args: **char) : i32 {
         }
     }
 
-    printf("Ran %d tests with %d failures\n", testHarness.numberOfTests, testHarness.numberOfFailures)
+    printf("\nRan %d tests with %d failures\n", testHarness.numberOfTests, testHarness.numberOfFailures)
     printf("Complete.\n")
     return 0;
 }
@@ -238,10 +240,11 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     }
 
     if(!lita.transpile(root)) {
-        goto report
+        goto err
     }
 
     lita.runCaptureOutput(testHarness.buffer)
+
     if(test.expectedOutput) {
         if(strcmp(test.expectedOutput, testHarness.buffer.cStr())  != 0) {
             goto err

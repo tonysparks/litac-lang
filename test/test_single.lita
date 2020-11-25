@@ -1,8 +1,6 @@
 import "assert"
 
-struct Struct {
-    a: i32
-}
 func main(len:i32, args:**char) : i32 {
-    theVariable: Struct = Struct{4}
+    const N = 256
+    var sprites : [N]i32;
 }

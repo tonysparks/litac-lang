@@ -569,15 +569,18 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             var baseName = this.cType(baseInfo)
 
             var buf = StringBufferInit(256, this.allocator)
+            var line = StringBufferInit(256, this.allocator)
             do {
-                if(arrayInfo.length < 0) {
+                if(arrayInfo.length == 0) {
                     if(arrayInfo.numOfElements) {
                         buf.append("[")
                         var cgen = CGen {
                             .lita = this.lita,
-                            .buf = buf
+                            .buf = buf,
+                            .line = line
                         }
                         cgen.emitStmt(arrayInfo.numOfElements)
+                        buf = cgen.buf // the buffer has expanded
                         buf.append("]")
                     }
                     else {

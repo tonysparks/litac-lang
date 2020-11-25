@@ -1,0 +1,194 @@
+{
+    "description": "Single Test",
+    "disabled": false,
+    "debug": true,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Address of Array Element",
+            "definitions": `
+                const array = [3]i32 {
+                    1, 2, 3
+                }
+            `,
+            "code": `
+                var a = &array[0]
+                assert(a != 1 as (*void))
+            `,
+        },
+        {
+            "name": "Array Init from Typedef",
+            "definitions": `
+                typedef [3]f32 as Vec3;
+
+                const array = Vec3 {
+                    1.0f, 2.0f, 3.0f
+                }
+            `,
+            "code": `
+                var a = &array[0]
+                assert(a != 1 as (*void))
+                assert(array[0] == 1)
+                assert(array[1] == 2)
+                assert(array[2] == 3)
+            `,
+        },
+
+        // TODO!!!
+        /*{
+            "name": "Array Init from Typedef with designator",
+            "definitions": `
+                typedef [3]f32 as Vec3;
+
+                const array = Vec3 {
+                    [0] = 1.0f, 2.0f, 3.0f
+                }
+            `,
+            "code": `
+                var a = &array[0]
+                assert(a != 1 as (void*))
+                assert(array[0] == 1)
+                assert(array[1] == 2)
+                assert(array[2] == 3)
+            `,
+        },*/
+
+        {
+            "name": "Array Return Decay",
+            "definitions": `
+                typedef [3]f32 as Vec3;
+
+                const array = Vec3 {
+                    1.0f, 2.0f, 3.0f
+                }
+
+                func test(v: Vec3) : Vec3 {
+                    return v
+                }
+            `,
+            "code": `
+                var a = test(array)
+                assert(a[0] == 1)
+                assert(a[1] == 2)
+                assert(a[2] == 3)
+            `,
+        },
+
+        {
+            "name": "Func with array const expr",
+            "definitions": `
+                const X = 4
+                const Y = 8
+                const LENGTH = X + (Y * 9)
+                struct Node {
+                    a: i32
+                }
+
+                func Test(array: [LENGTH]Node) : [LENGTH]Node {
+                    return array
+                }
+            `,
+            "code": `
+
+                var n = Node {
+                    .a = 4
+                }
+                var a = [LENGTH]Node {
+                    [0] = n
+                }
+
+                var b = Test(a)
+                assert(a == b)
+            `,
+        },
+
+        {
+            "name": "Func with array and pointer",
+            "definitions": `
+
+                struct Node {
+                    a: i32
+                }
+
+                func Test(array: [1]*Node) : [1]*Node {
+                    return array
+                }
+            `,
+            "code": `
+
+                var n = Node {
+                    .a = 4
+                }
+                var a = [1]*Node {
+                    [0] = &n
+                }
+
+                var b = Test(a)
+                assert(a == b)
+            `,
+        },
+
+        {
+            "name": "Func with array pointers",
+            "definitions": `
+
+                struct Node {
+                    a: i32
+                }
+
+                func Test(array: **Node) : **Node {
+                    return array
+                }
+            `,
+            "code": `
+
+                var n = Node {
+                    .a = 4
+                }
+                var a = [1]*Node {
+                    [0] = &n
+                }
+
+                var b = Test(a)
+                assert(a == b)
+            `,
+        },
+
+        {
+            "name": "Func with 2d array pointers",
+            "definitions": `
+
+                struct Node {
+                    a: i32
+                }
+
+                func Test(array: [1][1]Node) : [1][1]Node {
+                    return array
+                }
+            `,
+            "code": `
+
+                var n = Node {
+                    .a = 4
+                }
+                var a = [1][1]Node {
+                    [1]Node{
+                        n
+                    }
+                }
+
+                var b = Test(a)
+                assert(a == b)
+            `,
+        },
+    ]
+}
