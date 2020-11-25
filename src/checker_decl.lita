@@ -426,7 +426,6 @@ func (this: *TypeChecker) checkLabels() {
 }
 
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
-//printf("ResolveFunc %s\n", funcDecl.sym.name)
     this.enterModule(funcDecl.sym.declared)
     defer this.leaveModule()
 

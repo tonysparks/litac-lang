@@ -330,25 +330,8 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
         for(; index < genericArgs.size(); index += 1) {
             var arg = genericArgs.get(index)
             if(name.str.equals(arg.name)) {
-               /* //printf("Checking names: %.*s == %s %d of %d\n", name.str.length, name.str.buffer,
-                    //arg.name, index+1, genericArgs.size())
-                    var sb = StringBufferInit()
-                arg.toString(sb)
-                printf("Checking names: %.*s == %s %d of %d\n", name.str.length, name.str.buffer,
-                    sb.cStr(), index+1, genericArgs.size())*/
                 break;
-            }/*
-            else {
-                var sb = StringBufferInit()
-                arg.toString(sb)
-                printf("Checking names: %.*s != %s %d of %d\n", name.str.length, name.str.buffer,
-                    sb.cStr(), index+1, genericArgs.size())
-                printf("GenericParams: ")
-                for(var i = 0; i < paramType.sym.genericParams.size(); i+=1) {
-                    var p = paramType.sym.genericParams.get(i)
-                    printf("Param: %.*s\n", p.name.str.length, p.name.str.buffer)
-                }
-            }*/
+            }
         }
     }
     else if(paramType.kind == TypeKind.FUNC_PTR) {
@@ -495,62 +478,12 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
             var argType = suppliedArgs.get(j).operand.typeInfo
             assert(argType != null)
             assert(paramType != null)
-/*
-/////
-            {
-                var param = paramType
-                //PrintTypeSpec(param.type)
-                    var sb = StringBufferInit()
-                    param.toString(sb)
-                    printf(" => %s [", sb.cStr())
-                    var base = param.getBaseType()
-                    switch(base.kind) {
-                        case TypeKind.FUNC:
-                        case TypeKind.FUNC_PTR:
-                            break
-                        case TypeKind.STRUCT:
-                        case TypeKind.UNION: {
-                            var aggInfo = base as (*AggregateTypeInfo)
-                            printf("Decl.genericParams = ")
-                            for(var i = 0; i < aggInfo.decl.genericParams.size(); i += 1) {
-                                var p = aggInfo.decl.genericParams.get(i)
-                                printf("%.*s ", p.name.str.length, p.name.str.buffer)
-                            }
-                            printf(" vs. Sym.genericParams = ")
-                            for(var i = 0; i < aggInfo.sym.genericParams.size(); i += 1) {
-                                var p = aggInfo.sym.genericParams.get(i)
-                                printf("%.*s ", p.name.str.length, p.name.str.buffer)
-                            }
-
-                            printf(" vs. Sym.genericArgs = ")
-                            for(var i = 0; i < aggInfo.sym.genericArgs.size(); i += 1) {
-                                var p = aggInfo.sym.genericArgs.get(i)
-                                sb.clear()
-                                p.toString(sb)
-                                printf("%s ", sb.cStr())
-                            }
-                        }
-                        default:
-                    }
-                    printf("]\n")
-                }
-////
-*/
 
             var inferredType = this.inferredType(genericParam.name, paramType, argType)
             if(inferredType) {
                 nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
                 break
-            }/*
-            // temp
-            else {
-                var sb = StringBufferInit()
-                paramType.toString(sb)
-                sb.append(" vs ")
-                argType.toString(sb)
-                printf("Couldn't Infer Type: %s for %.*s\n",
-                    sb.cStr(), genericParam.name.str.length, genericParam.name.str.buffer)
-            }*/
+            }
         }
     }
 

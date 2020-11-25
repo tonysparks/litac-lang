@@ -531,43 +531,6 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                 if(!param.typeInfo) {
                     goto err;
                 }
-                /*
-                if(hasGenerics) {
-
-                    PrintTypeSpec(param.type)
-                    var sb = StringBufferInit()
-                    param.typeInfo.toString(sb)
-                    printf(" => %s [", sb.cStr())
-                    var base = param.typeInfo.getBaseType()
-                    switch(base.kind) {
-                        case TypeKind.FUNC:
-                        case TypeKind.FUNC_PTR:
-                            break
-                        case TypeKind.STRUCT:
-                        case TypeKind.UNION: {
-                            var aggInfo = base as (*AggregateTypeInfo)
-                            for(var i = 0; i < aggInfo.decl.genericParams.size(); i += 1) {
-                                var p = aggInfo.decl.genericParams.get(i)
-                                printf("%.*s ", p.name.str.length, p.name.str.buffer)
-                            }
-                            printf(" vs. ")
-                            for(var i = 0; i < aggInfo.sym.genericParams.size(); i += 1) {
-                                var p = aggInfo.sym.genericParams.get(i)
-                                printf("%.*s ", p.name.str.length, p.name.str.buffer)
-                            }
-
-                            printf(" vs. ")
-                            for(var i = 0; i < aggInfo.sym.genericArgs.size(); i += 1) {
-                                var p = aggInfo.sym.genericArgs.get(i)
-                                sb.clear()
-                                p.toString(sb)
-                                printf("%s ", sb.cStr())
-                            }
-                        }
-                        default:
-                    }
-                    printf("]\n")
-                }*/
             }
 
             var retType = this.resolveTypeSpec(funcDecl.returnType)
