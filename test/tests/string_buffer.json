@@ -1,0 +1,695 @@
+{
+    "description": "StringBuffer",
+    "disabled": false,
+    "program": `
+        import "string_buffer";
+
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        import "libc";
+        import "io";
+        /*
+        @include("<string.h>");
+        @foreign func strncmp(a:*const char, b:*const char, len: i32) : i32;
+        @foreign func strcmp(a:*const char, b:*const char) : i32;
+        @foreign func sprintf(b: *char, format: *const char, ...) : i32;
+        */
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "StringBuffer",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var s = StringBuffer{}
+                s.init(16)
+
+                s.appendStr("hello", 5)
+                s.appendStr(" ", 1)
+                s.appendStr("world", 5)
+
+                assert(s.size() == 11)
+
+                s.append(" '%d' '%f' '%s'", 24, 22.4f, "Packers")
+                //printf("Size: %d\n", s.size())
+
+
+                const NZ = 256
+                var buffer: [NZ]char;
+
+                var n = s.copyTo(buffer, NZ)
+
+                //printf("'%.*s'\n", n, buffer);
+
+                assert(strncmp(s.buffer, buffer, n) == 0)
+
+                s.free()
+                assert(s.length == 0)
+                assert(s.capacity == 0)
+                assert(s.buffer == null)
+            `,
+        },
+        {
+            "name": "StringBuffer_appends",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var s = StringBuffer{}
+                s.init(16)
+
+                s.appendStr("hi", 2)
+                //printf("'%.*s'\n", s.size(), s.buffer);
+                assert(strncmp(s.buffer, "hi", s.size()) == 0)
+                s.clear()
+
+                s.appendFloat(4.4f)
+                //printf("'%.*s'\n", s.size(), s.buffer);
+                assert(strncmp(s.buffer, "4.400000", s.size()) == 0)
+                s.clear()
+
+                s.appendI32(34)
+                //printf("'%.*s'\n", s.size(), s.buffer);
+                assert(strncmp(s.buffer, "34", s.size()) == 0)
+                s.clear()
+
+                s.appendI64(456_i64)
+                //printf("'%.*s'\n", s.size(), s.buffer);
+                assert(strncmp(s.buffer, "456", s.size()) == 0)
+                s.clear()
+
+                s.appendU32(2342_u32)
+                //printf("'%.*s'\n", s.size(), s.buffer);
+                assert(strncmp(s.buffer, "2342", s.size()) == 0)
+                s.clear()
+
+                s.appendU64(45739857_u64)
+                //printf("'%.*s'\n", s.size(), s.buffer);
+                assert(strncmp(s.buffer, "45739857", s.size()) == 0)
+                s.clear()
+
+                s.appendChar('t')
+                //printf("'%.*s'\n", s.size(), s.buffer);
+                assert(strncmp(s.buffer, "t", s.size()) == 0)
+                s.clear()
+
+                s.free()
+                assert(s.length == 0)
+                assert(s.capacity == 0)
+                assert(s.buffer == null)
+                assert(s.empty())
+            `,
+        },
+        {
+            "name": "StringBuffer cStr",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var s = StringBuffer{}
+                s.init(16)
+
+                assert(strcmp(s.cStr(), "") == 0)
+                s.append("H")
+                assert(strcmp(s.cStr(), "H") == 0)
+                s.append("e")
+                assert(strcmp(s.cStr(), "He") == 0)
+
+                s.free()
+                assert(s.length == 0)
+                assert(s.capacity == 0)
+                assert(s.buffer == null)
+                assert(s.empty())
+            `,
+        },
+
+        {
+            "name": "StringBuffer insert",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var s = StringBuffer{}
+                s.init(16)
+
+                // internal buffer is 32
+                const AT     = "12345678901234567890123456789012"
+                const OVER   = "123456789012345678901234567890123"
+                const BEFORE = "1234567890123456789012345678901"
+                const WAYLES = "12"
+
+                const N = 256;
+                var buf: [N]char;
+
+                {
+                    s.append("Red")
+                    //printf("%s\n", s.cStr())
+                    assert(strcmp(s.cStr(), "Red") == 0)
+
+                    s.insert(0, "%s", AT)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(0, "%s", OVER)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(0, "%s", BEFORE)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(0, "%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+
+                // middle
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(2, "%s", AT)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Re%sd", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(2, "%s", OVER)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Re%sd", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(2, "%s", BEFORE)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Re%sd", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(2, "%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Re%sd", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                // middle bigger
+                {
+                    s.append("RedBear")
+                    assert(strcmp(s.cStr(), "RedBear") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", AT)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%sBear", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                {
+                    s.append("RedBear")
+                    assert(strcmp(s.cStr(), "RedBear") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", OVER)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%sBear", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                {
+                    s.append("RedBear")
+                    assert(strcmp(s.cStr(), "RedBear") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", BEFORE)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%sBear", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+                {
+                    s.append("RedBear")
+                    assert(strcmp(s.cStr(), "RedBear") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%sBear", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                {
+                    s.append("RedBeares")
+                    assert(strcmp(s.cStr(), "RedBeares") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(4, "%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "RedB%seares", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                // END
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", AT)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", OVER)
+                   // printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", BEFORE)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(3, "%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+
+                // OVER
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(4, "%s", AT)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(4, "%s", OVER)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(4, "%s", BEFORE)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+                {
+                    s.append("Red")
+                    assert(strcmp(s.cStr(), "Red") == 0)
+                    //printf("%s\n", s.cStr())
+
+                    s.insert(4, "%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+
+                    s.clear()
+                }
+
+                s.free()
+                assert(s.length == 0)
+                assert(s.capacity == 0)
+                assert(s.buffer == null)
+                assert(s.empty())
+            `,
+        },
+
+        {
+            "name": "StringBuffer_appends extend",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                // internal buffer is 32
+                const AT     = "12345678901234567890123456789012"
+                const OVER   = "123456789012345678901234567890123"
+                const BEFORE = "1234567890123456789012345678901"
+                const WAYLES = "12"
+
+                const N = 256;
+                var buf: [N]char;
+
+                // empty
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", AT)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%s", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", OVER)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%s", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", BEFORE)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%s", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%s", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+
+
+                // with str
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.appendStr("Red", 3)
+
+                    s.append("%s", AT)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.appendStr("Red", 3)
+
+                    s.append("%s", OVER)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.appendStr("Red", 3)
+
+                    s.append("%s", BEFORE)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.appendStr("Red", 3)
+
+                    s.append("%s", WAYLES)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "Red%s", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+
+
+                // after
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", AT)
+                    s.appendStr("Red", 3)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", AT)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", OVER)
+                    s.appendStr("Red", 3)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", OVER)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", BEFORE)
+                    s.appendStr("Red", 3)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", BEFORE)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+                {
+                    var s = StringBuffer{}
+                    s.init(16)
+                    defer s.free()
+
+                    s.append("%s", WAYLES)
+                    s.appendStr("Red", 3)
+                    //printf("'%s'\n", s.cStr())
+
+                    sprintf(buf, "%sRed", WAYLES)
+                    assert(strcmp(s.cStr(), buf) == 0)
+                }
+            `,
+        },
+
+        {
+            "name": "StringBuffer_delete",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var s = StringBuffer{}
+                s.init(16)
+
+                s.append("hello cruel world")
+                s.delete(5, 11)
+                //printf("'%s'\n", s.cStr())
+                assert(strcmp(s.cStr(), "hello world") == 0)
+
+                s.delete(0, 1)
+                //printf("'%s'\n", s.cStr())
+                assert(strcmp(s.cStr(), "ello world") == 0)
+
+                s.delete(s.size() - 1, s.size())
+                //printf("'%s'\n", s.cStr())
+                assert(strcmp(s.cStr(), "ello worl") == 0)
+
+
+                s.delete(0, s.size())
+                //printf("'%s'\n", s.cStr())
+                assert(strcmp(s.cStr(), "") == 0)
+                assert(s.empty())
+            `,
+        },
+        {
+            "name": "StringBuffer_contains",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var s = StringBuffer{}
+                s.init(16)
+
+                s.append("hello cruel world")
+                assert(s.contains("h") == true)
+                assert(s.contains("z") == false)
+                assert(s.contains("world") == true)
+                assert(s.contains("cruel") == true)
+                assert(s.contains("cruxl") == false)
+            `,
+        },
+        {
+            "name": "StringBuffer_indexOf",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var s = StringBuffer{}
+                s.init(16)
+
+                s.append("hello cruel world")
+                assert(s.indexOf("h") == 0)
+                assert(s.indexOf("l") == 2)
+                assert(s.indexOf("cruel") == 6)
+                assert(s.indexOfAt("l", -1, 5) == 10)
+                assert(s.indexOfAt("h", -1, 5) == -1)
+            `,
+        },
+    ]
+}

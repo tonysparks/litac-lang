@@ -51,7 +51,15 @@ func main(len: i32, args: **char) : i32 {
     SystemInit()
 
     var testFiles = []*const char {
+        // "../test/tests/misc.json", json syntax error
+        "../test/tests/type_checker.json",
+        "../test/tests/string_view.json",
+        "../test/tests/string_buffer.json",
+        "../test/tests/stmts.json",
         "../test/tests/array.json",
+        "../test/tests/methods.json",
+        "../test/tests/defer.json",
+        "../test/tests/declarations.json",
         "../test/tests/arrays.json",
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",

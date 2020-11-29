@@ -1,0 +1,322 @@
+{
+    "description": "Tests Stmts",
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Switch",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0
+                switch(3) {
+                    case 0:
+                    case 1: {
+                        i += 1
+                    }
+                    case 3: i += 1
+                        break
+                }
+
+                assert(i == 1)
+            `,
+        },
+        {
+            "name": "Switch with default",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0
+                switch(3) {
+                    case 0:
+                    case 1: {
+                        i += 1
+                    }
+                    case 3: i += 1
+                        break
+                    default: i += 1
+                }
+
+                assert(i == 1)
+            `,
+        },
+        {
+            "name": "Switch with default no braces",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0
+                switch(3)
+                    case 0:
+                    case 1: {
+                        i += 1
+                    }
+                    case 3: i += 1
+                        break
+                    default: i += 1
+
+
+                assert(i == 1)
+            `,
+        },
+        {
+            "name": "Switch with double break",
+            "disabled": true,
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0
+                switch(3) {
+                    case 0: {
+                        break;
+                        break;
+                    }
+                    case 1: {
+                        i += 1
+                    }
+                    case 3: i += 1
+                        break
+                    default: i += 1
+                }
+
+                assert(i == 1)
+            `,
+            "error": "*** Invalid break statement"
+        },
+        {
+            "name": "Defer with Return",
+            "definitions": `
+                func test() : i32 {
+                    var x = 1
+                    defer (x /= 2)
+
+                    if(x) return (x+3)
+
+                    return 0
+                }
+            `,
+            "code": `
+
+
+                assert(test() == 4)
+            `,
+        },
+        {
+            "name": "Defer with Return if_else",
+            "definitions": `
+                func test() : i32 {
+                    var x = 1
+                    defer (x /= 2)
+
+                    if(!x) return (x+3)
+                    else  {return (x-3)}
+                }
+            `,
+            "code": `
+                assert(test() == -2)
+            `,
+        },
+        {
+            "name": "Defer Continue Embedded",
+            "definitions": `
+
+            `,
+            "code": `
+                {
+                    var count = 0
+                    for(var i = 0; i < 10; i+=1) {
+                        defer count += 1
+
+                        if(i % 2 == 0) {
+                            continue
+                        }
+                    }
+
+                    assert(count == 10)
+                }
+
+
+            `,
+        },
+        {
+            "name": "Ternary",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 1 ? -1 : 1
+                assert(i == -1)
+            `
+        },
+        {
+            "name": "Ternary with Binary",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 1 ? -1 : 1 + 7
+                assert(i == -1)
+            `
+        },
+        {
+            "name": "Ternary Double",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = false ? -1 : (true) ? 4 : 5
+                assert(i == 4)
+            `
+        },
+        {
+            "name": "Ternary Defer",
+            "definitions": `
+                func test() : i32 {
+                    var i = 0
+                    defer (i += 2)
+
+                    // this will return i as is, ignoring the i += 2 from defer from what's returned from the function!!!
+                    return false ? -1 : (true) ? i+=4 : 5
+                }
+            `,
+            "code": `
+
+                assert(test() == 4)
+            `
+        },
+        {
+            "name": "Ternary Generics",
+            "definitions": `
+                func test<T>(i : T) : T {
+                    return false ? -1 : (true) ? i +=4 : 5
+                }
+            `,
+            "code": `
+                assert(test<i32>(34) == 38)
+            `
+        },
+        {
+            "name": "Goto",
+            "definitions": `
+                func test() : i32 {
+                    goto b
+                    a:
+                        return 0
+                    b:
+                        return 4
+                }
+
+            `,
+            "code": `
+                assert(test() == 4)
+            `
+        },
+        {
+            "name": "Invalid Goto",
+            "definitions": `
+                func test() : i32 {
+                    goto c
+                    a:
+                        return 0
+                    b:
+                        return 4
+                }
+
+            `,
+            "code": `
+
+            `,
+            "error": "'c' label not found"
+        },
+        {
+            "name": "Goto before label def",
+            "definitions": `
+                func test() : i32 {
+                    var i = 0
+
+                    if(i > 0) {
+                    a:
+                        return 4
+                    }
+
+                    i += 1
+                    goto a
+                }
+
+            `,
+            "code": `
+                assert(test() == 4)
+            `
+        },
+        {
+            "name": "For Loop",
+            "definitions": `
+
+            `,
+            "code": `
+
+                var count = 0
+                for(count = 0; count < 10;) {
+                     count+=1
+                }
+
+                assert(count == 10)
+
+
+
+            `,
+        },
+        {
+            "name": "Defer outside of loop",
+            "definitions": `
+
+            `,
+            "code": `
+                var x = 0
+                {
+                    defer x += 1
+                    for(var i = 0; i < 1; i+=1) {
+                        if(i == 0) {
+                            break;
+                        }
+                    }
+
+                    assert(x == 0)
+                }
+                assert(x == 1)
+            `,
+        },
+        {
+            "name": "Defer Double with statement",
+            "definitions": `
+                func test() {
+                    var x = 1
+                    {
+                        defer if(true) x += 1
+                        defer x *= 2
+
+                        if(x == 2) {
+                            return;
+                        }
+                    }
+                    assert(x == 3)
+                }
+            `,
+            "code": `
+                test()
+            `,
+        }
+    ]
+}

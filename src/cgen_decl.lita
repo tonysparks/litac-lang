@@ -166,7 +166,8 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
-                this.emitStmt(field.enumField)
+                var decl = field.enumField.decl
+                this.emit("enum %s %.*s;\n", this.cTypeName(decl.sym.type), decl.name.str.length, decl.name.str.buffer)
                 break;
             }
             default: {

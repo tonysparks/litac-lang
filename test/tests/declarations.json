@@ -1,41 +1,40 @@
 {
-    description: "Tests Declarations",
-    disableLines: true,
-    program: '''                
+    "description": "Tests Declarations",
+    "program": `
         @include("assert.h");
         @foreign func assert(e:bool):void;
-        
+
         %definitions%
-        
+
         func main(len:i32, args:**char):i32 {
-            %test%
+            %code%
         }
-    '''
-    tests: [        
+    `,
+    "tests": [
         {
-            name: "Primatives",
-            code: '''
+            "name": "Primatives",
+            "code": `
                 var i = 32
                 assert( i == 32 )
-                
+
                 var j = 64_i64
                 assert( j == 64_i64 )
-                
+
                 var b = false
                 assert( !b )
                 b = true
                 assert(b)
-                
+
                 var f = 45.756
                 assert(f == 45.756)
-                
+
                 var d = 245.756_f64
                 assert(d == 245.756_f64)
-                
-                var p = "hello"             
+
+                var p = "hello"
                 assert(p)
                 assert(p[0] == 'h')
-                
+
                 var index = p
                 var k = 0
                 while (*index) {
@@ -43,596 +42,596 @@
                     index += 1
                     k += 1
                 }
-                  
-            '''
-        }, 
+
+            `
+        },
         {
-            name: "Float parse",
-            definitions: '''
-                  
-            ''',                       
-            code: '''                
-                
+            "name": "Float parse",
+            "definitions": `
+
+            `,
+            "code": `
+
                 var x = 0f
                 assert(x == 0_f32)
-                
+
                 var x2 = 0.5f
                 assert(x2 == 0.5_f32)
-                
+
                 var x3 = 1.5F
                 assert(x3 == 1.5_f32)
 
-            '''                      
+            `
         },
         {
-            name: "Double parse",
-            definitions: '''
-                  
-            ''',                       
-            code: '''                
-                
+            "name": "Double parse",
+            "definitions": `
+
+            `,
+            "code": `
+
                 var x = 0d
                 assert(x == 0_f64)
-                
+
                 var x2 = 0.5d
                 assert(x2 == 0.5_f64)
-                
+
                 var x3 = 1.5D
                 assert(x3 == 1.5_f64)
 
-            '''                      
+            `
         },
         {
-            name: "Floating point Number literal default type",
-            definitions: '''
-                  
-            ''',                       
-            code: '''                
-                
+            "name": "Floating point Number literal default type",
+            "definitions": `
+
+            `,
+            "code": `
+
                 var x = 0.0
                 assert(x == 0_f64)
-                
+
                 var x2 = 1000.0
-                assert(x2 == 1_000_f64)                
-            '''                      
+                assert(x2 == 1_000_f64)
+            `
         },
         {
-            name: "Implicit conversions int to float",
-            definitions: '''                
-                
-                            
-            ''',            
-            code: '''
+            "name": "Implicit conversions int to float",
+            "definitions": `
+
+
+            `,
+            "code": `
                 var x : f32 = 10_i32
                 assert(x == 10.0f)
-                 
-            '''
+
+            `
         },
         {
-            name: "Implicit conversions float to int",
-            definitions: '''                
-                
-                            
-            ''',            
-            code: '''
+            "name": "Implicit conversions float to int",
+            "definitions": `
+
+
+            `,
+            "code": `
                 var f : i32 = 10_f32
-            ''',
-            error: "'i32' is not of type 'f32'"
+            `,
+            "error": "'f32' can't be assigned to 'i32'"
         },
         {
-            name: "Implicit conversions param",
-            definitions: '''                
+            "name": "Implicit conversions param",
+            "definitions": `
                 func test(i:i64) : i64 {
                     return i
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 assert(test(4) == 4_i64)
-            ''',
-            
-        }, 
+            `,
+
+        },
         {
-            name: "Implicit cast binary expr",                       
-            code: '''
+            "name": "Implicit cast binary expr",
+            "code": `
                 var x : i32 = 10
                 var a : f32 = x / 2.0f
-                
+
                 assert(a == 5.0f)
-            ''',
+            `,
         },
         {
-            name: "Ptr type array", 
-            definitions: '''
-                                
-            ''',                       
-            code: '''
+            "name": "Ptr type array",
+            "definitions": `
+
+            `,
+            "code": `
                 const t = [2] i32 { 4, 5 };
                 const z = *t;
-                 assert(z == 4)              
-            ''',
-        },        
-        {
-            name: "Ptr to array", 
-            definitions: '''
-                                
-            ''',                       
-            code: '''
-                const t = &[2] i32 { 4, 5 };
-                const z = *t[0];
-                assert(z == 4)              
-            ''',
+                 assert(z == 4)
+            `,
         },
         {
-            name: "Array assign inference", 
-            definitions: '''
-                                
-            ''',                       
-            code: '''
+            "name": "Ptr to array",
+            "definitions": `
+
+            `,
+            "code": `
+                const t = &[2] i32 { 4, 5 };
+                const z = *t[0];
+                assert(z == 4)
+            `,
+        },
+        {
+            "name": "Array assign inference",
+            "definitions": `
+
+            `,
+            "code": `
                 const t = [2] i32 { 4, 5 };
                 const z = t;
                 assert(z[0] == 4)
                 assert(z[1] == 5)
-            ''',
+            `,
         },
         {
-            name: "Array assign", 
-            definitions: '''
-                                
-            ''',                       
-            code: '''
+            "name": "Array assign",
+            "definitions": `
+
+            `,
+            "code": `
                 const t : [2] i32 = [2] i32 { 4, 5 };
                 const z = t;
                 assert(z[0] == 4)
                 assert(z[1] == 5)
-            ''',
+            `,
         },
         {
-            name: "Casts",
-            definitions: '''
+            "name": "Casts",
+            "definitions": `
                 struct T {
                     v: i32
                 }
-                
+
                 struct X<T> {
                     v: T
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 var i : i64 = 32 as (i64) + 45_i64
                 assert( i == 77_i64 )
-                
-                
+
+
                 i = 2_i64*32 as (i64) + 45_i64
                 assert( i == 109_i64 )
 
-                
+
                 var t = T { 4}
                 var x = X<i32> {44} as (X<i32>)
-                  
-            '''
-        }, 
-        {
-            name: "Cast CharArray to VoidPtr", 
-            definitions: '''
-                func test(v: *void) {
-                }
-                
-            ''',                       
-            code: '''
-                var c = [4] char{'\0', '\0', '\0', '\0'};
-                test(c as (*void))
-            ''',
+
+            `
         },
         {
-            name: "Invalid struct Casts",
-            definitions: '''                
+            "name": "Cast CharArray to VoidPtr",
+            "definitions": `
+                func test(v: *void) {
+                }
+
+            `,
+            "code": `
+                var c = [4] char{'\0', '\0', '\0', '\0'};
+                test(c as (*void))
+            `,
+        },
+        {
+            "name": "Invalid struct Casts",
+            "definitions": `
                 struct X<T> {
                     v: T
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 var x = X<i32> {44} as (X<f32>)
-                  
-            ''',
-            error: "'struct X<f32>' can't be casted to 'struct X<i32>'"
+
+            `,
+            "error": "'X<i32>' can't be casted to 'X<f32>'"
         },
         {
-            name: "Invalid union Casts",
-            definitions: '''                
+            "name": "Invalid union Casts",
+            "definitions": `
                 union X<T> {
                     v: T
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 var x = X<i32> {44} as (X<f32>)
-                  
-            ''',
-            error: "'union X<f32>' can't be casted to 'union X<i32>'"
+
+            `,
+            "error": "'X<i32>' can't be casted to 'X<f32>'"
         },
-        
+
         {
-            name: "Enum",
-            definitions: '''                
+            "name": "Enum",
+            "definitions": `
                 enum TypeInfo {
                     Int = 0,
                     Float,
                     Double
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 var x: TypeInfo = TypeInfo.Int
-                assert(x == TypeInfo.Int)  
-            '''
+                assert(x == TypeInfo.Int)
+            `
         },
         {
-            name: "Enum SizeOf",
-            definitions: '''                
+            "name": "Enum SizeOf",
+            "definitions": `
                 enum TypeInfo {
                     Int = 0,
                     Float,
                     Double
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 var x: TypeInfo = TypeInfo.Int
                 assert(sizeof(x) == 4)
                 assert(sizeof(TypeInfo.Int) == 4)
-            '''
+            `
         },
         {
-            name: "Enum different args",
-            definitions: '''                
+            "name": "Enum different args",
+            "definitions": `
                 enum TypeInfo {
                     Int = 12,
                     Float = 54,
                     Double = 166
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 var x = TypeInfo.Int
                 var y = TypeInfo.Float as (i32)
-                assert(x == TypeInfo.Int)  
+                assert(x == TypeInfo.Int)
                 assert(y == 54)
                 assert(TypeInfo.Int as (i32) == 12)
                 assert(TypeInfo.Float as (i32) == 54)
                 assert(TypeInfo.Double as (i32) == 166)
-            '''
+            `
         },
         {
-            name: "Enum in struct",
-            definitions: '''    
-                struct Type {           
+            "name": "Enum in struct",
+            "definitions": `
+                struct Type {
                     enum TypeInfo {
                         Int = 12,
                         Float = 54,
                         Double = 166
                     }
                 }
-                            
-            ''',            
-            code: '''
+
+            `,
+            "code": `
                 var x = Type{TypeInfo.Int}
                 var y = TypeInfo.Float as (i32)
                 assert(x.TypeInfo == TypeInfo.Int)
-            '''
+            `
         },
         {
-            name: "Constant",                   
-            code: '''
-                const x = 1024              
+            "name": "Constant",
+            "code": `
+                const x = 1024
                 assert(x == 1024)
-            '''
+            `
         },
         {
-            name: "Invalid Constant reassign",                  
-            code: '''
+            "name": "Invalid Constant reassign",
+            "code": `
                 const x = 1024
                 x = 10
                 assert(x == 1024)
-            ''',
-            error: "can't reassign constant variable 'x'"
+            `,
+            "error": "can't reassign constant variable 'x'"
         },
         {
-            name: "Typedef primitives",
-            definitions: '''                
+            "name": "Typedef primitives",
+            "definitions": `
                 typedef i32 as int;
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 var b : int = 1
-                assert(b == 1)                                               
-            '''                      
+                assert(b == 1)
+            `
         },
         {
-            name: "Typedef struct",
-            definitions: '''
+            "name": "Typedef struct",
+            "definitions": `
                 typedef i32 as int;
                 struct X {a:int}
-                typedef X as Y;    
-                            
-            ''',                       
-            code: '''                
+                typedef X as Y;
+
+            `,
+            "code": `
                 var y  = Y{1}
                 var x  = X{2}
                 assert(y.a == 1)
-                assert(x.a == 2)                                               
-            '''                      
+                assert(x.a == 2)
+            `
         },
         {
-            name: "Typedef struct generics",
-            definitions: '''
+            "name": "Typedef struct generics",
+            "definitions": `
                 struct X<T> {a:T}
-                typedef X<i32> as Y;    
-                            
-            ''',                       
-            code: '''                
+                typedef X<i32> as Y;
+
+            `,
+            "code": `
                 var y  = Y{1}
                 assert(y.a == 1)
-            '''                      
+            `
         },
         {
-            name: "Typedef func",
-            definitions: '''
+            "name": "Typedef func",
+            "definitions": `
                 func test(i:i32) : i32 {
                     return i;
                 }
-                
-                typedef test as test2;    
-                            
-            ''',                       
-            code: '''                
+
+                typedef test as test2;
+
+            `,
+            "code": `
                 assert(test2(1) == 1)
-            '''                      
+            `
         },
         {
-            name: "Typedef func generics",
-            definitions: '''
+            "name": "Typedef func generics",
+            "definitions": `
                 func test<T>(i:T) : T {
                     return i;
                 }
-                
-                typedef test<i32> as test2;    
-                            
-            ''',                       
-            code: '''                
+
+                typedef test<i32> as test2;
+
+            `,
+            "code": `
                 assert(test2(1) == 1)
-            '''                      
+            `
         },
         {
-            name: "Func type",
-            definitions: '''
+            "name": "Func type",
+            "definitions": `
                 func test(i:i32) : i32 {
                     return i;
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 var t : func(i32) : i32 = &test;
                 assert(t(1) == 1)
-            '''                      
+            `
         },
         {
-            name: "Func type as return type",
-            definitions: '''
+            "name": "Func type as return type",
+            "definitions": `
                 func test(i:i32) : i32 {
                     return i;
                 }
-                    
+
                 func x() : func(i32) : i32 {
                     return &test
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 var t : func(i32) : i32 = x();
                 assert(t(1) == 1)
-            '''                      
+            `
         },
         {
-            name: "Func type as argument and return type",
-            definitions: '''
+            "name": "Func type as argument and return type",
+            "definitions": `
                 func test(i:i32) : i32 {
                     return i;
                 }
-                    
+
                 func x(f : func(i32):i32) : func(i32) : i32 {
                     return f
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 var t : func(i32) : i32 = x(&test);
                 assert(t(1) == 1)
-            '''                      
+            `
         },
         {
-            name: "Func type in struct",
-            definitions: '''
+            "name": "Func type in struct",
+            "definitions": `
                 func test(i:i32) : i32 {
                     return i;
                 }
-                    
+
                 struct Test {
                     a: func(i32) : i32
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 var t = Test { &test }
                 assert(t.a(1) == 1)
-            '''                      
+            `
         },
         {
-            name: "Func type in union",
-            definitions: '''
+            "name": "Func type in union",
+            "definitions": `
                 func test(i:i32) : i32 {
                     return i;
                 }
-                    
+
                 union Test {
                     a: func(i32) : i32
                     b: *void
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 var t = Test { .a: &test }
                 assert(t.a(1) == 1)
-            '''                      
+            `
         },
         {
-            name: "Fix sizeof and as bug",
-            definitions: '''
+            "name": "Fix sizeof and as bug",
+            "definitions": `
                 func t(i:i64) : i64 {
                     return i
                 }
-            ''',                       
-            code: '''                
+            `,
+            "code": `
                 var ln = 2_i64;
                 const n = t(sizeof(:char) as (i64) * (ln + 1_i64)) as (i32);
                 assert(n);
-            ''',
+            `,
         },
         {
-            name: "Function Default Arguments",
-            definitions: '''
+            "name": "Function Default Arguments",
+            "definitions": `
                 func t(i:i32 = 2) : i32 {
                     return i
                 }
-            ''',                       
-            code: '''                
+            `,
+            "code": `
                 assert(t(4) == 4);
                 assert(t()  == 2);
-            ''',
+            `,
         },
         {
-            name: "Invalid Function Default Arguments",
-            definitions: '''
+            "name": "Invalid Function Default Arguments",
+            "definitions": `
                 func t(i:i32 = 2, j:i32) : i32 {
                     return i
                 }
-            ''',                       
-            code: '''                
+            `,
+            "code": `
                 assert(false);
-            ''',
-            error: "'t' must have default arguments defined last"
+            `,
+            "error": "'t' must have default arguments defined last"
         },
         {
-            name: "Function Default Arguments null",
-            definitions: '''
+            "name": "Function Default Arguments null",
+            "definitions": `
                 func t(i:*i32 = null) : i32 {
                     if(!i) return 2;
                     return *i
                 }
-            ''',                       
-            code: '''                
+            `,
+            "code": `
                 var n = 4;
                 assert(t(&n) == 4);
                 assert(t()  == 2);
-            ''',
+            `,
         },
         {
-            name: "Function Default Arguments string",
-            definitions: '''
+            "name": "Function Default Arguments string",
+            "definitions": `
                 @include("string.h");
-                @foreign func strcmp(a:*char, b:*char) : i32;
-                
-                func t(i:*char = "bye") : *char {
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                func t(i:*const char = "bye") : *const char {
                     return i
                 }
-            ''',                       
-            code: '''                
+            `,
+            "code": `
                 assert(strcmp(t("hi"), "hi") == 0);
                 assert(strcmp(t(), "bye") == 0);
-            ''',
+            `,
         },
         {
-            name: "Function Default Arguments constant",
-            definitions: '''
+            "name": "Function Default Arguments constant",
+            "definitions": `
                 const X = 2
                 func t(i:i32 = X) : i32 {
                     return i
                 }
-            ''',                       
-            code: '''                
+            `,
+            "code": `
                 assert(t(4) == 4);
                 assert(t()  == 2);
-            ''',
+            `,
         },
         {
-            name: "Foreign Alias function",
-            definitions: '''
+            "name": "Foreign Alias function",
+            "definitions": `
                 @include("<string.h>");
-                
-                @foreign("strcmp") 
-                func stringCompare(a:*char, b:*char) : i32;
-            ''',                       
-            code: '''                
+
+                @foreign("strcmp")
+                func stringCompare(a:*const char, b:*const char) : i32;
+            `,
+            "code": `
                 assert(stringCompare("hi", "bye") != 0);
                 assert(stringCompare("hi", "hi") == 0);
-            ''',
+            `,
         },
         {
-            name: "Foreign Alias Const",
-            definitions: '''
+            "name": "Foreign Alias Const",
+            "definitions": `
                 @include("<stdio.h>");
-                
-                @foreign("SEEK_END") 
-                var END : i32; 
-            ''',                       
-            code: '''   
-                assert(END == 2)             
-            ''',
+
+                @foreign("SEEK_END")
+                var END : i32;
+            `,
+            "code": `
+                assert(END == 2)
+            `,
         },
         {
-            name: "Foreign Alias Struct",
-            definitions: '''
+            "name": "Foreign Alias Struct",
+            "definitions": `
                 @include("<stdio.h>");
-                
-                @foreign("FILE") 
-                struct File; 
-                
-                @foreign public func fopen(fileName:*char, openType:*char) : *File;
-            ''',                       
-            code: '''   
-                var t: *File = fopen("../examples/hello_world.lita", "r")
-                assert(t != null)             
-            ''',
+
+                @foreign("FILE")
+                struct File;
+
+                @foreign public func fopen(filename:*const char, openType:*const char) : *File;
+            `,
+            "code": `
+                var t: *File = fopen("doesntexist.txt", "r")
+                assert(t == null)
+            `,
         },
         {
-            name: "Array Designator",
-            definitions: '''
-            
-            ''',                       
-            code: '''   
+            "name": "Array Designator",
+            "definitions": `
+
+            `,
+            "code": `
                 var t = [256]i32 {
                     [0] = 2,
                     [128] = 1
                 }
                 assert(t[0] == 2);
                 assert(t[128] == 1);
-                
+
                 for(var i = 0; i < 256; i +=1) {
                     if(i == 0 || i == 128) {
                         continue;
                     }
                     assert(t[i] == 0)
-                }             
-            ''',
+                }
+            `,
         },
         {
-            name: "Array Designator with constant",
-            definitions: '''
-            
-            ''',                       
-            code: '''   
+            "name": "Array Designator with constant",
+            "definitions": `
+
+            `,
+            "code": `
                 const I = 0;
                 const Y = 128;
                 var t = [256]i32 {
@@ -641,162 +640,163 @@
                 }
                 assert(t[0] == 2);
                 assert(t[128] == 1);
-                
+
                 for(var i = 0; i < 256; i +=1) {
                     if(i == 0 || i == 128) {
                         continue;
                     }
                     assert(t[i] == 0)
-                }             
-            ''',
+                }
+            `,
         },
         {
-            name: "Array Designator with enum",
-            definitions: '''
+            "name": "Array Designator with enum",
+            "definitions": `
                 enum Index {
                     I = 2,
                     Y = 1
                 }
-            ''',                       
-            code: '''   
+            `,
+            "code": `
                 var t = [256]i32 {
                     [Index.I] = 2,
                     [Index.Y] = 1
                 }
                 assert(t[Index.I] == 2);
                 assert(t[Index.Y] == 1);
-                
+
                 for(var i = 0; i < 256; i +=1) {
                     if(i == Index.I || i == Index.Y) {
                         continue;
                     }
                     assert(t[i] == 0)
-                }             
-            ''',
+                }
+            `,
         },
         {
-            name: "Array Designator with variable",
-            definitions: '''
+            "name": "Array Designator with variable",
+            "definitions": `
                 var index = 0
                 var index2 = 128
-            ''',                       
-            code: '''   
+            `,
+            "code": `
                 var t = [256]i32 {
                     [index] = 2,
                     [index2] = 1
                 }
                 assert(t[0] == 2);
                 assert(t[128] == 1);
-                
+
                 for(var i = 0; i < 256; i +=1) {
                     if(i == 0 || i == 128) {
                         continue;
                     }
                     assert(t[i] == 0)
-                }             
-            ''',
-            error: "must be a constant"
+                }
+            `,
+            "error": "must be a constant"
         },
         {
-            name: "Array NonDesignator",
-            definitions: '''
-                
-            ''',                       
-            code: '''   
+            "name": "Array NonDesignator",
+            "definitions": `
+
+            `,
+            "code": `
                 var t = [1][2]i32 {
                     [2]i32 { 1, 2 }
                 }
                 assert(t[0][0] == 1);
-                assert(t[0][1] == 2);             
-            ''',
+                assert(t[0][1] == 2);
+            `,
         },
         {
-            name: "For loops",
-            definitions: '''
-                
-            ''',                       
-            code: '''   
+            "name": "For loops",
+            "definitions": `
+
+            `,
+            "code": `
                 var t = [1]i32 {
                     0
                 }
-                
+
                 var iterations = 0;
                 for(var i = 0; i < 1; i+=1) {
                     iterations += 1
                 }
-                
+
                 assert(iterations == 1);
-                
+
                 iterations = 0;
                 var i =0;
                 for(; i < 1; i+=1) {
                     iterations += 1
                 }
-                
+
                 assert(iterations == 1);
-                
+
                 iterations = 0;
                 i = 0;
                 for(;; i+=1) {
                     if(i >= 2) break;
                     iterations += 1
-                }             
-                
+                }
+
                 assert(iterations == 2);
-                
+
                 iterations = 0;
                 i = 0;
                 for(;;) {
                     if(i >= 2) break;
                     i += 1;
                     iterations += 1
-                }             
-                
+                }
+
                 assert(iterations == 2);
-            ''',
+            `,
         },
         {
-            name: "Struct DuplicateFieldNames",
-            definitions: '''
+            "name": "Struct DuplicateFieldNames",
+            "definitions": `
                 struct X {
                     x: i32
                     x: f32
                 }
-            ''',                       
-            code: '''   
-                             
-            ''',
-            error: "duplicate member 'x'"
+            `,
+            "code": `
+
+            `,
+            "error": "duplicate member 'x'"
         },
         {
-            name: "Enum DuplicateFieldNames",
-            definitions: '''
+            "name": "Enum DuplicateFieldNames",
+            "definitions": `
                 enum X {
                     x,
                     x
                 }
-            ''',                       
-            code: '''   
-                             
-            ''',
-            error: "duplicate member 'x'"
+            `,
+            "code": `
+
+            `,
+            "error": "duplicate member 'x'"
         },
         {
-            name: "Union DuplicateFieldNames",
-            definitions: '''
+            "name": "Union DuplicateFieldNames",
+            "definitions": `
                 union X {
                     x: i32
                     x: f32
                 }
-            ''',                       
-            code: '''   
-                             
-            ''',
-            error: "duplicate member 'x'"
+            `,
+            "code": `
+
+            `,
+            "error": "duplicate member 'x'"
         },
+
         {
-            name: "UsingStruct",
-            definitions: '''
+            "name": "UsingStruct",
+            "definitions": `
                 struct Vec {
                     x: f32
                     y: f32
@@ -805,22 +805,22 @@
                     pos: using Vec
                     type: i32
                 }
-            ''',                       
-            code: '''   
+            `,
+            "code": `
                 var e = Entity{.pos: Vec{1.0f,2.0f}, .type: 1};
                 assert(e.x == 1.0f);
                 assert(e.y == 2.0f);
-                
+
                 e.x = 3.0f;
                 e.y = 4.0f;
-                
+
                 assert(e.x == 3.0f);
                 assert(e.y == 4.0f);
-            ''',            
+            `,
         },
         {
-            name: "UsingStruct with conflict",
-            definitions: '''
+            "name": "UsingStruct with conflict",
+            "definitions": `
                 struct Vec {
                     x: f32
                     y: f32
@@ -829,19 +829,19 @@
                     pos: using Vec
                     x: i32
                 }
-            ''',                       
-            code: '''   
+            `,
+            "code": `
                 assert(false);
-            ''', 
-            error: "duplicate member 'x' in 'Entity' and 'Vec'"           
+            `,
+            "error": "duplicate member 'x' in 'Entity' and 'Vec'"
         },
         {
-            name: "UsingStructDeep",
-            definitions: '''
+            "name": "UsingStructDeep",
+            "definitions": `
                 struct X {
                     x:f32
                 }
-                
+
                 struct Vec {
                     e: using X
                     y: f32
@@ -850,26 +850,26 @@
                     type: i32
                     pos: using Vec
                 }
-            ''',                       
-            code: '''   
+            `,
+            "code": `
                 var e = Entity{.pos: Vec{ .e: X{1.0f} ,2.0f}, .type: 1};
                 assert(e.x == 1.0f);
                 assert(e.y == 2.0f);
-                
+
                 e.x = 3.0f;
                 e.y = 4.0f;
-                
+
                 assert(e.x == 3.0f);
                 assert(e.y == 4.0f);
-            ''',            
+            `,
         },
         {
-            name: "UsingStructDeepPointer",
-            definitions: '''
+            "name": "UsingStructDeepPointer",
+            "definitions": `
                 struct X {
                     x:f32
                 }
-                
+
                 struct Vec {
                     e: using *X
                     y: f32
@@ -878,228 +878,229 @@
                     type: i32
                     pos: using Vec
                 }
-            ''',                       
-            code: '''   
+            `,
+            "code": `
                 var xx = X{1.0f};
                 var e = Entity{.pos: Vec{ .e: &xx ,2.0f}, .type: 1};
                 assert(e.x == 1.0f);
                 assert(e.y == 2.0f);
-                
+
                 e.x = 3.0f;
                 e.y = 4.0f;
-                
+
                 assert(e.x == 3.0f);
                 assert(e.y == 4.0f);
-            ''',            
+            `,
         },
-        { 
-            name: "Struct Independent declaration",
-            definitions: '''
+        {
+            "name": "Struct Independent declaration",
+            "definitions": `
                 struct A {
                     x : B
                 }
                 struct B {
                     y : i32
                 }
-            ''',                       
-            code: '''                           
+            `,
+            "code": `
                 var a = A {
                     .x: B {4}
                 }
-                
+
                 assert(a.x.y == 4)
-            ''',                      
+            `,
         },
-        { 
-            name: "Struct Independent declaration Pointer",
-            definitions: '''
+        {
+            "name": "Struct Independent declaration Pointer",
+            "definitions": `
                 struct A {
                     x : *B
                 }
                 struct B {
                     y : i32
                 }
-            ''',                       
-            code: '''                           
+            `,
+            "code": `
                 var a = A {
                     .x: &B {4}
                 }
-                
+
                 assert(a.x.y == 4)
-            ''',                      
+            `,
         },
-        { 
-            name: "Var Independent declaration",
-            definitions: '''                
+        {
+            "name": "Var Independent declaration",
+            "definitions": `
                 var b = B{14}
                 var a = A {
                     .x: B {4}
                 }
-                
+
                 struct A {
                     x : B
                 }
                 struct B {
                     y : i32
                 }
-            ''',                       
-            code: '''                           
+            `,
+            "code": `
                 assert(a.x.y == 4)
                 assert(b.y == 14)
-            ''',                      
+            `,
         },
-        { 
-            name: "Var Independent declaration pointer",
-            definitions: '''                
+        {
+            "name": "Var Independent declaration pointer",
+            "definitions": `
                 var b = B{14}
                 var a = A {
                     .x: &B {4}
                 }
-                
+
                 struct A {
                     x : *B
                 }
                 struct B {
                     y : i32
                 }
-            ''',                       
-            code: '''                           
+            `,
+            "code": `
                 assert(a.x.y == 4)
                 assert(b.y == 14)
-            ''',                      
+            `,
         },
-        { 
-            name: "Func Independent declaration pointer",
-            definitions: '''
+        {
+            "name": "Func Independent declaration pointer",
+            "definitions": `
                 func test(a: A) : i32 {
                     return a.x.y;
-                }                
-                                
+                }
+
                 struct A {
                     x : *B
                 }
                 struct B {
                     y : i32
                 }
-            ''',                       
-            code: '''            
+            `,
+            "code": `
                 var a = A {
                     .x: &B {4}
-                }                           
-                assert(test(a) == 4)                                
-            ''',                      
+                }
+                assert(test(a) == 4)
+            `,
         },
-        { 
-            name: "Func Independent declaration",
-            definitions: '''
+        {
+            "name": "Func Independent declaration",
+            "definitions": `
                 func test(a: A) : i32 {
                     return a.x.y;
-                }                
-                                
+                }
+
                 struct A {
                     x : B
                 }
                 struct B {
                     y : i32
                 }
-            ''',                       
-            code: '''            
+            `,
+            "code": `
                 var a = A {
                     .x: B {4}
-                }                           
-                assert(test(a) == 4)                                
-            ''',                      
+                }
+                assert(test(a) == 4)
+            `,
         },
-        { 
-            name: "Func Independent declaration Generics",
-            definitions: '''
+        {
+            "name": "Func Independent declaration Generics",
+            "definitions": `
                 func test<T>(a: T) : i32 {
                     return a.x.y;
-                }                
-                                
+                }
+
                 struct A {
                     x : B
                 }
                 struct B {
                     y : i32
                 }
-            ''',                       
-            code: '''            
+            `,
+            "code": `
                 var a = A {
                     .x: B {4}
-                }                           
-                assert(test<A>(a) == 4)                                
-            ''',                      
+                }
+                assert(test<A>(a) == 4)
+            `,
         },
-        { 
-            name: "Var Independent declaration Generics",
-            definitions: '''                
+        {
+            "name": "Var Independent declaration Generics",
+            "definitions": `
                 var b = B<i32>{14}
                 var a = A<B<i32>> {
                     .x: B<i32> {4}
                 }
-                
+
                 struct A<T> {
                     x : T
                 }
                 struct B<T> {
                     y : T
                 }
-            ''',                       
-            code: '''                           
+            `,
+            "code": `
                 assert(a.x.y == 4)
                 assert(b.y == 14)
-            ''',                      
+            `,
         },
-        { 
-            name: "Func arg using",
-            definitions: '''                
+///////////////////////////////
+        {
+            "name": "Func arg using",
+            "definitions": `
                 func test(a : using A) : i32 {
                     return x
                 }
                 struct A {
                     x : i32
                 }
-                
-            ''',                       
-            code: '''                           
+
+            `,
+            "code": `
                 assert(test( A{.x: 4}) == 4)
-            ''',                      
+            `,
         },
-        { 
-            name: "Func arg pointer using",
-            definitions: '''                
+        {
+            "name": "Func arg pointer using",
+            "definitions": `
                 func test(a : using *A) : i32 {
                     return x
                 }
                 struct A {
                     x : i32
                 }
-                
-            ''',                       
-            code: '''                           
+
+            `,
+            "code": `
                 assert(test( &A{.x: 4}) == 4)
-            ''',                      
+            `,
         },
-        { 
-            name: "Invalid Func arg using",
-            definitions: '''                
+        {
+            "name": "Invalid Func arg using",
+            "definitions": `
                 func test(a : using **A) : i32 {
                     return 1
                 }
                 struct A {
                     x : i32
                 }
-                
-            ''',                       
-            code: '''                           
 
-            ''', 
-            error: "'a' is not an aggregate type (or pointer to an aggregate), can't use 'using'"                     
+            `,
+            "code": `
+
+            `,
+            "error": "invalid 'using' parameter 'a', only aggregate types (or pointer to an aggregate) are allowed"
         },
-        { 
-            name: "Func arg scoped shadow using",
-            definitions: '''   
+        {
+            "name": "Func arg scoped shadow using",
+            "definitions": `
                 func test(a : using *A) : i32 {
                     var x = 43
                     return x
@@ -1107,17 +1108,17 @@
                 struct A {
                     x : i32
                 }
-                
-            ''',                       
-            code: '''      
+
+            `,
+            "code": `
                 var x = test(&A{.x: 4});
                 assert(x == 43)
-            ''', 
-            error: "symbol 'x' already defined"
+            `,
+            "error": "symbol 'x' already defined"
         },
-        { 
-            name: "Func arg scoped shadow scoping using",
-            definitions: '''                
+        {
+            "name": "Func arg scoped shadow scoping using",
+            "definitions": `
                 func test(a : using *A) : i32 {
                     {var x = 43}
                     return x
@@ -1125,15 +1126,15 @@
                 struct A {
                     x : i32
                 }
-                
-            ''',                       
-            code: '''                           
+
+            `,
+            "code": `
                 assert(test( &A{.x: 4}) == 4)
-            ''', 
+            `,
         },
-        { 
-            name: "Func arg scoped shadow scoping using with embedded using",
-            definitions: '''                
+        {
+            "name": "Func arg scoped shadow scoping using with embedded using",
+            "definitions": `
                 func test(a : using A) : i32 {
                     return y
                 }
@@ -1143,15 +1144,15 @@
                 struct B {
                     y : i32
                 }
-                
-            ''',                       
-            code: '''  
+
+            `,
+            "code": `
                 assert(test(A{.x: B{.y: 4}}) == 4)
-            ''', 
+            `,
         },
-        { 
-            name: "Func arg scoped shadow scoping using with embedded using use fullpath",
-            definitions: '''                
+        {
+            "name": "Func arg scoped shadow scoping using with embedded using use fullpath",
+            "definitions": `
                 func test(a : using A) : i32 {
                     return a.x.y
                 }
@@ -1161,416 +1162,417 @@
                 struct B {
                     y : i32
                 }
-                
-            ''',                       
-            code: '''  
+
+            `,
+            "code": `
                 assert(test(A{.x: B{.y: 4}}) == 4)
-            ''', 
+            `,
         },
-        { 
-            name: "Const Ptr",
-            definitions: '''                
-                
-            ''',                       
-            code: '''  
+        {
+            "name": "Const Ptr",
+            "definitions": `
+
+            `,
+            "code": `
                 var t : *const char = "Hello";
                 assert(t)
-            ''', 
+            `,
         },
-        
-        { 
-            name: "Invalid Const assign to nonconst",
-            definitions: '''         
-                
-            ''',                       
-            code: '''  
+
+        {
+            "name": "Invalid Const assign to nonconst",
+            "definitions": `
+
+            `,
+            "code": `
                 var t : *const char = "Hello"
-                var x : *char = t                
-            ''', 
-            error: "'*char' is not of type '*const char'"
-        },
-        { 
-            name: "Assign no const",
-            definitions: '''         
-                
-            ''',                       
-            code: '''  
-                var t : *char = "Hello"
                 var x : *char = t
-                assert(t == x)                
-            ''',             
+            `,
+            "error": "'*const char' can't be assigned to '*char'"
         },
-        { 
-            name: "ArrayInt const",
-            definitions: '''         
-                
-            ''',                       
-            code: '''  
-                var t : [3]const i32 = []const i32{1,2,3}                               
-            ''',             
+        {
+            "name": "Assign const to const",
+            "definitions": `
+
+            `,
+            "code": `
+                var t : *const char = "Hello"
+                var x : *const char = t
+                assert(t == x)
+            `,
         },
-        { 
-            name: "PtrInt const",
-            definitions: '''         
-                
-            ''',                       
-            code: '''  
+        {
+            "name": "ArrayInt const",
+            "definitions": `
+
+            `,
+            "code": `
+                var t : [3]const i32 = []const i32{1,2,3}
+            `,
+        },
+        {
+            "name": "PtrInt const",
+            "definitions": `
+
+            `,
+            "code": `
                 // doesn't work - disallow?
-                var t : *const i32 = []const i32{1,2,3} as (*const i32)                               
-            ''',             
+                var t : *const i32 = []const i32{1,2,3} as (*const i32)
+            `,
         },
-        { 
-            name: "Func Const Ptr Param",
-            definitions: '''         
-                // TODO Return param       
+        {
+            "name": "Func Const Ptr Param",
+            "definitions": `
+                // TODO Return param
                 func test(a: *const char) : *const char {
                     return a
                 }
-            ''',                       
-            code: '''  
+            `,
+            "code": `
                 var t = test("Hello")
                 assert(t)
-            ''', 
+            `,
         },
-        { 
-            name: "Array Ptr assign",
-            definitions: '''         
+        {
+            "name": "Array Ptr assign",
+            "definitions": `
                 @include("<stdlib.h>");
-                @foreign public func malloc(size: u64) : *void;
-            ''',                       
-            code: '''  
+                @foreign public func malloc(size: usize) : *void;
+            `,
+            "code": `
                 var t = malloc( sizeof(:char) * 3_u64) as (*char);
                 t[0] = 'h';
                 t[1] = 'i';
                 t[2] = '\0';
-                
+
                 assert(t[0] == 'h');
                 assert(t[1] == 'i');
                 assert(t[2] == '\0');
-            ''', 
-        },       
+            `,
+        },
         {
-            name: "Verbatim String",
-            definitions: '''                
-                
-                            
-            ''',            
-            code: '''
+            "name": "Verbatim String",
+            "definitions": `
+
+
+            `,
+            "code": `
                 var x = """
                     Hello
                     There
                     "hi"
-                """        
-            '''
+                """
+            `
         },
-        
+/////////////////
         {
-            name: "Return array", 
-            definitions: '''
+            "name": "Return array",
+            "definitions": `
                 func test() : [2]u32 {
                     return []u32 { 0, 1 }
                 }
-            ''',                       
-            code: '''
+            `,
+            "code": `
                 const t = test()
-                assert(t[1] == 1)              
-            ''',
+                assert(t[1] == 1)
+            `,
         },
         {
-            name: "Array as argument", 
-            definitions: '''
+            "name": "Array as argument",
+            "definitions": `
                 func test(a: [2]u32) : [2]u32 {
                     return a
                 }
-            ''',                       
-            code: '''
+            `,
+            "code": `
                 const t = test([]u32 { 0, 1 })
-                assert(t[1] == 1)              
-            ''',
+                assert(t[1] == 1)
+            `,
         },
         {
-            name: "Struct as argument", 
-            definitions: '''
+            "name": "Struct as argument",
+            "definitions": `
                 struct A {
                     a: u32
                 }
                 func test(a: A) : A {
                     return a
                 }
-            ''',                       
-            code: '''
+            `,
+            "code": `
                 const t = test(A { 1 })
-                assert(t.a == 1)              
-            ''',
+                assert(t.a == 1)
+            `,
         },
         {
-            name: "Struct as a return", 
-            definitions: '''
+            "name": "Struct as a return",
+            "definitions": `
                 struct A {
                     a: u32
                 }
                 func test() : A {
                     return A {1}
                 }
-            ''',                       
-            code: '''
+            `,
+            "code": `
                 const t = test()
-                assert(t.a == 1)              
-            ''',
+                assert(t.a == 1)
+            `,
         },
         {
-            name: "Typedef Array as argument", 
-            definitions: '''
+            "name": "Typedef Array as argument",
+            "definitions": `
                 typedef [2]u32 as vec;
-                
+
                 func test(a: vec) : vec {
                     return a
                 }
-            ''',                       
-            code: '''
+            `,
+            "code": `
                 const t = test(vec { 0, 1 })
-                assert(t[1] == 1)              
-            ''',
+                assert(t[1] == 1)
+            `,
         },
         {
-            name: "Typedef Array as return", 
-            definitions: '''
+            "name": "Typedef Array as return",
+            "definitions": `
                 typedef [2]u32 as vec;
-                
+
                 func test() : vec {
                     return vec {0, 1}
                 }
-            ''',                       
-            code: '''
+            `,
+            "code": `
                 const t = test()
-                assert(t[1] == 1)              
-            ''',
+                assert(t[1] == 1)
+            `,
         },
         {
-            name: "Struct Initializer", 
-            definitions: '''
+            "name": "Struct Initializer",
+            "definitions": `
                 struct A {
                     b: B
                 }
-                
+
                 struct B {
                     v: u32
                 }
-                
-            ''',                       
-            code: '''
+
+            `,
+            "code": `
                 const t = A {
                     B{4}
                 }
-                assert(t.b.v == 4)              
-            ''',
-        },          
+                assert(t.b.v == 4)
+            `,
+        },
         {
-            name: "Array Initializer with Struct", 
-            definitions: '''                
+            "name": "Array Initializer with Struct",
+            "definitions": `
                 struct A {
                     v: u32
                 }
-                
-            ''',                       
-            code: '''
+
+            `,
+            "code": `
                 const t = []A {
                     A{4},
                     A{12},
                 }
-                
-                assert(t[1].v == 12)                  
-            ''',
+
+                assert(t[1].v == 12)
+            `,
         },
         {
-            name: "Global Array of Structs init in initializer",
-            definitions: '''                
+            "name": "Global Array of Structs init in initializer",
+            "definitions": `
                 struct A {
                     b: *B
                 }
-                
+
                 struct B {
                     v: i32
                 }
-                
+
                 var a = A {
                     .b = [2]B {
                         B{4},
                         B{8}
                     }
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 assert(a.b)
                 assert(a.b[0].v == 4)
-                assert(a.b[1].v == 8)                                         
-            '''                      
+                assert(a.b[1].v == 8)
+            `
         },
         {
-            name: "Global Array of primitive init in initializer",
-            definitions: '''                
+            "name": "Global Array of primitive init in initializer",
+            "definitions": `
                 struct A {
                     b: *i32
                 }
-                                
+
                 var a = A {
                     .b = [2]i32 {
                         4,
                         8
                     }
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 assert(a.b)
                 assert(a.b[0] == 4)
-                assert(a.b[1] == 8)                                         
-            '''                      
+                assert(a.b[1] == 8)
+            `
         },
         {
-            name: "Array of Structs init in initializer",
-            definitions: '''                
+            "name": "Array of Structs init in initializer",
+            "definitions": `
                 struct A {
                     z: u32
                     b: *B
                 }
-                
+
                 struct B {
                     v: i32
                 }
 
-                            
-            ''',                       
-            code: '''    
-                            
+
+            `,
+            "code": `
+
                 var a = A {
                     .z = 1,
                     .b = [2]B {
                         B{4},
                         B{8}
                     }
-                }            
+                }
                 assert(a.b)
                 assert(a.b[0].v == 4)
-                assert(a.b[1].v == 8)                                         
-            '''                      
+                assert(a.b[1].v == 8)
+            `
         },
         {
-            name: "Array of primitive init in initializer",
-            definitions: '''                
+            "name": "Array of primitive init in initializer",
+            "definitions": `
                 struct A {
                     b: *i32
                 }
-                            
-            ''',                       
-            code: '''
-                                            
+
+            `,
+            "code": `
+
                 var a = A {
                     .b = [2]i32 {
                         4,
                         8
                     }
-                }                
+                }
                 assert(a.b)
                 assert(a.b[0] == 4)
-                assert(a.b[1] == 8)                                         
-            '''                      
+                assert(a.b[1] == 8)
+            `
         },
         {
-            name: "Struct With Array Initializer", 
-            definitions: '''
+            "name": "Struct With Array Initializer",
+            "definitions": `
                 struct A {
                     b: B
                     array: *u32
                 }
-                
+
                 struct B {
                     v: u32
                 }
-                
-            ''',                       
-            code: '''
+
+            `,
+            "code": `
                 var t = A {
                     B{4},
                     .array: [2]u32 {8,12}
                 }
                 assert(t.b.v == 4)
-                assert(t.array[1] == 12)                  
-            ''',
-        },       
+                assert(t.array[1] == 12)
+            `,
+        },
+///////////////////////////////
         {
-            name: "Struct With Static Array Initializer", 
-            definitions: '''
+            "name": "Struct With Static Array Initializer",
+            "definitions": `
                 struct A {
                     b: B
                     array: [2]u32
                 }
-                
+
                 struct B {
                     v: u32
                 }
-                
-            ''',                       
-            code: '''
+
+            `,
+            "code": `
                 const t = A {
                     .b = B{4},
                     .array = [2]u32 {8, 12}
                 }
                 assert(t.b.v == 4)
-                assert(t.array[0] == 8)   
-                assert(t.array[1] == 12)                  
-            ''',
-        }, 
+                assert(t.array[0] == 8)
+                assert(t.array[1] == 12)
+            `,
+        },
         {
-            name: "Struct init in Function Call Arg",
-            definitions: '''                
+            "name": "Struct init in Function Call Arg",
+            "definitions": `
                 struct A {
                     a: i32
                 }
-                
+
                 func test(a: A) : A {
                     return a
                 }
-                
+
                 func test2(a: *A) : *A {
                     return a
                 }
-                            
-            ''',                       
-            code: '''                
+
+            `,
+            "code": `
                 assert(test(A{4}).a == 4)
                 assert(test2(&A{4}).a == 4)
-            '''                      
+            `
         },
         {
-            name: "Array init in Function Call Arg",
-            definitions: '''                
-                                
+            "name": "Array init in Function Call Arg",
+            "definitions": `
+
                 func test(a: [2]i32) : [2]i32 {
                     return a
                 }
-                
+
                 func test2(a: *i32) : *i32 {
                     return a
-                }            
-            ''',                       
-            code: '''                
+                }
+            `,
+            "code": `
                 assert(test([2]i32{4, 8})[0] == 4)
                 assert(test([2]i32{4, 8})[0] == 4)
-            '''                      
+            `
         },
         {
-            name: "Global Structs of Struct init in initializer",
-            definitions: '''                
+            "name": "Global Structs of Struct init in initializer",
+            "definitions": `
                 struct A {
                     b: B
                 }
-                
+
                 struct B {
                     v: i32
                 }
-                
+
                 var array = [1]*A {
                     [0] = &A {
                         .b = B {
@@ -1578,64 +1580,64 @@
                         }
                     }
                 }
-                        
-            ''',                       
-            code: '''
-                assert(array)                       
-                assert(array[0].b.v == 4)                                         
-            '''                      
+
+            `,
+            "code": `
+                assert(array)
+                assert(array[0].b.v == 4)
+            `
         },
         {
-            name: "Var null inference bug",
-            definitions: '''                
-                
-                            
-            ''',                       
-            code: '''                
+            "name": "Var null inference bug",
+            "definitions": `
+
+
+            `,
+            "code": `
                 var x = null
-            ''',
-            error: "invalid variable declaration, can't infer type from 'null' for 'x' variable"                      
+            `,
+            "error": "invalid variable declaration, can't infer type from 'null' for 'x' variable"
         },
         {
-            name: "Const null inference bug",
-            definitions: '''                
-                
-                            
-            ''',                       
-            code: '''                
+            "name": "Const null inference bug",
+            "definitions": `
+
+
+            `,
+            "code": `
                 const x = null
-            ''',
-            error: "invalid variable declaration, can't infer type from 'null' for 'x' variable"                      
+            `,
+            "error": "invalid variable declaration, can't infer type from 'null' for 'x' variable"
         },
         {
-            name: "Func parameter scopes",
-            definitions: '''
+            "name": "Func parameter scopes",
+            "definitions": `
                 func test(a: i32) {
                     var a = 14
                 }
-            ''',                       
-            code: '''   
-                             
-            ''',
-            error: "symbol 'a' already defined"
+            `,
+            "code": `
+
+            `,
+            "error": "symbol 'a' already defined"
         },
         {
-            name: "Func parameter scopes shadow",
-            definitions: '''
+            "name": "Func parameter scopes shadow",
+            "definitions": `
                 func test(a: i32) : i32 {
                     {
                         var a = 14
                         return a
                     }
                 }
-            ''',                       
-            code: '''   
+            `,
+            "code": `
                 assert(test(4) == 14)
-            ''',
+            `,
         },
         {
-            name: "Func with array",
-            definitions: '''
+            "name": "Func with array",
+            "definitions": `
                 struct Node {
                     x: i32
                 }
@@ -1643,29 +1645,28 @@
                     a: [32]Node
                 }
                 func Test(array: *Node, len: i32) {
-                    
+
                 }
-            ''',                       
-            code: '''
-                   
-                var obj = Object{                   
+            `,
+            "code": `
+
+                var obj = Object{
                 }
-                
+
                 Test(obj.a, 32)
-            ''',            
+            `,
         },
-        
         {
-            name: "Missing Var Reassign Type",
-            definitions: '''
+            "name": "Missing Var Reassign Type",
+            "definitions": `
                 struct Struct {
                     a: i32
                 }
-            '''
-            code: '''     
-                theVariable: Struct = Struct{4}                      
-            ''',
-            error: "can't reassign type 'Struct'"
+            `,
+            "code": `
+                theVariable: Struct = Struct{4}
+            `,
+            "error": "can't reassign type 'Struct'"
         },
     ]
 }

@@ -975,22 +975,23 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.BLOCK_STMT: {
             var stmt = s as (*BlockStmt)
-            this.pushScope(&CGenScope{})
-            defer this.popScope()
-
             this.emit("{")
-            for(var i = 0; i < stmt.stmts.size(); i += 1) {
-                var n = stmt.stmts.get(i)
-                this.emitStmt(n)
-                if(IsExpr(n)) {
-                    this.emit(";\n")
-                }
-                else {
-                    this.emit("\n")
+            {
+                this.pushScope(&CGenScope{})
+                defer this.popScope()
+
+                for(var i = 0; i < stmt.stmts.size(); i += 1) {
+                    var n = stmt.stmts.get(i)
+                    this.emitStmt(n)
+                    if(IsExpr(n)) {
+                        this.emit(";\n")
+                    }
+                    else {
+                        this.emit("\n")
+                    }
                 }
             }
-            this.emit("\n")
-            this.emit("}")
+            this.emit("\n}")
             return;
         }
         case StmtKind.BREAK_STMT: {
@@ -1106,6 +1107,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var stmt = s as (*GotoStmt)
             this.emit("goto ")
             this.emitName(stmt.label)
+            this.emit(";\n")
             return;
         }
         case StmtKind.IF_STMT: {
@@ -1142,8 +1144,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
-            this.emit(":")
             this.emitName(stmt.label)
+            this.emit(":\n")
             return;
         }
         case StmtKind.MODULE_STMT: {
@@ -1488,7 +1490,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 else if(c == '_') {
                     continue
                 }
-                else if(c == 'f' || c == 'u' || c == 'i') {
+                else if(isalpha(c)
+                    /*c == 'f' || c == 'u' || c == 'i' ||
+                      c == 'F' || c == 'U' || c == 'I'*/) {
                     break;
                 }
 

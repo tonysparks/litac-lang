@@ -165,18 +165,18 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
 
 func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
     if(aggDecl.name.str.length) {
-        this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types allowed",
+        this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types (or pointer to an aggregate) are allowed",
                                         fieldName.length, fieldName.buffer,
                                         aggDecl.name.str.length, aggDecl.name.str.buffer)
     }
     else {
-        this.result.addError(pos, "invalid 'using' member '%.*s', only aggregate types allowed",
+        this.result.addError(pos, "invalid 'using' member '%.*s', only aggregate types (or pointer to an aggregate) are allowed",
                                 fieldName.length, fieldName.buffer)
     }
 }
 
 func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
-    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types allowed",
+    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types (or pointer to an aggregate) are allowed",
                          paramDecl.name.str.length, paramDecl.name.str.buffer)
 
 }
@@ -281,7 +281,17 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                         this.errorUsingMember(aggDecl, varField.name.str, varField.startPos)
                     }
                 }
+
                 this.checkAggregateFieldDuplicate(aggDecl, varField.name.str, i)
+
+                if(varField.attributes.isUsing) {
+                    if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
+                        this.result.addError(varField.startPos, "'using' can only be used on aggregate types (or pointer to an aggregate)")
+                    }
+                    else {
+                        // TODO: Recursively check for duplicate members
+                    }
+                }
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
@@ -420,7 +430,7 @@ func (this: *TypeChecker) checkLabels() {
         var label = &this.labels[i]
         if(!label.defined) {
             assert(label.stmt != null)
-            this.result.addError(label.stmt.startPos, "'%.*s' label was not found", label.name.length, label.name.buffer)
+            this.result.addError(label.stmt.startPos, "'%.*s' label not found", label.name.length, label.name.buffer)
         }
     }
 }

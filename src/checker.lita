@@ -911,6 +911,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.GOTO_STMT: {
             var gotoStmt = stmt as (*GotoStmt)
+
             if(gotoStmt.label.type != TokenType.IDENTIFIER) {
                 return false
             }
@@ -932,7 +933,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
 
             this.numOfLabels += 1
 
-            return false;
+            return true;
         }
         case StmtKind.IF_STMT: {
             var ifStmt = stmt as (*IfStmt)

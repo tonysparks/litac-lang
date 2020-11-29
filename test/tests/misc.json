@@ -1,0 +1,1105 @@
+{
+    "description": "Misc stuff",
+    "disabled": true,
+    "debug": true,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %test%
+        }
+    `,
+    "tests": [
+
+        {
+            "name": "Str assigned to array",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    name: [32]char
+                }
+            `,
+            "code": `
+                var t = Test{
+                    .name = "Brett"
+                }
+
+                assert(strcmp(t.name, "Brett") == 0)
+            `,
+        },
+        {
+            "name": "array assigned to str",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    name: *char
+                    x: [32]char
+                }
+
+                struct X {
+                    x: [32]char
+                }
+            `,
+            "code": `
+                var m : [32]char = "Brett"
+                var x = X{m}
+                var t = Test{
+                    .name = m,
+                    .x = x.x
+
+                }
+
+                assert(strcmp(t.name, "Brett") == 0)
+            `,
+        },
+        {
+            "name": "Const char index to char",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    name: *const char
+
+                }
+            `,
+            "code": `
+                var t = Test{"Brett"}
+                var x = *t.name
+
+                assert(x == 'B')
+            `,
+        },
+        {
+            "name": "Anon Union",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+
+                struct Test {
+                    union {
+                        w: *X
+                        y: *X
+                    }
+                }
+            `,
+            "code": `
+                var x = X{4}
+                var t = Test {.w = &x}
+                var w = t.w
+                assert(w.method() == 4)
+            `,
+        },
+        {
+            "name": "Arena Allocator",
+            "definitions": `
+                import "mem";
+                import "array";
+                import "io";
+                import "map";
+                import "json";
+                import "string_buffer"
+
+            `,
+            "code": `
+                debugAllocator.init()
+                defer {
+                    debugAllocator.report();
+                    debugAllocator.free();
+                }
+
+                var arena = Arena{}
+                arena.init(4096, &debugAllocator.alloc)
+                defer {
+                    arena.free()
+                    assert(debugAllocator.allocations.empty())
+                }
+
+                var array = Array<i32>{}
+                array.init(2, &arena.alloc)
+
+                const size = 1024
+                for(var i = 0; i < size; i+=1) {
+                    array.add(i)
+                }
+
+                assert(array.size() == size)
+
+                var map = Map<*const char, i32>{}
+                map.init(0, 1, &StrHashFn, &StrEqualFn, &arena.alloc)
+
+                map.put("hi1", 421)
+                map.put("hi2", 422)
+                map.put("hi3", 423)
+                map.put("hi4", 424)
+                map.put("hi5", 425)
+
+                assert(map.size() == 5)
+
+                var parser = Parser{}
+                parser.init(&arena.alloc)
+
+                var node = parser.parseJson("""
+                    {
+                        "x" : true,
+                        "y" : false,
+                        "z" : [1,2,3]
+                    }
+                """);
+
+                var buf = StringBuffer{}
+                buf.init(1, &arena.alloc)
+                node.print(&buf)
+
+                printf("%s\n", buf.cStr())
+
+            `,
+        },
+        {
+            "name": "Arena Allocator with Default",
+            "definitions": `
+                import "mem";
+                import "array";
+                import "io";
+                import "map";
+                import "json";
+                import "string_buffer"
+
+            `,
+            "code": `
+                debugAllocator.init(cAllocator)
+                defer {
+                    debugAllocator.report();
+                    debugAllocator.free();
+                }
+
+                var arena = Arena{}
+                arena.init(4096, &debugAllocator.alloc)
+                defer {
+                    arena.free()
+                    assert(debugAllocator.allocations.empty())
+                }
+
+                defaultAllocator = (&arena.alloc) as (*const Allocator)
+
+                var array = Array<i32>{}
+                array.init(2)
+
+                const size = 1024
+                for(var i = 0; i < size; i+=1) {
+                    array.add(i)
+                }
+
+                assert(array.size() == size)
+
+                var map = Map<*const char, i32>{}
+                map.init(0, 1, &StrHashFn, &StrEqualFn)
+
+                map.put("hi1", 421)
+                map.put("hi2", 422)
+                map.put("hi3", 423)
+                map.put("hi4", 424)
+                map.put("hi5", 425)
+
+                assert(map.size() == 5)
+
+                var parser = Parser{}
+                parser.init()
+
+                var node = parser.parseJson("""
+                    {
+                        "x" : true,
+                        "y" : false,
+                        "z" : [1,2,3]
+                    }
+                """);
+
+                var buf = StringBuffer{}
+                buf.init(1)
+                node.print(&buf)
+
+                printf("%s\n", buf.cStr())
+
+            `,
+        },
+
+        {
+            "name": "Simple",
+            "definitions": `
+                import "array"
+                struct X<T> {
+                    i:T
+                }
+            `,
+            "code": `
+                var x = X{4}
+                assert(x.i == 4)
+            `
+        }
+
+
+        // Start
+
+        {
+            "name": "Generics Type Inference from Struct of Struct Generic Type multiple",
+            "definitions": `
+                struct B<Z> {
+                    b: Z
+                }
+                struct Test<X, Y> {
+                    t : B<X>
+                    v : B<Y>
+                }
+                func test<T, V>(a:Test<T, V>):T {
+                    return a.t.b
+                }
+            `,
+            "code": `
+                var t = Test<i32, *char> { B<i32>{4}, B<*char>{"hi"} }
+                assert(test<i32, *char>(t) == 4)
+            `,
+        },
+
+
+        {
+            "name": "Generics Partial",
+            "definitions": `
+                struct Test<X, Y> {
+                    x: X
+                    y: Y
+                }
+
+                func test<Y>() : Test<i32, Y> {
+                    var t = Test<i32, Y> {
+                    }
+
+                    return t
+                }
+            `,
+            "code": `
+                var t: Test<i32, f32> = test<f32>()
+                t.x = 10_i32
+                t.y = 22_f32
+
+                assert(t.x == 10_i32)
+                assert(t.y == 22_f32)
+            `,
+        },
+
+
+        {
+            "name": "Simple",
+            "definitions": `
+
+                struct Child {
+                    x: i32
+                }
+
+                struct Parent {
+                    c: Child
+                }
+
+            `,
+            "code": `
+                var p = Parent {.c = Child{4} }
+                assert(p.c.x == 4)
+            `,
+        },
+
+        {
+            "name": "Foreign funcPtr",
+            "symbolPrefix": "litaC__",
+            "definitions": `
+                @raw("""
+                // hand written
+                typedef int (*SomeFunc)(int x);
+
+                int nativeFn(SomeFunc aFn) {
+                   return aFn(4);
+                }
+                // end handwritten
+                """);
+
+                @foreign
+                func nativeFn(aFn: SomeFunc) : i32;
+
+                @foreign
+                typedef func(i32) : i32 as SomeFunc;
+
+
+                func test(x: i32) : i32 {
+                    return x
+                }
+
+                func testFn(aFn: SomeFunc) : i32 {
+                    return aFn(4)
+                }
+            `,
+            "code": `
+                var fn = &test
+
+                assert(fn(4)== 4)
+                assert(testFn(fn) == 4)
+                assert(nativeFn(fn) == 4)
+
+            `,
+        },
+
+
+
+        {
+            "name": "Simple",
+            "definitions": `
+                import "moduleX" as x
+                //import "moduleY"
+                //import "mem"
+
+                struct Y {
+                    v: x::X
+                }
+            `,
+            "modules": [
+                {
+                    "name": "moduleX",
+                    "program": `
+                        import "moduleY"
+
+                        public struct X {
+                            i: i32
+                        }
+                    `
+                },
+                {
+                    "name": "moduleY",
+                    "program": `
+                        import "moduleX" as x
+
+                        public struct H {
+                            i: x::X
+                        }
+                    `
+                }
+            ]
+            "code": `
+                var x = x::X{4}
+                var y = Y {.v = x}
+                //var h = H {.i = x}
+                assert(x.i == 4)
+                assert(y.v.i == 4)
+            `
+        },
+
+        {
+            "name": "Simple",
+            "definitions": `
+                //import "mem"
+
+
+                func test<T>(t: T) : T {
+                    return t
+                }
+
+                typedef func():i32 as Fn;
+
+                func n() : i32 {
+                    return 4
+                }
+
+                func curry<T>() : Fn {
+                    return n
+                }
+
+                struct Test<T> {
+                    x: T
+                }
+
+                func (t: *Test<T>) call<T>() : T {
+                    return t.x
+                }
+
+            `,
+            "code": `
+                assert(test(4) == 4)
+                assert(curry<i32>()() == 4)
+                var t = Test<i32> {.x = 4}
+                assert(t.call() == 4)
+            `
+        },
+        {
+            "name": "Generic Func Param in different module",
+            "definitions": `
+                import "moduleX"
+                import "moduleY"
+            `,
+            "modules": [
+                {
+                    "name": "moduleX",
+                    "program": `
+
+                        public struct X<T> {
+                            x: T
+                        }
+
+
+                        public func test<T>(t: T) : i32 {
+                            return t.x
+                        }
+
+                    `
+                },
+                {
+                    "name": "moduleY",
+                    "program": `
+                        public struct Y<T> {
+                            x: T
+                        }
+                    `
+                }
+            ]
+            "code": `
+                var x = X<i32>{.x=4}
+                var y = Y<i32>{.x=8}
+
+                assert(test(x) == 4)
+                assert(test(y) == 8)
+            `
+        },
+
+        {
+            "name": "Init inferrence",
+            "definitions": `
+                struct X<T> {
+                    x: T
+                }
+            `,
+            "code": `
+                var x = X{.x = 4}
+                assert(x.x == 4)
+            `
+        },
+
+
+        {
+            "name": "Init inferrence",
+            "definitions": `
+                import "mem"
+                import "clib" as c
+
+            `,
+            "code": `
+
+                var x = c::MAX(1,2)
+                //var x: i32* = null
+                //var m = defaultAllocator.alloc(24)
+               // defer defaultAllocator.free(m)
+            `
+        },
+
+        {
+            "name": "Enum asStr",
+            "definitions": `
+                @asStr
+                enum Test {
+                    X
+                }
+            `,
+            "code": `
+
+                var x = TestAsStr(Test.X)
+                //var x: i32* = null
+                //var m = defaultAllocator.alloc(24)
+               // defer defaultAllocator.free(m)
+            `
+        },
+
+
+        {
+            "name": "Fail Func Return TypeCheck",
+            "definitions": `
+                struct X {}
+                func test() : X{
+                    return 4
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "'struct X' is not of type 'i32'"
+        },
+
+        {
+            "name": "Func Return TypeCheck",
+            "definitions": `
+                struct X {}
+                func test() : X{
+                    return X{}
+                }
+            `,
+            "code": `
+
+            `,
+        },
+
+
+        {
+            "name": "Fail Enum Duplicate Fields",
+            "definitions": `
+                enum X {
+                    Y,
+                    Y
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "duplicate member 'Y'"
+        },
+
+        {
+            "name": "Enum Fields Type Check",
+            "definitions": `
+                enum X {
+                    Z = 1,
+                    Y
+                }
+            `,
+            "code": `
+
+            `,
+        },
+
+        {
+            "name": "Fail Struct Duplicate Fields",
+            "definitions": `
+                struct X {
+                    y: i32
+                    y: f32
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "duplicate member 'y' in 'X'"
+        },
+
+        {
+            "name": "Fail Union Duplicate Fields",
+            "definitions": `
+                union X {
+                    y: i32
+                    y: f32
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "duplicate member 'y' in 'X'"
+        },
+
+
+        {
+            "name": "Invalid AnonStructField",
+            "definitions": `
+                struct X {
+                    struct {
+                        y: i32
+                        x: i32
+                    }
+                }
+            `,
+            "code": `
+                var x = X{.y = 4, .x = 8, .z = 10}
+            `,
+            "error": "'X' does not have field 'z'"
+        },
+
+        {
+            "name": "Invalid AnonUnionField",
+            "definitions": `
+                union X {
+                    struct {
+                        y: i32
+                        x: i32
+                    }
+                }
+            `,
+            "code": `
+                var x = X{.y = 4, .x = 8, .z = 10}
+            `,
+            "error": "'X' does not have field 'z'"
+        },
+
+        {
+            "name": "AnonStructField",
+            "definitions": `
+                struct X {
+                    struct {
+                        y: i32
+                        x: i32
+                    }
+                }
+            `,
+            "code": `
+                var x = X{.y = 4, .x = 8}
+            `,
+        },
+
+        {
+            "name": "AnonUnionField",
+            "definitions": `
+                union X {
+                    struct {
+                        y: i32
+                        x: i32
+                    }
+                }
+            `,
+            "code": `
+                var x = X{.y = 4, .x = 8}
+            `,
+        },
+
+        {
+            "name": "Foreign Generic",
+            "definitions": `
+                import "clib" as c
+
+            `,
+            "code": `
+                var result = c::MIN(10_u64, 4_u64)
+                assert(result == 4)
+            `,
+        },
+
+        {
+            "name": "Typedef Func Generic",
+            "definitions": `
+                typedef func<K>(K) : K as HashFn<K>;
+
+                func test(x: i32) : i32 {
+                    return x
+                }
+            `,
+            "code": `
+                var x : HashFn<i32> = test
+                x(4)
+            `,
+        },
+
+
+        {
+            "name": "Typedef Struct Generic",
+            "definitions": `
+                struct Test<T> {
+                    t: T
+                }
+
+                typedef Test<K> as MyTest<K>;
+            `,
+            "code": `
+                var t = MyTest<i32> { .t = 4 }
+                assert(t.t == 4)
+            `,
+        },
+
+
+        {
+            "name": "Using",
+            "definitions": `
+                struct Test {
+                    t: i32
+                    x: f32
+                }
+
+                func (test: using *Test) test() : i32{
+                    return t;
+                }
+            `,
+            "code": `
+                var t = Test{4,12}
+                assert(t.test() == 4)
+            `,
+        },
+
+        {
+            "name": "UsingEmbed",
+            "definitions": `
+                struct A {
+                    y: i32
+                }
+                struct Test {
+                    t: i32
+                    x: f32
+                    a: using A
+                }
+
+                func (test: using *Test) test() : i32{
+                    return y;
+                }
+            `,
+            "code": `
+                var t = Test{4,12, A{24}}
+                assert(t.test() == 24)
+            `,
+        },
+
+
+        {
+            "name": "ArrayInStructField",
+            "definitions": `
+
+                struct Test {
+                    a: [100]char
+                }
+
+            `,
+            "code": `
+
+            `,
+        },
+
+
+        {
+            "name": "Array Struct Field with Constant",
+            "definitions": `
+
+                const MAX = 128
+
+                struct Test {
+                    a: [MAX]char
+                }
+
+            `,
+            "code": `
+                var s = sizeof(Test)
+                assert(s == MAX)
+            `,
+        },
+
+        {
+            "name": "SizeOf Struct",
+            "definitions": `
+
+                const MAX = 128
+
+                struct Test {
+                    a: [MAX]char
+                }
+
+            `,
+            "code": `
+                var s = sizeof(Test)
+                assert(s == MAX)
+            `,
+        },
+
+        {
+            "name": "SizeOf Struct Value",
+            "definitions": `
+
+                const MAX = 128
+
+                struct Test {
+                    a: [MAX]char
+                }
+
+            `,
+            "code": `
+                var t = Test{}
+
+                var s = sizeof(t)
+                assert(s == MAX)
+            `,
+        },
+
+
+        {
+            "name": "SizeOf Struct Value",
+            "definitions": `
+
+                const MAX = 128
+
+                const s = []i32 {
+                    [0] = 1,
+                    [1] = 2,
+                }
+
+                const x : [2]i32 = []i32 {
+                    [0] = 1,
+                    [1] = 2,
+                }
+
+            `,
+            "code": `
+                const y : [2]i32 = x
+
+                assert(s[0] == 1)
+                assert(s[1] == 2)
+                assert(x[0] == 1)
+                assert(x[1] == 2)
+                assert(y[0] == 1)
+                assert(y[1] == 2)
+            `,
+        },
+
+
+
+        {
+            "name": "Const Pointer Access Assign",
+            "definitions": `
+                struct X {
+                    s: *const char
+                }
+            `,
+            "code": `
+                var xx = X{"Hello"}
+                var x = *xx.s
+
+                assert(x == xx.s[0])
+                x = 'b'
+                assert(x == 'b')
+            `,
+        },
+
+
+        {
+            "name": "Array Decl Uninit",
+            "definitions": `
+
+            `,
+            "code": `
+                var t : [2]i32;
+                t[0] = 4;
+                t[1] = 8;
+                assert(t[0] == 4);
+                assert(t[1] == 8);
+            `,
+        },
+
+        {
+            "name": "Sign",
+            "definitions": `
+                func test(s: u8) {
+                }
+            `,
+            "code": `
+                var i : i32 = 55;
+                test(i)
+            `,
+            "error": "'u8' is not of type 'i32'"
+        },
+
+
+        {
+            "name": "Enum with EnumValue",
+            "definitions": `
+                enum First {
+                    X = 24
+                }
+
+                enum Second {
+                    Y = First.X
+                }
+            `,
+            "code": `
+                assert(First.X == 24)
+                assert(Second.Y == 24)
+            `,
+        },
+        {
+            "name": "Enum with EnumValues",
+            "definitions": `
+                enum First {
+                    X = 2,
+                    Z = 4
+                }
+
+                enum Second {
+                    Y = (First.X|First.Z)
+                }
+            `,
+            "code": `
+                assert(First.X == 2)
+                assert(First.Z == 4)
+                assert(Second.Y == 6)
+            `,
+        },
+
+        {
+            "name": "Func Ptr from Macro",
+            "definitions": `
+                import "opengls"
+            `,
+            "modules": [
+                {
+                    "name": "opengls",
+                    "program": `
+                        import using "glads"
+                    `
+                },
+                {
+                    "name": "glads",
+                    "program": `
+                        @raw("""
+                            int test(int i) {
+                                return i;
+                            }
+
+                            typedef int (*FLUSHPROC)(int);
+                            const FLUSHPROC gladFlush = &test;
+                            #define glFlush gladFlush
+                        """);
+
+                        @foreign public typedef func(i32) : i32 as FLUSHPROC;
+                        @foreign public const glFlush : FLUSHPROC;
+                    `
+                }
+            ]
+            "code": `
+                assert(glFlush(4) == 4)
+            `,
+        },
+
+
+        {
+            "name": "FuncPtr of Generic Func",
+            "definitions": `
+                func PtrEqual<K>(a: K) : K {
+                    return a
+                }
+
+                func Test<K>(c: K) : K {
+                    var t = &PtrEqual<K>;
+                    return t(c)
+                }
+
+            `,
+            "code": `
+                var t = Test(4)
+                assert(t == 4)
+            `,
+        },
+        {
+            "name": "Arena Allocator",
+            "definitions": `
+                import "mem";
+                import "array";
+                import "io";
+                import "map";
+                import "json";
+                import "string_buffer"
+
+            `,
+            "code": `
+                debugAllocator.init()
+                defer {
+                    debugAllocator.report();
+                    debugAllocator.free();
+                }
+
+                var arena = Arena{}
+                arena.init(4096, &debugAllocator.alloc)
+                defer {
+                    arena.free()
+                    assert(debugAllocator.allocations.empty())
+                }
+
+                var array = Array<i32>{}
+                array.init(2, &arena.alloc)
+
+                const size = 1024
+                for(var i = 0; i < size; i+=1) {
+                    array.add(i)
+                }
+
+                assert(array.size() == size)
+
+                var map = Map<*const char, i32>{}
+                map.init(0, 1, &StrHashFn, &StrEqualFn, &arena.alloc)
+
+                map.put("hi1", 421)
+                map.put("hi2", 422)
+                map.put("hi3", 423)
+                map.put("hi4", 424)
+                map.put("hi5", 425)
+
+                assert(map.size() == 5)
+
+                var parser = Parser{}
+                parser.init(&arena.alloc)
+
+                var node = parser.parseJson("""
+                    {
+                        "x" : true,
+                        "y" : false,
+                        "z" : [1,2,3]
+                    }
+                """);
+
+                var buf = StringBuffer{}
+                buf.init(1, &arena.alloc)
+                node.print(&buf)
+
+                printf("%s\n", buf.cStr())
+
+            `,
+        },
+
+
+        {
+            "name": "Typedef Generic Bug",
+            "definitions": `
+                import "moduleY"
+            `,
+            "modules": [
+                {
+                    "name": "moduleX",
+                    "program": `
+                        public struct Array<T> {
+                            alloc: Allocation
+                            t: T
+                        }
+
+                        public struct Allocation {
+                            a: i32
+                        }
+                    `
+                },
+                {
+                    "name": "moduleY",
+                    "program": `
+                        import "moduleX"
+
+                        public typedef Array<*Y> as YList;
+
+                        public struct Y {
+                            y: i32
+                        }
+                    `
+                },
+            ],
+            "code": `
+                var list = YList{
+                }
+
+                list.t = &Y{4}
+                assert(list.t.y == 4)
+            `,
+        },
+    ]
+}

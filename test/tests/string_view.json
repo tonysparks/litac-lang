@@ -1,0 +1,178 @@
+{
+    "description": "StringView",
+    "disabled": false,
+    "program": `
+        import "string_view";
+
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        import "io";
+
+        @include("<string.h>");
+        @foreign func strncmp(a:*const char, b:*const char, len: i32) : i32;
+        @foreign func strcmp(a:*const char, b:*const char) : i32;
+        @foreign func sprintf(b: *char, format: *const char, ...) : i32;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "StringView_equals",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var a = StringViewInit("Hello World")
+                var b = StringViewInit("Bye World")
+                var c = a
+                var d = StringViewInit("HelloWorld")
+                var e = StringViewInit(null)
+
+                assert(a.equals(c.buffer, c.length) == true)
+                assert(a.equals("Hell") == false)
+                assert(a.equals("Hello World") == true)
+                assert(a.equals(b.buffer, b.length) == false)
+                assert(a.equals(d.buffer, d.length) == false)
+                assert(e.equals(d.buffer, d.length) == false)
+                assert(a.equals(e.buffer, e.length) == false)
+            `,
+        },
+        {
+            "name": "StringView_contains",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var a = StringViewInit("Hello World")
+                var e = StringViewInit(null)
+
+                assert(a.contains("World") == true)
+                assert(a.contains("d") == true)
+                assert(a.contains("H") == true)
+                assert(a.contains("Which", 1) == true)
+                assert(e.contains("World") == false)
+                assert(a.contains(e.buffer, e.length) == false)
+            `,
+        },
+        {
+            "name": "StringView_startsWith",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var a = StringViewInit("Hello World")
+                var e = StringViewInit(null)
+
+                assert(a.startsWith("World") == false)
+                assert(a.startsWith("World", -1, 2) == false)
+                assert(a.startsWith("World", -1, 6) == true)
+                assert(a.startsWith("d") == false)
+                assert(a.startsWith("H") == true)
+                assert(a.startsWith("Hell") == true)
+                assert(a.startsWith("Hello World") == true)
+                assert(a.startsWith("Hello World!") == false)
+                assert(a.startsWith("Which", 1) == false)
+                assert(a.startsWith("Hhich", 1) == true)
+                assert(e.startsWith("World") == false)
+                assert(a.startsWith(e.buffer, e.length) == false)
+            `,
+        },
+        {
+            "name": "StringView_endsWith",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var a = StringViewInit("Hello World")
+                var e = StringViewInit(null)
+
+                assert(a.endsWith("World") == true)
+                assert(a.endsWith("d") == true)
+                assert(a.endsWith("H") == false)
+                assert(a.endsWith("Hell") == false)
+                assert(a.endsWith("Hello World") == true)
+                assert(a.endsWith("Hello World!") == false)
+                assert(a.endsWith("Which", 1) == false)
+                assert(a.endsWith("dhich", 1) == true)
+                assert(e.endsWith("World") == false)
+                assert(a.endsWith(e.buffer, e.length) == false)
+            `,
+        },
+        {
+            "name": "StringView_indexOfAt",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var a = StringViewInit("Hello World")
+                var e = StringViewInit(null)
+
+                assert(a.indexOfAt("World", 2) == 6)
+                assert(a.indexOfAt("World", 7) == -1)
+                assert(a.indexOfAt("d") == 10)
+                assert(a.indexOfAt("H") == 0)
+                assert(a.indexOfAt("H", 2) == -1)
+
+                assert(e.indexOfAt("World") == -1)
+                assert(a.indexOfAt(e.buffer, e.length) == -1)
+            `,
+        },
+        {
+            "name": "StringView_substring",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var a = StringViewInit("Hello World")
+                var e = StringViewInit(null)
+
+                assert(a.substring(-1, 2).length == 0)
+                assert(strncmp(a.substring(0, 2).buffer, "He", 2) == 0)
+                assert(a.substring(0, 2).equals("He", 2) == true)
+                assert(a.substring(1, 2).equals("e") == true)
+                assert(a.substring(1, 11).equals("ello World") == true)
+                assert(a.substring(1).equals("ello World") == true)
+                assert(a.substring(1, 10).equals("ello Worl") == true)
+                assert(a.substring(10, 11).equals("d") == true)
+                assert(a.substring(0).equals(a.buffer) == true)
+                assert(a.substring(12).equals(a.buffer) == false)
+                assert(a.substring(0).equals(e.buffer) == false)
+                assert(e.substring(0).equals(a.buffer) == false)
+                assert(e.substring(0).equals(e.buffer) == true)
+
+                assert(a.substring(22).buffer == null)
+            `,
+        },
+        {
+            "name": "StringView_copyTo",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var a = StringViewInit("Hello World")
+                var e = StringViewInit(null)
+
+                var b : [255]char
+                assert(a.copyTo(null, 255) == 0)
+                assert(a.copyTo(b, 0) == 0)
+                assert(a.copyTo(b, 255) == a.size())
+
+                var v = StringViewInit(b)
+                assert(v.equals(a.buffer))
+                assert(e.copyTo(b, 255) == 0)
+            `,
+        },
+    ]
+}

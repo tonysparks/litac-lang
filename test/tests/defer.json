@@ -1,0 +1,131 @@
+{
+    "description": "Test Defer",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+
+        {
+            "name": "Defer Bug",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0;
+                defer i += 1
+
+                if(i > 0) {
+                    var x = 0
+                    defer x += 1
+
+                    assert(x == 0)
+                }
+
+                return 0;
+
+                return -1;
+            `,
+        },
+        {
+            "name": "Defer Switch Bug",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0
+                defer i += 1
+                var x = 3;
+                switch(x) {
+                    case 1: {
+                        break;
+                    }
+                    case 2: {
+                        break;
+                    }
+                    case 3: {
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+
+                assert(i == 0)
+            `,
+        },
+        {
+            "name": "Defer Switch Bug with Loop",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0
+                defer i += 1
+                var x = 3;
+                switch(x) {
+                    case 1: {
+                        var z = 2
+                        while(z) {
+                            defer z-=1
+                        }
+                        break;
+                    }
+                    case 2: {
+                        break;
+                    }
+                    case 3: {
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+
+                assert(i == 0)
+            `,
+        },
+        {
+            "name": "Defer Switch Bug with Outer Loop",
+            "definitions": `
+
+            `,
+            "code": `
+                var i = 0
+                defer i += 1
+                var x = 3;
+                var z = 2
+                while(z) {
+                    defer z-=1
+
+                    switch(x) {
+                        case 1: {
+                            break;
+                        }
+                        case 2: {
+                            break;
+                        }
+                        case 3: {
+                            break;
+                        }
+                        default: {
+                            break;
+                        }
+                    }
+                    if(z == 2) {
+                        break;
+                    }
+                }
+                assert(z == 1)
+                assert(i == 0)
+            `,
+        },
+    ]
+}

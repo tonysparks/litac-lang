@@ -1,0 +1,630 @@
+{
+    "description": "Methods",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+         {
+            "name": "Func Method syntax",
+            "definitions": `
+                struct Test {
+                    field: i32
+                }
+
+                func (a: Test) apply() : i32 {
+                    return a.field
+                }
+
+            `,
+            "code": `
+                var t = Test{.field: 4}
+                assert(t.apply() == 4)
+            `
+        },
+        {
+            "name": "Func Method syntax with ptr",
+            "definitions": `
+                struct Test {
+                    field: i32
+                }
+
+                func (a: *Test) apply() : i32 {
+                    return a.field
+                }
+
+            `,
+            "code": `
+                var t = &Test{.field: 4}
+                assert(t.apply() == 4)
+            `
+        },
+        {
+            "name": "Func Method syntax with const ptr",
+            "definitions": `
+                struct Test {
+                    field: i32
+                }
+
+                func (a: *const Test) apply() : i32 {
+                    return a.field
+                }
+
+            `,
+            "code": `
+                var t = (&Test{.field: 4}) as (*const Test)
+                assert(t.apply() == 4)
+            `
+        },
+        {
+            "name": "Func Method two levels deep",
+            "definitions": `
+                struct A {
+
+                }
+
+                struct B {
+
+                }
+
+                func (a: A) apply() : B {
+                    return B{}
+                }
+
+                func (b: B) run() : i32 {
+                    return 4
+                }
+
+            `,
+            "code": `
+                var a = A{}
+                var r = a.apply().run()
+                assert(r == 4)
+            `
+        },
+        {
+            "name": "Func Method two levels deep Generics",
+            "definitions": `
+                struct A<T> {
+                    a: T
+                }
+
+                struct B<T> {
+                    b: T
+                }
+
+                func (a: A<T>) apply<T>() : B<T> {
+                    return B<T>{a.a}
+                }
+
+                func (b: B<T>) run<T>() : T {
+                    return b.b
+                }
+
+            `,
+            "code": `
+                var a = A<i32>{4}
+                var r = a.apply<i32>().run<i32>()
+                assert(r == 4)
+            `
+        },
+        {
+            "name": "Func Method two levels deep Generics inside Generic Func",
+            "definitions": `
+                struct A<T> {
+                    a: T
+                }
+
+                struct B<T> {
+                    b: T
+                }
+
+                func (a: A<T>) apply<T>() : B<T> {
+                    return B<T>{a.a}
+                }
+
+                func (b: B<T>) run<T>() : T {
+                    return b.b
+                }
+
+                func test<T>(v: T) : T {
+                    var a = A<T>{v}
+                    var r = a.apply<T>().run<T>()
+                    return r;
+                }
+
+            `,
+            "code": `
+                var r = test<i32>(4)
+                assert(r == 4)
+            `
+        },
+        {
+            "name": "Func Method func pointer",
+            "definitions": `
+                struct A {
+                    fn: func() : i32
+                }
+
+                func test() : i32 {
+                    return 4
+                }
+
+
+            `,
+            "code": `
+                var a = A { &test }
+                var r = a.fn()
+                assert(r == 4)
+            `
+        },
+        {
+            "name": "Func Method func pointer shadow func ptr",
+            "definitions": `
+                struct A {
+                    fn: func() : i32
+                }
+
+                func test() : i32 {
+                    return 4
+                }
+
+                func (a: A) fn() : i32 {
+                    return 32;
+                }
+
+            `,
+            "code": `
+                var a = A { &test }
+                var r = a.fn()
+                assert(r == 4)
+            `
+        },
+        {
+            "name": "Func Method func pointer and method",
+            "definitions": `
+                struct A {
+                    fn: func() : i32
+                }
+
+                func test() : i32 {
+                    return 4
+                }
+
+                func (a: A) fn2() : i32 {
+                    return 32;
+                }
+
+            `,
+            "code": `
+                var a = A { &test }
+                var r = a.fn()
+                assert(r == 4)
+                r = a.fn2()
+                assert(r == 32)
+            `
+        },
+        {
+            "name": "Method with ptr and callsite no ptr",
+            "definitions": `
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+            `,
+            "code": `
+                var x = X{4}
+                assert(x.method() == 4)
+            `,
+        },
+        {
+            "name": "Method with ptr and callsite ptr",
+            "definitions": `
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+            `,
+            "code": `
+                var x = &X{4}
+                assert(x.method() == 4)
+            `,
+        },
+        {
+            "name": "Method with ptr and callsite with struct of object no ptr",
+            "definitions": `
+                struct Y {
+                    x: X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+            `,
+            "code": `
+
+                var x = X{4}
+                var y = Y{x}
+                assert(y.x.method() == 4)
+            `,
+        },
+        {
+            "name": "Method with ptr and callsite with struct of object ptr",
+            "definitions": `
+                struct Y {
+                    x: *X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+            `,
+            "code": `
+
+                var x = X{4}
+                var y = Y{&x}
+                assert(y.x.method() == 4)
+            `,
+        },
+        {
+            "name": "Method with ptr and callsite with struct of object ptr in def",
+            "definitions": `
+                struct Y {
+                    x: *X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+            `,
+            "code": `
+
+                var x = &X{4}
+                var y = Y{x}
+                assert(y.x.method() == 4)
+            `,
+        },
+        {
+            "name": "Method with ptr and callsite with struct of object ptr in def from method",
+            "definitions": `
+                struct Y {
+                    x: *X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+
+                func test(y: Y): i32 {
+                    return y.x.method()
+                }
+            `,
+            "code": `
+
+                var x = &X{4}
+                var y = Y{x}
+                assert(test(y) == 4)
+            `,
+        },
+        {
+            "name": "Method with ptr and callsite with struct of object no ptr in def from method",
+            "definitions": `
+                struct Y {
+                    x: X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+
+                func test(y: Y): i32 {
+                    return y.x.method()
+                }
+            `,
+            "code": `
+
+                var x = X{4}
+                var y = Y{x}
+                assert(test(y) == 4)
+            `,
+        },
+        {
+            "name": "Method chain",
+            "definitions": `
+                struct Y {
+                    x: X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: X) methodX() : i32 {
+                    return x.a
+                }
+
+                func (y: Y) methodY(): X {
+                    return y.x
+                }
+            `,
+            "code": `
+
+                var x = X{4}
+                var y = Y{x}
+
+                assert(y.methodY().methodX() == 4)
+            `,
+        },
+        {
+            "name": "Method chain with ptr",
+            "definitions": `
+                struct Y {
+                    x: *X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) methodX() : i32 {
+                    return x.a
+                }
+
+                func (y: Y) methodY(): *X {
+                    return y.x
+                }
+            `,
+            "code": `
+
+                var x = X{4}
+                var y = Y{&x}
+
+                assert(y.methodY().methodX() == 4)
+            `,
+        },
+        {
+            "name": "Invalid Method chain no ptr auto cast",
+            "definitions": `
+                struct Y {
+                    x: X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) methodX() : i32 {
+                    return x.a
+                }
+
+                func (y: Y) methodY(): X {
+                    return y.x
+                }
+            `,
+            "code": `
+
+                var x = X{4}
+                var y = Y{x}
+
+                assert(y.methodY().methodX() == 4)
+            `,
+            "error": "'X' is not of type '*X'"
+        },
+        {
+            "name": "Invalid Method chain no ptr RValue",
+            "definitions": `
+                struct Y {
+                    x: X
+                }
+                struct X {
+                    a: i32
+                }
+
+                func (y: Y) methodY(): X {
+                    return y.x
+                }
+            `,
+            "code": `
+
+                var x = X{4}
+                var y = Y{x}
+                var z = &y.methodY()
+                assert(false)
+            `,
+            "error": "lvalue required as unary '&' operand"
+        },
+        {
+            "name": "Method infer generics",
+            "definitions": `
+                struct Test<T> {
+                    a: T
+                }
+
+                func (t: Test<T>) method<T>() : T {
+                    return t.a
+                }
+            `,
+            "code": `
+                var t = Test<i32>{4}
+                assert(t.method() == 4)
+            `,
+        },
+        {
+            "name": "Method infer generics ptr",
+            "definitions": `
+                struct Test<T> {
+                    a: T
+                }
+
+                func (t: *Test<T>) method<T>() : T {
+                    return t.a
+                }
+            `,
+            "code": `
+                var t = Test<i32>{4}
+                assert(t.method() == 4)
+            `,
+        },
+        {
+            "name": "Method generics ptr",
+            "definitions": `
+                struct Test<T> {
+                    a: T
+                }
+
+                func (t: *Test<T>) method<T>() : T {
+                    return t.a
+                }
+            `,
+            "code": `
+                var t = Test<i32>{4}
+                assert(t.method<i32>() == 4)
+            `,
+        },
+        // multiple args
+        {
+            "name": "Method infer generics multiarg",
+            "definitions": `
+                struct Test<T> {
+                    a: T
+                }
+
+                func (t: Test<T>) method<T>(z: T) : T {
+                    return t.a + z
+                }
+            `,
+            "code": `
+                var t = Test<i32>{4}
+                assert(t.method(8) == 12)
+            `,
+        },
+        {
+            "name": "Method infer generics ptr multiarg",
+            "definitions": `
+                struct Test<T> {
+                    a: T
+                }
+
+                func (t: *Test<T>) method<T>(z: T) : T {
+                    return t.a + z
+                }
+            `,
+            "code": `
+                var t = Test<i32>{4}
+                assert(t.method(8) == 12)
+            `,
+        },
+        {
+            "name": "Method generics ptr multiarg",
+            "definitions": `
+                struct Test<T> {
+                    a: T
+                }
+
+                func (t: *Test<T>) method<T>(z: T) : T {
+                    return t.a + z
+                }
+            `,
+            "code": `
+                var t = Test<i32>{4}
+                assert(t.method<i32>(8) == 12)
+            `,
+        },
+        {
+            "name": "Method func ptr",
+            "definitions": `
+                struct Test<T> {
+                    a: T
+                }
+
+                func (t: *Test<T>) method<T>(z: T) : T {
+                    return t.a + z
+                }
+            `,
+            "code": `
+                var t = Test<i32>{4}
+                var x : func(*Test<i32>, i32):i32 = &Test_method<i32>;
+                assert(t.method<i32>(8) == 12)
+                assert(x(&t, 8) == 12)
+            `,
+        },
+
+        {
+            "name": "Func Method two levels deep Generics inside Generic Func",
+            "definitions": `
+                struct A<T> {
+                    a: T
+                }
+
+                struct B<T> {
+                    b: T
+                }
+
+                func (a: A<T>) apply<T>() : B<T> {
+                    return B<T>{a.a}
+                }
+
+                func (b: B<T>) run<T>() : T {
+                    return b.b
+                }
+
+                func test<T>(v: T) : T {
+                    var a = A<T>{v}
+                    var r = a.apply<T>().run<T>()
+                    return r;
+                }
+
+            `,
+            "code": `
+                var r = test<i32>(4)
+                assert(r == 4)
+            `
+        },
+        {
+            "name": "Method definition out of order",
+            "definitions": `
+                struct Test {
+                    x: i32
+                }
+
+
+                func (t: *Test) a() : i32 {
+                    return t.b()
+                }
+
+                func (t: *Test) b() : i32 {
+                    return t.x
+                }
+            `,
+            "code": `
+                var t = Test{4}
+                assert(t.a() == 4)
+            `,
+        },
+    ]
+}

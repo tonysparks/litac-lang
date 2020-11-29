@@ -1,6 +1,39 @@
 import "assert"
+/*
+TODO: Duplicate using member
+struct Vec {
+    x: f32
+    y: f32
+}
+struct Entity {
+    pos: using Vec
+    x: i32
+}
 
 func main(len:i32, args:**char) : i32 {
-    const N = 256
-    var sprites : [N]i32;
+    assert(false)
+}*/
+
+
+ @include("<string.h>");
+@foreign func strcmp(a:*const char, b:*const char) : i32;
+
+struct Test {
+    name: *char
+    x: [32]char
+}
+
+struct X {
+    x: [32]char
+}
+func main(len:i32, args:**char) : i32 {
+    var m : [32]char = "Brett"
+    var x = X{m}
+    var t = Test{
+        .name = m,
+        .x = x.x
+
+    }
+
+    assert(strcmp(t.name, "Brett") == 0)
 }

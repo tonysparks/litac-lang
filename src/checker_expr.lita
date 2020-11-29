@@ -1405,7 +1405,7 @@ func (this: *TypeChecker) resolveCastExpr(expr: *CastExpr) : bool {
 
     expr.operand.typeInfo = typeInfo
 
-    if(!this.checkCastability(expr.startPos, expr.expr.operand.typeInfo, typeInfo)) {
+    if(!this.checkCastability(expr.startPos, typeInfo, expr.exprToCast.operand.typeInfo)) {
         return false
     }
 

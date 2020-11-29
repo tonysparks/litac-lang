@@ -1,0 +1,111 @@
+{
+    "description": "Type Checker",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+
+        {
+            "name": "Str assigned to const char pointer",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    name: *const char
+                }
+            `,
+            "code": `
+                var t = Test{
+                    .name = "Brett"
+                }
+
+                assert(strcmp(t.name, "Brett") == 0)
+            `,
+        },
+        {
+            "name": "array assigned to str",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    name: *char
+                    x: [32]char
+                }
+
+                struct X {
+                    x: [32]char
+                }
+            `,
+            "code": `
+                var m : [32]char = "Brett"
+                var x = X{m}
+                var t = Test{
+                    .name = m,
+                    .x = x.x
+
+                }
+
+                assert(strcmp(t.name, "Brett") == 0)
+            `,
+        },
+        {
+            "name": "Const char index to char",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    name: *const char
+
+                }
+            `,
+            "code": `
+                var t = Test{"Brett"}
+                var x = *t.name
+
+                assert(x == 'B')
+            `,
+        },
+
+
+        {
+            "name": "Anon Union",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct X {
+                    a: i32
+                }
+
+                func (x: *X) method() : i32 {
+                    return x.a
+                }
+
+                struct Test {
+                    union {
+                        w: *X
+                        y: *X
+                    }
+                }
+            `,
+            "code": `
+                var x = X{4}
+                var t = Test {.w = &x}
+                var w = t.w
+                assert(w.method() == 4)
+            `,
+        },
+
+    ]
+}

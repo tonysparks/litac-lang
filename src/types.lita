@@ -579,7 +579,6 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             }
 
             return true
-            //return other.kind == TypeKind.BOOL
         }
         case TypeKind.CHAR: {
             return other.kind <= TypeKind.CHAR
@@ -789,10 +788,18 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
                    IsPtrOf(other, TypeKind.CHAR)
         }
         case TypeKind.ARRAY: {
+            var thisArray = this as (*ArrayTypeInfo)
+            if(other.kind == TypeKind.STR) {
+                if(thisArray.arrayOf.kind != TypeKind.CHAR) {
+                    return false
+                }
+
+                return true
+            }
+
             if(other.kind != TypeKind.ARRAY) {
                 return false
             }
-            var thisArray = this as (*ArrayTypeInfo)
             var otherArray = other as (*ArrayTypeInfo)
 
             if(!thisArray.arrayOf.isDeclarable(otherArray.arrayOf)) {
@@ -962,7 +969,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
         }
         case TypeKind.ENUM: {
             if(other.kind != TypeKind.ENUM) {
-                return false
+                return IsInteger(other)
             }
             return this.typeid == other.typeid
         }
@@ -1045,6 +1052,13 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
             return this.isDeclarable(castTo)
         }
         case TypeKind.PTR: {
+            if(castTo.kind == TypeKind.PTR) {
+                return true
+            }
+            if(IsInteger(castTo)) {
+                return true
+            }
+            // TODO: this is wide open right now!
             return this.isDeclarable(castTo)
         }
         case TypeKind.FUNC_PTR: {
@@ -1759,7 +1773,7 @@ public const VOID_TYPE = TypeInfo {
 public const STR_TYPE = TypeInfo {
     .kind = TypeKind.STR,
     .typeid = TypeKind.STR as (Typeid),
-    .name = "*char",
+    .name = "*const char",
     .sym = null
 }
 
