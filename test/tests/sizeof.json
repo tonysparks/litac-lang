@@ -1,0 +1,62 @@
+{
+    "description": "Sizeof",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Sizeof Struct Ptr",
+            "disabled": false,
+            "definitions": `
+                struct Sprite {
+                    a: i32
+                }
+
+            `,
+            "code": `
+                var N = sizeof(:*Sprite);
+                var X = sizeof(:*void);
+                assert(N == X)
+            `,
+        },
+        {
+            "name": "Sizeof Enum",
+            "disabled": false,
+            "definitions": `
+                enum Test {
+                    A
+                }
+
+            `,
+            "code": `
+                var N = sizeof(Test.A);
+                var X = sizeof(:i32);
+                assert(N == X)
+            `,
+        },
+        {
+            "name": "Enum SizeOf with variable",
+            "definitions": `
+                enum TypeInfo {
+                    Int = 0,
+                    Float,
+                    Double
+                }
+
+            `,
+            "code": `
+                var x: TypeInfo = TypeInfo.Int
+                assert(sizeof(x) == 4)
+                assert(sizeof(TypeInfo.Int) == 4)
+            `
+        },
+    ]
+}

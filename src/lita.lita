@@ -229,9 +229,18 @@ public func (this: *Lita) compileC(module: *Module, cFilename: *const char, bina
     this.startCapture(MetricType.CCOMPILE)
     defer this.endCapture(MetricType.CCOMPILE)
 
-    var command: [512]char;
-    var commandStr = StringInit(command, 512)
-    commandStr.format("gcc -o \"%s\" \"%s\" -D_CRT_SECURE_NO_WARNINGS", binaryFilename, cFilename)
+    var commandStr = StringBufferInit(512)
+    commandStr.append("%s", this.options.compileCmd)
+
+    var index = commandStr.indexOf("%output%")
+    if(index > -1) {
+        commandStr.replace(index, index+strlen("%output%"), binaryFilename)
+    }
+    index = commandStr.indexOf("%input%")
+    if(index > -1) {
+        commandStr.replace(index, index+strlen("%input%"), cFilename)
+    }
+
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }

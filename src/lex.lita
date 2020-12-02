@@ -985,6 +985,9 @@ func (l: *Lexer) scanString() : Token {
     if(isVerbatim) {
         l.token.mod = Mod.MULTISTR
     }
+    else {
+        l.token.mod = Mod.NONE
+    }
     return l.token
 }
 

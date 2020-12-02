@@ -1,4 +1,4 @@
-import "assert"
+//import "assert"
 /*
 TODO: Duplicate using member
 struct Vec {
@@ -14,26 +14,27 @@ func main(len:i32, args:**char) : i32 {
     assert(false)
 }*/
 
+ //@include("<string.h>");
+//@foreign func strcmp(a:*const char, b:*const char) : i32;
 
- @include("<string.h>");
-@foreign func strcmp(a:*const char, b:*const char) : i32;
+/*
+func test(a:*Map) : i32 {
+    a = &Map{4}
+    return a.a;
+}*/
 
-struct Test {
-    name: *char
-    x: [32]char
-}
-
-struct X {
-    x: [32]char
-}
 func main(len:i32, args:**char) : i32 {
-    var m : [32]char = "Brett"
-    var x = X{m}
-    var t = Test{
-        .name = m,
-        .x = x.x
+    /*var x = """
+                    [
+                         true, 4, false, "hi", 34343, null, [5],
+                         {
+                            "k" : "v"
+                         }
 
-    }
+                    ]
+                """*/
+                var x = """ """
+                var z = "another"
+    var t = "[true,4.000000,false,\"hi\",34343.000000,null,[5.000000],{\"k\":\"v\"}]"
 
-    assert(strcmp(t.name, "Brett") == 0)
 }

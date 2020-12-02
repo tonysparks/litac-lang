@@ -1322,10 +1322,10 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*CharExpr)
             var c = escapeStrings[expr.character.intValue]
             if(c != 0) {
-                this.emit("'%s'", c)
+                this.buf.append("'%s'", c)
             }
             else {
-                this.emit("'%c'", expr.character.intValue as (char))
+                this.buf.append("'%c'", expr.character.intValue as (char))
             }
             return;
         }

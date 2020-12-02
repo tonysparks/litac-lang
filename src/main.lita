@@ -146,6 +146,13 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     options.showProfileInfo = parser.hasOption("profile")
     options.run = parser.hasOption("run")
 
+    if(parser.hasOption("buildCmd")) {
+        options.compileCmd = parser.getOption("buildCmd").value
+    }
+    else {
+        options.compileCmd = "clang %input% -std=c99 -o %output% -D_CRT_SECURE_NO_WARNINGS"
+    }
+
     var outputFile = parser.hasOption("output") ? parser.getOption("output").value : "a"
     strncpy(options.outputFile, outputFile, MAX_PATH)
 

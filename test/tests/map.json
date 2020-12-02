@@ -1,0 +1,165 @@
+{
+    "description": "Map",
+    "disabled": false,
+    "program": `
+        import "map";
+
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        @include("<stdio.h>");
+        @foreign func sprintf(buf: *char, format: *const char, ...): i32;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Map as Struct Member",
+            "disabled": false,
+            "definitions": `
+                struct Sprite {
+                    a: i32
+                }
+
+                struct Test {
+                    sprites: Map<*const char, Sprite>
+                }
+            `,
+            "code": `
+                var t = Test{}
+                var emptyValue = Sprite{0}
+                t.sprites = StrMap<Sprite>(emptyValue, 16)
+
+                t.sprites.put("hi", Sprite{4})
+                t.sprites.put("bye", Sprite{8})
+
+                assert(t.sprites.size() == 2)
+                assert(t.sprites.get("hi").a == 4)
+                assert(t.sprites.get("bye").a == 8)
+                assert(t.sprites.get("doesn't exist!!!'").a == emptyValue.a)
+
+                assert(t.sprites.remove("hi").a == 4)
+                assert(t.sprites.size() == 1)
+
+                assert(t.sprites.remove("doesn't exist!'").a == emptyValue.a)
+                assert(t.sprites.size() == 1)
+
+                assert(t.sprites.contains("nope") == false)
+                assert(t.sprites.contains("bye") == true)
+
+                var it = t.sprites.iter()
+                while(it.hasNext()) {
+                    var e = it.next()
+                    assert(e.value.a == 8)
+                }
+
+                assert(t.sprites.remove("bye").a == 8)
+                assert(t.sprites.empty() == true)
+
+                const N = 256;
+                var buffers: [N][32]char;
+
+                for(var i = 0; i<N; i+=1) {
+                    sprintf(buffers[i], "test%d", i)
+                    t.sprites.put(buffers[i], Sprite{i + 100})
+                }
+
+                assert(t.sprites.size() == N)
+
+                var it2 = t.sprites.iter()
+                var x = 0
+                while(it2.hasNext()) {
+                    var e = it2.next()
+
+                    x += 1
+                }
+                assert(x == N)
+
+                t.sprites.free()
+                assert(t.sprites.length == 0)
+                assert(t.sprites.capacity == 0)
+                assert(t.sprites.keys == null)
+                assert(t.sprites.values == null)
+
+            `,
+        },
+        {
+            "name": "Map as Struct Member ptr",
+            "disabled": false,
+            "definitions": `
+                struct Sprite {
+                    a: i32
+                }
+
+                struct Test {
+                    sprites: Map<*const char, *Sprite>
+                }
+            `,
+            "code": `
+                var t = Test{}
+                var emptyValue = Sprite{0}
+                t.sprites = StrMap<*Sprite>(null, 16)
+
+                var s1 = Sprite{4}
+                var s2 = Sprite{8}
+
+                t.sprites.put("hi", &s1)
+                t.sprites.put("bye", &s2)
+
+                assert(t.sprites.size() == 2)
+                assert(t.sprites.get("hi").a == 4)
+                assert(t.sprites.get("bye").a == 8)
+                assert(t.sprites.get("doesn't exist!!!'")==null)
+
+                assert(t.sprites.remove("hi").a == 4)
+                assert(t.sprites.size() == 1)
+
+                assert(t.sprites.remove("doesn't exist!'")==null)
+                assert(t.sprites.size() == 1)
+
+                assert(t.sprites.contains("nope") == false)
+                assert(t.sprites.contains("bye") == true)
+
+                var it = t.sprites.iter()
+                while(it.hasNext()) {
+                    var e = it.next()
+                    assert(e.value.a == 8)
+                }
+
+                assert(t.sprites.remove("bye").a == 8)
+                assert(t.sprites.empty() == true)
+
+                const N = 256;
+                var buffers: [N][32]char;
+                var sprites: [N]Sprite;
+
+                for(var i = 0; i<N; i+=1) {
+                    sprintf(buffers[i], "test%d", i)
+                    sprites[i] = Sprite{i + 100}
+                    t.sprites.put(buffers[i], &sprites[i])
+                }
+
+                assert(t.sprites.size() == N)
+
+                var it2 = t.sprites.iter()
+                var x = 0
+                while(it2.hasNext()) {
+                    var e = it2.next()
+                    x += 1
+                }
+                assert(x == N)
+
+                t.sprites.free()
+                assert(t.sprites.length == 0)
+                assert(t.sprites.capacity == 0)
+                assert(t.sprites.keys == null)
+                assert(t.sprites.values == null)
+
+            `,
+        },
+    ]
+}

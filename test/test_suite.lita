@@ -52,6 +52,10 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
+        "../test/tests/json.json",
+        "../test/tests/map.json",
+        "../test/tests/offsetof.json",
+        "../test/tests/sizeof.json",
         "../test/tests/type_checker.json",
         "../test/tests/string_view.json",
         "../test/tests/string_buffer.json",
@@ -68,7 +72,10 @@ func main(len: i32, args: **char) : i32 {
         null
     }
 
-    testHarness.allocator = defaultAllocator
+    var memSize = 1024*1024*5
+    var linearAllocator = LinearAllocator{}
+    linearAllocator.init(defaultAllocator.alloc(memSize), memSize)
+    testHarness.allocator = (&linearAllocator) as (*Allocator)
     testHarness.buffer = StringBufferInit(1024, defaultAllocator)
     testHarness.numberOfTests = 0
     testHarness.numberOfFailures = 0
@@ -97,6 +104,9 @@ func main(len: i32, args: **char) : i32 {
         if(!RunTestSuite(suite, filename)) {
             printf("***FAILED Loading test suite: '%s'***\n", filename)
         }
+
+        // free memory
+        linearAllocator.currentOffset = 0
     }
 
     printf("\nRan %d tests with %d failures\n", testHarness.numberOfTests, testHarness.numberOfFailures)
@@ -213,6 +223,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     testHarness.buffer.clear() // clear previous run
 
     var tmpSrcFile = "test_output/lita_test.lita"
+    Mkdir("test_output")
     if(WriteFile(tmpSrcFile, test.programText.cStrConst(), test.programText.length) != FileStatus.Ok) {
         return TestResult.LOADING_ERROR
     }
@@ -222,6 +233,8 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     options.cOutputOnly = false
     options.showProfileInfo = false
     options.run = false // we run outselves
+    options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+
 
     strncpy(options.inputFile, tmpSrcFile, MAX_PATH)
     strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)

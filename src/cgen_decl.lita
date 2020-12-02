@@ -152,6 +152,10 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
 
     var name = this.cName(decl.sym)
 
+    if(decl.flags & AggregateFlags.IS_ANONYMOUS) {
+        name = ""
+    }
+
     this.emit("%s %s {", decl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", name)
     for(var i = 0; i < decl.fields.size(); i+=1) {
         var field = decl.fields.get(i)
@@ -176,7 +180,9 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
     }
     this.emit("}")
     if(this.aggregateLevel > 1) {
-        this.emit(" %.*s", decl.name.str.length, decl.name.str.buffer)
+        if(decl.name.str.length) {
+            this.emit(" %.*s", decl.name.str.length, decl.name.str.buffer)
+        }
     }
     this.emit(";\n")
     this.emitNotes(decl.attributes, false)

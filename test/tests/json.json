@@ -1,0 +1,236 @@
+{
+    "description": "Json",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+
+        {
+            "name": "Json Parse",
+           // disabled: true,
+            "definitions": `
+                import "json";
+                import "string_buffer";
+                import "io";
+                import "libc";
+
+            `,
+            "code": `
+                var buf : StringBuffer;
+                buf.init(16)
+
+                var parser = Parser{}
+                parser.init()
+                defer parser.free()
+
+
+                //var data: char*;
+                //var status = readFile("C:/Users/antho/git/mini/assets/mini_city.json", &data)
+                //if(status) {
+                //    printf("Failed to open\n")
+                //    return 1;
+                //}
+                //var n = ParseJson(data)
+
+                //PrintJson(n, &buf)
+                //printf("%s\n", buf.cStr())
+
+
+                var node = parser.parseJson("""
+                    [
+                         true, 4, false, "hi", 34343, null, [5],
+                         {
+                            "k" : "v"
+                         }
+
+                    ]
+                """)
+
+
+                buf.clear()
+                PrintJson(node, &buf)
+
+                //printf("'%s'\n", buf.cStr())
+                assert( strcmp(buf.cStr(), "[true,4.000000,false,\"hi\",34343.000000,null,[5.000000],{\"k\":\"v\"}]") == 0)
+                node.free()
+
+            `,
+        },
+
+
+        {
+            "name": "Json Create",
+            "definitions": `
+                import "json";
+                import "string_buffer";
+                import "io";
+                import "libc";
+
+            `,
+            "code": `
+                var buf : StringBuffer;
+                buf.init(16)
+
+                var parser = Parser{}
+                parser.init()
+                defer parser.free()
+
+                var obj = CreateJsonObject()
+                var a   = CreateJsonArray()
+                obj.put("a", a)
+
+                a = obj.get("a")
+                if(a) {
+                    a.add(CreateJsonNumber(4.5))
+                    a.add(CreateJsonString("Hello World!"))
+                    a.add(JSON_TRUE)
+                    a.add(JSON_FALSE)
+                    a.add(JSON_NULL)
+                    var obj2 = CreateJsonObject()
+                    obj2.put("b", CreateJsonString("Nirvana!"))
+                    a.add(obj2)
+                }
+
+                PrintJson(obj, &buf)
+                //printf("'%s'\n", buf.cStr())
+                assert( strcmp(buf.cStr(), "{\"a\":[4.500000,\"Hello World!\",true,false,null,{\"b\":\"Nirvana!\"}]}") == 0)
+                obj.free()
+            `,
+        },
+        {
+            "name": "Json Error",
+            "definitions": `
+                import "json";
+                import "string_buffer";
+                import "io";
+                import "libc";
+
+            `,
+            "code": `
+                var buf : StringBuffer;
+                buf.init(16)
+
+                var parser = Parser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson("""
+                    [
+                         true, 4, false, "hi", 34343, null, [5],
+
+                            "k" : "v"
+                         }
+
+                    ]
+                """)
+                //printf("error: '%s'\n", parser.errorMsg)
+
+                assert(node == null)
+                assert(parser.hasError() == true)
+                assert( strcmp(parser.errorMsg, "Expected token ], got :") == 0)
+            `,
+        },
+        {
+            "name": "Json Token Error",
+            "definitions": `
+                import "json";
+                import "string_buffer";
+                import "io";
+                import "libc";
+
+            `,
+            "code": `
+                var buf : StringBuffer;
+                buf.init(16)
+
+                var parser = Parser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson("""
+                    fase
+                """)
+                //printf("error: '%s'\n", parser.errorMsg)
+
+                assert(node == null)
+                assert(parser.hasError() == true)
+                assert( strcmp(parser.errorMsg, "invalid identifier, did you mean 'false'?") == 0)
+            `,
+        },
+        {
+            "name": "Json Token in complex Error",
+            "definitions": `
+                import "json";
+                import "string_buffer";
+                import "io";
+                import "libc";
+
+            `,
+            "code": `
+                var buf : StringBuffer;
+                buf.init(16)
+
+                var parser = Parser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson("""
+                    [
+                         tru, 4, false, "hi", 34343, null, [5],
+                         {
+                            "k" : "v"
+                         }
+
+                    ]
+                """)
+                //printf("error: '%s'\n", parser.errorMsg)
+
+                assert(node == null)
+                assert(parser.hasError() == true)
+                assert( strcmp(parser.errorMsg, "invalid identifier, did you mean 'true'?") == 0)
+
+            `,
+        },
+        {
+            "name": "Json Token Stream Error",
+            "definitions": `
+                import "json";
+                import "string_buffer";
+                import "io";
+                import "libc";
+
+            `,
+            "code": `
+                var buf : StringBuffer;
+                buf.init(16)
+
+                var parser = Parser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson("""
+                    [
+                         true 4, false, "hi", 34343, null, [5],
+                         {
+                            "k" : "v"
+                         }
+
+                    ]
+                """)
+                //printf("error: '%s'\n", parser.errorMsg)
+
+                assert(node == null)
+                assert(parser.hasError() == true)
+                assert( strcmp(parser.errorMsg, "Expected token ], got number") == 0)
+            `,
+        },
+    ]
+}

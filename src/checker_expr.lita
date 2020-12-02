@@ -1775,6 +1775,11 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     if(expr.kind == StmtKind.IDENTIFIER_EXPR) {
         var idExpr = expr as (*IdentifierExpr)
         sym = idExpr.sym
+
+        if(sym && (sym.flags & SymbolFlags.IS_TYPE)) {
+            this.result.addError(expr.startPos, "can't reassign type '%s'", sym.name)
+            return false
+        }
     }
 
     if(!sym) {
@@ -1787,12 +1792,6 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
             return false;
         }
     }
-
-    if(sym.flags & SymbolFlags.IS_TYPE) {
-        this.result.addError(expr.startPos, "can't reassign type '%s'", sym.name)
-        return false
-    }
-
 
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
         this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)

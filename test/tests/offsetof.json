@@ -1,0 +1,104 @@
+{
+    "description": "OffsetOf",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Offset of struct",
+            "disabled": false,
+            "definitions": `
+                import "io"
+
+                struct Sprite {
+                    a: i32
+                    b: i64
+                    c: i8
+                    d: i8
+                }
+
+            `,
+            "code": `
+                var A = offsetof(Sprite, a);
+                //printf("A = %lld\n", A)
+                var B = offsetof(Sprite, b);
+                //printf("B = %lld\n", B)
+                var C = offsetof(Sprite, c);
+                //printf("C = %lld\n", C)
+                var D = offsetof(Sprite, d);
+                //printf("D = %lld\n", D)
+
+                assert(A == 0)
+                assert(B == 8)
+                assert(C == 16)
+                assert(D == 17)
+            `,
+        },
+        {
+            "name": "Offset of packed struct",
+            "disabled": false,
+            "definitions": `
+                import "io"
+
+                @packed
+                struct Sprite {
+                    a: i32
+                    b: i64
+                    c: i8
+                    d: i8
+                }
+
+            `,
+            "code": `
+                var A = offsetof(Sprite, a);
+                //printf("A = %lld\n", A)
+                var B = offsetof(Sprite, b);
+                //printf("B = %lld\n", B)
+                var C = offsetof(Sprite, c);
+                //printf("C = %lld\n", C)
+                var D = offsetof(Sprite, d);
+                //printf("D = %lld\n", D)
+
+                assert(A == 0)
+                assert(B == 4)
+                assert(C == 12)
+                assert(D == 13)
+            `,
+        },
+        {
+            "name": "Offset of invalid field in struct",
+            "disabled": false,
+            "definitions": `
+                struct Sprite {
+                    a: i32
+                    b: i64
+                    c: i8
+                    d: i8
+                }
+            `,
+            "code": `
+                var A = offsetof(Sprite, z);
+            `,
+            "error": "'Sprite' does not have field 'z'"
+        },
+        {
+            "name": "Offset of invalid type",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                var A = offsetof(i32, z);
+            `,
+            "error": "'i32' must be an aggregate type"
+        }
+    ]
+}
