@@ -1,0 +1,174 @@
+{
+    "description": "Aggregates",
+    "disabled": false,
+    "debug": true,
+    "disableLines": true,
+    "includeTypeInfos": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Struct default values",
+            "definitions": `
+                struct X {
+                    a: i32 = 1
+                    b: i32
+                }
+            `,
+            "code": `
+                var x1:X;
+                var x2:X = X{}
+                var x3 = X{.a = 2}
+                var x4 = X{.b = 2}
+
+                assert(x2.a == 1)
+                assert(x2.b == 0)
+
+                assert(x3.a == 2)
+                assert(x3.b == 0)
+
+                assert(x4.a == 1)
+                assert(x4.b == 2)
+            `,
+        },
+        {
+            "name": "Struct default values invalid type",
+            "definitions": `
+                struct X {
+                    a: *X = "hi"
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "'*X' can't be assigned to '*const char'"
+        },
+        {
+            "name": "Embedded Struct default values",
+            "definitions": `
+                struct X {
+                    a: i32 = 1
+                    b: i32
+
+                    struct Y {
+                        z: i32 = 4
+                    }
+                }
+            `,
+            "code": `
+                var x1:X = X{}
+
+                assert(x1.a == 1)
+                assert(x1.b == 0)
+                assert(x1.Y.z == 0) // notice it zeroes out and does NOT use default
+
+                var x2:X = X{
+                    .a = 32,
+                    .b = 42,
+                    .Y = Y{
+                        .z = 52
+                    }
+                }
+
+                assert(x2.a == 32)
+                assert(x2.b == 42)
+                assert(x2.Y.z == 52)
+
+
+                var x3:X = X{
+                    .b = 42,
+                    .Y = Y{
+                    }
+                }
+
+                assert(x3.a == 1)
+                assert(x3.b == 42)
+                assert(x3.Y.z == 4)
+            `,
+        },
+        {
+            "name": "Embedded Struct default invalid values",
+            "definitions": `
+                struct X {
+                    a: i32 = 1
+                    b: i32
+
+                    struct Y {
+                        z: i32 = 4.4
+                    }
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "'i32' can't be assigned to 'f64'"
+        },
+        {
+            "name": "Embedded Struct default values by position",
+            "definitions": `
+                struct X {
+                    a: i32 = 2
+                    b: i32 = 3
+
+                    struct Y {
+                        z: i32
+                        x: i32 = 4
+                    }
+                }
+            `,
+            "code": `
+                var x2:X = X{
+                    32,
+                    42,
+                    Y{
+                        52
+                    }
+                }
+
+                assert(x2.a == 32)
+                assert(x2.b == 42)
+                assert(x2.Y.z == 52)
+                assert(x2.Y.x == 4)
+            `,
+        },
+        {
+            "name": "Struct default values by position",
+            "definitions": `
+                struct X {
+                    a: i32 = 2
+                    b: i32 = 3
+                }
+            `,
+            "code": `
+                var x2:X = X{
+                    32
+                }
+
+                assert(x2.a == 32)
+                assert(x2.b == 3)
+            `,
+        },
+        {
+            "name": "Union default values",
+            "definitions": `
+                union X {
+                    a: i32 = 1
+                    b: f32 = 1.0f
+                }
+            `,
+            "code": `
+
+                var x1:X = X{}
+            `,
+            "error": "Invalid default assignment statement, only allowed for 'struct'"
+        },
+    ]
+}

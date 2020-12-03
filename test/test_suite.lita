@@ -52,6 +52,9 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
+        "../test/tests/compile_time_stmt.json",
+        "../test/tests/consts.json",
+        "../test/tests/aggregates.json",
         "../test/tests/json.json",
         "../test/tests/map.json",
         "../test/tests/offsetof.json",

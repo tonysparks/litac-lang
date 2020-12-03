@@ -23,6 +23,16 @@ func test(a:*Map) : i32 {
     return a.a;
 }*/
 
+func test<T>(i: T) : T {
+                    #if ??this->junk??
+                        return i
+                    #elseif getTypeKind("i") == "F32"
+                        return i + 4.4f
+                    #else
+                        return i + 6
+                    #end
+                }
+
 func main(len:i32, args:**char) : i32 {
     /*var x = """
                     [

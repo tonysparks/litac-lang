@@ -1411,22 +1411,37 @@ func (p: *Parser) compStatement() : *Stmt {
         var pos = p.pos()
         var currentLine = pos.lineNumber
         var script = StringBufferInit(128, p.allocator)
+        var stream = pos.start
+        while(*stream) {
+            var c = *stream
+            if(c == '\n') {
+                break
+            }
+            if(c == '\\') {
+                if(stream[1] == '\n') {
+                    stream += 2
+                    currentLine += 1
+                    continue
+                }
+            }
+            script.appendChar(c)
+            stream += 1
+        }
+
+        // read the tokens until we are caught up with the
+        // eval expression
         while(!p.atEnd()) {
             var token = p.peek()
 
             var nextLine = token.pos.lineNumber
-            if(nextLine != currentLine) {
-                // TODO: Escape
+            if(nextLine > currentLine) {
                 break
             }
-            else {
-                script.append("%.*s ", token.str.length, token.str.buffer)
-                p.advance()
-            }
+            p.advance()
         }
 
         scriptExpr = script.cStr()
-      //  printf("Script is: %s and next token is: %.*s\n", scriptExpr, p.peek().str.length, p.peek().str.buffer)
+        //printf("Script is: %s and next token is: %.*s\n", scriptExpr, p.peek().str.length, p.peek().str.buffer)
 
         var body = ArrayInit<*Stmt>(32, p.allocator)
         while(!p.atEnd()) {

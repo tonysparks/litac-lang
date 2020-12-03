@@ -1,0 +1,209 @@
+{
+    "description": "Compile time Statment",
+    "disabled": false,
+    "includeTypeInfos": true,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+		{
+            "name": "If True ElseIf End",
+            "definitions": `
+
+                #if(1 == 1)
+                    struct X {
+                        x: i32
+                    }
+                    typedef X as Thing;
+                #elseif(0 == 1)
+                    struct Y {
+                        y: i32
+                    }
+                    typedef Y as Thing;
+                #end
+
+            `,
+            "code": `
+                var x = Thing{4}
+                assert(x.x == 4)
+
+            `
+        },
+        {
+            "name": "If False ElseIf True End",
+            "definitions": `
+
+                #if(1 == 0)
+                    struct X {
+                        x: i32
+                    }
+                    typedef X as Thing;
+                #elseif(1 == 1)
+                    struct Y {
+                        y: i32
+                    }
+                    typedef Y as Thing;
+                #end
+
+            `,
+            "code": `
+                var x = Thing{4}
+                assert(x.y == 4)
+
+            `
+        },
+        {
+            "name": "If false ElseIf false Else End",
+            "definitions": `
+
+                #if(1 == 0)
+                    struct X {
+                        x: i32
+                    }
+                    typedef X as Thing;
+                #elseif(0 == 1)
+                    struct Y {
+                        y: i32
+                    }
+                    typedef Y as Thing;
+                #else
+                    struct Z {
+                        z: i32
+                    }
+                    typedef Z as Thing;
+                #end
+
+            `,
+            "code": `
+                var x = Thing{4}
+                assert(x.z == 4)
+
+            `
+        },
+
+        {
+            "name": "If true import note",
+            "definitions": `
+
+                #if(true)
+                    import "libc"
+                    @raw("""
+                        #define TONY 4
+                    """);
+
+                    @foreign("TONY")
+                    const tony : i32;
+                #end
+
+            `,
+            "code": `
+                assert(tony == 4)
+                assert(SEEK_END)
+            `
+        },
+        {
+            "name": "If OS",
+            "definitions": `
+                import "libc"
+                #if(OS == "WINDOWS")
+                    const OS = "Windows"
+                #else
+                    const OS ="NotWindows"
+                #end
+
+            `,
+            "code": `
+                assert(OS == "Windows")
+            `
+        },
+        {
+            "name": "Body If Simple",
+            "definitions": `
+                func test<T>(i: T) : T {
+                    #if getTypeKind("i") == "BOOL"
+                        return i
+                    #elseif getTypeKind("i") == "F32"
+                        return i + 4.4f
+                    #elseif getTypeKind("i") == "I32"
+                        return i + 4
+                    #else
+                        return i
+                    #end
+                }
+            `,
+            "code": `
+                var x : i32 = test<i32>(1)
+                var y : f32 = test<f32>(3.0f)
+                var z : bool = test<bool>(true)
+
+                assert(x == 5)
+                assert(y == 7.4f)
+                assert(z == true)
+            `
+        },
+        {
+            "name": "Body If MultiLine",
+            "definitions": `
+                func test<T>(i: T) : T {
+                    #if getTypeKind("i") == "BOOL" ||\
+                        getTypeKind("i") == "I32"
+                        return i
+                    #elseif getTypeKind("i") == "F32"
+                        return i + 4.4f
+                    #else
+                        return i + 6
+                    #end
+                }
+            `,
+            "code": `
+                var x : i32 = test<i32>(1)
+                var y : f32 = test<f32>(3.0f)
+                var z : bool = test<bool>(true)
+
+                assert(x == 1)
+                assert(y == 7.4f)
+                assert(z == true)
+            `
+        },
+        {
+            "name": "Preprocessor Syntax Body Error",
+            "definitions": `
+                func test<T>(i: T) : T {
+                    #if this->junk??
+                        return i
+                    #elseif getTypeKind("i") == "F32"
+                        return i + 4.4f
+                    #else
+                        return i + 6
+                    #end
+                }
+            `,
+            "code": `
+                var x : i32 = test<i32>(1)
+                assert(false)
+            `,
+            "error": "error evaluating preprocessor expression: No prefix parse function for \">\" found"
+        },
+        {
+            "name": "Preprocessor Syntax Module Error",
+            "definitions": `
+                #if(??OS  "WINDOWS")
+                    const OS = "Windows"
+                #else
+                    const OS ="NotWindows"
+                #end
+            `,
+            "code": `
+                assert(false)
+            `,
+            "error": "error evaluating preprocessor expression: Illegal token"
+        },
+    ]
+}

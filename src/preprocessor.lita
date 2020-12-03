@@ -44,7 +44,7 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     this.callContext.checker = null
     this.callContext.comp = null
 
-    ape_set_repl_mode(this.ape, false) // allows redefinition of symbols if true
+    ape_set_repl_mode(this.ape, true) // allows redefinition of symbols if true
 
     // TODO: Make this properties actually respect the litaOptions...
     ape_set_global_constant(this.ape, "OS", ape_object_make_string(this.ape, "WINDOWS")) // TODO: Make this respect the platform...
@@ -54,7 +54,16 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     ape_set_external_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
 }
 
+func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
+    var result = ape_execute(this.ape, comp.expr)
+    if(ape_has_errors(this.ape)) {
+        var error = ape_get_error(this.ape, 0)
+        this.lita.result.addError(comp.startPos, "error evaluating preprocessor expression: %s", ape_error_get_message(error))
+        return false
+    }
 
+    return ape_object_get_bool(result)
+}
 /*
     type: *const char
     expr: *const char
@@ -72,7 +81,7 @@ public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, com
        strcmp(comp.type, "elseif") == 0 ||
        strcmp(comp.type, "else")   == 0) {
 
-        if(strcmp(comp.type, "else") == 0 || ape_object_get_bool(ape_execute(this.ape, comp.expr))) {
+        if(strcmp(comp.type, "else") == 0 || this.eval(comp)) {
             for(var i = 0; i < comp.body.size(); i += 1) {
                 var stmt = comp.body.get(i)
                 switch(stmt.kind) {
@@ -126,7 +135,7 @@ public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, com
        strcmp(comp.type, "elseif") == 0 ||
        strcmp(comp.type, "else")   == 0) {
 
-        if(strcmp(comp.type, "else") == 0 || ape_object_get_bool(ape_execute(this.ape, comp.expr))) {
+        if(strcmp(comp.type, "else") == 0 || this.eval(comp)) {
             comp.evaluatedStmt = NewBlockStmt(comp.startPos, comp.endPos, comp.body, this.lita.allocator)
         }
         else if(comp.end) {
