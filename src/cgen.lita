@@ -1481,6 +1481,20 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*NumberExpr)
 
             var hasDecimal = false
+            var isHex = false
+            var isBin = false
+            var length: usize = expr.startPos.end - expr.startPos.start
+            if(length > 2) {
+                var first = expr.startPos.start[0]
+                var second = tolower(expr.startPos.start[1])
+                if(first == '0' && second == 'x') {
+                    isHex = true
+                }
+                else if(first == '0' && second == 'b') {
+                    isBin = true
+                }
+            }
+
             for(var start = expr.startPos.start; start != expr.startPos.end; start += 1) {
                 var c = *start
 
@@ -1490,10 +1504,32 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 else if(c == '_') {
                     continue
                 }
-                else if(isalpha(c)
-                    /*c == 'f' || c == 'u' || c == 'i' ||
-                      c == 'F' || c == 'U' || c == 'I'*/) {
-                    break;
+                else if(isalpha(c)) {
+                    if(!isHex && !isBin) {
+                        break;
+                    }
+
+                    if(isHex) {
+                        var lowered = tolower(c)
+                        if(c != 'a' &&
+                           c != 'b' &&
+                           c != 'c' &&
+                           c != 'd' &&
+                           c != 'e' &&
+                           c != 'f' &&
+                           c != 'x') {
+                               break
+                        }
+                    }
+                    else if(isBin) {
+                        var lowered = tolower(c)
+                        if(c != 'b') {
+                               break
+                        }
+                    }
+                    else {
+                        break
+                    }
                 }
 
                 this.emit("%c", *start)

@@ -1,0 +1,190 @@
+{
+    "description": "Enums",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Enum asStr",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                @asStr
+                enum Test {
+                    A,
+                    B
+                }
+            `,
+            "code": `
+
+                assert(Test.A == 0)
+                assert(strcmp(TestAsStr(Test.A), "A") == 0)
+                assert(strcmp(TestAsStr(Test.B), "B") == 0)
+            `,
+        },
+        {
+            "name": "Enum asStr with custom name",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                @asStr
+                enum Test {
+                    @asStr("Brett")
+                    A,
+
+                    @asStr("Favre")
+                    B
+                }
+            `,
+            "code": `
+
+                assert(Test.A == 0)
+                assert(strcmp(TestAsStr(Test.A), "Brett") == 0)
+                assert(strcmp(TestAsStr(Test.B), "Favre") == 0)
+            `,
+        },
+        {
+            "name": "Enum Big asStr",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                @asStr
+                enum Test {
+                    A = 0,
+                    B = 1024
+                }
+            `,
+            "code": `
+
+                assert(Test.A == 0)
+                assert(strcmp(TestAsStr(Test.A), "A") == 0)
+                assert(strcmp(TestAsStr(Test.B), "B") == 0)
+            `,
+        },
+        {
+            "name": "Enum asStr with name",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                @asStr("ToStr")
+                enum Test {
+                    A,
+                    B
+                }
+            `,
+            "code": `
+
+                assert(Test.A == 0)
+                assert(strcmp(ToStr(Test.A), "A") == 0)
+                assert(strcmp(ToStr(Test.B), "B") == 0)
+            `,
+        },
+        {
+            "name": "Enum inside struct",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct X {
+                    @asStr("ToStr")
+                    enum Test {
+                        A,
+                        B
+                    }
+                }
+            `,
+            "code": `
+
+                assert(Test.A == 0)
+                assert(strcmp(ToStr(Test.A), "A") == 0)
+                assert(strcmp(ToStr(Test.B), "B") == 0)
+            `,
+        },
+        {
+            "name": "Enum BinaryExpr",
+            "definitions": `
+                enum Test{
+                    X = (1<<1)
+                }
+            `,
+            "code": `
+                assert(Test.X == 2)
+            `,
+        },
+
+        {
+            "name": "Enum UnaryExpr",
+            "definitions": `
+                enum Test{
+                    X = -1
+                }
+            `,
+            "code": `
+                assert(Test.X == -1)
+            `,
+        },
+        {
+            "name": "Enum with EnumValue",
+            "definitions": `
+                enum First {
+                    X = 24
+                }
+
+                enum Second {
+                    Y = First.X
+                }
+            `,
+            "code": `
+                assert(First.X == 24)
+                assert(Second.Y == 24)
+            `,
+        },
+        {
+            "name": "Enum with EnumValues",
+            "definitions": `
+                enum First {
+                    X = 2,
+                    Z = 4
+                }
+
+                enum Second {
+                    Y = (First.X|First.Z)
+                }
+            `,
+            "code": `
+                assert(First.X == 2)
+                assert(First.Z == 4)
+                assert(Second.Y == 6)
+            `,
+        },
+
+        {
+            "name": "Enum with EnumValue Hex",
+            "definitions": `
+                enum First {
+                    X = 0x0,
+                    X1 = 0x1,
+                    X2 = 0x2,
+                }
+
+            `,
+            "code": `
+                assert(First.X == 0)
+                assert(First.X1 == 1)
+                assert(First.X2 == 2)
+            `,
+        },
+    ]
+}

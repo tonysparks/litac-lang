@@ -663,8 +663,10 @@ func (l: *Lexer) scanWord() : Token {
 func (l: *Lexer) scanInt(stream: *char) {
     var base = 10;
     var start_digits = stream;
+
     if (*stream == '0') {
         stream += 1;
+
         if (tolower(*stream) == 'x') {
             stream += 1;
             base = 16;
@@ -846,6 +848,17 @@ func (l: *Lexer) scanTypeInfo() {
     }
 }
 
+func IsNumberChar(c: char) : bool {
+    return isdigit(c) || c == '_' ||
+           c == 'x' || c == 'X' ||
+           c == 'a' || c == 'A' ||
+           c == 'b' || c == 'B' ||
+           c == 'c' || c == 'C' ||
+           c == 'd' || c == 'D' ||
+           c == 'e' || c == 'E' ||
+           c == 'f' || c == 'F'
+}
+
 func (l: *Lexer) scanNumber() : Token {
     var start = l.stream
 
@@ -854,6 +867,7 @@ func (l: *Lexer) scanNumber() : Token {
 
     var hasDecimal = false
     var hasExpo = false
+    var isHex = false
     while(!l.eof()) {
         var c = *l.stream
         if(c == '.') {
@@ -862,13 +876,16 @@ func (l: *Lexer) scanNumber() : Token {
             }
             hasDecimal = true
         }
-        else if(tolower(c) == 'e') {
+        else if(tolower(c) == 'e' && !isHex) {
             if(hasExpo) {
                 break;
             }
             hasExpo = true
         }
-        else if(!isdigit(c) && c != '_') {
+        else if(!IsNumberChar(c)) {
+            if(c == 'x' || c == 'X') {
+                isHex = true
+            }
             break;
         }
 

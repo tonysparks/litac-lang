@@ -1,4 +1,4 @@
-//import "assert"
+import "assert"
 /*
 TODO: Duplicate using member
 struct Vec {
@@ -23,28 +23,14 @@ func test(a:*Map) : i32 {
     return a.a;
 }*/
 
-func test<T>(i: T) : T {
-                    #if ??this->junk??
-                        return i
-                    #elseif getTypeKind("i") == "F32"
-                        return i + 4.4f
-                    #else
-                        return i + 6
-                    #end
+enum First {
+                    X = 0x0,
+                    X1 = 0x1,
+                    X2 = 0x2,
                 }
-
 func main(len:i32, args:**char) : i32 {
-    /*var x = """
-                    [
-                         true, 4, false, "hi", 34343, null, [5],
-                         {
-                            "k" : "v"
-                         }
-
-                    ]
-                """*/
-                var x = """ """
-                var z = "another"
-    var t = "[true,4.000000,false,\"hi\",34343.000000,null,[5.000000],{\"k\":\"v\"}]"
-
+    //var i = 0x0
+    assert(First.X == 0)
+    assert(First.X1 == 1)
+    assert(First.X2 == 2)
 }
