@@ -11,6 +11,11 @@ public struct ape_object {
    _internal: u64
 }
 @foreign public typedef void as ape_object_t;
+
+
+@foreign
+public struct ape_error {
+}
 @foreign public typedef void as ape_error_t;
 
 @foreign
@@ -41,16 +46,17 @@ public enum ape_object_type {
   ,APE_OBJECT_BOOL
   ,APE_OBJECT_STRING
   ,APE_OBJECT_NULL
-  ,APE_OBJECT_BUILTIN
+  ,APE_OBJECT_NATIVE_FUNCTION
   ,APE_OBJECT_ARRAY
   ,APE_OBJECT_MAP
   ,APE_OBJECT_FUNCTION
   ,APE_OBJECT_EXTERNAL
+  ,APE_OBJECT_FREED
   ,APE_OBJECT_ANY
 }
 @foreign public typedef void as ape_object_type_t;
 
-@foreign public typedef func(*ape_t, *void, i32, *ape_object_t) : ape_object_t as ape_external_fn;
+@foreign public typedef func(*ape_t, *void, i32, *ape_object_t) : ape_object_t as ape_native_fn;
 @foreign public typedef func(u64) : *void as ape_malloc_fn;
 @foreign public typedef func(*void) : void as ape_free_fn;
 @foreign public typedef func(*void) : void as ape_data_destroy_fn;
@@ -105,10 +111,10 @@ public func ape_execute_file(p0: *ape_t, p1: *const char) : ape_object_t;
 public func ape_call(p0: *ape_t, p1: *const char, p2: i32, p3: *ape_object_t) : ape_object_t;
 
 @foreign
-public func ape_add_error(p0: *ape_t, p1: *const char) : void;
+public func ape_set_runtime_error(p0: *ape_t, p1: *const char) : void;
 
 @foreign
-public func ape_add_errorf(p0: *ape_t, p1: *const char, ...) : void;
+public func ape_set_runtime_errorf(p0: *ape_t, p1: *const char, ...) : void;
 
 @foreign
 public func ape_has_errors(p0: *const ape_t) : bool;
@@ -120,7 +126,7 @@ public func ape_errors_count(p0: *const ape_t) : i32;
 public func ape_get_error(p0: *const ape_t, p1: i32) : *const ape_error_t;
 
 @foreign
-public func ape_set_external_function(p0: *ape_t, p1: *const char, p2: ape_external_fn, p3: *void) : bool;
+public func ape_set_native_function(p0: *ape_t, p1: *const char, p2: ape_native_fn, p3: *void) : bool;
 
 @foreign
 public func ape_set_global_constant(p0: *ape_t, p1: *const char, p2: ape_object_t) : bool;
@@ -153,6 +159,9 @@ public func ape_object_make_array(p0: *ape_t) : ape_object_t;
 public func ape_object_make_map(p0: *ape_t) : ape_object_t;
 
 @foreign
+public func ape_object_make_native_function(p0: *ape_t, p1: ape_native_fn, p2: *void) : ape_object_t;
+
+@foreign
 public func ape_object_make_error(p0: *ape_t, p1: *const char) : ape_object_t;
 
 @foreign
@@ -163,6 +172,21 @@ public func ape_object_make_external(p0: *ape_t, p1: *void) : ape_object_t;
 
 @foreign
 public func ape_object_serialize(p0: ape_object_t) : *char;
+
+@foreign
+public func ape_object_disable_gc(p0: ape_object_t) : void;
+
+@foreign
+public func ape_object_enable_gc(p0: ape_object_t) : void;
+
+@foreign
+public func ape_object_equals(p0: ape_object_t, p1: ape_object_t) : bool;
+
+@foreign
+public func ape_object_copy(p0: ape_object_t) : ape_object_t;
+
+@foreign
+public func ape_object_deep_copy(p0: ape_object_t) : ape_object_t;
 
 @foreign
 public func ape_object_get_type(p0: ape_object_t) : ape_object_type_t;
@@ -243,40 +267,46 @@ public func ape_object_get_map_key_at(p0: ape_object_t, p1: i32) : ape_object_t;
 public func ape_object_get_map_value_at(p0: ape_object_t, p1: i32) : ape_object_t;
 
 @foreign
-public func ape_object_set_map_value(p0: ape_object_t, p1: ape_object_t, p2: ape_object_t) : bool;
+public func ape_object_set_map_value_at(p0: ape_object_t, p1: i32, p2: ape_object_t) : bool;
 
 @foreign
-public func ape_object_set_map_value_with_string_key(p0: ape_object_t, p1: *const char, p2: ape_object_t) : bool;
+public func ape_object_set_map_value_with_value_key(p0: ape_object_t, p1: ape_object_t, p2: ape_object_t) : bool;
 
 @foreign
-public func ape_object_set_map_string_with_string_key(p0: ape_object_t, p1: *const char, p2: *const char) : bool;
+public func ape_object_set_map_value(p0: ape_object_t, p1: *const char, p2: ape_object_t) : bool;
 
 @foreign
-public func ape_object_set_map_number_with_string_key(p0: ape_object_t, p1: *const char, p2: f64) : bool;
+public func ape_object_set_map_string(p0: ape_object_t, p1: *const char, p2: *const char) : bool;
 
 @foreign
-public func ape_object_set_map_bool_with_string_key(p0: ape_object_t, p1: *const char, p2: bool) : bool;
+public func ape_object_set_map_number(p0: ape_object_t, p1: *const char, p2: f64) : bool;
 
 @foreign
-public func ape_object_get_map_value(p0: ape_object_t, p1: ape_object_t) : ape_object_t;
+public func ape_object_set_map_bool(p0: ape_object_t, p1: *const char, p2: bool) : bool;
 
 @foreign
-public func ape_object_get_map_value_with_string_key(p0: ape_object_t, p1: *const char) : ape_object_t;
+public func ape_object_get_map_value_with_value_key(p0: ape_object_t, p1: ape_object_t) : ape_object_t;
 
 @foreign
-public func ape_object_get_map_string_with_string_key(p0: ape_object_t, p1: *const char) : *const char;
+public func ape_object_get_map_value(p0: ape_object_t, p1: *const char) : ape_object_t;
 
 @foreign
-public func ape_object_get_map_number_with_string_key(p0: ape_object_t, p1: *const char) : f64;
+public func ape_object_get_map_string(p0: ape_object_t, p1: *const char) : *const char;
 
 @foreign
-public func ape_object_get_map_bool_with_string_key(p0: ape_object_t, p1: *const char) : bool;
+public func ape_object_get_map_number(p0: ape_object_t, p1: *const char) : f64;
+
+@foreign
+public func ape_object_get_map_bool(p0: ape_object_t, p1: *const char) : bool;
+
+@foreign
+public func ape_object_map_has_key(p0: ape_object_t, p1: *const char) : bool;
 
 @foreign
 public func ape_error_get_message(p0: *const ape_error_t) : *const char;
 
 @foreign
-public func ape_error_get_filename(p0: *const ape_error_t) : *const char;
+public func ape_error_get_filepath(p0: *const ape_error_t) : *const char;
 
 @foreign
 public func ape_error_get_line(p0: *const ape_error_t) : *const char;
@@ -306,7 +336,7 @@ public func ape_error_get_traceback(p0: *const ape_error_t) : *const ape_traceba
 public func ape_traceback_get_depth(p0: *const ape_traceback_t) : i32;
 
 @foreign
-public func ape_traceback_get_filename(p0: *const ape_traceback_t, p1: i32) : *const char;
+public func ape_traceback_get_filepath(p0: *const ape_traceback_t, p1: i32) : *const char;
 
 @foreign
 public func ape_traceback_get_line(p0: *const ape_traceback_t, p1: i32) : *const char;
@@ -319,15 +349,14 @@ public func ape_traceback_get_column_number(p0: *const ape_traceback_t, p1: i32)
 
 @foreign
 public func ape_traceback_get_function_name(p0: *const ape_traceback_t, p1: i32) : *const char;
-
 // empty macro!!
 // empty macro!!
 @foreign public const APE_VERSION_MAJOR: i32;
 @foreign public const APE_VERSION_MINOR: i32;
 @foreign public const APE_VERSION_PATCH: i32;
 @foreign public const APE_VERSION_STRING: i32;
-///@foreign public const APE_CALL: i32;
-///@foreign public const APE_CHECK_ARGS: i32;
+//@foreign public const APE_CALL: i32;
+//@foreign public const APE_CHECK_ARGS: i32;
 
 
 @foreign("APE_CALL")

@@ -1,15 +1,20 @@
 import "ast"
 import "ast_new"
 import "array"
+import "map"
 import "string_buffer"
+import "string_view"
 import "phase_result"
 import "checker"
+import "parser"
 import "lex"
 import "mem"
+import "module"
 import "lita"
 import "types"
 import "libc"
 import "assert"
+import "symbols"
 import "ape/ape"
 /*
 ================================================
@@ -17,17 +22,26 @@ import "ape/ape"
 ================================================
 */
 
+func noOpFree(mem: *void) {
+    // do nothing
+}
+
+@foreign("malloc")
+func xmalloc(len: u64) :*void;
+
 
 public struct Preprocessor {
     lita: *Lita
     ape: *ape_t
     callContext: CallContext
+    preCheckers: Array<*CompStmt>
 }
 
 struct CallContext {
     pp: *Preprocessor
     checker: *TypeChecker
     comp: *CompStmt
+    buffer: StringBuffer
 }
 
 public func PreprocessorInit(lita: *Lita) : Preprocessor {
@@ -40,18 +54,29 @@ public func PreprocessorInit(lita: *Lita) : Preprocessor {
 public func (this: *Preprocessor) init(lita: *Lita) {
     this.lita = lita
     this.ape = ape_make();
+    this.preCheckers.init(8, lita.allocator)
     this.callContext.pp = this
     this.callContext.checker = null
     this.callContext.comp = null
+    this.callContext.buffer.init(1024, lita.allocator)
+
+
 
     ape_set_repl_mode(this.ape, true) // allows redefinition of symbols if true
+//    ape_set_gc_interval(this.ape, 1000000)
+  //  ape_set_memory_functions(&xmalloc, &noOpFree)
 
     // TODO: Make this properties actually respect the litaOptions...
     ape_set_global_constant(this.ape, "OS", ape_object_make_string(this.ape, "WINDOWS")) // TODO: Make this respect the platform...
     ape_set_global_constant(this.ape, "DEBUG", ape_object_make_bool(true))
     ape_set_global_constant(this.ape, "REFLECTION", ape_object_make_bool(false))
 
-    ape_set_external_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
+    ape_set_native_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
+    ape_set_native_function(this.ape, "getSymbolsByNote", ApeGetSymbolsWithNote, &this.callContext)
+    ape_set_native_function(this.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
+    ape_set_native_function(this.ape, "emit", ApeEmit, &this.callContext)
+    ape_set_native_function(this.ape, "emitClear", ApeEmitClear, &this.callContext)
+    ape_set_native_function(this.ape, "emitStr", ApeEmitStr, &this.callContext)
 }
 
 func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
@@ -77,7 +102,14 @@ public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, com
     // TODO: we need a checker...
     this.callContext.comp = comp
 
-    if(strcmp(comp.type, "if")     == 0 ||
+    // Preprocessor directives
+    if(strcmp(comp.type, "precheck") == 0) {
+        this.preCheckers.add(comp)
+    }
+    else if(strcmp(comp.type, "postparse") == 0) {
+        this.callContext.preprocessCall(moduleStmt, comp)
+    }
+    else if(strcmp(comp.type, "if")     == 0 ||
        strcmp(comp.type, "elseif") == 0 ||
        strcmp(comp.type, "else")   == 0) {
 
@@ -192,4 +224,302 @@ func (this: *CallContext) logErrors() : bool {
     }
 
     return true
+}
+
+
+public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker) {
+    //this.symbolFuncs.add(sym)
+    //this.symbolTypes.add(sym)
+
+    this.callContext.checker = checker
+
+    for(var i = 0; i < this.preCheckers.size(); i += 1) {
+        var comp = this.preCheckers.get(i)
+        this.callContext.comp = comp
+        this.eval(comp)
+    }
+
+    /*
+    for(var i = 0; i < checker.symbolFuncs.size(); i += 1) {
+        var sym = checker.symbolFuncs.get(i)
+        printf("Visiting function: %s\n", sym.name)
+
+        var symObj = ape_object_make_map(this.ape)
+        ape_object_set_map_string_with_string_key(symObj, "name", sym.name)
+    }
+    for(var i = 0; i < checker.symbolTypes.size(); i += 1) {
+        var sym = checker.symbolTypes.get(i)
+        printf("Visiting type: %s\n", sym.name)
+    }*/
+}
+
+func (this: *Preprocessor) addNotes(obj: ape_object_t, attributes: *Attributes) {
+    if(attributes.notes.size()) {
+        var notesArray = ape_object_make_array(this.ape)
+        for(var i = 0; i < attributes.notes.size(); i += 1) {
+            var note = attributes.notes.get(i)
+            var noteObj = ape_object_make_map(this.ape)
+            var name = ape_object_make_stringf(this.ape, "%.*s", note.name.str.length, note.name.str.buffer)
+            ape_object_set_map_value(noteObj, "name", name)
+
+            if(note.attributes.size()) {
+                var attributesArray = ape_object_make_array(this.ape)
+                for(var i = 0; i < note.attributes.size(); i += 1) {
+                    var attr = note.attributes.get(i)
+                    var attrObj = ape_object_make_map(this.ape)
+                    var name = ape_object_make_stringf(this.ape, "%.*s", attr.str.length, attr.str.buffer)
+                    ape_object_set_map_value(attrObj, "name", name)
+                    ape_object_add_array_value(attributesArray, attrObj)
+                }
+                ape_object_set_map_value(noteObj, "attributes", attributesArray)
+            }
+
+            ape_object_add_array_value(notesArray, noteObj)
+        }
+
+        ape_object_set_map_value(obj, "notes", notesArray)
+    }
+}
+
+func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
+    var declObj = ape_object_make_map(this.ape)
+    ape_object_set_map_string(declObj, "name", sym.name)
+    ape_object_set_map_string(declObj, "kind", StmtKindAsStr(sym.decl.kind))
+    ape_object_set_map_string(declObj, "moduleName", sym.declared.id.filename)
+    ape_object_set_map_value(declObj, "isPublic", ape_object_make_bool(sym.decl.attributes.isPublic))
+    ape_object_set_map_value(declObj, "isGlobal", ape_object_make_bool(sym.decl.attributes.isGlobal))
+
+    this.addNotes(declObj, sym.decl.attributes)
+
+    switch(sym.decl.kind) {
+        case StmtKind.FUNC_DECL: {
+            break;
+        }
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL: {
+            var aggObj = ape_object_make_map(this.ape)
+            if(StmtKind.UNION_DECL == sym.decl.kind) {
+                ape_object_set_map_value(declObj, "unionDecl", aggObj)
+            }
+            else {
+                ape_object_set_map_value(declObj, "structDecl", aggObj)
+            }
+
+            var fieldsArray = ape_object_make_array(this.ape)
+            var aggDecl = sym.decl as (*AggregateDecl)
+            for(var i = 0; i < aggDecl.fields.size(); i += 1) {
+                var field = aggDecl.fields.get(i)
+
+                var fieldObj = ape_object_make_map(this.ape)
+                switch(field.kind) {
+                    case StmtKind.VAR_FIELD_DECL: {
+                        var varField = field.varField
+
+                        var name = ape_object_make_stringf(this.ape, "%.*s", varField.name.str.length, varField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+
+                        // TODO: type and defaultExpr
+
+                        this.addNotes(fieldObj, varField.attributes)
+                        break
+                    }
+                    case StmtKind.ENUM_FIELD_DECL: {
+                        var enumField = field.enumField
+                        // TODO
+
+                        var name = ape_object_make_stringf(this.ape, "%.*s", enumField.name.str.length, enumField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+
+                        this.addNotes(fieldObj, enumField.attributes)
+                        break;
+                    }
+                    case StmtKind.UNION_FIELD_DECL:
+                    case StmtKind.STRUCT_FIELD_DECL: {
+                        var aggregateField = field.aggregateField
+                        // TODO
+                        var name = ape_object_make_stringf(this.ape, "%.*s", aggregateField.name.str.length, aggregateField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+
+                        this.addNotes(fieldObj, aggregateField.attributes)
+                        break;
+                    }
+                    default:
+                        break;
+                }
+
+                ape_object_add_array_value(fieldsArray, fieldObj)
+            }
+            ape_object_set_map_value(aggObj, "fields", fieldsArray)
+            break;
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            break;
+        }
+        case StmtKind.ENUM_DECL: {
+            var enumObj = ape_object_make_map(this.ape)
+            ape_object_set_map_value(declObj, "enumDecl", enumObj)
+
+            var fieldsArray = ape_object_make_array(this.ape)
+            var enumDecl = sym.decl as (*EnumDecl)
+            for(var i = 0; i < enumDecl.fields.size(); i += 1) {
+                var field = enumDecl.fields.get(i)
+                var fieldObj = ape_object_make_map(this.ape)
+
+                var name = ape_object_make_stringf(this.ape, "%.*s", field.name.str.length, field.name.str.buffer)
+                ape_object_set_map_value(fieldObj, "name", name)
+
+                this.addNotes(fieldObj, field.attributes)
+                ape_object_add_array_value(fieldsArray, fieldObj)
+            }
+            ape_object_set_map_value(enumObj, "fields", fieldsArray)
+            break;
+        }
+        default: {
+            break
+        }
+    }
+
+    return declObj
+
+}
+
+@doc("""
+Parses out the #preprocess compile time statement which will attempt to
+generate or alter existing source.
+""")
+func (this: *CallContext) preprocessCall(moduleStmt: *ModuleStmt, comp: *CompStmt) {
+    this.pp.eval(comp)
+
+    var original = StringViewInit(this.buffer.buffer, this.buffer.length)
+    var emitCode = original.copy(this.pp.lita.allocator)
+
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, this.pp.lita)
+    var stmts = parser.parseModule()
+
+    if(stmts) {
+        if(stmts.imports.size()) {
+            moduleStmt.imports.addAll(stmts.imports)
+        }
+        if(stmts.notes.size()) {
+            moduleStmt.notes.addAll(stmts.notes)
+        }
+        if(stmts.declarations.size()) {
+            moduleStmt.declarations.addAll(stmts.declarations)
+        }
+    }
+}
+
+
+func ApeEmit(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(element) {
+        context.buffer.append("%s", element)
+    }
+
+    return ape_object_make_null()
+}
+
+func ApeEmitClear(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    context.buffer.clear()
+    return ape_object_make_null()
+}
+
+func ApeEmitStr(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    return ape_object_make_string(ape, context.buffer.cStr())
+}
+
+func ApeGetSymbolsWithNote(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(!element) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty note name")
+        return ape_object_make_null()
+    }
+
+    var results = ape_object_make_array(ape)
+    for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
+        var sym = context.checker.symbolFuncs.get(i)
+        if(sym.decl.hasNote(element)) {
+            var declObj = context.pp.declToApe(sym)
+            ape_object_add_array_value(results, declObj)
+        }
+    }
+    for(var i = 0; i < context.checker.symbolTypes.size(); i += 1) {
+        var sym = context.checker.symbolTypes.get(i)
+        if(sym.decl.hasNote(element)) {
+            var declObj = context.pp.declToApe(sym)
+            ape_object_add_array_value(results, declObj)
+        }
+    }
+
+    return results
+}
+
+func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module name")
+        return ape_object_make_null()
+    }
+
+    var code = ape_object_get_string(args[1]) as (*const char)
+    if(!code) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.modules.get(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var moduleStmt = module.ast
+
+    var original = StringViewInit(code)
+    var emitCode = original.copy(context.pp.lita.allocator)
+
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, context.pp.lita)
+    var stmts = parser.parseModule()
+
+    if(stmts) {
+        if(stmts.imports.size()) {
+            moduleStmt.imports.addAll(stmts.imports)
+        }
+        if(stmts.notes.size()) {
+            moduleStmt.notes.addAll(stmts.notes)
+        }
+        if(stmts.declarations.size()) {
+            moduleStmt.declarations.addAll(stmts.declarations)
+
+            context.checker.enterModule(module)
+            defer context.checker.leaveModule()
+
+            for(var i = 0; i < stmts.declarations.size(); i += 1) {
+                var decl = stmts.declarations.get(i)
+                context.checker.createDeclSymbol(decl)
+            }
+        }
+    }
+
+    return ape_object_make_bool(true)
 }

@@ -48,7 +48,7 @@ public const BUILTIN_IMPORT_TOKEN = Token {
     }
 }
 public const builtins = Module{}
-const genericSymbols = Map<*const char, *Symbol>{}
+const genericSymbols = Map<*const char, *Symbol>{} // TODO: make this in Lita? bad that it's a global...
 public func BuiltinsInit(lita: *Lita) : *Module {
     genericSymbols.init(null, 128, StrHashFn, StrEqualFn, lita.allocator)
 

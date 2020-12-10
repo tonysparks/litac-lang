@@ -103,8 +103,10 @@ typedef struct ape_config {
     bool repl_mode; // allows redefinition of symbols
 } ape_config_t;
 
+#ifndef APE_AMALGAMATED
 extern const src_pos_t src_pos_invalid;
 extern const src_pos_t src_pos_zero;
+#endif
 
 APE_INTERNAL src_pos_t src_pos_make(const compiled_file_t *file, int line, int column);
 APE_INTERNAL char *ape_stringf(const char *format, ...);
@@ -165,7 +167,7 @@ THE SOFTWARE.
 typedef void * (*collections_malloc_fn)(size_t size);
 typedef void (*collections_free_fn)(void *ptr);
 typedef unsigned long (*collections_hash_fn)(const void* val);
-typedef int (*collections_equals_fn)(const void *a, const void *b);
+typedef bool (*collections_equals_fn)(const void *a, const void *b);
 
 COLLECTIONS_API void collections_set_memory_functions(collections_malloc_fn malloc_fn, collections_free_fn free_fn);
 
@@ -206,13 +208,15 @@ typedef struct valdict_ valdict_t_;
 #define valdict_make(key_type, val_type) valdict_make_(sizeof(key_type), sizeof(val_type))
 
 COLLECTIONS_API valdict_t_* valdict_make_(size_t key_size, size_t val_size);
+COLLECTIONS_API valdict_t_* valdict_make_with_capacity(unsigned int min_capacity, size_t key_size, size_t val_size);
 COLLECTIONS_API void        valdict_destroy(valdict_t_ *dict);
 COLLECTIONS_API void        valdict_set_hash_function(valdict_t_ *dict, collections_hash_fn hash_fn);
 COLLECTIONS_API void        valdict_set_equals_function(valdict_t_ *dict, collections_equals_fn equals_fn);
 COLLECTIONS_API bool        valdict_set(valdict_t_ *dict, void *key, void *value);
 COLLECTIONS_API void *      valdict_get(const valdict_t_ *dict, const void *key);
-COLLECTIONS_API void *      valdict_get_value_at(const valdict_t_ *dict, unsigned int ix);
 COLLECTIONS_API void *      valdict_get_key_at(const valdict_t_ *dict, unsigned int ix);
+COLLECTIONS_API void *      valdict_get_value_at(const valdict_t_ *dict, unsigned int ix);
+COLLECTIONS_API bool        valdict_set_value_at(const valdict_t_ *dict, unsigned int ix, const void *value);
 COLLECTIONS_API int         valdict_count(const valdict_t_ *dict);
 COLLECTIONS_API bool        valdict_remove(valdict_t_ *dict, void *key);
 COLLECTIONS_API void        valdict_clear(valdict_t_ *dict);
@@ -227,7 +231,7 @@ typedef struct ptrdict_ ptrdict_t_;
 
 COLLECTIONS_API ptrdict_t_* ptrdict_make(void);
 COLLECTIONS_API void        ptrdict_destroy(ptrdict_t_ *dict);
-COLLECTIONS_API void        trdict_set_hash_function(ptrdict_t_ *dict, collections_hash_fn hash_fn);
+COLLECTIONS_API void        ptrdict_set_hash_function(ptrdict_t_ *dict, collections_hash_fn hash_fn);
 COLLECTIONS_API void        ptrdict_set_equals_function(ptrdict_t_ *dict, collections_equals_fn equals_fn);
 COLLECTIONS_API bool        ptrdict_set(ptrdict_t_ *dict, void *key, void *value);
 COLLECTIONS_API void *      ptrdict_get(const ptrdict_t_ *dict, const void *key);
@@ -266,11 +270,13 @@ COLLECTIONS_API bool        array_setn(array_t_ *arr, unsigned int ix, void *val
 COLLECTIONS_API void *      array_get(const array_t_ *arr, unsigned int ix);
 COLLECTIONS_API void *      array_get_last(const array_t_ *arr);
 COLLECTIONS_API int         array_count(const array_t_ *arr);
-COLLECTIONS_API bool        array_remove(array_t_ *arr, unsigned int ix);
+COLLECTIONS_API bool        array_remove_at(array_t_ *arr, unsigned int ix);
+COLLECTIONS_API bool        array_remove_item(array_t_ *arr, void *ptr);
 COLLECTIONS_API void        array_clear(array_t_ *arr);
 COLLECTIONS_API void        array_clear_and_deinit_items_(array_t_ *arr, array_item_deinit_fn deinit_fn);
 COLLECTIONS_API void        array_lock_capacity(array_t_ *arr);
 COLLECTIONS_API int         array_get_index(const array_t_ *arr, void *ptr);
+COLLECTIONS_API bool        array_contains(const array_t_ *arr, void *ptr);
 COLLECTIONS_API void*       array_data(array_t_ *arr);
 COLLECTIONS_API const void* array_const_data(const array_t_ *arr);
 COLLECTIONS_API bool        array_orphan_data(array_t_ *arr);
@@ -305,12 +311,13 @@ COLLECTIONS_API bool         ptrarray_push(ptrarray_t_ *arr, void *ptr);
 COLLECTIONS_API void *       ptrarray_pop(ptrarray_t_ *arr);
 COLLECTIONS_API void *       ptrarray_top(ptrarray_t_ *arr);
 COLLECTIONS_API int          ptrarray_count(const ptrarray_t_ *arr);
-COLLECTIONS_API bool         ptrarray_remove(ptrarray_t_ *arr, unsigned int ix);
+COLLECTIONS_API bool         ptrarray_remove_at(ptrarray_t_ *arr, unsigned int ix);
 COLLECTIONS_API bool         ptrarray_remove_item(ptrarray_t_ *arr, void *item);
 COLLECTIONS_API void         ptrarray_clear(ptrarray_t_ *arr);
 COLLECTIONS_API void         ptrarray_clear_and_destroy_items_(ptrarray_t_ *arr, ptrarray_item_destroy_fn destroy_fn);
 COLLECTIONS_API void         ptrarray_lock_capacity(ptrarray_t_ *arr);
 COLLECTIONS_API int          ptrarray_get_index(ptrarray_t_ *arr, void *ptr);
+COLLECTIONS_API bool         ptrarray_contains(ptrarray_t_ *arr, void *ptr);
 COLLECTIONS_API void *       ptrarray_get_addr(ptrarray_t_ *arr, unsigned int ix);
 COLLECTIONS_API void*        ptrarray_data(ptrarray_t_ *arr);
 COLLECTIONS_API void         ptrarray_reverse(ptrarray_t_ *arr);
@@ -330,6 +337,16 @@ COLLECTIONS_API bool strbuf_appendf(strbuf_t *buf, const char *fmt, ...)  __attr
 COLLECTIONS_API const char * strbuf_get_string(const strbuf_t *buf);
 COLLECTIONS_API size_t strbuf_get_length(const strbuf_t *buf);
 COLLECTIONS_API char * strbuf_get_string_and_destroy(strbuf_t *buf);
+
+//-----------------------------------------------------------------------------
+// Utils
+//-----------------------------------------------------------------------------
+
+COLLECTIONS_API ptrarray(char)* kg_split_string(const char *str, const char *delimiter);
+COLLECTIONS_API char* kg_join(ptrarray(char) *items, const char *with);
+COLLECTIONS_API char* kg_canonicalise_path(const char *path);
+COLLECTIONS_API bool  kg_is_path_absolute(const char *path);
+COLLECTIONS_API bool  kg_streq(const char *a, const char *b);
 
 #endif /* collections_h */
 //FILE_END
@@ -386,6 +403,12 @@ typedef enum {
     TOKEN_MINUS_ASSIGN,
     TOKEN_ASTERISK_ASSIGN,
     TOKEN_SLASH_ASSIGN,
+    TOKEN_PERCENT_ASSIGN,
+    TOKEN_BIT_AND_ASSIGN,
+    TOKEN_BIT_OR_ASSIGN,
+    TOKEN_BIT_XOR_ASSIGN,
+    TOKEN_LSHIFT_ASSIGN,
+    TOKEN_RSHIFT_ASSIGN,
 
     TOKEN_PLUS,
     TOKEN_MINUS,
@@ -403,8 +426,12 @@ typedef enum {
 
     TOKEN_AND,
     TOKEN_OR,
-    TOKEN_AMPERSAND,
-    TOKEN_VBAR,
+
+    TOKEN_BIT_AND,
+    TOKEN_BIT_OR,
+    TOKEN_BIT_XOR,
+    TOKEN_LSHIFT,
+    TOKEN_RSHIFT,
 
     // Delimiters
     TOKEN_COMMA,
@@ -435,6 +462,7 @@ typedef enum {
     TOKEN_CONTINUE,
     TOKEN_NULL,
     TOKEN_IMPORT,
+    TOKEN_RECOVER,
 
     // Identifiers and literals
     TOKEN_IDENT,
@@ -472,7 +500,6 @@ APE_INTERNAL const char *token_type_to_string(token_type_t type);
 typedef struct lexer {
     const char *input;
     int input_len;
-    int line_start_position;
     int position;
     int next_position;
     char ch;
@@ -526,6 +553,11 @@ typedef enum {
     OPERATOR_MODULUS,
     OPERATOR_LOGICAL_AND,
     OPERATOR_LOGICAL_OR,
+    OPERATOR_BIT_AND,
+    OPERATOR_BIT_OR,
+    OPERATOR_BIT_XOR,
+    OPERATOR_LSHIFT,
+    OPERATOR_RSHIFT,
 } operator_t;
 
 typedef struct prefix {
@@ -590,7 +622,8 @@ typedef enum expression_type {
 } expression_type_t;
 
 typedef struct ident {
-    char *name;
+    char *value;
+    src_pos_t pos;
 } ident_t;
 
 typedef struct expression {
@@ -626,10 +659,11 @@ typedef enum statement_type {
     STATEMENT_FOR_LOOP,
     STATEMENT_BLOCK,
     STATEMENT_IMPORT,
+    STATEMENT_RECOVER,
 } statement_type_t;
 
 typedef struct define_statement {
-    char *name;
+    ident_t name;
     expression_t *value;
     bool assignable;
 } define_statement_t;
@@ -645,7 +679,7 @@ typedef struct while_loop_statement {
 } while_loop_statement_t;
 
 typedef struct foreach_statement {
-    char *iterator_name;
+    ident_t iterator;
     expression_t *source;
     code_block_t *body;
 } foreach_statement_t;
@@ -658,8 +692,13 @@ typedef struct for_loop_statement {
 } for_loop_statement_t;
 
 typedef struct import_statement {
-    char *name;
+    char *path;
 } import_statement_t;
+
+typedef struct recover_statement {
+    ident_t error_ident;
+    code_block_t *body;
+} recover_statement_t;
 
 typedef struct statement {
     statement_type_t type;
@@ -673,23 +712,25 @@ typedef struct statement {
         for_loop_statement_t for_loop;
         code_block_t *block;
         import_statement_t import;
+        recover_statement_t recover;
     };
     src_pos_t pos;
 } statement_t;
 
 APE_INTERNAL char* statements_to_string(ptrarray(statement_t) *statements);
 
-APE_INTERNAL statement_t* statement_make_define(char *name, expression_t *value, bool assignable);
+APE_INTERNAL statement_t* statement_make_define(ident_t name, expression_t *value, bool assignable);
 APE_INTERNAL statement_t* statement_make_if(ptrarray(if_case_t) *cases, code_block_t *alternative);
 APE_INTERNAL statement_t* statement_make_return(expression_t *value);
 APE_INTERNAL statement_t* statement_make_expression(expression_t *value);
 APE_INTERNAL statement_t* statement_make_while_loop(expression_t *test, code_block_t *body);
 APE_INTERNAL statement_t* statement_make_break(void);
-APE_INTERNAL statement_t* statement_make_foreach(char *iterator_name, expression_t *source, code_block_t *body);
+APE_INTERNAL statement_t* statement_make_foreach(ident_t iterator, expression_t *source, code_block_t *body);
 APE_INTERNAL statement_t* statement_make_for_loop(statement_t *init, expression_t *test, expression_t *update, code_block_t *body);
 APE_INTERNAL statement_t* statement_make_continue(void);
 APE_INTERNAL statement_t* statement_make_block(code_block_t *block);
-APE_INTERNAL statement_t* statement_make_import(const char *name);
+APE_INTERNAL statement_t* statement_make_import(char *path);
+APE_INTERNAL statement_t* statement_make_recover(ident_t error_ident, code_block_t *body);
 
 APE_INTERNAL void statement_destroy(statement_t *stmt);
 
@@ -699,10 +740,10 @@ APE_INTERNAL code_block_t* code_block_make(ptrarray(statement_t) *statements);
 APE_INTERNAL void code_block_destroy(code_block_t *stmt);
 APE_INTERNAL code_block_t* code_block_copy(code_block_t *block);
 
-APE_INTERNAL expression_t* expression_make_ident(char *name); // takes ownership of value
+APE_INTERNAL expression_t* expression_make_ident(ident_t ident);
 APE_INTERNAL expression_t* expression_make_number_literal(double val);
 APE_INTERNAL expression_t* expression_make_bool_literal(bool val);
-APE_INTERNAL expression_t* expression_make_string_literal(char *value); // takes ownership of value
+APE_INTERNAL expression_t* expression_make_string_literal(char *value);
 APE_INTERNAL expression_t* expression_make_null_literal(void);
 APE_INTERNAL expression_t* expression_make_array_literal(ptrarray(expression_t) *values);
 APE_INTERNAL expression_t* expression_make_map_literal(ptrarray(expression_t) *keys, ptrarray(expression_t) *values);
@@ -728,7 +769,8 @@ APE_INTERNAL const char *expression_type_to_string(expression_type_t type);
 
 APE_INTERNAL void fn_literal_deinit(fn_literal_t *fn);
 
-APE_INTERNAL void ident_init(ident_t *ident, char *value);
+APE_INTERNAL ident_t ident_make(token_t tok);
+APE_INTERNAL ident_t ident_copy(ident_t ident);
 APE_INTERNAL void ident_deinit(ident_t *ident);
 
 APE_INTERNAL if_case_t *if_case_make(expression_t *test, code_block_t *consequence);
@@ -760,7 +802,7 @@ typedef struct parser {
     token_t cur_token;
     token_t peek_token;
     ptrarray(error_t) *errors;
-    
+
     prefix_parse_fn prefix_parse_fns[TOKEN_TYPE_MAX];
     infix_parse_fn infix_parse_fns[TOKEN_TYPE_MAX];
 
@@ -788,9 +830,10 @@ typedef enum symbol_type {
     SYMBOL_NONE = 0,
     SYMBOL_GLOBAL,
     SYMBOL_LOCAL,
-    SYMBOL_BUILTIN,
+    SYMBOL_NATIVE_FUNCTION,
     SYMBOL_FREE,
     SYMBOL_FUNCTION,
+    SYMBOL_THIS,
 } symbol_type_t;
 
 typedef struct symbol {
@@ -822,15 +865,21 @@ APE_INTERNAL void symbol_table_destroy(symbol_table_t *st);
 APE_INTERNAL symbol_table_t* symbol_table_copy(symbol_table_t *st);
 APE_INTERNAL void symbol_table_add_module_symbol(symbol_table_t *st, const symbol_t *symbol);
 APE_INTERNAL symbol_t *symbol_table_define(symbol_table_t *st, const char *name, bool assignable);
-APE_INTERNAL symbol_t *symbol_table_define_builtin(symbol_table_t *st, const char *name, int ix);
+APE_INTERNAL symbol_t *symbol_table_define_native_function(symbol_table_t *st, const char *name, int ix);
 APE_INTERNAL symbol_t *symbol_table_define_free(symbol_table_t *st, symbol_t *original);
-APE_INTERNAL symbol_t * symbol_table_define_function_name(symbol_table_t *st, const char *name, bool assignable);
+APE_INTERNAL symbol_t *symbol_table_define_function_name(symbol_table_t *st, const char *name, bool assignable);
+APE_INTERNAL symbol_t *symbol_table_define_this(symbol_table_t *st);
+
 APE_INTERNAL symbol_t *symbol_table_resolve(symbol_table_t *st, const char *name);
 
 APE_INTERNAL bool symbol_table_symbol_is_defined(symbol_table_t *st, const char *name);
 APE_INTERNAL void symbol_table_push_block_scope(symbol_table_t *table);
 APE_INTERNAL void symbol_table_pop_block_scope(symbol_table_t *table);
 APE_INTERNAL block_scope_t* symbol_table_get_block_scope(symbol_table_t *table);
+
+APE_INTERNAL bool symbol_table_is_global_scope(symbol_table_t *table);
+APE_INTERNAL bool symbol_table_is_top_block_scope(symbol_table_t *table);
+APE_INTERNAL bool symbol_table_is_top_global_scope(symbol_table_t *table);
 
 #endif /* symbol_table_h */
 //FILE_END
@@ -858,6 +907,7 @@ typedef enum opcode_val {
     OPCODE_MOD,
     OPCODE_TRUE,
     OPCODE_FALSE,
+    OPCODE_COMPARE,
     OPCODE_EQUAL,
     OPCODE_NOT_EQUAL,
     OPCODE_GREATER_THAN,
@@ -870,8 +920,11 @@ typedef enum opcode_val {
     OPCODE_NULL,
     OPCODE_GET_GLOBAL,
     OPCODE_SET_GLOBAL,
+    OPCODE_DEFINE_GLOBAL,
     OPCODE_ARRAY,
-    OPCODE_MAP,
+    OPCODE_MAP_START,
+    OPCODE_MAP_END,
+    OPCODE_GET_THIS,
     OPCODE_GET_INDEX,
     OPCODE_SET_INDEX,
     OPCODE_GET_VALUE_AT,
@@ -879,8 +932,9 @@ typedef enum opcode_val {
     OPCODE_RETURN_VALUE,
     OPCODE_RETURN,
     OPCODE_GET_LOCAL,
+    OPCODE_DEFINE_LOCAL,
     OPCODE_SET_LOCAL,
-    OPCODE_GET_BUILTIN,
+    OPCODE_GET_NATIVE_FUNCTION,
     OPCODE_FUNCTION,
     OPCODE_GET_FREE,
     OPCODE_SET_FREE,
@@ -888,6 +942,12 @@ typedef enum opcode_val {
     OPCODE_DUP,
     OPCODE_NUMBER,
     OPCODE_LEN,
+    OPCODE_SET_RECOVER,
+    OPCODE_OR,
+    OPCODE_XOR,
+    OPCODE_AND,
+    OPCODE_LSHIFT,
+    OPCODE_RSHIFT,
     OPCODE_MAX,
 } opcode_val_t;
 
@@ -960,23 +1020,24 @@ typedef struct module {
 } module_t;
 
 typedef struct compiled_file {
-    char *name;
+    char *dir_path;
+    char *path;
     ptrarray(char*) *lines;
 } compiled_file_t;
 
 typedef struct file_scope {
     parser_t *parser;
-    char *filename;
     symbol_table_t *symbol_table;
     module_t *module;
     compiled_file_t *file;
+    ptrarray(char) *loaded_module_names;
 } file_scope_t;
 
 typedef struct compiler {
     const ape_config_t *config;
     gcmem_t *mem;
     compilation_scope_t *compilation_scope;
-    array(file_scope_t) *file_scopes;
+    ptrarray(file_scope_t) *file_scopes;
     array(object_t) *constants;
     ptrarray(error_t) *errors;
     array(src_pos_t) *src_positions_stack;
@@ -989,7 +1050,7 @@ typedef struct compiler {
 APE_INTERNAL compiler_t *compiler_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors);
 APE_INTERNAL void compiler_destroy(compiler_t *comp);
 APE_INTERNAL compilation_result_t* compiler_compile(compiler_t *comp, const char *code);
-APE_INTERNAL compilation_result_t* compiler_compile_file(compiler_t *comp, const char *filename);
+APE_INTERNAL compilation_result_t* compiler_compile_file(compiler_t *comp, const char *path);
 APE_INTERNAL int compiler_emit(compiler_t *comp, opcode_t op, int operands_count, uint64_t *operands);
 APE_INTERNAL compilation_scope_t* compiler_get_compilation_scope(compiler_t *comp);
 APE_INTERNAL void compiler_push_compilation_scope(compiler_t *comp);
@@ -1019,6 +1080,8 @@ typedef struct traceback traceback_t;
 typedef struct vm vm_t;
 typedef struct gcmem gcmem_t;
 
+#define OBJECT_STRING_BUF_SIZE 32
+
 typedef enum {
     OBJECT_NONE      = 0,
     OBJECT_ERROR     = 1 << 0,
@@ -1026,11 +1089,12 @@ typedef enum {
     OBJECT_BOOL      = 1 << 2,
     OBJECT_STRING    = 1 << 3,
     OBJECT_NULL      = 1 << 4,
-    OBJECT_BUILTIN   = 1 << 5,
+    OBJECT_NATIVE_FUNCTION   = 1 << 5,
     OBJECT_ARRAY     = 1 << 6,
     OBJECT_MAP       = 1 << 7,
     OBJECT_FUNCTION  = 1 << 8,
     OBJECT_EXTERNAL  = 1 << 9,
+    OBJECT_FREED     = 1 << 10,
     OBJECT_ANY       = 0xffff,
 } object_type_t;
 
@@ -1042,21 +1106,28 @@ typedef struct object {
 } object_t;
 
 typedef struct function {
-    array(object_t) *free_vals;
-    char *name;
+    union {
+        object_t *free_vals_allocated;
+        object_t free_vals_buf[2];
+    };
+    union {
+        char *name;
+        const char *const_name;
+    };
     compilation_result_t *comp_result;
     int num_locals;
     int num_args;
-    bool owns_comp_result;
+    int free_vals_count;
+    bool owns_data;
 } function_t;
 
-typedef object_t (*builtin_fn)(vm_t *vm, void *data, int argc, object_t *args);
+typedef object_t (*native_fn)(vm_t *vm, void *data, int argc, object_t *args);
 
-typedef struct builtin {
+typedef struct native_function {
     char *name;
-    builtin_fn fn;
+    native_fn fn;
     void *data;
-} builtin_t;
+} native_function_t;
 
 typedef void  (*external_data_destroy_fn)(void* data);
 typedef void* (*external_data_copy_fn)(void* data);
@@ -1072,15 +1143,24 @@ typedef struct object_error {
     traceback_t *traceback;
 } object_error_t;
 
+typedef struct object_string {
+    union {
+        char *value_allocated;
+        char value_buf[OBJECT_STRING_BUF_SIZE];
+    };
+    unsigned long hash;
+    bool is_allocated;
+} object_string_t;
+
 typedef struct object_data {
     gcmem_t *mem;
     union {
-        char *string;
+        object_string_t string;
         object_error_t error;
         array(object_t) *array;
         valdict(object_t, object_t) *map;
         function_t function;
-        builtin_t builtin;
+        native_function_t native_function;
         external_data_t external;
     };
     bool gcmark;
@@ -1093,15 +1173,18 @@ APE_INTERNAL object_t object_make_null(void);
 APE_INTERNAL object_t object_make_string(gcmem_t *mem, const char *string);
 APE_INTERNAL object_t object_make_string_no_copy(gcmem_t *mem, char *string);
 APE_INTERNAL object_t object_make_stringf(gcmem_t *mem, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
-APE_INTERNAL object_t object_make_builtin(gcmem_t *mem, const char *name, builtin_fn fn, void *data);
+APE_INTERNAL object_t object_make_native_function(gcmem_t *mem, const char *name, native_fn fn, void *data);
 APE_INTERNAL object_t object_make_array(gcmem_t *mem);
+APE_INTERNAL object_t object_make_array_with_capacity(gcmem_t *mem, unsigned capacity);
 APE_INTERNAL object_t object_make_array_with_array(gcmem_t *mem, array(object_t) *array);
 APE_INTERNAL object_t object_make_map(gcmem_t *mem);
+APE_INTERNAL object_t object_make_map_with_capacity(gcmem_t *mem, unsigned capacity);
 APE_INTERNAL object_t object_make_error(gcmem_t *mem, const char *message);
 APE_INTERNAL object_t object_make_error_no_copy(gcmem_t *mem, char *message);
 APE_INTERNAL object_t object_make_errorf(gcmem_t *mem, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
-APE_INTERNAL object_t object_make_function(gcmem_t *mem, const char *name, compilation_result_t *comp_res, bool owns_comp_res, int num_locals, int num_args);
-APE_INTERNAL object_t object_make_function(gcmem_t *mem, const char *name, compilation_result_t *comp_res, bool owns_comp_res, int num_locals, int num_args);
+APE_INTERNAL object_t object_make_function(gcmem_t *mem, const char *name, compilation_result_t *comp_res,
+                                           bool owns_data, int num_locals, int num_args,
+                                           int free_vals_count);
 APE_INTERNAL object_t object_make_external(gcmem_t *mem, void *data);
 
 APE_INTERNAL void object_deinit(object_t obj);
@@ -1116,6 +1199,7 @@ APE_INTERNAL char*       object_serialize(object_t object);
 APE_INTERNAL object_t    object_deep_copy(gcmem_t *mem, object_t object);
 APE_INTERNAL object_t    object_copy(gcmem_t *mem, object_t obj);
 APE_INTERNAL double      object_compare(object_t a, object_t b);
+APE_INTERNAL bool        object_equals(object_t a, object_t b);
 
 APE_INTERNAL object_data_t* object_get_allocated_data(object_t object);
 
@@ -1123,8 +1207,17 @@ APE_INTERNAL bool           object_get_bool(object_t obj);
 APE_INTERNAL double         object_get_number(object_t obj);
 APE_INTERNAL function_t*    object_get_function(object_t obj);
 APE_INTERNAL const char*    object_get_string(object_t obj);
+APE_INTERNAL native_function_t*     object_get_native_function(object_t obj);
 APE_INTERNAL object_type_t  object_get_type(object_t obj);
-APE_INTERNAL builtin_t*     object_get_builtin(object_t obj);
+
+APE_INTERNAL bool object_is_numeric(object_t obj);
+APE_INTERNAL bool object_is_null(object_t obj);
+APE_INTERNAL bool object_is_callable(object_t obj);
+
+APE_INTERNAL const char* object_get_function_name(object_t obj);
+APE_INTERNAL object_t    object_get_function_free_val(object_t obj, int ix);
+APE_INTERNAL void        object_set_function_free_val(object_t obj, int ix, object_t val);
+APE_INTERNAL object_t*   object_get_function_free_vals(object_t obj);
 
 APE_INTERNAL const char*  object_get_error_message(object_t obj);
 APE_INTERNAL void         object_set_error_traceback(object_t obj, traceback_t *traceback);
@@ -1143,9 +1236,11 @@ APE_INTERNAL int              object_get_array_length(object_t array);
 APE_INTERNAL int      object_get_map_length(object_t obj);
 APE_INTERNAL object_t object_get_map_key_at(object_t obj, int ix);
 APE_INTERNAL object_t object_get_map_value_at(object_t obj, int ix);
+APE_INTERNAL bool     object_set_map_value_at(object_t obj, int ix, object_t val);
 APE_INTERNAL object_t object_get_kv_pair_at(gcmem_t *mem, object_t obj, int ix);
 APE_INTERNAL bool     object_set_map_value(object_t obj, object_t key, object_t val);
 APE_INTERNAL object_t object_get_map_value(object_t obj, object_t key);
+APE_INTERNAL bool     object_map_has_key(object_t obj, object_t key);
 
 #endif /* object_h */
 //FILE_END
@@ -1162,20 +1257,21 @@ APE_INTERNAL object_t object_get_map_value(object_t obj, object_t key);
 typedef struct object_data object_data_t;
 typedef struct env env_t;
 
-typedef struct gcmem {
-    ptrarray(object_data_t) *objects;
-    ptrarray(object_data_t) *objects_back;
-} gcmem_t;
+typedef struct gcmem gcmem_t;
 
 APE_INTERNAL gcmem_t *gcmem_make(void);
 APE_INTERNAL void gcmem_destroy(gcmem_t *mem);
 
-object_data_t* gcmem_alloc_object_data(gcmem_t *mem, object_type_t type);
+APE_INTERNAL object_data_t* gcmem_alloc_object_data(gcmem_t *mem, object_type_t type);
 
 APE_INTERNAL void gc_unmark_all(gcmem_t *mem);
 APE_INTERNAL void gc_mark_objects(object_t *objects, int count);
 APE_INTERNAL void gc_mark_object(object_t object);
+APE_INTERNAL void gc_mark_object_data(object_data_t *data);
 APE_INTERNAL void gc_sweep(gcmem_t *mem);
+
+APE_INTERNAL void gc_disable_on_object(object_t obj);
+APE_INTERNAL void gc_enable_on_object(object_t obj);
 
 #endif /* gc_h */
 //FILE_END
@@ -1193,7 +1289,7 @@ APE_INTERNAL void gc_sweep(gcmem_t *mem);
 typedef struct vm vm_t;
 
 APE_INTERNAL int builtins_count(void);
-APE_INTERNAL builtin_fn builtins_get_fn(int ix);
+APE_INTERNAL native_fn builtins_get_fn(int ix);
 APE_INTERNAL const char* builtins_get_name(int ix);
 
 #endif /* builtins_h */
@@ -1224,7 +1320,7 @@ APE_INTERNAL void traceback_append(traceback_t *traceback, const char *function_
 APE_INTERNAL void traceback_append_from_vm(traceback_t *traceback, vm_t *vm);
 APE_INTERNAL void traceback_to_string(const traceback_t *traceback, strbuf_t *buf);
 APE_INTERNAL const char* traceback_item_get_line(traceback_item_t *item);
-APE_INTERNAL const char* traceback_item_get_filename(traceback_item_t *item);
+APE_INTERNAL const char* traceback_item_get_filepath(traceback_item_t *item);
 
 #endif /* traceback_h */
 //FILE_END
@@ -1249,6 +1345,8 @@ typedef struct {
     uint8_t *bytecode;
     int src_ip;
     int bytecode_size;
+    int recover_ip;
+    bool is_recovering;
 } frame_t;
 
 APE_INTERNAL bool frame_init(frame_t* frame, object_t function, int base_pointer);
@@ -1276,6 +1374,8 @@ APE_INTERNAL src_pos_t frame_src_position(const frame_t *frame);
 
 #define VM_STACK_SIZE 2048
 #define VM_MAX_GLOBALS 2048
+#define VM_MAX_FRAMES 2048
+#define VM_THIS_STACK_SIZE 2048
 
 typedef struct ape_config ape_config_t;
 typedef struct compilation_result compilation_result_t;
@@ -1285,29 +1385,37 @@ typedef struct vm {
     gcmem_t *mem;
     object_t globals[VM_MAX_GLOBALS];
     int globals_count;
-    array(object_t) *builtins;
+    array(object_t) *native_functions;
     object_t stack[VM_STACK_SIZE];
     int sp;
-    array(frame_t) *frames;
+    object_t this_stack[VM_THIS_STACK_SIZE];
+    int this_sp;
+    frame_t frames[VM_MAX_FRAMES];
+    int frames_count;
     ptrarray(error_t) *errors;
-    bool running;
     object_t last_popped;
-
     frame_t *current_frame;
+    bool running;
+    error_t *runtime_error;
+    object_t operator_oveload_keys[OPCODE_MAX];
 } vm_t;
 
-APE_INTERNAL vm_t *vm_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors); // ape can be null (for internal testing purposes)
-APE_INTERNAL void vm_destroy(vm_t *vm);
+APE_INTERNAL vm_t* vm_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors); // ape can be null (for internal testing purposes)
+APE_INTERNAL void  vm_destroy(vm_t *vm);
+
+APE_INTERNAL void  vm_reset(vm_t *vm);
 
 APE_INTERNAL bool vm_run(vm_t *vm, compilation_result_t *comp_res, array(object_t) *constants);
 APE_INTERNAL object_t vm_call(vm_t *vm, array(object_t) *constants, object_t callee, int argc, object_t *args);
 APE_INTERNAL bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants);
 
-APE_INTERNAL object_t vm_last_popped(vm_t *vm);
+APE_INTERNAL object_t vm_get_last_popped(vm_t *vm);
 APE_INTERNAL bool vm_has_errors(vm_t *vm);
 
-void vm_set_global(vm_t *vm, int ix, object_t val);
-object_t vm_get_global(vm_t *vm, int ix);
+APE_INTERNAL void vm_set_global(vm_t *vm, int ix, object_t val);
+APE_INTERNAL object_t vm_get_global(vm_t *vm, int ix);
+
+APE_INTERNAL void vm_set_runtime_error(vm_t *vm, error_t *error); // only allowed when vm is running
 
 #endif /* vm_h */
 //FILE_END
@@ -1324,8 +1432,8 @@ object_t vm_get_global(vm_t *vm, int ix);
 #include "common.h"
 #endif
 
-const src_pos_t src_pos_invalid = { NULL, -1, -1 };
-const src_pos_t src_pos_zero = { NULL, 0, 0 };
+APE_INTERNAL const src_pos_t src_pos_invalid = { NULL, -1, -1 };
+APE_INTERNAL const src_pos_t src_pos_zero = { NULL, 0, 0 };
 
 APE_INTERNAL src_pos_t src_pos_make(const compiled_file_t *file, int line, int column) {
     return (src_pos_t) {
@@ -1446,6 +1554,7 @@ THE SOFTWARE.
 static char* collections_strndup(const char *string, size_t n);
 static char* collections_strdup(const char *string);
 static unsigned long collections_hash(const void *ptr, size_t len); /* djb2 */
+static unsigned int upper_power_of_two(unsigned int v);
 
 static collections_malloc_fn collections_malloc = malloc;
 static collections_free_fn collections_free = free;
@@ -1479,11 +1588,23 @@ static unsigned long collections_hash(const void *ptr, size_t len) { /* djb2 */
     return hash;
 }
 
+static unsigned int upper_power_of_two(unsigned int v) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
 //-----------------------------------------------------------------------------
 // Dictionary
 //-----------------------------------------------------------------------------
 
 #define DICT_INVALID_IX UINT_MAX
+#define DICT_INITIAL_SIZE 32
 
 typedef struct dict_ {
     unsigned int *cells;
@@ -1513,7 +1634,7 @@ dict_t_* dict_make(void) {
     if (dict == NULL) {
         return NULL;
     }
-    bool succeeded = dict_init(dict, 4);
+    bool succeeded = dict_init(dict, DICT_INITIAL_SIZE);
     if (succeeded == false) {
         collections_free(dict);
         return NULL;
@@ -1807,17 +1928,22 @@ static unsigned int valdict_get_cell_ix(const valdict_t_ *dict,
                                         bool *out_found);
 static bool valdict_grow_and_rehash(valdict_t_ *dict);
 static bool valdict_set_key_at(valdict_t_ *dict, unsigned int ix, void *key);
-static bool valdict_set_value_at(valdict_t_ *dict, unsigned int ix, void *value);
 static bool valdict_keys_are_equal(const valdict_t_ *dict, const void *a, const void *b);
 static unsigned long valdict_hash_key(const valdict_t_ *dict, const void *key);
 
 // Public
 valdict_t_* valdict_make_(size_t key_size, size_t val_size) {
+    return valdict_make_with_capacity(DICT_INITIAL_SIZE, key_size, val_size);
+}
+
+valdict_t_* valdict_make_with_capacity(unsigned int min_capacity, size_t key_size, size_t val_size) {
+    unsigned int capacity = upper_power_of_two(min_capacity * 2);
+
     valdict_t_ *dict = collections_malloc(sizeof(valdict_t_));
     if (dict == NULL) {
         return NULL;
     }
-    bool succeeded = valdict_init(dict, key_size, val_size, 4);
+    bool succeeded = valdict_init(dict, key_size, val_size, capacity);
     if (succeeded == false) {
         collections_free(dict);
         return NULL;
@@ -1878,6 +2004,13 @@ void* valdict_get(const valdict_t_ *dict, const void *key) {
     return valdict_get_value_at(dict, item_ix);
 }
 
+void* valdict_get_key_at(const valdict_t_ *dict, unsigned int ix) {
+    if (ix >= dict->count) {
+        return NULL;
+    }
+    return (char*)dict->keys + (dict->key_size * ix);
+}
+
 void *valdict_get_value_at(const valdict_t_ *dict, unsigned int ix) {
     if (ix >= dict->count) {
         return NULL;
@@ -1885,11 +2018,13 @@ void *valdict_get_value_at(const valdict_t_ *dict, unsigned int ix) {
     return (char*)dict->values + (dict->val_size * ix);
 }
 
-void* valdict_get_key_at(const valdict_t_ *dict, unsigned int ix) {
+bool valdict_set_value_at(const valdict_t_ *dict, unsigned int ix, const void *value) {
     if (ix >= dict->count) {
-        return NULL;
+        return false;
     }
-    return (char*)dict->keys + (dict->key_size * ix);
+    size_t offset = ix * dict->val_size;
+    memcpy((char*)dict->values + offset, value, dict->val_size);
+    return true;
 }
 
 int valdict_count(const valdict_t_ *dict) {
@@ -2037,7 +2172,8 @@ static unsigned int valdict_get_cell_ix(const valdict_t_ *dict,
 
 static bool valdict_grow_and_rehash(valdict_t_ *dict) {
     valdict_t_ new_dict;
-    bool succeeded = valdict_init(&new_dict, dict->key_size, dict->val_size, dict->cell_capacity * 2);
+    unsigned new_capacity = dict->cell_capacity == 0 ? DICT_INITIAL_SIZE : dict->cell_capacity * 2;
+    bool succeeded = valdict_init(&new_dict, dict->key_size, dict->val_size, new_capacity);
     if (succeeded == false) {
         return false;
     }
@@ -2063,15 +2199,6 @@ static bool valdict_set_key_at(valdict_t_ *dict, unsigned int ix, void *key) {
     }
     size_t offset = ix * dict->key_size;
     memcpy((char*)dict->keys + offset, key, dict->key_size);
-    return true;
-}
-
-static bool valdict_set_value_at(valdict_t_ *dict, unsigned int ix, void *value) {
-    if (ix >= dict->count) {
-        return false;
-    }
-    size_t offset = ix * dict->val_size;
-    memcpy((char*)dict->values + offset, value, dict->val_size);
     return true;
 }
 
@@ -2104,7 +2231,7 @@ ptrdict_t_* ptrdict_make(void) {
     if (dict == NULL) {
         return NULL;
     }
-    bool succeeded = valdict_init(&dict->vd, sizeof(void*), sizeof(void*), 4);
+    bool succeeded = valdict_init(&dict->vd, sizeof(void*), sizeof(void*), DICT_INITIAL_SIZE);
     if (succeeded == false) {
         collections_free(dict);
         return NULL;
@@ -2184,7 +2311,7 @@ static bool array_init_with_capacity(array_t_ *arr, unsigned int capacity, size_
 static void array_deinit(array_t_ *arr);
 
 array_t_* array_make_(size_t element_size) {
-    return array_make_with_capacity(0, element_size);
+    return array_make_with_capacity(32, element_size);
 }
 
 array_t_* array_make_with_capacity(unsigned int capacity, size_t element_size) {
@@ -2299,7 +2426,7 @@ bool array_pop(array_t_ *arr, void *out_value) {
         void *res = array_get(arr, arr->count - 1);
         memcpy(out_value, res, arr->element_size);
     }
-    array_remove(arr, arr->count - 1);
+    array_remove_at(arr, arr->count - 1);
     return true;
 }
 
@@ -2362,7 +2489,7 @@ int array_count(const array_t_ *arr) {
     return arr->count;
 }
 
-bool array_remove(array_t_ *arr, unsigned int ix) {
+bool array_remove_at(array_t_ *arr, unsigned int ix) {
     if (ix >= arr->count) {
         return false;
     }
@@ -2376,6 +2503,14 @@ bool array_remove(array_t_ *arr, unsigned int ix) {
     memmove(dest, src, to_move_bytes);
     arr->count--;
     return true;
+}
+
+bool array_remove_item(array_t_ *arr, void *ptr) {
+    int ix = array_get_index(arr, ptr);
+    if (ix < 0) {
+        return false;
+    }
+    return array_remove_at(arr, ix);
 }
 
 void array_clear(array_t_ *arr) {
@@ -2401,6 +2536,10 @@ int array_get_index(const array_t_ *arr, void *ptr) {
         }
     }
     return -1;
+}
+
+bool array_contains(const array_t_ *arr, void *ptr) {
+    return array_get_index(arr, ptr) >= 0;
 }
 
 void* array_data(array_t_ *arr) {
@@ -2543,7 +2682,7 @@ bool ptrarray_push(ptrarray_t_ *arr, void *ptr) {
 void *ptrarray_pop(ptrarray_t_ *arr) {
     int ix = ptrarray_count(arr) - 1;
     void *res = ptrarray_get(arr, ix);
-    ptrarray_remove(arr, ix);
+    ptrarray_remove_at(arr, ix);
     return res;
 }
 
@@ -2559,14 +2698,14 @@ int ptrarray_count(const ptrarray_t_ *arr) {
     return array_count(&arr->arr);
 }
 
-bool ptrarray_remove(ptrarray_t_ *arr, unsigned int ix) {
-    return array_remove(&arr->arr, ix);
+bool ptrarray_remove_at(ptrarray_t_ *arr, unsigned int ix) {
+    return array_remove_at(&arr->arr, ix);
 }
 
 bool ptrarray_remove_item(ptrarray_t_ *arr, void *item) {
     for (int i = 0; i < ptrarray_count(arr); i++) {
         if (item == ptrarray_get(arr, i)) {
-            ptrarray_remove(arr, i);
+            ptrarray_remove_at(arr, i);
             return true;
         }
     }
@@ -2597,6 +2736,10 @@ int ptrarray_get_index(ptrarray_t_ *arr, void *ptr) {
         }
     }
     return -1;
+}
+
+bool ptrarray_contains(ptrarray_t_ *arr, void *item) {
+    return ptrarray_get_index(arr, item) >= 0;
 }
 
 void * ptrarray_get_addr(ptrarray_t_ *arr, unsigned int ix) {
@@ -2734,6 +2877,80 @@ static bool strbuf_grow(strbuf_t *buf, size_t new_capacity) {
     buf->capacity = new_capacity;
     return true;
 }
+
+//-----------------------------------------------------------------------------
+// Utils
+//-----------------------------------------------------------------------------
+
+ptrarray(char)* kg_split_string(const char *str, const char *delimiter) {
+    ptrarray(char)* res = ptrarray_make();
+    if (!str) {
+        return res;
+    }
+    const char *line_start = str;
+    const char *line_end = strstr(line_start, delimiter);
+    while (line_end != NULL) {
+        long len = line_end - line_start;
+        char *line = collections_strndup(line_start, len);
+        ptrarray_add(res, line);
+        line_start = line_end + 1;
+        line_end = strstr(line_start, delimiter);
+    }
+    char *rest = collections_strdup(line_start);
+    ptrarray_add(res, rest);
+    return res;
+}
+
+char* kg_join(ptrarray(char) *items, const char *with) {
+    strbuf_t *res = strbuf_make();
+    for (int i = 0; i < ptrarray_count(items); i++) {
+        char *item = ptrarray_get(items, i);
+        strbuf_append(res, item);
+        if (i < (ptrarray_count(items) - 1)) {
+            strbuf_append(res, with);
+        }
+    }
+    return strbuf_get_string_and_destroy(res);
+}
+
+char* kg_canonicalise_path(const char *path) {
+    if (!strchr(path, '/') || (!strstr(path, "/../") && !strstr(path, "./"))) {
+        return collections_strdup(path);
+    }
+
+    ptrarray(char) *split = kg_split_string(path, "/");
+
+    for (int i = 0; i < ptrarray_count(split) - 1; i++) {
+        char *item = ptrarray_get(split, i);
+        char *next_item = ptrarray_get(split, i + 1);
+        if (kg_streq(item, ".")) {
+            collections_free(item);
+            ptrarray_remove_at(split, i);
+            i = -1;
+            continue;
+        }
+        if (kg_streq(next_item, "..")) {
+            collections_free(item);
+            collections_free(next_item);
+            ptrarray_remove_at(split, i);
+            ptrarray_remove_at(split, i);
+            i = -1;
+            continue;
+        }
+    }
+
+    char *joined = kg_join(split, "/");
+    ptrarray_destroy_with_items(split, collections_free);
+    return joined;
+}
+
+bool kg_is_path_absolute(const char *path) {
+    return path[0] == '/';
+}
+
+bool kg_streq(const char *a, const char *b) {
+    return strcmp(a, b) == 0;
+}
 //FILE_END
 //FILE_START:error.c
 #include <stdarg.h>
@@ -2806,6 +3023,12 @@ static const char *g_type_names[] = {
     "-=",
     "*=",
     "/=",
+    "%=",
+    "&=",
+    "|=",
+    "^=",
+    "<<=",
+    ">>=",
     "+",
     "-",
     "!",
@@ -2821,6 +3044,9 @@ static const char *g_type_names[] = {
     "||",
     "&",
     "|",
+    "^",
+    "<<",
+    ">>",
     ",",
     ";",
     ":",
@@ -2833,7 +3059,7 @@ static const char *g_type_names[] = {
     ".",
     "%",
     "FUNCTION",
-    "LET",
+    "CONST",
     "VAR",
     "TRUE",
     "FALSE",
@@ -2847,6 +3073,7 @@ static const char *g_type_names[] = {
     "CONTINUE",
     "NULL",
     "IMPORT",
+    "RECOVER",
     "IDENT",
     "NUMBER",
     "STRING",
@@ -2858,11 +3085,11 @@ void token_make(token_t *tok, token_type_t type, const char *literal, int len) {
     tok->len = len;
 }
 
-char *token_duplicate_literal(const token_t *tok) {
+char* token_duplicate_literal(const token_t *tok) {
     return ape_strndup(tok->literal, tok->len);
 }
 
-const char *token_type_to_string(token_type_t type) {
+const char* token_type_to_string(token_type_t type) {
     return g_type_names[type];
 }
 //FILE_END
@@ -2886,12 +3113,11 @@ static const char* read_number(lexer_t *lex, int *out_len);
 static const char* read_string(lexer_t *lex, char delimiter, int *out_len);
 static token_type_t lookup_identifier(const char *ident, int len);
 static void skip_whitespace(lexer_t *lex);
-static void add_line(lexer_t *lex);
+static void add_line(lexer_t *lex, int offset);
 
 bool lexer_init(lexer_t *lex, const char *input, compiled_file_t *file) {
     lex->input = input;
     lex->input_len = (int)strlen(input);
-    lex->line_start_position = 0;
     lex->position = 0;
     lex->next_position = 0;
     lex->ch = '\0';
@@ -2902,14 +3128,15 @@ bool lexer_init(lexer_t *lex, const char *input, compiled_file_t *file) {
     }
     lex->column = -1;
     lex->file = file;
+    add_line(lex, 0);
     read_char(lex);
     return true;
 }
 
-token_t lexer_next_token(lexer_t *lex) { 
+token_t lexer_next_token(lexer_t *lex) {
     while (true) {
         skip_whitespace(lex);
-        
+
         token_t out_tok;
         out_tok.type = TOKEN_ILLEGAL;
         out_tok.literal = lex->input + lex->position;
@@ -2931,8 +3158,11 @@ token_t lexer_next_token(lexer_t *lex) {
                 if (peek_char(lex) == '&') {
                     token_make(&out_tok, TOKEN_AND, "&&", 2);
                     read_char(lex);
+                } else if (peek_char(lex) == '=') {
+                    token_make(&out_tok, TOKEN_BIT_AND_ASSIGN, "&=", 2);
+                    read_char(lex);
                 } else {
-                    token_make(&out_tok, TOKEN_AMPERSAND, "&", 1);
+                    token_make(&out_tok, TOKEN_BIT_AND, "&", 1);
                 }
                 break;
             }
@@ -2940,8 +3170,20 @@ token_t lexer_next_token(lexer_t *lex) {
                 if (peek_char(lex) == '|') {
                     token_make(&out_tok, TOKEN_OR, "||", 2);
                     read_char(lex);
+                } else if (peek_char(lex) == '=') {
+                    token_make(&out_tok, TOKEN_BIT_OR_ASSIGN, "|=", 2);
+                    read_char(lex);
                 } else {
-                    token_make(&out_tok, TOKEN_VBAR, "|", 1);
+                    token_make(&out_tok, TOKEN_BIT_OR, "|", 1);
+                }
+                break;
+            }
+            case '^': {
+                if (peek_char(lex) == '=') {
+                    token_make(&out_tok, TOKEN_BIT_XOR_ASSIGN, "^=", 2);
+                    read_char(lex);
+                } else {
+                    token_make(&out_tok, TOKEN_BIT_XOR, "^", 1); break;
                 }
                 break;
             }
@@ -3000,6 +3242,14 @@ token_t lexer_next_token(lexer_t *lex) {
                 if (peek_char(lex) == '=') {
                     token_make(&out_tok, TOKEN_LTE, "<=", 2);
                     read_char(lex);
+                } else if (peek_char(lex) == '<') {
+                    read_char(lex);
+                    if (peek_char(lex) == '=') {
+                        token_make(&out_tok, TOKEN_LSHIFT_ASSIGN, "<<=", 3);
+                        read_char(lex);
+                    } else {
+                        token_make(&out_tok, TOKEN_LSHIFT, "<<", 2);
+                    }
                 } else {
                     token_make(&out_tok, TOKEN_LT, "<", 1); break;
                 }
@@ -3009,6 +3259,14 @@ token_t lexer_next_token(lexer_t *lex) {
                 if (peek_char(lex) == '=') {
                     token_make(&out_tok, TOKEN_GTE, ">=", 2);
                     read_char(lex);
+                } else if (peek_char(lex) == '>') {
+                    read_char(lex);
+                    if (peek_char(lex) == '=') {
+                        token_make(&out_tok, TOKEN_RSHIFT_ASSIGN, ">>=", 3);
+                        read_char(lex);
+                    } else {
+                        token_make(&out_tok, TOKEN_RSHIFT, ">>", 2);
+                    }
                 } else {
                     token_make(&out_tok, TOKEN_GT, ">", 1);
                 }
@@ -3024,7 +3282,15 @@ token_t lexer_next_token(lexer_t *lex) {
             case '[': token_make(&out_tok, TOKEN_LBRACKET, "[", 1); break;
             case ']': token_make(&out_tok, TOKEN_RBRACKET, "]", 1); break;
             case '.': token_make(&out_tok, TOKEN_DOT, ".", 1); break;
-            case '%': token_make(&out_tok, TOKEN_PERCENT, "%", 1); break;
+            case '%': {
+                if (peek_char(lex) == '=') {
+                    token_make(&out_tok, TOKEN_PERCENT_ASSIGN, "%=", 2);
+                    read_char(lex);
+                } else {
+                    token_make(&out_tok, TOKEN_PERCENT, "%", 1); break;
+                }
+                break;
+            }
             case '"': {
                 int len;
                 const char *str = read_string(lex, '"', &len);
@@ -3069,21 +3335,17 @@ token_t lexer_next_token(lexer_t *lex) {
 // INTERNAL
 static void read_char(lexer_t *lex) {
     if (lex->next_position >= lex->input_len) {
-        if (lex->ch != '\0') {
-            add_line(lex);
-        }
         lex->ch = '\0';
     } else {
         lex->ch = lex->input[lex->next_position];
     }
     lex->position = lex->next_position;
     lex->next_position++;
-    
+
     if (lex->ch == '\n') {
-        add_line(lex);
-        lex->line_start_position = lex->next_position;
         lex->line++;
         lex->column = -1;
+        add_line(lex, lex->next_position);
     } else {
         lex->column++;
     }
@@ -3187,6 +3449,7 @@ static token_type_t lookup_identifier(const char *ident, int len) {
         {"continue", 8, TOKEN_CONTINUE},
         {"null", 4, TOKEN_NULL},
         {"import", 6, TOKEN_IMPORT},
+        {"recover", 7, TOKEN_RECOVER},
     };
 
     for (int i = 0; i < APE_ARRAY_LEN(keywords); i++) {
@@ -3194,7 +3457,7 @@ static token_type_t lookup_identifier(const char *ident, int len) {
             return keywords[i].type;
         }
     }
-    
+
     return TOKEN_IDENT;
 }
 
@@ -3206,11 +3469,11 @@ static void skip_whitespace(lexer_t *lex) {
     }
 }
 
-static void add_line(lexer_t *lex) {
+static void add_line(lexer_t *lex, int offset) {
     if (!lex->file) {
         return;
     }
-    const char *line_start = lex->input + lex->line_start_position;
+    const char *line_start = lex->input + offset;
     const char *new_line_ptr = strchr(line_start, '\n');
     char *line = NULL;
     if (!new_line_ptr) {
@@ -3234,9 +3497,9 @@ static void add_line(lexer_t *lex) {
 static expression_t* expression_make(expression_type_t type);
 static statement_t* statement_make(statement_type_t type);
 
-expression_t* expression_make_ident(char *name) {
+expression_t* expression_make_ident(ident_t ident) {
     expression_t *res = expression_make(EXPRESSION_IDENT);
-    ident_init(&res->ident, name);
+    res->ident = ident;
     return res;
 }
 
@@ -3411,7 +3674,8 @@ expression_t* expression_copy(expression_t *expr) {
             break;
         }
         case EXPRESSION_IDENT: {
-            res = expression_make_ident(ape_strdup(expr->ident.name));
+            ident_t ident = ident_copy(expr->ident);
+            res = expression_make_ident(ident);
             break;
         }
         case EXPRESSION_NUMBER_LITERAL: {
@@ -3456,8 +3720,7 @@ expression_t* expression_copy(expression_t *expr) {
             array(ident_t) *params_copy = array_make(ident_t);
             for (int i = 0; i < array_count(expr->fn_literal.params); i++) {
                 ident_t *param = array_get(expr->fn_literal.params, i);
-                ident_t copy;
-                ident_init(&copy, ape_strdup(param->name));
+                ident_t copy = ident_copy(*param);
                 array_add(params_copy, &copy);
             }
             code_block_t *body_copy = code_block_copy(expr->fn_literal.body);
@@ -3494,7 +3757,7 @@ expression_t* expression_copy(expression_t *expr) {
     return res;
 }
 
-statement_t* statement_make_define(char *name, expression_t *value, bool assignable) {
+statement_t* statement_make_define(ident_t name, expression_t *value, bool assignable) {
     statement_t *res = statement_make(STATEMENT_DEFINE);
     res->define.name = name;
     res->define.value = value;
@@ -3533,9 +3796,9 @@ statement_t* statement_make_break() {
     return res;
 }
 
-statement_t* statement_make_foreach(char *iterator_name, expression_t *source, code_block_t *body) {
+statement_t* statement_make_foreach(ident_t iterator, expression_t *source, code_block_t *body) {
     statement_t *res = statement_make(STATEMENT_FOREACH);
-    res->foreach.iterator_name = iterator_name;
+    res->foreach.iterator = iterator;
     res->foreach.source = source;
     res->foreach.body = body;
     return res;
@@ -3561,9 +3824,16 @@ statement_t* statement_make_block(code_block_t *block) {
     return res;
 }
 
-statement_t* statement_make_import(const char *name) {
+statement_t* statement_make_import(char *path) {
     statement_t *res = statement_make(STATEMENT_IMPORT);
-    res->import.name = ape_strdup(name);
+    res->import.path = path;
+    return res;
+}
+
+statement_t* statement_make_recover(ident_t error_ident, code_block_t *body) {
+    statement_t *res = statement_make(STATEMENT_RECOVER);
+    res->recover.error_ident = error_ident;
+    res->recover.body = body;
     return res;
 }
 
@@ -3577,7 +3847,7 @@ void statement_destroy(statement_t *stmt) {
             break;
         }
         case STATEMENT_DEFINE: {
-            ape_free(stmt->define.name);
+            ident_deinit(&stmt->define.name);
             expression_destroy(stmt->define.value);
             break;
         }
@@ -3606,7 +3876,7 @@ void statement_destroy(statement_t *stmt) {
             break;
         }
         case STATEMENT_FOREACH: {
-            ape_free(stmt->foreach.iterator_name);
+            ident_deinit(&stmt->foreach.iterator);
             expression_destroy(stmt->foreach.source);
             code_block_destroy(stmt->foreach.body);
             break;
@@ -3623,7 +3893,12 @@ void statement_destroy(statement_t *stmt) {
             break;
         }
         case STATEMENT_IMPORT: {
-            ape_free(stmt->import.name);
+            ape_free(stmt->import.path);
+            break;
+        }
+        case STATEMENT_RECOVER: {
+            code_block_destroy(stmt->recover.body);
+            ident_deinit(&stmt->recover.error_ident);
             break;
         }
     }
@@ -3643,7 +3918,7 @@ statement_t* statement_copy(statement_t *stmt) {
         }
         case STATEMENT_DEFINE: {
             expression_t *value_copy = expression_copy(stmt->define.value);
-            res = statement_make_define(ape_strdup(stmt->define.name), value_copy, stmt->define.assignable);
+            res = statement_make_define(ident_copy(stmt->define.name), value_copy, stmt->define.assignable);
             break;
         }
         case STATEMENT_IF: {
@@ -3679,7 +3954,7 @@ statement_t* statement_copy(statement_t *stmt) {
         case STATEMENT_FOREACH: {
             expression_t *source_copy = expression_copy(stmt->foreach.source);
             code_block_t *body_copy = code_block_copy(stmt->foreach.body);
-            res = statement_make_foreach(ape_strdup(stmt->foreach.iterator_name), source_copy, body_copy);
+            res = statement_make_foreach(ident_copy(stmt->foreach.iterator), source_copy, body_copy);
             break;
         }
         case STATEMENT_FOR_LOOP: {
@@ -3696,7 +3971,12 @@ statement_t* statement_copy(statement_t *stmt) {
             break;
         }
         case STATEMENT_IMPORT: {
-            res = statement_make_import(stmt->import.name);
+            res = statement_make_import(ape_strdup(stmt->import.path));
+            break;
+        }
+        case STATEMENT_RECOVER: {
+            code_block_t *body_copy = code_block_copy(stmt->recover.body);
+            res = statement_make_recover(ident_copy(stmt->recover.error_ident), body_copy);
             break;
         }
     }
@@ -3750,7 +4030,7 @@ void statement_to_string(const statement_t *stmt, strbuf_t *buf) {
             } else {
                 strbuf_append(buf, "const ");
             }
-            strbuf_append(buf, def_stmt->name);
+            strbuf_append(buf, def_stmt->name.value);
             strbuf_append(buf, " = ");
 
             if (def_stmt->value) {
@@ -3821,7 +4101,7 @@ void statement_to_string(const statement_t *stmt, strbuf_t *buf) {
         }
         case STATEMENT_FOREACH: {
             strbuf_append(buf, "for (");
-            strbuf_appendf(buf, "%s", stmt->foreach.iterator_name);
+            strbuf_appendf(buf, "%s", stmt->foreach.iterator.value);
             strbuf_append(buf, " in ");
             expression_to_string(stmt->foreach.source, buf);
             strbuf_append(buf, ")");
@@ -3841,11 +4121,16 @@ void statement_to_string(const statement_t *stmt, strbuf_t *buf) {
             break;
         }
         case STATEMENT_IMPORT: {
-            strbuf_appendf(buf, "import \"%s\"", stmt->import.name);
+            strbuf_appendf(buf, "import \"%s\"", stmt->import.path);
             break;
         }
         case STATEMENT_NONE: {
             strbuf_append(buf, "STATEMENT_NONE");
+            break;
+        }
+        case STATEMENT_RECOVER: {
+            strbuf_appendf(buf, "recover (%s)", stmt->recover.error_ident.value);
+            code_block_to_string(stmt->recover.body, buf);
             break;
         }
     }
@@ -3854,7 +4139,7 @@ void statement_to_string(const statement_t *stmt, strbuf_t *buf) {
 void expression_to_string(expression_t *expr, strbuf_t *buf) {
     switch (expr->type) {
         case EXPRESSION_IDENT: {
-            strbuf_append(buf, expr->ident.name);
+            strbuf_append(buf, expr->ident.value);
             break;
         }
         case EXPRESSION_NUMBER_LITERAL: {
@@ -3923,13 +4208,13 @@ void expression_to_string(expression_t *expr, strbuf_t *buf) {
         }
         case EXPRESSION_FUNCTION_LITERAL: {
             fn_literal_t *fn = &expr->fn_literal;
-            
+
             strbuf_append(buf, "fn");
 
             strbuf_append(buf, "(");
             for (int i = 0; i < array_count(fn->params); i++) {
                 ident_t *param = array_get(fn->params, i);
-                strbuf_append(buf, param->name);
+                strbuf_append(buf, param->value);
                 if (i < (array_count(fn->params) - 1)) {
                     strbuf_append(buf, ", ");
                 }
@@ -3998,37 +4283,46 @@ void code_block_to_string(const code_block_t *stmt, strbuf_t *buf) {
 
 const char* operator_to_string(operator_t op) {
     switch (op) {
-        case OPERATOR_NONE: return "OPERATOR_NONE";
-        case OPERATOR_ASSIGN: return "=";
-        case OPERATOR_PLUS: return "+";
-        case OPERATOR_MINUS: return "-";
-        case OPERATOR_BANG: return "!";
-        case OPERATOR_ASTERISK: return "*";
-        case OPERATOR_SLASH: return "/";
-        case OPERATOR_LT: return "<";
-        case OPERATOR_GT: return ">";
-        case OPERATOR_EQ: return "==";
-        case OPERATOR_NOT_EQ: return "!=";
-        default: return "OPERATOR_UNKNOWN";
+        case OPERATOR_NONE:        return "OPERATOR_NONE";
+        case OPERATOR_ASSIGN:      return "=";
+        case OPERATOR_PLUS:        return "+";
+        case OPERATOR_MINUS:       return "-";
+        case OPERATOR_BANG:        return "!";
+        case OPERATOR_ASTERISK:    return "*";
+        case OPERATOR_SLASH:       return "/";
+        case OPERATOR_LT:          return "<";
+        case OPERATOR_GT:          return ">";
+        case OPERATOR_EQ:          return "==";
+        case OPERATOR_NOT_EQ:      return "!=";
+        case OPERATOR_MODULUS:     return "%";
+        case OPERATOR_LOGICAL_AND: return "&&";
+        case OPERATOR_LOGICAL_OR:  return "||";
+        case OPERATOR_BIT_AND:     return "&";
+        case OPERATOR_BIT_OR:      return "|";
+        case OPERATOR_BIT_XOR:     return "^";
+        case OPERATOR_LSHIFT:      return "<<";
+        case OPERATOR_RSHIFT:      return ">>";
+        default:                   return "OPERATOR_UNKNOWN";
     }
 }
 
 const char *expression_type_to_string(expression_type_t type) {
     switch (type) {
-        case EXPRESSION_NONE: return "NONE";
-        case EXPRESSION_IDENT: return "IDENT";
-        case EXPRESSION_NUMBER_LITERAL: return "INT_LITERAL";
-        case EXPRESSION_BOOL_LITERAL: return "BOOL_LITERAL";
-        case EXPRESSION_STRING_LITERAL: return "STRING_LITERAL";
-        case EXPRESSION_ARRAY_LITERAL: return "ARRAY_LITERAL";
-        case EXPRESSION_MAP_LITERAL: return "MAP_LITERAL";
-        case EXPRESSION_PREFIX: return "PREFIX";
-        case EXPRESSION_INFIX: return "INFIX";
+        case EXPRESSION_NONE:             return "NONE";
+        case EXPRESSION_IDENT:            return "IDENT";
+        case EXPRESSION_NUMBER_LITERAL:   return "INT_LITERAL";
+        case EXPRESSION_BOOL_LITERAL:     return "BOOL_LITERAL";
+        case EXPRESSION_STRING_LITERAL:   return "STRING_LITERAL";
+        case EXPRESSION_ARRAY_LITERAL:    return "ARRAY_LITERAL";
+        case EXPRESSION_MAP_LITERAL:      return "MAP_LITERAL";
+        case EXPRESSION_PREFIX:           return "PREFIX";
+        case EXPRESSION_INFIX:            return "INFIX";
         case EXPRESSION_FUNCTION_LITERAL: return "FN_LITERAL";
-        case EXPRESSION_CALL: return "CALL";
-        case EXPRESSION_INDEX: return "INDEX";
-        case EXPRESSION_ASSIGN: return "ASSIGN";
-        default: return "UNKNOWN";
+        case EXPRESSION_CALL:             return "CALL";
+        case EXPRESSION_INDEX:            return "INDEX";
+        case EXPRESSION_ASSIGN:           return "ASSIGN";
+        case EXPRESSION_LOGICAL:          return "LOGICAL";
+        default:                          return "UNKNOWN";
     }
 }
 
@@ -4038,12 +4332,24 @@ void fn_literal_deinit(fn_literal_t *fn) {
     code_block_destroy(fn->body);
 }
 
-void ident_init(ident_t *ident, char *value) {
-    ident->name = value;
+ident_t ident_make(token_t tok) {
+    ident_t res;
+    res.value = token_duplicate_literal(&tok);
+    res.pos = tok.pos;
+    return res;
+}
+
+ident_t ident_copy(ident_t ident) {
+    ident_t res;
+    res.value = ape_strdup(ident.value);
+    res.pos = ident.pos;
+    return res;
 }
 
 void ident_deinit(ident_t *ident) {
-    ape_free(ident->name);
+    ape_free(ident->value);
+    ident->value = NULL;
+    ident->pos = src_pos_invalid;
 }
 
 if_case_t *if_case_make(expression_t *test, code_block_t *consequence) {
@@ -4095,9 +4401,13 @@ typedef enum precedence {
     PRECEDENCE_ASSIGN,      // a = b
     PRECEDENCE_LOGICAL_OR,  // ||
     PRECEDENCE_LOGICAL_AND, // &&
+    PRECEDENCE_BIT_OR,      // |
+    PRECEDENCE_BIT_XOR,     // ^
+    PRECEDENCE_BIT_AND,     // &
     PRECEDENCE_EQUALS,      // == !=
     PRECEDENCE_LESSGREATER, // >, >=, <, <=
-    PRECEDENCE_SUM,         // +
+    PRECEDENCE_SHIFT,       // << >>
+    PRECEDENCE_SUM,         // + -
     PRECEDENCE_PRODUCT,     // * / %
     PRECEDENCE_PREFIX,      // -X or !X
     PRECEDENCE_CALL,        // myFunction(X)
@@ -4120,6 +4430,7 @@ static statement_t* parse_classic_for_loop(parser_t *p);
 static statement_t* parse_function_statement(parser_t *p);
 static statement_t* parse_block_statement(parser_t *p);
 static statement_t* parse_import_statement(parser_t *p);
+static statement_t* parse_recover_statement(parser_t *p);
 
 static code_block_t* parse_code_block(parser_t *p);
 
@@ -4192,9 +4503,20 @@ parser_t* parser_make(const ape_config_t *config, ptrarray(error_t) *errors) {
     parser->infix_parse_fns[TOKEN_MINUS_ASSIGN] = parse_assign_expression;
     parser->infix_parse_fns[TOKEN_SLASH_ASSIGN] = parse_assign_expression;
     parser->infix_parse_fns[TOKEN_ASTERISK_ASSIGN] = parse_assign_expression;
+    parser->infix_parse_fns[TOKEN_PERCENT_ASSIGN] = parse_assign_expression;
+    parser->infix_parse_fns[TOKEN_BIT_AND_ASSIGN] = parse_assign_expression;
+    parser->infix_parse_fns[TOKEN_BIT_OR_ASSIGN] = parse_assign_expression;
+    parser->infix_parse_fns[TOKEN_BIT_XOR_ASSIGN] = parse_assign_expression;
+    parser->infix_parse_fns[TOKEN_LSHIFT_ASSIGN] = parse_assign_expression;
+    parser->infix_parse_fns[TOKEN_RSHIFT_ASSIGN] = parse_assign_expression;
     parser->infix_parse_fns[TOKEN_DOT] = parse_dot_expression;
     parser->infix_parse_fns[TOKEN_AND] = parse_logical_expression;
     parser->infix_parse_fns[TOKEN_OR] = parse_logical_expression;
+    parser->infix_parse_fns[TOKEN_BIT_AND] = parse_infix_expression;
+    parser->infix_parse_fns[TOKEN_BIT_OR] = parse_infix_expression;
+    parser->infix_parse_fns[TOKEN_BIT_XOR] = parse_infix_expression;
+    parser->infix_parse_fns[TOKEN_LSHIFT] = parse_infix_expression;
+    parser->infix_parse_fns[TOKEN_RSHIFT] = parse_infix_expression;
 
     parser->depth = 0;
 
@@ -4302,6 +4624,10 @@ static statement_t* parse_statement(parser_t *p) {
             res = parse_import_statement(p);
             break;
         }
+        case TOKEN_RECOVER: {
+            res = parse_recover_statement(p);
+            break;
+        }
         default: {
             res = parse_expression_statement(p);
             break;
@@ -4314,7 +4640,7 @@ static statement_t* parse_statement(parser_t *p) {
 }
 
 static statement_t* parse_define_statement(parser_t *p) {
-    char *name = NULL;
+    ident_t name_ident;
     expression_t *value = NULL;
 
     bool assignable = cur_token_is(p, TOKEN_VAR);
@@ -4325,7 +4651,7 @@ static statement_t* parse_define_statement(parser_t *p) {
         goto err;
     }
 
-    name = token_duplicate_literal(&p->cur_token);
+    name_ident = ident_make(p->cur_token);
 
     next_token(p);
 
@@ -4341,13 +4667,13 @@ static statement_t* parse_define_statement(parser_t *p) {
     }
 
     if (value->type == EXPRESSION_FUNCTION_LITERAL) {
-        value->fn_literal.name = ape_strdup(name);
+        value->fn_literal.name = ape_strdup(name_ident.value);
     }
 
-    return statement_make_define(name, value, assignable);
+    return statement_make_define(name_ident, value, assignable);
 err:
     expression_destroy(value);
-    ape_free(name);
+    ident_deinit(&name_ident);
     return NULL;
 }
 
@@ -4527,8 +4853,40 @@ static statement_t* parse_import_statement(parser_t *p) {
     }
     next_token(p);
     statement_t *result = statement_make_import(processed_name);
-    ape_free(processed_name);
     return result;
+}
+
+static statement_t* parse_recover_statement(parser_t *p) {
+    next_token(p);
+
+    if (!expect_current(p, TOKEN_LPAREN)) {
+        return NULL;
+    }
+    next_token(p);
+
+
+    if (!expect_current(p, TOKEN_IDENT)) {
+        return NULL;
+    }
+
+    ident_t error_ident = ident_make(p->cur_token);
+    next_token(p);
+
+    if (!expect_current(p, TOKEN_RPAREN)) {
+        goto err;
+    }
+    next_token(p);
+
+    code_block_t *body = parse_code_block(p);
+    if (!body) {
+        goto err;
+    }
+
+    return statement_make_recover(error_ident, body);
+err:
+    ident_deinit(&error_ident);
+    return NULL;
+
 }
 
 static statement_t* parse_for_loop_statement(parser_t *p) {
@@ -4549,9 +4907,7 @@ static statement_t* parse_for_loop_statement(parser_t *p) {
 
 static statement_t* parse_foreach(parser_t *p) {
     expression_t *source = NULL;
-    char *iterator_name = NULL;
-
-    iterator_name = token_duplicate_literal(&p->cur_token);
+    ident_t iterator_ident = ident_make(p->cur_token);
 
     next_token(p);
 
@@ -4577,9 +4933,9 @@ static statement_t* parse_foreach(parser_t *p) {
         goto err;
     }
 
-    return statement_make_foreach(iterator_name, source, body);
+    return statement_make_foreach(iterator_ident, source, body);
 err:
-    free(iterator_name);
+    ident_deinit(&iterator_ident);
     expression_destroy(source);
     return NULL;
 }
@@ -4647,7 +5003,8 @@ err:
 }
 
 static statement_t* parse_function_statement(parser_t *p) {
-    char *name = NULL;
+    ident_t name_ident;
+
     expression_t* value = NULL;
 
     src_pos_t pos = p->cur_token.pos;
@@ -4658,7 +5015,7 @@ static statement_t* parse_function_statement(parser_t *p) {
         goto err;
     }
 
-    name = token_duplicate_literal(&p->cur_token);
+    name_ident = ident_make(p->cur_token);
 
     next_token(p);
 
@@ -4668,12 +5025,12 @@ static statement_t* parse_function_statement(parser_t *p) {
     }
 
     value->pos = pos;
-    value->fn_literal.name = ape_strdup(name);
+    value->fn_literal.name = ape_strdup(name_ident.value);
 
-    return statement_make_define(name, value, false);
+    return statement_make_define(name_ident, value, false);
 err:
     expression_destroy(value);
-    ape_free(name);
+    ident_deinit(&name_ident);
     return NULL;
 }
 
@@ -4708,7 +5065,7 @@ static code_block_t* parse_code_block(parser_t *p) {
     next_token(p);
 
     p->depth--;
-    
+
     return code_block_make(statements);
 
 err:
@@ -4761,7 +5118,8 @@ static expression_t* parse_expression(parser_t *p, precedence_t prec) {
 }
 
 static expression_t* parse_identifier(parser_t *p) {
-    expression_t *res = expression_make_ident(token_duplicate_literal(&p->cur_token));
+    ident_t ident = ident_make(p->cur_token);
+    expression_t *res = expression_make_ident(ident);
     next_token(p);
     return res;
 }
@@ -4963,8 +5321,7 @@ static bool parse_function_parameters(parser_t *p, array(ident_t) *out_params) {
         return false;
     }
 
-    ident_t ident;
-    ident_init(&ident, token_duplicate_literal(&p->cur_token));
+    ident_t ident = ident_make(p->cur_token);
     array_add(out_params, &ident);
 
     next_token(p);
@@ -4976,8 +5333,7 @@ static bool parse_function_parameters(parser_t *p, array(ident_t) *out_params) {
             return false;
         }
 
-        ident_t ident;
-        ident_init(&ident, token_duplicate_literal(&p->cur_token));
+        ident_t ident = ident_make(p->cur_token);
         array_add(out_params, &ident);
 
         next_token(p);
@@ -5080,7 +5436,14 @@ static expression_t* parse_assign_expression(parser_t *p, expression_t *left) {
         case TOKEN_PLUS_ASSIGN:
         case TOKEN_MINUS_ASSIGN:
         case TOKEN_SLASH_ASSIGN:
-        case TOKEN_ASTERISK_ASSIGN: {
+        case TOKEN_ASTERISK_ASSIGN:
+        case TOKEN_PERCENT_ASSIGN:
+        case TOKEN_BIT_AND_ASSIGN:
+        case TOKEN_BIT_OR_ASSIGN:
+        case TOKEN_BIT_XOR_ASSIGN:
+        case TOKEN_LSHIFT_ASSIGN:
+        case TOKEN_RSHIFT_ASSIGN:
+        {
             operator_t op = token_to_operator(assign_type);
             expression_t *left_copy = expression_copy(left);
             if (!left_copy) {
@@ -5119,7 +5482,7 @@ static expression_t* parse_logical_expression(parser_t *p, expression_t *left) {
 
 static expression_t* parse_dot_expression(parser_t *p, expression_t *left) {
     next_token(p);
-    
+
     if (!expect_current(p, TOKEN_IDENT)) {
         return NULL;
     }
@@ -5155,9 +5518,20 @@ static precedence_t get_precedence(token_type_t tk) {
         case TOKEN_MINUS_ASSIGN:    return PRECEDENCE_ASSIGN;
         case TOKEN_ASTERISK_ASSIGN: return PRECEDENCE_ASSIGN;
         case TOKEN_SLASH_ASSIGN:    return PRECEDENCE_ASSIGN;
+        case TOKEN_PERCENT_ASSIGN:  return PRECEDENCE_ASSIGN;
+        case TOKEN_BIT_AND_ASSIGN:  return PRECEDENCE_ASSIGN;
+        case TOKEN_BIT_OR_ASSIGN:   return PRECEDENCE_ASSIGN;
+        case TOKEN_BIT_XOR_ASSIGN:  return PRECEDENCE_ASSIGN;
+        case TOKEN_LSHIFT_ASSIGN:   return PRECEDENCE_ASSIGN;
+        case TOKEN_RSHIFT_ASSIGN:   return PRECEDENCE_ASSIGN;
         case TOKEN_DOT:             return PRECEDENCE_DOT;
         case TOKEN_AND:             return PRECEDENCE_LOGICAL_AND;
         case TOKEN_OR:              return PRECEDENCE_LOGICAL_OR;
+        case TOKEN_BIT_OR:          return PRECEDENCE_BIT_OR;
+        case TOKEN_BIT_XOR:         return PRECEDENCE_BIT_XOR;
+        case TOKEN_BIT_AND:         return PRECEDENCE_BIT_AND;
+        case TOKEN_LSHIFT:          return PRECEDENCE_SHIFT;
+        case TOKEN_RSHIFT:          return PRECEDENCE_SHIFT;
         default:                    return PRECEDENCE_LOWEST;
     }
 }
@@ -5183,6 +5557,17 @@ static operator_t token_to_operator(token_type_t tk) {
         case TOKEN_MINUS_ASSIGN:    return OPERATOR_MINUS;
         case TOKEN_ASTERISK_ASSIGN: return OPERATOR_ASTERISK;
         case TOKEN_SLASH_ASSIGN:    return OPERATOR_SLASH;
+        case TOKEN_PERCENT_ASSIGN:  return OPERATOR_MODULUS;
+        case TOKEN_BIT_AND_ASSIGN:  return OPERATOR_BIT_AND;
+        case TOKEN_BIT_OR_ASSIGN:   return OPERATOR_BIT_OR;
+        case TOKEN_BIT_XOR_ASSIGN:  return OPERATOR_BIT_XOR;
+        case TOKEN_LSHIFT_ASSIGN:   return OPERATOR_LSHIFT;
+        case TOKEN_RSHIFT_ASSIGN:   return OPERATOR_RSHIFT;
+        case TOKEN_BIT_AND:         return OPERATOR_BIT_AND;
+        case TOKEN_BIT_OR:          return OPERATOR_BIT_OR;
+        case TOKEN_BIT_XOR:         return OPERATOR_BIT_XOR;
+        case TOKEN_LSHIFT:          return OPERATOR_LSHIFT;
+        case TOKEN_RSHIFT:          return OPERATOR_RSHIFT;
         default: {
             APE_ASSERT(false);
             return OPERATOR_NONE;
@@ -5280,6 +5665,9 @@ symbol_t *symbol_make(const char *name, symbol_type_t type, int index, bool assi
 }
 
 void symbol_destroy(symbol_t *symbol) {
+    if (!symbol) {
+        return;
+    }
     ape_free(symbol->name);
     ape_free(symbol);
 }
@@ -5299,7 +5687,7 @@ symbol_table_t *symbol_table_make(symbol_table_t *outer) {
     if (!outer) {
         for (int i = 0; i < builtins_count(); i++) {
             const char *name = builtins_get_name(i);
-            symbol_table_define_builtin(table, name, i);
+            symbol_table_define_native_function(table, name, i);
         }
     }
     return table;
@@ -5309,6 +5697,7 @@ void symbol_table_destroy(symbol_table_t *table) {
     if (!table) {
         return;
     }
+
     while (ptrarray_count(table->block_scopes) > 0) {
         symbol_table_pop_block_scope(table);
     }
@@ -5319,6 +5708,7 @@ void symbol_table_destroy(symbol_table_t *table) {
 
 symbol_table_t* symbol_table_copy(symbol_table_t *table) {
     symbol_table_t *copy = ape_malloc(sizeof(symbol_table_t));
+    memset(copy, 0, sizeof(symbol_table_t));
     copy->outer = table->outer;
     copy->block_scopes = ptrarray_copy_with_items(table->block_scopes, block_scope_copy);
     copy->free_symbols = ptrarray_copy_with_items(table->free_symbols, symbol_copy);
@@ -5342,6 +5732,9 @@ symbol_t *symbol_table_define(symbol_table_t *table, const char *name, bool assi
     if (strchr(name, ':')) {
         return NULL; // module symbol
     }
+    if (APE_STREQ(name, "this")) {
+        return NULL; // this is reserved
+    }
     symbol_type_t symbol_type = table->outer == NULL ? SYMBOL_GLOBAL : SYMBOL_LOCAL;
     int ix = next_symbol_index(table);
     symbol_t *symbol = symbol_make(name, symbol_type, ix, assignable);
@@ -5355,8 +5748,8 @@ symbol_t *symbol_table_define(symbol_table_t *table, const char *name, bool assi
     return symbol;
 }
 
-symbol_t *symbol_table_define_builtin(symbol_table_t *st, const char *name, int ix) {
-    symbol_t *symbol = symbol_make(name, SYMBOL_BUILTIN, ix, false);
+symbol_t *symbol_table_define_native_function(symbol_table_t *st, const char *name, int ix) {
+    symbol_t *symbol = symbol_make(name, SYMBOL_NATIVE_FUNCTION, ix, false);
     set_symbol(st, symbol);
     return symbol;
 }
@@ -5380,6 +5773,12 @@ symbol_t * symbol_table_define_function_name(symbol_table_t *st, const char *nam
     return symbol;
 }
 
+symbol_t *symbol_table_define_this(symbol_table_t *st) {
+    symbol_t *symbol = symbol_make("this", SYMBOL_THIS, 0, false);
+    set_symbol(st, symbol);
+    return symbol;
+}
+
 symbol_t *symbol_table_resolve(symbol_table_t *table, const char *name) {
     symbol_t *symbol = NULL;
     block_scope_t *scope = NULL;
@@ -5390,9 +5789,14 @@ symbol_t *symbol_table_resolve(symbol_table_t *table, const char *name) {
             break;
         }
     }
+
+    if (symbol && symbol->type == SYMBOL_THIS) {
+        symbol = symbol_table_define_free(table, symbol);
+    }
+
     if (!symbol && table->outer) {
         symbol = symbol_table_resolve(table->outer, name);
-        if (!symbol || symbol->type == SYMBOL_GLOBAL || symbol->type == SYMBOL_BUILTIN) {
+        if (!symbol || symbol->type == SYMBOL_GLOBAL || symbol->type == SYMBOL_NATIVE_FUNCTION) {
             return symbol;
         }
         symbol = symbol_table_define_free(table, symbol);
@@ -5427,6 +5831,19 @@ void symbol_table_pop_block_scope(symbol_table_t *table) {
 block_scope_t* symbol_table_get_block_scope(symbol_table_t *table) {
     block_scope_t *top_scope = ptrarray_top(table->block_scopes);
     return top_scope;
+}
+
+
+bool symbol_table_is_global_scope(symbol_table_t *table) {
+    return table->outer == NULL;
+}
+
+bool symbol_table_is_top_block_scope(symbol_table_t *table) {
+    return ptrarray_count(table->block_scopes) == 1;
+}
+
+bool symbol_table_is_top_global_scope(symbol_table_t *table) {
+    return symbol_table_is_global_scope(table) && symbol_table_is_top_block_scope(table);
 }
 
 // INTERNAL
@@ -5483,6 +5900,7 @@ static opcode_definition_t g_definitions[OPCODE_MAX + 1] = {
     {"MOD", 0, {0}},
     {"TRUE", 0, {0}},
     {"FALSE", 0, {0}},
+    {"COMPARE", 0, {0}},
     {"EQUAL", 0, {0}},
     {"NOT_EQUAL", 0, {0}},
     {"GREATER_THAN", 0, {0}},
@@ -5495,8 +5913,11 @@ static opcode_definition_t g_definitions[OPCODE_MAX + 1] = {
     {"NULL", 0, {0}},
     {"GET_GLOBAL", 1, {2}},
     {"SET_GLOBAL", 1, {2}},
+    {"DEFINE_GLOBAL", 1, {2}},
     {"ARRAY", 1, {2}},
-    {"MAP", 1, {2}},
+    {"MAP_START", 1, {2}},
+    {"MAP_END", 1, {2}},
+    {"GET_THIS", 0, {0}},
     {"GET_INDEX", 0, {0}},
     {"SET_INDEX", 0, {0}},
     {"GET_VALUE_AT", 0, {0}},
@@ -5504,8 +5925,9 @@ static opcode_definition_t g_definitions[OPCODE_MAX + 1] = {
     {"RETURN_VALUE", 0, {0}},
     {"RETURN", 0, {0}},
     {"GET_LOCAL", 1, {1}},
+    {"DEFINE_LOCAL", 1, {1}},
     {"SET_LOCAL", 1, {1}},
-    {"GET_BUILTIN", 1, {2}},
+    {"GET_NATIVE_FUNCTION", 1, {2}},
     {"FUNCTION", 2, {2, 1}},
     {"GET_FREE", 1, {1}},
     {"SET_FREE", 1, {1}},
@@ -5513,6 +5935,12 @@ static opcode_definition_t g_definitions[OPCODE_MAX + 1] = {
     {"DUP", 0, {0}},
     {"NUMBER", 1, {8}},
     {"LEN", 0, {0}},
+    {"SET_RECOVER", 1, {2}},
+    {"OR", 0, {0}},
+    {"XOR", 0, {0}},
+    {"AND", 0, {0}},
+    {"LSHIFT", 0, {0}},
+    {"RSHIFT", 0, {0}},
     {"INVALID_MAX", 0, {0}},
 };
 
@@ -5612,11 +6040,16 @@ void code_to_string(uint8_t *code, src_pos_t *source_positions, size_t code_size
             strbuf_appendf(res, "%04d %s", pos, def->name);
         }
         pos += 1;
-        
+
         uint64_t operands[2];
         code_read_operands(def, code + pos, operands);
         for (int i = 0; i < def->num_operands; i++) {
-            strbuf_appendf(res, " %llu", operands[i]);
+            if (op == OPCODE_NUMBER) {
+                double val_double = ape_uint64_to_double(operands[i]);
+                strbuf_appendf(res, " %1.17g", val_double);
+            } else {
+                strbuf_appendf(res, " %llu", operands[i]);
+            }
             pos += def->operand_widths[i];
         }
         strbuf_append(res, "\n");
@@ -5746,7 +6179,7 @@ static int  add_constant(compiler_t *comp, object_t obj);
 static void change_uint16_operand(compiler_t *comp, int ip, uint16_t operand);
 static bool last_opcode_is(compiler_t *comp, opcode_t op);
 static void read_symbol(compiler_t *comp, symbol_t *symbol);
-static void write_symbol(compiler_t *comp, symbol_t *symbol);
+static void write_symbol(compiler_t *comp, symbol_t *symbol, bool define);
 
 static void push_break_ip(compiler_t *comp, int ip);
 static void pop_break_ip(compiler_t *comp);
@@ -5761,7 +6194,7 @@ static int  get_ip(compiler_t *comp);
 static array(src_pos_t)* get_src_positions(compiler_t *comp);
 static array(uint8_t)*   get_bytecode(compiler_t *comp);
 
-static void push_file_scope(compiler_t *comp, const char *filename, module_t *module);
+static void push_file_scope(compiler_t *comp, const char *filepath, module_t *module);
 static void pop_file_scope(compiler_t *comp);
 
 static void set_compilation_scope(compiler_t *comp, compilation_scope_t *scope);
@@ -5771,8 +6204,13 @@ static module_t* module_make(const char *name);
 static void module_destroy(module_t *module);
 static void module_add_symbol(module_t *module, const symbol_t *symbol);
 
-static compiled_file_t *compiled_file_make(const char *name);
+static compiled_file_t* compiled_file_make(const char *path);
 static void compiled_file_destroy(compiled_file_t *file);
+
+static const char* get_module_name(const char *path);
+static symbol_t* define_symbol(compiler_t *comp, src_pos_t pos, const char *name, bool assignable, bool can_shadow);
+
+static bool is_comparison(operator_t op);
 
 compiler_t *compiler_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors) {
     compiler_t *comp = ape_malloc(sizeof(compiler_t));
@@ -5780,7 +6218,7 @@ compiler_t *compiler_make(const ape_config_t *config, gcmem_t *mem, ptrarray(err
     APE_ASSERT(config);
     comp->config = config;
     comp->mem = mem;
-    comp->file_scopes = array_make(file_scope_t);
+    comp->file_scopes = ptrarray_make();
     comp->constants = array_make(object_t);
     comp->errors = errors;
     comp->break_ip_stack = array_make(int);
@@ -5804,10 +6242,10 @@ void compiler_destroy(compiler_t *comp) {
     while (compiler_get_compilation_scope(comp)) {
         compiler_pop_compilation_scope(comp);
     }
-    while (array_count(comp->file_scopes) > 0) {
+    while (ptrarray_count(comp->file_scopes) > 0) {
         pop_file_scope(comp);
     }
-    array_destroy(comp->file_scopes);
+    ptrarray_destroy(comp->file_scopes);
     ptrarray_destroy_with_items(comp->files, compiled_file_destroy);
     dict_destroy_with_items(comp->modules, module_destroy);
     ape_free(comp);
@@ -5835,7 +6273,9 @@ compilation_result_t* compiler_compile(compiler_t *comp, const char *code) {
     }
 
     if (!ok) {
-        symbol_table_destroy(compiler_get_symbol_table(comp));
+        while (compiler_get_symbol_table(comp) != NULL) {
+            compiler_pop_symbol_table(comp);
+        }
         compiler_set_symbol_table(comp, global_table_copy);
         return NULL;
     }
@@ -5846,25 +6286,25 @@ compilation_result_t* compiler_compile(compiler_t *comp, const char *code) {
     return compilation_scope_orphan_result(compilation_scope);
 }
 
-compilation_result_t* compiler_compile_file(compiler_t *comp, const char *filename) {
+compilation_result_t* compiler_compile_file(compiler_t *comp, const char *path) {
     if (!comp->config->fileio.read_file.read_file) {
         error_t *err = error_make(ERROR_COMPILATION, src_pos_invalid, "File read function not configured");
         ptrarray_add(comp->errors, err);
         return NULL;
     }
 
-    char *code = comp->config->fileio.read_file.read_file(comp->config->fileio.read_file.context, filename);
+    char *code = comp->config->fileio.read_file.read_file(comp->config->fileio.read_file.context, path);
     if (!code) {
-        error_t *err = error_makef(ERROR_COMPILATION, src_pos_invalid, "Reading file \"%s\" failed", filename);
+        error_t *err = error_makef(ERROR_COMPILATION, src_pos_invalid, "Reading file \"%s\" failed", path);
         ptrarray_add(comp->errors, err);
         return NULL;
     }
 
-    compiled_file_t *file = compiled_file_make(filename);
+    compiled_file_t *file = compiled_file_make(path);
     ptrarray_add(comp->files, file);
 
-    APE_ASSERT(array_count(comp->file_scopes) == 1);
-    file_scope_t *file_scope = array_top(comp->file_scopes);
+    APE_ASSERT(ptrarray_count(comp->file_scopes) == 1);
+    file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     if (!file_scope) {
         APE_ASSERT(false);
         ape_free(code);
@@ -5874,7 +6314,7 @@ compilation_result_t* compiler_compile_file(compiler_t *comp, const char *filena
     file_scope->file = file;
 
     compilation_result_t *res = compiler_compile(comp, code);
-    
+
     file_scope->file = prev_file;
     ape_free(code);
     return res;
@@ -5898,7 +6338,7 @@ void compiler_pop_compilation_scope(compiler_t *comp) {
 }
 
 void compiler_push_symbol_table(compiler_t *comp) {
-    file_scope_t *file_scope = array_top(comp->file_scopes);
+    file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     if (!file_scope) {
         APE_ASSERT(false);
         return;
@@ -5908,7 +6348,7 @@ void compiler_push_symbol_table(compiler_t *comp) {
 }
 
 void compiler_pop_symbol_table(compiler_t *comp) {
-    file_scope_t *file_scope = array_top(comp->file_scopes);
+    file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     if (!file_scope) {
         APE_ASSERT(false);
         return;
@@ -5923,7 +6363,7 @@ void compiler_pop_symbol_table(compiler_t *comp) {
 }
 
 symbol_table_t* compiler_get_symbol_table(compiler_t *comp) {
-    file_scope_t *file_scope = array_top(comp->file_scopes);
+    file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     if (!file_scope) {
         APE_ASSERT(false);
         return NULL;
@@ -5936,7 +6376,7 @@ symbol_table_t* compiler_get_symbol_table(compiler_t *comp) {
 }
 
 void compiler_set_symbol_table(compiler_t *comp, symbol_table_t *table) {
-    file_scope_t *file_scope = array_top(comp->file_scopes);
+    file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     if (!file_scope) {
         APE_ASSERT(false);
         return;
@@ -5951,7 +6391,7 @@ opcode_t compiler_last_opcode(compiler_t *comp) {
 
 // INTERNAL
 static bool compile_code(compiler_t *comp, const char *code) {
-    file_scope_t *file_scope = array_top(comp->file_scopes);
+    file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     APE_ASSERT(file_scope);
 
     ptrarray(statement_t) *statements = parser_parse_all(file_scope->parser, code, file_scope->file);
@@ -5980,59 +6420,82 @@ static bool compile_statements(compiler_t *comp, ptrarray(statement_t) *statemen
 }
 
 static bool import_module(compiler_t *comp, const statement_t *import_stmt) {
-    const char *module_name = import_stmt->import.name;
+    bool result = false;
+    char *filepath = NULL;
+
+    file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
+
+    const char *module_path = import_stmt->import.path;
+    const char *module_name = get_module_name(module_path);
+
+    for (int i = 0; i < ptrarray_count(file_scope->loaded_module_names); i++) {
+        const char *loaded_name = ptrarray_get(file_scope->loaded_module_names, i);
+        if (kg_streq(loaded_name, module_name)) {
+            error_t *err = error_makef(ERROR_COMPILATION, import_stmt->pos, "Module \"%s\" was already imported", module_name);
+            ptrarray_add(comp->errors, err);
+            result = false;
+            goto end;
+        }
+    }
+
+    strbuf_t *filepath_buf = strbuf_make();
+    if (kg_is_path_absolute(module_path)) {
+        strbuf_appendf(filepath_buf, "%s.bn", module_path);
+    } else {
+        strbuf_appendf(filepath_buf, "%s%s.bn", file_scope->file->dir_path, module_path);
+    }
+    const char *filepath_non_canonicalised = strbuf_get_string(filepath_buf);
+    filepath = kg_canonicalise_path(filepath_non_canonicalised);
+    strbuf_destroy(filepath_buf);
 
     symbol_table_t *symbol_table = compiler_get_symbol_table(comp);
     if (symbol_table->outer != NULL || ptrarray_count(symbol_table->block_scopes) > 1) {
         error_t *err = error_make(ERROR_COMPILATION, import_stmt->pos, "Modules can only be imported in global scope");
         ptrarray_add(comp->errors, err);
-        return false;
+        result = false;
+        goto end;
     }
 
-    for (int i = 0; i < array_count(comp->file_scopes); i++) {
-        file_scope_t *fs = array_get(comp->file_scopes, i);
-        if (!fs->module) {
-            continue;
-        }
-        if (APE_STREQ(fs->module->name, module_name)) {
-            error_t *err = error_makef(ERROR_COMPILATION, import_stmt->pos, "Cyclic reference of module \"%s\"", module_name);
+    for (int i = 0; i < ptrarray_count(comp->file_scopes); i++) {
+        file_scope_t *fs = ptrarray_get(comp->file_scopes, i);
+        if (APE_STREQ(fs->file->path, filepath)) {
+            error_t *err = error_makef(ERROR_COMPILATION, import_stmt->pos, "Cyclic reference of file \"%s\"", filepath);
             ptrarray_add(comp->errors, err);
-            return false;
+            result = false;
+            goto end;
         }
     }
 
-    module_t *module = dict_get(comp->modules, module_name);
+    module_t *module = dict_get(comp->modules, filepath);
     if (!module) {
         if (!comp->config->fileio.read_file.read_file) {
-            error_t *err = error_makef(ERROR_COMPILATION, import_stmt->pos, "Cannot import module \"%s\", file read function not configured", module_name);
+            error_t *err = error_makef(ERROR_COMPILATION, import_stmt->pos, "Cannot import module \"%s\", file read function not configured", filepath);
             ptrarray_add(comp->errors, err);
-            return false;
+            result = false;
+            goto end;
         }
 
-        strbuf_t *filename_buf = strbuf_make();
-        strbuf_appendf(filename_buf, "%s.bn", module_name);
-        const char *filename = strbuf_get_string(filename_buf);
-        char *code = comp->config->fileio.read_file.read_file(comp->config->fileio.read_file.context, filename);
+        char *code = comp->config->fileio.read_file.read_file(comp->config->fileio.read_file.context, filepath);
         if (!code) {
-            error_t *err = error_makef(ERROR_COMPILATION, import_stmt->pos, "Reading module file \"%s\" failed", module_name);
+            error_t *err = error_makef(ERROR_COMPILATION, import_stmt->pos, "Reading module file \"%s\" failed", filepath);
             ptrarray_add(comp->errors, err);
-            strbuf_destroy(filename_buf);
-            return false;
+            result = false;
+            goto end;
         }
 
         module = module_make(module_name);
-        push_file_scope(comp, filename, module);
+        push_file_scope(comp, filepath, module);
         bool ok = compile_code(comp, code);
         pop_file_scope(comp);
         ape_free(code);
-        strbuf_destroy(filename_buf);
 
         if (!ok) {
             module_destroy(module);
-            return false;
+            result = false;
+            goto end;
         }
 
-        dict_set(comp->modules, module->name, module);
+        dict_set(comp->modules, filepath, module);
     }
 
     for (int i = 0; i < ptrarray_count(module->symbols); i++) {
@@ -6040,7 +6503,13 @@ static bool import_module(compiler_t *comp, const statement_t *import_stmt) {
         symbol_table_add_module_symbol(symbol_table, symbol);
     }
 
-    return true;
+    ptrarray_add(file_scope->loaded_module_names, ape_strdup(module_name));
+
+    result = true;
+
+end:
+    ape_free(filepath);
+    return result;
 }
 
 static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
@@ -6062,20 +6531,9 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
             if (!ok) {
                 return false;
             }
-            
-            symbol_t *current_symbol = symbol_table_resolve(symbol_table, stmt->define.name);
-            if (current_symbol && !comp->config->repl_mode) {
-                error_t *err = error_makef(ERROR_COMPILATION, stmt->pos,
-                                           "Symbol \"%s\" is already defined", stmt->define.name);
-                ptrarray_add(comp->errors, err);
-                return false;
-            }
 
-            symbol_t *symbol = symbol_table_define(symbol_table, stmt->define.name, stmt->define.assignable);
+            symbol_t *symbol = define_symbol(comp, stmt->define.name.pos, stmt->define.name.value, stmt->define.assignable, false);
             if (!symbol) {
-                error_t *err = error_makef(ERROR_COMPILATION, stmt->pos,
-                                           "Cannot define symbol \"%s\"", stmt->define.name);
-                ptrarray_add(comp->errors, err);
                 return false;
             }
 
@@ -6086,7 +6544,7 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
                 }
             }
 
-            write_symbol(comp, symbol);
+            write_symbol(comp, symbol, true);
 
             break;
         }
@@ -6134,7 +6592,7 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
             }
 
             array_destroy(jump_to_end_ips);
-            
+
             break;
         }
         case STATEMENT_RETURN_VALUE: {
@@ -6209,21 +6667,20 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
             symbol_table_push_block_scope(symbol_table);
 
             // Init
-            symbol_t *index_symbol = symbol_table_define(symbol_table, "@i", false);
+            symbol_t *index_symbol = define_symbol(comp, stmt->pos, "@i", false, true);
             if (!index_symbol) {
                 APE_ASSERT(false);
-                error_t *err = error_make(ERROR_COMPILATION, stmt->pos, "Defining internal @i variable in foreach failed");
-                ptrarray_add(comp->errors, err);
                 return false;
             }
+
             compiler_emit(comp, OPCODE_NUMBER, 1, (uint64_t[]){0});
-            write_symbol(comp, index_symbol);
+            write_symbol(comp, index_symbol, true);
             symbol_t *source_symbol = NULL;
             if (foreach->source->type == EXPRESSION_IDENT) {
-                source_symbol = symbol_table_resolve(symbol_table, foreach->source->ident.name);
+                source_symbol = symbol_table_resolve(symbol_table, foreach->source->ident.value);
                 if (!source_symbol) {
                     error_t *err = error_makef(ERROR_COMPILATION, foreach->source->pos,
-                                              "Symbol \"%s\" could not be resolved", foreach->source->ident.name);
+                                              "Symbol \"%s\" could not be resolved", foreach->source->ident.value);
                     ptrarray_add(comp->errors, err);
                     return false;
                 }
@@ -6232,15 +6689,12 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
                 if (!ok) {
                     return false;
                 }
-                source_symbol = symbol_table_define(symbol_table, "@source", false);
+                source_symbol = define_symbol(comp, foreach->source->pos, "@source", false, true);
                 if (!source_symbol) {
                     APE_ASSERT(false);
-                    error_t *err = error_make(ERROR_COMPILATION, stmt->pos,
-                                               "Defining internal @source variable in foreach failed");
-                    ptrarray_add(comp->errors, err);
                     return false;
                 }
-                write_symbol(comp, source_symbol);
+                write_symbol(comp, source_symbol, true);
             }
 
             // Update
@@ -6249,7 +6703,7 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
             read_symbol(comp, index_symbol);
             compiler_emit(comp, OPCODE_NUMBER, 1, (uint64_t[]){ape_double_to_uint64(1)});
             compiler_emit(comp, OPCODE_ADD, 0, NULL);
-            write_symbol(comp, index_symbol);
+            write_symbol(comp, index_symbol, false);
             int after_update_ip = get_ip(comp);
             change_uint16_operand(comp, jump_to_after_update_ip + 1, after_update_ip);
 
@@ -6259,6 +6713,7 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
             compiler_emit(comp, OPCODE_LEN, 0, NULL);
             array_pop(comp->src_positions_stack, NULL);
             read_symbol(comp, index_symbol);
+            compiler_emit(comp, OPCODE_COMPARE, 0, NULL);
             compiler_emit(comp, OPCODE_EQUAL, 0, NULL);
 
             int after_test_ip = get_ip(comp);
@@ -6269,15 +6724,12 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
             read_symbol(comp, index_symbol);
             compiler_emit(comp, OPCODE_GET_VALUE_AT, 0, NULL);
 
-            symbol_t *iter_symbol = symbol_table_define(symbol_table, foreach->iterator_name, false);
+            symbol_t *iter_symbol  = define_symbol(comp, foreach->iterator.pos, foreach->iterator.value, false, false);
             if (!iter_symbol) {
-                error_t *err = error_makef(ERROR_COMPILATION, foreach->source->pos,
-                                           "Cannot define symbol \"%s\"", foreach->iterator_name);
-                ptrarray_add(comp->errors, err);
                 return false;
             }
-            
-            write_symbol(comp, iter_symbol);
+
+            write_symbol(comp, iter_symbol, true);
 
             // Body
             push_continue_ip(comp, update_ip);
@@ -6368,6 +6820,56 @@ static bool compile_statement(compiler_t *comp, const statement_t *stmt) {
             }
             break;
         }
+        case STATEMENT_RECOVER: {
+            const recover_statement_t *recover = &stmt->recover;
+
+            if (symbol_table_is_global_scope(symbol_table)) {
+                error_t *err = error_make(ERROR_COMPILATION, stmt->pos,
+                                          "Recover statement cannot be defined in global scope");
+                ptrarray_add(comp->errors, err);
+                return false;
+            }
+
+            if (!symbol_table_is_top_block_scope(symbol_table)) {
+                error_t *err = error_make(ERROR_COMPILATION, stmt->pos,
+                                          "Recover statement cannot be defined within other statements");
+                ptrarray_add(comp->errors, err);
+                return false;
+            }
+
+            int recover_ip = compiler_emit(comp, OPCODE_SET_RECOVER, 1, (uint64_t[]){0xbeef});
+            int jump_to_after_recover_ip = compiler_emit(comp, OPCODE_JUMP, 1, (uint64_t[]){0xbeef});
+            int after_jump_to_recover_ip = get_ip(comp);
+            change_uint16_operand(comp, recover_ip + 1, after_jump_to_recover_ip);
+
+            symbol_table_push_block_scope(symbol_table);
+
+            symbol_t *error_symbol = define_symbol(comp, recover->error_ident.pos, recover->error_ident.value, false, false);
+            if (!error_symbol) {
+                return false;
+            }
+
+            write_symbol(comp, error_symbol, true);
+
+            ok = compile_code_block(comp, recover->body);
+            if (!ok) {
+                return false;
+            }
+
+            if (!last_opcode_is(comp, OPCODE_RETURN) && !last_opcode_is(comp, OPCODE_RETURN_VALUE)) {
+                error_t *err = error_make(ERROR_COMPILATION, stmt->pos,
+                                          "Recover body must end with a return statement");
+                ptrarray_add(comp->errors, err);
+                return false;
+            }
+
+            symbol_table_pop_block_scope(symbol_table);
+
+            int after_recover_ip = get_ip(comp);
+            change_uint16_operand(comp, jump_to_after_recover_ip + 1, after_recover_ip);
+
+            break;
+        }
         default: {
             APE_ASSERT(false);
             return false;
@@ -6389,17 +6891,22 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
 
             opcode_t op = OPCODE_NONE;
             switch (expr->infix.op) {
-                case OPERATOR_PLUS: op = OPCODE_ADD; break;
-                case OPERATOR_MINUS: op = OPCODE_SUB; break;
-                case OPERATOR_ASTERISK: op = OPCODE_MUL; break;
-                case OPERATOR_SLASH: op = OPCODE_DIV; break;
-                case OPERATOR_MODULUS: op = OPCODE_MOD; break;
-                case OPERATOR_EQ: op = OPCODE_EQUAL; break;
-                case OPERATOR_NOT_EQ: op = OPCODE_NOT_EQUAL; break;
-                case OPERATOR_GT: op = OPCODE_GREATER_THAN; break;
-                case OPERATOR_GTE: op = OPCODE_GREATER_THAN_EQUAL; break;
-                case OPERATOR_LT: op = OPCODE_GREATER_THAN; rearrange = true; break;
-                case OPERATOR_LTE: op = OPCODE_GREATER_THAN_EQUAL; rearrange = true; break;
+                case OPERATOR_PLUS:        op = OPCODE_ADD; break;
+                case OPERATOR_MINUS:       op = OPCODE_SUB; break;
+                case OPERATOR_ASTERISK:    op = OPCODE_MUL; break;
+                case OPERATOR_SLASH:       op = OPCODE_DIV; break;
+                case OPERATOR_MODULUS:     op = OPCODE_MOD; break;
+                case OPERATOR_EQ:          op = OPCODE_EQUAL; break;
+                case OPERATOR_NOT_EQ:      op = OPCODE_NOT_EQUAL; break;
+                case OPERATOR_GT:          op = OPCODE_GREATER_THAN; break;
+                case OPERATOR_GTE:         op = OPCODE_GREATER_THAN_EQUAL; break;
+                case OPERATOR_LT:          op = OPCODE_GREATER_THAN; rearrange = true; break;
+                case OPERATOR_LTE:         op = OPCODE_GREATER_THAN_EQUAL; rearrange = true; break;
+                case OPERATOR_BIT_OR:      op = OPCODE_OR; break;
+                case OPERATOR_BIT_XOR:     op = OPCODE_XOR; break;
+                case OPERATOR_BIT_AND:     op = OPCODE_AND; break;
+                case OPERATOR_LSHIFT:      op = OPCODE_LSHIFT; break;
+                case OPERATOR_RSHIFT:      op = OPCODE_RSHIFT; break;
                 default: {
                     error_t *err = error_makef(ERROR_COMPILATION, expr->pos, "Unknown infix operator");
                     ptrarray_add(comp->errors, err);
@@ -6418,6 +6925,10 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
             ok = compile_expression(comp, right);
             if (!ok) {
                 return false;
+            }
+
+            if (is_comparison(expr->infix.op)) {
+                compiler_emit(comp, OPCODE_COMPARE, 0, NULL);
             }
 
             compiler_emit(comp, op, 0, NULL);
@@ -6456,6 +6967,7 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
         case EXPRESSION_MAP_LITERAL: {
             const map_literal_t *map = &expr->map;
             int len = ptrarray_count(map->keys);
+            compiler_emit(comp, OPCODE_MAP_START, 1, (uint64_t[]){len * 2});
             for (int i = 0; i < len; i++) {
                 const expression_t *key = ptrarray_get(map->keys, i);
                 const expression_t *val = ptrarray_get(map->values, i);
@@ -6470,7 +6982,7 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
                     return false;
                 }
             }
-            compiler_emit(comp, OPCODE_MAP, 1, (uint64_t[]){len * 2});
+            compiler_emit(comp, OPCODE_MAP_END, 1, (uint64_t[]){len * 2});
             break;
         }
         case EXPRESSION_PREFIX: {
@@ -6493,10 +7005,10 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
         }
         case EXPRESSION_IDENT: {
             const ident_t *ident = &expr->ident;
-            symbol_t *symbol = symbol_table_resolve(symbol_table, ident->name);
+            symbol_t *symbol = symbol_table_resolve(symbol_table, ident->value);
             if (!symbol) {
-                error_t *err = error_makef(ERROR_COMPILATION, expr->pos,
-                                          "Symbol \"%s\" could not be resolved", ident->name);
+                error_t *err = error_makef(ERROR_COMPILATION, ident->pos,
+                                           "Symbol \"%s\" could not be resolved", ident->value);
                 ptrarray_add(comp->errors, err);
                 return false;
             }
@@ -6534,20 +7046,17 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
                 }
             }
 
+            symbol_t *this_symbol = symbol_table_define_this(symbol_table);
+            if (!this_symbol) {
+                error_t *err = error_make(ERROR_COMPILATION, expr->pos, "Cannot define \"this\" symbol");
+                ptrarray_add(comp->errors, err);
+                return false;
+            }
+
             for (int i = 0; i < array_count(expr->fn_literal.params); i++) {
                 ident_t *param = array_get(expr->fn_literal.params, i);
-                symbol_t *current_symbol = symbol_table_resolve(symbol_table, param->name);
-                if (current_symbol) {
-                    error_t *err = error_makef(ERROR_COMPILATION, expr->pos,
-                                               "Symbol \"%s\" is already defined", param->name);
-                    ptrarray_add(comp->errors, err);
-                    return false;
-                }
-                symbol_t *param_symbol = symbol_table_define(symbol_table, param->name, false);
+                symbol_t *param_symbol = define_symbol(comp, param->pos, param->value, true, false);
                 if (!param_symbol) {
-                    error_t *err = error_makef(ERROR_COMPILATION, expr->pos,
-                                               "Cannot define symbol \"%s\"", param->name);
-                    ptrarray_add(comp->errors, err);
                     return false;
                 }
             }
@@ -6555,10 +7064,6 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
             ok = compile_statements(comp, fn->body->statements);
             if (!ok) {
                 return false;
-            }
-            
-            if (last_opcode_is(comp, OPCODE_POP)) {
-                compiler_emit(comp, OPCODE_NULL, 0, NULL);
             }
 
             if (!last_opcode_is(comp, OPCODE_RETURN_VALUE) && !last_opcode_is(comp, OPCODE_RETURN)) {
@@ -6569,22 +7074,15 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
             symbol_table->free_symbols = NULL; // because it gets destroyed with compiler_pop_compilation_scope()
 
             int num_locals = symbol_table->max_num_definitions;
-            
+
             compilation_result_t *comp_res = compilation_scope_orphan_result(compilation_scope);
             compiler_pop_symbol_table(comp);
             compiler_pop_compilation_scope(comp);
             compilation_scope = compiler_get_compilation_scope(comp);
             symbol_table = compiler_get_symbol_table(comp);
-            
+
             object_t obj = object_make_function(comp->mem, fn->name, comp_res, true,
-                                                num_locals, array_count(fn->params));
-            if (object_get_type(obj) != OBJECT_FUNCTION) {
-                error_t *err = error_makef(ERROR_COMPILATION, expr->pos,
-                                           "Compiling function failed");
-                ptrarray_add(comp->errors, err);
-                ptrarray_destroy_with_items(free_symbols, symbol_destroy);
-                return false;
-            }
+                                                num_locals, array_count(fn->params), 0);
 
             for (int i = 0; i < ptrarray_count(free_symbols); i++) {
                 symbol_t *symbol = ptrarray_get(free_symbols, i);
@@ -6634,20 +7132,20 @@ static bool compile_expression(compiler_t *comp, const expression_t *expr) {
             array_push(comp->src_positions_stack, &assign->dest->pos);
             if (assign->dest->type == EXPRESSION_IDENT) {
                 const ident_t *ident = &assign->dest->ident;
-                symbol_t *symbol = symbol_table_resolve(symbol_table, ident->name);
+                symbol_t *symbol = symbol_table_resolve(symbol_table, ident->value);
                 if (!symbol) {
                     error_t *err = error_makef(ERROR_COMPILATION, assign->dest->pos,
-                                              "Symbol \"%s\" could not be resolved", ident->name);
+                                              "Symbol \"%s\" could not be resolved", ident->value);
                     ptrarray_add(comp->errors, err);
                     return false;
                 }
                 if (!symbol->assignable) {
                     error_t *err = error_makef(ERROR_COMPILATION, assign->dest->pos,
-                                              "Symbol \"%s\" is not assignable", ident->name);
+                                              "Symbol \"%s\" is not assignable", ident->value);
                     ptrarray_add(comp->errors, err);
                     return false;
                 }
-                write_symbol(comp, symbol);
+                write_symbol(comp, symbol, false);
             } else if (assign->dest->type == EXPRESSION_INDEX) {
                 const index_expression_t *index = &assign->dest->index_expr;
                 ok = compile_expression(comp, index->left);
@@ -6759,22 +7257,32 @@ static bool last_opcode_is(compiler_t *comp, opcode_t op) {
 static void read_symbol(compiler_t *comp, symbol_t *symbol) {
     if (symbol->type == SYMBOL_GLOBAL) {
         compiler_emit(comp, OPCODE_GET_GLOBAL, 1, (uint64_t[]){symbol->index});
-    } else if (symbol->type == SYMBOL_BUILTIN) {
-        compiler_emit(comp, OPCODE_GET_BUILTIN, 1, (uint64_t[]){symbol->index});
+    } else if (symbol->type == SYMBOL_NATIVE_FUNCTION) {
+        compiler_emit(comp, OPCODE_GET_NATIVE_FUNCTION, 1, (uint64_t[]){symbol->index});
     } else if (symbol->type == SYMBOL_LOCAL) {
         compiler_emit(comp, OPCODE_GET_LOCAL, 1, (uint64_t[]){symbol->index});
     } else if (symbol->type == SYMBOL_FREE) {
         compiler_emit(comp, OPCODE_GET_FREE, 1, (uint64_t[]){symbol->index});
     } else if (symbol->type == SYMBOL_FUNCTION) {
         compiler_emit(comp, OPCODE_CURRENT_FUNCTION, 0, NULL);
+    } else if (symbol->type == SYMBOL_THIS) {
+        compiler_emit(comp, OPCODE_GET_THIS, 0, NULL);
     }
 }
 
-static void write_symbol(compiler_t *comp, symbol_t *symbol) {
+static void write_symbol(compiler_t *comp, symbol_t *symbol, bool define) {
     if (symbol->type == SYMBOL_GLOBAL) {
-        compiler_emit(comp, OPCODE_SET_GLOBAL, 1, (uint64_t[]){symbol->index});
+        if (define) {
+            compiler_emit(comp, OPCODE_DEFINE_GLOBAL, 1, (uint64_t[]){symbol->index});
+        } else {
+            compiler_emit(comp, OPCODE_SET_GLOBAL, 1, (uint64_t[]){symbol->index});
+        }
     } else if (symbol->type == SYMBOL_LOCAL) {
-        compiler_emit(comp, OPCODE_SET_LOCAL, 1, (uint64_t[]){symbol->index});
+        if (define) {
+            compiler_emit(comp, OPCODE_DEFINE_LOCAL, 1, (uint64_t[]){symbol->index});
+        } else {
+            compiler_emit(comp, OPCODE_SET_LOCAL, 1, (uint64_t[]){symbol->index});
+        }
     } else if (symbol->type == SYMBOL_FREE) {
         compiler_emit(comp, OPCODE_SET_FREE, 1, (uint64_t[]){symbol->index});
     }
@@ -6836,21 +7344,21 @@ static array(uint8_t)* get_bytecode(compiler_t *comp) {
     return compilation_scope->bytecode;
 }
 
-static void push_file_scope(compiler_t *comp, const char *filename, module_t *module) {
+static void push_file_scope(compiler_t *comp, const char *filepath, module_t *module) {
     symbol_table_t *prev_st = NULL;
-    if (array_count(comp->file_scopes) > 0) {
+    if (ptrarray_count(comp->file_scopes) > 0) {
         prev_st = compiler_get_symbol_table(comp);
     }
-    file_scope_t file_scope;
-    memset(&file_scope, 0, sizeof(file_scope_t));
-    file_scope.filename = ape_strdup(filename);
-    file_scope.parser = parser_make(comp->config, comp->errors);
-    file_scope.symbol_table = NULL;
-    file_scope.module = module;
-    file_scope.file = compiled_file_make(filename);
-    ptrarray_add(comp->files, file_scope.file);
+    file_scope_t *file_scope = ape_malloc(sizeof(file_scope_t));
+    memset(file_scope, 0, sizeof(file_scope_t));
+    file_scope->parser = parser_make(comp->config, comp->errors);
+    file_scope->symbol_table = NULL;
+    file_scope->module = module;
+    file_scope->file = compiled_file_make(filepath);
+    ptrarray_add(comp->files, file_scope->file);
+    file_scope->loaded_module_names = ptrarray_make();
 
-    array_push(comp->file_scopes, &file_scope);
+    ptrarray_push(comp->file_scopes, file_scope);
     compiler_push_symbol_table(comp);
 
     if (prev_st) {
@@ -6866,7 +7374,7 @@ static void pop_file_scope(compiler_t *comp) {
     block_scope_t *popped_st_top_scope = symbol_table_get_block_scope(popped_st);
     int popped_num_defs = popped_st_top_scope->num_definitions;
 
-    file_scope_t *scope = array_top(comp->file_scopes);
+    file_scope_t *scope = ptrarray_top(comp->file_scopes);
     if (!scope) {
         APE_ASSERT(false);
         return;
@@ -6874,11 +7382,15 @@ static void pop_file_scope(compiler_t *comp) {
     while (compiler_get_symbol_table(comp)) {
         compiler_pop_symbol_table(comp);
     }
-    parser_destroy(scope->parser);
-    ape_free(scope->filename);
-    array_pop(comp->file_scopes, NULL);
+    ptrarray_destroy_with_items(scope->loaded_module_names, ape_free);
+    scope->loaded_module_names = NULL;
 
-    if (array_count(comp->file_scopes) > 0) {
+    parser_destroy(scope->parser);
+
+    ape_free(scope);
+    ptrarray_pop(comp->file_scopes);
+
+    if (ptrarray_count(comp->file_scopes) > 0) {
         symbol_table_t *current_st = compiler_get_symbol_table(comp);
         block_scope_t *current_st_top_scope = symbol_table_get_block_scope(current_st);
         current_st_top_scope->num_definitions += popped_num_defs;
@@ -6890,7 +7402,7 @@ static void set_compilation_scope(compiler_t *comp, compilation_scope_t *scope) 
 }
 
 static module_t* get_current_module(compiler_t *comp) {
-    file_scope_t *scope = array_top(comp->file_scopes);
+    file_scope_t *scope = ptrarray_top(comp->file_scopes);
     return scope->module;
 }
 
@@ -6915,9 +7427,16 @@ static void module_add_symbol(module_t *module, const symbol_t *symbol) {
     ptrarray_add(module->symbols, module_symbol);
 }
 
-static compiled_file_t *compiled_file_make(const char *name) {
+static compiled_file_t* compiled_file_make(const char *path) {
     compiled_file_t *file = ape_malloc(sizeof(compiled_file_t));
-    file->name = ape_strdup(name);
+    const char *last_slash_pos = strrchr(path, '/');
+    if (last_slash_pos) {
+        size_t len = last_slash_pos - path + 1;
+        file->dir_path = ape_strndup(path, len);
+    } else {
+        file->dir_path = ape_strdup("");
+    }
+    file->path = ape_strdup(path);
     file->lines = ptrarray_make();
     return file;
 }
@@ -6927,8 +7446,53 @@ static void compiled_file_destroy(compiled_file_t *file) {
         return;
     }
     ptrarray_destroy_with_items(file->lines, ape_free);
-    ape_free(file->name);
+    ape_free(file->dir_path);
+    ape_free(file->path);
     ape_free(file);
+}
+
+static const char* get_module_name(const char *path) {
+    const char *last_slash_pos = strrchr(path, '/');
+    if (last_slash_pos) {
+        return last_slash_pos + 1;
+    }
+    return path;
+}
+
+static symbol_t* define_symbol(compiler_t *comp, src_pos_t pos, const char *name, bool assignable, bool can_shadow) {
+    symbol_table_t *symbol_table = compiler_get_symbol_table(comp);
+    if (!can_shadow && !symbol_table_is_top_global_scope(symbol_table)) {
+        symbol_t *current_symbol = symbol_table_resolve(symbol_table, name);
+        if (current_symbol) {
+            error_t *err = error_makef(ERROR_COMPILATION, pos, "Symbol \"%s\" is already defined", name);
+            ptrarray_add(comp->errors, err);
+            return NULL;
+        }
+    }
+
+    symbol_t *symbol = symbol_table_define(symbol_table, name, assignable);
+    if (!symbol) {
+        error_t *err = error_makef(ERROR_COMPILATION, pos, "Cannot define symbol \"%s\"", name);
+        ptrarray_add(comp->errors, err);
+        return false;
+    }
+
+    return symbol;
+}
+
+static bool is_comparison(operator_t op) {
+    switch (op) {
+        case OPERATOR_EQ:
+        case OPERATOR_NOT_EQ:
+        case OPERATOR_GT:
+        case OPERATOR_GTE:
+        case OPERATOR_LT:
+        case OPERATOR_LTE:
+            return true;
+        default:
+            return false;
+    }
+    return false;
 }
 //FILE_END
 //FILE_START:object.c
@@ -6955,12 +7519,13 @@ static void compiled_file_destroy(compiled_file_t *file) {
 
 static object_t object_make(object_type_t type, object_data_t *data);
 static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(object_t, object_t) *copies);
-static bool object_equals(const object_t *a, const object_t *b);
+static bool object_equals_wrapped(const object_t *a, const object_t *b);
 static unsigned long object_hash(object_t *obj_ptr);
 static unsigned long object_hash_string(const char *str);
 static unsigned long object_hash_double(double val);
 static bool object_is_number(object_t obj);
 static uint64_t get_type_tag(object_type_t type);
+static bool freevals_are_allocated(function_t *fun);
 
 object_t object_make_number(double val) {
     object_t o = { .number = val };
@@ -6979,13 +7544,33 @@ object_t object_make_null() {
 }
 
 object_t object_make_string(gcmem_t *mem, const char *string) {
-    char *string_copy = ape_strdup(string);
-    return object_make_string_no_copy(mem, string_copy);
+    object_data_t *obj = gcmem_alloc_object_data(mem, OBJECT_STRING);
+    int len = (int)strlen(string);
+    if ((len + 1) < OBJECT_STRING_BUF_SIZE) {
+        memcpy(obj->string.value_buf, string, len + 1);
+        obj->string.is_allocated = false;
+    } else {
+        obj->string.value_allocated = ape_strdup(string);
+        obj->string.is_allocated = true;
+    }
+    obj->string.hash = object_hash_string(string);
+    return object_make(OBJECT_STRING, obj);
 }
 
 object_t object_make_string_no_copy(gcmem_t *mem, char *string) {
     object_data_t *obj = gcmem_alloc_object_data(mem, OBJECT_STRING);
-    obj->string = string;
+    int len = (int)strlen(string);
+    if ((len + 1) < OBJECT_STRING_BUF_SIZE) {
+        memcpy(obj->string.value_buf, string, len + 1);
+        obj->string.hash = object_hash_string(string);
+        ape_free(string);
+        obj->string.is_allocated = false;
+    } else {
+        obj->string.hash = object_hash_string(string);
+        obj->string.value_allocated = string;
+        obj->string.is_allocated = true;
+    }
+
     return object_make(OBJECT_STRING, obj);
 }
 
@@ -7003,16 +7588,20 @@ object_t object_make_stringf(gcmem_t *mem, const char *fmt, ...) {
     return object_make_string_no_copy(mem, res);
 }
 
-object_t object_make_builtin(gcmem_t *mem, const char *name, builtin_fn fn, void *data) {
-    object_data_t *obj = gcmem_alloc_object_data(mem, OBJECT_BUILTIN);
-    obj->builtin.name = ape_strdup(name);
-    obj->builtin.fn = fn;
-    obj->builtin.data = data;
-    return object_make(OBJECT_BUILTIN, obj);
+object_t object_make_native_function(gcmem_t *mem, const char *name, native_fn fn, void *data) {
+    object_data_t *obj = gcmem_alloc_object_data(mem, OBJECT_NATIVE_FUNCTION);
+    obj->native_function.name = ape_strdup(name);
+    obj->native_function.fn = fn;
+    obj->native_function.data = data;
+    return object_make(OBJECT_NATIVE_FUNCTION, obj);
 }
 
 object_t object_make_array(gcmem_t *mem) {
-    array(object_t) *arr = array_make(object_t);
+    return object_make_array_with_capacity(mem, 8);
+}
+
+object_t object_make_array_with_capacity(gcmem_t *mem, unsigned capacity) {
+    array(object_t) *arr = array_make_with_capacity(capacity, sizeof(object_t));
     return object_make_array_with_array(mem, arr);
 }
 
@@ -7023,10 +7612,14 @@ object_t object_make_array_with_array(gcmem_t *mem, array(object_t) *array) {
 }
 
 object_t object_make_map(gcmem_t *mem) {
+    return object_make_map_with_capacity(mem, 32);
+}
+
+object_t object_make_map_with_capacity(gcmem_t *mem, unsigned capacity) {
     object_data_t *data = gcmem_alloc_object_data(mem, OBJECT_MAP);
-    data->map = valdict_make(object_t, object_t);
+    data->map = valdict_make_with_capacity(capacity, sizeof(object_t), sizeof(object_t));
     valdict_set_hash_function(data->map, (collections_hash_fn)object_hash);
-    valdict_set_equals_function(data->map, (collections_equals_fn)object_equals);
+    valdict_set_equals_function(data->map, (collections_equals_fn)object_equals_wrapped);
     return object_make(OBJECT_MAP, data);
 }
 
@@ -7037,6 +7630,7 @@ object_t object_make_error(gcmem_t *mem, const char *error) {
 object_t object_make_error_no_copy(gcmem_t *mem, char *error) {
     object_data_t *data = gcmem_alloc_object_data(mem, OBJECT_ERROR);
     data->error.message = error;
+    data->error.traceback = NULL;
     return object_make(OBJECT_ERROR, data);
 }
 
@@ -7054,15 +7648,23 @@ object_t object_make_errorf(gcmem_t *mem, const char *fmt, ...) {
     return object_make_error_no_copy(mem, res);
 }
 
-object_t object_make_function(gcmem_t *mem, const char *name, compilation_result_t *comp_res, bool owns_comp_res,
-                              int num_locals, int num_args) {
+object_t object_make_function(gcmem_t *mem, const char *name, compilation_result_t *comp_res, bool owns_data,
+                              int num_locals, int num_args,
+                              int free_vals_count) {
     object_data_t *obj = gcmem_alloc_object_data(mem, OBJECT_FUNCTION);
-    obj->function.name = name ? ape_strdup(name) : ape_strdup("anonymous");
+    if (owns_data) {
+        obj->function.name = name ? ape_strdup(name) : ape_strdup("anonymous");
+    } else {
+        obj->function.const_name = name ? name : "anonymous";
+    }
     obj->function.comp_result = comp_res;
-    obj->function.owns_comp_result = owns_comp_res;
+    obj->function.owns_data = owns_data;
     obj->function.num_locals = num_locals;
     obj->function.num_args = num_args;
-    obj->function.free_vals = NULL;
+    obj->function.free_vals_count = free_vals_count;
+    if (free_vals_count >= APE_ARRAY_LEN(obj->function.free_vals_buf)) {
+        obj->function.free_vals_allocated = ape_malloc(sizeof(object_t) * free_vals_count);
+    }
     return object_make(OBJECT_FUNCTION, obj);
 }
 
@@ -7083,16 +7685,24 @@ void object_deinit(object_t obj) {
 
 void object_data_deinit(object_data_t *data) {
     switch (data->type) {
+        case OBJECT_FREED: {
+            APE_ASSERT(false);
+            return;
+        }
         case OBJECT_STRING: {
-            ape_free(data->string);
+            if (data->string.is_allocated) {
+                ape_free(data->string.value_allocated);
+            }
             break;
         }
         case OBJECT_FUNCTION: {
-            ape_free(data->function.name);
-            if (data->function.owns_comp_result) {
+            if (data->function.owns_data) {
+                ape_free(data->function.name);
                 compilation_result_destroy(data->function.comp_result);
             }
-            array_destroy(data->function.free_vals);
+            if (freevals_are_allocated(&data->function)) {
+                ape_free(data->function.free_vals_allocated);
+            }
             break;
         }
         case OBJECT_ARRAY: {
@@ -7103,8 +7713,8 @@ void object_data_deinit(object_data_t *data) {
             valdict_destroy(data->map);
             break;
         }
-        case OBJECT_BUILTIN: {
-            ape_free(data->builtin.name);
+        case OBJECT_NATIVE_FUNCTION: {
+            ape_free(data->native_function.name);
             break;
         }
         case OBJECT_EXTERNAL: {
@@ -7122,6 +7732,7 @@ void object_data_deinit(object_data_t *data) {
             break;
         }
     }
+    data->type = OBJECT_FREED;
 }
 
 bool object_is_allocated(object_t object) {
@@ -7146,6 +7757,10 @@ bool object_is_hashable(object_t obj) {
 void object_to_string(object_t obj, strbuf_t *buf, bool quote_str) {
     object_type_t type = object_get_type(obj);
     switch (type) {
+        case OBJECT_FREED: {
+            strbuf_append(buf, "FREED");
+            break;
+        }
         case OBJECT_NONE: {
             strbuf_append(buf, "NONE");
             break;
@@ -7174,7 +7789,7 @@ void object_to_string(object_t obj, strbuf_t *buf, bool quote_str) {
         }
         case OBJECT_FUNCTION: {
             const function_t *function = object_get_function(obj);
-            strbuf_appendf(buf, "CompiledFunction: %s\n", function->name);
+            strbuf_appendf(buf, "CompiledFunction: %s\n", object_get_function_name(obj));
             code_to_string(function->comp_result->bytecode, function->comp_result->src_positions, function->comp_result->count, buf);
             break;
         }
@@ -7205,8 +7820,8 @@ void object_to_string(object_t obj, strbuf_t *buf, bool quote_str) {
             strbuf_append(buf, "}");
             break;
         }
-        case OBJECT_BUILTIN: {
-            strbuf_append(buf, "BUILTIN");
+        case OBJECT_NATIVE_FUNCTION: {
+            strbuf_append(buf, "NATIVE_FUNCTION");
             break;
         }
         case OBJECT_EXTERNAL: {
@@ -7231,18 +7846,19 @@ void object_to_string(object_t obj, strbuf_t *buf, bool quote_str) {
 
 const char *object_get_type_name(const object_type_t type) {
     switch (type) {
-        case OBJECT_NONE: return "NONE";
-        case OBJECT_NUMBER: return "NUMBER";
-        case OBJECT_BOOL: return "BOOL";
-        case OBJECT_STRING: return "STRING";
-        case OBJECT_NULL: return "NULL";
-        case OBJECT_BUILTIN: return "BUILTIN";
-        case OBJECT_ARRAY: return "ARRAY";
-        case OBJECT_MAP: return "MAP";
-        case OBJECT_FUNCTION: return "FUNCTION";
-        case OBJECT_EXTERNAL: return "EXTERNAL";
-        case OBJECT_ERROR: return "ERROR";
-        case OBJECT_ANY: return "ANY";
+        case OBJECT_NONE:            return "NONE";
+        case OBJECT_FREED:           return "NONE";
+        case OBJECT_NUMBER:          return "NUMBER";
+        case OBJECT_BOOL:            return "BOOL";
+        case OBJECT_STRING:          return "STRING";
+        case OBJECT_NULL:            return "NULL";
+        case OBJECT_NATIVE_FUNCTION: return "NATIVE_FUNCTION";
+        case OBJECT_ARRAY:           return "ARRAY";
+        case OBJECT_MAP:             return "MAP";
+        case OBJECT_FUNCTION:        return "FUNCTION";
+        case OBJECT_EXTERNAL:        return "EXTERNAL";
+        case OBJECT_ERROR:           return "ERROR";
+        case OBJECT_ANY:             return "ANY";
     }
     return "NONE";
 }
@@ -7266,6 +7882,7 @@ object_t object_copy(gcmem_t *mem, object_t obj) {
     object_type_t type = object_get_type(obj);
     switch (type) {
         case OBJECT_ANY:
+        case OBJECT_FREED:
         case OBJECT_NONE: {
             APE_ASSERT(false);
             copy = object_make_null();
@@ -7275,7 +7892,7 @@ object_t object_copy(gcmem_t *mem, object_t obj) {
         case OBJECT_BOOL:
         case OBJECT_NULL:
         case OBJECT_FUNCTION:
-        case OBJECT_BUILTIN:
+        case OBJECT_NATIVE_FUNCTION:
         case OBJECT_ERROR: {
             copy = obj;
             break;
@@ -7325,7 +7942,7 @@ double object_compare(object_t a, object_t b) {
     if (a.handle == b.handle) {
         return 0;
     }
-    
+
     object_type_t a_type = object_get_type(a);
     object_type_t b_type = object_get_type(b);
 
@@ -7343,6 +7960,17 @@ double object_compare(object_t a, object_t b) {
         intptr_t b_data_val = (intptr_t)object_get_allocated_data(b);
         return (double)(a_data_val - b_data_val);
     }
+}
+
+bool object_equals(object_t a, object_t b) {
+    object_type_t a_type = object_get_type(a);
+    object_type_t b_type = object_get_type(b);
+
+    if (a_type != b_type) {
+        return false;
+    }
+    double res = object_compare(a, b);
+    return APE_DBLEQ(res, 0);
 }
 
 external_data_t* object_get_external_data(object_t object) {
@@ -7383,13 +8011,22 @@ double object_get_number(object_t obj) {
 const char * object_get_string(object_t object) {
     APE_ASSERT(object_get_type(object) == OBJECT_STRING);
     object_data_t *data = object_get_allocated_data(object);
-    return data->string;
+    if (data->string.is_allocated) {
+        return data->string.value_allocated;
+    } else {
+        return data->string.value_buf;
+    }
 }
 
 function_t* object_get_function(object_t object) {
     APE_ASSERT(object_get_type(object) == OBJECT_FUNCTION);
     object_data_t *data = object_get_allocated_data(object);
     return &data->function;
+}
+
+native_function_t* object_get_native_function(object_t obj) {
+    object_data_t *data = object_get_allocated_data(obj);
+    return &data->native_function;
 }
 
 object_type_t object_get_type(object_t obj) {
@@ -7409,9 +8046,86 @@ object_type_t object_get_type(object_t obj) {
     }
 }
 
-builtin_t* object_get_builtin(object_t obj) {
+bool object_is_numeric(object_t obj) {
+    object_type_t type = object_get_type(obj);
+    return type == OBJECT_NUMBER || type == OBJECT_BOOL;
+}
+
+bool object_is_null(object_t obj) {
+    return object_get_type(obj) == OBJECT_NULL;
+}
+
+bool object_is_callable(object_t obj) {
+    object_type_t type = object_get_type(obj);
+    return type == OBJECT_NATIVE_FUNCTION || type == OBJECT_FUNCTION;
+}
+
+const char* object_get_function_name(object_t obj) {
+    APE_ASSERT(object_get_type(obj) == OBJECT_FUNCTION);
     object_data_t *data = object_get_allocated_data(obj);
-    return &data->builtin;
+    APE_ASSERT(data);
+    if (!data) {
+        return NULL;
+    }
+
+    if (data->function.owns_data) {
+        return data->function.name;
+    } else {
+        return data->function.const_name;
+    }
+}
+
+object_t object_get_function_free_val(object_t obj, int ix) {
+    APE_ASSERT(object_get_type(obj) == OBJECT_FUNCTION);
+    object_data_t *data = object_get_allocated_data(obj);
+    APE_ASSERT(data);
+    if (!data) {
+        return object_make_null();
+    }
+    function_t *fun = &data->function;
+    APE_ASSERT(ix >= 0 && ix < fun->free_vals_count);
+    if (ix < 0 || ix >= fun->free_vals_count) {
+        return object_make_null();
+    }
+    if (freevals_are_allocated(fun)) {
+        return fun->free_vals_allocated[ix];
+    } else {
+        return fun->free_vals_buf[ix];
+    }
+}
+
+void object_set_function_free_val(object_t obj, int ix, object_t val) {
+    APE_ASSERT(object_get_type(obj) == OBJECT_FUNCTION);
+    object_data_t *data = object_get_allocated_data(obj);
+    APE_ASSERT(data);
+    if (!data) {
+        return;
+    }
+    function_t *fun = &data->function;
+    APE_ASSERT(ix >= 0 && ix < fun->free_vals_count);
+    if (ix < 0 || ix >= fun->free_vals_count) {
+        return;
+    }
+    if (freevals_are_allocated(fun)) {
+        fun->free_vals_allocated[ix] = val;
+    } else {
+        fun->free_vals_buf[ix] = val;
+    }
+}
+
+object_t* object_get_function_free_vals(object_t obj) {
+    APE_ASSERT(object_get_type(obj) == OBJECT_FUNCTION);
+    object_data_t *data = object_get_allocated_data(obj);
+    APE_ASSERT(data);
+    if (!data) {
+        return NULL;
+    }
+    function_t *fun = &data->function;
+    if (freevals_are_allocated(fun)) {
+        return fun->free_vals_allocated;
+    } else {
+        return fun->free_vals_buf;
+    }
 }
 
 const char* object_get_error_message(object_t object) {
@@ -7509,6 +8223,16 @@ object_t object_get_map_value_at(object_t object, int ix) {
     return *res;
 }
 
+bool object_set_map_value_at(object_t object, int ix, object_t val) {
+    APE_ASSERT(object_get_type(object) == OBJECT_MAP);
+    if (ix >= object_get_map_length(object)) {
+        return false;
+    }
+    object_data_t *data = object_get_allocated_data(object);
+    bool res = valdict_set_value_at(data->map, ix, &val);
+    return res;
+}
+
 object_t object_get_kv_pair_at(gcmem_t *mem, object_t object, int ix) {
     APE_ASSERT(object_get_type(object) == OBJECT_MAP);
     object_data_t *data = object_get_allocated_data(object);
@@ -7539,6 +8263,13 @@ object_t object_get_map_value(object_t object, object_t key) {
     return *res;
 }
 
+bool object_map_has_key(object_t object, object_t key) {
+    APE_ASSERT(object_get_type(object) == OBJECT_MAP);
+    object_data_t *data = object_get_allocated_data(object);
+    object_t *res = valdict_get(data->map, &key);
+    return res != NULL;
+}
+
 // INTERNAL
 static object_t object_make(object_type_t type, object_data_t *data) {
     object_t object;
@@ -7559,6 +8290,7 @@ static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(ob
 
     object_type_t type = object_get_type(obj);
     switch (type) {
+        case OBJECT_FREED:
         case OBJECT_ANY:
         case OBJECT_NONE: {
             APE_ASSERT(false);
@@ -7568,7 +8300,7 @@ static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(ob
         case OBJECT_NUMBER:
         case OBJECT_BOOL:
         case OBJECT_NULL:
-        case OBJECT_BUILTIN: {
+        case OBJECT_NATIVE_FUNCTION: {
             copy = obj;
             break;
         }
@@ -7584,14 +8316,18 @@ static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(ob
             src_pos_t *src_positions_copy = ape_malloc(sizeof(src_pos_t) * function->comp_result->count);
             memcpy(src_positions_copy, function->comp_result->src_positions, sizeof(src_pos_t) * function->comp_result->count);
             compilation_result_t *comp_res_copy = compilation_result_make(bytecode_copy, src_positions_copy, function->comp_result->count);
-            copy = object_make_function(mem, function->name, comp_res_copy, true, function->num_locals, function->num_args);
+            copy = object_make_function(mem, object_get_function_name(obj), comp_res_copy, true,
+                                        function->num_locals, function->num_args, 0);
             valdict_set(copies, &obj, &copy);
             function_t *function_copy = object_get_function(copy);
-            function_copy->free_vals = array_make_with_capacity(array_count(function->free_vals), sizeof(object_t));
-            for (int i = 0; i < array_count(function->free_vals); i++) {
-                object_t *free_val = array_get(function->free_vals, i);
-                object_t free_val_copy = object_deep_copy_internal(mem, *free_val, copies);
-                array_add(function_copy->free_vals, &free_val_copy);
+            if (freevals_are_allocated(function)) {
+                function_copy->free_vals_allocated = ape_malloc(sizeof(object_t) * function->free_vals_count);
+            }
+            function_copy->free_vals_count = function->free_vals_count;
+            for (int i = 0; i < function->free_vals_count; i++) {
+                object_t free_val = object_get_function_free_val(obj, i);
+                object_t free_val_copy = object_deep_copy_internal(mem, free_val, copies);
+                object_set_function_free_val(copy, i, free_val_copy);
             }
             break;
         }
@@ -7630,17 +8366,10 @@ static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(ob
     return copy;
 }
 
-static bool object_equals(const object_t *a_ptr, const object_t *b_ptr) {
+static bool object_equals_wrapped(const object_t *a_ptr, const object_t *b_ptr) {
     object_t a = *a_ptr;
     object_t b = *b_ptr;
-    object_type_t a_type = object_get_type(a);
-    object_type_t b_type = object_get_type(b);
-
-    if (a_type != b_type) {
-        return false;
-    }
-    double res = object_compare(a, b);
-    return APE_DBLEQ(res, 0);
+    return object_equals(a, b);
 }
 
 static unsigned long object_hash(object_t *obj_ptr) {
@@ -7657,8 +8386,8 @@ static unsigned long object_hash(object_t *obj_ptr) {
             return val;
         }
         case OBJECT_STRING: {
-            const char *str = object_get_string(obj);
-            return object_hash_string(str);
+            object_data_t *data = object_get_allocated_data(obj);
+            return data->string.hash;
         }
         default: {
             return 0;
@@ -7695,6 +8424,10 @@ static uint64_t get_type_tag(object_type_t type) {
         default:          return 4;
     }
 }
+
+static bool freevals_are_allocated(function_t *fun) {
+    return fun->free_vals_count >= APE_ARRAY_LEN(fun->free_vals_buf);
+}
 //FILE_END
 //FILE_START:gc.c
 #include <stdlib.h>
@@ -7706,11 +8439,25 @@ static uint64_t get_type_tag(object_type_t type) {
 #include "object.h"
 #endif
 
+#define GCMEM_POOL_SIZE 1024
+
+typedef struct gcmem {
+    ptrarray(object_data_t) *objects;
+    ptrarray(object_data_t) *objects_back;
+
+    array(object_t) *objects_not_gced;
+
+    object_data_t *pool[GCMEM_POOL_SIZE];
+    int pool_index;
+} gcmem_t;
+
 gcmem_t *gcmem_make() {
     gcmem_t *mem = ape_malloc(sizeof(gcmem_t));
     memset(mem, 0, sizeof(gcmem_t));
     mem->objects = ptrarray_make();
     mem->objects_back = ptrarray_make();
+    mem->objects_not_gced = array_make(object_t);
+    mem->pool_index = -1;
     return mem;
 }
 
@@ -7725,11 +8472,22 @@ void gcmem_destroy(gcmem_t *mem) {
     }
     ptrarray_destroy(mem->objects);
     ptrarray_destroy(mem->objects_back);
+    array_destroy(mem->objects_not_gced);
+    for (int i = 0; i <= mem->pool_index; i++) {
+        ape_free(mem->pool[i]);
+    }
+    memset(mem, 0, sizeof(gcmem_t));
     ape_free(mem);
 }
 
 object_data_t* gcmem_alloc_object_data(gcmem_t *mem, object_type_t type) {
-    object_data_t *data = ape_malloc(sizeof(object_data_t));
+    object_data_t *data = NULL;
+    if (mem->pool_index >= 0) {
+        data = mem->pool[mem->pool_index];
+        mem->pool_index--;
+    } else {
+        data = ape_malloc(sizeof(object_data_t));
+    }
     memset(data, 0, sizeof(object_data_t));
     ptrarray_add(mem->objects, data);
     data->mem = mem;
@@ -7759,6 +8517,7 @@ void gc_mark_object(object_t obj) {
     if (data->gcmark) {
         return;
     }
+
     data->gcmark = true;
     switch (data->type) {
         case OBJECT_MAP: {
@@ -7781,9 +8540,9 @@ void gc_mark_object(object_t obj) {
         }
         case OBJECT_FUNCTION: {
             function_t *function = object_get_function(obj);
-            for (int i = 0; i < array_count(function->free_vals); i++) {
-                object_t *free_val = array_get(function->free_vals, i);
-                gc_mark_object(*free_val);
+            for (int i = 0; i < function->free_vals_count; i++) {
+                object_t free_val = object_get_function_free_val(obj, i);
+                gc_mark_object(free_val);
             }
             break;
         }
@@ -7794,6 +8553,8 @@ void gc_mark_object(object_t obj) {
 }
 
 void gc_sweep(gcmem_t *mem) {
+    gc_mark_objects(array_data(mem->objects_not_gced), array_count(mem->objects_not_gced));
+
     ptrarray_clear(mem->objects_back);
     for (int i = 0; i < ptrarray_count(mem->objects); i++) {
         object_data_t *data = ptrarray_get(mem->objects, i);
@@ -7801,12 +8562,36 @@ void gc_sweep(gcmem_t *mem) {
             ptrarray_add(mem->objects_back, data);
         } else {
             object_data_deinit(data);
-            ape_free(data);
+            if (mem->pool_index < (GCMEM_POOL_SIZE - 1)) {
+                mem->pool_index++;
+                mem->pool[mem->pool_index] = data;
+            } else {
+                ape_free(data);
+            }
         }
     }
     ptrarray(object_t) *objs_temp = mem->objects;
     mem->objects = mem->objects_back;
     mem->objects_back = objs_temp;
+}
+
+void gc_disable_on_object(object_t obj) {
+    if (!object_is_allocated(obj)) {
+        return;
+    }
+    object_data_t *data = object_get_allocated_data(obj);
+    if (array_contains(data->mem->objects_not_gced, &obj)) {
+        return;
+    }
+    array_add(data->mem->objects_not_gced, &obj);
+}
+
+void gc_enable_on_object(object_t obj) {
+    if (!object_is_allocated(obj)) {
+        return;
+    }
+    object_data_t *data = object_get_allocated_data(obj);
+    array_remove_item(data->mem->objects_not_gced, &obj);
 }
 //FILE_END
 //FILE_START:builtins.c
@@ -7829,6 +8614,7 @@ static object_t reverse_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t array_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t append_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t remove_fn(vm_t *vm, void *data, int argc, object_t *args);
+static object_t remove_at_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t println_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t print_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t read_file_fn(vm_t *vm, void *data, int argc, object_t *args);
@@ -7842,6 +8628,7 @@ static object_t copy_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t deep_copy_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t concat_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t error_fn(vm_t *vm, void *data, int argc, object_t *args);
+static object_t crash_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t assert_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t random_fn(vm_t *vm, void *data, int argc, object_t *args);
 
@@ -7855,6 +8642,7 @@ static object_t is_null_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t is_function_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t is_external_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t is_error_fn(vm_t *vm, void *data, int argc, object_t *args);
+static object_t is_native_function_fn(vm_t *vm, void *data, int argc, object_t *args);
 
 // Math
 static object_t sqrt_fn(vm_t *vm, void *data, int argc, object_t *args);
@@ -7867,11 +8655,11 @@ static object_t ceil_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t floor_fn(vm_t *vm, void *data, int argc, object_t *args);
 static object_t abs_fn(vm_t *vm, void *data, int argc, object_t *args);
 
-static bool check_args(vm_t *vm, bool generate_errors, int argc, object_t *args, int expected_argc, object_type_t *expected_types);
-#define CHECK_ARGS(vm, generate_errors, argc, args, ...) \
+static bool check_args(vm_t *vm, bool generate_error, int argc, object_t *args, int expected_argc, object_type_t *expected_types);
+#define CHECK_ARGS(vm, generate_error, argc, args, ...) \
     check_args(\
         (vm),\
-        (generate_errors),\
+        (generate_error),\
         (argc),\
         (args),\
         sizeof((object_type_t[]){__VA_ARGS__}) / sizeof(object_type_t),\
@@ -7879,8 +8667,8 @@ static bool check_args(vm_t *vm, bool generate_errors, int argc, object_t *args,
 
 static struct {
     const char *name;
-    builtin_fn fn;
-} g_builtins[] = {
+    native_fn fn;
+} g_native_functions[] = {
     {"len",         len_fn},
     {"println",     println_fn},
     {"print",       print_fn},
@@ -7891,6 +8679,7 @@ static struct {
     {"rest",        rest_fn},
     {"append",      append_fn},
     {"remove",      remove_fn},
+    {"remove_at",   remove_at_fn},
     {"to_str",      to_str_fn},
     {"range",       range_fn},
     {"keys",        keys_fn},
@@ -7902,6 +8691,7 @@ static struct {
     {"reverse",     reverse_fn},
     {"array",       array_fn},
     {"error",       error_fn},
+    {"crash",       crash_fn},
     {"assert",      assert_fn},
     {"random",      random_fn},
 
@@ -7912,9 +8702,10 @@ static struct {
     {"is_number",   is_number_fn},
     {"is_bool",     is_bool_fn},
     {"is_null",     is_null_fn},
-    {"is_function",  is_function_fn},
+    {"is_function", is_function_fn},
     {"is_external", is_external_fn},
     {"is_error",    is_error_fn},
+    {"is_native_function", is_native_function_fn},
 
     // Math
     {"sqrt",  sqrt_fn},
@@ -7929,15 +8720,15 @@ static struct {
 };
 
 int builtins_count() {
-    return APE_ARRAY_LEN(g_builtins);
+    return APE_ARRAY_LEN(g_native_functions);
 }
 
-builtin_fn builtins_get_fn(int ix) {
-    return g_builtins[ix].fn;
+native_fn builtins_get_fn(int ix) {
+    return g_native_functions[ix].fn;
 }
 
 const char* builtins_get_name(int ix) {
-    return g_builtins[ix].name;
+    return g_native_functions[ix].name;
 }
 
 // INTERNAL
@@ -8068,7 +8859,7 @@ static object_t println_fn(vm_t *vm, void *data, int argc, object_t *args) {
     (void)data;
 
     const ape_config_t *config = vm->config;
-    
+
     if (!config->stdio.write.write) {
         return object_make_null(); // todo: runtime error?
     }
@@ -8119,7 +8910,7 @@ static object_t write_file_fn(vm_t *vm, void *data, int argc, object_t *args) {
     int string_size = (int)strlen(string) + 1;
 
     int written = (int)config->fileio.write_file.write_file(config->fileio.write_file.context, path, string, string_size);
-    
+
     return object_make_number(written);
 }
 
@@ -8181,7 +8972,7 @@ static object_t range_fn(vm_t *vm, void *data, int argc, object_t *args) {
             error_t *err = error_makef(ERROR_RUNTIME, src_pos_invalid,
                                        "Invalid argument %d passed to range, got %s instead of %s",
                                        i, type_str, expected_str);
-            ptrarray_add(vm->errors, err);
+            vm_set_runtime_error(vm, err);
             return object_make_null();
         }
     }
@@ -8201,13 +8992,13 @@ static object_t range_fn(vm_t *vm, void *data, int argc, object_t *args) {
         step = object_get_number(args[2]);
     } else {
         error_t *err = error_makef(ERROR_RUNTIME, src_pos_invalid, "Invalid number of arguments passed to range, got %d", argc);
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         return object_make_null();
     }
 
     if (step == 0) {
         error_t *err = error_make(ERROR_RUNTIME, src_pos_invalid, "range step cannot be 0");
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         return object_make_null();
     }
 
@@ -8278,7 +9069,7 @@ static object_t concat_fn(vm_t *vm, void *data, int argc, object_t *args) {
             error_t *err = error_makef(ERROR_RUNTIME, src_pos_invalid,
                                        "Invalid argument 2 passed to concat, got %s",
                                        item_type_str);
-            ptrarray_add(vm->errors, err);
+            vm_set_runtime_error(vm, err);
             return object_make_null();
         }
         array(object_t) *arr = object_get_array(args[0]);
@@ -8300,7 +9091,7 @@ static object_t concat_fn(vm_t *vm, void *data, int argc, object_t *args) {
         for (int i = 0; i < arg_str_len; i++) {
             res_buf[len + i] = arg_str[i];
         }
-        res_buf[len + arg_str_len + 1] = '\0';
+        res_buf[len + arg_str_len] = '\0';
         return object_make_string_no_copy(vm->mem, res_buf);
     }
     return object_make_null();
@@ -8314,7 +9105,7 @@ static object_t assert_fn(vm_t *vm, void *data, int argc, object_t *args) {
 
     if (!object_get_bool(args[0])) {
         error_t *err = error_make(ERROR_RUNTIME, src_pos_invalid, "assertion failed");
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         return object_make_null();
     }
 
@@ -8322,6 +9113,30 @@ static object_t assert_fn(vm_t *vm, void *data, int argc, object_t *args) {
 }
 
 static object_t remove_fn(vm_t *vm, void *data, int argc, object_t *args) {
+    (void)data;
+    if (!CHECK_ARGS(vm, true, argc, args, OBJECT_ARRAY, OBJECT_ANY)) {
+        return object_make_null();
+    }
+
+    int ix = -1;
+    for (int i = 0; i < object_get_array_length(args[0]); i++) {
+        object_t obj = object_get_array_value_at(args[0], i);
+        if (object_equals(obj, args[1])) {
+            ix = i;
+            break;
+        }
+    }
+
+    if (ix == -1) {
+        return object_make_bool(false);
+    }
+
+    array(object_t) *arr = object_get_array(args[0]);
+    bool res = array_remove_at(arr, ix);
+    return object_make_bool(res);
+}
+
+static object_t remove_at_fn(vm_t *vm, void *data, int argc, object_t *args) {
     (void)data;
     if (!CHECK_ARGS(vm, true, argc, args, OBJECT_ARRAY, OBJECT_NUMBER)) {
         return object_make_null();
@@ -8333,7 +9148,7 @@ static object_t remove_fn(vm_t *vm, void *data, int argc, object_t *args) {
     switch (type) {
         case OBJECT_ARRAY: {
             array(object_t) *arr = object_get_array(args[0]);
-            bool res = array_remove(arr, ix);
+            bool res = array_remove_at(arr, ix);
             return object_make_bool(res);
         }
         default:
@@ -8343,13 +9158,25 @@ static object_t remove_fn(vm_t *vm, void *data, int argc, object_t *args) {
     return object_make_bool(true);
 }
 
+
 static object_t error_fn(vm_t *vm, void *data, int argc, object_t *args) {
     (void)data;
     if (argc == 1 && object_get_type(args[0]) == OBJECT_STRING) {
-    return object_make_error(vm->mem, object_get_string(args[0]));
+        return object_make_error(vm->mem, object_get_string(args[0]));
     } else {
         return object_make_error(vm->mem, "");
     }
+}
+
+static object_t crash_fn(vm_t *vm, void *data, int argc, object_t *args) {
+    error_t *err = NULL;
+    if (argc == 1 && object_get_type(args[0]) == OBJECT_STRING) {
+        err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), object_get_string(args[0]));
+    } else {
+        err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "");
+    }
+    vm_set_runtime_error(vm, err);
+    return object_make_null();
 }
 
 static object_t random_fn(vm_t *vm, void *data, int argc, object_t *args) {
@@ -8364,7 +9191,7 @@ static object_t random_fn(vm_t *vm, void *data, int argc, object_t *args) {
         double max = object_get_number(args[1]);
         if (min >= max) {
             error_t *err = error_make(ERROR_RUNTIME, src_pos_invalid, "max is bigger than min");
-            ptrarray_add(vm->errors, err);
+            vm_set_runtime_error(vm, err);
             return object_make_null();
         }
         double range = max - min;
@@ -8372,7 +9199,7 @@ static object_t random_fn(vm_t *vm, void *data, int argc, object_t *args) {
         return object_make_number(res);
     } else {
         error_t *err = error_make(ERROR_RUNTIME, src_pos_invalid, "Invalid number or arguments");
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         return object_make_null();
     }
 }
@@ -8451,6 +9278,14 @@ static object_t is_error_fn(vm_t *vm, void *data, int argc, object_t *args) {
         return object_make_null();
     }
     return object_make_bool(object_get_type(args[0]) == OBJECT_ERROR);
+}
+
+static object_t is_native_function_fn(vm_t *vm, void *data, int argc, object_t *args) {
+    (void)data;
+    if (!CHECK_ARGS(vm, true, argc, args, OBJECT_ANY)) {
+        return object_make_null();
+    }
+    return object_make_bool(object_get_type(args[0]) == OBJECT_NATIVE_FUNCTION);
 }
 
 //-----------------------------------------------------------------------------
@@ -8540,35 +9375,34 @@ static object_t abs_fn(vm_t *vm, void *data, int argc, object_t *args) {
 }
 
 
-static bool check_args(vm_t *vm, bool generate_errors, int argc, object_t *args, int expected_argc, object_type_t *expected_types) {
+static bool check_args(vm_t *vm, bool generate_error, int argc, object_t *args, int expected_argc, object_type_t *expected_types) {
     if (argc != expected_argc) {
-        if (generate_errors) {
+        if (generate_error) {
             error_t *err = error_makef(ERROR_RUNTIME, src_pos_invalid,
                                        "Invalid number or arguments, got %d instead of %d",
                                        argc, expected_argc);
-            ptrarray_add(vm->errors, err);
+            vm_set_runtime_error(vm, err);
         }
         return false;
     }
 
-    bool ok = true;
-    for(int i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; i++) {
        object_t arg = args[i];
         object_type_t type = object_get_type(arg);
         object_type_t expected_type = expected_types[i];
         if (!(type & expected_type)) {
-            if (generate_errors) {
+            if (generate_error) {
                 const char *type_str = object_get_type_name(type);
                 const char *expected_type_str = object_get_type_name(expected_type);
                 error_t *err = error_makef(ERROR_RUNTIME, src_pos_invalid,
                                            "Invalid argument %d type, got %s, expected %s",
                                            i, type_str, expected_type_str);
-                ptrarray_add(vm->errors, err);
+                vm_set_runtime_error(vm, err);
             }
-            ok = false;
+            return false;
         }
     }
-    return ok;
+    return true;
 }
 //FILE_END
 //FILE_START:traceback.c
@@ -8604,11 +9438,9 @@ void traceback_append(traceback_t *traceback, const char *function_name, src_pos
 }
 
 void traceback_append_from_vm(traceback_t *traceback, vm_t *vm) {
-    int count = array_count(vm->frames);
-    for (int i = count - 1; i >= 0; i--) {
-        frame_t *frame = array_get(vm->frames, i);
-        function_t *function = object_get_function(frame->function);
-        traceback_append(traceback, function->name, frame_src_position(frame));
+    for (int i = vm->frames_count - 1; i >= 0; i--) {
+        frame_t *frame = &vm->frames[i];
+        traceback_append(traceback, object_get_function_name(frame->function), frame_src_position(frame));
     }
 }
 
@@ -8616,7 +9448,7 @@ void traceback_to_string(const traceback_t *traceback, strbuf_t *buf) {
     int depth  = array_count(traceback->items);
     for (int i = 0; i < depth; i++) {
         traceback_item_t *item = array_get(traceback->items, i);
-        const char *filename = traceback_item_get_filename(item);
+        const char *filename = traceback_item_get_filepath(item);
         if (item->pos.line >= 0 && item->pos.column >= 0) {
             strbuf_appendf(buf, "%s in %s on %d:%d\n", item->function_name, filename, item->pos.line, item->pos.column);
         } else {
@@ -8637,11 +9469,11 @@ const char* traceback_item_get_line(traceback_item_t *item) {
     return line;
 }
 
-const char* traceback_item_get_filename(traceback_item_t *item) {
+const char* traceback_item_get_filepath(traceback_item_t *item) {
     if (!item->pos.file) {
         return NULL;
     }
-    return item->pos.file->name;
+    return item->pos.file->path;
 }
 //FILE_END
 //FILE_START:frame.c
@@ -8664,6 +9496,8 @@ bool frame_init(frame_t* frame, object_t function_obj, int base_pointer) {
     frame->bytecode = function->comp_result->bytecode;
     frame->src_positions = function->comp_result->src_positions;
     frame->bytecode_size = function->comp_result->count;
+    frame->recover_ip = -1;
+    frame->is_recovering = false;
     return true;
 }
 
@@ -8726,10 +9560,18 @@ static void set_sp(vm_t *vm, int new_sp);
 static void stack_push(vm_t *vm, object_t obj);
 static object_t stack_pop(vm_t *vm);
 static object_t stack_get(vm_t *vm, int nth_item);
-static void push_frame(vm_t *vm, frame_t frame);
+
+static void this_stack_push(vm_t *vm, object_t obj);
+static object_t this_stack_pop(vm_t *vm);
+static object_t this_stack_get(vm_t *vm, int nth_item);
+
+static bool push_frame(vm_t *vm, frame_t frame);
 static bool pop_frame(vm_t *vm);
 static void run_gc(vm_t *vm, array(object_t) *constants);
-static object_t call_builtin(vm_t *vm, object_t callee, src_pos_t src_pos, int argc, object_t *args);
+static bool call_object(vm_t *vm, object_t callee, int num_args);
+static object_t call_native_function(vm_t *vm, object_t callee, src_pos_t src_pos, int argc, object_t *args);
+static bool check_assign(vm_t *vm, object_t old_value, object_t new_value);
+static bool try_overload_operator(vm_t *vm, object_t left, object_t right, opcode_t op, bool *out_overload_found);
 
 vm_t *vm_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors) {
     vm_t *vm = ape_malloc(sizeof(vm_t));
@@ -8738,16 +9580,40 @@ vm_t *vm_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *error
     vm->mem = mem;
     vm->globals_count = 0;
     vm->sp = 0;
-    vm->frames = array_make(frame_t);
-    vm->builtins = array_make(object_t);
+    vm->this_sp = 0;
+    vm->frames_count = 0;
+    vm->native_functions = array_make(object_t);
     vm->errors = errors;
-    vm->running = false;
+    vm->runtime_error = NULL;
     vm->last_popped = object_make_null();
+    vm->running = false;
 
     for (int i = 0; i < builtins_count(); i++) {
-        object_t builtin = object_make_builtin(vm->mem, builtins_get_name(i), builtins_get_fn(i), vm);
-        array_add(vm->builtins, &builtin);
+        object_t builtin = object_make_native_function(vm->mem, builtins_get_name(i), builtins_get_fn(i), vm);
+        array_add(vm->native_functions, &builtin);
     }
+
+    for (int i = 0; i < OPCODE_MAX; i++) {
+        vm->operator_oveload_keys[i] = object_make_null();
+    }
+#define SET_OPERATOR_OVERLOAD_KEY(op, key) do {\
+    object_t key_obj = object_make_string(vm->mem, key);\
+    vm->operator_oveload_keys[op] = key_obj;\
+} while (0)
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_ADD,     "__operator_add__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_SUB,     "__operator_sub__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_MUL,     "__operator_mul__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_DIV,     "__operator_div__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_MOD,     "__operator_mod__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_OR,      "__operator_or__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_XOR,     "__operator_xor__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_AND,     "__operator_and__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_LSHIFT,  "__operator_lshift__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_RSHIFT,  "__operator_rshift__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_MINUS,   "__operator_minus__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_BANG,    "__operator_bang__");
+    SET_OPERATOR_OVERLOAD_KEY(OPCODE_COMPARE, "__cmp__");
+#undef SET_OPERATOR_OVERLOAD_KEY
 
     return vm;
 }
@@ -8756,19 +9622,39 @@ void vm_destroy(vm_t *vm) {
     if (!vm) {
         return;
     }
-    array_destroy(vm->builtins);
-    array_destroy(vm->frames);
+    array_destroy(vm->native_functions);
     ape_free(vm);
 }
 
+void vm_reset(vm_t *vm) {
+    vm->sp = 0;
+    vm->this_sp = 0;
+    while (vm->frames_count > 0) {
+        pop_frame(vm);
+    }
+}
+
 bool vm_run(vm_t *vm, compilation_result_t *comp_res, array(object_t) *constants) {
-    object_t main_fn = object_make_function(vm->mem, "main", comp_res, false, 0, 0);
-    return vm_execute_function(vm, main_fn, constants);
+    int old_sp = vm->sp;
+    int old_this_sp = vm->this_sp;
+    int old_frames_count = vm->frames_count;
+    object_t main_fn = object_make_function(vm->mem, "main", comp_res, false, 0, 0, 0);
+    stack_push(vm, main_fn);
+    bool res = vm_execute_function(vm, main_fn, constants);
+    while (vm->frames_count > old_frames_count) {
+        pop_frame(vm);
+    }
+    APE_ASSERT(vm->sp == old_sp);
+    vm->this_sp = old_this_sp;
+    return res;
 }
 
 object_t vm_call(vm_t *vm, array(object_t) *constants, object_t callee, int argc, object_t *args) {
     object_type_t type = object_get_type(callee);
     if (type == OBJECT_FUNCTION) {
+        int old_sp = vm->sp;
+        int old_this_sp = vm->this_sp;
+        int old_frames_count = vm->frames_count;
         stack_push(vm, callee);
         for (int i = 0; i < argc; i++) {
             stack_push(vm, args[i]);
@@ -8777,9 +9663,14 @@ object_t vm_call(vm_t *vm, array(object_t) *constants, object_t callee, int argc
         if (!ok) {
             return object_make_null();
         }
-        return vm_last_popped(vm);
-    } else if (type == OBJECT_BUILTIN) {
-        return call_builtin(vm, callee, src_pos_invalid, argc, args);
+        while (vm->frames_count > old_frames_count) {
+            pop_frame(vm);
+        }
+        APE_ASSERT(vm->sp == old_sp);
+        vm->this_sp = old_this_sp;
+        return vm_get_last_popped(vm);
+    } else if (type == OBJECT_NATIVE_FUNCTION) {
+        return call_native_function(vm, callee, src_pos_invalid, argc, args);
     } else {
         error_t *err = error_make(ERROR_USER, src_pos_invalid, "Object is not callable");
         ptrarray_add(vm->errors, err);
@@ -8789,19 +9680,23 @@ object_t vm_call(vm_t *vm, array(object_t) *constants, object_t callee, int argc
 
 bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants) {
     if (vm->running) {
-        error_t *err = error_make(ERROR_RUNTIME, src_pos_invalid, "VM is already executing code");
+        error_t *err = error_make(ERROR_USER, src_pos_invalid, "VM is already executing code");
         ptrarray_add(vm->errors, err);
         return false;
     }
 
-    vm->last_popped = object_make_null();
-    vm->running = true;
-
     function_t *function_function = object_get_function(function); // naming is hard
     frame_t new_frame;
     frame_init(&new_frame, function, vm->sp - function_function->num_args);
-    set_sp(vm, new_frame.base_pointer + function_function->num_locals);
-    push_frame(vm, new_frame);
+    bool ok = push_frame(vm, new_frame);
+    if (!ok) {
+        error_t *err = error_make(ERROR_USER, src_pos_invalid, "Pushing frame failed");
+        ptrarray_add(vm->errors, err);
+        return false;
+    }
+
+    vm->running = true;
+    vm->last_popped = object_make_null();
 
     int ticks_between_gc = 0;
     if (vm->config) {
@@ -8819,8 +9714,8 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 if (!constant) {
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                               "Constant at %d not found", constant_ix);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
                 stack_push(vm, *constant);
                 break;
@@ -8830,46 +9725,60 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
             case OPCODE_MUL:
             case OPCODE_DIV:
             case OPCODE_MOD:
+            case OPCODE_OR:
+            case OPCODE_XOR:
+            case OPCODE_AND:
+            case OPCODE_LSHIFT:
+            case OPCODE_RSHIFT:
             {
                 object_t right = stack_pop(vm);
                 object_t left = stack_pop(vm);
                 object_type_t left_type = object_get_type(left);
                 object_type_t right_type = object_get_type(right);
-                object_t res_obj = object_make_null();
-                if (left_type == OBJECT_NUMBER && right_type == OBJECT_NUMBER) {
+                if (object_is_numeric(left) && object_is_numeric(right)) {
                     double right_val = object_get_number(right);
-
-                    if (APE_DBLEQ(right_val, 0) && (opcode == OPCODE_DIV || opcode == OPCODE_MOD)) { // todo: don't make error here?
-                        error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Division by 0");
-                        ptrarray_add(vm->errors, err);
-                        goto end;
-                    }
                     double left_val = object_get_number(left);
+
+                    int64_t left_val_int = left_val;
+                    int64_t right_val_int = right_val;
+
                     double res = 0;
                     switch (opcode) {
-                        case OPCODE_ADD: res = left_val + right_val; break;
-                        case OPCODE_SUB: res = left_val - right_val; break;
-                        case OPCODE_MUL: res = left_val * right_val; break;
-                        case OPCODE_DIV: res = left_val / right_val; break;
-                        case OPCODE_MOD: res = fmod(left_val, right_val); break;
+                        case OPCODE_ADD:    res = left_val + right_val; break;
+                        case OPCODE_SUB:    res = left_val - right_val; break;
+                        case OPCODE_MUL:    res = left_val * right_val; break;
+                        case OPCODE_DIV:    res = left_val / right_val; break;
+                        case OPCODE_MOD:    res = fmod(left_val, right_val); break;
+                        case OPCODE_OR:     res = left_val_int | right_val_int; break;
+                        case OPCODE_XOR:    res = left_val_int ^ right_val_int; break;
+                        case OPCODE_AND:    res = left_val_int & right_val_int; break;
+                        case OPCODE_LSHIFT: res = left_val_int << right_val_int; break;
+                        case OPCODE_RSHIFT: res = left_val_int >> right_val_int; break;
                         default: APE_ASSERT(false); break;
                     }
-                    res_obj = object_make_number(res);
+                    stack_push(vm, object_make_number(res));
                 } else if (left_type == OBJECT_STRING  && right_type == OBJECT_STRING && opcode == OPCODE_ADD) {
                     const char* right_val = object_get_string(right);
                     const char* left_val = object_get_string(left);
-                    res_obj = object_make_stringf(vm->mem, "%s%s", left_val, right_val);
+                    object_t res_obj = object_make_stringf(vm->mem, "%s%s", left_val, right_val);
+                    stack_push(vm, res_obj);
                 } else {
-                    const char *opcode_name = opcode_get_name(opcode);
-                    const char *left_type_name = object_get_type_name(left_type);
-                    const char *right_type_name = object_get_type_name(right_type);
-                    error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
-                                              "Invalid operand types for %s, got %s and %s",
-                                              opcode_name, left_type_name, right_type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    bool overload_found = false;
+                    bool ok = try_overload_operator(vm, left, right, opcode, &overload_found);
+                    if (!ok) {
+                        goto err;
+                    }
+                    if (!overload_found) {
+                        const char *opcode_name = opcode_get_name(opcode);
+                        const char *left_type_name = object_get_type_name(left_type);
+                        const char *right_type_name = object_get_type_name(right_type);
+                        error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
+                                                   "Invalid operand types for %s, got %s and %s",
+                                                   opcode_name, left_type_name, right_type_name);
+                        vm_set_runtime_error(vm, err);
+                        goto err;
+                    }
                 }
-                stack_push(vm, res_obj);
                 break;
             }
             case OPCODE_POP: {
@@ -8884,22 +9793,37 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 stack_push(vm, object_make_bool(false));
                 break;
             }
+            case OPCODE_COMPARE: {
+                object_t right = stack_pop(vm);
+                object_t left = stack_pop(vm);
+                bool is_overloaded = false;
+                bool ok = try_overload_operator(vm, left, right, OPCODE_COMPARE, &is_overloaded);
+                if (!ok) {
+                    goto err;
+                }
+                if (!is_overloaded) {
+                    double comparison_res = object_compare(left, right);
+                    object_t res = object_make_number(comparison_res);
+                    stack_push(vm, res);
+                }
+                break;
+            }
             case OPCODE_EQUAL:
             case OPCODE_NOT_EQUAL:
             case OPCODE_GREATER_THAN:
             case OPCODE_GREATER_THAN_EQUAL:
             {
-                object_t right = stack_pop(vm);
-                object_t left = stack_pop(vm);
-
-                double comparison_res = object_compare(left, right);
-
+                object_t value = stack_pop(vm);
+                double comparison_res = object_get_number(value);
                 bool res_val = false;
                 switch (opcode) {
                     case OPCODE_EQUAL: res_val = APE_DBLEQ(comparison_res, 0); break;
                     case OPCODE_NOT_EQUAL: res_val = !APE_DBLEQ(comparison_res, 0); break;
                     case OPCODE_GREATER_THAN: res_val = comparison_res > 0; break;
-                    case OPCODE_GREATER_THAN_EQUAL: res_val = comparison_res >= 0; break;
+                    case OPCODE_GREATER_THAN_EQUAL: {
+                        res_val = comparison_res > 0 || APE_DBLEQ(comparison_res, 0);
+                        break;
+                    }
                     default: APE_ASSERT(false); break;
                 }
                 object_t res = object_make_bool(res_val);
@@ -8910,32 +9834,47 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
             {
                 object_t operand = stack_pop(vm);
                 object_type_t operand_type = object_get_type(operand);
-                const char *operand_type_string = object_get_type_name(operand_type);
-
-                if (operand_type != OBJECT_NUMBER) {
-                    error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
-                                              "Invalid operand type for MINUS, got %s",
-                                              operand_type_string);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                if (operand_type == OBJECT_NUMBER) {
+                    double val = object_get_number(operand);
+                    object_t res = object_make_number(-val);
+                    stack_push(vm, res);
+                } else {
+                    bool overload_found = false;
+                    bool ok = try_overload_operator(vm, operand, object_make_null(), OPCODE_MINUS, &overload_found);
+                    if (!ok) {
+                        goto err;
+                    }
+                    if (!overload_found) {
+                        const char *operand_type_string = object_get_type_name(operand_type);
+                        error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
+                                                   "Invalid operand type for MINUS, got %s",
+                                                   operand_type_string);
+                        vm_set_runtime_error(vm, err);
+                        goto err;
+                    }
                 }
-                double val = object_get_number(operand);
-                object_t res = object_make_number(-val);
-                stack_push(vm, res);
                 break;
             }
             case OPCODE_BANG: {
-                object_t val = stack_pop(vm);
-                object_t res = object_make_null();
-                object_type_t type = object_get_type(val);
+                object_t operand = stack_pop(vm);
+                object_type_t type = object_get_type(operand);
                 if (type == OBJECT_BOOL) {
-                     res = object_make_bool(!object_get_bool(val));
+                    object_t res = object_make_bool(!object_get_bool(operand));
+                    stack_push(vm, res);
                 } else if (type == OBJECT_NULL) {
-                    res = object_make_bool(true);
+                    object_t res = object_make_bool(true);
+                    stack_push(vm, res);
                 } else {
-                    res = object_make_bool(false);
+                    bool overload_found = false;
+                    bool ok = try_overload_operator(vm, operand, object_make_null(), OPCODE_BANG, &overload_found);
+                    if (!ok) {
+                        goto err;
+                    }
+                    if (!overload_found) {
+                        object_t res = object_make_bool(false);
+                        stack_push(vm, res);
+                    }
                 }
-                stack_push(vm, res);
                 break;
             }
             case OPCODE_JUMP: {
@@ -8963,10 +9902,20 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 stack_push(vm, object_make_null());
                 break;
             }
+            case OPCODE_DEFINE_GLOBAL: {
+                uint16_t ix = frame_read_uint16(vm->current_frame);
+                object_t value = stack_pop(vm);
+                vm_set_global(vm, ix, value);
+                break;
+            }
             case OPCODE_SET_GLOBAL: {
                 uint16_t ix = frame_read_uint16(vm->current_frame);
-                object_t global = stack_pop(vm);
-                vm_set_global(vm, ix, global);
+                object_t new_value = stack_pop(vm);
+                object_t old_value = vm_get_global(vm, ix);
+                if (!check_assign(vm, old_value, new_value)) {
+                    goto err;
+                }
+                vm_set_global(vm, ix, new_value);
                 break;
             }
             case OPCODE_GET_GLOBAL: {
@@ -8977,7 +9926,7 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
             }
             case OPCODE_ARRAY: {
                 uint16_t count = frame_read_uint16(vm->current_frame);
-                object_t array_obj = object_make_array(vm->mem);
+                object_t array_obj = object_make_array_with_capacity(vm->mem, count);
                 object_t *items = vm->stack + vm->sp - count;
                 for (int i = 0; i < count; i++) {
                     object_t item = items[i];
@@ -8987,9 +9936,15 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 stack_push(vm, array_obj);
                 break;
             }
-            case OPCODE_MAP: {
+            case OPCODE_MAP_START: {
                 uint16_t count = frame_read_uint16(vm->current_frame);
-                object_t map_obj = object_make_map(vm->mem);
+                object_t map_obj = object_make_map_with_capacity(vm->mem, count);
+                this_stack_push(vm, map_obj);
+                break;
+            }
+            case OPCODE_MAP_END: {
+                uint16_t count = frame_read_uint16(vm->current_frame);
+                object_t map_obj = this_stack_pop(vm);
                 object_t *kvpairs = vm->stack + vm->sp - count;
                 for (int i = 0; i < count; i += 2) {
                     object_t key = kvpairs[i];
@@ -8998,8 +9953,8 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                         const char *key_type_name = object_get_type_name(key_type);
                         error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                                    "Key of type %s is not hashable", key_type_name);
-                        ptrarray_add(vm->errors, err);
-                        goto end;
+                        vm_set_runtime_error(vm, err);
+                        goto err;
                     }
 
                     object_t val = kvpairs[i + 1];
@@ -9007,6 +9962,11 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 }
                 set_sp(vm, vm->sp - count);
                 stack_push(vm, map_obj);
+                break;
+            }
+            case OPCODE_GET_THIS: {
+                object_t obj = this_stack_get(vm, 0);
+                stack_push(vm, obj);
                 break;
             }
             case OPCODE_GET_INDEX: {
@@ -9020,8 +9980,8 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 if (left_type != OBJECT_ARRAY && left_type != OBJECT_MAP && left_type != OBJECT_STRING) {
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                               "Type %s is not indexable", left_type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
 
                 object_t res = object_make_null();
@@ -9030,8 +9990,8 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                     if (index_type != OBJECT_NUMBER) {
                         error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                                   "Cannot index %s with %s", left_type_name, index_type_name);
-                        ptrarray_add(vm->errors, err);
-                        goto end;
+                        vm_set_runtime_error(vm, err);
+                        goto err;
                     }
                     int ix = (int)object_get_number(index);
                     if (ix < 0) {
@@ -9064,16 +10024,16 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 if (left_type != OBJECT_ARRAY && left_type != OBJECT_MAP && left_type != OBJECT_STRING) {
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                                "Type %s is not indexable", left_type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
 
                 object_t res = object_make_null();
                 if (index_type != OBJECT_NUMBER) {
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                                "Cannot index %s with %s", left_type_name, index_type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
                 int ix = (int)object_get_number(index);
 
@@ -9095,40 +10055,14 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
             case OPCODE_CALL: {
                 uint8_t num_args = frame_read_uint8(vm->current_frame);
                 object_t callee = stack_get(vm, num_args);
-                object_type_t callee_type = object_get_type(callee);
-                if (callee_type == OBJECT_FUNCTION) {
-                    function_t *callee_function = object_get_function(callee);
-                    if (num_args != callee_function->num_args) {
-                        error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
-                                                  "Invalid number of arguments to \"%s\", expected %d, got %d",
-                                                  callee_function->name, callee_function->num_args, num_args);
-                        ptrarray_add(vm->errors, err);
-                        goto end;
-                    }
-                    frame_t callee_frame;
-                    frame_init(&callee_frame, callee, vm->sp - num_args);
-                    push_frame(vm, callee_frame);
-                    set_sp(vm, callee_frame.base_pointer + callee_function->num_locals);
-                } else if (callee_type == OBJECT_BUILTIN) {
-                    object_t *stack_pos = vm->stack + vm->sp - num_args;
-                    object_t res = call_builtin(vm, callee, frame_src_position(vm->current_frame), num_args, stack_pos);
-                    if (vm_has_errors(vm)) {
-                        goto end;
-                    }
-                    set_sp(vm, vm->sp - num_args - 1);
-                    stack_push(vm, res);
-                } else {
-                    const char *callee_type_name = object_get_type_name(callee_type);
-                    error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
-                                              "%s object is not callable", callee_type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                bool ok = call_object(vm, callee, num_args);
+                if (!ok) {
+                    goto err;
                 }
                 break;
             }
             case OPCODE_RETURN_VALUE: {
                 object_t res = stack_pop(vm);
-                set_sp(vm, vm->current_frame->base_pointer - 1);
                 bool ok = pop_frame(vm);
                 if (!ok) {
                     goto end;
@@ -9137,17 +10071,27 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 break;
             }
             case OPCODE_RETURN: {
-                set_sp(vm, vm->current_frame->base_pointer - 1);
                 bool ok = pop_frame(vm);
+                stack_push(vm, object_make_null());
                 if (!ok) {
+                    stack_pop(vm);
                     goto end;
                 }
-                stack_push(vm, object_make_null());
+                break;
+            }
+            case OPCODE_DEFINE_LOCAL: {
+                uint8_t pos = frame_read_uint8(vm->current_frame);
+                vm->stack[vm->current_frame->base_pointer + pos] = stack_pop(vm);
                 break;
             }
             case OPCODE_SET_LOCAL: {
                 uint8_t pos = frame_read_uint8(vm->current_frame);
-                vm->stack[vm->current_frame->base_pointer + pos] = stack_pop(vm);
+                object_t new_value = stack_pop(vm);
+                object_t old_value = vm->stack[vm->current_frame->base_pointer + pos];
+                if (!check_assign(vm, old_value, new_value)) {
+                    goto err;
+                }
+                vm->stack[vm->current_frame->base_pointer + pos] = new_value;
                 break;
             }
             case OPCODE_GET_LOCAL: {
@@ -9156,13 +10100,13 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 stack_push(vm, val);
                 break;
             }
-            case OPCODE_GET_BUILTIN: {
+            case OPCODE_GET_NATIVE_FUNCTION: {
                 uint16_t ix = frame_read_uint16(vm->current_frame);
-                object_t *val = array_get(vm->builtins, ix);
+                object_t *val = array_get(vm->native_functions, ix);
                 if (!val) {
-                    error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Builtin %d not found", ix);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Native function %d not found", ix);
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
                 stack_push(vm, *val);
                 break;
@@ -9173,64 +10117,40 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 object_t *constant = array_get(constants, constant_ix);
                 if (!constant) {
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Constant %d not found", constant_ix);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
                 object_type_t constant_type = object_get_type(*constant);
                 if (constant_type != OBJECT_FUNCTION) {
                     const char *type_name = object_get_type_name(constant_type);
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame), "%s is not a function", type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
 
-                array(object_t) *free_vals = array_make(object_t);
+                const function_t *constant_function = object_get_function(*constant);
+                object_t function_obj = object_make_function(vm->mem, object_get_function_name(*constant),
+                                                            constant_function->comp_result, false,
+                                                            constant_function->num_locals, constant_function->num_args,
+                                                            num_free);
                 for (int i = 0; i < num_free; i++) {
                     object_t free_val = vm->stack[vm->sp - num_free + i];
-                    array_add(free_vals, &free_val);
+                    object_set_function_free_val(function_obj, i, free_val);
                 }
-                const function_t *constant_function = object_get_function(*constant);
-                object_t function_obj = object_make_function(vm->mem, constant_function->name,
-                                                            constant_function->comp_result, false,
-                                                            constant_function->num_locals, constant_function->num_args);
-                if (object_get_type(function_obj) != OBJECT_FUNCTION) {
-                    error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Making function failed");
-                    ptrarray_add(vm->errors, err);
-                    array_destroy(free_vals);
-                    goto end;
-                }
-                function_t *function_function = object_get_function(function_obj);
-                function_function->free_vals = free_vals;
                 set_sp(vm, vm->sp - num_free);
                 stack_push(vm, function_obj);
                 break;
             }
             case OPCODE_GET_FREE: {
                 uint8_t free_ix = frame_read_uint8(vm->current_frame);
-                function_t *function = object_get_function(vm->current_frame->function);
-                array(object_t) *free_vals = function->free_vals;
-                object_t *val = array_get(free_vals, free_ix);
-                if (!val) {
-                    error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
-                                               "Free value %d not found", free_ix);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
-                }
-                stack_push(vm, *val);
+                object_t val = object_get_function_free_val(vm->current_frame->function, free_ix);
+                stack_push(vm, val);
                 break;
             }
             case OPCODE_SET_FREE: {
                 uint8_t free_ix = frame_read_uint8(vm->current_frame);
-                function_t *function = object_get_function(vm->current_frame->function);
-                array(object_t) *free_vals = function->free_vals;
                 object_t val = stack_pop(vm);
-                bool ok = array_set(free_vals, free_ix, &val);
-                if (!ok) {
-                    error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
-                                               "Setting free value at %d failed", free_ix);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
-                }
+                object_set_function_free_val(vm->current_frame->function, free_ix, val);
                 break;
             }
             case OPCODE_CURRENT_FUNCTION: {
@@ -9241,7 +10161,7 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
             case OPCODE_SET_INDEX: {
                 object_t index = stack_pop(vm);
                 object_t left = stack_pop(vm);
-                object_t val = stack_pop(vm);
+                object_t new_value = stack_pop(vm);
                 object_type_t left_type = object_get_type(left);
                 object_type_t index_type = object_get_type(index);
                 const char *left_type_name = object_get_type_name(left_type);
@@ -9250,26 +10170,30 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 if (left_type != OBJECT_ARRAY && left_type != OBJECT_MAP) {
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                               "Type %s is not indexable", left_type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
 
                 if (left_type == OBJECT_ARRAY) {
                     if (index_type != OBJECT_NUMBER) {
                         error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                                   "Cannot index %s with %s", left_type_name, index_type_name);
-                        ptrarray_add(vm->errors, err);
-                        goto end;
+                        vm_set_runtime_error(vm, err);
+                        goto err;
                     }
                     int ix = (int)object_get_number(index);
-                    bool ok = object_set_array_value_at(left, ix, val);
+                    bool ok = object_set_array_value_at(left, ix, new_value);
                     if (!ok) {
                         error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Setting array item failed (out of bounds?)");
-                        ptrarray_add(vm->errors, err);
-                        goto end;
+                        vm_set_runtime_error(vm, err);
+                        goto err;
                     }
                 } else if (left_type == OBJECT_MAP) {
-                    object_set_map_value(left, index, val);
+                    object_t old_value = object_get_map_value(left, index);
+                    if (!check_assign(vm, old_value, new_value)) {
+                        goto err;
+                    }
+                    object_set_map_value(left, index, new_value);
                 }
                 break;
             }
@@ -9292,8 +10216,8 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 } else {
                     const char *type_name = object_get_type_name(type);
                     error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Cannot get length of %s", type_name);
-                    ptrarray_add(vm->errors, err);
-                    goto end;
+                    vm_set_runtime_error(vm, err);
+                    goto err;
                 }
                 stack_push(vm, object_make_number(len));
                 break;
@@ -9305,15 +10229,48 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
                 stack_push(vm, obj);
                 break;
             }
+            case OPCODE_SET_RECOVER: {
+                uint16_t recover_ip = frame_read_uint16(vm->current_frame);
+                vm->current_frame->recover_ip = recover_ip;
+                break;
+            }
             default: {
                 APE_ASSERT(false);
                 error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Unknown opcode: 0x%x", opcode);
-                ptrarray_add(vm->errors, err);
-                goto end;
+                vm_set_runtime_error(vm, err);
+                goto err;
             }
         }
-        if (ptrarray_count(vm->errors) > 0) {
-            goto end;
+    err:
+        if (vm->runtime_error != NULL) {
+            int recover_frame_ix = -1;
+            for (int i = vm->frames_count - 1; i >= 0; i--) {
+                frame_t *frame = &vm->frames[i];
+                if (frame->recover_ip >= 0 && !frame->is_recovering) {
+                    recover_frame_ix = i;
+                    break;
+                }
+            }
+            if (recover_frame_ix < 0) {
+                goto end;
+            } else {
+                error_t *err = vm->runtime_error;
+                if (!err->traceback) {
+                    err->traceback = traceback_make();
+                }
+                traceback_append_from_vm(err->traceback, vm);
+                while (vm->frames_count > (recover_frame_ix + 1)) {
+                    pop_frame(vm);
+                }
+                object_t err_obj = object_make_error(vm->mem, err->message);
+                object_set_error_traceback(err_obj, err->traceback);
+                err->traceback = NULL;
+                stack_push(vm, err_obj);
+                vm->current_frame->ip = vm->current_frame->recover_ip;
+                vm->current_frame->is_recovering = true;
+                error_destroy(vm->runtime_error);
+                vm->runtime_error = NULL;
+            }
         }
         if (ticks_between_gc >= 0 && ticks_since_gc >= ticks_between_gc) {
             run_gc(vm, constants);
@@ -9324,37 +10281,28 @@ bool vm_execute_function(vm_t *vm, object_t function, array(object_t) *constants
     }
 
 end:
-    if (ptrarray_count(vm->errors) > 0) {
-        for (int i = 0; i < ptrarray_count(vm->errors); i++) {
-            error_t *err = ptrarray_get(vm->errors, i);
-            if (!err->traceback) {
-                err->traceback = traceback_make();
-            }
-            traceback_append_from_vm(err->traceback, vm);
+    if (vm->runtime_error) {
+        error_t *err = vm->runtime_error;
+        if (!err->traceback) {
+            err->traceback = traceback_make();
         }
+        traceback_append_from_vm(err->traceback, vm);
+        ptrarray_add(vm->errors, vm->runtime_error);
+        vm->runtime_error = NULL;
     }
 
-    while (array_count(vm->frames) > 0) {
-        pop_frame(vm);
-    }
-
-    if (ptrarray_count(vm->errors) == 0) {
-        APE_ASSERT(vm->sp == 0);
-    }
-    
     run_gc(vm, constants);
 
-    vm->sp = 0;
     vm->running = false;
     return ptrarray_count(vm->errors) == 0;
 }
 
-object_t vm_last_popped(vm_t *vm) {
+object_t vm_get_last_popped(vm_t *vm) {
     return vm->last_popped;
 }
 
 bool vm_has_errors(vm_t *vm) {
-    return ptrarray_count(vm->errors) > 0;
+    return vm->runtime_error != NULL || ptrarray_count(vm->errors) > 0;
 }
 
 void vm_set_global(vm_t *vm, int ix, object_t val) {
@@ -9362,7 +10310,7 @@ void vm_set_global(vm_t *vm, int ix, object_t val) {
     if (ix >= VM_MAX_GLOBALS) {
         APE_ASSERT(false);
         error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Global write out of range");
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         return;
     }
 #endif
@@ -9377,11 +10325,19 @@ object_t vm_get_global(vm_t *vm, int ix) {
     if (ix >= VM_MAX_GLOBALS) {
         APE_ASSERT(false);
         error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Global read out of range");
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         return object_make_null();
     }
 #endif
     return vm->globals[ix];
+}
+
+void vm_set_runtime_error(vm_t *vm, error_t *error) {
+    APE_ASSERT(vm->running);
+    if (error) {
+        APE_ASSERT(vm->runtime_error == NULL);
+    }
+    vm->runtime_error = error;
 }
 
 // INTERNAL
@@ -9399,7 +10355,7 @@ static void stack_push(vm_t *vm, object_t obj) {
     if (vm->sp >= VM_STACK_SIZE) {
         APE_ASSERT(false);
         error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Stack overflow");
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         return;
     }
     if (vm->current_frame) {
@@ -9417,7 +10373,7 @@ static object_t stack_pop(vm_t *vm) {
 #ifdef APE_DEBUG
     if (vm->sp == 0) {
         error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "Stack underflow");
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         APE_ASSERT(false);
         return object_make_null();
     }
@@ -9440,7 +10396,7 @@ static object_t stack_get(vm_t *vm, int nth_item) {
     if (ix < 0 || ix >= VM_STACK_SIZE) {
         error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
                                   "Invalid stack index: %d", nth_item);
-        ptrarray_add(vm->errors, err);
+        vm_set_runtime_error(vm, err);
         APE_ASSERT(false);
         return object_make_null();
     }
@@ -9448,50 +10404,143 @@ static object_t stack_get(vm_t *vm, int nth_item) {
     return vm->stack[ix];
 }
 
-static void push_frame(vm_t *vm, frame_t frame) {
-    array_push(vm->frames, &frame);
-    vm->current_frame = array_top(vm->frames);
+static void this_stack_push(vm_t *vm, object_t obj) {
+#ifdef APE_DEBUG
+    if (vm->this_sp >= VM_THIS_STACK_SIZE) {
+        APE_ASSERT(false);
+        error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "this stack overflow");
+        vm_set_runtime_error(vm, err);
+        return;
+    }
+#endif
+    vm->this_stack[vm->this_sp] = obj;
+    vm->this_sp++;
+}
+
+static object_t this_stack_pop(vm_t *vm) {
+#ifdef APE_DEBUG
+    if (vm->this_sp == 0) {
+        error_t *err = error_make(ERROR_RUNTIME, frame_src_position(vm->current_frame), "this stack underflow");
+        vm_set_runtime_error(vm, err);
+        APE_ASSERT(false);
+        return object_make_null();
+    }
+#endif
+    vm->this_sp--;
+    return vm->this_stack[vm->this_sp];
+}
+
+static object_t this_stack_get(vm_t *vm, int nth_item) {
+    int ix = vm->this_sp - 1 - nth_item;
+#ifdef APE_DEBUG
+    if (ix < 0 || ix >= VM_THIS_STACK_SIZE) {
+        error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
+                                   "Invalid this stack index: %d", nth_item);
+        vm_set_runtime_error(vm, err);
+        APE_ASSERT(false);
+        return object_make_null();
+    }
+#endif
+    return vm->this_stack[ix];
+}
+
+static bool push_frame(vm_t *vm, frame_t frame) {
+    if (vm->frames_count >= VM_MAX_FRAMES) {
+        APE_ASSERT(false);
+        return false;
+    }
+    vm->frames[vm->frames_count] = frame;
+    vm->current_frame = &vm->frames[vm->frames_count];
+    vm->frames_count++;
+    function_t *frame_function = object_get_function(frame.function);
+    set_sp(vm, frame.base_pointer + frame_function->num_locals);
+    return true;
 }
 
 static bool pop_frame(vm_t *vm) {
-    array_pop(vm->frames, NULL);
-    vm->current_frame = array_top(vm->frames);
-    if (!vm->current_frame) {
+    set_sp(vm, vm->current_frame->base_pointer - 1);
+    if (vm->frames_count <= 0) {
+        APE_ASSERT(false);
+        vm->current_frame = NULL;
         return false;
     }
+    vm->frames_count--;
+    if (vm->frames_count == 0) {
+        vm->current_frame = NULL;
+        return false;
+    }
+    vm->current_frame = &vm->frames[vm->frames_count - 1];
     return true;
 }
 
 static void run_gc(vm_t *vm, array(object_t) *constants) {
     gc_unmark_all(vm->mem);
-    gc_mark_objects(array_data(vm->builtins), array_count(vm->builtins));
+    gc_mark_objects(array_data(vm->native_functions), array_count(vm->native_functions));
     gc_mark_objects(array_data(constants), array_count(constants));
     gc_mark_objects(vm->globals, vm->globals_count);
-    for (int i = 0; i < array_count(vm->frames); i++) {
-        frame_t *frame = array_get(vm->frames, i);
+    for (int i = 0; i < vm->frames_count; i++) {
+        frame_t *frame = &vm->frames[i];
         gc_mark_object(frame->function);
     }
     gc_mark_objects(vm->stack, vm->sp);
+    gc_mark_objects(vm->this_stack, vm->this_sp);
     gc_mark_object(vm->last_popped);
+    gc_mark_objects(vm->operator_oveload_keys, OPCODE_MAX);
     gc_sweep(vm->mem);
 }
 
-static object_t call_builtin(vm_t *vm, object_t callee, src_pos_t src_pos, int argc, object_t *args) {
-    builtin_t *bn = object_get_builtin(callee);
-    object_t res = bn->fn(vm, bn->data, argc, args);
-    if (ptrarray_count(vm->errors) > 0) {
-        for (int i = 0; i < ptrarray_count(vm->errors); i++) {
-            error_t *err = ptrarray_get(vm->errors, i);
-            err->pos = src_pos;
-            err->traceback = traceback_make();
-            traceback_append(err->traceback, bn->name, src_pos_invalid);
+static bool call_object(vm_t *vm, object_t callee, int num_args) {
+    object_type_t callee_type = object_get_type(callee);
+    if (callee_type == OBJECT_FUNCTION) {
+        function_t *callee_function = object_get_function(callee);
+        if (num_args != callee_function->num_args) {
+            error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
+                                       "Invalid number of arguments to \"%s\", expected %d, got %d",
+                                       object_get_function_name(callee), callee_function->num_args, num_args);
+            vm_set_runtime_error(vm, err);
+            return false;
         }
+        frame_t callee_frame;
+        frame_init(&callee_frame, callee, vm->sp - num_args);
+        bool ok = push_frame(vm, callee_frame);
+        if (!ok) {
+            error_t *err = error_make(ERROR_RUNTIME, src_pos_invalid, "Pushing frame failed in call_object");
+            vm_set_runtime_error(vm, err);
+            return false;
+        }
+    } else if (callee_type == OBJECT_NATIVE_FUNCTION) {
+        object_t *stack_pos = vm->stack + vm->sp - num_args;
+        object_t res = call_native_function(vm, callee, frame_src_position(vm->current_frame), num_args, stack_pos);
+        if (vm_has_errors(vm)) {
+            return false;
+        }
+        set_sp(vm, vm->sp - num_args - 1);
+        stack_push(vm, res);
+    } else {
+        const char *callee_type_name = object_get_type_name(callee_type);
+        error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
+                                   "%s object is not callable", callee_type_name);
+        vm_set_runtime_error(vm, err);
+        return false;
+    }
+    return true;
+}
+
+static object_t call_native_function(vm_t *vm, object_t callee, src_pos_t src_pos, int argc, object_t *args) {
+    native_function_t *bn = object_get_native_function(callee);
+    object_t res = bn->fn(vm, bn->data, argc, args);
+    if (vm->runtime_error != NULL && !APE_STREQ(bn->name, "crash")) {
+        error_t *err = vm->runtime_error;
+        err->pos = src_pos;
+        err->traceback = traceback_make();
+        traceback_append(err->traceback, bn->name, src_pos_invalid);
         return object_make_null();
     }
     object_type_t res_type = object_get_type(res);
     if (res_type == OBJECT_ERROR) {
         traceback_t *traceback = traceback_make();
-        if (!APE_STREQ(bn->name, "error")) { // error builtin is treated in a special way
+         // error builtin is treated in a special way
+        if (!APE_STREQ(bn->name, "error")) {
             traceback_append(traceback, bn->name, src_pos_invalid);
         }
         traceback_append_from_vm(traceback, vm);
@@ -9499,6 +10548,66 @@ static object_t call_builtin(vm_t *vm, object_t callee, src_pos_t src_pos, int a
     }
     return res;
 }
+
+static bool check_assign(vm_t *vm, object_t old_value, object_t new_value) {
+    object_type_t old_value_type = object_get_type(old_value);
+    object_type_t new_value_type = object_get_type(new_value);
+    if (old_value_type == OBJECT_NULL || new_value_type == OBJECT_NULL) {
+        return true;
+    }
+    if (old_value_type != new_value_type) {
+        error_t *err = error_makef(ERROR_RUNTIME, frame_src_position(vm->current_frame),
+                                   "Trying to assign variable of type %s to %s",
+                                   object_get_type_name(new_value_type),
+                                   object_get_type_name(old_value_type)
+                                   );
+        vm_set_runtime_error(vm, err);
+        return false;
+    }
+    return true;
+}
+
+static bool try_overload_operator(vm_t *vm, object_t left, object_t right, opcode_t op, bool *out_overload_found) {
+    *out_overload_found = false;
+    object_type_t left_type = object_get_type(left);
+    object_type_t right_type = object_get_type(right);
+    if (left_type != OBJECT_MAP && right_type != OBJECT_MAP) {
+        *out_overload_found = false;
+        return true;
+    }
+
+    int num_operands = 2;
+    if (op == OPCODE_MINUS || op == OPCODE_BANG) {
+        num_operands = 1;
+    }
+
+    object_t key = vm->operator_oveload_keys[op];
+    object_t callee = object_make_null();
+    if (left_type == OBJECT_MAP) {
+        callee = object_get_map_value(left, key);
+    }
+    if (!object_is_callable(callee)) {
+        if (right_type == OBJECT_MAP) {
+            callee = object_get_map_value(right, key);
+        }
+
+        if (!object_is_callable(callee)) {
+            *out_overload_found = false;
+            return true;
+        }
+    }
+
+    *out_overload_found = true;
+
+    stack_push(vm, callee);
+    stack_push(vm, left);
+    if (num_operands == 2) {
+        stack_push(vm, right);
+    }
+    bool ok = call_object(vm, callee, num_operands);
+    return ok;
+}
+
 //FILE_END
 //FILE_START:ape.c
 #include "ape.h"
@@ -9509,8 +10618,8 @@ static object_t call_builtin(vm_t *vm, object_t callee, src_pos_t src_pos, int a
 #include <stdio.h>
 
 #define APE_IMPL_VERSION_MAJOR 0
-#define APE_IMPL_VERSION_MINOR 1
-#define APE_IMPL_VERSION_PATCH 1
+#define APE_IMPL_VERSION_MINOR 5
+#define APE_IMPL_VERSION_PATCH 0
 
 #if (APE_VERSION_MAJOR != APE_IMPL_VERSION_MAJOR)\
  || (APE_VERSION_MINOR != APE_IMPL_VERSION_MINOR)\
@@ -9530,11 +10639,11 @@ static object_t call_builtin(vm_t *vm, object_t callee, src_pos_t src_pos, int a
 #include "traceback.h"
 #endif
 
-typedef struct external_fn_wrapper {
-    ape_external_fn fn;
+typedef struct native_fn_wrapper {
+    ape_native_fn fn;
     ape_t *ape;
     void *data;
-} external_fn_wrapper_t;
+} native_fn_wrapper_t;
 
 typedef struct ape_program {
     ape_t *ape;
@@ -9546,14 +10655,15 @@ typedef struct ape {
     compiler_t *compiler;
     vm_t *vm;
     ptrarray(ape_error_t) *errors;
-    ptrarray(external_fn_wrapper_t) *external_fn_wrappers;
+    ptrarray(native_fn_wrapper_t) *native_fn_wrappers;
     ape_config_t config;
 } ape_t;
 
-static object_t ape_external_fn_wrapper(vm_t *vm, void *data, int argc, object_t *args);
+static object_t ape_native_fn_wrapper(vm_t *vm, void *data, int argc, object_t *args);
 static object_t ape_object_to_object(ape_object_t obj);
 static ape_object_t object_to_ape_object(object_t obj);
 
+static void reset_state(ape_t *ape);
 static void set_default_config(ape_t *ape);
 static char* read_file_default(void *ctx, const char *filename);
 static size_t write_file_default(void* context, const char *path, const char *string, size_t string_size);
@@ -9580,7 +10690,7 @@ ape_t *ape_make(void) {
     memset(ape, 0, sizeof(ape_t));
 
     set_default_config(ape);
-    
+
     ape->mem = gcmem_make();
     ape->errors = ptrarray_make();
     if (!ape->errors) {
@@ -9597,8 +10707,8 @@ ape_t *ape_make(void) {
     if (!ape->vm) {
         goto err;
     }
-    ape->external_fn_wrappers = ptrarray_make();
-    if (!ape->external_fn_wrappers) {
+    ape->native_fn_wrappers = ptrarray_make();
+    if (!ape->native_fn_wrappers) {
         goto err;
     }
     return ape;
@@ -9614,7 +10724,7 @@ void ape_destroy(ape_t *ape) {
     if (!ape) {
         return;
     }
-    ptrarray_destroy_with_items(ape->external_fn_wrappers, ape_free);
+    ptrarray_destroy_with_items(ape->native_fn_wrappers, ape_free);
     ptrarray_destroy_with_items(ape->errors, error_destroy);
     vm_destroy(ape->vm);
     compiler_destroy(ape->compiler);
@@ -9686,10 +10796,11 @@ err:
 }
 
 ape_object_t ape_execute_program(ape_t *ape, const ape_program_t *program) {
-    ptrarray_clear_and_destroy_items(ape->errors, error_destroy);
+    reset_state(ape);
 
     if (ape != program->ape) {
-        ape_add_errorf(ape, "ape program was compiled with a different ape instance");
+        error_t *err = error_make(ERROR_USER, src_pos_invalid, "ape program was compiled with a different ape instance");
+        ptrarray_add(ape->errors, err);
         return ape_object_make_null();
     }
 
@@ -9700,7 +10811,7 @@ ape_object_t ape_execute_program(ape_t *ape, const ape_program_t *program) {
 
     APE_ASSERT(ape->vm->sp == 0);
 
-    object_t res = vm_last_popped(ape->vm);
+    object_t res = vm_get_last_popped(ape->vm);
     if (object_get_type(res) == OBJECT_NONE) {
         return ape_object_make_null();
     }
@@ -9717,7 +10828,7 @@ void ape_program_destroy(ape_program_t *program) {
 }
 
 ape_object_t ape_execute(ape_t *ape, const char *code) {
-    ptrarray_clear_and_destroy_items(ape->errors, error_destroy);
+    reset_state(ape);
 
     compilation_result_t *comp_res = NULL;
 
@@ -9733,7 +10844,7 @@ ape_object_t ape_execute(ape_t *ape, const char *code) {
 
     APE_ASSERT(ape->vm->sp == 0);
 
-    object_t res = vm_last_popped(ape->vm);
+    object_t res = vm_get_last_popped(ape->vm);
     if (object_get_type(res) == OBJECT_NONE) {
         goto err;
     }
@@ -9748,7 +10859,7 @@ err:
 }
 
 ape_object_t ape_execute_file(ape_t *ape, const char *path) {
-    ptrarray_clear_and_destroy_items(ape->errors, error_destroy);
+    reset_state(ape);
 
     compilation_result_t *comp_res = NULL;
 
@@ -9764,7 +10875,7 @@ ape_object_t ape_execute_file(ape_t *ape, const char *path) {
 
     APE_ASSERT(ape->vm->sp == 0);
 
-    object_t res = vm_last_popped(ape->vm);
+    object_t res = vm_get_last_popped(ape->vm);
     if (object_get_type(res) == OBJECT_NONE) {
         goto err;
     }
@@ -9779,7 +10890,7 @@ err:
 }
 
 ape_object_t ape_call(ape_t *ape, const char *function_name, int argc, ape_object_t *args) {
-    ptrarray_clear_and_destroy_items(ape->errors, error_destroy);
+    reset_state(ape);
 
     object_t callee = ape_object_to_object(ape_get_object(ape, function_name));
     if (object_get_type(callee) == OBJECT_NULL) {
@@ -9804,18 +10915,18 @@ const ape_error_t* ape_get_error(const ape_t *ape, int index) {
     return ptrarray_get(ape->errors, index);
 }
 
-bool ape_set_external_function(ape_t *ape, const char *name, ape_external_fn fn, void *data) {
-    external_fn_wrapper_t *wrapper = ape_malloc(sizeof(external_fn_wrapper_t));
-    memset(wrapper, 0, sizeof(external_fn_wrapper_t));
+bool ape_set_native_function(ape_t *ape, const char *name, ape_native_fn fn, void *data) {
+    native_fn_wrapper_t *wrapper = ape_malloc(sizeof(native_fn_wrapper_t));
+    memset(wrapper, 0, sizeof(native_fn_wrapper_t));
     wrapper->fn = fn;
     wrapper->ape = ape;
     wrapper->data = data;
-    object_t wrapper_builtin = object_make_builtin(ape->mem, name, ape_external_fn_wrapper, wrapper);
-    int ix = array_count(ape->vm->builtins);
-    array_add(ape->vm->builtins, &wrapper_builtin);
+    object_t wrapper_native_function = object_make_native_function(ape->mem, name, ape_native_fn_wrapper, wrapper);
+    int ix = array_count(ape->vm->native_functions);
+    array_add(ape->vm->native_functions, &wrapper_native_function);
     symbol_table_t *symbol_table = compiler_get_symbol_table(ape->compiler);
-    symbol_table_define_builtin(symbol_table, name, ix);
-    ptrarray_add(ape->external_fn_wrappers, wrapper);
+    symbol_table_define_native_function(symbol_table, name, ix);
+    ptrarray_add(ape->native_fn_wrappers, wrapper);
     return true;
 }
 
@@ -9825,7 +10936,9 @@ bool ape_set_global_constant(ape_t *ape, const char *name, ape_object_t obj) {
     if (symbol_table_symbol_is_defined(symbol_table, name)) {
         symbol = symbol_table_resolve(symbol_table, name);
         if (symbol->type != SYMBOL_GLOBAL) {
-            ape_add_errorf(ape, "Symbol \"%s\" already defined outside global scope", name);
+            error_t *err = error_makef(ERROR_USER, src_pos_invalid,
+                                       "Symbol \"%s\" already defined outside global scope", name);
+            ptrarray_add(ape->errors, err);
             return false;
         }
     } else {
@@ -9839,45 +10952,48 @@ ape_object_t ape_get_object(ape_t *ape, const char *name) {
     symbol_table_t *st = compiler_get_symbol_table(ape->compiler);
     symbol_t *symbol = symbol_table_resolve(st, name);
     if (!symbol) {
-        ape_add_errorf(ape, "Symbol \"%s\" is not defined", name);
+        error_t *err = error_makef(ERROR_USER, src_pos_invalid,
+                                   "Symbol \"%s\" is not defined", name);
+        ptrarray_add(ape->errors, err);
         return ape_object_make_null();
     }
     object_t res = object_make_null();
     if (symbol->type == SYMBOL_GLOBAL) {
         res = vm_get_global(ape->vm, symbol->index);
-    } else if (symbol->type == SYMBOL_BUILTIN) {
-        object_t *res_ptr = array_get(ape->vm->builtins, symbol->index);
+    } else if (symbol->type == SYMBOL_NATIVE_FUNCTION) {
+        object_t *res_ptr = array_get(ape->vm->native_functions, symbol->index);
         res = *res_ptr;
     } else {
-        ape_add_errorf(ape, "Value associated with symbol \"%s\" could not be loaded", name);
+        error_t *err = error_makef(ERROR_USER, src_pos_invalid,
+                                   "Value associated with symbol \"%s\" could not be loaded", name);
+        ptrarray_add(ape->errors, err);
         return ape_object_make_null();
     }
     return object_to_ape_object(res);
 }
 
-bool ape_check_args(ape_t *ape, bool generate_errors, int argc, ape_object_t *args, int expected_argc, int *expected_types) {
+bool ape_check_args(ape_t *ape, bool generate_error, int argc, ape_object_t *args, int expected_argc, int *expected_types) {
     if (argc != expected_argc) {
-        if (generate_errors) {
-            ape_add_errorf(ape, "Invalid number or arguments, got %d instead of %d", argc, expected_argc);
+        if (generate_error) {
+            ape_set_runtime_errorf(ape, "Invalid number or arguments, got %d instead of %d", argc, expected_argc);
         }
         return false;
     }
-    
-    bool ok = true;
+
     for(int i = 0; i < argc; i++) {
         ape_object_t arg = args[i];
         ape_object_type_t type = ape_object_get_type(arg);
         ape_object_type_t expected_type = expected_types[i];
         if (!(type & expected_type)) {
-            if (generate_errors) {
+            if (generate_error) {
                 const char *type_str = ape_object_get_type_name(type);
                 const char *expected_type_str = ape_object_get_type_name(expected_type);
-                ape_add_errorf(ape, "Invalid argument type, got %s, expected %s", type_str, expected_type_str);
+                ape_set_runtime_errorf(ape, "Invalid argument type, got %s, expected %s", type_str, expected_type_str);
             }
-            ok = false;
+            return false;
         }
     }
-    return ok;
+    return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -9922,6 +11038,17 @@ ape_object_t ape_object_make_map(ape_t *ape) {
     return object_to_ape_object(object_make_map(ape->mem));
 }
 
+ape_object_t ape_object_make_native_function(ape_t *ape, ape_native_fn fn, void *data) {
+    native_fn_wrapper_t *wrapper = ape_malloc(sizeof(native_fn_wrapper_t));
+    memset(wrapper, 0, sizeof(native_fn_wrapper_t));
+    wrapper->fn = fn;
+    wrapper->ape = ape;
+    wrapper->data = data;
+    object_t wrapper_native_function = object_make_native_function(ape->mem, "", ape_native_fn_wrapper, wrapper);
+    ptrarray_add(ape->native_fn_wrappers, wrapper);
+    return object_to_ape_object(wrapper_native_function);
+}
+
 ape_object_t ape_object_make_error(ape_t *ape, const char *msg) {
     return object_to_ape_object(object_make_error(ape->mem, msg));
 }
@@ -9949,12 +11076,42 @@ char *ape_object_serialize(ape_object_t obj) {
     return object_serialize(ape_object_to_object(obj));
 }
 
-void ape_add_error(ape_t *ape, const char *message) {
-    error_t *err = error_make(ERROR_USER, src_pos_invalid, message);
+void ape_object_disable_gc(ape_object_t ape_obj) {
+    object_t obj = ape_object_to_object(ape_obj);
+    gc_disable_on_object(obj);
+}
+
+void ape_object_enable_gc(ape_object_t ape_obj) {
+    object_t obj = ape_object_to_object(ape_obj);
+    gc_enable_on_object(obj);
+}
+
+bool ape_object_equals(ape_object_t ape_a, ape_object_t ape_b){
+    object_t a = ape_object_to_object(ape_a);
+    object_t b = ape_object_to_object(ape_b);
+    return object_equals(a, b);
+}
+
+ape_object_t ape_object_copy(ape_object_t ape_obj) {
+    object_t obj = ape_object_to_object(ape_obj);
+    gcmem_t *mem = object_get_mem(obj);
+    object_t res = object_copy(mem, obj);
+    return object_to_ape_object(res);
+}
+
+ape_object_t ape_object_deep_copy(ape_object_t ape_obj) {
+    object_t obj = ape_object_to_object(ape_obj);
+    gcmem_t *mem = object_get_mem(obj);
+    object_t res = object_deep_copy(mem, obj);
+    return object_to_ape_object(res);
+}
+
+void ape_set_runtime_error(ape_t *ape, const char *message) {
+    error_t *err = error_make(ERROR_RUNTIME, src_pos_invalid, message);
     ptrarray_add(ape->errors, err);
 }
 
-void ape_add_errorf(ape_t *ape, const char *fmt, ...) {
+void ape_set_runtime_errorf(ape_t *ape, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     int to_write = vsnprintf(NULL, 0, fmt, args);
@@ -9964,7 +11121,7 @@ void ape_add_errorf(ape_t *ape, const char *fmt, ...) {
     vsprintf(message, fmt, args);
     va_end(args);
 
-    error_t *err = error_make_no_copy(ERROR_USER, src_pos_invalid, message);
+    error_t *err = error_make_no_copy(ERROR_RUNTIME, src_pos_invalid, message);
 
     ptrarray_add(ape->errors, err);
 }
@@ -9972,19 +11129,20 @@ void ape_add_errorf(ape_t *ape, const char *fmt, ...) {
 ape_object_type_t ape_object_get_type(ape_object_t ape_obj) {
     object_t obj = ape_object_to_object(ape_obj);
     switch (object_get_type(obj)) {
-        case OBJECT_NONE:      return APE_OBJECT_NONE;
-        case OBJECT_ERROR:     return APE_OBJECT_ERROR;
-        case OBJECT_NUMBER:    return APE_OBJECT_NUMBER;
-        case OBJECT_BOOL:      return APE_OBJECT_BOOL;
-        case OBJECT_STRING:    return APE_OBJECT_STRING;
-        case OBJECT_NULL:      return APE_OBJECT_NULL;
-        case OBJECT_BUILTIN:   return APE_OBJECT_BUILTIN;
-        case OBJECT_ARRAY:     return APE_OBJECT_ARRAY;
-        case OBJECT_MAP:       return APE_OBJECT_MAP;
-        case OBJECT_FUNCTION:  return APE_OBJECT_FUNCTION;
-        case OBJECT_EXTERNAL:  return APE_OBJECT_EXTERNAL;
-        case OBJECT_ANY:       return APE_OBJECT_ANY;
-        default:               return APE_OBJECT_NONE;
+        case OBJECT_NONE:            return APE_OBJECT_NONE;
+        case OBJECT_ERROR:           return APE_OBJECT_ERROR;
+        case OBJECT_NUMBER:          return APE_OBJECT_NUMBER;
+        case OBJECT_BOOL:            return APE_OBJECT_BOOL;
+        case OBJECT_STRING:          return APE_OBJECT_STRING;
+        case OBJECT_NULL:            return APE_OBJECT_NULL;
+        case OBJECT_NATIVE_FUNCTION: return APE_OBJECT_NATIVE_FUNCTION;
+        case OBJECT_ARRAY:           return APE_OBJECT_ARRAY;
+        case OBJECT_MAP:             return APE_OBJECT_MAP;
+        case OBJECT_FUNCTION:        return APE_OBJECT_FUNCTION;
+        case OBJECT_EXTERNAL:        return APE_OBJECT_EXTERNAL;
+        case OBJECT_FREED:           return APE_OBJECT_FREED;
+        case OBJECT_ANY:             return APE_OBJECT_ANY;
+        default:                     return APE_OBJECT_NONE;
     }
 }
 
@@ -9994,19 +11152,20 @@ const char* ape_object_get_type_string(ape_object_t obj) {
 
 const char* ape_object_get_type_name(ape_object_type_t type) {
     switch (type) {
-        case APE_OBJECT_NONE:      return "NONE";
-        case APE_OBJECT_ERROR:     return "ERROR";
-        case APE_OBJECT_NUMBER:    return "NUMBER";
-        case APE_OBJECT_BOOL:      return "BOOL";
-        case APE_OBJECT_STRING:    return "STRING";
-        case APE_OBJECT_NULL:      return "NULL";
-        case APE_OBJECT_BUILTIN:   return "BUILTIN";
-        case APE_OBJECT_ARRAY:     return "ARRAY";
-        case APE_OBJECT_MAP:       return "MAP";
-        case APE_OBJECT_FUNCTION:  return "FUNCTION";
-        case APE_OBJECT_EXTERNAL:  return "EXTERNAL";
-        case APE_OBJECT_ANY:       return "ANY";
-        default:                   return "NONE";
+        case APE_OBJECT_NONE:            return "NONE";
+        case APE_OBJECT_ERROR:           return "ERROR";
+        case APE_OBJECT_NUMBER:          return "NUMBER";
+        case APE_OBJECT_BOOL:            return "BOOL";
+        case APE_OBJECT_STRING:          return "STRING";
+        case APE_OBJECT_NULL:            return "NULL";
+        case APE_OBJECT_NATIVE_FUNCTION: return "NATIVE_FUNCTION";
+        case APE_OBJECT_ARRAY:           return "ARRAY";
+        case APE_OBJECT_MAP:             return "MAP";
+        case APE_OBJECT_FUNCTION:        return "FUNCTION";
+        case APE_OBJECT_EXTERNAL:        return "EXTERNAL";
+        case APE_OBJECT_FREED:           return "FREED";
+        case APE_OBJECT_ANY:             return "ANY";
+        default:                         return "NONE";
     }
 }
 
@@ -10134,67 +11293,86 @@ int ape_object_get_map_length(ape_object_t obj) {
     return object_get_map_length(ape_object_to_object(obj));
 }
 
-ape_object_t ape_object_get_map_key_at(ape_object_t obj, int ix) {
-    return object_to_ape_object(object_get_map_key_at(ape_object_to_object(obj), ix));
+ape_object_t ape_object_get_map_key_at(ape_object_t ape_obj, int ix) {
+    object_t obj = ape_object_to_object(ape_obj);
+    return object_to_ape_object(object_get_map_key_at(obj, ix));
 }
 
-ape_object_t ape_object_get_map_value_at(ape_object_t obj, int ix) {
-    return object_to_ape_object(object_get_map_value_at(ape_object_to_object(obj), ix));
+ape_object_t ape_object_get_map_value_at(ape_object_t ape_obj, int ix) {
+    object_t obj = ape_object_to_object(ape_obj);
+    object_t res = object_get_map_value_at(obj, ix);
+    return object_to_ape_object(res);
 }
 
-bool ape_object_set_map_value(ape_object_t obj, ape_object_t key, ape_object_t val) {
+bool ape_object_set_map_value_at(ape_object_t ape_obj, int ix, ape_object_t ape_val) {
+    object_t obj = ape_object_to_object(ape_obj);
+    object_t val = ape_object_to_object(ape_val);
+    return object_set_map_value_at(obj, ix, val);
+}
+
+bool ape_object_set_map_value_with_value_key(ape_object_t obj, ape_object_t key, ape_object_t val) {
     return object_set_map_value(ape_object_to_object(obj), ape_object_to_object(key), ape_object_to_object(val));
 }
 
-bool ape_object_set_map_value_with_string_key(ape_object_t obj, const char *key, ape_object_t value) {
+bool ape_object_set_map_value(ape_object_t obj, const char *key, ape_object_t value) {
     gcmem_t *mem = object_get_mem(ape_object_to_object(obj));
     object_t key_object = object_make_string(mem, key);
-    return ape_object_set_map_value(obj, object_to_ape_object(key_object), value);
+    return ape_object_set_map_value_with_value_key(obj, object_to_ape_object(key_object), value);
 }
 
-bool ape_object_set_map_string_with_string_key(ape_object_t obj, const char *key, const char *string) {
+bool ape_object_set_map_string(ape_object_t obj, const char *key, const char *string) {
     gcmem_t *mem = object_get_mem(ape_object_to_object(obj));
     object_t string_object = object_make_string(mem, string);
-    return ape_object_set_map_value_with_string_key(obj, key, object_to_ape_object(string_object));
+    return ape_object_set_map_value(obj, key, object_to_ape_object(string_object));
 }
 
-bool ape_object_set_map_number_with_string_key(ape_object_t obj, const char *key, double number) {
+bool ape_object_set_map_number(ape_object_t obj, const char *key, double number) {
     object_t number_object = object_make_number(number);
-    return ape_object_set_map_value_with_string_key(obj, key, object_to_ape_object(number_object));
+    return ape_object_set_map_value(obj, key, object_to_ape_object(number_object));
 }
 
-bool ape_object_set_map_bool_with_string_key(ape_object_t obj, const char *key, bool value) {
+bool ape_object_set_map_bool(ape_object_t obj, const char *key, bool value) {
     object_t bool_object = object_make_bool(value);
-    return ape_object_set_map_value_with_string_key(obj, key, object_to_ape_object(bool_object));
+    return ape_object_set_map_value(obj, key, object_to_ape_object(bool_object));
 }
 
-ape_object_t ape_object_get_map_value(ape_object_t obj, ape_object_t key) {
+ape_object_t ape_object_get_map_value_with_value_key(ape_object_t obj, ape_object_t key) {
     return object_to_ape_object(object_get_map_value(ape_object_to_object(obj), ape_object_to_object(key)));
 }
 
-ape_object_t ape_object_get_map_value_with_string_key(ape_object_t object, const char *key) {
+ape_object_t ape_object_get_map_value(ape_object_t object, const char *key) {
     gcmem_t *mem = object_get_mem(ape_object_to_object(object));
     if (!mem) {
         return ape_object_make_null();
     }
     object_t key_object = object_make_string(mem, key);
-    ape_object_t res = ape_object_get_map_value(object, object_to_ape_object(key_object));
+    ape_object_t res = ape_object_get_map_value_with_value_key(object, object_to_ape_object(key_object));
     return res;
 }
 
-const char* ape_object_get_map_string_with_string_key(ape_object_t object, const char *key) {
-    ape_object_t res = ape_object_get_map_value_with_string_key(object, key);
+const char* ape_object_get_map_string(ape_object_t object, const char *key) {
+    ape_object_t res = ape_object_get_map_value(object, key);
     return ape_object_get_string(res);
 }
 
-double ape_object_get_map_number_with_string_key(ape_object_t object, const char *key) {
-    ape_object_t res = ape_object_get_map_value_with_string_key(object, key);
+double ape_object_get_map_number(ape_object_t object, const char *key) {
+    ape_object_t res = ape_object_get_map_value(object, key);
     return ape_object_get_number(res);
 }
 
-bool ape_object_get_map_bool_with_string_key(ape_object_t object, const char *key) {
-    ape_object_t res = ape_object_get_map_value_with_string_key(object, key);
+bool ape_object_get_map_bool(ape_object_t object, const char *key) {
+    ape_object_t res = ape_object_get_map_value(object, key);
     return ape_object_get_bool(res);
+}
+
+bool ape_object_map_has_key(ape_object_t ape_object, const char *key) {
+    object_t object = ape_object_to_object(ape_object);
+    gcmem_t *mem = object_get_mem(object);
+    if (!mem) {
+        return false;
+    }
+    object_t key_object = object_make_string(mem, key);
+    return object_map_has_key(object, key_object);
 }
 
 //-----------------------------------------------------------------------------
@@ -10206,12 +11384,12 @@ const char* ape_error_get_message(const ape_error_t *ape_error) {
     return error->message;
 }
 
-const char* ape_error_get_filename(const ape_error_t *ape_error) {
+const char* ape_error_get_filepath(const ape_error_t *ape_error) {
     const error_t *error = (const error_t*)ape_error;
     if (!error->pos.file) {
         return NULL;
     }
-    return error->pos.file->name;
+    return error->pos.file->path;
 }
 
 const char* ape_error_get_line(const ape_error_t *ape_error) {
@@ -10229,12 +11407,12 @@ const char* ape_error_get_line(const ape_error_t *ape_error) {
 
 int ape_error_get_line_number(const ape_error_t *ape_error) {
     const error_t *error = (const error_t*)ape_error;
-    return error->pos.line;
+    return error->pos.line + 1;
 }
 
 int ape_error_get_column_number(const ape_error_t *ape_error) {
     const error_t *error = (const error_t*)ape_error;
-    return error->pos.column;
+    return error->pos.column + 1;
 }
 
 ape_error_type_t ape_error_get_type(const ape_error_t *ape_error) {
@@ -10265,7 +11443,7 @@ const char* ape_error_type_to_string(ape_error_type_t type) {
 
 char* ape_error_serialize(const ape_error_t *err) {
     const char *type_str = ape_error_get_type_string(err);
-    const char *filename = ape_error_get_filename(err);
+    const char *filename = ape_error_get_filepath(err);
     const char *line = ape_error_get_line(err);
     int line_num = ape_error_get_line_number(err);
     int col_num = ape_error_get_column_number(err);
@@ -10274,7 +11452,7 @@ char* ape_error_serialize(const ape_error_t *err) {
         strbuf_append(buf, line);
         strbuf_append(buf, "\n");
         if (col_num >= 0) {
-            for (int j = 0; j < col_num; j++) {
+            for (int j = 0; j < (col_num - 1); j++) {
                 strbuf_append(buf, " ");
             }
             strbuf_append(buf, "^\n");
@@ -10304,13 +11482,13 @@ int ape_traceback_get_depth(const ape_traceback_t *ape_traceback) {
     return array_count(traceback->items);
 }
 
-const char* ape_traceback_get_filename(const ape_traceback_t *ape_traceback, int depth) {
+const char* ape_traceback_get_filepath(const ape_traceback_t *ape_traceback, int depth) {
     const traceback_t *traceback = (const traceback_t*)ape_traceback;
     traceback_item_t *item = array_get(traceback->items, depth);
     if (!item) {
         return NULL;
     }
-    return traceback_item_get_filename(item);
+    return traceback_item_get_filepath(item);
 }
 
 const char* ape_traceback_get_line(const ape_traceback_t *ape_traceback, int depth) {
@@ -10353,8 +11531,8 @@ const char* ape_traceback_get_function_name(const ape_traceback_t *ape_traceback
 // Ape internal
 //-----------------------------------------------------------------------------
 
-static object_t ape_external_fn_wrapper(vm_t *vm, void *data, int argc, object_t *args) {
-    external_fn_wrapper_t *wrapper = (external_fn_wrapper_t*)data;
+static object_t ape_native_fn_wrapper(vm_t *vm, void *data, int argc, object_t *args) {
+    native_fn_wrapper_t *wrapper = (native_fn_wrapper_t*)data;
     APE_ASSERT(vm == wrapper->ape->vm);
     ape_object_t res = wrapper->fn(wrapper->ape, wrapper->data, argc, (ape_object_t*)args);
     if (ape_has_errors(wrapper->ape)) {
@@ -10369,6 +11547,11 @@ static object_t ape_object_to_object(ape_object_t obj) {
 
 static ape_object_t object_to_ape_object(object_t obj) {
     return (ape_object_t){ ._internal = obj.handle };
+}
+
+static void reset_state(ape_t *ape) {
+    ptrarray_clear_and_destroy_items(ape->errors, error_destroy);
+    vm_reset(ape->vm);
 }
 
 static void set_default_config(ape_t *ape) {

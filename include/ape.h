@@ -44,10 +44,10 @@ extern "C"
 #endif
 
 #define APE_VERSION_MAJOR 0
-#define APE_VERSION_MINOR 1
-#define APE_VERSION_PATCH 1
+#define APE_VERSION_MINOR 5
+#define APE_VERSION_PATCH 0
 
-#define APE_VERSION_STRING "0.1.1"
+#define APE_VERSION_STRING "0.5.0"
 
 typedef struct ape ape_t;
 typedef struct ape_object { uint64_t _internal; } ape_object_t;
@@ -64,21 +64,22 @@ typedef enum ape_error_type {
 } ape_error_type_t;
 
 typedef enum ape_object_type {
-    APE_OBJECT_NONE = 0,
-    APE_OBJECT_ERROR = 1 << 0,
-    APE_OBJECT_NUMBER = 1 << 1,
-    APE_OBJECT_BOOL = 1 << 2,
-    APE_OBJECT_STRING = 1 << 3,
-    APE_OBJECT_NULL = 1 << 4,
-    APE_OBJECT_BUILTIN = 1 << 5,
-    APE_OBJECT_ARRAY = 1 << 6,
-    APE_OBJECT_MAP = 1 << 7,
-    APE_OBJECT_FUNCTION = 1 << 8,
-    APE_OBJECT_EXTERNAL = 1 << 9,
-    APE_OBJECT_ANY = 0xffff, // for checking types with &
+    APE_OBJECT_NONE            = 0,
+    APE_OBJECT_ERROR           = 1 << 0,
+    APE_OBJECT_NUMBER          = 1 << 1,
+    APE_OBJECT_BOOL            = 1 << 2,
+    APE_OBJECT_STRING          = 1 << 3,
+    APE_OBJECT_NULL            = 1 << 4,
+    APE_OBJECT_NATIVE_FUNCTION = 1 << 5,
+    APE_OBJECT_ARRAY           = 1 << 6,
+    APE_OBJECT_MAP             = 1 << 7,
+    APE_OBJECT_FUNCTION        = 1 << 8,
+    APE_OBJECT_EXTERNAL        = 1 << 9,
+    APE_OBJECT_FREED           = 1 << 10,
+    APE_OBJECT_ANY             = 0xffff, // for checking types with &
 } ape_object_type_t;
 
-typedef ape_object_t (*ape_external_fn)(ape_t *ape, void *data, int argc, ape_object_t *args);
+typedef ape_object_t (*ape_native_fn)(ape_t *ape, void *data, int argc, ape_object_t *args);
 typedef void*        (*ape_malloc_fn)(size_t size);
 typedef void         (*ape_free_fn)(void *ptr);
 typedef void         (*ape_data_destroy_fn)(void* data);
@@ -106,7 +107,6 @@ void ape_set_stdout_write_function(ape_t *ape, ape_stdout_write_fn stdout_write,
 void ape_set_file_write_function(ape_t *ape, ape_write_file_fn file_write, void *context);
 void ape_set_file_read_function(ape_t *ape, ape_read_file_fn file_read, void *context);
 
-
 ape_program_t* ape_compile(ape_t *ape, const char *code);
 ape_program_t* ape_compile_file(ape_t *ape, const char *path);
 ape_object_t   ape_execute_program(ape_t *ape, const ape_program_t *program);
@@ -123,21 +123,21 @@ ape_object_t  ape_call(ape_t *ape, const char *function_name, int argc, ape_obje
         sizeof((ape_object_t[]){__VA_ARGS__}) / sizeof(ape_object_t),\
         (ape_object_t[]){__VA_ARGS__})
 
-void ape_add_error(ape_t *ape, const char *message);
-void ape_add_errorf(ape_t *ape, const char *format, ...) __attribute__ ((format (printf, 2, 3)));
+void ape_set_runtime_error(ape_t *ape, const char *message);
+void ape_set_runtime_errorf(ape_t *ape, const char *format, ...) __attribute__ ((format (printf, 2, 3)));
 bool ape_has_errors(const ape_t *ape);
 int  ape_errors_count(const ape_t *ape);
 const ape_error_t* ape_get_error(const ape_t *ape, int index);
 
-bool ape_set_external_function(ape_t *ape, const char *name, ape_external_fn fn, void *data);
+bool ape_set_native_function(ape_t *ape, const char *name, ape_native_fn fn, void *data);
 bool ape_set_global_constant(ape_t *ape, const char *name, ape_object_t obj);
 ape_object_t ape_get_object(ape_t *ape, const char *name);
 
-bool ape_check_args(ape_t *ape, bool generate_errors, int argc, ape_object_t *args, int expected_argc, int *expected_types);
-#define APE_CHECK_ARGS(ape, generate_errors, argc, args, ...)\
+bool ape_check_args(ape_t *ape, bool generate_error, int argc, ape_object_t *args, int expected_argc, int *expected_types);
+#define APE_CHECK_ARGS(ape, generate_error, argc, args, ...)\
     ape_check_args(\
         (ape),\
-        (generate_errors),\
+        (generate_error),\
         (argc),\
         (args),\
         sizeof((int[]){__VA_ARGS__}) / sizeof(int),\
@@ -154,20 +154,30 @@ ape_object_t ape_object_make_string(ape_t *ape, const char *str);
 ape_object_t ape_object_make_stringf(ape_t *ape, const char *format, ...) __attribute__ ((format (printf, 2, 3)));
 ape_object_t ape_object_make_array(ape_t *ape);
 ape_object_t ape_object_make_map(ape_t *ape);
+ape_object_t ape_object_make_native_function(ape_t *ape, ape_native_fn fn, void *data);
 ape_object_t ape_object_make_error(ape_t *ape, const char *message);
 ape_object_t ape_object_make_errorf(ape_t *ape, const char *format, ...) __attribute__ ((format (printf, 2, 3)));
 ape_object_t ape_object_make_external(ape_t *ape, void *data);
 
-char *ape_object_serialize(ape_object_t obj);
+char* ape_object_serialize(ape_object_t obj);
+
+void ape_object_disable_gc(ape_object_t obj);
+void ape_object_enable_gc(ape_object_t obj);
+
+bool ape_object_equals(ape_object_t a, ape_object_t b);
+
+ape_object_t ape_object_copy(ape_object_t obj);
+ape_object_t ape_object_deep_copy(ape_object_t obj);
 
 ape_object_type_t ape_object_get_type(ape_object_t obj);
 const char*       ape_object_get_type_string(ape_object_t obj);
 const char*       ape_object_get_type_name(ape_object_type_t type);
 
-double  ape_object_get_number(ape_object_t obj);
-bool ape_object_get_bool(ape_object_t obj);
+double       ape_object_get_number(ape_object_t obj);
+bool         ape_object_get_bool(ape_object_t obj);
 const char * ape_object_get_string(ape_object_t obj);
-const char * ape_object_get_error_message(ape_object_t obj);
+
+const char*            ape_object_get_error_message(ape_object_t obj);
 const ape_traceback_t* ape_object_get_error_traceback(ape_object_t obj);
 
 bool ape_object_set_external_destroy_function(ape_object_t object, ape_data_destroy_fn destroy_fn);
@@ -198,27 +208,30 @@ bool ape_object_add_array_bool(ape_object_t object, bool value);
 // Ape object map
 //-----------------------------------------------------------------------------
 
-int           ape_object_get_map_length(ape_object_t obj);
+int          ape_object_get_map_length(ape_object_t obj);
 ape_object_t ape_object_get_map_key_at(ape_object_t object, int ix);
 ape_object_t ape_object_get_map_value_at(ape_object_t object, int ix);
+bool         ape_object_set_map_value_at(ape_object_t object, int ix, ape_object_t val);
 
-bool ape_object_set_map_value(ape_object_t object, ape_object_t key, ape_object_t value);
-bool ape_object_set_map_value_with_string_key(ape_object_t object, const char *key, ape_object_t value);
-bool ape_object_set_map_string_with_string_key(ape_object_t object, const char *key, const char *string);
-bool ape_object_set_map_number_with_string_key(ape_object_t object, const char *key, double number);
-bool ape_object_set_map_bool_with_string_key(ape_object_t object, const char *key, bool value);
+bool ape_object_set_map_value_with_value_key(ape_object_t object, ape_object_t key, ape_object_t value);
+bool ape_object_set_map_value(ape_object_t object, const char *key, ape_object_t value);
+bool ape_object_set_map_string(ape_object_t object, const char *key, const char *string);
+bool ape_object_set_map_number(ape_object_t object, const char *key, double number);
+bool ape_object_set_map_bool(ape_object_t object, const char *key, bool value);
 
-ape_object_t ape_object_get_map_value(ape_object_t object, ape_object_t key);
-ape_object_t ape_object_get_map_value_with_string_key(ape_object_t object, const char *key);
-const char*   ape_object_get_map_string_with_string_key(ape_object_t object, const char *key);
-double        ape_object_get_map_number_with_string_key(ape_object_t object, const char *key);
-bool          ape_object_get_map_bool_with_string_key(ape_object_t object, const char *key);
+ape_object_t  ape_object_get_map_value_with_value_key(ape_object_t object, ape_object_t key);
+ape_object_t  ape_object_get_map_value(ape_object_t object, const char *key);
+const char*   ape_object_get_map_string(ape_object_t object, const char *key);
+double        ape_object_get_map_number(ape_object_t object, const char *key);
+bool          ape_object_get_map_bool(ape_object_t object, const char *key);
+
+bool ape_object_map_has_key(ape_object_t object, const char *key);
 
 //-----------------------------------------------------------------------------
 // Ape error
 //-----------------------------------------------------------------------------
 const char*      ape_error_get_message(const ape_error_t *error);
-const char*      ape_error_get_filename(const ape_error_t *error);
+const char*      ape_error_get_filepath(const ape_error_t *error);
 const char*      ape_error_get_line(const ape_error_t *error);
 int              ape_error_get_line_number(const ape_error_t *error);
 int              ape_error_get_column_number(const ape_error_t *error);
@@ -232,7 +245,7 @@ const ape_traceback_t* ape_error_get_traceback(const ape_error_t *error);
 // Ape traceback
 //-----------------------------------------------------------------------------
 int         ape_traceback_get_depth(const ape_traceback_t *traceback);
-const char* ape_traceback_get_filename(const ape_traceback_t *traceback, int depth);
+const char* ape_traceback_get_filepath(const ape_traceback_t *traceback, int depth);
 const char* ape_traceback_get_line(const ape_traceback_t *traceback, int depth);
 int         ape_traceback_get_line_number(const ape_traceback_t *traceback, int depth);
 int         ape_traceback_get_column_number(const ape_traceback_t *traceback, int depth);

@@ -89,6 +89,8 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     root.flags |= ModuleFlags.TYPE_CHECKED
 
     this.createModuleSymbols(root)
+    this.lita.preprocessor.preResolveSymbols(this)
+
     this.resolveSymbols()
 
     for(var it = this.current.genericSymbols.iter(); it.hasNext();) {
