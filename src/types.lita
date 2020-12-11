@@ -608,7 +608,8 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return other.kind <= TypeKind.U64
         }
         case TypeKind.F32: {
-            return other.kind == TypeKind.F32
+            return other.kind == TypeKind.F32 ||
+                   other.kind <= TypeKind.U32
         }
         case TypeKind.F64: {
             return other.kind == TypeKind.F32 ||
@@ -765,7 +766,8 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             return other.kind <= TypeKind.U64
         }
         case TypeKind.F32: {
-            return other.kind == TypeKind.F32
+            return other.kind == TypeKind.F32 ||
+                   other.kind <= TypeKind.U32
         }
         case TypeKind.F64: {
             return other.kind == TypeKind.F32 ||

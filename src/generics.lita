@@ -126,16 +126,6 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         genericSym.genericCallsiteModule = checker.current
         genericSym.genericParams = genericDecl.genericParams.copy()
         checker.current.genericSymbols.put(newNameStr, genericSym)
-/*
-/// TEMP
-    printf("xGeneric Sym.genericParams = ")
-    for(var i = 0; i < genericSym.genericParams.size(); i += 1) {
-        var p = genericSym.genericParams.get(i)
-        printf("%.*s ", p.name.str.length, p.name.str.buffer)
-    }
-    printf("\n")
-///
-*/
 
         // if this still has generic parameters, add in the original
         // parameters
@@ -143,59 +133,20 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             genericSym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
 
             var originalDecl = sym.decl as (*GenericDecl)
-            /*
-            printf("Replacing: {\n")
-            for(var i = 0; i < genericDecl.genericParams.size(); i += 1) {
-                var p = genericDecl.genericParams.get(i)
-                printf("    %.*s ", p.name.str.length, p.name.str.buffer)
-            }
-            printf("\n} with: {\n")*/
+
             genericDecl.genericParams = originalDecl.genericParams.copy()
-            /*for(var i = 0; i < genericDecl.genericParams.size(); i += 1) {
-                var p = genericDecl.genericParams.get(i)
-                printf("    %.*s ", p.name.str.length, p.name.str.buffer)
-            }
-            printf("\n}\n")*/
         }
         else {
-            /*
-            /// TEMP
-    printf("BEFORE DELETION Sym.genericParams = ")
-    for(var i = 0; i < genericSym.genericParams.size(); i += 1) {
-        var p = genericSym.genericParams.get(i)
-        printf("%.*s ", p.name.str.length, p.name.str.buffer)
-    }
-    printf("\n")
-///
-            printf("Removing args for: %.*s {\n", genericDecl.name.str.length, genericDecl.name.str.buffer)*/
             // Remove any generic parameters from the declaration that
             // have been defined a type
             var removed = 0
             for(var i = 0; i < name.genericArgs.size(); i+=1) {
                 var index = i - removed
                 if(index < genericDecl.genericParams.size()) {
-
-                    // TEMP
-                     // replace with: genericDecl.genericParams.removeAt(index)
-                    var p = genericDecl.genericParams.removeAt(index)/*
-                    printf("    Removing: %.*s\n", p.name.str.length, p.name.str.buffer)
-                    for(var i = 0; i < genericSym.genericParams.size(); i += 1) {
-        var p = genericSym.genericParams.get(i)
-        printf("%.*s ", p.name.str.length, p.name.str.buffer)
-    }
-    printf("\n")*/
+                    genericDecl.genericParams.removeAt(index)
                     removed+=1;
                 }
-            }/*
-            printf("\n}\n")
-            /// TEMP
-    printf("After DELETION Sym.genericParams = ")
-    for(var i = 0; i < genericSym.genericParams.size(); i += 1) {
-        var p = genericSym.genericParams.get(i)
-        printf("%.*s ", p.name.str.length, p.name.str.buffer)
-    }
-    printf("\n")
-/// */
+            }
         }
 
         var numOfGenericArgs = name.genericArgs.size();

@@ -337,6 +337,39 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 sym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
                 this.genericTemplates.add(sym)
             }
+
+            for(var i = 0; i < aggDecl.fields.size(); i+=1) {
+                var field = &aggDecl.fields.elements[i]
+
+                switch(field.kind) {
+                    case StmtKind.VAR_FIELD_DECL: {
+                        break;
+                    }
+                    case StmtKind.ENUM_FIELD_DECL: {
+                        var sym = this.createDeclSymbol(field.enumField)
+                        field.enumField.sym = sym
+                        break;
+                    }
+                    case StmtKind.UNION_FIELD_DECL:
+                    case StmtKind.STRUCT_FIELD_DECL: {
+                        // if this isn't a generic type, we can create the declaration symbol;
+                        // otherwise we have to defer this when the generic template is actually
+                        // used (see resolveAggregateDecl)
+                        if(!(aggDecl.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
+                            field.aggregateField.sym = this.createDeclSymbol(field.aggregateField)
+                        }
+                        break;
+                    }
+                    case StmtKind.POISON_EXPR: {
+                        break;
+                    }
+                    default: {
+                        assert(false)
+                    }
+                }
+            }
+
+
             this.symbolTypes.add(sym)
             break;
         }

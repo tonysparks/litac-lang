@@ -83,7 +83,15 @@ func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
     var result = ape_execute(this.ape, comp.expr)
     if(ape_has_errors(this.ape)) {
         var error = ape_get_error(this.ape, 0)
-        this.lita.result.addError(comp.startPos, "error evaluating preprocessor expression: %s", ape_error_get_message(error))
+        var pos = SrcPos {
+            .filename: comp.startPos.filename,
+            .lineStart: comp.startPos.lineStart,
+            .start: comp.startPos.start,
+            .end: comp.startPos.end,
+            .lineNumber: comp.startPos.lineNumber /*+ ape_error_get_line_number(error)*/, // doesn't work because repl mode
+            .position: comp.startPos.position /* ape_error_get_column_number(error) */
+        }
+        this.lita.result.addError(pos, "error evaluating preprocessor expression: '%s' for line: '%s'", ape_error_get_message(error), ape_error_get_line(error))
         return false
     }
 
@@ -228,9 +236,6 @@ func (this: *CallContext) logErrors() : bool {
 
 
 public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker) {
-    //this.symbolFuncs.add(sym)
-    //this.symbolTypes.add(sym)
-
     this.callContext.checker = checker
 
     for(var i = 0; i < this.preCheckers.size(); i += 1) {
@@ -239,18 +244,6 @@ public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker) {
         this.eval(comp)
     }
 
-    /*
-    for(var i = 0; i < checker.symbolFuncs.size(); i += 1) {
-        var sym = checker.symbolFuncs.get(i)
-        printf("Visiting function: %s\n", sym.name)
-
-        var symObj = ape_object_make_map(this.ape)
-        ape_object_set_map_string_with_string_key(symObj, "name", sym.name)
-    }
-    for(var i = 0; i < checker.symbolTypes.size(); i += 1) {
-        var sym = checker.symbolTypes.get(i)
-        printf("Visiting type: %s\n", sym.name)
-    }*/
 }
 
 func (this: *Preprocessor) addNotes(obj: ape_object_t, attributes: *Attributes) {
@@ -353,6 +346,7 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
             break;
         }
         case StmtKind.TYPEDEF_DECL: {
+            // TODO:
             break;
         }
         case StmtKind.ENUM_DECL: {
@@ -412,14 +406,55 @@ func (this: *CallContext) preprocessCall(moduleStmt: *ModuleStmt, comp: *CompStm
 
 func ApeEmit(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
-    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+    /*if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
         context.logErrors()
         return ape_object_make_null()
-    }
+    }*/
 
+    var argIndex = 1
     var element = ape_object_get_string(args[0]) as (*const char)
     if(element) {
-        context.buffer.append("%s", element)
+        var str: *const char = element
+        while(*str) {
+            var c = *str
+            if(c == '%') {
+                if(str[1] == '%') {
+                    context.buffer.append("%s", "%") // escaped %
+                }
+                else {
+                    if(argIndex >= argc) {
+                        context.pp.lita.result.addError(context.comp.startPos, "invalid argument index, there are more format parameters than supplied function arguments")
+                        return ape_object_make_null()
+                    }
+
+                    if(str[1] == 's') {
+                        var arg = ape_object_get_string(args[argIndex]) as (*const char)
+                        context.buffer.append("%s", arg)
+                    }
+                    else if(str[1] == 'f') {
+                        var arg = ape_object_get_number(args[argIndex]) as (f64)
+                        context.buffer.append("%f", arg)
+                    }
+                    else if(str[1] == 'd') {
+                        var arg = ape_object_get_number(args[argIndex]) as (i64)
+                        context.buffer.append("%d", arg)
+                    }
+                    else if(str[1] == 'b') {
+                        var arg = ape_object_get_bool(args[argIndex]) as (bool)
+                        context.buffer.append("%s", arg ? "true" : "false")
+                    }
+                    else {
+                        context.pp.lita.result.addError(context.comp.startPos, "invalid format parameter: '%%%c'", str[1])
+                        return ape_object_make_null()
+                    }
+                    argIndex += 1
+                    str += 2
+                    continue
+                }
+            }
+            context.buffer.append("%c", c)
+            str += 1
+        }
     }
 
     return ape_object_make_null()

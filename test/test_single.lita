@@ -32,19 +32,29 @@ enum Test {
     B
 }
 
-#precheck
-emitClear()
-emit("
-func something() : i32 {
-    return 4;
+struct Top {
+    @asStr
+    enum TopEnum {
+        Z
+    }
 }
 
-")
-addDeclaration("../test/test_single.lita", emitStr())
+
+#precheck
+for(sym in getSymbolsByNote("asStr")) {
+    println("Sym: ", sym.name)
+}
+emitClear()
+emit("Test String: '%s' Float: %f Int: %d Bool: %b", "Hi", 10.3, 44, true)
+println("Output: ", emitStr())
 #end
+
 
 func main(len:i32, args:**char) : i32 {
     assert(Test.A == 0)
     assert(strcmp(ToStr2(Test.A), "A") == 0)
     assert(strcmp(ToStr2(Test.B), "B") == 0)
+    assert(strcmp(TopEnumAsStr(TopEnum.Z), "Z") == 0)
+
+    var i: f32 = 4.0f
 }

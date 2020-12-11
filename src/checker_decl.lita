@@ -295,10 +295,11 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
-                var sym = this.createDeclSymbol(field.enumField)
+                var sym = field.enumField.sym
                 if(!sym) {
                     return false
                 }
+
                 sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
 
@@ -316,7 +317,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             case StmtKind.STRUCT_FIELD_DECL: {
                 // if this is from a generic template, we must make sure
                 // any generic arguments are accounted for
-                var sym: *Symbol = null
+                var sym: *Symbol = field.aggregateField.sym
                 if(aggDecl.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
 
                     var name = [MAX_SYMBOL_NAME]char{}
@@ -351,15 +352,13 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     // symbol
                     sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
                 }
-                else {
-                    sym = this.createDeclSymbol(field.aggregateField)
-                }
 
                 if(!sym) {
                     return false
                 }
 
                 field.aggregateField.sym = sym
+
                 sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
                 this.finishResolveSymbol(sym)

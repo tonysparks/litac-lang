@@ -189,7 +189,7 @@
                 var x : i32 = test<i32>(1)
                 assert(false)
             `,
-            "error": "error evaluating preprocessor expression: No prefix parse function for \">\" found"
+            "error": "error evaluating preprocessor expression: 'No prefix parse function for \">\" found' for line: 'this->junk??'"
         },
         {
             "name": "Preprocessor Syntax Module Error",
@@ -203,7 +203,7 @@
             "code": `
                 assert(false)
             `,
-            "error": "error evaluating preprocessor expression: Illegal token"
+            "error": "error evaluating preprocessor expression: 'Illegal token' for line: '(??OS  \"WINDOWS\")'"
         },
     ]
 }

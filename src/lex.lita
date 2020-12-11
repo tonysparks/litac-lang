@@ -848,9 +848,8 @@ func (l: *Lexer) scanTypeInfo() {
     }
 }
 
-func IsNumberChar(c: char) : bool {
-    return isdigit(c) || c == '_' ||
-           c == 'x' || c == 'X' ||
+func IsHexChar(c: char) : bool {
+    return //c == 'x' || c == 'X' ||
            c == 'a' || c == 'A' ||
            c == 'b' || c == 'B' ||
            c == 'c' || c == 'C' ||
@@ -882,11 +881,18 @@ func (l: *Lexer) scanNumber() : Token {
             }
             hasExpo = true
         }
-        else if(!IsNumberChar(c)) {
+        else if(!isdigit(c) && c != '_') {
             if(c == 'x' || c == 'X') {
                 isHex = true
             }
-            break;
+            else if(isHex) {
+                if(!IsHexChar(c)) {
+                    break;
+                }
+            }
+            else {
+                break
+            }
         }
 
         if(c != '_') {
