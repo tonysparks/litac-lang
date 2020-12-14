@@ -720,6 +720,7 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
                                     false,
                                     context.pp.lita.allocator) as (*ImportDecl)
 
+    importStmt.moduleId = &importModule.id
     module.ast.imports.add(importStmt)
 
     context.checker.enterModule(module)

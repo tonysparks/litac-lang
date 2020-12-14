@@ -896,7 +896,7 @@ func (this: using *CGen) emitPostludeNote(note: *NoteStmt) {
 }
 
 func (this: using *CGen) emitFieldName(field: FieldStmt) {
-    assert(field.kind == StmtKind.VAR_FIELD_DECL)
+    assert(field.kind != StmtKind.POISON_EXPR)
     var alias = field.varField.decl.getNote("alias")
     if(alias && alias.attributes.size()) {
         var name = alias.attributes.get(0)
