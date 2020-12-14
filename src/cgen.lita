@@ -895,6 +895,19 @@ func (this: using *CGen) emitPostludeNote(note: *NoteStmt) {
     }
 }
 
+func (this: using *CGen) emitFieldName(field: FieldStmt) {
+    assert(field.kind == StmtKind.VAR_FIELD_DECL)
+    var alias = field.varField.decl.getNote("alias")
+    if(alias && alias.attributes.size()) {
+        var name = alias.attributes.get(0)
+        this.emitName(name)
+    }
+    else {
+        this.emitName(field.varField.name)
+    }
+
+}
+
 func (this: using *CGen) emitSymbol(sym: *Symbol) {
     if(!sym) {
         return;
@@ -1396,13 +1409,24 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             this.emitStmt(expr.object)
 
+            if(!IsAggregateLike(objectType)) {
+                if(objectType.kind == TypeKind.PTR) {
+                    buf.append("->")
+                }
+                else {
+                    buf.append(".")
+                }
+                this.emitStmt(expr.field)
+                return;
+            }
+
+            var baseInfo = objectType.getBaseType()
+            assert(baseInfo != null)
+            assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
+
+            var aggInfo = baseInfo as (*AggregateTypeInfo)
+
             if(expr.flags & GetExprFlags.IS_USING) {
-                var baseInfo = objectType.getBaseType()
-                assert(baseInfo != null)
-                assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
-
-                var aggInfo = baseInfo as (*AggregateTypeInfo)
-
                 var path = FieldPath{}
                 var isFound = aggInfo.getFieldPath(expr.field.type.name, &path)
                 assert(isFound)
@@ -1416,7 +1440,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     else {
                         buf.append(".")
                     }
-                    this.emit("%.*s", field.varField.name.str.length, field.varField.name.str.buffer)
+                    this.emitFieldName(field)
                     nextType = field.typeInfo
                 }
             }
@@ -1427,8 +1451,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 else {
                     buf.append(".")
                 }
-
-                this.emitStmt(expr.field)
+                var field = aggInfo.getField(expr.field.type.name)
+                this.emitFieldName(field)
             }
 
             return;
@@ -1443,9 +1467,25 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.INIT_ARG_EXPR: {
             var expr = s as (*InitArgExpr)
             if(expr.fieldName.type == TokenType.IDENTIFIER) {
-                this.emit(".")
-                this.emitName(expr.fieldName)
-                this.emit(" = ")
+                var parentExpr = expr.parent
+                assert(parentExpr && parentExpr.kind == StmtKind.INIT_EXPR)
+
+                var objectType = (parentExpr as (*InitExpr)).type.typeInfo
+                assert(objectType != null)
+
+                assert(IsAggregateLike(objectType))
+                var baseInfo = objectType.getBaseType()
+                assert(baseInfo != null)
+                assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
+
+                var aggInfo = baseInfo as (*AggregateTypeInfo)
+
+                var field = aggInfo.getField(expr.fieldName.asString())
+                if(field.kind == StmtKind.VAR_FIELD_DECL) {
+                    this.emit(".")
+                    this.emitFieldName(field)
+                    this.emit(" = ")
+                }
             }
 
             this.emitStmt(expr.value)

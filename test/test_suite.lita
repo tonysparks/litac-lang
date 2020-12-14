@@ -52,7 +52,8 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
-       // "../test/tests/generics.json",
+        "../test/tests/arena.json",/*
+        "../test/tests/alias.json",
         "../test/tests/enums.json",
         "../test/tests/compile_time_stmt.json",
         "../test/tests/consts.json",
@@ -73,7 +74,7 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",
+        "../test/tests/generics_inference.json",*/
         null
     }
 
@@ -178,7 +179,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
                         }
                         case TestResult.OUTPUT_MISMATCH: {
                             printf("        The expected output did not match the actual output:\n")
-                            printf("\n%s\n\n", testHarness.buffer.cStr())
+                            printf("\n'%s'\n\n", testHarness.buffer.cStr())
                             break
                         }
                         case TestResult.ERROR_MISMATCH: {

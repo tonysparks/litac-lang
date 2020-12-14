@@ -74,6 +74,10 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     ape_set_native_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
     ape_set_native_function(this.ape, "getSymbolsByNote", ApeGetSymbolsWithNote, &this.callContext)
     ape_set_native_function(this.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
+    ape_set_native_function(this.ape, "addImport", ApeAddImport, &this.callContext)
+
+    ape_set_native_function(this.ape, "getMainSymbol", ApeGetMainSymbol, &this.callContext)
+    ape_set_native_function(this.ape, "astInsert", ApeAstInsert, &this.callContext)
     ape_set_native_function(this.ape, "emit", ApeEmit, &this.callContext)
     ape_set_native_function(this.ape, "emitClear", ApeEmitClear, &this.callContext)
     ape_set_native_function(this.ape, "emitStr", ApeEmitStr, &this.callContext)
@@ -281,6 +285,7 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     ape_object_set_map_string(declObj, "moduleName", sym.declared.id.filename)
     ape_object_set_map_value(declObj, "isPublic", ape_object_make_bool(sym.decl.attributes.isPublic))
     ape_object_set_map_value(declObj, "isGlobal", ape_object_make_bool(sym.decl.attributes.isGlobal))
+    ape_object_set_map_value(declObj, "declPtr", ape_object_make_external(this.ape, sym.decl))
 
     this.addNotes(declObj, sym.decl.attributes)
 
@@ -557,4 +562,169 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
     }
 
     return ape_object_make_bool(true)
+}
+
+
+func ApeGetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var mainEntry = context.checker.mainEntry
+    if(!mainEntry) {
+        return ape_object_make_null()
+    }
+
+    return context.pp.declToApe(mainEntry)
+}
+
+func ApeAstInsert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_EXTERNAL, ape_object_type.APE_OBJECT_STRING,  ape_object_type.APE_OBJECT_NUMBER)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var astPtr = ape_object_get_external(args[0])
+    if(!astPtr) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty ast node")
+        return ape_object_make_null()
+    }
+
+    var code = ape_object_get_string(args[1]) as (*const char)
+    if(!code) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
+        return ape_object_make_null()
+    }
+
+
+    var index = ape_object_get_number(args[2]) as (i32)
+
+    var astNode = astPtr as (*Node)
+
+    var parser = ParserInit(astNode.startPos.filename, code, context.pp.lita)
+    var stmt = parser.statement()
+
+    context.astInsert(astNode, stmt, index)
+    return ape_object_make_null()
+}
+
+func (this: *CallContext) astInsert(node: *Node, stmt: *Stmt, index: i32) {
+
+    switch(node.kind) {
+        case StmtKind.FUNC_DECL: {
+            var funcDecl = node as (*FuncDecl)
+            if(!funcDecl.body) {
+                funcDecl.body = funcDecl.node.becomeParentOf(stmt)
+            }
+            else {
+                if(funcDecl.body.kind == StmtKind.FUNC_BODY_STMT) {
+                    var body = funcDecl.body as (*FuncBodyStmt)
+                    body.stmts.insertAt(index, stmt)
+                    body.node.becomeParentOf(stmt)
+                }
+                else {
+                    var stmts = ArrayInit<*Stmt>(8, this.pp.lita.allocator)
+                    if(index) {
+                        stmts.add(funcDecl.body)
+                        stmts.add(stmt)
+                    }
+                    else {
+                        stmts.add(stmt)
+                        stmts.add(funcDecl.body)
+                    }
+
+                    funcDecl.body = NewFuncBodyStmt(index ? funcDecl.body.startPos : stmt.startPos,
+                                                    index ? stmt.endPos : funcDecl.body.endPos,
+                                                    stmts,
+                                                    this.pp.lita.allocator)
+
+                }
+            }
+            break
+        }
+        default: {
+            // NOT implemented yet!!
+            printf("Assert AstInsert: %s\n", StmtKindAsStr(node.kind))
+            assert(false)
+        }
+    }
+}
+
+
+func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    @static var moduleNameIndex: i32;
+
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module name")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.modules.get(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var moduleToImport = ape_object_get_string(args[1]) as (*const char)
+    if(!moduleToImport) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module to import name")
+        return ape_object_make_null()
+    }
+
+    var importModule = context.pp.lita.modules.get(moduleToImport)
+    if(!importModule) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleToImport)
+        return ape_object_make_null()
+    }
+
+    for(var i = 0; i < module.ast.imports.size(); i += 1) {
+        var importStmt = module.ast.imports.get(i)
+        if(strcmp(importStmt.moduleId.filename, importModule.id.filename) == 0) {
+            if(importStmt.alias.type == TokenType.IDENTIFIER) {
+                return ape_object_make_string(ape, importStmt.alias.asString())
+            }
+            else {
+                // this is already being imported and doesn't have an alias
+                return ape_object_make_null()
+            }
+        }
+    }
+
+    // this module isn't being imported, so we must inject an import
+    // statement for it; but also give it an alias that *shouldn't*
+    // collide with other imports
+    var name = Token {
+        .type = TokenType.IDENTIFIER,
+        .pos = module.ast.startPos,
+        .value = Value{.str = importModule.id.name}
+    }
+    var sb = StringBufferInit(16, context.pp.lita.allocator)
+    sb.append("____%d", moduleNameIndex += 1)
+
+    var alias = Token {
+        .type = TokenType.IDENTIFIER,
+        .pos = module.ast.startPos,
+        .value = Value{ .str = StringViewInit(sb.cStr(), sb.length)}
+    }
+    var importStmt = NewImportDecl(module.ast.startPos,
+                                    module.ast.startPos,
+                                    name,
+                                    alias,
+                                    false,
+                                    context.pp.lita.allocator) as (*ImportDecl)
+
+    module.ast.imports.add(importStmt)
+
+    context.checker.enterModule(module)
+    defer context.checker.leaveModule()
+    context.checker.createImportSymbols(importStmt)
+
+    return ape_object_make_string(ape, sb.cStr())
 }

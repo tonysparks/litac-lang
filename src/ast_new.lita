@@ -693,6 +693,18 @@ public func NewCompStmt(startPos: SrcPos,
     return stmt as (*Stmt)
 }
 
+public func NewFuncBodyStmt(startPos: SrcPos,
+                         endPos: SrcPos,
+                         stmts: Array<*Stmt>,
+                         allocator: *const Allocator) : *Stmt {
+    var stmt = new<BlockStmt>(allocator)
+    stmt.kind = StmtKind.FUNC_BODY_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.stmts = *stmt.node.becomeParentOfChildren(stmts)
+    return stmt as (*Stmt)
+}
+
 
 public func NewBlockStmt(startPos: SrcPos,
                          endPos: SrcPos,

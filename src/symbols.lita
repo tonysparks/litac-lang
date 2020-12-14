@@ -73,6 +73,7 @@ public struct ProgramSymbols {
     values: Array<*Symbol>
     symbolTypes: Array<*Symbol>
     symbolFuncs: Array<*Symbol>
+    mainEntry: *Symbol
 }
 
 public struct Scope {

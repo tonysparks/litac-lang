@@ -176,6 +176,7 @@ const char*       ape_object_get_type_name(ape_object_type_t type);
 double       ape_object_get_number(ape_object_t obj);
 bool         ape_object_get_bool(ape_object_t obj);
 const char * ape_object_get_string(ape_object_t obj);
+void *       ape_object_get_external(ape_object_t obj);
 
 const char*            ape_object_get_error_message(ape_object_t obj);
 const ape_traceback_t* ape_object_get_error_traceback(ape_object_t obj);

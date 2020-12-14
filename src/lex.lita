@@ -3,6 +3,7 @@ import "string_buffer"
 import "libc"
 import "mem"
 import "types"
+import "string"
 
 @asStr
 public enum TokenType {
@@ -466,8 +467,18 @@ public func (p: *SrcPos) getLineLength() : i32 {
     return len
 }
 
-
+@doc("""
+There be dragons -- Uses a static buffer internally; do
+not free this memory and do not rely on the memory being
+correct for very long
+""")
 public func (t: *Token) asString() : *const char {
+    @static var buffer: [260]char;
+    if(t.type == TokenType.IDENTIFIER) {
+        var str = StringInit(buffer, 260)
+        str.format("%.*s", t.str.length, t.str.buffer)
+        return str.cStr()
+    }
     return tokenText[t.type]
 }
 

@@ -1,60 +1,9 @@
 import "assert"
-/*
-TODO: Duplicate using member
-struct Vec {
-    x: f32
-    y: f32
-}
-struct Entity {
-    pos: using Vec
-    x: i32
-}
+
+import "mem"
+import "libc"
 
 func main(len:i32, args:**char) : i32 {
-    assert(false)
-}*/
+    printf("In Main\n")
 
- //@include("<string.h>");
-//@foreign func strcmp(a:*const char, b:*const char) : i32;
-
-/*
-func test(a:*Map) : i32 {
-    a = &Map{4}
-    return a.a;
-}*/
-
-@include("<string.h>");
-@foreign func strcmp(a:*const char, b:*const char) : i32;
-
-@asStr("ToStr2")
-enum Test {
-    A,
-    B
-}
-
-struct Top {
-    @asStr
-    enum TopEnum {
-        Z
-    }
-}
-
-
-#precheck
-for(sym in getSymbolsByNote("asStr")) {
-    println("Sym: ", sym.name)
-}
-emitClear()
-emit("Test String: '%s' Float: %f Int: %d Bool: %b", "Hi", 10.3, 44, true)
-println("Output: ", emitStr())
-#end
-
-
-func main(len:i32, args:**char) : i32 {
-    assert(Test.A == 0)
-    assert(strcmp(ToStr2(Test.A), "A") == 0)
-    assert(strcmp(ToStr2(Test.B), "B") == 0)
-    assert(strcmp(TopEnumAsStr(TopEnum.Z), "Z") == 0)
-
-    var i: f32 = 4.0f
 }

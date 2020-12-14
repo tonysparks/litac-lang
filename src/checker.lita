@@ -51,6 +51,7 @@ public struct TypeChecker {
     pendingValues: Array<*Symbol>
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
+    mainEntry: *Symbol // main entry point to the program
 
     genericContext: GenericContext
     genericParamStack: Array<Array<GenericParam>>
@@ -77,6 +78,8 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     //this.genericTypes = StrMap<*Symbol>(null, 64, lita.allocator)
     this.genericContext.callsite = null
 
+    this.mainEntry = null
+
     memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
     this.numOfLabels = 0
 }
@@ -89,6 +92,16 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     root.flags |= ModuleFlags.TYPE_CHECKED
 
     this.createModuleSymbols(root)
+
+    for(var i = 0; i < root.ast.declarations.size(); i += 1) {
+        var decl = root.ast.declarations.get(i)
+        if(decl.sym && decl.kind == StmtKind.FUNC_DECL &&
+           strcmp(decl.sym.name, "main") == 0) {
+           this.mainEntry = decl.sym
+           continue
+        }
+    }
+
     this.lita.preprocessor.preResolveSymbols(this)
 
     this.resolveSymbols()
@@ -110,6 +123,7 @@ exit:
         .values = this.pendingValues,
         .symbolTypes = this.symbolTypes,
         .symbolFuncs = this.symbolFuncs,
+        .mainEntry = this.mainEntry,
     };
 }
 

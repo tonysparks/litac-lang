@@ -11181,6 +11181,12 @@ const char *ape_object_get_string(ape_object_t obj) {
     return object_get_string(ape_object_to_object(obj));
 }
 
+void *ape_object_get_external(ape_object_t obj) {
+    external_data_t* data = object_get_external_data(ape_object_to_object(obj));
+    if(!data) return NULL;
+    return data->data;
+}
+
 const char *ape_object_get_error_message(ape_object_t obj) {
     return object_get_error_message(ape_object_to_object(obj));
 }

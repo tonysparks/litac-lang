@@ -207,6 +207,9 @@ public func ape_object_get_bool(p0: ape_object_t) : bool;
 public func ape_object_get_string(p0: ape_object_t) : *const char;
 
 @foreign
+public func ape_object_get_external(p0: ape_object_t): *void;
+
+@foreign
 public func ape_object_get_error_message(p0: ape_object_t) : *const char;
 
 @foreign

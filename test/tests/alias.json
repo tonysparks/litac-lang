@@ -1,0 +1,290 @@
+{
+    "description": "Field alias",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+
+        {
+            "name": "Struct Aliased",
+            "definitions": `
+
+                struct Test {
+                    @alias("brett")
+                    v: i32
+                }
+            `,
+            "code": `
+                var t = Test{
+                    .v = 4
+                }
+
+                assert(t.v == 4)
+            `,
+        },
+        {
+            "name": "Struct Foreign Aliased ",
+            "definitions": `
+                @raw("""
+                    typedef struct Test {
+                        int brett;
+                    } Test;
+                """);
+
+                @foreign
+                struct Test {
+                    @alias("brett")
+                    v: i32
+                }
+            `,
+            "code": `
+                var t = Test{
+                    .v = 4
+                }
+
+                assert(t.v == 4)
+            `,
+        },
+        {
+            "name": "Struct Embedded Aliased",
+            "definitions": `
+
+                struct Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.t.v == 4)
+            `,
+        },
+        {
+            "name": "Struct Embedded Foreign Aliased ",
+            "definitions": `
+                @raw("""
+                    typedef struct Test {
+                        int brett;
+                    } Test;
+                """);
+
+                @foreign
+                struct Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.t.v == 4)
+            `,
+        },
+        {
+            "name": "Struct Aliased with Using",
+            "definitions": `
+
+                struct Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: using Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.v == 4)
+            `,
+        },
+        {
+            "name": "Struct Embedded Foreign Aliased with Using",
+            "definitions": `
+                @raw("""
+                    typedef struct Test {
+                        int brett;
+                    } Test;
+                """);
+
+                @foreign
+                struct Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: using Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.v == 4)
+            `,
+        },
+        {
+            "name": "Union Aliased",
+            "definitions": `
+
+                union Test {
+                    @alias("brett")
+                    v: i32
+                }
+            `,
+            "code": `
+                var t = Test{
+                    .v = 4
+                }
+
+                assert(t.v == 4)
+            `,
+        },
+        {
+            "name": "Union Foreign Aliased ",
+            "definitions": `
+                @raw("""
+                    typedef union Test {
+                        int brett;
+                    } Test;
+                """);
+
+                @foreign
+                union Test {
+                    @alias("brett")
+                    v: i32
+                }
+            `,
+            "code": `
+                var t = Test{
+                    .v = 4
+                }
+
+                assert(t.v == 4)
+            `,
+        },
+        {
+            "name": "Union Embedded Aliased",
+            "definitions": `
+
+                union Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.t.v == 4)
+            `,
+        },
+        {
+            "name": "Union Embedded Foreign Aliased ",
+            "definitions": `
+                @raw("""
+                    typedef union Test {
+                        int brett;
+                    } Test;
+                """);
+
+                @foreign
+                union Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.t.v == 4)
+            `,
+        },
+        {
+            "name": "Union Aliased with Using",
+            "definitions": `
+
+                union Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: using Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.v == 4)
+            `,
+        },
+        {
+            "name": "Union Embedded Foreign Aliased with Using",
+            "definitions": `
+                @raw("""
+                    typedef union Test {
+                        int brett;
+                    } Test;
+                """);
+
+                @foreign
+                union Test {
+                    @alias("brett")
+                    v: i32
+                }
+
+                struct X {
+                    t: using Test
+                }
+            `,
+            "code": `
+                var t = X{Test{
+                    .v = 4
+                }}
+
+                assert(t.v == 4)
+            `,
+        },
+
+    ]
+}
