@@ -153,6 +153,7 @@ public func IsPtrOf(type: *TypeInfo, kind: TypeKind) : bool {
     }
 }
 
+
 public func IsFuncLike(type: *TypeInfo) : bool {
     if(!type) {
         return false;
@@ -581,7 +582,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return true
         }
         case TypeKind.CHAR: {
-            return other.kind <= TypeKind.CHAR
+            return other.kind <= TypeKind.U32
         }
         case TypeKind.I8: {
             return other.kind <= TypeKind.I8
@@ -596,16 +597,20 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return other.kind <= TypeKind.U16
         }
         case TypeKind.I32: {
-            return other.kind <= TypeKind.I32
+            return other.kind <= TypeKind.I32 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.U32: {
-            return other.kind <= TypeKind.U32
+            return other.kind <= TypeKind.U32 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.I64: {
-            return other.kind <= TypeKind.I64
+            return other.kind <= TypeKind.I64 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.U64: {
-            return other.kind <= TypeKind.U64
+            return other.kind <= TypeKind.U64 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.F32: {
             return other.kind == TypeKind.F32 ||
@@ -632,10 +637,10 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             if(IsInteger(other)) {
                 return true
             }
-            return other.kind == TypeKind.STR ||
-                   IsPtrOf(other, TypeKind.CHAR)
+            return this.isDeclarable(other)
         }
         case TypeKind.ARRAY: {
+
             // Allow for pointer arithmetic
             if(IsInteger(other)) {
                 return true
@@ -739,7 +744,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             return other.kind == TypeKind.BOOL
         }
         case TypeKind.CHAR: {
-            return other.kind <= TypeKind.CHAR
+            return other.kind <= TypeKind.U32
         }
         case TypeKind.I8: {
             return other.kind <= TypeKind.I8
@@ -754,16 +759,20 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
             return other.kind <= TypeKind.U16
         }
         case TypeKind.I32: {
-            return other.kind <= TypeKind.I32
+            return other.kind <= TypeKind.I32 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.U32: {
-            return other.kind <= TypeKind.U32
+            return other.kind <= TypeKind.U32 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.I64: {
-            return other.kind <= TypeKind.I64
+            return other.kind <= TypeKind.I64 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.U64: {
-            return other.kind <= TypeKind.U64
+            return other.kind <= TypeKind.U64 ||
+                   other.kind == TypeKind.ENUM
         }
         case TypeKind.F32: {
             return other.kind == TypeKind.F32 ||
@@ -774,7 +783,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
                    other.kind == TypeKind.F64
         }
         case TypeKind.USIZE: {
-            return other.kind == TypeKind.USIZE ||
+            return other.kind <= TypeKind.USIZE ||
                    other.kind == TypeKind.NULL ||
                    IsPtrLike(other);
         }
@@ -786,17 +795,32 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
         }
 
         case TypeKind.STR: {
-            return other.kind == TypeKind.STR ||
-                   IsPtrOf(other, TypeKind.CHAR)
+            if(IsPtr(other)) {
+                var otherPtr = other as (*PtrTypeInfo)
+                if(otherPtr.ptrOf.kind == TypeKind.CONST) {
+                    var constOf = otherPtr.ptrOf as (*ConstTypeInfo)
+                    return constOf.constOf.kind == TypeKind.CHAR
+                }
+                return otherPtr.ptrOf.kind == TypeKind.CHAR
+            }
+            return other.kind == TypeKind.STR
         }
         case TypeKind.ARRAY: {
             var thisArray = this as (*ArrayTypeInfo)
             if(other.kind == TypeKind.STR) {
-                if(thisArray.arrayOf.kind != TypeKind.CHAR) {
+                if(thisArray.arrayOf.kind == TypeKind.CONST) {
+                    return IsPtrOf(thisArray.arrayOf, TypeKind.CHAR)
+                }
+                if(!IsPtrOf(thisArray, TypeKind.CHAR)) {
                     return false
                 }
 
                 return true
+            }
+
+            if(other.kind == TypeKind.PTR) {
+                var otherPtr = other as (*PtrTypeInfo)
+                return thisArray.arrayOf.isDeclarable(otherPtr.ptrOf)
             }
 
             if(other.kind != TypeKind.ARRAY) {
@@ -1048,12 +1072,16 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo) : bool {
         }
         // TODO
         case TypeKind.STR: {
+            if(IsPtrLike(castTo)) {
+                return true
+            }
             return this.isDeclarable(castTo)
         }
         case TypeKind.ARRAY: {
-            return this.isDeclarable(castTo)
+            return IsPtrLike(castTo)
         }
         case TypeKind.PTR: {
+
             if(castTo.kind == TypeKind.PTR) {
                 return true
             }
@@ -1224,13 +1252,11 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
 public func (this: *FuncTypeInfo) asPtr(allocator: *const Allocator) : *FuncPtrTypeInfo {
     var genericParams = ArrayInit<GenericParam>(this.decl.genericParams.size(), allocator)
     genericParams.addAll(this.decl.genericParams)
-
     var paramDecls = ArrayInit<*TypeInfo>(this.decl.params.size(), allocator)
     for(var i = 0; i < this.decl.params.size() ; i += 1) {
         var p = this.decl.params.get(i)
         paramDecls.add(p.typeInfo)
     }
-
     return NewFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.decl.flags & FuncFlags.HAS_VARARGS, allocator)
 }
 
@@ -1337,7 +1363,7 @@ err:
 Gets the first field of the supplied type.  This should only be used for finding 'using'
 fields to match against and the supplied type should be an aggregate (i.e., not a pointer)
 """)
-public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) : FieldStmt {
+public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo, isParent: bool = true) : FieldStmt {
     assert(this != null)
 
     var isGenericCapable = type.sym.isGenericCapable()
@@ -1347,6 +1373,12 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) 
 
         if(!IsAggregateLike(field.typeInfo)) {
             continue
+        }
+
+        if(isParent && field.kind == StmtKind.VAR_FIELD_DECL) {
+            if(!field.varField.attributes.isUsing) {
+                continue
+            }
         }
 
         var fieldBaseType = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
@@ -1376,7 +1408,7 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo) 
                 // should be looked at for matching
                 if(aggField.name.type == TokenType.VOID) {
                     var aggType = aggField.sym.type as (*AggregateTypeInfo)
-                    return aggType.getFieldByType(type)
+                    return aggType.getFieldByType(type, false)
                 }
                 break;
             }

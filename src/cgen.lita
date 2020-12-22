@@ -884,8 +884,42 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
         }
     }
     else if(strncmp(note.name.str.buffer, "cFile", note.name.str.length) == 0) {
-        // TODO
-        assert(false)
+        const BUFFER_SIZE = 1024*10;
+        var filename = [MAX_PATH]char {0};
+        var filenameStr = StringInit(filename, MAX_PATH)
+        var filedata = [BUFFER_SIZE]char{0};
+
+        for(var i = 0; i < note.attributes.size(); i += 1) {
+            var arg = note.attributes.get(i)
+            FilePath(note.startPos.filename, filename)
+
+            filenameStr.adjust()
+            filenameStr.append("/%.*s", arg.str.length, arg.str.buffer)
+            if(!FileExists(filenameStr.cStr())) {
+                // TODO:
+                //      check relative to source directory
+                //      check working directory
+                //      check lib directory
+                //printf("FilePath: '%s'\n", filename)
+                this.result.addError(note.startPos, "unable to locate file: '%.*s'", arg.str.length, arg.str.buffer)
+                continue;
+            }
+
+            var file = fopen(filename, "r");
+            defer if(file) fclose(file)
+
+            if(!file) {
+                this.result.addError(note.startPos, "unable to open file: '%.*s'", filename)
+                continue;
+            }
+
+            var bytesRead = 0_i64;
+            do {
+                bytesRead = fread(filedata, 1, BUFFER_SIZE, file)
+                this.buf.append("%.*s", bytesRead, filedata)
+            }
+            while(bytesRead > 0);
+        }
     }
 }
 

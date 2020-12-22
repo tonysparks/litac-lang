@@ -7,6 +7,7 @@ import "io"
 import "array"
 import "mem"
 import "string_buffer"
+import "string"
 import "../src/system"
 import "../src/lita"
 import "../src/phase_result"
@@ -27,10 +28,16 @@ struct TestSuite {
     tests: Array<Test>
 }
 
+struct TestModule {
+    name: *const char
+    code: *const char
+}
+
 struct Test {
     programText: StringBuffer
     name: *const char
 
+    modules: Array<TestModule>
     //definitions: *const char
     //code: *const char
     disabled: bool
@@ -52,6 +59,9 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
+        "../test/tests/using.json",
+        "../test/tests/notes.json",
+        "../test/tests/foreign_type.json",
         "../test/tests/arena.json",
         "../test/tests/alias.json",
         "../test/tests/enums.json",
@@ -221,7 +231,22 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
     output.expectedOutput = testNode.getStr("output", null)
     output.expectedErrorOutput = testNode.getStr("error", null)
     output.disabled = testNode.getBool("disabled", false)
+    var modules = testNode.getArray("modules")
+    if(modules) {
+        output.modules.init(modules.size(), testHarness.allocator)
+        for(var i = 0; i < modules.size(); i += 1) {
+            var module = modules.at(i)
+            var m = TestModule {
+                .name = module.getStr("name", ""),
+                .code = module.getStr("program", "")
+            }
+            output.modules.add(m)
+        }
 
+    }
+    else {
+        output.modules.length = 0
+    }
     return output
 }
 
@@ -230,8 +255,20 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
 
     var tmpSrcFile = "test_output/lita_test.lita"
     Mkdir("test_output")
+
     if(WriteFile(tmpSrcFile, test.programText.cStrConst(), test.programText.length) != FileStatus.Ok) {
         return TestResult.LOADING_ERROR
+    }
+
+    var moduleFilename = [260]char {};
+    var moduleFilenameStr = StringInit(moduleFilename, 260)
+    for(var i = 0; i < test.modules.size(); i += 1) {
+        var m = test.modules.get(i)
+        moduleFilenameStr.clear()
+        moduleFilenameStr.format("test_output/%s.lita", m.name)
+        if(WriteFile(moduleFilenameStr.cStr(), m.code, strlen(m.code)) != FileStatus.Ok) {
+            return TestResult.LOADING_ERROR
+        }
     }
 
     var options = LitaOptions{}
@@ -324,6 +361,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuffer) : *const char {
     sb.append(" && %s 2>&1", &this.binaryFilename[len + 1])
 
     var process = SystemExec(sb.cStr())
+    defer process.close()
 
     sb.clear()
 

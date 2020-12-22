@@ -1,0 +1,761 @@
+{
+    "description": "Using",
+    "disabled": false,
+    "disableLines": true,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+		{
+            "name": "Using in struct",
+            "definitions": `
+                struct Child {
+                    b: i32
+                }
+
+                struct Parent {
+                    child: using Child
+                    a: f32
+                }
+
+
+            `,
+            "code": `
+                // TODO Allow for constructors to use using
+                // var p = Parent {.b = 4, .a = 4.4}
+                var p = Parent {.child = Child{4}, .a = 4.4f}
+                assert(p.b == 4)
+                assert(p.child.b == 4)
+                assert(p.a == 4.4f)
+
+            `
+        },
+        {
+            "name": "Using in func param",
+            "definitions": `
+                struct Child {
+                    b: i32
+                }
+
+                struct Parent {
+                    child: using Child
+                    a: f32
+                }
+
+                func test(p: using Parent) : i32 {
+                    return p.b
+                }
+
+
+            `,
+            "code": `
+                var p = Parent {.child = Child{4}, .a = 4.4f}
+                assert(test(p) == 4)
+
+            `
+        },
+        {
+            "name": "Using in method func param",
+            "definitions": `
+                struct Child {
+                    b: i32
+                }
+
+                struct Parent {
+                    child: using Child
+                    a: f32
+                }
+
+                func (p: using Parent) test() : i32 {
+                    return p.b
+                }
+
+                func (p: using *Parent) test2() : i32 {
+                    return p.b
+                }
+            `,
+            "code": `
+                // TODO Allow for constructors to use using
+                // var p = Parent {.b = 4, .a = 4.4f}
+                var p = Parent {.child = Child{4}, .a = 4.4f}
+                assert(p.test() == 4)
+                assert(p.test2() == 4)
+            `
+        },
+        {
+            "name": "Using in struct child in different module",
+            "modules": [
+                {
+                    "name": "child",
+                    "program": `
+                        public struct Child {
+                            b: i32
+                        }
+                    `
+                },
+            ],
+            "definitions": `
+                import "child"
+
+                struct Parent {
+                    child: using Child
+                    a: f32
+                }
+            `,
+            "code": `
+                // TODO Allow for constructors to use using
+                // var p = Parent {.b = 4, .a = 4.4}
+                var p = Parent {.child = Child{4}, .a = 4.4f}
+                assert(p.b == 4)
+                assert(p.child.b == 4)
+                assert(p.a == 4.4f)
+            `,
+        },
+        {
+            "name": "Using in struct child in different module two layers",
+            "modules": [
+                {
+                    "name": "child",
+                    "program": `
+                        public struct Child {
+                            b: i32
+                        }
+
+                        public struct GrandChild {
+                            child: using Child
+                            c: i32
+                        }
+                    `
+                },
+            ],
+            "definitions": `
+                import "child"
+
+                struct Parent {
+                    grand: using GrandChild
+                    a: f32
+                }
+            `,
+            "code": `
+                // TODO Allow for constructors to use using
+                // var p = Parent {.b = 4, .a = 4.4}
+                var p = Parent {.grand = GrandChild{.child = Child{4}, .c = 64}, .a = 4.4f}
+                assert(p.b == 4)
+                assert(p.c == 64)
+                assert(p.grand.c == 64)
+                assert(p.grand.b == 4)
+                assert(p.grand.child.b == 4)
+                assert(p.a == 4.4f)
+            `,
+        },
+        {
+            "name": "Using in struct with generics",
+            "definitions": `
+                struct Child<T> {
+                    b: T
+                }
+
+                struct Parent<T> {
+                    child: using Child<T>
+                    a: f32
+                }
+
+
+            `,
+            "code": `
+                var p = Parent {.child = Child{4}, .a = 4.4f}
+                assert(p.b == 4)
+                assert(p.child.b == 4)
+                assert(p.a == 4.4f)
+            `
+        },
+        {
+            "name": "Struct Using Function",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: *EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using EntityBase
+                }
+            `,
+            "code": `
+                var unit = Unit {
+                    .base = EntityBase {.health = 100}
+                }
+                var i = unit.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function x2",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: *EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+            `,
+            "code": `
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = EntityBase {.health = 100}
+                    }
+                }
+
+                var i = heavy.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function x2 with pointer",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: *EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = heavy.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function with pointer",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: *EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var unit = Unit {
+                    .base = &base
+                }
+                var i = unit.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function with pointer dereference",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var unit = Unit {
+                    .base = &base
+                }
+                var i = unit.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function x2 with pointer dereference",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = heavy.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function partial with pointer dereference",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var unit = Unit {
+                    .base = &base
+                }
+                var i = unit.base.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function x2 partial with pointer dereference",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = heavy.base.getHealth()
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Struct Using Function x2 none with pointer dereference",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+                func (e: EntityBase) getHealth() : i32 {
+                    return e.health
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = heavy.getHealth()
+                assert(i == 100)
+
+                i = heavy.base.getHealth()
+                assert(i == 100)
+
+                i = heavy.unit.base.getHealth()
+                assert(i == 100)
+            `,
+        },
+
+
+        {
+            "name": "Func with type with using as parameter",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+
+                func GetHealth(e: EntityBase) : i32 {
+                    return e.health
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = GetHealth(heavy)
+                assert(i == 100)
+
+                i = GetHealth(heavy.base)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit.base)
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Func with type with using as parameter and using parameter",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+
+                func GetHealth(e: using EntityBase) : i32 {
+                    return health
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = GetHealth(heavy)
+                assert(i == 100)
+
+                i = GetHealth(heavy.base)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit.base)
+                assert(i == 100)
+            `,
+        },
+
+        {
+            "name": "Func with type with using as parameter and using parameter and generic inference",
+            "definitions": `
+                struct EntityBase<T> {
+                    health: T
+                }
+
+                struct Unit<T> {
+                    base: using *EntityBase<T>
+                }
+
+                struct HeavyUnit<T> {
+                    unit: using Unit<T>
+                }
+
+                func GetHealth<T>(e: using EntityBase<T>) : T {
+                    return health
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = GetHealth(heavy)
+                assert(i == 100)
+
+                i = GetHealth(heavy.base)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit.base)
+                assert(i == 100)
+            `,
+        },
+
+
+
+
+
+
+
+
+
+        {
+            "name": "Func with type ptr with using as parameter",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+
+                func GetHealth(e: *EntityBase) : i32 {
+                    return e.health
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = GetHealth(heavy)
+                assert(i == 100)
+
+                i = GetHealth(heavy.base)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit.base)
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Func with type ptr with using as parameter and using parameter",
+            "definitions": `
+                struct EntityBase {
+                    health: i32
+                }
+
+                struct Unit {
+                    base: using *EntityBase
+                }
+
+                struct HeavyUnit {
+                    unit: using Unit
+                }
+
+                func GetHealth(e: using *EntityBase) : i32 {
+                    return health
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = GetHealth(heavy)
+                assert(i == 100)
+
+                i = GetHealth(heavy.base)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit.base)
+                assert(i == 100)
+            `,
+        },
+
+        {
+            "name": "Func with type ptr with using as parameter and using parameter and generic inference",
+            "definitions": `
+                struct EntityBase<T> {
+                    health: T
+                }
+
+                struct Unit<T> {
+                    base: using *EntityBase<T>
+                }
+
+                struct HeavyUnit<T> {
+                    unit: using Unit<T>
+                }
+
+                func GetHealth<T>(e: using *EntityBase<T>) : T {
+                    return health
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = GetHealth(heavy)
+                assert(i == 100)
+
+                i = GetHealth(heavy.base)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit.base)
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Func with type ptr with using as parameter and using parameter and generic inference with varargs",
+            "definitions": `
+                struct EntityBase<T> {
+                    health: T
+                }
+
+                struct Unit<T> {
+                    base: using *EntityBase<T>
+                }
+
+                struct HeavyUnit<T> {
+                    unit: using Unit<T>
+                }
+
+                func GetHealth<T>(e: using *EntityBase<T>, ...) : T {
+                    return health
+                }
+            `,
+            "code": `
+                var base = EntityBase {.health = 100}
+                var heavy = HeavyUnit {
+                    .unit = Unit {
+                        .base = &base
+                    }
+                }
+
+                var i = GetHealth(heavy, 1, 2)
+                assert(i == 100)
+
+                i = GetHealth(heavy.base, 1, 2)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit, 1, 2)
+                assert(i == 100)
+
+                i = GetHealth(heavy.unit.base, 1, 2)
+                assert(i == 100)
+            `,
+        },
+        {
+            "name": "Using Bug",
+            "definitions": `
+                struct ArrayInitExpr {
+                    expr: using Expr
+                }
+
+                struct Expr {
+                    stmt: using Stmt
+                    operand: Operand
+                    type: *TypeInfo
+                }
+
+                struct Stmt {
+                    node: using Node
+                }
+
+                struct Node {
+                    kind: i32
+                }
+
+                struct Operand {
+                    stuff: bool
+                }
+
+                struct TypeInfo {
+                    kind: i32
+                }
+            `,
+            "code": `
+                var type = TypeInfo {.kind = 4}
+                var init = &ArrayInitExpr {
+                }
+                init.expr.stmt = Stmt {
+                    .node = Node{.kind = 12}
+                }
+                init.expr.type = &type
+
+                assert(init.kind == 12)
+            `,
+        },
+
+    ]
+}

@@ -1,8 +1,66 @@
 import "assert"
 
-import "string_buffer"
-//import "libc"
+import "test_module"
+//import "string_buffer"
+import "libc"
+/*
+@asStr
+enum Status {
+    OK = (1<<0)
+}
+const MAXZ =16
+func test(result: [MAXZ]char) {
+    for(var i = 0; i < MAXZ; i+=1) {
+        printf("%c", result[i])
+    }
+    printf("\n'%s'", result)
+}*/
+
+enum State {
+    EMPTY = 0,
+    PENDING  = 1,
+    RESOLVED = 2,
+}
+
+struct Dependency {
+    state: State = State.PENDING
+ }
+
+//func test(a: [2]const char) {
+//}
+
+struct Bucket<T> {
+    bucket: *T
+}
+
+func (this: *Bucket<T>) add<T>(a: T) {
+
+}
 
 func main(len:i32, args:**char) : i32 {
-    var sb = StringBufferInit(1024)
+   // var string = []char { 'h', 'i', '\0'} as (*const char)
+    var buckets = Bucket<Bucket<i32>>{}
+    var ok = Bucket<i32>{}
+    buckets.add(ok)
+
+  //var string = "ab" as (*char)
+  //test(string)
+
+  //  var sb = StringBufferInit(1024)
+    //var s : Status = Status.OK
+  //  var a : i32 = s as (i32)
+
+  //var string: *const char = "hello"
+   // var x = false ? "" : string
+
+  //  var str: *char = "hi" as (i32)
+
+//var size: usize = 1024 * 1024 * 1000;
+
+ //var funcName = [20]char {0};
+   // test(str)
+  // printf("%s\n", StatusAsStr(Status.OK))
+   //printf("%s\n", SomeEnumAsStr(SomeEnum.BRETT))
+
+
 }

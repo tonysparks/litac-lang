@@ -55,7 +55,7 @@ func stat(filename: *const char, s: *FileStat) : i32;
 func CreateDirectoryA(pathname: *const char, attr: *void) : bool;
 
 @foreign
-func QueryPerformanceFrequency(freq: *LARGE_INTEGER);
+func QueryPerformanceFrequency(freq: *LARGE_INTEGER) : bool;
 
 @foreign
 func QueryPerformanceCounter(time: *LARGE_INTEGER);
@@ -167,5 +167,9 @@ public func SystemExec(command: *const char) : Process {
     return Process{
         .pipe = pipe
     }
+}
+
+public func (this: *Process) close() {
+    if(this.pipe) pclose(this.pipe)
 }
 

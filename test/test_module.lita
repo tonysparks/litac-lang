@@ -12,6 +12,12 @@ struct StructB {
     b: i32
 }
 
+@asStr
+public enum SomeEnum {
+    BRETT,
+    FAVRE
+}
+
 public func functionA() : i32 {
     return 4
 }

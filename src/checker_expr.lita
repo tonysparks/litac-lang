@@ -184,8 +184,16 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
         return expr
     }
 
+
     var source = sourceType.getBaseType() as (*AggregateTypeInfo)
     var target = targetType.getBaseType() as (*AggregateTypeInfo)
+
+    // if this is a generic template, see if their generic types match
+    if(targetType.sym && targetType.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+        if(source.genericTypeid == target.genericTypeid) {
+            return expr
+        }
+    }
 
     if(source.typeid == target.typeid) {
         return expr
@@ -225,7 +233,6 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
 func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
                                          funcPtr: *FuncPtrTypeInfo,
                                          suppliedArgs: *Array<*Expr>) : bool {
-
 
     for(var i = 0; i < funcPtr.paramDecls.size() && i < suppliedArgs.size(); i += 1) {
         var argExpr = suppliedArgs.get(i)
@@ -329,6 +336,7 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
         var genericArgs = paramType.sym.genericArgs
         for(; index < genericArgs.size(); index += 1) {
             var arg = genericArgs.get(index)
+
             if(name.str.equals(arg.name)) {
                 break;
             }
@@ -1405,7 +1413,7 @@ func (this: *TypeChecker) resolveCastExpr(expr: *CastExpr) : bool {
 
     expr.operand.typeInfo = typeInfo
 
-    if(!this.checkCastability(expr.startPos, typeInfo, expr.exprToCast.operand.typeInfo)) {
+    if(!this.checkCastability(expr.startPos, expr.exprToCast.operand.typeInfo, typeInfo)) {
         return false
     }
 

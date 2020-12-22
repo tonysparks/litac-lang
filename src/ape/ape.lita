@@ -363,8 +363,8 @@ public func ape_traceback_get_function_name(p0: *const ape_traceback_t, p1: i32)
 
 
 @foreign("APE_CALL")
-public func ape_callx(ape: *ape_t, name: *const char, ...);
+public func ape_callx(ape: *ape_t, name: *const char, ...) : bool;
 
 
 @foreign("APE_CHECK_ARGS")
-public func ape_check_argsx(ape: *ape_t, errors: bool, argc: i32, args: *ape_object_t, ...);
+public func ape_check_argsx(ape: *ape_t, errors: bool, argc: i32, args: *ape_object_t, ...) : bool;

@@ -350,6 +350,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             for(var i = 0; i < funcDecl.params.size(); i+=1) {
                 var param = funcDecl.params.get(i)
                 param.type = template.replaceTypeSpec(param.type)
+
                 if(param.defaultExpr) {
                     ReplaceTypes(template, param.defaultExpr)
                 }

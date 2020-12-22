@@ -134,9 +134,9 @@ func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeIn
     if(!a.canCastTo(b)) {
         var sb = StringBufferInit(256, this.allocator)
         sb.append("'")
-        b.toString(sb)
-        sb.append("' can't be casted to '")
         a.toString(sb)
+        sb.append("' can't be casted to '")
+        b.toString(sb)
         sb.append("'")
 
         this.result.addErrorStr(src, sb)
@@ -238,7 +238,7 @@ func (this: *TypeChecker) leaveModule() {
     }
 }
 
-func (this: *TypeChecker) currentScope() : *Scope {
+public func (this: *TypeChecker) currentScope() : *Scope {
     return this.current.currentScope
 }
 

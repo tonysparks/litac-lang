@@ -23,4 +23,5 @@ bin/litac_tests.lib
 bin/output/*.c
 bin/output/*.exe
 bin/output/*.pdb
+bin/output/**
 vstudio/**

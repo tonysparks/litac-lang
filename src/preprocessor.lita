@@ -556,7 +556,16 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
 
             for(var i = 0; i < stmts.declarations.size(); i += 1) {
                 var decl = stmts.declarations.get(i)
-                context.checker.createDeclSymbol(decl)
+                var sym = context.checker.createDeclSymbol(decl)
+
+                // make sure every import of this module's symbol
+                // has the new symbol we just created
+                if(sym) {
+                    for(var i = 0; i < module.importedBy.size(); i += 1) {
+                        var imp = module.importedBy.get(i)
+                        imp.module.importModuleSymbol(module, imp.alias, sym, sym.name)
+                    }
+                }
             }
         }
     }

@@ -89,7 +89,7 @@ public func NewForeignTypeInfo(sym: *Symbol,
                                allocator: *const Allocator) : *TypeInfo {
 
     var type = new<TypeInfo>(allocator)
-    type.kind = TypeKind.VOID
+    type.kind = TypeKind.I64 // TODO: Create a foreign primitive type?
     type.typeid = NextTypeId()
     type.name = sym.name
     type.sym = sym
