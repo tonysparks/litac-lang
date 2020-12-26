@@ -1,0 +1,305 @@
+import "lita"
+import "mem"
+import "string_buffer"
+import "string"
+import "json"
+import "libc"
+import "map"
+import "system"
+import "phase_result"
+import "array"
+import "lsp/workspace"
+
+const IN_BUFFER_SIZE = 1024 * 1024 * 2
+const VERSION = "0.12" // TODO: read from a file at compile time; share with lita.main
+
+public struct LspServer {
+    requestAllocator: LinearAllocator
+    applicationAllocator: LinearAllocator
+
+    lita: *Lita
+    message: StringBuffer
+    output: StringBuffer
+
+    isInitialized: bool
+    isRunning: bool
+
+    workspace: Workspace
+
+    logFile: *FILE
+}
+
+public func (this: *LspServer) init(lita: *Lita) {
+    this.lita = lita
+    this.isRunning = false
+    this.isInitialized = false
+
+    this.logFile = fopen("lsp1.log", "w")
+    if(!this.logFile) {
+        printf("Couldn't open log file!\n")
+    }
+
+    var size: usize = 1024 * 1024 * 100;
+    this.requestAllocator.init(defaultAllocator.alloc(size), size)
+    this.applicationAllocator.init(defaultAllocator.alloc(size), size)
+
+    this.message = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
+    this.output = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
+
+    this.workspace.init(this, this.appAlloc())
+}
+
+
+public func (this: *LspServer) requestAlloc() : *const Allocator {
+    return (&this.requestAllocator) as (*const Allocator)
+}
+
+
+public func (this: *LspServer) appAlloc() : *const Allocator {
+    return (&this.applicationAllocator) as (*const Allocator)
+}
+
+public func (this: *LspServer) free() {
+    if(this.applicationAllocator.mem) {
+        defaultAllocator.free(this.applicationAllocator.mem)
+    }
+    if(this.requestAllocator.mem) {
+        defaultAllocator.free(this.requestAllocator.mem)
+    }
+    this.message.free()
+    this.output.free()
+
+    if(this.logFile) {
+        fclose(this.logFile)
+    }
+}
+
+
+public func (this: *LspServer) start() {
+    this.log("starting Lita Language Server v%s\n", VERSION)
+    defer this.log("terminating Lita Language Server\n")
+
+    this.isRunning = true
+    while(this.isRunning) {
+        this.readMessage()
+    }
+}
+
+public func (this: *LspServer) log(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    vfprintf(this.logFile, format, args);
+    //vfprintf(stdout, format, args)
+    //fprintf(stdout, "\n")
+    va_end(args);
+    //fputs("\n", this.logFile);
+    fflush(this.logFile)
+}
+
+public func (this: *LspServer) readMessage() {
+    this.message.clear()
+
+    var contentSize = [17]char{0};
+    var size = 0_i32
+
+    fscanf(stdin, "%16s %d\r\n\r\n", contentSize, &size)
+    if(strnlen(contentSize, 17) == 0) {
+        return;
+    }
+
+    // free memory
+    defer this.requestAllocator.currentOffset = 0
+
+    this.log("Received Content Header: '%s'\n", contentSize)
+
+    if(strncmp(contentSize, "Content-Length:", 16) != 0) {
+        this.log("error reading 'Content-Length', found '%s'", contentSize)
+        this.writeErrorResponse(0, "error reading 'Content-Length'")
+        return;
+    }
+    // TODO: Support Content-Type header
+
+    this.log("Received message size: %d\n", size)
+
+    this.message.reserve(size)
+
+    // Read content-size
+    var bytesRead = fread(this.message.buffer, 1, size, stdin)
+    this.log("Received %d bytes from fread\n", bytesRead)
+
+    if(bytesRead != size) {
+        this.log("message received size of %d did not match Content-Length: %d\n", bytesRead, size)
+        this.writeErrorResponse(0, "message received size did not match content-length")
+        return;
+    }
+
+    this.message.length = size
+    this.log("Received message: '%.*s'\n", size, this.message.buffer)
+
+    var parser = ParserInit(this.requestAlloc())
+    defer parser.free()
+
+    var json = parser.parseJson(this.message.cStr())
+    if(parser.hasError()) {
+        this.log("json parsing error: %s\n", parser.errorMsg)
+        return;
+    }
+
+    this.handleMessage(json)
+}
+
+public func (this: *LspServer) handleMessage(msg: *JsonNode) {
+    var method = msg.getStr("method", null)
+    if(!method) {
+        this.writeErrorResponse(0, "no method defined")
+        return;
+    }
+
+    var params = msg.getObject("params")
+    if(strcmp(method, "initialize") == 0) {
+        this.handleInitializeMessage(msg, params)
+    }
+    else if(strcmp(method, "initialized") == 0) {
+        this.isInitialized = true
+    }
+    else if(!this.isInitialized) {
+        this.writeErrorResponse(0, "no yet properly initialized")
+    }
+    else if(strcmp(method, "textDocument/didOpen") == 0) {
+        this.handleTextDocumentOpenMessage(msg, params)
+    }
+    else {
+        this.writeErrorResponse(0, "unsupported params: %s", params)
+    }
+}
+
+public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *JsonNode) {
+    var rootPath = params.getStr("rootPath", "")
+    var rootUri = params.getStr("rootUri", "")
+    this.log("Root Path = '%s'\n", rootPath)
+
+    var path = [MAX_PATH]char{0}
+    UriToFilePath(rootUri, path)
+
+    this.log("Root Uri = '%s' as path: '%s'\n", rootUri, path)
+
+    this.workspace.setup(rootPath, path)
+
+    var capabilities = """
+    {
+        "capabilities": {
+            "textDocumentSync": 2,
+            "definitionProvider": true,
+            "documentSymbolProvider": true,
+            "workspaceSymbolProvider": true,
+            "referencesProvider": true,
+            "completionProvider": {
+                "resolveProvider": true,
+                "triggerCharacters": [
+                    "."
+                ]
+            }
+        }
+    }
+    """
+    var parser = ParserInit(this.requestAlloc())
+    var resp = CreateJsonObject(this.requestAlloc())
+    resp.put("result", parser.parseJson(capabilities))
+
+    this.writeResponse(msg.getInt("id"), resp)
+}
+
+
+public func (this: *LspServer) handleTextDocumentOpenMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    this.workspace.openDocument(uri, textDoc.getStr("text", null))
+    this.writeDiagnostic(uri)
+}
+
+public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
+    var result = this.workspace.runDiagnostics(this.requestAlloc())
+
+    var params = CreateJsonObject(this.requestAlloc())
+    params.putStr("uri", docUri)
+    var diagnostics = CreateJsonArray(this.requestAlloc())
+    params.put("diagnostics", diagnostics)
+
+    var resp = CreateJsonObject(this.requestAlloc())
+    resp.putStr("method", "textDocument/publishDiagnostics")
+    resp.put("params", params)
+
+    var output = [MAX_PATH]char{0}
+    var filename = UriToFilePath(docUri, output)
+
+    if(!result.errors.empty()) {
+        for(var i = 0; i < result.errors.size(); i += 1) {
+            var error =  result.errors.get(i)
+            printf("")
+        }
+    }
+}
+
+public func (this: *LspServer) writeErrorResponse(id: u64, format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    var sb = StringBufferInit(512, this.requestAlloc())
+    sb.appendArgs(format, args)
+    va_end(args);
+
+
+    var error = CreateJsonObject(this.requestAlloc())
+    error.putStr("message", sb.cStr())
+
+    var resp = CreateJsonObject(this.requestAlloc())
+    resp.put("error", error)
+
+    this.writeResponse(id, resp)
+}
+
+public func (this: *LspServer) writeResponse(id: u64, msg: *JsonNode) {
+    this.output.clear()
+
+    msg.putStr("jsonrpc", "2.0")
+    if(id > -1) {
+        msg.putNumber("id", id as (f64))
+    }
+
+    var header = [256]char{0};
+    var headerStr = StringInit(header, 256)
+
+    var jsonStr = msg.print(this.output)
+    var length = this.output.length
+
+    this.log("Sending: %d '%.*s'\n", length, this.output.length, this.output.buffer)
+
+    headerStr.append("Content-Length: %d\r\n\r\n", length + 1)
+    fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)
+    fwrite(this.output.buffer, sizeof(:char), length, stdout)
+    fwrite("\n" as (*const void), sizeof(:char), 1, stdout)
+    fflush(stdout)
+}
+
+
+/*
+@test
+public func test() {
+    var server = LspServer{}
+    var lita = Lita{}
+    server.init(&lita)
+
+    server.readMessage()
+}
+
+public struct Param {
+
+}
+
+public struct JrpcMessage {
+    method: *const char
+    params: *
+}*/

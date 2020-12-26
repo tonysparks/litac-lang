@@ -19,6 +19,7 @@ import "string_view"
 import "string_buffer"
 import "checker"
 import "cgen"
+import "lsp/lsp"
 import "cmdline"
 
 func main(len: i32, args: **char) : i32 {
@@ -33,6 +34,16 @@ func main(len: i32, args: **char) : i32 {
     var lita = Lita{}
     lita.init(&options)
     defer lita.free()
+
+    if(options.languageServer) {
+        var server = LspServer{}
+        server.init(&lita)
+        defer server.free()
+
+        server.start()
+
+        return 0;
+    }
 
     var root = lita.parse()
     if(!root) {
@@ -125,13 +136,21 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
         goto err_print;
     }
 
-    if(parser.args.size() < 2) {
-        printf("Missing input file\n")
-        goto err;
+    options.languageServer = parser.hasOption("languageServer")
+
+    if(!options.languageServer) {
+        if(parser.args.size() < 2) {
+            printf("Missing input file\n")
+            goto err;
+        }
+
+        strncpy(options.inputFile, parser.args.get(1), MAX_PATH)
     }
 
-    strncpy(options.inputFile, parser.args.get(1), MAX_PATH)
-    strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
+    var lib:*const char = GetEnv("LITAC_HOME")
+    if(!lib) lib = "";
+
+    strncpy(options.litaPath, lib, MAX_PATH)
 
     if(parser.hasOption("help")) {
         var sb = StringBufferInit()

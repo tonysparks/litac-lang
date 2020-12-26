@@ -1,0 +1,76 @@
+import "libc"
+import "array"
+import "map"
+import "json"
+import "string_buffer"
+import "string"
+import "mem"
+import "system"
+import "lita"
+import "phase_result"
+import "lsp/lsp"
+
+public struct Workspace {
+    allocator: *const Allocator
+    lsp: *LspServer
+    rootPath: *const char
+    openedDocuments: Map<*const char, *TextDocument>
+}
+
+public struct TextDocument {
+    text: StringBuffer
+}
+
+public func (this: *Workspace) init(lsp: *LspServer, alloc: *const Allocator) {
+    this.allocator = alloc
+    this.lsp = lsp
+    this.openedDocuments = StrMap<*TextDocument>(null, 64, this.allocator)
+}
+
+public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char) {
+    this.rootPath = rootPath
+    var lita = this.lsp.lita
+
+    var filepath = [MAX_PATH]char{0};
+    var pathStr = StringInit(filepath, MAX_PATH);
+
+    pathStr.format("%s/src/main.lita", rootPath)
+    if(FileExists(pathStr.cStrConst())) {
+        strncpy(lita.options.inputFile, pathStr.cStr(), MAX_PATH)
+        FilePath(lita.options.inputFile, lita.options.srcPath)
+        return;
+    }
+
+    // TODO: Inspect the URI
+    this.lsp.log("Unable to find main.lita from '%s'\n", rootPath)
+}
+
+public func (this: *Workspace) openDocument(uri: *const char, text: *const char) {
+    if(!uri) return;
+
+    var moduleUri = StringCopy(uri, -1, this.allocator)
+
+    var doc = new<TextDocument>(this.allocator)
+    doc.text = StringBufferInit(strlen(text), this.allocator)
+    doc.text.append("%s", text)
+
+    this.openedDocuments.put(moduleUri, doc)
+}
+
+public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseResult {
+    var lita = this.lsp.lita
+    lita.linearAllocator.currentOffset = 0
+
+    var root = lita.parse()
+    if(!root) {
+        goto report
+    }
+
+    if(!lita.typeCheck(root)) {
+        goto report
+    }
+
+report:
+
+    return &lita.result
+}

@@ -3,6 +3,8 @@ bin/*.exe
 bin/*.json
 bin/*.pdb
 bin/*.rdbg
+bin/*.exp
+bin/*.lib
 bin/test.txt
 lib/*.lib
 .vscode/ipch
@@ -25,3 +27,4 @@ bin/output/*.exe
 bin/output/*.pdb
 bin/output/**
 vstudio/**
+*.log

@@ -73,6 +73,7 @@ public struct LitaOptions {
     cOutputOnly: bool              // generates C file only, does not compile it
     run: bool                      // runs after successful compilation
     showProfileInfo: bool          // outputs profiling information
+    languageServer: bool           // if this should launch the language server
 
     cPrefix: [MAX_PREFIX_SIZE]char // Prefix for types/variables defined in C
 }

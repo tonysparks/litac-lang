@@ -19,6 +19,9 @@ typedef struct tm tm;
 """);
 
 import "libc"
+import "assert"
+import "string"
+import "string_view"
 
 @foreign
 public const MAX_PATH: i32;
@@ -55,6 +58,9 @@ func stat(filename: *const char, s: *FileStat) : i32;
 func CreateDirectoryA(pathname: *const char, attr: *void) : bool;
 
 @foreign
+func GetCurrentDirectory(len: i32, buffer: *char): i32;
+
+@foreign
 func QueryPerformanceFrequency(freq: *LARGE_INTEGER) : bool;
 
 @foreign
@@ -85,6 +91,12 @@ public func GetEnv(varName: *const char) : *char {
     return getenv(varName)
 }
 
+public func CurrentWorkingPath() : *const char {
+    @static var path: [MAX_PATH]char;
+    GetCurrentDirectory(MAX_PATH, path)
+    return path;
+
+}
 public func FileExists(filename: *const char) : bool {
     var s: FileStat;
     return stat(filename, &s) == 0
@@ -116,6 +128,186 @@ end:
     return out
 }
 
+
+func strcicmp(a: *const char, b: *const char) : i32 {
+    if(a==b) return 0;
+    if(!a && b) return -1;
+    if(a && !b) return 1;
+
+    for (;;) {
+        var ac = *a
+        var bc = *b
+
+        if(!ac && bc)  return -1;
+        if(ac && !bc)  return 1;
+        if(!ac && !bc) return 0;
+
+        var d = tolower(ac) - tolower(bc);
+        if (d != 0) {
+            return d;
+        }
+        a+=1
+        b+=1
+    }
+    return 0
+}
+
+public func GetAbsolutePath(pwd: *const char, path: *const char) : *const char {
+    @static var absolutePath: [MAX_PATH]char;
+
+    var absStr = StringInit(absolutePath, MAX_PATH, 0);
+    var pathStr = StringViewInit(path)
+
+    if(pathStr.startsWith(".")) {
+        absStr.append("%s/", pwd);
+    }
+
+    var start = path
+    while(*path) {
+        if(path[0] == '\\') {
+            if(path[1] == '\\') {
+                path += 1
+            }
+            absStr.appendChar('/')
+        }
+        else if(path[0] == '.') {
+            if(path[1] == '.') {
+
+                while(start != path) {
+                    //if()
+                }
+            }
+        }
+        else {
+            absStr.appendChar(*path)
+        }
+        path += 1
+    }
+
+    // if this is already an absolute path
+
+    return absStr.cStr()
+}
+
+public func PathEquals(a: *const char, b: *const char) : bool {
+    // Total BS implementation... this is downright wrong
+    return strcicmp(a, b) == 0
+}
+public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
+    if(strncmp(uri, "file:///", 8) == 0) {
+        uri = &uri[8]
+    }
+
+    var outputStr = StringInit(output, MAX_PATH, 0)
+    while(*uri) {
+        if(*uri == '%') {
+            var escaped = [2]char{0};
+            if(uri[1] == '2') {
+                if(uri[2] == '1') {
+                    outputStr.appendChar('!')
+                }
+                else if(uri[2] == '3') {
+                    outputStr.appendChar('#')
+                }
+                else if(uri[2] == '4') {
+                    outputStr.appendChar('$')
+                }
+                else if(uri[2] == '5') {
+                    outputStr.appendChar('%')
+                }
+                else if(uri[2] == '6') {
+                    outputStr.appendChar('&')
+                }
+                else if(uri[2] == '7') {
+                    outputStr.appendChar('\'')
+                }
+                else if(uri[2] == '8') {
+                    outputStr.appendChar('(')
+                }
+                else if(uri[2] == '9') {
+                    outputStr.appendChar(')')
+                }
+                else if(uri[2] == 'A') {
+                    outputStr.appendChar('*')
+                }
+                else if(uri[2] == 'B') {
+                    outputStr.appendChar('+')
+                }
+                else if(uri[2] == 'C') {
+                    outputStr.appendChar(',')
+                }
+                else if(uri[2] == 'F') {
+                    outputStr.appendChar('/')
+                }
+                else {
+                    // invalid escaped sequence -- what to do here?
+                    outputStr.append("%s", "%2")
+                    uri += 2
+                    continue
+                }
+            }
+            else if(uri[1] == '3') {
+                if(uri[2] == 'A') {
+                    outputStr.appendChar(':')
+                }
+                else if(uri[2] == 'B') {
+                    outputStr.appendChar(';')
+                }
+                else if(uri[2] == 'D') {
+                    outputStr.appendChar('=')
+                }
+                else if(uri[2] == 'F') {
+                    outputStr.appendChar('?')
+                }
+                else {
+                    // invalid escaped sequence -- what to do here?
+                    outputStr.append("%s", "%2")
+                    uri += 2
+                    continue
+                }
+            }
+            else if(uri[1] == '4') {
+                if(uri[2] == '0') {
+                    outputStr.appendChar('@')
+                }
+                else {
+                    // invalid escaped sequence -- what to do here?
+                    outputStr.append("%s", "%2")
+                    uri += 2
+                    continue
+                }
+            }
+            else if(uri[1] == '5') {
+                if(uri[2] == 'B') {
+                    outputStr.appendChar('[')
+                }
+                else if(uri[2] == 'D') {
+                    outputStr.appendChar(']')
+                }
+                else {
+                    // invalid escaped sequence -- what to do here?
+                    outputStr.append("%s", "%2")
+                    uri += 2
+                    continue
+                }
+            }
+            else {
+                outputStr.appendChar(*uri)
+                uri += 1
+                continue
+            }
+
+            uri += 3
+            continue
+        }
+
+        outputStr.appendChar(*uri)
+        uri += 1
+    }
+
+    return outputStr.cStr()
+}
+
 // TODO
 public func IsFile(filename: *const char) : bool {
     return false
@@ -143,8 +335,6 @@ public func CurrentDateTime() : *const char {
     return asctime(timeinfo)
 }
 
-
-
 @foreign("_popen")
 func popen(command: *const char, mode: *const char) : *FILE;
 @foreign("_pclose")
@@ -162,8 +352,16 @@ public func (this: *Process) readOutput(buffer: *char, length: usize) : i64 {
     return fread(buffer, sizeof(:char), length, this.pipe)
 }
 
+public func (this: *Process) writeInput(buffer: *char, length: usize) : u64 {
+    if(!this.pipe) {
+        return -1;
+    }
+
+    return fwrite(buffer, sizeof(:char), length, this.pipe)
+}
+
 public func SystemExec(command: *const char) : Process {
-    var pipe = popen(command, "rt")
+    var pipe = popen(command, "rwt")
     return Process{
         .pipe = pipe
     }

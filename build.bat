@@ -8,6 +8,7 @@ java -jar %LITAC_HOME%/target/litac.jar -buildCmd %BUILD_CMD% -outputDir "./bin"
 cd bin
 litaC.exe -profile -buildCmd %BUILD_CMD% "../src/main.lita"
 REM litaC.exe -run -profile "../test/test_single.lita"
+REM litaC.exe -run -profile -buildCmd %BUILD_CMD% "../src/lsp.lita"
 goto end
 
 :error_exit

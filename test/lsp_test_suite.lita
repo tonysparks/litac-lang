@@ -1,0 +1,167 @@
+
+import "libc"
+import "json"
+import "io"
+import "array"
+import "mem"
+import "string_buffer"
+import "string"
+import "../src/system"
+import "../src/lita"
+import "../src/phase_result"
+import "../src/error_codes"
+
+import "subprocess"
+
+struct TestHarness {
+    allocator: *const Allocator
+    buffer: StringBuffer
+    numberOfTests: i32
+    numberOfFailures: i32
+}
+
+struct TestRequest {
+    request: *char
+    response: *char
+}
+struct TestCase {
+    requests: Array<TestRequest>
+}
+
+const testHarness = TestHarness{}
+
+
+public func main(argc: i32, args: **char) : i32 {
+    SystemInit()
+
+
+    var memSize = 1024*1024*5
+    var linearAllocator = LinearAllocator{}
+    linearAllocator.init(defaultAllocator.alloc(memSize), memSize)
+    testHarness.allocator = (&linearAllocator) as (*Allocator)
+    testHarness.buffer = StringBufferInit(1024, defaultAllocator)
+    testHarness.numberOfTests = 0
+    testHarness.numberOfFailures = 0
+
+    defer defaultAllocator.free(linearAllocator.mem)
+    defer testHarness.buffer.free()
+
+    var testCase = TestCase{}
+    testCase.requests.init(16, testHarness.allocator)
+
+    var req = TestRequest{
+        .request = """{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":12844,"rootPath":"c:\\\\Users\\\\chq-tonys\\\\git\\\\litac-lang","rootUri":"file:///c%3A/Users/chq-tonys/git/litac-lang","capabilities":{"workspace":{"applyEdit":true,"workspaceEdit":{"documentChanges":true},"didChangeConfiguration":{"dynamicRegistration":true},"didChangeWatchedFiles":{"dynamicRegistration":true},"symbol":{"dynamicRegistration":true,"symbolKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]}},"executeCommand":{"dynamicRegistration":true},"configuration":true,"workspaceFolders":true},"textDocument":{"publishDiagnostics":{"relatedInformation":true},"synchronization":{"dynamicRegistration":true,"willSave":true,"willSaveWaitUntil":true,"didSave":true},"completion":{"dynamicRegistration":true,"contextSupport":true,"completionItem":{"snippetSupport":true,"commitCharactersSupport":true,"documentationFormat":["markdown","plaintext"],"deprecatedSupport":true,"preselectSupport":true},"completionItemKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]}},"hover":{"dynamicRegistration":true,"contentFormat":["markdown","plaintext"]},"signatureHelp":{"dynamicRegistration":true,"signatureInformation":{"documentationFormat":["markdown","plaintext"]}},"definition":{"dynamicRegistration":true},"references":{"dynamicRegistration":true},"documentHighlight":{"dynamicRegistration":true},"documentSymbol":{"dynamicRegistration":true,"symbolKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]},"hierarchicalDocumentSymbolSupport":true},"codeAction":{"dynamicRegistration":true,"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["","quickfix","refactor","refactor.extract","refactor.inline","refactor.rewrite","source","source.organizeImports"]}}},"codeLens":{"dynamicRegistration":true},"formatting":{"dynamicRegistration":true},"rangeFormatting":{"dynamicRegistration":true},"onTypeFormatting":{"dynamicRegistration":true},"rename":{"dynamicRegistration":true},"documentLink":{"dynamicRegistration":true},"typeDefinition":{"dynamicRegistration":true},"implementation":{"dynamicRegistration":true},"colorProvider":{"dynamicRegistration":true},"foldingRange":{"dynamicRegistration":true,"rangeLimit":5000,"lineFoldingOnly":true}}},"trace":"off","workspaceFolders":[{"uri":"file:///c%3A/Users/chq-tonys/git/litac-lang","name":"litac-lang"}]}}""",
+        .response = """{"jsonrpc":"2.0","id":0,"result":{"capabilities":{"textDocumentSync":2,"definitionProvider":true,"documentSymbolProvider":true,"workspaceSymbolProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":true,"triggerCharacters":["."]}}},"error":null}""",
+    }
+
+    testCase.requests.add(req)
+
+    RunTest(testHarness.buffer, &testCase)
+}
+
+func RunTest(sb: *StringBuffer, test: *TestCase) {
+// TODO: fix path
+    var binaryFilename = "C:\\Users\\chq-tonys\\git\\litac-lang\\bin\\litaC.exe";
+
+/*
+    var path: [MAX_PATH]char;
+    FilePath(binaryFilename, path)
+printf("Path: %s\n", path)
+    var len = strlen(path)
+    sb.append("cd ")
+    sb.appendStr(path, len)
+    sb.append(" && %s", &binaryFilename[len + 1])
+*/
+    sb.append("%s", binaryFilename)
+    var process: subprocess_s;
+    var args = []*const char {
+        sb.cStr(),
+        "-languageServer",
+        null
+    };
+
+    var options = subprocess_option_e.subprocess_option_combined_stdout_stderr |
+                  subprocess_option_e.subprocess_option_inherit_environment |
+                  subprocess_option_e.subprocess_option_enable_async
+
+    if(subprocess_create(args, options, &process)) {
+        printf("Unable to start process: %s\n", sb.cStr())
+        return;
+    }
+    defer subprocess_destroy(&process)
+
+    var input = subprocess_stdin(&process)
+    var output = subprocess_stdout(&process)
+    for(var i = 0; i < test.requests.size(); i +=1) {
+        var req = test.requests.get(i)
+        sb.clear()
+
+        // make request
+        var contentLen = strlen(req.request)
+        sb.append("Content-Length: %d\r\n\r\n", contentLen)
+        fwrite(sb.cStr(), sizeof(:char), sb.length, input)
+        fflush(input)
+
+        fwrite(req.request, sizeof(:char), contentLen, input)
+        fflush(input)
+
+        sb.clear()
+        var buffer = [32]char{0};
+        var contentLength = [16]char{0};
+        var size = 0_i32
+
+        var bytesRead = subprocess_read_stdout(&process, buffer, 31)
+        buffer[bytesRead] = '\0'
+
+        if(bytesRead > 0) {
+            sscanf(buffer, "%16s %d\r\n\r\n", contentLength, &size)
+            if(strncmp(contentLength, "Content-Length:", 16) != 0) {
+                printf("Failure\n")
+                return;
+            }
+
+            var i = 0;
+            var numOfNL = 0
+            for(; i < bytesRead; i += 1) {
+                var c = buffer[i]
+                if(c == '\n') {
+                    i += 1
+                    numOfNL += 1
+                    if(numOfNL > 1) {
+                        break;
+                    }
+                }
+            }
+            var bytesConsumed = bytesRead - i
+            sb.append("%.*s", bytesConsumed, &buffer[i])
+
+            size -= bytesConsumed
+            if(size > 0) {
+                sb.reserve(size)
+                bytesRead = subprocess_read_stdout(&process, &sb.buffer[sb.length], size)
+                sb.length += bytesRead as (i32)
+            }
+        }
+
+        var response = sb.cStr()
+        var parser = ParserInit(testHarness.allocator)
+        var responseJson = parser.parseJson(response)
+        if(!responseJson) {
+            printf("Failed for parse response json: %s\n", parser.errorMsg)
+            printf("Response: '%s'\n", response)
+            return;
+        }
+        var expectedJson = parser.parseJson(req.response)
+        if(!expectedJson) {
+            printf("Failed for parse expected json: %s\n", parser.errorMsg)
+            return;
+        }
+
+        if(!responseJson.equals(expectedJson)) {
+            printf("Response did not match: \n  Expected:\n    '%s'\n  Actual:   '%s'\n", req.response, response)
+        }
+        else {
+            printf("Success\n")
+        }
+    }
+}
