@@ -38,6 +38,7 @@ public enum SymbolFlags {
     IS_IMPORTED             = (1<<10),
     IS_PUBLIC               = (1<<11),
     IS_EMITTED              = (1<<12),
+    IS_TEST                 = (1<<13),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -131,7 +132,6 @@ public func (this: *Scope) importSymbol(name:[MAX_SYMBOL_NAME]const char,
                                         symbol: *Symbol) {
 
     if(this.symbols.contains(name) && !symbol.decl.hasNote("generated")) {
-        printf("%s already defines '%s' from '%s'\n", this.module.id.filename, name, symbol.declared.id.filename)
         this.result.addError(symbol.decl.startPos, "can't import symbol '%s' because it is already defined", name)
         return;
     }
@@ -184,6 +184,9 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
         }
         case StmtKind.FUNC_DECL: {
             kind = SymbolKind.FUNC
+            if(decl.hasNote("test")) {
+                flags |= SymbolFlags.IS_TEST
+            }
             break;
         }
         case StmtKind.CONST_DECL: {

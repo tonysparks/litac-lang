@@ -37,6 +37,16 @@ func (this: *Bucket<T>) add<T>(a: T) {
 
 }
 
+@test("t.x")
+func myTestX() {
+
+}
+
+@test("t.y")
+func myTestY() {
+
+}
+
 func main(len:i32, args:**char) : i32 {
    // var string = []char { 'h', 'i', '\0'} as (*const char)
     var buckets = Bucket<Bucket<i32>>{}
@@ -62,5 +72,5 @@ func main(len:i32, args:**char) : i32 {
   // printf("%s\n", StatusAsStr(Status.OK))
    //printf("%s\n", SomeEnumAsStr(SomeEnum.BRETT))
 
-
+    return 0
 }

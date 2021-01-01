@@ -15,7 +15,10 @@ import "types"
 import "libc"
 import "assert"
 import "symbols"
+
 import "ape/ape"
+import "re/re"
+
 /*
 ================================================
     Compile time processing
@@ -68,15 +71,19 @@ public func (this: *Preprocessor) init(lita: *Lita) {
 
     // TODO: Make this properties actually respect the litaOptions...
     ape_set_global_constant(this.ape, "OS", ape_object_make_string(this.ape, "WINDOWS")) // TODO: Make this respect the platform...
-    ape_set_global_constant(this.ape, "DEBUG", ape_object_make_bool(true))
+    ape_set_global_constant(this.ape, "DEBUG", ape_object_make_bool(lita.options.isDebug))
     ape_set_global_constant(this.ape, "REFLECTION", ape_object_make_bool(false))
+    ape_set_global_constant(this.ape, "TESTING", ape_object_make_bool(lita.options.testsOnly))
 
     ape_set_native_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
     ape_set_native_function(this.ape, "getSymbolsByNote", ApeGetSymbolsWithNote, &this.callContext)
+    ape_set_native_function(this.ape, "getSymbolsToTest", ApeGetSymbolsToTest, &this.callContext)
     ape_set_native_function(this.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
     ape_set_native_function(this.ape, "addImport", ApeAddImport, &this.callContext)
 
     ape_set_native_function(this.ape, "getMainSymbol", ApeGetMainSymbol, &this.callContext)
+    ape_set_native_function(this.ape, "setMainSymbol", ApeSetMainSymbol, &this.callContext)
+    ape_set_native_function(this.ape, "getInputModuleName", ApeGetInputModuleName, &this.callContext)
     ape_set_native_function(this.ape, "astInsert", ApeAstInsert, &this.callContext)
     ape_set_native_function(this.ape, "emit", ApeEmit, &this.callContext)
     ape_set_native_function(this.ape, "emitClear", ApeEmitClear, &this.callContext)
@@ -573,6 +580,18 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
     return ape_object_make_bool(true)
 }
 
+func ApeGetInputModuleName(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var moduleName = context.pp.lita.options.inputFile
+    var mainModule = context.pp.lita.modules.get(moduleName)
+    if(!mainModule) {
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, moduleName)
+}
+
 
 func ApeGetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
@@ -687,6 +706,11 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
         return ape_object_make_null()
     }
 
+    // don't import to yourself
+    if(strcmp(moduleName, moduleToImport) == 0) {
+        return ape_object_make_null()
+    }
+
     var importModule = context.pp.lita.modules.get(moduleToImport)
     if(!importModule) {
         context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleToImport)
@@ -737,4 +761,104 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
     context.checker.createImportSymbols(importStmt)
 
     return ape_object_make_string(ape, sb.cStr())
+}
+
+
+func ApeSetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module name")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.modules.get(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var symbolName = ape_object_get_string(args[1]) as (*const char)
+    if(!symbolName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        return ape_object_make_null()
+    }
+
+    var sym = module.getType(symbolName)
+    if(!sym) {
+        context.pp.lita.result.addError(context.comp.startPos, "can not find symbol '%s' in module: '%s'", symbolName, moduleName)
+        return ape_object_make_null()
+    }
+
+    if(sym.kind != SymbolKind.FUNC) {
+        context.pp.lita.result.addError(context.comp.startPos, "can not make symbol '%s' a main entry point because it isn't a function", symbolName)
+        return ape_object_make_null()
+    }
+
+    context.checker.mainEntry = sym
+    return ape_object_make_bool(true)
+}
+
+
+func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var results = ape_object_make_array(ape)
+    if(!context.pp.lita.options.testsOnly) {
+        return results
+    }
+
+    // if we are testing by regex, test each function with @test attribute
+    if(context.pp.lita.options.testsRegex) {
+        var all = strcmp(context.pp.lita.options.testsRegex, ".*") == 0
+        var pattern = re_compile(context.pp.lita.options.testsRegex)
+
+        for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
+            var sym = context.checker.symbolFuncs.get(i)
+            if(sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+                if(all) {
+                    var declObj = context.pp.declToApe(sym)
+                    ape_object_add_array_value(results, declObj)
+                }
+                else {
+                    var note = sym.decl.getNote("test")
+                    for(var i = 0; i < note.attributes.size(); i += 1) {
+                        var att = note.attributes.get(i)
+                        var matchlength = 0
+
+                        if(re_matchp(pattern, att.asString(), &matchlength) > -1) {
+                            var declObj = context.pp.declToApe(sym)
+                            ape_object_add_array_value(results, declObj)
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // otherwise we are just testing the input file's tests
+    else {
+        var moduleName = context.pp.lita.options.inputFile
+        var mainModule = context.pp.lita.modules.get(moduleName)
+        if(!mainModule) {
+            return results;
+        }
+
+        // iterate thru all symbols, this way we are deterministic in our output
+        for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
+            var sym = context.checker.symbolFuncs.get(i)
+            if(sym.declared == mainModule && sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+                var declObj = context.pp.declToApe(sym)
+                ape_object_add_array_value(results, declObj)
+            }
+        }
+    }
+
+    return results
 }

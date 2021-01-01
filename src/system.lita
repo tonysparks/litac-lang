@@ -91,10 +91,15 @@ public func GetEnv(varName: *const char) : *char {
     return getenv(varName)
 }
 
+const pwd = [MAX_PATH]char{0};
 public func CurrentWorkingPath() : *const char {
     @static var path: [MAX_PATH]char;
-    GetCurrentDirectory(MAX_PATH, path)
-    return path;
+    if(pwd[0] == 0) {
+        GetCurrentDirectory(MAX_PATH, path)
+        GetAbsolutePath("", path, pwd)
+    }
+
+    return pwd;
 
 }
 public func FileExists(filename: *const char) : bool {
@@ -152,10 +157,8 @@ func strcicmp(a: *const char, b: *const char) : i32 {
     return 0
 }
 
-public func GetAbsolutePath(pwd: *const char, path: *const char) : *const char {
-    @static var absolutePath: [MAX_PATH]char;
-
-    var absStr = StringInit(absolutePath, MAX_PATH, 0);
+public func GetAbsolutePath(pwd: *const char, path: *const char, output: [MAX_PATH]char) : *char {
+    var absStr = StringInit(output, MAX_PATH, 0);
     var pathStr = StringViewInit(path)
 
     if(pathStr.startsWith(".")) {
@@ -171,11 +174,36 @@ public func GetAbsolutePath(pwd: *const char, path: *const char) : *const char {
             absStr.appendChar('/')
         }
         else if(path[0] == '.') {
+            // go up a directory
             if(path[1] == '.') {
-
-                while(start != path) {
-                    //if()
+                var len = absStr.length
+                var index = len - 1
+                var upCount = 0
+                for(; index >= 0; index -= 1) {
+                    if(absStr.buffer[index] == '/' ||
+                       absStr.buffer[index] == '\\') {
+                        upCount += 1
+                        if(upCount > 1) {
+                            break;
+                        }
+                    }
                 }
+                if(index < 0) {
+                    index = 0
+                }
+
+                absStr.length = index
+                if(absStr.buffer[index] == '/'||
+                   absStr.buffer[index] == '\\') {
+                    absStr.length = index + 1
+                }
+            }
+            else if(path[1] == '/' || path[1] == '\\') {
+                // current directory, skip both
+                path += 1
+            }
+            else {
+                absStr.appendChar('.') // part of a filename
             }
         }
         else {
@@ -184,15 +212,55 @@ public func GetAbsolutePath(pwd: *const char, path: *const char) : *const char {
         path += 1
     }
 
-    // if this is already an absolute path
-
     return absStr.cStr()
 }
 
 public func PathEquals(a: *const char, b: *const char) : bool {
-    // Total BS implementation... this is downright wrong
+    // TODO: Total BS implementation... this is downright wrong
     return strcicmp(a, b) == 0
 }
+
+const uriEscapeChars = [256]*const char {
+    ['!'] = "%21",
+    ['#'] = "%23",
+    ['$'] = "%24",
+    ['%'] = "%25",
+    ['&'] = "%26",
+    ['\''] = "%27",
+    ['('] = "%28",
+    [')'] = "%29",
+    ['*'] = "%2A",
+    ['+'] = "%2B",
+    [','] = "%2C",
+    ['/'] = "%2F",
+    [':'] = "%3A",
+    [';'] = "%3B",
+    ['='] = "%3D",
+    ['?'] = "%3F",
+    ['@'] = "%40",
+    ['['] = "%5B",
+    [']'] = "%5D",
+}
+
+public func FilePathToUri(path: *const char, output: [MAX_PATH]char) : *char {
+    var outputStr = StringInit(output, MAX_PATH, 0)
+    outputStr.append("%s", "file:///")
+
+    while(*path) {
+        var escaped = uriEscapeChars[*path]
+        if(escaped) {
+            outputStr.append("%s", escaped)
+        }
+        else {
+            outputStr.appendChar(*path)
+        }
+
+        path+=1
+    }
+
+    return outputStr.cStr()
+}
+
 public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
     if(strncmp(uri, "file:///", 8) == 0) {
         uri = &uri[8]
@@ -361,7 +429,7 @@ public func (this: *Process) writeInput(buffer: *char, length: usize) : u64 {
 }
 
 public func SystemExec(command: *const char) : Process {
-    var pipe = popen(command, "rwt")
+    var pipe = popen(command, "rt")
     return Process{
         .pipe = pipe
     }
@@ -371,3 +439,20 @@ public func (this: *Process) close() {
     if(this.pipe) pclose(this.pipe)
 }
 
+
+
+
+
+
+/**
+    tests
+*/
+
+@test
+func testAbsolutePath() {
+    var path = [MAX_PATH]char{0}
+    assert(strcmp(GetAbsolutePath("C:/litac", "../src/main.lita", path), "C:/src/main.lita") == 0)
+    assert(strcmp(GetAbsolutePath("C:/litac", "./../src/main.lita", path), "C:/src/main.lita") == 0)
+    assert(strcmp(GetAbsolutePath("C:/litac", "./..\\src/main.lita", path), "C:/src/main.lita") == 0)
+    assert(strcmp(GetAbsolutePath("C:/litac", "../../src/main.lita", path), "src/main.lita") == 0)
+}

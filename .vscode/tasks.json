@@ -86,6 +86,34 @@
                 "isDefault": true
             }
         },
+        {
+            "label": "BuildTestFile",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "build_test_file.sh",
+                "${file}"
+            ],
+            "windows": {
+                "command": "build_test_file.bat",
+                "args": ["${file}"]
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
         /*
         {
             "label": "BuildDocs",

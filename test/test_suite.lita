@@ -6,6 +6,7 @@ import "json"
 import "io"
 import "array"
 import "mem"
+import "map"
 import "string_buffer"
 import "string"
 import "../src/system"
@@ -59,6 +60,7 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
+        "../test/tests/strings.json",/*
         "../test/tests/using.json",
         "../test/tests/notes.json",
         "../test/tests/foreign_type.json",
@@ -84,7 +86,7 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",
+        "../test/tests/generics_inference.json",*/
         null
     }
 
@@ -136,7 +138,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
         goto err;
     }
 
-    var parser = Parser{}
+    var parser = JsonParser{}
     parser.init(testHarness.allocator)
     defer parser.free()
 
@@ -156,6 +158,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
 
     var tests = node.getArray("tests")
     if(!tests) {
+        printf("No tests\n")
         return 0
     }
 
@@ -231,6 +234,7 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
     output.expectedOutput = testNode.getStr("output", null)
     output.expectedErrorOutput = testNode.getStr("error", null)
     output.disabled = testNode.getBool("disabled", false)
+
     var modules = testNode.getArray("modules")
     if(modules) {
         output.modules.init(modules.size(), testHarness.allocator)

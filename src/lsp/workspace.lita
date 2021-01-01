@@ -8,7 +8,10 @@ import "mem"
 import "system"
 import "lita"
 import "phase_result"
+import "symbols"
+
 import "lsp/lsp"
+import "lsp/protocol"
 
 public struct Workspace {
     allocator: *const Allocator
@@ -18,6 +21,7 @@ public struct Workspace {
 }
 
 public struct TextDocument {
+    filename: [MAX_PATH]char
     text: StringBuffer
 }
 
@@ -35,14 +39,17 @@ public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char
     var pathStr = StringInit(filepath, MAX_PATH);
 
     pathStr.format("%s/src/main.lita", rootPath)
+    this.lsp.log("Checking for main at: '%s'...", pathStr.cStr())
+
     if(FileExists(pathStr.cStrConst())) {
+        this.lsp.log("found!\n")
         strncpy(lita.options.inputFile, pathStr.cStr(), MAX_PATH)
         FilePath(lita.options.inputFile, lita.options.srcPath)
         return;
     }
 
     // TODO: Inspect the URI
-    this.lsp.log("Unable to find main.lita from '%s'\n", rootPath)
+    this.lsp.log("unable to find main.lita from '%s'\n", rootPath)
 }
 
 public func (this: *Workspace) openDocument(uri: *const char, text: *const char) {
@@ -54,7 +61,40 @@ public func (this: *Workspace) openDocument(uri: *const char, text: *const char)
     doc.text = StringBufferInit(strlen(text), this.allocator)
     doc.text.append("%s", text)
 
+    UriToFilePath(uri, doc.filename)
+
     this.openedDocuments.put(moduleUri, doc)
+}
+
+public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const Allocator) : *JsonNode {
+    if(!uri) return null;
+
+    var doc = this.openedDocuments.get(uri)
+    this.lsp.log("Uri: '%s' has doc: %d\n", uri, doc != null)
+    if(!doc) return null;
+
+    var syms = &this.lsp.lita.programSymbols
+    var absPath = [MAX_PATH]char{0}
+
+    var results = CreateJsonArray(alloc)
+    for(var i = 0; i < syms.symbolFuncs.size(); i += 1) {
+        var sym = syms.symbolFuncs.get(i)
+
+        var path = GetAbsolutePath(this.rootPath, sym.declared.id.filename, absPath)
+        if(PathEquals(path, doc.filename)) {
+            var info = SymbolToSymbolInformation(sym, this.rootPath, alloc)
+            if(info) {
+                results.add(info)
+            }
+        }
+    }
+
+    return results
+/*
+    values: Array<*Symbol>
+    symbolTypes: Array<*Symbol>
+    symbolFuncs: Array<*Symbol>
+    mainEntry: *Symbol*/
 }
 
 public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseResult {

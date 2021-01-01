@@ -88,7 +88,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     graph.init(this.lita)
     var declarations = graph.sort()
 
-    var mainSym: *Symbol = null
+    var isTesting = this.lita.options.testsOnly
 
     for(var i = 0; i < declarations.size(); i += 1) {
         var sym = declarations.get(i)
@@ -106,10 +106,12 @@ public func (this: using *CGen) emitProgram(module: *Module) {
             continue
         }
 
-        if(sym.decl.kind == StmtKind.FUNC_DECL &&
-           strcmp(sym.name, "main") == 0) {
-           mainSym = sym
-           continue
+        if(sym == this.lita.programSymbols.mainEntry) {
+            continue
+        }
+
+        if(!isTesting && sym.flags & SymbolFlags.IS_TEST) {
+            continue
         }
 
         this.emitStmt(sym.decl)
@@ -118,8 +120,8 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 
     this.emitln()
 
-    if(mainSym) {
-        this.emitMain(mainSym)
+    if(this.lita.programSymbols.mainEntry) {
+        this.emitMain(this.lita.programSymbols.mainEntry)
     }
 }
 
@@ -231,6 +233,11 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     var decl = sym.decl
 
     if(sym.flags & SymbolFlags.IS_FOREIGN || sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+        return;
+    }
+
+
+    if(!this.lita.options.testsOnly && sym.flags & SymbolFlags.IS_TEST) {
         return;
     }
 

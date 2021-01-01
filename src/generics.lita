@@ -87,7 +87,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     var genericSym = checker.current.genericSymbols.get(newName)
 
     if(!genericSym) {
-        var newNameStr = genericName.copy(checker.allocator).str
+        var newNameStr = genericName.copy(checker.allocator).buffer
         var genericDecl: *GenericDecl = null;
 
         switch(sym.decl.kind) {

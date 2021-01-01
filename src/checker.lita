@@ -96,9 +96,9 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     for(var i = 0; i < root.ast.declarations.size(); i += 1) {
         var decl = root.ast.declarations.get(i)
         if(decl.sym && decl.kind == StmtKind.FUNC_DECL &&
-           strcmp(decl.sym.name, "main") == 0) {
-           this.mainEntry = decl.sym
-           continue
+            strcmp(decl.sym.name, "main") == 0) {
+            this.mainEntry = decl.sym
+            break
         }
     }
 
@@ -214,6 +214,12 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
         var decl = module.ast.declarations.get(i)
         this.createDeclSymbol(decl)
     }
+
+    if((module.flags & ModuleFlags.TYPE_IMPORTED)) {
+        return;
+    }
+
+    module.flags |= ModuleFlags.TYPE_IMPORTED
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var imp = module.ast.imports.get(i)
@@ -411,7 +417,6 @@ err:
 }
 
 func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
-
     for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
         var other = this.current.ast.imports.get(i)
         if(imp == other) {

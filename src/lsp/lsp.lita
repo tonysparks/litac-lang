@@ -129,14 +129,16 @@ public func (this: *LspServer) readMessage() {
 
     if(bytesRead != size) {
         this.log("message received size of %d did not match Content-Length: %d\n", bytesRead, size)
-        this.writeErrorResponse(0, "message received size did not match content-length")
-        return;
+        size = bytesRead as (i32)
+        //this.log("   message: '%.*s'\n", bytesRead, this.message.buffer)
+        //this.writeErrorResponse(0, "message received size did not match content-length")
+        //return;
     }
 
     this.message.length = size
     this.log("Received message: '%.*s'\n", size, this.message.buffer)
 
-    var parser = ParserInit(this.requestAlloc())
+    var parser = JsonParserInit(this.requestAlloc())
     defer parser.free()
 
     var json = parser.parseJson(this.message.cStr())
@@ -163,10 +165,13 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
         this.isInitialized = true
     }
     else if(!this.isInitialized) {
-        this.writeErrorResponse(0, "no yet properly initialized")
+        this.writeErrorResponse(0, "not yet properly initialized")
     }
     else if(strcmp(method, "textDocument/didOpen") == 0) {
         this.handleTextDocumentOpenMessage(msg, params)
+    }
+    else if(strcmp(method, "textDocument/documentSymbol") == 0) {
+        this.handleTextDocumentSymbolMessage(msg, params)
     }
     else {
         this.writeErrorResponse(0, "unsupported params: %s", params)
@@ -183,7 +188,7 @@ public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *
 
     this.log("Root Uri = '%s' as path: '%s'\n", rootUri, path)
 
-    this.workspace.setup(rootPath, path)
+    this.workspace.setup(path, rootUri)
 
     var capabilities = """
     {
@@ -202,7 +207,7 @@ public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *
         }
     }
     """
-    var parser = ParserInit(this.requestAlloc())
+    var parser = JsonParserInit(this.requestAlloc())
     var resp = CreateJsonObject(this.requestAlloc())
     resp.put("result", parser.parseJson(capabilities))
 
@@ -219,6 +224,22 @@ public func (this: *LspServer) handleTextDocumentOpenMessage(msg: *JsonNode, par
     var uri = textDoc.getStr("uri", null)
     this.workspace.openDocument(uri, textDoc.getStr("text", null))
     this.writeDiagnostic(uri)
+}
+
+public func (this: *LspServer) handleTextDocumentSymbolMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    var results = this.workspace.documentSymbols(uri, this.requestAlloc())
+
+
+    var resp = CreateJsonObject(this.requestAlloc())
+    resp.put("result", results)
+
+    this.writeResponse(msg.getInt("id"), resp)
 }
 
 public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
@@ -239,12 +260,16 @@ public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
     if(!result.errors.empty()) {
         for(var i = 0; i < result.errors.size(); i += 1) {
             var error =  result.errors.get(i)
-            printf("")
+            /*var path = GetAbsolutePath(this.workspace.rootPath, error.pos.filename)
+            if(strcmp(path, filename) == 0) {
+
+            }*/
+            // TODO:
         }
     }
 }
 
-public func (this: *LspServer) writeErrorResponse(id: u64, format: *const char, ...) {
+public func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, ...) {
     var args: va_list;
     va_start(args, format);
     var sb = StringBufferInit(512, this.requestAlloc())
@@ -261,10 +286,11 @@ public func (this: *LspServer) writeErrorResponse(id: u64, format: *const char, 
     this.writeResponse(id, resp)
 }
 
-public func (this: *LspServer) writeResponse(id: u64, msg: *JsonNode) {
+public func (this: *LspServer) writeResponse(id: i64, msg: *JsonNode) {
     this.output.clear()
 
     msg.putStr("jsonrpc", "2.0")
+
     if(id > -1) {
         msg.putNumber("id", id as (f64))
     }
@@ -283,23 +309,3 @@ public func (this: *LspServer) writeResponse(id: u64, msg: *JsonNode) {
     fwrite("\n" as (*const void), sizeof(:char), 1, stdout)
     fflush(stdout)
 }
-
-
-/*
-@test
-public func test() {
-    var server = LspServer{}
-    var lita = Lita{}
-    server.init(&lita)
-
-    server.readMessage()
-}
-
-public struct Param {
-
-}
-
-public struct JrpcMessage {
-    method: *const char
-    params: *
-}*/

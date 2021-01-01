@@ -37,6 +37,7 @@ public struct Lita {
     sourceFilename: [MAX_PATH]char
 
     programSymbols: ProgramSymbols
+    genericSymbols: Map<*const char, *Symbol>
 }
 
 @asStr
@@ -74,6 +75,11 @@ public struct LitaOptions {
     run: bool                      // runs after successful compilation
     showProfileInfo: bool          // outputs profiling information
     languageServer: bool           // if this should launch the language server
+    isDebug: bool                  // if we are in debug mode
+    testsOnly: bool                // if we are running tests only
+    testsRegex: *const char        // the regex of tests to include
+    testFileOnly: bool             // if we should only test the supplied file only
+
 
     cPrefix: [MAX_PREFIX_SIZE]char // Prefix for types/variables defined in C
 }
@@ -89,12 +95,15 @@ public func (this: *Lita) init(options: *LitaOptions) {
     this.options = options
     this.totalSourceLines = 0
     this.totalAllocations = 0
+
     memset(this.binaryFilename, 0, MAX_PATH)
     memset(this.sourceFilename, 0, MAX_PATH)
 
     this.preprocessor.init(this)
     this.result = PhaseResultInit(allocator)
     this.modules = StrMap<*Module>(null, 32, allocator)
+
+    this.genericSymbols = StrMap<*Symbol>(null, 128, allocator)
 }
 
 public func (lita: *Lita) free() {
@@ -268,7 +277,11 @@ func FindModulePath(lita: *Lita,
                     moduleName: StringView,
                     filename: [MAX_PATH]char) : bool {
 
-    var pathStr = StringInit(filename, MAX_PATH);
+    var path = [MAX_PATH]char{0}
+    var pathStr = StringInit(path, MAX_PATH);
+    defer {
+        GetAbsolutePath(CurrentWorkingPath(), pathStr.cStr(), filename)
+    }
 
     pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
     if(FileExists(pathStr.cStrConst())) {
@@ -332,7 +345,6 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 
         importModule = NewModule(lita, filename)
         importStmt.moduleId = &importModule.id
-
         lita.addModule(importModule)
 
         ParseModule(lita, importModule, importStmt.startPos)

@@ -1,0 +1,161 @@
+import "symbols" as sym
+import "types"
+import "json"
+import "lex"
+import "mem"
+import "system"
+import "libc"
+
+@doc("""
+    Protocol specifications from: https://microsoft.github.io/language-server-protocol/specifications
+""");
+
+
+@asStr
+public enum SymbolInfoKind {
+    File = 1,
+    Module = 2,
+    Namespace = 3,
+    Package = 4,
+    Class = 5,
+    Method = 6,
+    Property = 7,
+    Field = 8,
+    Constructor = 9,
+    Enum = 10,
+    Interface = 11,
+    Function = 12,
+    Variable = 13,
+    Constant = 14,
+    String = 15,
+    Number = 16,
+    Boolean = 17,
+    Array = 18,
+    Object = 19,
+    Key = 20,
+    Null = 21,
+    EnumMember = 22,
+    Struct = 23,
+    Event = 24,
+    Operator = 25,
+    TypeParameter = 26,
+}
+
+public func SymbolKindFromSymbol(sym: *sym::Symbol) : SymbolInfoKind {
+    if(!sym) return SymbolInfoKind.Null;
+
+    switch(sym.kind) {
+        case sym::SymbolKind.CONST: {
+            return SymbolInfoKind.Constant;
+        }
+        case sym::SymbolKind.FUNC: {
+            return SymbolInfoKind.Function;
+        }
+        case sym::SymbolKind.VAR: {
+            return SymbolInfoKind.Variable;
+        }
+        case sym::SymbolKind.TYPE: {
+            var type = sym.type
+            if(!type) return SymbolInfoKind.Null;
+
+            switch(type.kind) {
+                case TypeKind.ARRAY: {
+                    return SymbolInfoKind.Array;
+                }
+                case TypeKind.BOOL: {
+                    return SymbolInfoKind.Boolean;
+                }
+                case TypeKind.CHAR: {
+                    return SymbolInfoKind.Number;
+                }
+                case TypeKind.ENUM: {
+                    return SymbolInfoKind.Enum;
+                }
+                case TypeKind.FUNC: {
+                    return SymbolInfoKind.Function;
+                }
+                case TypeKind.FUNC_PTR: {
+                    return SymbolInfoKind.Object;
+                }
+                case TypeKind.GENERIC_PARAM: {
+                    return SymbolInfoKind.TypeParameter;
+                }
+                case TypeKind.NULL: {
+                    return SymbolInfoKind.Null;
+                }
+                case TypeKind.PTR: {
+                    return SymbolInfoKind.Object;
+                }
+                case TypeKind.STR: {
+                    return SymbolInfoKind.String;
+                }
+                case TypeKind.STRUCT: {
+                    return SymbolInfoKind.Struct;
+                }
+                case TypeKind.UNION: {
+                    return SymbolInfoKind.Struct;
+                }
+                case TypeKind.VOID: {
+                    return SymbolInfoKind.Null;
+                }
+                default: {
+                    return SymbolInfoKind.Number
+                }
+            }
+        }
+        default: {
+            return SymbolInfoKind.Variable
+        }
+    }
+}
+
+public func SymbolToSymbolInformation(sym: *sym::Symbol, rootPath: *const char, alloc: *const Allocator) : *JsonNode {
+    if(!sym) return null;
+
+    var result = CreateJsonObject(alloc)
+    result.putStr("name", sym.name)
+    result.putBool("deprecated", (sym.flags & sym::SymbolFlags.IS_TYPE) && sym.decl.hasNote("deprecated"))
+
+    var kind = SymbolKindFromSymbol(sym) as (i32)
+    result.putNumber("kind", kind as (f64))
+
+    if(sym.decl) {
+        result.put("location", SrcPosToLocation(sym.decl.startPos, rootPath, alloc))
+    }
+
+    return result
+}
+
+public func SrcPosToLocation(pos: SrcPos, rootPath: *const char,  alloc: *const Allocator) : *JsonNode {
+    if(!pos.filename) return null;
+
+    var absPath = [MAX_PATH]char{0}
+    GetAbsolutePath(rootPath, pos.filename, absPath)
+
+    var uri = [MAX_PATH]char{0}
+    FilePathToUri(absPath, uri)
+
+    var result = CreateJsonObject(alloc)
+    result.putStr("uri", uri)
+    result.put("range", SrcPosToRange(pos, alloc))
+    return result
+}
+
+
+public func SrcPosToRange(pos: SrcPos, alloc: *const Allocator) : *JsonNode {
+    var lineNumber = MAX(pos.lineNumber - 1, 0) as (f64)
+
+    var start = CreateJsonObject(alloc)
+    start.putNumber("line", lineNumber)
+    start.putNumber("character", 0_f64)
+
+    var end = CreateJsonObject(alloc)
+    end.putNumber("line", lineNumber)
+    var length = (pos.end - pos.start) as (i64)
+    end.putNumber("character", length as (f64))
+
+    var range = CreateJsonObject(alloc)
+    range.put("start", start)
+    range.put("end", end)
+    return range
+}

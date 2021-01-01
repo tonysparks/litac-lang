@@ -24,6 +24,7 @@ import "cmdline"
 
 func main(len: i32, args: **char) : i32 {
     SystemInit()
+
     var startTime = SystemTimeMSec()
 
     var options = LitaOptions{}
@@ -144,13 +145,13 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
             goto err;
         }
 
-        strncpy(options.inputFile, parser.args.get(1), MAX_PATH)
+        GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
     }
 
     var lib:*const char = GetEnv("LITAC_HOME")
     if(!lib) lib = "";
 
-    strncpy(options.litaPath, lib, MAX_PATH)
+    GetAbsolutePath("", lib, options.litaPath)
 
     if(parser.hasOption("help")) {
         var sb = StringBufferInit()
@@ -164,6 +165,17 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     options.cOutputOnly = parser.hasOption("cOnly")
     options.showProfileInfo = parser.hasOption("profile")
     options.run = parser.hasOption("run")
+    options.isDebug = parser.hasOption("debug")
+
+    if(parser.hasOption("test")) {
+        options.testsRegex = parser.getOption("test").value
+        options.testsOnly = true
+    }
+
+    if(parser.hasOption("testFile")) {
+        options.testFileOnly = true
+        options.testsOnly = true
+    }
 
     if(parser.hasOption("buildCmd")) {
         options.compileCmd = parser.getOption("buildCmd").value

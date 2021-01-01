@@ -49,19 +49,61 @@ public func main(argc: i32, args: **char) : i32 {
     var testCase = TestCase{}
     testCase.requests.init(16, testHarness.allocator)
 
-    var req = TestRequest{
-        .request = """{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":12844,"rootPath":"c:\\\\Users\\\\chq-tonys\\\\git\\\\litac-lang","rootUri":"file:///c%3A/Users/chq-tonys/git/litac-lang","capabilities":{"workspace":{"applyEdit":true,"workspaceEdit":{"documentChanges":true},"didChangeConfiguration":{"dynamicRegistration":true},"didChangeWatchedFiles":{"dynamicRegistration":true},"symbol":{"dynamicRegistration":true,"symbolKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]}},"executeCommand":{"dynamicRegistration":true},"configuration":true,"workspaceFolders":true},"textDocument":{"publishDiagnostics":{"relatedInformation":true},"synchronization":{"dynamicRegistration":true,"willSave":true,"willSaveWaitUntil":true,"didSave":true},"completion":{"dynamicRegistration":true,"contextSupport":true,"completionItem":{"snippetSupport":true,"commitCharactersSupport":true,"documentationFormat":["markdown","plaintext"],"deprecatedSupport":true,"preselectSupport":true},"completionItemKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]}},"hover":{"dynamicRegistration":true,"contentFormat":["markdown","plaintext"]},"signatureHelp":{"dynamicRegistration":true,"signatureInformation":{"documentationFormat":["markdown","plaintext"]}},"definition":{"dynamicRegistration":true},"references":{"dynamicRegistration":true},"documentHighlight":{"dynamicRegistration":true},"documentSymbol":{"dynamicRegistration":true,"symbolKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]},"hierarchicalDocumentSymbolSupport":true},"codeAction":{"dynamicRegistration":true,"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["","quickfix","refactor","refactor.extract","refactor.inline","refactor.rewrite","source","source.organizeImports"]}}},"codeLens":{"dynamicRegistration":true},"formatting":{"dynamicRegistration":true},"rangeFormatting":{"dynamicRegistration":true},"onTypeFormatting":{"dynamicRegistration":true},"rename":{"dynamicRegistration":true},"documentLink":{"dynamicRegistration":true},"typeDefinition":{"dynamicRegistration":true},"implementation":{"dynamicRegistration":true},"colorProvider":{"dynamicRegistration":true},"foldingRange":{"dynamicRegistration":true,"rangeLimit":5000,"lineFoldingOnly":true}}},"trace":"off","workspaceFolders":[{"uri":"file:///c%3A/Users/chq-tonys/git/litac-lang","name":"litac-lang"}]}}""",
+    var reqInit = TestRequest{
+        .request = """{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"processId":12844,"rootPath":"c:\\\\Users\\\\antho\\\\git\\\\litac-lang","rootUri":"file:///c%3A/Users/antho/git/litac-lang","capabilities":{"workspace":{"applyEdit":true,"workspaceEdit":{"documentChanges":true},"didChangeConfiguration":{"dynamicRegistration":true},"didChangeWatchedFiles":{"dynamicRegistration":true},"symbol":{"dynamicRegistration":true,"symbolKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]}},"executeCommand":{"dynamicRegistration":true},"configuration":true,"workspaceFolders":true},"textDocument":{"publishDiagnostics":{"relatedInformation":true},"synchronization":{"dynamicRegistration":true,"willSave":true,"willSaveWaitUntil":true,"didSave":true},"completion":{"dynamicRegistration":true,"contextSupport":true,"completionItem":{"snippetSupport":true,"commitCharactersSupport":true,"documentationFormat":["markdown","plaintext"],"deprecatedSupport":true,"preselectSupport":true},"completionItemKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]}},"hover":{"dynamicRegistration":true,"contentFormat":["markdown","plaintext"]},"signatureHelp":{"dynamicRegistration":true,"signatureInformation":{"documentationFormat":["markdown","plaintext"]}},"definition":{"dynamicRegistration":true},"references":{"dynamicRegistration":true},"documentHighlight":{"dynamicRegistration":true},"documentSymbol":{"dynamicRegistration":true,"symbolKind":{"valueSet":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26]},"hierarchicalDocumentSymbolSupport":true},"codeAction":{"dynamicRegistration":true,"codeActionLiteralSupport":{"codeActionKind":{"valueSet":["","quickfix","refactor","refactor.extract","refactor.inline","refactor.rewrite","source","source.organizeImports"]}}},"codeLens":{"dynamicRegistration":true},"formatting":{"dynamicRegistration":true},"rangeFormatting":{"dynamicRegistration":true},"onTypeFormatting":{"dynamicRegistration":true},"rename":{"dynamicRegistration":true},"documentLink":{"dynamicRegistration":true},"typeDefinition":{"dynamicRegistration":true},"implementation":{"dynamicRegistration":true},"colorProvider":{"dynamicRegistration":true},"foldingRange":{"dynamicRegistration":true,"rangeLimit":5000,"lineFoldingOnly":true}}},"trace":"off","workspaceFolders":[{"uri":"file:///c%3A/Users/antho/git/litac-lang","name":"litac-lang"}]}}""",
         .response = """{"jsonrpc":"2.0","id":0,"result":{"capabilities":{"textDocumentSync":2,"definitionProvider":true,"documentSymbolProvider":true,"workspaceSymbolProvider":true,"referencesProvider":true,"completionProvider":{"resolveProvider":true,"triggerCharacters":["."]}}},"error":null}""",
     }
 
-    testCase.requests.add(req)
+    var reqAccept = TestRequest{
+        .request = """{"jsonrpc":"2.0","method":"initialized","params":{}}""",
+        .response = null,
+    }
+
+    var reqOpen = TestRequest{
+        //.request = """{"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///c%3A/Users/antho/git/litac-lang/src/lsp/lsp.lita","languageId":"litac","version":1,"text":"import \"lita\"\r\nimport \"mem\"\r\nimport \"string_buffer\"\r\nimport \"string\"\r\nimport \"json\"\r\nimport \"libc\"\r\nimport \"map\"\r\nimport \"system\"\r\nimport \"phase_result\"\r\nimport \"array\"\r\nimport \"lsp/workspace\"\r\n\r\nconst IN_BUFFER_SIZE = 1024 * 1024 * 2\r\nconst VERSION = \"0.12\" // TODO: read from a file at compile time; share with lita.main\r\n\r\npublic struct LspServer {\r\n    requestAllocator: LinearAllocator\r\n    applicationAllocator: LinearAllocator\r\n\r\n    lita: *Lita\r\n    message: StringBuffer\r\n    output: StringBuffer\r\n\r\n    isInitialized: bool\r\n    isRunning: bool\r\n\r\n    workspace: Workspace\r\n\r\n    logFile: *FILE\r\n}\r\n\r\npublic func (this: *LspServer) init(lita: *Lita) {\r\n    this.lita = lita\r\n    this.isRunning = false\r\n    this.isInitialized = false\r\n\r\n    this.logFile = fopen(\"lsp1.log\", \"w\")\r\n    if(!this.logFile) {\r\n        printf(\"Couldn't open log file!\\n\")\r\n    }\r\n\r\n    var size: usize = 1024 * 1024 * 100;\r\n    this.requestAllocator.init(defaultAllocator.alloc(size), size)\r\n    this.applicationAllocator.init(defaultAllocator.alloc(size), size)\r\n\r\n    this.message = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)\r\n    this.output = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)\r\n\r\n    this.workspace.init(this, this.appAlloc())\r\n}\r\n\r\n\r\npublic func (this: *LspServer) requestAlloc() : *const Allocator {\r\n    return (&this.requestAllocator) as (*const Allocator)\r\n}\r\n\r\n\r\npublic func (this: *LspServer) appAlloc() : *const Allocator {\r\n    return (&this.applicationAllocator) as (*const Allocator)\r\n}\r\n\r\npublic func (this: *LspServer) free() {\r\n    if(this.applicationAllocator.mem) {\r\n        defaultAllocator.free(this.applicationAllocator.mem)\r\n    }\r\n    if(this.requestAllocator.mem) {\r\n        defaultAllocator.free(this.requestAllocator.mem)\r\n    }\r\n    this.message.free()\r\n    this.output.free()\r\n\r\n    if(this.logFile) {\r\n        fclose(this.logFile)\r\n    }\r\n}\r\n\r\n\r\npublic func (this: *LspServer) start() {\r\n    this.log(\"starting Lita Language Server v%s\\n\", VERSION)\r\n    defer this.log(\"terminating Lita Language Server\\n\")\r\n\r\n    this.isRunning = true\r\n    while(this.isRunning) {\r\n        this.readMessage()\r\n    }\r\n}\r\n\r\npublic func (this: *LspServer) log(format: *const char, ...) {\r\n    var args: va_list;\r\n    va_start(args, format);\r\n    vfprintf(this.logFile, format, args);\r\n    //vfprintf(stdout, format, args)\r\n    //fprintf(stdout, \"\\n\")\r\n    va_end(args);\r\n    //fputs(\"\\n\", this.logFile);\r\n    fflush(this.logFile)\r\n}\r\n\r\npublic func (this: *LspServer) readMessage() {\r\n    this.message.clear()\r\n\r\n    var contentSize = [17]char{0};\r\n    var size = 0_i32\r\n\r\n    fscanf(stdin, \"%16s %d\\r\\n\\r\\n\", contentSize, &size)\r\n    if(strnlen(contentSize, 17) == 0) {\r\n        return;\r\n    }\r\n\r\n    // free memory\r\n    defer this.requestAllocator.currentOffset = 0\r\n\r\n    this.log(\"Received Content Header: '%s'\\n\", contentSize)\r\n\r\n    if(strncmp(contentSize, \"Content-Length:\", 16) != 0) {\r\n        this.log(\"error reading 'Content-Length', found '%s'\", contentSize)\r\n        this.writeErrorResponse(0, \"error reading 'Content-Length'\")\r\n        return;\r\n    }\r\n    // TODO: Support Content-Type header\r\n\r\n    this.log(\"Received message size: %d\\n\", size)\r\n\r\n    this.message.reserve(size)\r\n\r\n    // Read content-size\r\n    var bytesRead = fread(this.message.buffer, 1, size, stdin)\r\n    this.log(\"Received %d bytes from fread\\n\", bytesRead)\r\n\r\n    if(bytesRead != size) {\r\n        this.log(\"message received size of %d did not match Content-Length: %d\\n\", bytesRead, size)\r\n        this.writeErrorResponse(0, \"message received size did not match content-length\")\r\n        return;\r\n    }\r\n\r\n    this.message.length = size\r\n    this.log(\"Received message: '%.*s'\\n\", size, this.message.buffer)\r\n\r\n    var parser = ParserInit(this.requestAlloc())\r\n    defer parser.free()\r\n\r\n    var json = parser.parseJson(this.message.cStr())\r\n    if(parser.hasError()) {\r\n        this.log(\"json parsing error: %s\\n\", parser.errorMsg)\r\n        return;\r\n    }\r\n\r\n    this.handleMessage(json)\r\n}\r\n\r\npublic func (this: *LspServer) handleMessage(msg: *JsonNode) {\r\n    var method = msg.getStr(\"method\", null)\r\n    if(!method) {\r\n        this.writeErrorResponse(0, \"no method defined\")\r\n        return;\r\n    }\r\n\r\n    var params = msg.getObject(\"params\")\r\n    if(strcmp(method, \"initialize\") == 0) {\r\n        this.handleInitializeMessage(msg, params)\r\n    }\r\n    else if(strcmp(method, \"initialized\") == 0) {\r\n        this.isInitialized = true\r\n    }\r\n    else if(!this.isInitialized) {\r\n        this.writeErrorResponse(0, \"no yet properly initialized\")\r\n    }\r\n    else if(strcmp(method, \"textDocument/didOpen\") == 0) {\r\n        this.handleTextDocumentOpenMessage(msg, params)\r\n    }\r\n    else {\r\n        this.writeErrorResponse(0, \"unsupported params: %s\", params)\r\n    }\r\n}\r\n\r\npublic func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *JsonNode) {\r\n    var rootPath = params.getStr(\"rootPath\", \"\")\r\n    var rootUri = params.getStr(\"rootUri\", \"\")\r\n    this.log(\"Root Path = '%s'\\n\", rootPath)\r\n\r\n    var path = [MAX_PATH]char{0}\r\n    UriToFilePath(rootUri, path)\r\n\r\n    this.log(\"Root Uri = '%s' as path: '%s'\\n\", rootUri, path)\r\n\r\n    this.workspace.setup(rootPath, path)\r\n\r\n    var capabilities = \"\"\"\r\n    {\r\n        \"capabilities\": {\r\n            \"textDocumentSync\": 2,\r\n            \"definitionProvider\": true,\r\n            \"documentSymbolProvider\": true,\r\n            \"workspaceSymbolProvider\": true,\r\n            \"referencesProvider\": true,\r\n            \"completionProvider\": {\r\n                \"resolveProvider\": true,\r\n                \"triggerCharacters\": [\r\n                    \".\"\r\n                ]\r\n            }\r\n        }\r\n    }\r\n    \"\"\"\r\n    var parser = ParserInit(this.requestAlloc())\r\n    var resp = CreateJsonObject(this.requestAlloc())\r\n    resp.put(\"result\", parser.parseJson(capabilities))\r\n\r\n    this.writeResponse(msg.getInt(\"id\"), resp)\r\n}\r\n\r\n\r\npublic func (this: *LspServer) handleTextDocumentOpenMessage(msg: *JsonNode, params: *JsonNode) {\r\n    var textDoc = params.getObject(\"textDocument\")\r\n    if(!textDoc) {\r\n        return;\r\n    }\r\n\r\n    var uri = textDoc.getStr(\"uri\", null)\r\n    this.workspace.openDocument(uri, textDoc.getStr(\"text\", null))\r\n    this.writeDiagnostic(uri)\r\n}\r\n\r\npublic func (this: *LspServer) writeDiagnostic(docUri: *const char) {\r\n    var result = this.workspace.runDiagnostics(this.requestAlloc())\r\n\r\n    var params = CreateJsonObject(this.requestAlloc())\r\n    params.putStr(\"uri\", docUri)\r\n    var diagnostics = CreateJsonArray(this.requestAlloc())\r\n    params.put(\"diagnostics\", diagnostics)\r\n\r\n    var resp = CreateJsonObject(this.requestAlloc())\r\n    resp.putStr(\"method\", \"textDocument/publishDiagnostics\")\r\n    resp.put(\"params\", params)\r\n\r\n    var output = [MAX_PATH]char{0}\r\n    var filename = UriToFilePath(docUri, output)\r\n\r\n    if(!result.errors.empty()) {\r\n        for(var i = 0; i < result.errors.size(); i += 1) {\r\n            var error =  result.errors.get(i)\r\n            printf(\"\")\r\n        }\r\n    }\r\n}\r\n\r\npublic func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, ...) {\r\n    var args: va_list;\r\n    va_start(args, format);\r\n    var sb = StringBufferInit(512, this.requestAlloc())\r\n    sb.appendArgs(format, args)\r\n    va_end(args);\r\n\r\n\r\n    var error = CreateJsonObject(this.requestAlloc())\r\n    error.putStr(\"message\", sb.cStr())\r\n\r\n    var resp = CreateJsonObject(this.requestAlloc())\r\n    resp.put(\"error\", error)\r\n\r\n    this.writeResponse(id, resp)\r\n}\r\n\r\npublic func (this: *LspServer) writeResponse(id: i64, msg: *JsonNode) {\r\n    this.output.clear()\r\n\r\n    msg.putStr(\"jsonrpc\", \"2.0\")\r\n\r\n    if(id > -1) {\r\n        msg.putNumber(\"id\", id as (f64))\r\n    }\r\n\r\n    var header = [256]char{0};\r\n    var headerStr = StringInit(header, 256)\r\n\r\n    var jsonStr = msg.print(this.output)\r\n    var length = this.output.length\r\n\r\n    this.log(\"Sending: %d '%.*s'\\n\", length, this.output.length, this.output.buffer)\r\n\r\n    headerStr.append(\"Content-Length: %d\\r\\n\\r\\n\", length + 1)\r\n    fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)\r\n    fwrite(this.output.buffer, sizeof(:char), length, stdout)\r\n    fwrite(\"\\n\" as (*const void), sizeof(:char), 1, stdout)\r\n    fflush(stdout)\r\n}\r\n\r\n\r\n/*\r\n@test\r\npublic func test() {\r\n    var server = LspServer{}\r\n    var lita = Lita{}\r\n    server.init(&lita)\r\n\r\n    server.readMessage()\r\n}\r\n\r\npublic struct Param {\r\n\r\n}\r\n\r\npublic struct JrpcMessage {\r\n    method: *const char\r\n    params: *\r\n}*/\r\n"}}}""",
+        .request =
+        """{
+            "jsonrpc": "2.0",
+            "method": "textDocument/didOpen",
+            "params": {
+                "textDocument": {
+                    "uri": "file:///c%3A/Users/antho/git/litac-lang/src/lsp/lsp.lita",
+                    "languageId": "litac",
+                    "version": 1,
+                    "text": ""
+                }
+            }
+        }""", //"
+        .response = null,
+    }
+
+    var reqSymbols = TestRequest{
+        .request = """{
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "textDocument/documentSymbol",
+            "params": {
+                "textDocument": {
+                    "uri": "file:///c%3A/Users/antho/git/litac-lang/src/lsp/lsp.lita"
+                }
+            }}""", // "
+        .response = """
+            false
+        """, // "
+    }
+
+    testCase.requests.add(reqInit)
+    testCase.requests.add(reqAccept)
+    testCase.requests.add(reqOpen)
+    testCase.requests.add(reqSymbols)
 
     RunTest(testHarness.buffer, &testCase)
 }
 
 func RunTest(sb: *StringBuffer, test: *TestCase) {
 // TODO: fix path
-    var binaryFilename = "C:\\Users\\chq-tonys\\git\\litac-lang\\bin\\litaC.exe";
+    //var binaryFilename = "C:\\Users\\antho\\git\\litac-lang\\bin\\litaC.exe";
+    var binaryFilename = "litaC.exe";
 
 /*
     var path: [MAX_PATH]char;
@@ -105,6 +147,10 @@ printf("Path: %s\n", path)
         fwrite(req.request, sizeof(:char), contentLen, input)
         fflush(input)
 
+        if(!req.response) {
+            continue
+        }
+
         sb.clear()
         var buffer = [32]char{0};
         var contentLength = [16]char{0};
@@ -116,7 +162,10 @@ printf("Path: %s\n", path)
         if(bytesRead > 0) {
             sscanf(buffer, "%16s %d\r\n\r\n", contentLength, &size)
             if(strncmp(contentLength, "Content-Length:", 16) != 0) {
-                printf("Failure\n")
+                if(!req.response) {
+                    continue
+                }
+                printf("Failure for 'Content-Length' header: '%.*s'\n", bytesRead, buffer)
                 return;
             }
 
@@ -132,7 +181,7 @@ printf("Path: %s\n", path)
                     }
                 }
             }
-            var bytesConsumed = bytesRead - i
+            var bytesConsumed = bytesRead - i + 1
             sb.append("%.*s", bytesConsumed, &buffer[i])
 
             size -= bytesConsumed
@@ -144,16 +193,23 @@ printf("Path: %s\n", path)
         }
 
         var response = sb.cStr()
-        var parser = ParserInit(testHarness.allocator)
+        var parser = JsonParserInit(testHarness.allocator)
         var responseJson = parser.parseJson(response)
+
         if(!responseJson) {
-            printf("Failed for parse response json: %s\n", parser.errorMsg)
+            printf("Failed parsing response json: %s\n", parser.errorMsg)
             printf("Response: '%s'\n", response)
             return;
         }
+
+        if(!req.response) {
+            printf("Success\n")
+            continue
+        }
+
         var expectedJson = parser.parseJson(req.response)
         if(!expectedJson) {
-            printf("Failed for parse expected json: %s\n", parser.errorMsg)
+            printf("Failed parsing expected json: %s from '%s'\n", parser.errorMsg, req.response)
             return;
         }
 

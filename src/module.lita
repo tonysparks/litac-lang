@@ -17,6 +17,7 @@ import "types"
 public enum ModuleFlags {
     TYPE_CHECKED  = (1<<0),
     TYPE_RESOLVED = (1<<1),
+    TYPE_IMPORTED = (1<<2),
 }
 
 public struct ModuleId {
@@ -54,17 +55,14 @@ public const BUILTIN_IMPORT_TOKEN = Token {
     }
 }
 public const builtins = Module{}
-const genericSymbols = Map<*const char, *Symbol>{} // TODO: make this in Lita? bad that it's a global...
 public func BuiltinsInit(lita: *Lita) : *Module {
-    genericSymbols.init(null, 128, StrHashFn, StrEqualFn, lita.allocator)
-
     builtins.text = null
     builtins.ast = null
     builtins.flags = 0
     builtins.allocator = lita.allocator
     builtins.importedBy.init(512, lita.allocator)
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
-    builtins.genericSymbols = &genericSymbols
+    builtins.genericSymbols = &lita.genericSymbols
 
     var filename: [MAX_PATH]char;
     var pathStr = StringInit(filename, MAX_PATH);
@@ -105,12 +103,13 @@ public func NewModule(lita: *Lita,
                       filename: *const char) : *Module {
 
     var mod = new<Module>(lita.allocator)
-    mod.init(lita.result, lita.allocator)
+    mod.init(&lita.result, &lita.genericSymbols, lita.allocator)
     mod.id.fromFile(lita, filename)
     return mod
 }
 
 public func (this: *Module) init(result: *PhaseResult,
+                                 genericSymbols: *Map<*const char, *Symbol>,
                                  allocator: *const Allocator) {
     this.text = null
     this.ast = null
@@ -119,7 +118,7 @@ public func (this: *Module) init(result: *PhaseResult,
     this.flags = 0
     this.allocator = allocator
     this.currentScope = &this.symbols
-    this.genericSymbols = &genericSymbols
+    this.genericSymbols = genericSymbols
 
     this.symbols.module = this // TEMP
 }
@@ -209,7 +208,7 @@ public func (this: *Module) print(header: *const char) {
 }
 
 public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {
-    strcpy(moduleId.filename, filename)
+    GetAbsolutePath(CurrentWorkingPath(), filename, moduleId.filename)
     var pathStr = StringViewInit(moduleId.filename);
 
     moduleId.packageName = StringViewInit(moduleId.filename, 0)
