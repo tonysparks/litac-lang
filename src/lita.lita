@@ -106,6 +106,19 @@ public func (this: *Lita) init(options: *LitaOptions) {
     this.genericSymbols = StrMap<*Symbol>(null, 128, allocator)
 }
 
+@doc("Resets the state reading for another compile")
+public func (this: *Lita) reset() {
+    this.linearAllocator.currentOffset = 0
+    this.totalSourceLines = 0
+    this.totalAllocations = 0
+
+    this.preprocessor.init(this)
+    this.result = PhaseResultInit(this.allocator)
+    this.modules = StrMap<*Module>(null, 32, this.allocator)
+
+    this.genericSymbols = StrMap<*Symbol>(null, 128, this.allocator)
+}
+
 public func (lita: *Lita) free() {
     if(lita.linearAllocator.mem) {
         defaultAllocator.free(lita.linearAllocator.mem)

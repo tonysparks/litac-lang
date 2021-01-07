@@ -9,6 +9,8 @@ import "system"
 import "lita"
 import "phase_result"
 import "symbols"
+import "checker"
+
 
 import "lsp/lsp"
 import "lsp/protocol"
@@ -43,8 +45,22 @@ public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char
 
     if(FileExists(pathStr.cStrConst())) {
         this.lsp.log("found!\n")
-        strncpy(lita.options.inputFile, pathStr.cStr(), MAX_PATH)
+
+        GetAbsolutePath("", pathStr.cStr(), lita.options.inputFile)
         FilePath(lita.options.inputFile, lita.options.srcPath)
+
+        var lib:*const char = GetEnv("LITAC_HOME")
+        if(!lib) lib = "";
+
+        GetAbsolutePath("", lib, lita.options.litaPath)
+
+        this.lsp.log("Lita.inputFile = '%s'\nLita.srcPath = '%s'\nLita.libPath = '%s'\nLita.litaPath = '%s'\n",
+            lita.options.inputFile,
+            lita.options.srcPath,
+            lita.options.libPath,
+            lita.options.litaPath)
+
+        lita.options.checkerOnly = true
         return;
     }
 
@@ -98,19 +114,25 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
 }
 
 public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseResult {
+    var startTime = SystemTimeMSec()
     var lita = this.lsp.lita
-    lita.linearAllocator.currentOffset = 0
+    lita.reset()
 
     var root = lita.parse()
     if(!root) {
+        this.lsp.log("Failed to parse\n")
         goto report
     }
 
-    if(!lita.typeCheck(root)) {
+    var checked = lita.typeCheck(root)
+    if(!checked) {
+        this.lsp.log("Failed to type check\n")
         goto report
     }
+
+    var totalTime = SystemTimeMSec()
+    this.lsp.log("Successfully compiled in %.3f msec\n", totalTime)
 
 report:
-
     return &lita.result
 }

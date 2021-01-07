@@ -229,7 +229,6 @@ func (this: *CallContext) logErrors() : bool {
         return false;
     }
 
-    //ConsolePrintf("Script Error: \n")
     var sb = StringBufferInit(1024, this.pp.lita.allocator)
     var pos = SrcPos{}
 
@@ -238,7 +237,6 @@ func (this: *CallContext) logErrors() : bool {
         var errStr = ape_error_serialize(err);
         defer if(errStr) free(errStr)
 
-        //ConsolePrintf("%s\n", errStr)
         this.pp.lita.result.addErrorStr(pos, sb)
     }
 
@@ -254,7 +252,6 @@ public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker) {
         this.callContext.comp = comp
         this.eval(comp)
     }
-
 }
 
 func (this: *Preprocessor) addNotes(obj: ape_object_t, attributes: *Attributes) {

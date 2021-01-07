@@ -55,7 +55,6 @@ public struct TypeChecker {
 
     genericContext: GenericContext
     genericParamStack: Array<Array<GenericParam>>
-    //genericTypes: Map<*const char, *Symbol>
     genericTemplates: Array<*Symbol>
 
     labels: [MAX_LABELS]LabelInfo;
@@ -67,7 +66,6 @@ public struct TypeChecker {
 public func (this: *TypeChecker) init(lita: *Lita) {
     this.lita = lita
     this.current = null
-    //this.currentScope = null
     this.moduleStack.init(64, lita.allocator)
     this.funcDeclStack.init(64, lita.allocator)
     this.pendingValues.init(128, lita.allocator)
@@ -75,7 +73,6 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.symbolFuncs.init(256, lita.allocator)
     this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
-    //this.genericTypes = StrMap<*Symbol>(null, 64, lita.allocator)
     this.genericContext.callsite = null
 
     this.mainEntry = null

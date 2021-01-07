@@ -89,10 +89,7 @@ public func (this: *LspServer) log(format: *const char, ...) {
     var args: va_list;
     va_start(args, format);
     vfprintf(this.logFile, format, args);
-    //vfprintf(stdout, format, args)
-    //fprintf(stdout, "\n")
     va_end(args);
-    //fputs("\n", this.logFile);
     fflush(this.logFile)
 }
 
@@ -205,13 +202,14 @@ public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *
                 ]
             }
         }
-    }
-    """
+    }"""
+
+    var resp = this.createResponse(msg.getInt("id"))
+
     var parser = JsonParserInit(this.requestAlloc())
-    var resp = CreateJsonObject(this.requestAlloc())
     resp.put("result", parser.parseJson(capabilities))
 
-    this.writeResponse(msg.getInt("id"), resp)
+    this.writeResponse(resp)
 }
 
 
@@ -235,16 +233,16 @@ public func (this: *LspServer) handleTextDocumentSymbolMessage(msg: *JsonNode, p
     var uri = textDoc.getStr("uri", null)
     var results = this.workspace.documentSymbols(uri, this.requestAlloc())
 
-
-    var resp = CreateJsonObject(this.requestAlloc())
+    var resp = this.createResponse(msg.getInt("id"))
     resp.put("result", results)
 
-    this.writeResponse(msg.getInt("id"), resp)
+    this.writeResponse(resp)
 }
 
 public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
+    this.log("Running diagnostics for: '%s'\n", docUri)
     var result = this.workspace.runDiagnostics(this.requestAlloc())
-
+/*
     var params = CreateJsonObject(this.requestAlloc())
     params.putStr("uri", docUri)
     var diagnostics = CreateJsonArray(this.requestAlloc())
@@ -260,13 +258,14 @@ public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
     if(!result.errors.empty()) {
         for(var i = 0; i < result.errors.size(); i += 1) {
             var error =  result.errors.get(i)
-            /*var path = GetAbsolutePath(this.workspace.rootPath, error.pos.filename)
+            var path = GetAbsolutePath(this.workspace.rootPath, error.pos.filename)
             if(strcmp(path, filename) == 0) {
 
-            }*/
+            }
             // TODO:
         }
     }
+*/
 }
 
 public func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, ...) {
@@ -280,20 +279,14 @@ public func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, 
     var error = CreateJsonObject(this.requestAlloc())
     error.putStr("message", sb.cStr())
 
-    var resp = CreateJsonObject(this.requestAlloc())
+    var resp = this.createResponse(id)
     resp.put("error", error)
 
-    this.writeResponse(id, resp)
+    this.writeResponse(resp)
 }
 
-public func (this: *LspServer) writeResponse(id: i64, msg: *JsonNode) {
+public func (this: *LspServer) writeResponse(msg: *JsonNode) {
     this.output.clear()
-
-    msg.putStr("jsonrpc", "2.0")
-
-    if(id > -1) {
-        msg.putNumber("id", id as (f64))
-    }
 
     var header = [256]char{0};
     var headerStr = StringInit(header, 256)
@@ -302,10 +295,24 @@ public func (this: *LspServer) writeResponse(id: i64, msg: *JsonNode) {
     var length = this.output.length
 
     this.log("Sending: %d '%.*s'\n", length, this.output.length, this.output.buffer)
+    if(length < 1) {
+        return;
+    }
 
     headerStr.append("Content-Length: %d\r\n\r\n", length + 1)
     fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)
-    fwrite(this.output.buffer, sizeof(:char), length, stdout)
-    fwrite("\n" as (*const void), sizeof(:char), 1, stdout)
+    fwrite(this.output.buffer, sizeof(:char), length + 1, stdout)
+    //fwrite("\n" as (*const void), sizeof(:char), 1, stdout)
     fflush(stdout)
+}
+
+public func (this: *LspServer) createResponse(id: i64) : *JsonNode {
+    var response = CreateJsonObject(this.requestAlloc())
+    response.putStr("jsonrpc", "2.0")
+
+    if(id > -1) {
+        response.putNumber("id", id as (f64))
+    }
+
+    return response
 }
