@@ -72,7 +72,7 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     // TODO: Make this properties actually respect the litaOptions...
     ape_set_global_constant(this.ape, "OS", ape_object_make_string(this.ape, "WINDOWS")) // TODO: Make this respect the platform...
     ape_set_global_constant(this.ape, "DEBUG", ape_object_make_bool(lita.options.isDebug))
-    ape_set_global_constant(this.ape, "REFLECTION", ape_object_make_bool(false))
+    ape_set_global_constant(this.ape, "REFLECTION", ape_object_make_bool(lita.options.typeOption != TypeInfoOption.NONE))
     ape_set_global_constant(this.ape, "TESTING", ape_object_make_bool(lita.options.testsOnly))
 
     ape_set_native_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)

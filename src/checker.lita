@@ -16,6 +16,7 @@ import "string"
 import "ast_print"
 import "libc"
 import "generics"
+import "introspection"
 
 import "checker_decl"
 import "checker_expr"
@@ -60,7 +61,10 @@ public struct TypeChecker {
     labels: [MAX_LABELS]LabelInfo;
     numOfLabels: i32
 
+    typeCache: TypeCache
+
     randomNameIndex: u32
+    //isFull
 }
 
 public func (this: *TypeChecker) init(lita: *Lita) {
@@ -74,6 +78,8 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
     this.genericContext.callsite = null
+
+    this.typeCache.init(lita.allocator)
 
     this.mainEntry = null
 
@@ -98,9 +104,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
             break
         }
     }
-
     this.lita.preprocessor.preResolveSymbols(this)
-
     this.resolveSymbols()
 
     for(var it = this.current.genericSymbols.iter(); it.hasNext();) {
@@ -113,6 +117,11 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
         else {
             this.symbolTypes.add(sym)
         }
+    }
+
+    if(!this.lita.result.hasErrors()) {
+        var introspect = Introspect{.lita = this.lita}
+        introspect.generate(this)
     }
 
 exit:
@@ -305,19 +314,25 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         case StmtKind.VAR_DECL: {
             var varDecl = decl as (*VarDecl)
 
+            var isValid = false
             if(varDecl.expr.isConstExpr() || varDecl.hasNote("foreign")) {
                 this.result.enabled = false
-                var isValid = this.resolveValueDecl(varDecl)
+                isValid = this.resolveValueDecl(varDecl) != null
                 this.result.enabled = true
 
                 // if this is resolvable, this means it
                 // is a valid constant expression and we don't need
                 // to resolve it later
                 if(isValid) {
+                    this.resolveSymbol(sym)
                     this.finishResolveSymbol(sym)
                 }
             }
-            this.pendingValues.add(sym)
+
+            if(!isValid) {
+                this.pendingValues.add(sym)
+            }
+
             break;
         }
         case StmtKind.FUNC_DECL: {
@@ -339,7 +354,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 this.genericTemplates.add(sym)
             }
 
-            sym.type = NewFuncTypeInfo(sym, funcDecl, this.allocator) as (*TypeInfo)
+            sym.type = this.typeCache.newFuncTypeInfo(sym, funcDecl) as (*TypeInfo)
             this.symbolFuncs.add(sym)
             break;
         }
@@ -514,7 +529,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
             switch(sym.decl.kind) {
                 case StmtKind.ENUM_DECL: {
                     var enumDecl = sym.decl as (*EnumDecl)
-                    sym.type = NewEnumTypeInfo(sym, enumDecl, this.allocator) as (*TypeInfo)
+                    sym.type = this.typeCache.newEnumTypeInfo(sym, enumDecl) as (*TypeInfo)
                     break;
                 }
                 case StmtKind.TYPEDEF_DECL: {
@@ -535,7 +550,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     }
 
                     if(typedefDecl.hasNote("foreign") && aliasedType.kind == TypeKind.VOID) {
-                        aliasedType = NewForeignTypeInfo(sym, this.allocator)
+                        aliasedType = this.typeCache.newForeignTypeInfo(sym)
                     }
                     sym.type = aliasedType
                     break;
@@ -543,7 +558,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                 case StmtKind.STRUCT_DECL:
                 case StmtKind.UNION_DECL: {
                     var aggregateDecl = sym.decl as (*AggregateDecl)
-                    sym.type = NewAggregateTypeInfo(sym, aggregateDecl, this.allocator) as (*TypeInfo)
+                    sym.type = this.typeCache.newAggregateTypeInfo(sym, aggregateDecl) as (*TypeInfo)
                     break;
                 }
                 default: {
@@ -554,6 +569,13 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         }
         case SymbolKind.VAR:
         case SymbolKind.CONST: {
+            if(sym.flags & SymbolFlags.IS_CONSTANT) {
+                var decl = sym.decl as (*VarDecl)
+                if(decl && decl.expr && decl.expr.operand.isConst) {
+                    sym.val = decl.expr.operand.val
+                }
+            }
+
             if(!(sym.flags & SymbolFlags.IS_LOCAL)) {
                 this.pendingValues.add(sym)
                 return;
@@ -565,7 +587,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
             var funcDecl = sym.decl as (*FuncDecl)
             var funcInfo = sym.type != null ?
                                 sym.type as (*FuncTypeInfo) :
-                                NewFuncTypeInfo(sym, funcDecl, this.allocator)
+                                this.typeCache.newFuncTypeInfo(sym, funcDecl)
 
             var hasGenerics = !funcDecl.genericParams.empty() //sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
             if(hasGenerics) {
@@ -589,7 +611,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                 goto err;
             }
 
-            funcInfo.returnType = TypeDecay(retType, this.allocator)
+            funcInfo.returnType = this.typeCache.typeDecay(retType)
             sym.type = funcInfo as (*TypeInfo)
             break
         }
@@ -695,7 +717,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             var nameSpec = spec as (*NameTypeSpec)
 
             if(this.isGenericParamType(nameSpec)) {
-                nameSpec.typeInfo = NewGenericParamTypeInfo(nameSpec.name, this.allocator)
+                nameSpec.typeInfo = this.typeCache.newGenericParamTypeInfo(nameSpec.name)
                 return nameSpec.typeInfo
             }
 
@@ -733,13 +755,13 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
         case TypeSpecKind.CONST: {
             var constSpec = spec as (*ConstTypeSpec)
             var constOf = this.resolveTypeSpec(constSpec.base)
-            spec.typeInfo = NewConstTypeInfo(constOf, this.allocator) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newConstTypeInfo(constOf) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.PTR: {
             var ptrSpec = spec as (*PtrTypeSpec)
             var ptrOf = this.resolveTypeSpec(ptrSpec.base)
-            spec.typeInfo = NewPtrTypeInfo(ptrOf, this.allocator) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newPtrTypeInfo(ptrOf) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.ARRAY: {
@@ -761,7 +783,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
 
                 length = expr.operand.val.intValue // TODO: fix: usize != i64
             }
-            spec.typeInfo = NewArrayTypeInfo(arrayOf, length, arraySpec.numElements, this.allocator) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newArrayTypeInfo(arrayOf, length, arraySpec.numElements) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.FUNC_PTR: {
@@ -776,7 +798,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                 }
             }
             var returnType = this.resolveTypeSpec(funcPtrSpec.ret)
-            spec.typeInfo = NewFuncPtrTypeInfo(funcPtrSpec.genericParams, returnType, paramDecls, funcPtrSpec.hasVarargs, this.allocator) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newFuncPtrTypeInfo(funcPtrSpec.genericParams, returnType, paramDecls, funcPtrSpec.hasVarargs) as (*TypeInfo)
             return spec.typeInfo
         }
         default: {

@@ -1,0 +1,477 @@
+import "symbols"
+import "lita"
+import "libc"
+import "string_buffer"
+import "string_view"
+import "checker"
+import "checker_decl"
+import "array"
+import "map"
+import "types"
+import "types_new"
+import "module"
+import "ast"
+import "parser"
+import "lex"
+import "assert"
+import "system"
+import "error_codes"
+import "phase_result"
+
+public struct Introspect {
+    lita: *Lita
+}
+
+public func (this: *Introspect) generate(checker: *TypeChecker) {
+    if(this.lita.options.typeOption == TypeInfoOption.NONE) {
+        return;
+    }
+
+    var sb = StringBufferInit(2048*8, this.lita.allocator)
+    var scratch = StringBufferInit(1024, this.lita.allocator)
+    var onlyTagged = this.lita.options.typeOption == TypeInfoOption.TAGGED
+
+    var maxTypes = NextTypeId()
+    sb.append("""
+    public const numOfTypeInfos : usize = %llu_u64;
+    public const typeInfos: **TypeInfo = [%llu]*TypeInfo {
+    """, maxTypes, maxTypes)
+
+    if(onlyTagged) {
+        for(var i = 0; i < checker.symbolFuncs.size(); i += 1) {
+            var sym = checker.symbolFuncs.get(i)
+            if(sym.decl.hasNote("typeinfo")) {
+            }
+        }
+        for(var i = 0; i < checker.symbolTypes.size(); i += 1) {
+            var sym = checker.symbolTypes.get(i)
+            if(sym.decl.hasNote("typeinfo")) {
+            }
+        }
+    }
+    else {
+        for(var i = 0; i < checker.symbolFuncs.size(); i += 1) {
+            var sym = checker.symbolFuncs.get(i)
+            var type = sym.type
+
+            if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+                continue
+            }
+
+            if(!type || type.kind != TypeKind.FUNC) {
+                continue
+            }
+
+            this.emitFunc(sb, scratch, sym)
+        }
+
+        for(var i = 0; i < checker.symbolTypes.size(); i += 1) {
+            var sym = checker.symbolTypes.get(i)
+            if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+                continue
+            }
+
+            if(sym.flags & SymbolFlags.IS_ALIAS) {
+                continue
+            }
+
+            this.emitType(sb, scratch, sym.type)
+        }
+
+    }
+
+    // all container types
+    {
+        for(var it = checker.typeCache.arrayCache.iter(); it.hasNext();) {
+            var entry = it.next()
+            this.emitPrimitiveType(sb, entry.value as (*TypeInfo))
+        }
+
+        for(var it = checker.typeCache.ptrCache.iter(); it.hasNext();) {
+            var entry = it.next()
+            this.emitPrimitiveType(sb,  entry.value as (*TypeInfo))
+        }
+
+        for(var it = checker.typeCache.constCache.iter(); it.hasNext();) {
+            var entry = it.next()
+            this.emitPrimitiveType(sb, entry.value as (*TypeInfo))
+        }
+    }
+
+    // all primitive types
+    {
+        this.emitPrimitiveType(sb, BOOL_TYPE)
+        this.emitPrimitiveType(sb, CHAR_TYPE)
+        this.emitPrimitiveType(sb, I8_TYPE)
+        this.emitPrimitiveType(sb, U8_TYPE)
+        this.emitPrimitiveType(sb, I16_TYPE)
+        this.emitPrimitiveType(sb, U16_TYPE)
+        this.emitPrimitiveType(sb, I32_TYPE)
+        this.emitPrimitiveType(sb, U32_TYPE)
+        this.emitPrimitiveType(sb, I64_TYPE)
+        this.emitPrimitiveType(sb, U64_TYPE)
+        this.emitPrimitiveType(sb, F32_TYPE)
+        this.emitPrimitiveType(sb, F64_TYPE)
+        this.emitPrimitiveType(sb, USIZE_TYPE)
+        this.emitPrimitiveType(sb, NULL_TYPE)
+        this.emitPrimitiveType(sb, VOID_TYPE)
+        this.emitPrimitiveType(sb, STR_TYPE)
+        this.emitPrimitiveType(sb, POISON_TYPE)
+    }
+    sb.append("\n};")
+
+    var filename = [MAX_PATH]char{0}
+    var moduleName = StringViewInit("type")
+    if(!FindModulePath(this.lita, moduleName, filename)) {
+        // TODO: write error message
+        return;
+    }
+
+    var module = this.lita.modules.get(filename)
+    assert(module != null)
+
+    var parser = ParserInit(module.id.filename, sb.cStr(), this.lita)
+    var stmts = parser.parseModule()
+    if(stmts) {
+        checker.enterModule(module)
+        defer checker.leaveModule()
+
+        assert(stmts.declarations.size() == 2)
+        {
+            var numDecl = stmts.declarations.get(0)
+            assert(numDecl.kind == StmtKind.CONST_DECL)
+
+            var typeInfo = checker.resolveValueDecl(numDecl as (*VarDecl))
+            assert(typeInfo != null)
+
+            var existingDecl = module.getType("numOfTypeInfos")
+            assert(existingDecl != null)
+
+            numDecl.sym = existingDecl
+            existingDecl.decl = numDecl
+        }
+        {
+            var typesDecl = stmts.declarations.get(1)
+            assert(typesDecl.kind == StmtKind.CONST_DECL)
+
+            var typeInfo = checker.resolveValueDecl(typesDecl as (*VarDecl))
+
+            // TEMP: Remove once all types are implemented
+            if(!typeInfo) {
+                if(checker.lita.result.hasErrors()) {
+                    var sb = StringBufferInit()
+                    for(var i = 0; i < checker.lita.result.errors.size(); i+=1) {
+                        var error = checker.lita.result.errors.get(i)
+                        PrintError(sb, error)
+                    }
+
+                    printf("ERRORS: \n%s\n", sb.cStr())
+                }
+            }
+            // END TEMP
+            assert(typeInfo != null)
+
+            var existingDecl = module.getType("typeInfos")
+            assert(existingDecl != null)
+
+            typesDecl.sym = existingDecl
+            existingDecl.decl = typesDecl
+            existingDecl.type = typeInfo
+            //typeInfo.sym = existingDecl
+        }
+    }
+}
+
+func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym: *Symbol) {
+    var type = sym.type
+    assert(type.kind ==  TypeKind.FUNC)
+
+    var funcInfo = type as (*FuncTypeInfo)
+    var isVararg = funcInfo.decl.params.isVararg
+    var returnTypeid = funcInfo.returnType.typeid
+    var numOfParams = funcInfo.decl.params.size()
+
+    {
+        scratch.clear()
+        if(numOfParams) {
+            scratch.append("[]ParamInfo {")
+            for(var i = 0; i < numOfParams; i += 1) {
+                var param = funcInfo.decl.params.get(i)
+                scratch.append("""
+                    ParamInfo {
+                        .name = "%s",
+                        .type = %llu,
+                        .modifiers = Modifiers.%s,
+                    },
+                """, param.name.asString(), param.type.typeInfo.typeid, (param.attributes.isUsing) ? "Using" : "None")
+            }
+            scratch.append("}")
+
+        }
+        else {
+            scratch.append("null")
+        }
+    }
+
+    sb.append("""
+        [%llu] = &TypeInfo {
+            .kind = TypeKind.FUNC,
+            .name = "%s",
+            .id = %llu,
+            .funcType = funcType {
+                .isVararg = %s,
+                .returnType = %llu,
+                .params = %s,
+                .numOfParams = %d
+            }
+        },
+    """, type.typeid, sym.name, type.typeid, isVararg ? "true": "false", returnTypeid, scratch.cStr(), numOfParams)
+}
+
+func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, type: *TypeInfo) {
+    scratch.clear()
+
+    switch(type.kind) {
+        default: {}
+        case TypeKind.ENUM: {
+            var enumInfo = type as (*EnumTypeInfo)
+            var decl = enumInfo.decl
+            var numOfFields = decl.fields.size()
+
+            if(numOfFields) {
+                scratch.append("[]EnumFieldInfo {")
+                var value = 0
+                for(var i = 0; i < numOfFields; i += 1) {
+                    var field = decl.fields.get(i)
+
+                    if(field.value) {
+                        // TODO: Get the value from the expr,
+                        // we don't do const evaluation yet!!
+                        if(field.value.operand.isConst) {
+                            value = field.value.operand.val.intValue
+                        }
+                    }
+                    scratch.append("""
+                        EnumFieldInfo {
+                            .name = "%s",
+                            .value = %d,
+                        },
+                    """, field.name.asString(), value)
+
+                    value += 1
+                }
+                scratch.append("}")
+            }
+            else {
+                scratch.append("null")
+            }
+
+            var name = type.sym.name
+
+            sb.append("""
+                [%llu] = &TypeInfo {
+                    .kind = TypeKind.%s,
+                    .name = "%s",
+                    .id = %llu,
+                    .enumType = enumType {
+                        .fields = %s,
+                        .numOfFields = %d
+                    }
+                },
+            """, type.typeid, TypeKindAsStr(type.kind), name, type.typeid, scratch.cStr(), numOfFields)
+
+            break
+        }
+        case TypeKind.UNION:
+        case TypeKind.STRUCT: {
+            var aggInfo = type as (*AggregateTypeInfo)
+            var decl = aggInfo.decl
+            var numOfFields = decl.fields.size()
+
+            if(numOfFields) {
+                scratch.append("[]FieldInfo {")
+                for(var i = 0; i < numOfFields; i += 1) {
+                    var field = decl.fields.get(i)
+
+                    switch(field.kind) {
+                        case StmtKind.VAR_FIELD_DECL: {
+                            var varField = field.varField
+                            if(varField.name.type != TokenType.IDENTIFIER) {
+                                break
+                            }
+
+                            var typeid = (field.typeInfo) ? field.typeInfo.typeid : 0_i64;
+
+                            scratch.append("""
+                                FieldInfo {
+                                    .kind = FieldInfoKind.VAR_FIELD,
+                                    .name = "%s",
+                                    .type = %llu,
+                                    .modifiers = Modifiers.%s,
+                                },
+                            """, varField.name.asString(), typeid, (varField.attributes.isUsing) ? "Using" : "None")
+
+                            break;
+                        }
+                        case StmtKind.ENUM_FIELD_DECL: {
+                            var enumField = field.enumField
+                            if(enumField.name.type != TokenType.IDENTIFIER) {
+                                break
+                            }
+
+                            scratch.append("""
+                                FieldInfo {
+                                    .kind = FieldInfoKind.ENUM_FIELD,
+                                    .name = "%s",
+                                    .type = %llu,
+                                    .modifiers = Modifiers.%s,
+                                },
+                            """, enumField.name.asString(), enumField.sym.type.typeid, (enumField.attributes.isUsing) ? "Using" : "None")
+
+                            break;
+                        }
+                        case StmtKind.UNION_FIELD_DECL:
+                        case StmtKind.STRUCT_FIELD_DECL: {
+                            var aggField = field.aggregateField
+                            var fieldType = field.kind == StmtKind.STRUCT_FIELD_DECL ? "STRUCT_FIELD" : "UNION_FIELD"
+                            if(aggField.name.type == TokenType.IDENTIFIER) {
+                                scratch.append("""
+                                    FieldInfo {
+                                        .kind = FieldInfoKind.%s,
+                                        .name = "%s",
+                                        .type = %llu,
+                                        .modifiers = Modifiers.%s,
+                                    },
+                                """, fieldType, aggField.name.asString(), aggField.sym.type.typeid, (aggField.attributes.isUsing) ? "Using" : "None")
+
+                                break;
+                            }
+                            else if(aggField.name.type == TokenType.VOID) {
+                                scratch.append("""
+                                    FieldInfo {
+                                        .kind = FieldInfoKind.%s,
+                                        .name = null,
+                                        .type = %llu,
+                                        .modifiers = Modifiers.%s,
+                                    },
+                                """, fieldType, aggField.sym.type.typeid, (aggField.attributes.isUsing) ? "Using" : "None")
+
+                            }
+                            break;
+                        }
+                        case StmtKind.POISON_EXPR: {
+                            break;
+                        }
+                        default: {
+                            assert(false)
+                        }
+                    }
+                }
+                scratch.append("}")
+            }
+            else {
+                scratch.append("null")
+            }
+
+            var name = type.sym.name
+
+            sb.append("""
+                [%llu] = &TypeInfo {
+                    .kind = TypeKind.%s,
+                    .name = "%s",
+                    .id = %llu,
+                    .aggType = aggType {
+                        .fields = %s,
+                        .numOfFields = %d
+                    }
+                },
+            """, type.typeid, TypeKindAsStr(type.kind), name, type.typeid, scratch.cStr(), numOfFields)
+            break
+        }
+    }
+
+
+}
+
+func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
+    switch(type.kind) {
+        default: {}
+        case TypeKind.BOOL:
+        case TypeKind.CHAR:
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.I16:
+        case TypeKind.U16:
+        case TypeKind.I32:
+        case TypeKind.U32:
+        case TypeKind.I64:
+        case TypeKind.U64:
+        case TypeKind.F32:
+        case TypeKind.F64:
+        case TypeKind.USIZE:
+        case TypeKind.NULL:
+        case TypeKind.STR:
+        case TypeKind.VOID: {
+            sb.append("""
+                [%llu] = &TypeInfo {
+                    .kind = TypeKind.%s,
+                    .name = "%s",
+                    .id = %llu
+                },
+            """, type.typeid, TypeKindAsStr(type.kind), type.name, type.typeid)
+
+            break
+        }
+        case TypeKind.ARRAY: {
+            var arrayType = type as (*ArrayTypeInfo)
+            sb.append("""
+                [%llu] = &TypeInfo {
+                    .kind = TypeKind.%s,
+                    .name = null,
+                    .id = %llu,
+                    .arrayType = arrayType {
+                        .length = %llu,
+                        .arrayOfType: %llu
+                    }
+                },
+            """, type.typeid, TypeKindAsStr(type.kind), type.typeid, arrayType.length, arrayType.arrayOf.typeid)
+
+            break
+        }
+        case TypeKind.PTR: {
+            var ptrType = type as (*PtrTypeInfo)
+            sb.append("""
+                [%llu] = &TypeInfo {
+                    .kind = TypeKind.%s,
+                    .name = null,
+                    .id = %llu,
+                    .ptrType = ptrType {
+                        .ptrOfType: %llu
+                    }
+                },
+            """, type.typeid, TypeKindAsStr(type.kind), type.typeid, ptrType.ptrOf.typeid)
+
+            break
+        }
+        case TypeKind.CONST: {
+            var constType = type as (*ConstTypeInfo)
+            sb.append("""
+                [%llu] = &TypeInfo {
+                    .kind = TypeKind.%s,
+                    .name = null,
+                    .id = %llu,
+                    .constType = constType {
+                        .constOfType: %llu
+                    }
+                },
+            """, type.typeid, TypeKindAsStr(type.kind), type.typeid, constType.constOf.typeid)
+
+            break
+        }
+        case TypeKind.FUNC_PTR: {
+            // TODO
+            break
+        }
+        default:{}
+    }
+}

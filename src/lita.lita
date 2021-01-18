@@ -59,6 +59,13 @@ public struct Metric {
     startTime: f64
 }
 
+@asStr
+public enum TypeInfoOption {
+    NONE,        // no type information should be generated
+    TAGGED,      // only types tagged with @typeinfo shall be generated
+    ALL,         // all types will be generated
+}
+
 public struct LitaOptions {
     srcPath: [MAX_PATH]char        // the directory of where the main source module is
     libPath: [MAX_PATH]char        // optional configurable path to modules for libraries
@@ -76,12 +83,15 @@ public struct LitaOptions {
     showProfileInfo: bool          // outputs profiling information
     languageServer: bool           // if this should launch the language server
     isDebug: bool                  // if we are in debug mode
+
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include
     testFileOnly: bool             // if we should only test the supplied file only
 
+    typeOption: TypeInfoOption     // type generation option
 
     cPrefix: [MAX_PREFIX_SIZE]char // Prefix for types/variables defined in C
+    cFormat: bool                  // format the C output
 }
 
 
@@ -233,17 +243,24 @@ public func (this: *Lita) transpile(module: *Module) : bool {
 
 public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool {
     this.startCapture(MetricType.CGEN)
+    var fp = fopen(cFilename, "w")
+    if(fp == null) {
+        return FileStatus.FileNotFoundError;
+    }
+    defer fclose(fp)
+
     var cgen = CGen{}
-    cgen.init(this)
+    cgen.init(this, fp)
     cgen.emitProgram(module)
     this.endCapture(MetricType.CGEN)
 
+    /*
     this.startCapture(MetricType.CWRITE)
     var status = WriteFile(cFilename, cgen.buf.cStrConst(), cgen.buf.length)
     this.endCapture(MetricType.CWRITE)
     if(status != FileStatus.Ok) {
         return false
-    }
+    }*/
 
     return this.result.errors.empty()
 }
@@ -286,7 +303,7 @@ public func (this: *Lita) run(binaryFilename: *const char) {
 }
 
 
-func FindModulePath(lita: *Lita,
+public func FindModulePath(lita: *Lita,
                     moduleName: StringView,
                     filename: [MAX_PATH]char) : bool {
 

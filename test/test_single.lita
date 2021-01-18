@@ -1,76 +1,175 @@
 import "assert"
-
-import "test_module"
-//import "string_buffer"
 import "libc"
-/*
-@asStr
-enum Status {
-    OK = (1<<0)
+
+import "type"
+import "json"
+import "string_buffer"
+
+func MyFunc(a: i32) : f32 {
+    return 4
 }
-const MAXZ =16
-func test(result: [MAXZ]char) {
-    for(var i = 0; i < MAXZ; i+=1) {
-        printf("%c", result[i])
+
+typedef i32 as int;
+
+struct X<T> {
+    a: T
+}
+
+func (this: X<T>) name<T>() : T {
+    return this.a
+}
+
+struct TestStruct {
+    a: i32
+}
+
+enum MyEnum {
+    X = 10,
+    Y
+}
+
+const SIZE3 = 55
+
+func toJson<T>(sb: *StringBuffer, type: T) {
+    var typeid = typeof(:T)
+    var typeInfo = getTypeInfo(typeid)
+    var input: *void = (&type) as (*void)
+    switch(typeInfo.kind) {
+        case TypeKind.BOOL: {
+            // TODO: *bool doesn't work with introspection????
+           // var boolPtr = input as (*bool)
+           // sb.append((*boolPtr) ? "true" : "false")
+            break
+        }
+        case TypeKind.CHAR: {
+            var charPtr = input as (*char)
+            sb.appendChar((*charPtr) as (char))
+            break
+        }
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.I16:
+        case TypeKind.U16:
+        case TypeKind.I32: {
+            var ptr = input as (*i32)
+            sb.append("%llu", (*ptr) as (i32))
+            break
+        }
+        case TypeKind.U32:
+        case TypeKind.I64:
+        case TypeKind.U64:
+        case TypeKind.USIZE: {
+            var sizePtr = input as (*usize)
+            sb.append("%llu", (*sizePtr) as (usize))
+            break
+        }
+        case TypeKind.F32: {
+            var floatPtr = input as (*f32)
+            sb.append("%.3f", (*floatPtr) as (f32))
+            break
+        }
+        case TypeKind.F64: {
+            var floatPtr = input as (*f64)
+            sb.append("%.4f", (*floatPtr) as (f64))
+            break
+        }
+        case TypeKind.NULL: {
+            break
+        }
+        case TypeKind.STR: {
+            var ptr = input as (*const char)
+            if(ptr)  sb.append("\"%s\"", ptr)
+            else     sb.append("null")
+
+            break
+        }
+        case TypeKind.VOID: {
+            break
+        }
+        case TypeKind.PTR: {
+            break
+        }
+        case TypeKind.STRUCT: {
+            var val = input as (T)
+            var aggInfo = typeInfo.aggType
+            for(var i = 0; i < aggInfo.numOfFields; i += 1) {
+                if(i > 0) {
+                    sb.append(",\n")
+                }
+                var field = aggInfo.fields[i]
+                var fieldName = field.name
+                //offsetof(T, fieldName)
+                sb.append("\"%s\": ", field.name)
+                //toJson(sb, field.)
+            }
+            sb.append("\n")
+            break
+        }
+        default: {
+            sb.append("<not implemented>")
+            break
+        }
     }
-    printf("\n'%s'", result)
-}*/
-
-enum State {
-    EMPTY = 0,
-    PENDING  = 1,
-    RESOLVED = 2,
-}
-
-struct Dependency {
-    state: State = State.PENDING
- }
-
-//func test(a: [2]const char) {
-//}
-
-struct Bucket<T> {
-    bucket: *T
-}
-
-func (this: *Bucket<T>) add<T>(a: T) {
-
-}
-
-@test("t.x")
-func myTestX() {
-
-}
-
-@test("t.y")
-func myTestY() {
-
 }
 
 func main(len:i32, args:**char) : i32 {
-   // var string = []char { 'h', 'i', '\0'} as (*const char)
-    var buckets = Bucket<Bucket<i32>>{}
-    var ok = Bucket<i32>{}
-    buckets.add(ok)
 
-  //var string = "ab" as (*char)
-  //test(string)
+    var sb = StringBufferInit()
+    defer sb.free()
 
-  //  var sb = StringBufferInit(1024)
-    //var s : Status = Status.OK
-  //  var a : i32 = s as (i32)
+    toJson(sb, 4)
 
-  //var string: *const char = "hello"
-   // var x = false ? "" : string
+    printf("'%s'\n", sb.cStr())
 
-  //  var str: *char = "hi" as (i32)
+    /*
+    var x = X<int>{4}
+    printf("X<int> %lld vs X<i32> %lld\n", typeof(:X<int>), typeof(:X<i32>))
+    assert(x.a == 4)
+    var v = 2>>1
+    assert(v == 1)
+    */
+    //assert(x.name() == 4) // TODO: Fix alias generics bug
 
-//var size: usize = 1024 * 1024 * 1000;
+/*
+    var id1 = typeof(:*i32)
+    var id2 = typeof(:*i32)
+    printf("Ids: %llu vs %llu\n", id1, id2)
 
- //var funcName = [20]char {0};
-   // test(str)
-  // printf("%s\n", StatusAsStr(Status.OK))
-   //printf("%s\n", SomeEnumAsStr(SomeEnum.BRETT))
 
+    assert(typeof(:TestStruct) == typeof(:TestStruct))
+    assert(typeof(:*TestStruct) == typeof(:*TestStruct))
+    assert(typeof(:**TestStruct) == typeof(:**TestStruct))
+    assert(typeof(:* const TestStruct) == typeof(:* const TestStruct))
+
+    const SIZE = 256
+    const SIZE2 = 4
+    var array = [256]char{0}
+    var idx = typeof(array)
+    var idy = typeof(:[256]char)
+    var idz = typeof(:[SIZE]char)
+    var idw = typeof(:[SIZE]char)
+    var idw2 = typeof(:[SIZE2]char)
+    var idw3 = typeof(:[SIZE3]char)
+    //printf("Array: %llu vs. %llu vs %llu vs %llu vs %llu vs %llu\n", idx, idy, idz, idw, idw2, idw3)
+
+    var a = typeof(:[SIZE3]char)
+    var b = typeof(:[55]char)
+    printf("Array: %llu vs %llu\n", a, b)
+*/
+    /*
+    var id = typeof(:MyFunc)
+    var info = getTypeInfo(id)
+
+    //TODO: Bug with c geb
+    //var funcInfo = info.funcType
+
+    printf("Name: %s\n", info.name)
+    for(var i = 0; i < info.funcType.numOfParams; i += 1) {
+        var param = info.funcType.params[i]
+        printf("Param: %s\n", param.name)
+    }
+
+    var id2 = typeof(:f32)
+    printf("typeid: %llu %llu\n", id, id2)*/
     return 0
 }

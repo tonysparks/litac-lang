@@ -87,7 +87,7 @@
 
                 assert(map.size() == 5)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init(&arena.alloc)
 
                 var node = parser.parseJson("""
@@ -158,7 +158,7 @@
 
                 assert(map.size() == 5)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init()
 
                 var node = parser.parseJson("""

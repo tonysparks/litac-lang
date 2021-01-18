@@ -16,26 +16,48 @@ import "ast_print"
 
 public const MAX_GENERIC_NAME = 1024;
 
-func GetGenericName(type: *TypeSpec, str: *String) {
+func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
     switch(type.kind) {
         case TypeSpecKind.ARRAY: {
             str.append("[]")
-            GetGenericName(type.base, str)
+            GetGenericName(checker, type.base, str)
             return;
         }
         case TypeSpecKind.PTR: {
             str.append("*")
-            GetGenericName(type.base, str)
+            GetGenericName(checker, type.base, str)
             return;
         }
         case TypeSpecKind.CONST: {
             str.append("const ")
-            GetGenericName(type.base, str)
+            GetGenericName(checker, type.base, str)
             return;
         }
         case TypeSpecKind.NAME: {
             var name = type as (*NameTypeSpec)
-            str.append(name.name)
+
+            // We must account for typedef'd types, if they
+            // are typedef'd we need to use the real type
+            // for the naming
+            var nameSet = false
+            if(!type.typeInfo) {
+                var unaliasedType = checker.getType(name)
+                if(unaliasedType) {
+                    var type = unaliasedType.type
+                    if(type && type.name) {
+                        str.append(type.name)
+                        nameSet = true
+                    }
+                }
+            }
+            else {
+                str.append("%s", type.typeInfo.name)
+                nameSet = true
+            }
+
+            if(!nameSet) {
+                str.append(name.name)
+            }
 
             if(name.genericArgs.empty()) {
                 return;
@@ -48,7 +70,7 @@ func GetGenericName(type: *TypeSpec, str: *String) {
                     str.append(",")
                 }
                 var arg = name.genericArgs.get(i)
-                GetGenericName(arg, str)
+                GetGenericName(checker, arg, str)
             }
             str.append(">")
             return;
@@ -78,10 +100,9 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     }
     defer if(isNewContext) checker.genericContext.callsite = null
 
-
     var buffer: [MAX_GENERIC_NAME]char;
     var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
-    GetGenericName(name, genericName)
+    GetGenericName(checker, name, genericName)
 
     var newName = genericName.cStrConst()
     var genericSym = checker.current.genericSymbols.get(newName)

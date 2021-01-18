@@ -27,7 +27,7 @@
                 var buf : StringBuffer;
                 buf.init(16)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init()
                 defer parser.free()
 
@@ -79,7 +79,7 @@
                 var buf : StringBuffer;
                 buf.init(16)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init()
                 defer parser.free()
 
@@ -118,7 +118,7 @@
                 var buf : StringBuffer;
                 buf.init(16)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init()
                 defer parser.free()
 
@@ -151,7 +151,7 @@
                 var buf : StringBuffer;
                 buf.init(16)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init()
                 defer parser.free()
 
@@ -178,7 +178,7 @@
                 var buf : StringBuffer;
                 buf.init(16)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init()
                 defer parser.free()
 
@@ -212,7 +212,7 @@
                 var buf : StringBuffer;
                 buf.init(16)
 
-                var parser = Parser{}
+                var parser = JsonParser{}
                 parser.init()
                 defer parser.free()
 

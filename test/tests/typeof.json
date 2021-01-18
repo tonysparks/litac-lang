@@ -1,0 +1,86 @@
+{
+    "description": "TypeOf",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Typeof Pointer Caching",
+            "disabled": false,
+            "definitions": `
+                struct TestStruct {
+                    a: i32
+                }
+            `,
+            "code": `
+                assert(typeof(:TestStruct) == typeof(:TestStruct))
+                assert(typeof(:*TestStruct) == typeof(:*TestStruct))
+                assert(typeof(:**TestStruct) == typeof(:**TestStruct))
+                assert(typeof(:* const TestStruct) == typeof(:* const TestStruct))
+                assert(typeof(:**TestStruct) != typeof(:*TestStruct))
+                assert(typeof(:* TestStruct) != typeof(:* const TestStruct))
+            `,
+        },
+        {
+            "name": "Typeof Array Caching",
+            "disabled": false,
+            "definitions": `
+                const SIZE3 = 55
+                const SIZE1C = 4
+                const SIZE2C = 8
+            `,
+            "code": `
+                const SIZE1 = 4
+                const SIZE2 = 8
+
+                assert(typeof(:[4]i32) == typeof(:[SIZE1]i32))
+                assert(typeof(:[4]i32) == typeof(:[SIZE1C]i32))
+
+                var array = [4]char{0}
+                assert(typeof(array) == typeof(:[4]char))
+                assert(typeof(array) == typeof(:[SIZE1]char))
+                assert(typeof(array) == typeof(:[SIZE1C]char))
+
+                assert(typeof(:[4]i32) != typeof(:[SIZE2]i32))
+                assert(typeof(:[4]i32) != typeof(:[SIZE2C]i32))
+
+                assert(typeof(:[SIZE2]i32) != typeof(:[SIZE2]f32))
+                assert(typeof(:[SIZE2]i32) != typeof(:[SIZE2C]f32))
+
+                assert(typeof(:[8]i32) != typeof(:[SIZE2]f32))
+                assert(typeof(:[8]i32) != typeof(:[SIZE2C]f32))
+            `,
+        },
+        {
+            "name": "Typeof Const Caching",
+            "disabled": false,
+            "definitions": `
+
+            `,
+            "code": `
+                const SIZE1 = 4
+
+                assert(typeof(:[4]const i32) == typeof(:[SIZE1]const i32))
+                assert(typeof(:[4]const i32) != typeof(:[SIZE1]i32))
+
+                assert(typeof(:const i32) != typeof(:i32))
+                assert(typeof(:const i32) == typeof(:const i32))
+
+                assert(typeof(:* const i32) == typeof(:* const i32))
+                assert(typeof(:* const i32) != typeof(:* i32))
+
+                assert(typeof(:const * const i32) == typeof(:const * const i32))
+                assert(typeof(:const * const i32) != typeof(: * const i32))
+                assert(typeof(:const * const i32) != typeof(:const * i32))
+            `,
+        },
+    ]
+}

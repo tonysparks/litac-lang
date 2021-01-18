@@ -190,5 +190,44 @@
                 assert(a == b)
             `,
         },
+        {
+            "name": "Empty Arrays",
+            "definitions": `
+                struct ParamType {
+                    a: i32
+                }
+            `,
+            "code": `
+                var x = []ParamType{}
+                var y:[0]ParamType;
+                var z:[10]ParamType;
+                var w:[2]ParamType = []ParamType{
+                    [0] = ParamType{1},
+                    [1] = ParamType{4}
+                }
+            `,
+        },
+        {
+            "name": "Empty Arrays In Struct Initializer",
+            "definitions": `
+                struct ParamType {
+                    a: i32
+                }
+                struct FuncType {
+                    params: *ParamType
+                }
+            `,
+            "code": `
+                var x = FuncType{
+                    .params = []ParamType{}
+                }
+                var y = FuncType{
+                    .params = [0]ParamType{}
+                }
+                var z = FuncType{
+                    .params = [2]ParamType{}
+                }
+            `,
+        },
     ]
 }

@@ -538,7 +538,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
     // if this is a function, return it as a function pointer
     if(type.kind == TypeKind.FUNC) {
         var funcInfo = type as (*FuncTypeInfo)
-        return funcInfo.asPtr(this.allocator)
+        return funcInfo.asPtr(this.typeCache)
     }
 
     return type as (*FuncPtrTypeInfo)
@@ -570,7 +570,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     if(objectType.kind == TypeKind.FUNC) {
         var funcInfo = objectType as (*FuncTypeInfo)
         isMethod = (funcInfo.decl.flags & FuncFlags.IS_METHOD)
-        funcPtr = funcInfo.asPtr(this.allocator)
+        funcPtr = funcInfo.asPtr(this.typeCache)
 
         for(var i = 0; i < funcInfo.decl.params.size(); i += 1) {
             var p = funcInfo.decl.params.get(i)
@@ -1371,7 +1371,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
         }
         case TokenType.BAND: {
             if(type.kind == TypeKind.FUNC) {
-                expr.operand.typeInfo = (type as (*FuncTypeInfo)).asPtr(this.allocator) as (*TypeInfo)
+                expr.operand.typeInfo = (type as (*FuncTypeInfo)).asPtr(this.typeCache) as (*TypeInfo)
                 expr.operand.isRightValue = true
             }
             else if(expr.unaryExpr.operand.isRightValue) {
@@ -1379,7 +1379,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                 return false
             }
             else {
-                expr.operand.typeInfo = NewPtrTypeInfo(type, this.allocator) as (*TypeInfo)
+                expr.operand.typeInfo = this.typeCache.newPtrTypeInfo(type) as (*TypeInfo)
             }
             break;
         }
@@ -1857,8 +1857,15 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
         sym = typeInfo.sym
     }
 
-    expr.operand.typeInfo = typeInfo
-    expr.operand.isConst = sym.flags & SymbolFlags.IS_CONSTANT
     expr.sym = sym
+    expr.operand.typeInfo = typeInfo
+
+    // if we are able to determine the constant of this symbol,
+    // make sure this expression contains the constant
+    if(sym.flags & SymbolFlags.IS_CONSTANT) {
+        expr.operand.isConst = true
+        expr.operand.val = sym.val
+    }
+
     return true;
 }

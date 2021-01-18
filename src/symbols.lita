@@ -39,6 +39,7 @@ public enum SymbolFlags {
     IS_PUBLIC               = (1<<11),
     IS_EMITTED              = (1<<12),
     IS_TEST                 = (1<<13),
+    IS_ALIAS                = (1<<14),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -53,6 +54,7 @@ public struct Symbol {
     usingParent: *Symbol
     declared: *Module
     flags: i32
+    val: Value
 
     // TODO: put in struct
     genericCallsiteModule: *Module
@@ -175,9 +177,12 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
 
     var kind = SymbolKind.VAR
     switch(decl.kind) {
+        case StmtKind.TYPEDEF_DECL: {
+            flags |= SymbolFlags.IS_ALIAS
+            // fallthru
+        }
         case StmtKind.ENUM_DECL:
         case StmtKind.UNION_DECL:
-        case StmtKind.TYPEDEF_DECL:
         case StmtKind.STRUCT_DECL: {
             kind = SymbolKind.TYPE
             break;

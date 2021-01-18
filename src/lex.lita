@@ -934,7 +934,7 @@ func (l: *Lexer) scanNumber() : Token {
     l.scanTypeInfo()
 
     l.token.pos.end = l.stream
-    l.token.pos.position += (l.stream - start) as (i32)
+    //l.token.pos.position += (l.stream - start) as (i32)
     //l.token.pos.lineNumber = l.lineNumber
     return l.token
 }
@@ -1253,6 +1253,7 @@ repeat:
     l.token.pos.lineNumber = l.lineNumber
     l.token.pos.lineStart = l.lineStart
     l.token.pos.start = l.stream
+    l.token.pos.position = l.position
     l.token.typeInfo = null
 
     var c = *l.stream

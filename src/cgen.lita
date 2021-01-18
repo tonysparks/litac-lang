@@ -16,16 +16,20 @@ import "dependency_graph"
 import "assert"
 import "system"
 import "cgen_decl"
+import "io"
 
 public struct CGen {
     lita: using *Lita
     buf: StringBuffer
     line: StringBuffer
+    format: bool
     indent: i32
     aggregateLevel: i32
 
     currentFunc: *FuncTypeInfo
     currentScope: *CGenScope
+
+    output: *FILE
 }
 
 struct CGenScope {
@@ -60,13 +64,17 @@ const escapeChars = [256]*const char {
 }
 
 
-public func (this: *CGen) init(lita: *Lita) {
+public func (this: *CGen) init(lita: *Lita, output: *FILE) {
     this.lita = lita
-    this.buf.init(4096*4, lita.allocator)
-    this.line.init(1024, lita.allocator)
+    this.buf.init(1024 * 2, lita.allocator)
+    this.line.init(1024 * 2, lita.allocator)
     this.aggregateLevel = 0
     this.currentFunc = null
     this.currentScope = null
+
+    this.format = lita.options.cFormat
+
+    this.output = output
 }
 
 public func (this: using *CGen) emitProgram(module: *Module) {
@@ -123,6 +131,8 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     if(this.lita.programSymbols.mainEntry) {
         this.emitMain(this.lita.programSymbols.mainEntry)
     }
+
+    this.flush()
 }
 
 func (this: using *CGen) emitMain(sym: *Symbol) {
@@ -254,7 +264,8 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var aggDecl = decl as (*AggregateDecl)
-            if(!(aggDecl.flags & AggregateFlags.IS_EMBEDDED)) {
+            //if(!(aggDecl.flags & AggregateFlags.IS_EMBEDDED))
+            {
                 this.buf.append("typedef %s %s %s;\n", aggDecl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", name, name)
             }
             break;
@@ -781,6 +792,11 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
     }
 }
 
+func (this: using *CGen) flush() {
+    WriteBytes(this.output, buf.buffer, buf.length)
+    buf.length = 0
+}
+
 func (this: using *CGen) emitName(tok: Token) {
     if(tok.type != TokenType.ERROR) {
         buf.append("%.*s", tok.value.str.length, tok.value.str.buffer)
@@ -794,32 +810,44 @@ func (this: using *CGen) emitln() {
     }
 }
 
-func (this: using *CGen) emit(format: *const char, ...) {
-    line.clear()
+func (this: using *CGen) emit(strFormat: *const char, ...) {
+    if(this.format) {
+        line.clear()
 
-    var args: va_list;
-    va_start(args, format);
-    line.appendArgs(format, args)
-    va_end(args)
+        var args: va_list;
+        va_start(args, strFormat);
+        line.appendArgs(strFormat, args)
+        va_end(args)
 
-    for(var i = 0; i < line.length; i+=1) {
-        var c = line.buffer[i]
-        if(c == '\n') {
-            this.emitln()
+        for(var i = 0; i < line.length; i+=1) {
+            var c = line.buffer[i]
+            if(c == '\n') {
+                this.emitln()
+            }
+            else if(c == '{') {
+                buf.appendChar(c)
+                indent+=1
+                this.emitln()
+            }
+            else if(c == '}') {
+                indent-=1
+                this.emitln()
+                buf.appendChar(c)
+            }
+            else {
+                buf.appendChar(c)
+            }
         }
-        else if(c == '{') {
-            buf.appendChar(c)
-            indent+=1
-            this.emitln()
-        }
-        else if(c == '}') {
-            indent-=1
-            this.emitln()
-            buf.appendChar(c)
-        }
-        else {
-            buf.appendChar(c)
-        }
+    }
+    else {
+        var args: va_list;
+        va_start(args, strFormat);
+        buf.appendArgs(strFormat, args)
+        va_end(args)
+    }
+
+    if(buf.length > (buf.capacity/2)) {
+        this.flush()
     }
 }
 
@@ -920,10 +948,12 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 continue;
             }
 
+            this.flush()
+
             var bytesRead = 0_i64;
             do {
                 bytesRead = fread(filedata, 1, BUFFER_SIZE, file)
-                this.buf.append("%.*s", bytesRead, filedata)
+                fwrite(filedata as (*const void), sizeof(:char), bytesRead, this.output)
             }
             while(bytesRead > 0);
         }
@@ -1328,14 +1358,17 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.ARRAY_INIT_EXPR: {
             var expr = s as (*ArrayInitExpr)
-            if(expr.values.empty()) {
+
+            // TODO: I don't think this is needed?
+            // this breaks struct initializers i.e., .TypeInfo {.params = []ParamInfo{} }
+            if(false && expr.values.empty()) {
                 buf.append("{}")
             }
             else {
                 var requiresCast = false
                 if(expr.parent) {
                     requiresCast = expr.parent.kind == StmtKind.RETURN_STMT ||
-                                expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
+                                   expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
                 }
 
                 if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {
@@ -1526,6 +1559,22 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     this.emit(".")
                     this.emitFieldName(field)
                     this.emit(" = ")
+                }
+                else if(field.kind == StmtKind.STRUCT_FIELD_DECL ||
+                        field.kind == StmtKind.UNION_FIELD_DECL) {
+                    var decl = field.aggregateField
+                    this.emit(".")
+                    this.emitName(decl.name)
+                    this.emit(" = ")
+                }
+                else if(field.kind == StmtKind.ENUM_FIELD_DECL) {
+                    var decl = field.enumField
+                    this.emit(".")
+                    this.emitName(decl.name)
+                    this.emit(" = ")
+                }
+                else {
+                    assert(false)
                 }
             }
 
@@ -1781,15 +1830,17 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
             }
             return;
-        }/*
+        }
         case StmtKind.TYPE_OF_EXPR: {
-            var expr = new<TypeOfExpr>(allocator)
-            expr.kind = StmtKind.TYPE_OF_EXPR;
-            expr.startPos = startPos
-            expr.typeOfExpr = null
-            expr.type = null
-            return expr as (*Stmt);
-        }*/
+            var expr = s as (*TypeOfExpr)
+            if(expr.typeOfExpr) {
+                this.emit("%lldLL", expr.typeOfExpr.operand.typeInfo.typeid)
+            }
+            else if(expr.type) {
+                this.emit("%lldLL", expr.type.typeInfo.typeid)
+            }
+            return;
+        }
         case StmtKind.UNARY_EXPR: {
             var expr = s as (*UnaryExpr)
             this.emit("%s(", tokenText[expr.operator])

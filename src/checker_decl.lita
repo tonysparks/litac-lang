@@ -101,10 +101,10 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
             return null
         }
         else {
-            inferredType = TypeDecay(decl.expr.operand.typeInfo, this.allocator)
+            inferredType = this.typeCache.typeDecay(decl.expr.operand.typeInfo)
             if(declaredType) {
                 decl.expr = this.coerceTypeWithUsing(decl.expr, inferredType, declaredType)
-                inferredType = TypeDecay(decl.expr.operand.typeInfo, this.allocator)
+                inferredType = this.typeCache.typeDecay(decl.expr.operand.typeInfo)
             }
         }
 

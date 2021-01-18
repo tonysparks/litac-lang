@@ -113,6 +113,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     parser.addOption("languageServer", '\0', "Start the LitaC language server", 0, null);
     parser.addOption("lib", '\0', "The LitaC library path", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("cPrefx", '\0', "The symbol prefix to use on the generated C code output", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("cFormat", '\0', "Formats the C output", 0, null);
     parser.addOption("run", '\0', "Runs the program after a successful compile", 0, null);
     parser.addOption("checkerOnly", '\0', "Only runs the type checker, does not compile", 0, null);
     parser.addOption("cOnly", '\0', "Only creates the C output file, does not cimple the generated C code", 0, null);
@@ -166,6 +167,18 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     options.showProfileInfo = parser.hasOption("profile")
     options.run = parser.hasOption("run")
     options.isDebug = parser.hasOption("debug")
+    options.cFormat = parser.hasOption("cFormat")
+
+    options.typeOption = TypeInfoOption.NONE
+    if(parser.hasOption("types")) {
+        var opt = parser.getOption("types").value
+        if(strcmp(opt, "all") == 0) {
+            options.typeOption = TypeInfoOption.ALL
+        }
+        else if(strcmp(opt, "tagged") == 0) {
+            options.typeOption = TypeInfoOption.TAGGED
+        }
+    }
 
     if(parser.hasOption("test")) {
         options.testsRegex = parser.getOption("test").value
