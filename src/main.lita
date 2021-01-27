@@ -63,6 +63,8 @@ func main(len: i32, args: **char) : i32 {
         goto report;
     }
 
+    var runProgram = options.run
+
 report:
     var totalTime = SystemTimeMSec() - startTime
 
@@ -100,6 +102,11 @@ report:
         printf("Total allocations:  %u\n", allocator.totalAllocations)
         printf("Total source lines: %u\n", lita.totalSourceLines)
         printf("\n")
+    }
+
+
+    if(runProgram) {
+        lita.run()
     }
 
     return 0
@@ -197,11 +204,21 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
         options.compileCmd = "clang %input% -std=c99 -o %output% -D_CRT_SECURE_NO_WARNINGS"
     }
 
+    var cPrefix = parser.hasOption("cPrefix") ? parser.getOption("cPrefix").value : "litaC_"
+    strncpy(options.cPrefix, cPrefix, MAX_PREFIX_SIZE)
+
     var outputFile = parser.hasOption("output") ? parser.getOption("output").value : "a"
     strncpy(options.outputFile, outputFile, MAX_PATH)
 
     var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "output"
     strncpy(options.outputPath, outputPath, MAX_PATH)
+
+    var len = strlen(options.outputPath)
+    if(len > 0) {
+        if(options.outputPath[len-1] != '/') {
+            strcat(options.outputPath, "/")
+        }
+    }
 
     FilePath(options.inputFile, options.srcPath)
     return true

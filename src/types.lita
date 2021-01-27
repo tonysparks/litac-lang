@@ -13,7 +13,7 @@ import "types_new"
 
 @asStr
 public enum TypeKind {
-    BOOL,
+    BOOL = 1,
     CHAR,
     I8,
     U8,
@@ -47,7 +47,7 @@ public enum TypeKind {
     MAX_TYPE_KINDS
 }
 
-const typeKindText = []*const char {
+const typeKindText = [TypeKind.MAX_TYPE_KINDS + 1]*const char {
     [TypeKind.BOOL] = "bool",
     [TypeKind.CHAR] = "char",
     [TypeKind.I8] = "i8",

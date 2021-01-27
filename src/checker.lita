@@ -17,6 +17,7 @@ import "ast_print"
 import "libc"
 import "generics"
 import "introspection"
+import "system"
 
 import "checker_decl"
 import "checker_expr"
@@ -64,7 +65,8 @@ public struct TypeChecker {
     typeCache: TypeCache
 
     randomNameIndex: u32
-    //isFull
+
+    bypassing: bool // if the checker should bypass imported modules and look at all modules
 }
 
 public func (this: *TypeChecker) init(lita: *Lita) {
@@ -78,6 +80,8 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
     this.genericContext.callsite = null
+
+    this.bypassing = false
 
     this.typeCache.init(lita.allocator)
 
@@ -696,8 +700,30 @@ func (this: *TypeChecker) getTypeByName(typeName: *const char) : *Symbol {
     var type = this.current.getType(typeName)
     if(!type) {
         if(this.genericContext.callsite) {
-            return this.genericContext.callsite.getType(typeName)
+            type = this.genericContext.callsite.getType(typeName)
         }
+    }
+
+    // a work around that allows for looking up ALL
+    // modules without having to import them all into
+    // the current module
+    if(!type && this.bypassing) {
+        var name = StringViewInit(typeName)
+        var index = name.indexOf("::")
+        if(index < 0) {
+            return null
+        }
+        var mod = name.substring(0, index)
+        var filename = [MAX_PATH]char{0}
+        if(!FindModulePath(this.lita, mod, filename)) {
+            return null
+        }
+
+        var module = this.lita.modules.get(filename)
+        assert(module != null)
+        var namePart = name.substring(index + 2)
+
+        return module.getType(namePart.buffer)
     }
 
     return type

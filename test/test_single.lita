@@ -1,9 +1,12 @@
 import "assert"
 import "libc"
 
+import "test_module"
+
 import "type"
 import "json"
 import "string_buffer"
+
 
 func MyFunc(a: i32) : f32 {
     return 4
@@ -29,8 +32,11 @@ enum MyEnum {
 }
 
 const SIZE3 = 55
-
+/*
 func toJson<T>(sb: *StringBuffer, type: T) {
+}
+
+func toJson_<T>(sb: *StringBuffer, type: T) {
     var typeid = typeof(:T)
     var typeInfo = getTypeInfo(typeid)
     var input: *void = (&type) as (*void)
@@ -98,9 +104,10 @@ func toJson<T>(sb: *StringBuffer, type: T) {
                 }
                 var field = aggInfo.fields[i]
                 var fieldName = field.name
+                var value = getFieldValue(any{.data = input, .id = typeid}, fieldName)
                 //offsetof(T, fieldName)
                 sb.append("\"%s\": ", field.name)
-                //toJson(sb, field.)
+               // toJson(sb, value)
             }
             sb.append("\n")
             break
@@ -110,16 +117,27 @@ func toJson<T>(sb: *StringBuffer, type: T) {
             break
         }
     }
-}
+}*/
 
 func main(len:i32, args:**char) : i32 {
 
+/*
     var sb = StringBufferInit()
     defer sb.free()
 
     toJson(sb, 4)
 
     printf("'%s'\n", sb.cStr())
+*/
+
+printf("Hello world\n")
+/*
+    var x = any {
+        .value = null,
+        .id = 0
+    }
+
+    printf("id: %llu\n", x.id)*/
 
     /*
     var x = X<int>{4}

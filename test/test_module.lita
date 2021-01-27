@@ -1,3 +1,5 @@
+@compilation_unit();
+
 public const A = 32
 const B = 64
 
