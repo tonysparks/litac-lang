@@ -1470,8 +1470,9 @@ func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
     var arrayOf = arrayInfo.arrayOf
 
     if(!expr.values.empty()) {
-        if(!arrayInfo.numOfElements && !arrayInfo.length) {
+        if(!arrayInfo.numOfElements && arrayInfo.length < 1) {
             arrayInfo.length = expr.values.size()
+            arrayInfo.isLengthDefined = true
         }
 
         var hasSucceed = true

@@ -50,7 +50,9 @@
                 typedef [3]f32 as Vec3;
 
                 const array = Vec3 {
-                    [0] = 1.0f, 2.0f, 3.0f
+                    [0] = 1.0f,
+                    2.0f,
+                    3.0f
                 }
             `,
             "code": `
@@ -163,8 +165,14 @@
             `,
         },
 
+        /* TODO:
+            2D arrays should not be allowed to be
+            returned, and furthermore decay and require
+            more than just a forward declaration of the
+            underlying type -- which causes problems for
+            aggregate types!!!
         {
-            "name": "Func with 2d array pointers",
+            "name": "Func with 2d array of struct pointers",
             "definitions": `
 
                 struct Node {
@@ -189,7 +197,35 @@
                 var b = Test(a)
                 assert(a == b)
             `,
+        },*/
+
+        {
+            "name": "Func with 2d array pointers",
+            "definitions": `
+
+                struct Node {
+                    a: i32
+                }
+
+                func Test(array: [1][1]i32) : i32 {
+                    return array[0][0]
+                }
+            `,
+            "code": `
+
+                var value = 4
+                var a = [1][1]i32 {
+                    [1]i32{
+                        value
+                    }
+                }
+
+                var b = Test(a)
+                assert(value == b)
+            `,
         },
+
+
         {
             "name": "Empty Arrays",
             "definitions": `

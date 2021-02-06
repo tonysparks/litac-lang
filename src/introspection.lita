@@ -27,6 +27,20 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
         return;
     }
 
+
+    var filename = [MAX_PATH]char{0}
+    var moduleName = StringViewInit("type")
+    if(!FindModulePath(this.lita, moduleName, filename)) {
+        this.lita.result.addError(SrcPos{}, "could not find builtin module 'type' on the system path.")
+        return;
+    }
+
+    // if the type module is never used -- don't bother generating it
+    var module = this.lita.modules.get(filename)
+    if(!module) {
+        return;
+    }
+
     var sb = StringBufferInit(2048*8, this.lita.allocator)
     var scratch = StringBufferInit(1024, this.lita.allocator)
     var onlyTagged = this.lita.options.typeOption == TypeInfoOption.TAGGED
@@ -75,7 +89,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
                 continue
             }
 
-            this.emitType(sb, scratch, sym.type)
+            this.emitType(sb, scratch, sym)
         }
 
     }
@@ -120,16 +134,6 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
     }
     sb.append("\n};")
 
-    var filename = [MAX_PATH]char{0}
-    var moduleName = StringViewInit("type")
-    if(!FindModulePath(this.lita, moduleName, filename)) {
-        // TODO: write error message
-        return;
-    }
-
-    var module = this.lita.modules.get(filename)
-    assert(module != null)
-
     var parser = ParserInit(module.id.filename, sb.cStr(), this.lita)
     var stmts = parser.parseModule()
     if(stmts) {
@@ -154,7 +158,9 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
             var typesDecl = stmts.declarations.get(1)
             assert(typesDecl.kind == StmtKind.CONST_DECL)
 
+            checker.bypassing = true
             var typeInfo = checker.resolveValueDecl(typesDecl as (*VarDecl))
+            checker.bypassing = false
 
             // TEMP: Remove once all types are implemented
             if(!typeInfo) {
@@ -228,8 +234,10 @@ func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym
     """, type.typeid, sym.name, type.typeid, isVararg ? "true": "false", returnTypeid, scratch.cStr(), numOfParams)
 }
 
-func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, type: *TypeInfo) {
+func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym: *Symbol) {
     scratch.clear()
+
+    var type = sym.type
 
     switch(type.kind) {
         default: {}
@@ -240,7 +248,7 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, typ
 
             if(numOfFields) {
                 scratch.append("[]EnumFieldInfo {")
-                var value = 0
+                var value = 0_i32
                 for(var i = 0; i < numOfFields; i += 1) {
                     var field = decl.fields.get(i)
 
@@ -248,7 +256,7 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, typ
                         // TODO: Get the value from the expr,
                         // we don't do const evaluation yet!!
                         if(field.value.operand.isConst) {
-                            value = field.value.operand.val.intValue
+                            value = field.value.operand.val.intValue as (i32)
                         }
                     }
                     scratch.append("""
@@ -288,6 +296,10 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, typ
             var decl = aggInfo.decl
             var numOfFields = decl.fields.size()
 
+            if(decl.flags & AggregateFlags.IS_ANONYMOUS) {
+                return;
+            }
+
             if(numOfFields) {
                 scratch.append("[]FieldInfo {")
                 for(var i = 0; i < numOfFields; i += 1) {
@@ -308,8 +320,9 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, typ
                                     .name = "%s",
                                     .type = %llu,
                                     .modifiers = Modifiers.%s,
+                                    .offset = offsetof(%.*s::%s, %s)
                                 },
-                            """, varField.name.asString(), typeid, (varField.attributes.isUsing) ? "Using" : "None")
+                            """, varField.name.asString(), typeid, (varField.attributes.isUsing) ? "Using" : "None", sym.declared.id.name.length, sym.declared.id.name.buffer, type.name, varField.name.asString())
 
                             break;
                         }

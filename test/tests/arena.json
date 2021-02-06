@@ -102,7 +102,7 @@
                 buf.init(1, &arena.alloc)
                 node.print(&buf)
 
-                assert(!strcmp("{\"y\":false,\"x\":true,\"z\":[1.000000,2.000000,3.000000]}", buf.cStr()))
+                assert(!strcmp("{\"x\":true,\"y\":false,\"z\":[1,2,3]}", buf.cStr()))
             `,
             "output":
 `Leaked Allocations: {
@@ -173,7 +173,7 @@
                 buf.init(1)
                 node.print(&buf)
 
-                assert(!strcmp("{\"y\":false,\"x\":true,\"z\":[1.000000,2.000000,3.000000]}", buf.cStr()))
+                assert(!strcmp("{\"x\":true,\"y\":false,\"z\":[1,2,3]}", buf.cStr()))
             `,
             "output":
 `Leaked Allocations: {

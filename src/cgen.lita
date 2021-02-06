@@ -39,6 +39,13 @@ struct CGenScope {
     isSwitch: bool
 }
 
+public const MAX_COMPILATION_UNITS = 256
+struct CompilationUnit {
+    module: *Module
+    filename: [MAX_PATH]char
+    file: *FILE
+}
+
 const escapeStrings = [256]*const char {
     ['\b'] = "\\b",
     ['\f'] = "\\f",
@@ -73,7 +80,6 @@ public func (this: *CGen) init(lita: *Lita, output: *FILE) {
     this.currentScope = null
 
     this.format = lita.options.cFormat
-
     this.output = output
 }
 
@@ -81,10 +87,16 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     assert(module != null)
     assert(module.ast != null)
 
+    buf.append("#ifndef _LITAC_HEADER_H\n")
+    buf.append("#define _LITAC_HEADER_H\n")
+
     this.emitForward()
     this.emitPrimitiveConstDecls()
     this.emitModuleNotes()
     this.emitForwardDecls()
+
+    buf.append("\n#endif /* _LITAC_HEADER_H */\n")
+
 
     buf.append("\n\n")
     buf.append("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
@@ -163,11 +175,26 @@ typedef uint32_t  %s%s;
 typedef uint64_t  %s%s;
 typedef float     %s%s;
 typedef double    %s%s;
-typedef int8_t    %s%s;
+//typedef int8_t    %s%s;
 typedef size_t    %s%s;
-#define %s%s (1)
-#define %s%s (0)
 
+#if _MSC_VER
+#define LITAC_THREADLOCAL __declspec(thread)
+#define LITAC_INLINE static inline __forceinline
+#define LITAC_NOINLINE __declspec(noinline)
+#define LITAC_PACKED __pragma(pack(push, 1))
+#define LITAC_PACKED_POP __pragma(pack(pop))
+#define LITAC_EXPORT __declspec(dllexport)
+#endif
+
+#if __GNUC__
+#define LITAC_THREADLOCAL __thread
+#define LITAC_INLINE static inline __attribute__((always_inline))
+#define LITAC_NOINLINE __attribute__((noinline))
+#define LITAC_PACKED __attribute__((packed))
+#define LITAC_PACKED_POP
+#define LITAC_EXPORT __attribute__((visibility("default")))
+#endif
 
 """,
     CurrentDateTime(),
@@ -182,15 +209,25 @@ typedef size_t    %s%s;
     this.options.cPrefix, "f32",
     this.options.cPrefix, "f64",
     this.options.cPrefix, "bool",
-    this.options.cPrefix, "usize",
-    this.options.cPrefix, "true",
-    this.options.cPrefix, "false",
-    this.options.cPrefix, "void"
+    this.options.cPrefix, "usize"
     );
 
     if(strlen(this.options.cPrefix) > 0) {
+        buf.append("typedef int8_t %s%s;\n", this.options.cPrefix, "bool")
+        buf.append("#define %s%s (1)\n", this.options.cPrefix, "true")
+        buf.append("#define %s%s (0)\n", this.options.cPrefix, "false")
         buf.append("#define %s%s void\n", this.options.cPrefix, "void")
         buf.append("typedef char   %s%s;\n", this.options.cPrefix, "char")
+    }
+    else {
+        buf.append("""
+// Boolean type
+#if defined(__STDC__) && __STDC_VERSION__ >= 199901L
+    #include <stdbool.h>
+#elif !defined(__cplusplus) && !defined(bool)
+    typedef enum { false, true } bool;
+#endif
+        """)
     }
 }
 
@@ -217,10 +254,15 @@ func (this: using *CGen) emitPrimitiveConstDecls() {
 }
 
 func (this: using *CGen) emitModuleNotes() {
+
     for(var it = this.lita.modules.iter(); it.hasNext();) {
         var m = it.next()
-        for(var i = 0; i < m.value.ast.notes.size(); i += 1) {
-            this.emitPreludeNote(m.value.ast.notes.get(i))
+        var module = m.value
+
+        for(var i = 0; i < module.ast.notes.size(); i += 1) {
+            var note = module.ast.notes.get(i)
+
+            this.emitPreludeNote(note)
             this.emit("\n")
         }
     }
@@ -342,7 +384,9 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
                 return this.escapeNameStr(methodName)
             }
         }
-        return this.escapeNameStr(type.name)
+        // function pointer
+        return "_"
+        //return this.escapeNameStr(type.name)
     }
 
     return type.name
@@ -444,11 +488,12 @@ func (this: using *CGen) cType(type: *TypeInfo,
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type as (*PtrTypeInfo)
-            var baseInfo = ptrInfo.getBaseType()
-            if(baseInfo.kind == TypeKind.ARRAY && !decay) {
-                var arrayInfo = baseInfo as (*ArrayTypeInfo)
-                if(arrayInfo.length > -1) {
-                    var cType = this.cType(arrayInfo.arrayOf, isCast, decay)
+            var ptrOf = ptrInfo.ptrOf
+            if(ptrOf.kind == TypeKind.ARRAY && !decay) {
+                var arrayInfo = ptrOf as (*ArrayTypeInfo)
+                if(arrayInfo.isLengthDefined) {
+                    var baseInfo = arrayInfo.getBaseType()
+                    var cType = this.cType(baseInfo, isCast, false)
                     sb.append("%s (*)[%zu]", cType, arrayInfo.length)
                     return sb.cStrConst()
                 }
@@ -476,7 +521,8 @@ func (this: using *CGen) cType(type: *TypeInfo,
                     .info = TypeInfo {. kind = TypeKind.PTR},
                     .ptrOf = arrayInfo.arrayOf
                 }
-                return this.cType(ptrInfo, isCast, decay)
+                // array's only decay once
+                return this.cType(ptrInfo, isCast, false)
             }
 
             var baseInfo = arrayInfo.getBaseType()
@@ -496,8 +542,11 @@ func (this: using *CGen) cType(type: *TypeInfo,
                         cgen.emitStmt(arrayInfo.numOfElements)
                         buf.append("]")
                     }
-                    else {
+                    else if(!arrayInfo.isLengthDefined) {
                         buf.append("[]")
+                    }
+                    else {
+                        buf.append("[0]")
                     }
                 }
                 else {
@@ -549,11 +598,12 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type as (*PtrTypeInfo)
-            var baseInfo = ptrInfo.getBaseType()
-            if(baseInfo.kind == TypeKind.ARRAY && !decay) {
-                var arrayInfo = baseInfo as (*ArrayTypeInfo)
-                if(arrayInfo.length > -1) {
-                    var cType = this.cType(arrayInfo.arrayOf)
+            var ptrOf = ptrInfo.ptrOf
+            if(ptrOf.kind == TypeKind.ARRAY && !decay) {
+                var arrayInfo = ptrOf as (*ArrayTypeInfo)
+                if(arrayInfo.isLengthDefined) {
+                    var baseInfo = arrayInfo.getBaseType()
+                    var cType = this.cType(baseInfo)
                     sb.append("%s (*%s)[%zu]", cType, name, arrayInfo.length)
                     return sb.cStrConst()
                 }
@@ -577,10 +627,11 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             var arrayInfo = type as (*ArrayTypeInfo)
             if(decay) {
                 var ptrInfo = PtrTypeInfo {
-                    .info = TypeInfo {. kind = TypeKind.PTR},
+                    .info = TypeInfo {.kind = TypeKind.PTR},
                     .ptrOf = arrayInfo.arrayOf
                 }
-                return this.cTypeDecl(ptrInfo, name, decay)
+                // arrays only decay once
+                return this.cTypeDecl(ptrInfo, name, false)
             }
 
             var baseInfo = arrayInfo.getBaseType()
@@ -601,8 +652,11 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                         buf = cgen.buf // the buffer has expanded
                         buf.append("]")
                     }
-                    else {
+                    else if(!arrayInfo.isLengthDefined) {
                         buf.append("[]")
+                    }
+                    else {
+                        buf.append("[0]")
                     }
                 }
                 else {
@@ -678,7 +732,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
 
     var declName:*const char = sym.name
-    if(IsFuncLike(sym.type)) {//}.kind == TypeKind.FUNC) {
+    if(IsFuncLike(sym.type)) {
         declName = this.escapeNameStr(sym.name)
     }
     else if (sym.flags & SymbolFlags.IS_TYPE) {
@@ -691,7 +745,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
         if(sym.flags & SymbolFlags.IS_BUILTIN) {
-            return sym.name
+            return this.prefix(sym.name, sb)
         }
 
         var name = this.foreignName(sym.decl, this.baseTypeName(sym.decl.name.str))
@@ -699,7 +753,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
         return sb.cStrConst()
     }
 
-    sb.append("%.*s__%s", sym.declared.id.name.length, sym.declared.id.name.buffer, declName)
+    sb.append("%s%.*s__%s", this.options.cPrefix, sym.declared.id.name.length, sym.declared.id.name.buffer, declName)
     return sb.cStrConst()
 }
 
@@ -898,6 +952,9 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     }
     else if(strncmp(note.name.str.buffer, "static", note.name.str.length) == 0) {
         this.emit("static ")
+    }
+    else if(strncmp(note.name.str.buffer, "atomic", note.name.str.length) == 0) {
+        this.emit("_Atomic ")
     }
     else if(strncmp(note.name.str.buffer, "register", note.name.str.length) == 0) {
         this.emit("register ")
@@ -1315,6 +1372,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var decl = s as (*VarFieldDecl)
             this.emitLineInfo(decl)
 
+            this.emitNotes(&decl.attributes)
+
             var name: [MAX_SYMBOL_NAME]char;
             var nameStr = StringInit(name, MAX_SYMBOL_NAME)
             nameStr.format("%.*s", decl.name.str.length, decl.name.str.buffer)
@@ -1396,7 +1455,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.BOOLEAN_EXPR: {
             var expr = s as (*BooleanExpr)
-            this.emit("%s", expr.boolean ? "true" : "false")
+            this.emit("%s%s", this.options.cPrefix, expr.boolean ? "true" : "false")
             return;
         }
         case StmtKind.CAST_EXPR: {
@@ -1614,6 +1673,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var isHex = false
             var isBin = false
             var length: usize = expr.startPos.end - expr.startPos.start
+            var start = expr.startPos.start
+
             if(length > 2) {
                 var first = expr.startPos.start[0]
                 var second = tolower(expr.startPos.start[1])
@@ -1625,7 +1686,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
             }
 
-            for(var start = expr.startPos.start; start != expr.startPos.end; start += 1) {
+            for(; start != expr.startPos.end; start += 1) {
                 var c = *start
 
                 if(c == '.') {
@@ -1640,7 +1701,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     }
 
                     if(isHex) {
-                        var lowered = tolower(c)
+                        c = tolower(c)
                         if(c != 'a' &&
                            c != 'b' &&
                            c != 'c' &&
@@ -1648,11 +1709,11 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                            c != 'e' &&
                            c != 'f' &&
                            c != 'x') {
-                               break
+                           break
                         }
                     }
                     else if(isBin) {
-                        var lowered = tolower(c)
+                        c = tolower(c)
                         if(c != 'b') {
                                break
                         }
@@ -1666,30 +1727,32 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
 
             var type = expr.operand.typeInfo
-            switch(type.kind) {
-                case TypeKind.F32: {
-                    if(!hasDecimal) {
-                        this.emit(".")
+            if(!isHex && !isBin) {
+                switch(type.kind) {
+                    case TypeKind.F32: {
+                        if(!hasDecimal) {
+                            this.emit(".")
+                        }
+                        this.emit("f")
+                        break;
                     }
-                    this.emit("f")
-                    break;
-                }
-                case TypeKind.U8:
-                case TypeKind.U16:
-                case TypeKind.U32: {
-                    this.emit("U")
-                    break;
-                }
-                case TypeKind.U64: {
-                    this.emit("UL")
-                    break;
-                }
-                case TypeKind.I64: {
-                    this.emit("L")
-                    break;
-                }
-                default: {
+                    case TypeKind.U8:
+                    case TypeKind.U16:
+                    case TypeKind.U32: {
+                        this.emit("U")
+                        break;
+                    }
+                    case TypeKind.U64: {
+                        this.emit("UL")
+                        break;
+                    }
+                    case TypeKind.I64: {
+                        this.emit("L")
+                        break;
+                    }
+                    default: {
 
+                    }
                 }
             }
             return;

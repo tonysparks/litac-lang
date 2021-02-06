@@ -38,6 +38,10 @@ public struct Lita {
 
     programSymbols: ProgramSymbols
     genericSymbols: Map<*const char, *Symbol>
+
+    // all the generated C files for compilation
+    compilationUnitFilenames: [MAX_COMPILATION_UNITS][MAX_PATH]char;
+    numOfCompilationUnitFilenames: i32
 }
 
 @asStr
@@ -45,7 +49,6 @@ public enum MetricType {
     PARSING,
     TYPE_CHECKING,
     CGEN,
-    CWRITE,
     CCOMPILE,
 
     MAX_METRIC_TYPES
@@ -208,13 +211,6 @@ public func (this: *Lita) transpile(module: *Module) : bool {
     memset(this.sourceFilename, 0, MAX_PATH)
 
     strcat(this.sourceFilename, this.options.outputPath)
-    var len = strlen(this.options.outputPath)
-    if(len > 0) {
-        if(this.options.outputPath[len-1] != '/') {
-            strcat(this.sourceFilename, "/")
-        }
-    }
-
     strcat(this.sourceFilename, this.options.outputFile)
 
     strcpy(this.binaryFilename, this.sourceFilename)
@@ -234,10 +230,6 @@ public func (this: *Lita) transpile(module: *Module) : bool {
         return false
     }
 
-    if(this.options.run) {
-        this.run(this.binaryFilename)
-    }
-
     return true
 }
 
@@ -254,50 +246,46 @@ public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool 
     cgen.emitProgram(module)
     this.endCapture(MetricType.CGEN)
 
-    /*
-    this.startCapture(MetricType.CWRITE)
-    var status = WriteFile(cFilename, cgen.buf.cStrConst(), cgen.buf.length)
-    this.endCapture(MetricType.CWRITE)
-    if(status != FileStatus.Ok) {
-        return false
-    }*/
-
     return this.result.errors.empty()
 }
 
-public func (this: *Lita) compileC(module: *Module, cFilename: *const char, binaryFilename: *const char) : bool {
+public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char, binaryFilename: *const char) : bool {
     this.startCapture(MetricType.CCOMPILE)
     defer this.endCapture(MetricType.CCOMPILE)
 
-    var commandStr = StringBufferInit(512)
+    var commandStr = StringBufferInit(1024)
+    defer commandStr.free()
+
     commandStr.append("%s", this.options.compileCmd)
 
     var index = commandStr.indexOf("%output%")
     if(index > -1) {
         commandStr.replace(index, index+strlen("%output%"), binaryFilename)
     }
+
     index = commandStr.indexOf("%input%")
     if(index > -1) {
-        commandStr.replace(index, index+strlen("%input%"), cFilename)
+        commandStr.replace(index, index+strlen("%input%"), sourceFilename)
     }
 
+    //printf("Running command: '%s'\n", commandStr.cStr())
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }
     return false
 }
 
-public func (this: *Lita) run(binaryFilename: *const char) {
+public func (this: *Lita) run() {
     var sb = StringBufferInit(256, this.allocator)
     defer sb.free()
 
     var path: [MAX_PATH]char;
-    FilePath(binaryFilename, path)
+    FilePath(this.binaryFilename, path)
 
     var len = strlen(path)
     sb.append("cd ")
     sb.appendStr(path, len)
-    sb.append(" && %s", &binaryFilename[len + 1])
+    sb.append(" && %s", &this.binaryFilename[len + 1])
 
     system(sb.cStr())
 }

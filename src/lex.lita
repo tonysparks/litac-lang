@@ -923,7 +923,12 @@ func (l: *Lexer) scanNumber() : Token {
 
         l.token.typeInfo = &I32_TYPE
         if(l.token.value.intValue > INT_MAX) {
-            l.token.typeInfo = &I64_TYPE
+            if(l.token.value.intValue > UINT_MAX) {
+                l.token.typeInfo = &I64_TYPE
+            }
+            else {
+                l.token.typeInfo = &U32_TYPE
+            }
         }
     }
 

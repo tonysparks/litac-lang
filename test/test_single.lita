@@ -1,10 +1,15 @@
-import "assert"
-import "libc"
+//import "assert"
+//import "libc"
 
+import "test_module"
+
+/*
 import "type"
 import "json"
 import "string_buffer"
+*/
 
+/*
 func MyFunc(a: i32) : f32 {
     return 4
 }
@@ -29,8 +34,12 @@ enum MyEnum {
 }
 
 const SIZE3 = 55
-
+*/
+/*
 func toJson<T>(sb: *StringBuffer, type: T) {
+}
+
+func toJson_<T>(sb: *StringBuffer, type: T) {
     var typeid = typeof(:T)
     var typeInfo = getTypeInfo(typeid)
     var input: *void = (&type) as (*void)
@@ -98,9 +107,10 @@ func toJson<T>(sb: *StringBuffer, type: T) {
                 }
                 var field = aggInfo.fields[i]
                 var fieldName = field.name
+                var value = getFieldValue(any{.data = input, .id = typeid}, fieldName)
                 //offsetof(T, fieldName)
                 sb.append("\"%s\": ", field.name)
-                //toJson(sb, field.)
+               // toJson(sb, value)
             }
             sb.append("\n")
             break
@@ -110,16 +120,105 @@ func toJson<T>(sb: *StringBuffer, type: T) {
             break
         }
     }
+}*/
+
+const MAX_KEYWORD_CACHE = 9
+const keywordCache = [MAX_KEYWORD_CACHE]**const char {
+    [0] = []*const char {
+        null
+    },
+    [1] = []*const char {
+        null
+    },
+    [2] = []*const char {
+        "i8",
+        "u8",
+        "do",
+        "if",
+        "as",
+        null,
+    },
+    [3] = []*const char {
+        "var",
+        "i16",
+        "u16",
+        "i32",
+        "u32",
+        "i64",
+        "u64",
+        "f32",
+        "f64",
+        "for",
+        null
+    },
+    [4] = []*const char {
+        "enum",
+        "func",
+        "null",
+        "void",
+        "true",
+        "bool",
+        "char",
+        "else",
+        "case",
+        "goto",
+        null
+    },
+    [5] = []*const char {
+        "union",
+        "const",
+        "false",
+        "usize",
+        "defer",
+        "while",
+        "break",
+        "using",
+        null
+    },
+    [6] = []*const char {
+        "import",
+        "struct",
+        "switch",
+        "return",
+        "sizeof",
+        "typeof",
+        "public",
+        null
+    },
+    [7] = []*const char {
+        "typedef",
+        "default",
+        null
+    },
+    [8] = []*const char {
+        "continue",
+        "offsetof",
+        null
+    },
 }
 
-func main(len:i32, args:**char) : i32 {
 
+func main(len:i32, args:**char) : i32 {
+    var x = SomeType{4}
+   // printf("%llu\n", 0xFFFF_FFFF)
+
+/*
     var sb = StringBufferInit()
     defer sb.free()
 
     toJson(sb, 4)
 
     printf("'%s'\n", sb.cStr())
+*/
+
+//printf("Hello world\n")
+/*
+    var x = any {
+        .value = null,
+        .id = 0
+    }
+
+    printf("id: %llu\n", x.id)*/
 
     /*
     var x = X<int>{4}

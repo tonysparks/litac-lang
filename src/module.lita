@@ -29,6 +29,7 @@ public struct ModuleId {
 public struct ModuleImport {
     module: *Module
     alias: *StringView
+    isUsing: bool
 }
 
 public struct Module {
@@ -132,32 +133,36 @@ public func (this: *Module) getType(type: *const char) : *Symbol {
     return this.genericSymbols.get(type)
 }
 
-public func (this: *Module) importModule(importDecl: *ImportDecl, module: *Module) {
+public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport: *Module) {
     var moduleName: *StringView = null;
 
     if(importDecl.alias.type == TokenType.IDENTIFIER) {
         moduleName = &importDecl.alias.str;
     }
 
-    this.importModuleSymbols(module, moduleName)
+    this.importModuleSymbols(moduleToImport, moduleName, importDecl.isUsing)
 }
 
 
-func (this: *Module) importModuleSymbols(module: *Module, moduleName: *StringView) {
-    module.importedBy.add(ModuleImport{this, moduleName})
+func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *StringView, isUsing: bool) {
+    moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
 
-    for(var i = 0; i < module.symbols.capacity; i += 1) {
-        var symName = module.symbols.keys[i]
-        var symbol = module.symbols.values[i]
+    for(var i = 0; i < moduleToImport.symbols.capacity; i += 1) {
+        var symName = moduleToImport.symbols.keys[i]
+        var symbol = moduleToImport.symbols.values[i]
         if(!symName || !symbol) {
             continue
         }
 
-        this.importModuleSymbol(module, moduleName, symbol, symName)
+        this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
     }
 }
 
-public func (this: *Module) importModuleSymbol(module: *Module, moduleName: *StringView, symbol: *Symbol, symName: *const char) {
+public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
+                                               moduleName: *StringView,
+                                               symbol: *Symbol,
+                                               symName: *const char,
+                                               isUsing: bool) {
 
     // only import public symbols
     if(!(symbol.flags & SymbolFlags.IS_PUBLIC)) {
@@ -165,13 +170,19 @@ public func (this: *Module) importModuleSymbol(module: *Module, moduleName: *Str
     }
 
     // only import symbols that are declared in the import module
-    if(!symbol.declared.equals(module)) {
-        return;
+    if(!symbol.declared.equals(moduleToImport)) {
+        if(!symbol.usingModule || !symbol.usingModule.equals(moduleToImport)) {
+            return;
+        }
     }
 
     // don't import symbols already defined in this module
     if(symbol.declared.equals(this)) {
         return;
+    }
+
+    if(isUsing && !symbol.usingModule) {
+        symbol.usingModule = this
     }
 
     if(moduleName) {
@@ -186,11 +197,14 @@ public func (this: *Module) importModuleSymbol(module: *Module, moduleName: *Str
     }
 }
 
-
+@inline
 public func (this: *Module) equals(other: *Module) : bool {
+    return this == other
+    /*
     if(!other) return false
-
+    if(this == other) return true
     return strcmp(this.id.filename, other.id.filename) == 0
+    */
 }
 
 public func (this: *Module) print(header: *const char) {

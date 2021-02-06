@@ -80,17 +80,19 @@ public func (this: *TypeCache) newFuncTypeInfo(sym: *Symbol,
 
 public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
                                                 length: usize,
-                                                numOfElements: *Expr) : *ArrayTypeInfo {
+                                                numOfElements: *Expr,
+                                                isLengthDefined: bool) : *ArrayTypeInfo {
 
     var entry = ArrayEntry{.arrayOf = arrayOf, .expr = numOfElements, .length = length}
     var type = this.arrayCache.get(entry)
-    if(!type || type.length != length) {
+    if(!type || type.length != length || type.isLengthDefined != isLengthDefined) {
         type = new<ArrayTypeInfo>(this.allocator)
         type.kind = TypeKind.ARRAY
         type.typeid = NextTypeId()
         type.arrayOf = arrayOf
         type.length = length
         type.numOfElements = numOfElements
+        type.isLengthDefined = isLengthDefined
 
         this.arrayCache.put(entry, type)
     }

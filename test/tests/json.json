@@ -59,7 +59,7 @@
                 PrintJson(node, &buf)
 
                 //printf("'%s'\n", buf.cStr())
-                assert( strcmp(buf.cStr(), "[true,4.000000,false,\"hi\",34343.000000,null,[5.000000],{\"k\":\"v\"}]") == 0)
+                assert( strcmp(buf.cStr(), "[true,4,false,\"hi\",34343,null,[5],{\"k\":\"v\"}]") == 0)
                 node.free()
 
             `,
@@ -229,7 +229,7 @@
 
                 assert(node == null)
                 assert(parser.hasError() == true)
-                assert( strcmp(parser.errorMsg, "Expected token ], got number") == 0)
+                assert( strcmp(parser.errorMsg, "Expected token ], got int") == 0)
             `,
         },
     ]

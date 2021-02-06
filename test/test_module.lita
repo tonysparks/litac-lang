@@ -1,3 +1,7 @@
+//@compilation_unit();
+
+import using "test_module2"
+/*
 public const A = 32
 const B = 64
 
@@ -24,4 +28,4 @@ public func functionA() : i32 {
 
 func functionB() : i32 {
     return 8
-}
+}*/
