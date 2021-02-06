@@ -29,16 +29,7 @@ public struct CGen {
     currentFunc: *FuncTypeInfo
     currentScope: *CGenScope
 
-    // writing C compilation units
-    outputDir: [MAX_PATH]char       // the output directory
-    outputFilename: [MAX_PATH]char  // the output filename (just the name, no extension or path)
-
-    compilationUnits: [MAX_COMPILATION_UNITS]CompilationUnit
-    numOfCompilationUnits: i32
-
-    defaultOutput: *FILE
     output: *FILE
-    headerOutput: *FILE
 }
 
 struct CGenScope {
@@ -80,7 +71,7 @@ const escapeChars = [256]*const char {
 }
 
 
-public func (this: *CGen) init(lita: *Lita, path: *const char, filename: *const char) {
+public func (this: *CGen) init(lita: *Lita, output: *FILE) {
     this.lita = lita
     this.buf.init(1024 * 2, lita.allocator)
     this.line.init(1024 * 2, lita.allocator)
@@ -89,151 +80,12 @@ public func (this: *CGen) init(lita: *Lita, path: *const char, filename: *const 
     this.currentScope = null
 
     this.format = lita.options.cFormat
-
-    memset(this.outputFilename, 0, MAX_PATH)
-    strncpy(this.outputFilename, filename, MAX_PATH)
-
-    memset(this.outputDir, 0, MAX_PATH)
-    strncpy(this.outputDir, path, MAX_PATH)
-}
-
-func (this: using *CGen) addCompilationUnit(module: *Module, unitName: StringView) : *CompilationUnit {
-    if(this.numOfCompilationUnits >= MAX_COMPILATION_UNITS) {
-        this.lita.result.addError(module.ast.startPos, "exceeded maximum number of compilation units: %d", MAX_COMPILATION_UNITS)
-        return null;
-    }
-
-    var buffer = [MAX_PATH]char{0}
-    var sb = StringInit(buffer, MAX_PATH, 0)
-
-    sb.format("%s%.*s.c", this.outputDir, unitName.length, unitName.buffer)
-    var fp = fopen(sb.cStr(), "w")
-    if(fp == null) {
-        this.lita.result.addError(module.ast.startPos, "unable to create compilation unit '%s'", sb.cStr())
-        return null;
-    }
-
-    var compUnit = &this.compilationUnits[this.numOfCompilationUnits]
-    compUnit.module = module
-    compUnit.file = fp
-    strncpy(compUnit.filename, buffer, MAX_PATH)
-
-    this.changeOutput(fp)
-    this.emit("#include \"%s.h\"\n", this.outputFilename)
-    this.flush()
-
-    this.numOfCompilationUnits += 1
-
-    return compUnit
-}
-
-func (this: using *CGen) compilationUnit(module: *Module) {
-    var newOutput = this.defaultOutput
-    for(var i = 0; i < this.numOfCompilationUnits; i += 1) {
-        var compUnit = &this.compilationUnits[i]
-        if(compUnit.module == module) {
-            newOutput = compUnit.file
-            break
-        }
-    }
-    this.changeOutput(newOutput)
-}
-
-func (this: using *CGen) changeOutput(newOutput: *FILE) {
-    if(this.output != newOutput) {
-        this.flush()
-        this.output = newOutput
-    }
-}
-
-func (this: using *CGen) closeOutput(out: *FILE) {
-    if(out != null) {
-        this.output = out
-        this.flush()
-        fclose(out)
-    }
-}
-
-func (this: using *CGen) prepareOutput(module: *Module) : bool {
-
-    // calculate any compilation units
-    for(var it = this.lita.modules.iter(); it.hasNext();) {
-        var m = it.next()
-
-        // determine if there is a compilation_unit
-        for(var i = 0; i < m.value.ast.notes.size(); i += 1) {
-            var note = m.value.ast.notes.get(i)
-            if(strcmp(note.name.asString(), "compilation_unit") == 0) {
-                var unitName = m.value.id.name
-                if(!note.attributes.empty()) {
-                    unitName = note.attributes.get(0).str
-                }
-
-                this.addCompilationUnit(m.value, unitName)
-                break
-            }
-        }
-    }
-
-    var buffer = [MAX_PATH]char{0}
-    var sb = StringInit(buffer, MAX_PATH, 0)
-
-    sb.format("%s%s.c", this.outputDir, this.outputFilename)
-    this.defaultOutput = fopen(sb.cStr(), "w")
-    if(!this.defaultOutput) {
-        this.lita.result.addError(module.ast.startPos, "unable to create c file for '%s'", sb.cStr())
-        return false;
-    }
-
-    this.output = this.defaultOutput
-
-    this.lita.numOfCompilationUnitFilenames = 1
-    strncpy(this.lita.compilationUnitFilenames[0], sb.cStr(), MAX_PATH)
-
-
-    // if we have a compilation unit, we need to create
-    // a header file
-    if(this.numOfCompilationUnits) {
-
-        // include the header file for the main module
-        {
-            this.emit("#include \"%s.h\"\n", this.outputFilename)
-            this.flush()
-        }
-
-        // Create a Header file which all compilation units can use
-        {
-            sb.format("%s%s.h", this.outputDir, this.outputFilename)
-            this.headerOutput = fopen(sb.cStr(), "w")
-            if(!this.headerOutput) {
-                this.lita.result.addError(module.ast.startPos, "unable to create header file for '%s'", sb.cStr())
-                return false;
-            }
-
-            this.output = this.headerOutput
-        }
-
-        // Keep track of all compilation unit files we created, so that we can
-        // feed them to the C compiler
-        {
-            this.lita.numOfCompilationUnitFilenames += this.numOfCompilationUnits
-            for(var i = 0; i < this.numOfCompilationUnits; i += 1) {
-                var compUnit = &this.compilationUnits[i]
-                strncpy(this.lita.compilationUnitFilenames[i + 1], compUnit.filename, MAX_PATH)
-            }
-        }
-    }
-
-    return true
+    this.output = output
 }
 
 public func (this: using *CGen) emitProgram(module: *Module) {
     assert(module != null)
     assert(module.ast != null)
-
-    if(!this.prepareOutput(module)) {
-        return;
-    }
 
     buf.append("#ifndef _LITAC_HEADER_H\n")
     buf.append("#define _LITAC_HEADER_H\n")
@@ -245,13 +97,12 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 
     buf.append("\n#endif /* _LITAC_HEADER_H */\n")
 
-/*
+
     buf.append("\n\n")
     buf.append("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
     buf.append("// translated code begins\n")
     buf.append("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
     buf.append("\n\n")
-*/
 
     var graph = DependencyGraph{}
     graph.init(this.lita)
@@ -283,13 +134,9 @@ public func (this: using *CGen) emitProgram(module: *Module) {
             continue
         }
 
-        this.compilationUnit(sym.declared)
-
         this.emitStmt(sym.decl)
         this.emitln()
     }
-
-    this.changeOutput(this.defaultOutput)
 
     this.emitln()
 
@@ -298,15 +145,6 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     }
 
     this.flush()
-
-    this.closeOutput(this.defaultOutput)
-    this.closeOutput(this.headerOutput)
-
-    // flush all compilation unit files
-    for(var i = 0; i < this.numOfCompilationUnits; i += 1) {
-        var compUnit = &this.compilationUnits[i]
-        this.closeOutput(compUnit.file)
-    }
 }
 
 func (this: using *CGen) emitMain(sym: *Symbol) {
@@ -416,14 +254,10 @@ func (this: using *CGen) emitPrimitiveConstDecls() {
 }
 
 func (this: using *CGen) emitModuleNotes() {
-    var previousOutput = this.output
-    defer this.changeOutput(previousOutput)
 
     for(var it = this.lita.modules.iter(); it.hasNext();) {
         var m = it.next()
         var module = m.value
-
-        this.compilationUnit(module)
 
         for(var i = 0; i < module.ast.notes.size(); i += 1) {
             var note = module.ast.notes.get(i)
@@ -654,11 +488,12 @@ func (this: using *CGen) cType(type: *TypeInfo,
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type as (*PtrTypeInfo)
-            var baseInfo = ptrInfo.getBaseType()
-            if(baseInfo.kind == TypeKind.ARRAY && !decay) {
-                var arrayInfo = baseInfo as (*ArrayTypeInfo)
-                if(arrayInfo.length > -1) {
-                    var cType = this.cType(arrayInfo.arrayOf, isCast, decay)
+            var ptrOf = ptrInfo.ptrOf
+            if(ptrOf.kind == TypeKind.ARRAY && !decay) {
+                var arrayInfo = ptrOf as (*ArrayTypeInfo)
+                if(arrayInfo.isLengthDefined) {
+                    var baseInfo = arrayInfo.getBaseType()
+                    var cType = this.cType(baseInfo, isCast, false)
                     sb.append("%s (*)[%zu]", cType, arrayInfo.length)
                     return sb.cStrConst()
                 }
@@ -686,7 +521,8 @@ func (this: using *CGen) cType(type: *TypeInfo,
                     .info = TypeInfo {. kind = TypeKind.PTR},
                     .ptrOf = arrayInfo.arrayOf
                 }
-                return this.cType(ptrInfo, isCast, decay)
+                // array's only decay once
+                return this.cType(ptrInfo, isCast, false)
             }
 
             var baseInfo = arrayInfo.getBaseType()
@@ -706,8 +542,11 @@ func (this: using *CGen) cType(type: *TypeInfo,
                         cgen.emitStmt(arrayInfo.numOfElements)
                         buf.append("]")
                     }
-                    else {
+                    else if(!arrayInfo.isLengthDefined) {
                         buf.append("[]")
+                    }
+                    else {
+                        buf.append("[0]")
                     }
                 }
                 else {
@@ -759,11 +598,12 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type as (*PtrTypeInfo)
-            var baseInfo = ptrInfo.getBaseType()
-            if(baseInfo.kind == TypeKind.ARRAY && !decay) {
-                var arrayInfo = baseInfo as (*ArrayTypeInfo)
-                if(arrayInfo.length > -1) {
-                    var cType = this.cType(arrayInfo.arrayOf)
+            var ptrOf = ptrInfo.ptrOf
+            if(ptrOf.kind == TypeKind.ARRAY && !decay) {
+                var arrayInfo = ptrOf as (*ArrayTypeInfo)
+                if(arrayInfo.isLengthDefined) {
+                    var baseInfo = arrayInfo.getBaseType()
+                    var cType = this.cType(baseInfo)
                     sb.append("%s (*%s)[%zu]", cType, name, arrayInfo.length)
                     return sb.cStrConst()
                 }
@@ -787,10 +627,11 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             var arrayInfo = type as (*ArrayTypeInfo)
             if(decay) {
                 var ptrInfo = PtrTypeInfo {
-                    .info = TypeInfo {. kind = TypeKind.PTR},
+                    .info = TypeInfo {.kind = TypeKind.PTR},
                     .ptrOf = arrayInfo.arrayOf
                 }
-                return this.cTypeDecl(ptrInfo, name, decay)
+                // arrays only decay once
+                return this.cTypeDecl(ptrInfo, name, false)
             }
 
             var baseInfo = arrayInfo.getBaseType()
@@ -811,8 +652,11 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                         buf = cgen.buf // the buffer has expanded
                         buf.append("]")
                     }
-                    else {
+                    else if(!arrayInfo.isLengthDefined) {
                         buf.append("[]")
+                    }
+                    else {
+                        buf.append("[0]")
                     }
                 }
                 else {
@@ -1100,26 +944,6 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             buf.appendStr(attr.str.buffer, attr.str.length)
         }
     }
-    else if(strncmp(note.name.str.buffer, "global", note.name.str.length) == 0) {
-        // do for default
-        this.changeOutput(this.defaultOutput)
-
-        for(var i = 0; i < note.attributes.size(); i += 1) {
-            var attr = note.attributes.get(i)
-            buf.appendStr(attr.str.buffer, attr.str.length)
-        }
-
-        // now do for all compilation units
-        for(var i = 0; i < this.numOfCompilationUnits; i += 1) {
-            var compUnit = &this.compilationUnits[i]
-            this.changeOutput(compUnit.file)
-
-            for(var i = 0; i < note.attributes.size(); i += 1) {
-                var attr = note.attributes.get(i)
-                buf.appendStr(attr.str.buffer, attr.str.length)
-            }
-        }
-    }
     else if(strncmp(note.name.str.buffer, "inline", note.name.str.length) == 0) {
         this.emit("LITAC_INLINE ")
     }
@@ -1128,6 +952,9 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     }
     else if(strncmp(note.name.str.buffer, "static", note.name.str.length) == 0) {
         this.emit("static ")
+    }
+    else if(strncmp(note.name.str.buffer, "atomic", note.name.str.length) == 0) {
+        this.emit("_Atomic ")
     }
     else if(strncmp(note.name.str.buffer, "register", note.name.str.length) == 0) {
         this.emit("register ")
@@ -1545,6 +1372,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var decl = s as (*VarFieldDecl)
             this.emitLineInfo(decl)
 
+            this.emitNotes(&decl.attributes)
+
             var name: [MAX_SYMBOL_NAME]char;
             var nameStr = StringInit(name, MAX_SYMBOL_NAME)
             nameStr.format("%.*s", decl.name.str.length, decl.name.str.buffer)
@@ -1844,6 +1673,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var isHex = false
             var isBin = false
             var length: usize = expr.startPos.end - expr.startPos.start
+            var start = expr.startPos.start
+
             if(length > 2) {
                 var first = expr.startPos.start[0]
                 var second = tolower(expr.startPos.start[1])
@@ -1855,7 +1686,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
             }
 
-            for(var start = expr.startPos.start; start != expr.startPos.end; start += 1) {
+            for(; start != expr.startPos.end; start += 1) {
                 var c = *start
 
                 if(c == '.') {
@@ -1870,7 +1701,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     }
 
                     if(isHex) {
-                        var lowered = tolower(c)
+                        c = tolower(c)
                         if(c != 'a' &&
                            c != 'b' &&
                            c != 'c' &&
@@ -1878,11 +1709,11 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                            c != 'e' &&
                            c != 'f' &&
                            c != 'x') {
-                               break
+                           break
                         }
                     }
                     else if(isBin) {
-                        var lowered = tolower(c)
+                        c = tolower(c)
                         if(c != 'b') {
                                break
                         }
@@ -1896,30 +1727,32 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
 
             var type = expr.operand.typeInfo
-            switch(type.kind) {
-                case TypeKind.F32: {
-                    if(!hasDecimal) {
-                        this.emit(".")
+            if(!isHex && !isBin) {
+                switch(type.kind) {
+                    case TypeKind.F32: {
+                        if(!hasDecimal) {
+                            this.emit(".")
+                        }
+                        this.emit("f")
+                        break;
                     }
-                    this.emit("f")
-                    break;
-                }
-                case TypeKind.U8:
-                case TypeKind.U16:
-                case TypeKind.U32: {
-                    this.emit("U")
-                    break;
-                }
-                case TypeKind.U64: {
-                    this.emit("UL")
-                    break;
-                }
-                case TypeKind.I64: {
-                    this.emit("L")
-                    break;
-                }
-                default: {
+                    case TypeKind.U8:
+                    case TypeKind.U16:
+                    case TypeKind.U32: {
+                        this.emit("U")
+                        break;
+                    }
+                    case TypeKind.U64: {
+                        this.emit("UL")
+                        break;
+                    }
+                    case TypeKind.I64: {
+                        this.emit("L")
+                        break;
+                    }
+                    default: {
 
+                    }
                 }
             }
             return;

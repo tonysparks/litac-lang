@@ -53,6 +53,7 @@ public struct Symbol {
     //usingParent: *TypeInfo
     usingParent: *Symbol
     declared: *Module
+    usingModule: *Module
     flags: i32
     val: Value
 

@@ -601,6 +601,23 @@ public func NewArrayInitExpr(startPos: SrcPos,
     expr.type = type
     expr.values = *expr.node.becomeParentOfChildren(values)
 
+    assert(expr.type.kind == TypeSpecKind.ARRAY)
+
+    // if we are relying on the values to determine the
+    // size, create the AST number
+    var arrayType = expr.type as (*ArrayTypeSpec)
+    if(!arrayType.numElements && !expr.values.empty()) {
+        var token = Token {
+            .type = TokenType.USIZE,
+            .typeInfo = &USIZE_TYPE,
+            .pos = startPos, // TODO: fix this...
+            .value = Value {
+                .intValue = expr.values.size()
+            }
+        }
+        arrayType.numElements = NewNumberExpr(startPos, startPos, token, allocator)
+    }
+
     return expr as (*Expr)
 }
 

@@ -60,6 +60,7 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
+        //"../test/tests/arrays.json",
         "../test/tests/typeof.json",
         "../test/tests/strings.json",
         "../test/tests/using.json",
@@ -292,6 +293,12 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
 
     var outputPath = "test_output"
     strncpy(options.outputPath, outputPath, MAX_PATH)
+    var len = strlen(options.outputPath)
+    if(len > 0) {
+        if(options.outputPath[len-1] != '/') {
+            strcat(options.outputPath, "/")
+        }
+    }
 
     FilePath(options.inputFile, options.srcPath)
 

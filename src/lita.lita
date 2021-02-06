@@ -216,6 +216,7 @@ public func (this: *Lita) transpile(module: *Module) : bool {
     strcpy(this.binaryFilename, this.sourceFilename)
 
     strcat(this.binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
+    strcat(this.sourceFilename, ".c")
 
     if(!this.emitC(module, this.sourceFilename)) {
         return false
@@ -225,7 +226,7 @@ public func (this: *Lita) transpile(module: *Module) : bool {
         return false
     }
 
-    if(!this.compileC(module, this.binaryFilename)) {
+    if(!this.compileC(module, this.sourceFilename, this.binaryFilename)) {
         return false
     }
 
@@ -234,16 +235,21 @@ public func (this: *Lita) transpile(module: *Module) : bool {
 
 public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool {
     this.startCapture(MetricType.CGEN)
+    var fp = fopen(cFilename, "w")
+    if(fp == null) {
+        return FileStatus.FileNotFoundError;
+    }
+    defer fclose(fp)
 
     var cgen = CGen{}
-    cgen.init(this, this.options.outputPath, this.options.outputFile)
+    cgen.init(this, fp)
     cgen.emitProgram(module)
     this.endCapture(MetricType.CGEN)
 
     return this.result.errors.empty()
 }
 
-public func (this: *Lita) compileC(module: *Module, binaryFilename: *const char) : bool {
+public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char, binaryFilename: *const char) : bool {
     this.startCapture(MetricType.CCOMPILE)
     defer this.endCapture(MetricType.CCOMPILE)
 
@@ -256,21 +262,13 @@ public func (this: *Lita) compileC(module: *Module, binaryFilename: *const char)
     if(index > -1) {
         commandStr.replace(index, index+strlen("%output%"), binaryFilename)
     }
+
     index = commandStr.indexOf("%input%")
     if(index > -1) {
-        var sb = StringBufferInit(1024)
-        defer sb.free()
-
-        for(var i = 0; i < this.numOfCompilationUnitFilenames; i += 1) {
-            if(i > 0) {
-                sb.append(" ")
-            }
-            sb.append("%s", this.compilationUnitFilenames[i])
-        }
-
-        commandStr.replace(index, index+strlen("%input%"), sb.cStr())
+        commandStr.replace(index, index+strlen("%input%"), sourceFilename)
     }
-printf("Running command: '%s'\n", commandStr.cStr())
+
+    //printf("Running command: '%s'\n", commandStr.cStr())
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }

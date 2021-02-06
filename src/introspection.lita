@@ -248,7 +248,7 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
 
             if(numOfFields) {
                 scratch.append("[]EnumFieldInfo {")
-                var value = 0
+                var value = 0_i32
                 for(var i = 0; i < numOfFields; i += 1) {
                     var field = decl.fields.get(i)
 
@@ -256,7 +256,7 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                         // TODO: Get the value from the expr,
                         // we don't do const evaluation yet!!
                         if(field.value.operand.isConst) {
-                            value = field.value.operand.val.intValue
+                            value = field.value.operand.val.intValue as (i32)
                         }
                     }
                     scratch.append("""

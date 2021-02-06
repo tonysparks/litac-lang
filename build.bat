@@ -10,8 +10,8 @@ if errorlevel 1 (
 )
 cd bin
 echo Running litaC...
-REM litaC.exe -debug -profile -buildCmd %BUILD_CMD% "../src/main.lita"
-litacc.exe -cFormat -types all -debug -run -profile "../test/test_single.lita"
+litacc.exe -debug -profile -buildCmd %BUILD_CMD% "../src/main.lita"
+REM litacc.exe -cFormat -types all -debug -run -profile "../test/test_single.lita"
 REM litaC.exe -run -profile -buildCmd %BUILD_CMD% "../src/lsp.lita"
 goto end
 

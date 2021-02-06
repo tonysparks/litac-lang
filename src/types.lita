@@ -1679,6 +1679,7 @@ public struct ArrayTypeInfo {
     arrayOf: *TypeInfo
     length: usize
     numOfElements: *Expr
+    isLengthDefined: bool
 }
 
 public struct FuncPtrTypeInfo {

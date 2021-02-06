@@ -794,6 +794,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
             var arraySpec = spec as (*ArrayTypeSpec)
             var arrayOf = this.resolveTypeSpec(arraySpec.base)
             var length: usize = 0
+            var isLengthDefined = false
             if(arraySpec.numElements) {
                 var expr = arraySpec.numElements
                 if(!this.resolveConstExpr(expr)) {
@@ -806,10 +807,10 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                     goto err;
                 }
 
-
                 length = expr.operand.val.intValue // TODO: fix: usize != i64
+                isLengthDefined = true
             }
-            spec.typeInfo = this.typeCache.newArrayTypeInfo(arrayOf, length, arraySpec.numElements) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newArrayTypeInfo(arrayOf, length, arraySpec.numElements, isLengthDefined) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.FUNC_PTR: {
