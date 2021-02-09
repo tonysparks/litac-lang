@@ -113,23 +113,25 @@ public func Mkdir(dir: *const char) : bool {
 }
 
 public func FilePath(filename: *const char, out:[MAX_PATH]char) : *char {
-    var index = -1
+    var index = 0
 
     if(!filename) {
         goto end;
     }
 
     var len = strlen(filename)
-    for(index = len-1; index >= 0; index -= 1) {
-        var c = filename[index]
-        if(c == '/' || c == '\\') {
-            memcpy(out, filename, index)
-            goto end;
+    if(len > 0) {
+        for(index = len-1; index >= 0; index -= 1) {
+            var c = filename[index]
+            if(c == '/' || c == '\\') {
+                memcpy(out, filename, index)
+                goto end;
+            }
         }
     }
 
 end:
-    out[index + 1] = '\0'
+    out[index] = '\0'
     return out
 }
 
