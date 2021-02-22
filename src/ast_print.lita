@@ -799,7 +799,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         default: {
             //Panic("Unknown statement kind: %d", s.kind)
-            Printf(indent, "<%s Not Implemented>", StmtKindAsStr(s.kind))
+            Printf(indent, "<%s:%d Not Implemented>", StmtKindAsStr(s.kind), s.kind)
             return;
         }
     }

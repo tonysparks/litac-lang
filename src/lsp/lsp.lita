@@ -9,6 +9,7 @@ import "system"
 import "phase_result"
 import "array"
 import "lsp/workspace"
+import "lsp/protocol"
 
 const IN_BUFFER_SIZE = 1024 * 1024 * 2
 const VERSION = "0.12" // TODO: read from a file at compile time; share with lita.main
@@ -20,6 +21,7 @@ public struct LspServer {
     lita: *Lita
     message: StringBuffer
     output: StringBuffer
+    outbound: StringBuffer
 
     isInitialized: bool
     isRunning: bool
@@ -45,6 +47,7 @@ public func (this: *LspServer) init(lita: *Lita) {
 
     this.message = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
     this.output = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
+    this.outbound = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
 
     this.workspace.init(this, this.appAlloc())
 }
@@ -96,28 +99,17 @@ public func (this: *LspServer) log(format: *const char, ...) {
 public func (this: *LspServer) readMessage() {
     this.message.clear()
 
-    var contentSize = [17]char{0};
-    var size = 0_i32
-
-    fscanf(stdin, "%16s %d\r\n\r\n", contentSize, &size)
-    if(strnlen(contentSize, 17) == 0) {
+    this.log("Waiting for message..\n")
+    var size = this.readHeader()
+    if(size < 0) {
+        this.writeErrorResponse(0, "error reading 'Content-Length'")
         return;
     }
 
     // free memory
     defer this.requestAllocator.currentOffset = 0
 
-    this.log("Received Content Header: '%s'\n", contentSize)
-
-    if(strncmp(contentSize, "Content-Length:", 16) != 0) {
-        this.log("error reading 'Content-Length', found '%s'", contentSize)
-        this.writeErrorResponse(0, "error reading 'Content-Length'")
-        return;
-    }
-    // TODO: Support Content-Type header
-
     this.log("Received message size: %d\n", size)
-
     this.message.reserve(size)
 
     // Read content-size
@@ -147,6 +139,47 @@ public func (this: *LspServer) readMessage() {
     this.handleMessage(json)
 }
 
+func (this: *LspServer) readHeader() : i32 {
+    var header = [256]char{0};
+    var sizeIndex = 0
+    var index = 0
+
+    this.log("Reading header:\n'")
+    while(true) {
+        var r = getchar()
+        if(r == EOF) {
+            break
+        }
+
+        var c = r as (char)
+        this.log("%c", c)
+
+        if(c == ' ') {
+            sizeIndex = index + 1
+        }
+
+        if(c == '\n' || c == '\r') {
+            header[index] = '\0'
+            break
+        }
+        else {
+            header[index] = c
+        }
+
+        index += 1
+    }
+
+    this.log("'\nRead header: '%s'\n", header)
+
+    if(strncmp(header, "Content-Length: ", sizeIndex) != 0) {
+        this.log("Invalid header: '%s'\n", header)
+        return -1
+    }
+
+    var size = atoi(&header[sizeIndex])
+    return size + 1 /* for the \r\n\r\n */
+}
+
 public func (this: *LspServer) handleMessage(msg: *JsonNode) {
     var method = msg.getStr("method", null)
     if(!method) {
@@ -170,8 +203,17 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
     else if(strcmp(method, "textDocument/documentSymbol") == 0) {
         this.handleTextDocumentSymbolMessage(msg, params)
     }
+    else if(strcmp(method, "textDocument/didSave") == 0) {
+        this.handleTextDocumentSaveMessage(msg, params)
+    }
+    else if(strcmp(method, "textDocument/references") == 0) {
+        this.handleTextDocumentReferencesMessage(msg, params)
+    }
+    else if(strcmp(method, "$/cancelRequest") == 0) {
+        // TODO: do nothing for right now
+    }
     else {
-        this.writeErrorResponse(0, "unsupported params: %s", params)
+        this.writeErrorResponse(0, "unsupported method: '%s'", method)
     }
 }
 
@@ -208,6 +250,7 @@ public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *
 
     var parser = JsonParserInit(this.requestAlloc())
     resp.put("result", parser.parseJson(capabilities))
+    resp.put("error", JSON_NULL)
 
     this.writeResponse(resp)
 }
@@ -235,14 +278,44 @@ public func (this: *LspServer) handleTextDocumentSymbolMessage(msg: *JsonNode, p
 
     var resp = this.createResponse(msg.getInt("id"))
     resp.put("result", results)
+    resp.put("error", JSON_NULL)
 
     this.writeResponse(resp)
 }
 
+public func (this: *LspServer) handleTextDocumentSaveMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    this.workspace.saveDocument(uri)
+    this.writeDiagnostic(uri)
+}
+
+public func (this: *LspServer) handleTextDocumentReferencesMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    var pos = params.getObject("position")
+    var results = this.workspace.references(uri, pos, this.requestAlloc())
+
+    var resp = this.createResponse(msg.getInt("id"))
+    resp.put("result", results)
+    resp.put("error", JSON_NULL)
+
+    this.writeResponse(resp)
+}
+
+
 public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
     this.log("Running diagnostics for: '%s'\n", docUri)
     var result = this.workspace.runDiagnostics(this.requestAlloc())
-/*
+
     var params = CreateJsonObject(this.requestAlloc())
     params.putStr("uri", docUri)
     var diagnostics = CreateJsonArray(this.requestAlloc())
@@ -253,19 +326,38 @@ public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
     resp.put("params", params)
 
     var output = [MAX_PATH]char{0}
-    var filename = UriToFilePath(docUri, output)
+    var openedDocFilename = UriToFilePath(docUri, output)
 
     if(!result.errors.empty()) {
+        var outputPath = [MAX_PATH]char{0}
         for(var i = 0; i < result.errors.size(); i += 1) {
             var error =  result.errors.get(i)
-            var path = GetAbsolutePath(this.workspace.rootPath, error.pos.filename)
-            if(strcmp(path, filename) == 0) {
 
+            // TODO: when does this happen?
+            if(!error.pos.filename) {
+                continue
             }
-            // TODO:
+
+            var modulePathOfError = GetAbsolutePath(this.workspace.rootPath, error.pos.filename, outputPath)
+            //this.log("Comparing path: '%s' vs '%s'\n", path, filename)
+
+            // TODO: should we be only sending over errors in this file?
+            if(strcmp(modulePathOfError, openedDocFilename) != 0) {
+                continue
+            }
+
+            var diagnostic = CreateJsonObject(this.requestAlloc())
+            diagnostic.putStr("message", error.message)
+            diagnostic.putIntNumber("severity", 1)
+            var sourceLine = StringCopy(error.pos.start, (error.pos.end - error.pos.start) as (i32), this.requestAlloc())
+            diagnostic.putStr("source", sourceLine)
+            diagnostic.put("range", SrcPosToRange(error.pos, this.requestAlloc()))
+
+            diagnostics.add(diagnostic)
         }
     }
-*/
+
+    this.writeResponse(resp)
 }
 
 public func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, ...) {
@@ -287,22 +379,26 @@ public func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, 
 
 public func (this: *LspServer) writeResponse(msg: *JsonNode) {
     this.output.clear()
+    this.outbound.clear()
 
-    var header = [256]char{0};
-    var headerStr = StringInit(header, 256)
+    //var header = [256]char{0};
+    //var headerStr = StringInit(header, 256)
 
     var jsonStr = msg.print(this.output)
     var length = this.output.length
 
-    this.log("Sending: %d '%.*s'\n", length, this.output.length, this.output.buffer)
     if(length < 1) {
         return;
     }
 
-    headerStr.append("Content-Length: %d\r\n\r\n", length + 1)
-    fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)
-    fwrite(this.output.buffer, sizeof(:char), length + 1, stdout)
-    //fwrite("\n" as (*const void), sizeof(:char), 1, stdout)
+
+    //headerStr.append("Content-Length: %d\r\n\r\n", length)
+    this.outbound.append("Content-Length: %d\n\n%.*s", length, length, this.output.buffer)
+    this.log("Sending: Len: %d %.*s\n", this.outbound.length, this.outbound.length, this.outbound.buffer)
+
+    //fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)
+    fwrite(this.outbound.cStr() as (*const void), sizeof(:char), this.outbound.length, stdout)
+    //printf("%.*s", this.outbound.length, this.outbound.buffer)
     fflush(stdout)
 }
 
@@ -311,7 +407,7 @@ public func (this: *LspServer) createResponse(id: i64) : *JsonNode {
     response.putStr("jsonrpc", "2.0")
 
     if(id > -1) {
-        response.putNumber("id", id as (f64))
+        response.putIntNumber("id", id)
     }
 
     return response

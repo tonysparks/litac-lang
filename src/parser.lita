@@ -2568,7 +2568,11 @@ func (p: *Parser) pos() : SrcPos {
         return p.peek().pos
     }
 
-    return SrcPos{}
+    if(p.tokens.empty()) {
+        return SrcPos{}
+    }
+
+    return p.tokens.last().pos
 }
 
 func (p: *Parser) prevPos() : SrcPos {

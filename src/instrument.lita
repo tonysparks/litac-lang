@@ -1,0 +1,174 @@
+import "lita"
+import "mem"
+import "array"
+import "map"
+import "checker"
+import "symbols"
+import "string_buffer"
+import "string_view"
+import "string"
+import "system"
+import "phase_result"
+import "module"
+import "lex"
+import "parser"
+import "ast"
+import "assert"
+import "libc"
+import "error_codes"
+import "ast_copy"
+
+public func Instrument(lita: *Lita, checker: *TypeChecker) {
+
+    var filename = [MAX_PATH]char{0}
+    var moduleName = StringViewInit("profile")
+    if(!FindModulePath(lita, moduleName, filename)) {
+        lita.result.addError(SrcPos{}, "could not find module 'profile' on the system path.")
+        return;
+    }
+
+    var module = lita.modules.get(filename)
+    if(!module) {
+        return;
+    }
+
+    var sb = StringBufferInit(2048*2, lita.allocator)
+    var profileAll = true
+
+    // creating the Profile tags
+    sb.append("@generated public enum ProfileTag {\n")
+    var numOfProfiled = 0
+    for(var i = 0; i < checker.symbolFuncs.size(); i += 1) {
+        var sym = checker.symbolFuncs.get(i)
+        if(sym.declared == module) {
+            continue
+        }
+
+        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+            continue
+        }
+
+        if(profileAll || sym.decl.hasNote("profile")) {
+            sb.append("    %.*s__%s,\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+            numOfProfiled += 1
+        }
+    }
+    sb.append("    MAX_PROFILE_TAGS\n")
+    sb.append("\n}\n")
+
+    // Create the array of profile entries
+    sb.append("@generated const profileEntries = [%d]ProfileEntry {\n", numOfProfiled)
+    for(var i = 0; i < checker.symbolFuncs.size(); i += 1) {
+        var sym = checker.symbolFuncs.get(i)
+        if(sym.declared == module) {
+            continue
+        }
+
+        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+            continue
+        }
+
+        if(profileAll || sym.decl.hasNote("profile")) {
+            sb.append("""
+                ProfileEntry {
+                    .functionName = "%.*s::%s",
+                    .count = 0_u64,
+                    .startTime = 0_f64,
+                    .totalTime = 0_f64,
+                },
+            """,  sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+        }
+    }
+    sb.append("\n}\n")
+
+/*
+printf("\n%s = %s\n", module.id.filename, sb.cStr())
+printf("Module: ")
+module.print("WTF?")
+*/
+    var parser = ParserInit(module.id.filename, sb.cStr(), lita)
+    var stmts = parser.parseModule()
+    if(stmts) {
+        checker.enterModule(module)
+        defer checker.leaveModule()
+
+        // the ProfileTag
+        {
+            var tagDecl = stmts.declarations.get(0)
+            assert(tagDecl.kind == StmtKind.ENUM_DECL)
+
+            var existingDecl = module.getType("ProfileTag")
+            assert(existingDecl != null)
+
+            tagDecl.sym = existingDecl
+            existingDecl.decl = tagDecl
+        }
+
+        // the profileEntries
+        {
+            var entriesDecl = stmts.declarations.get(1)
+            assert(entriesDecl.kind == StmtKind.CONST_DECL)
+
+/*
+            var entries = checker.resolveValueDecl(entriesDecl as (*VarDecl))
+             // TEMP: Remove once all types are implemented
+            if(!entries) {
+                if(checker.lita.result.hasErrors()) {
+                    var sb = StringBufferInit()
+                    for(var i = 0; i < checker.lita.result.errors.size(); i+=1) {
+                        var error = checker.lita.result.errors.get(i)
+                        PrintError(sb, error)
+                    }
+
+                    printf("ERRORS: \n%s\n", sb.cStr())
+                }
+            }
+            // END TEMP
+            assert(entries != null)*/
+
+            var existingDecl = module.getType("profileEntries")
+            assert(existingDecl != null)
+
+            entriesDecl.sym = existingDecl
+            existingDecl.decl = entriesDecl
+        }
+    }
+
+
+    sb = StringBufferInit(2048, lita.allocator)
+
+
+    // Now inject each function with start/stop watch
+    for(var i = 0; i < checker.symbolFuncs.size(); i += 1) {
+        var sym = checker.symbolFuncs.get(i)
+        if(sym.declared == module) {
+            continue
+        }
+
+        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+            continue
+        }
+
+        if(profileAll || sym.decl.hasNote("profile")) {
+            var alias = AstAddImport(lita, checker, sym.declared, module)
+            if(alias) {
+                sb.clear()
+                sb.append("defer %s::StopWatch(%s::ProfileTag.%.*s__%s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+
+                sb.clear()
+                sb.append("%s::StartWatch(%s::ProfileTag.%.*s__%s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+            }
+            else {
+                sb.clear()
+                sb.append("defer StopWatch(ProfileTag.%.*s__%s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+
+                sb.clear()
+                sb.append("StartWatch(ProfileTag.%.*s__%s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+            }
+        }
+    }
+}

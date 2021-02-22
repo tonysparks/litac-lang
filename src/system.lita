@@ -128,6 +128,7 @@ public func FilePath(filename: *const char, out:[MAX_PATH]char) : *char {
                 goto end;
             }
         }
+        index = 0
     }
 
 end:

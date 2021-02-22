@@ -35,6 +35,7 @@ public struct CGen {
 struct CGenScope {
     parent: *CGenScope
     defers: Array<*Stmt>
+    constDefs: Array<*const char>
     isLoop: bool
     isSwitch: bool
 }
@@ -441,7 +442,7 @@ func (this: using *CGen) popLoopScope(checkSwitch: bool = false) {
 }
 
 func (this: using *CGen) leaveScope(scope: *CGenScope) {
-    if(!scope || scope.defers.empty()) {
+    if(!scope) {
         return;
     }
 
@@ -449,6 +450,11 @@ func (this: using *CGen) leaveScope(scope: *CGenScope) {
         var deferStmt = scope.defers.get(i)
         this.emitStmt(deferStmt)
         this.emit(";\n")
+    }
+
+    for(var i = 0; i < scope.constDefs.size(); i+=1) {
+        var name = scope.constDefs.get(i)
+        this.emit("#undef %s\n", name)
     }
 }
 
@@ -1317,7 +1323,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var stmt = s as (*ReturnStmt)
 
 
-            if(stmt.expr && this.hasPendingDefers()) {
+            if(stmt.expr && stmt.expr.operand.typeInfo != &VOID_TYPE && this.hasPendingDefers()) {
                 assert(this.currentFunc != null)
                 this.emit("{%s = ", this.cTypeDecl(this.currentFunc.returnType, "___result"))
                 this.emitStmt(stmt.expr)

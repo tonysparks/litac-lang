@@ -113,5 +113,24 @@
             `,
             "error": "can't reassign constant variable 'X'"
         },
+        {
+            "name": "Constant Scoping",
+            "definitions": `
+                const X = 1 + 1
+            `,
+            "code": `
+                {
+                    const X = 44
+                    assert(X == 44)
+                    {
+                        const Y = 31
+                        assert(Y == 31)
+                    }
+                    var Y = 55
+                    assert(Y == 55)
+                }
+                assert(X == 2)
+            `,
+        },
     ]
 }

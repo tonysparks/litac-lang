@@ -7,8 +7,13 @@ import "mem"
 import "array"
 import "common"
 import "assert"
-
+import "lita"
+import "module"
+import "checker"
+import "string_buffer"
+import "string_view"
 import "libc"
+import "parser"
 
 public func NewTokenName(token: Token, allocator: *const Allocator) : *const char {
     if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
@@ -677,4 +682,113 @@ public func CopyTypedefDecl(decl: *TypedefDecl, allocator: *const Allocator) : *
     var copy = NewTypedefDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams.copy(), CopyTypeSpec(decl.type, allocator), allocator)
     copy.attributes = decl.attributes
     return copy as (*TypedefDecl)
+}
+
+public func AstInsertText(node: *Node, text: *const char, index: i32, lita: *Lita) {
+    var parser = ParserInit(node.startPos.filename, text, lita)
+    var stmt = parser.statement()
+
+    AstInsert(node, stmt, index, lita.allocator)
+}
+
+
+@doc("""
+    Inserts a stmt inside another AstNode.
+
+    Right now only FuncDecl is supported.
+""")
+public func AstInsert(node: *Node, stmt: *Stmt, index: i32, allocator: *const Allocator) {
+
+    switch(node.kind) {
+        case StmtKind.FUNC_DECL: {
+            var funcDecl = node as (*FuncDecl)
+            if(!funcDecl.body) {
+                funcDecl.body = funcDecl.node.becomeParentOf(stmt)
+            }
+            else {
+                if(funcDecl.body.kind == StmtKind.FUNC_BODY_STMT) {
+                    var body = funcDecl.body as (*FuncBodyStmt)
+                    body.stmts.insertAt(index, stmt)
+                    body.node.becomeParentOf(stmt)
+                }
+                else {
+                    var stmts = ArrayInit<*Stmt>(8, allocator)
+                    if(index) {
+                        stmts.add(funcDecl.body)
+                        stmts.add(stmt)
+                    }
+                    else {
+                        stmts.add(stmt)
+                        stmts.add(funcDecl.body)
+                    }
+
+                    funcDecl.body = NewFuncBodyStmt(index ? funcDecl.body.startPos : stmt.startPos,
+                                                    index ? stmt.endPos : funcDecl.body.endPos,
+                                                    stmts,
+                                                    allocator)
+
+                }
+            }
+            break
+        }
+        default: {
+            // NOT implemented yet!!
+            printf("Assert AstInsert: %s\n", StmtKindAsStr(node.kind))
+            assert(false)
+        }
+    }
+}
+
+
+public func AstAddImport(lita: *Lita,
+                         checker: *TypeChecker,
+                         module: *Module,
+                         importModule: *Module) : *const char {
+
+    @static var moduleNameIndex: i32;
+
+    for(var i = 0; i < module.ast.imports.size(); i += 1) {
+        var importStmt = module.ast.imports.get(i)
+        if(strcmp(importStmt.moduleId.filename, importModule.id.filename) == 0) {
+            if(importStmt.alias.type == TokenType.IDENTIFIER) {
+                return importStmt.alias.asString()
+            }
+            else {
+                // this is already being imported and doesn't have an alias
+                return null
+            }
+        }
+    }
+
+    // this module isn't being imported, so we must inject an import
+    // statement for it; but also give it an alias that *shouldn't*
+    // collide with other imports
+    var name = Token {
+        .type = TokenType.IDENTIFIER,
+        .pos = module.ast.startPos,
+        .value = Value{.str = importModule.id.name}
+    }
+    var sb = StringBufferInit(16, lita.allocator)
+    sb.append("____%d", moduleNameIndex += 1)
+
+    var alias = Token {
+        .type = TokenType.IDENTIFIER,
+        .pos = module.ast.startPos,
+        .value = Value{ .str = StringViewInit(sb.cStr(), sb.length)}
+    }
+    var importStmt = NewImportDecl(module.ast.startPos,
+                                    module.ast.startPos,
+                                    name,
+                                    alias,
+                                    false,
+                                    lita.allocator) as (*ImportDecl)
+
+    importStmt.moduleId = &importModule.id
+    module.ast.imports.add(importStmt)
+
+    checker.enterModule(module)
+    defer checker.leaveModule()
+    checker.createImportSymbols(importStmt)
+
+    return sb.cStr()
 }

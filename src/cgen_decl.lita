@@ -27,6 +27,7 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
     var name = this.cName(decl.sym)
     if(decl.sym.flags & SymbolFlags.IS_CONSTANT && decl.expr.isConstExpr()) {
         assert(decl.expr != null)
+
         buf.append("\n#define ")
         this.emit(name)
 
@@ -34,7 +35,16 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         this.emitStmt(decl.expr)
         buf.append(")")
 
-        // TODO pop/undef if not a global
+
+        // If this isn't a global variable, we need to #undef
+        // this once we leave the current scope
+        if(decl.sym.flags & SymbolFlags.IS_LOCAL) {
+            if(this.currentScope.constDefs.empty()) {
+                this.currentScope.constDefs.init(16, this.lita.allocator)
+            }
+
+            this.currentScope.constDefs.add(name)
+        }
     }
     else {
         buf.append("%s", this.cTypeDecl(decl.sym.type, name))

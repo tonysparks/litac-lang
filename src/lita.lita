@@ -18,6 +18,8 @@ import "checker"
 import "cgen"
 import "io"
 
+import "lsp/references"
+
 public const MAX_PREFIX_SIZE = 32
 
 public struct Lita {
@@ -42,6 +44,9 @@ public struct Lita {
     // all the generated C files for compilation
     compilationUnitFilenames: [MAX_COMPILATION_UNITS][MAX_PATH]char;
     numOfCompilationUnitFilenames: i32
+
+    // Language Server support
+    references: ReferenceDatabase
 }
 
 @asStr
@@ -86,6 +91,7 @@ public struct LitaOptions {
     showProfileInfo: bool          // outputs profiling information
     languageServer: bool           // if this should launch the language server
     isDebug: bool                  // if we are in debug mode
+    instrument: bool               // if we have profiling instrumentation enabled
 
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include
@@ -106,17 +112,11 @@ public func (this: *Lita) init(options: *LitaOptions) {
 
     this.allocator = allocator
     this.options = options
-    this.totalSourceLines = 0
-    this.totalAllocations = 0
 
     memset(this.binaryFilename, 0, MAX_PATH)
     memset(this.sourceFilename, 0, MAX_PATH)
 
-    this.preprocessor.init(this)
-    this.result = PhaseResultInit(allocator)
-    this.modules = StrMap<*Module>(null, 32, allocator)
-
-    this.genericSymbols = StrMap<*Symbol>(null, 128, allocator)
+    this.reset()
 }
 
 @doc("Resets the state reading for another compile")
@@ -130,6 +130,9 @@ public func (this: *Lita) reset() {
     this.modules = StrMap<*Module>(null, 32, this.allocator)
 
     this.genericSymbols = StrMap<*Symbol>(null, 128, this.allocator)
+
+    // TODO: Only initialize if this is an LSP
+    this.references.init(this.allocator)
 }
 
 public func (lita: *Lita) free() {

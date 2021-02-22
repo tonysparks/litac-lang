@@ -11,9 +11,9 @@ import "phase_result"
 import "symbols"
 import "checker"
 
-
 import "lsp/lsp"
 import "lsp/protocol"
+import "lsp/references"
 
 public struct Workspace {
     allocator: *const Allocator
@@ -68,6 +68,12 @@ public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char
     this.lsp.log("unable to find main.lita from '%s'\n", rootPath)
 }
 
+public func (this: *Workspace) isDocumentOpen(uri: *const char) : bool {
+    if(!uri) return false;
+
+    return this.openedDocuments.contains(uri)
+}
+
 public func (this: *Workspace) openDocument(uri: *const char, text: *const char) {
     if(!uri) return;
 
@@ -82,6 +88,11 @@ public func (this: *Workspace) openDocument(uri: *const char, text: *const char)
     this.openedDocuments.put(moduleUri, doc)
 }
 
+public func (this: *Workspace) saveDocument(uri: *const char) {
+    if(!uri) return;
+    // TODO: Implement...
+}
+
 public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const Allocator) : *JsonNode {
     if(!uri) return null;
 
@@ -90,27 +101,58 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     if(!doc) return null;
 
     var syms = &this.lsp.lita.programSymbols
-    var absPath = [MAX_PATH]char{0}
-
     var results = CreateJsonArray(alloc)
+
+    // Generics
+    for(var it = this.lsp.lita.genericSymbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var sym = entry.value
+
+        this.addDocumentSymbol(results, sym, doc.filename, alloc)
+    }
+
+    // Values
+    for(var i = 0; i < syms.values.size(); i += 1) {
+        var sym = syms.values.get(i)
+        this.addDocumentSymbol(results, sym, doc.filename, alloc)
+    }
+
+    // Types
+    for(var i = 0; i < syms.symbolTypes.size(); i += 1) {
+        var sym = syms.symbolTypes.get(i)
+        this.addDocumentSymbol(results, sym, doc.filename, alloc)
+    }
+
+    // Show functions
     for(var i = 0; i < syms.symbolFuncs.size(); i += 1) {
         var sym = syms.symbolFuncs.get(i)
-
-        var path = GetAbsolutePath(this.rootPath, sym.declared.id.filename, absPath)
-        if(PathEquals(path, doc.filename)) {
-            var info = SymbolToSymbolInformation(sym, this.rootPath, alloc)
-            if(info) {
-                results.add(info)
-            }
-        }
+        this.addDocumentSymbol(results, sym, doc.filename, alloc)
     }
 
     return results
-/*
-    values: Array<*Symbol>
-    symbolTypes: Array<*Symbol>
-    symbolFuncs: Array<*Symbol>
-    mainEntry: *Symbol*/
+}
+
+func (this: *Workspace) addDocumentSymbol(results: *JsonNode, sym: *Symbol, docFilename: *const char, alloc: *const Allocator) {
+    var absPath = [MAX_PATH]char{0}
+    var path = GetAbsolutePath(this.rootPath, sym.declared.id.filename, absPath)
+    if(PathEquals(path, docFilename)) {
+        var info = SymbolToSymbolInformation(sym, this.rootPath, alloc)
+        if(info) {
+            results.add(info)
+        }
+    }
+}
+
+public func (this: *Workspace) references(uri: *const char, position: *JsonNode, alloc: *const Allocator) : *JsonNode {
+    if(!uri) return null;
+
+    var doc = this.openedDocuments.get(uri)
+    var pos = Position {
+        .line = position.getInt("line", 0),
+        .character = position.getInt("character", 0)
+    }
+    FindTokenByPosition(this.lsp, alloc, doc, pos)
+    return JSON_NULL
 }
 
 public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseResult {

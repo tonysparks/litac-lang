@@ -1,5 +1,6 @@
 import "ast"
 import "ast_new"
+import "ast_copy"
 import "array"
 import "map"
 import "string_buffer"
@@ -15,6 +16,7 @@ import "types"
 import "libc"
 import "assert"
 import "symbols"
+import "profile"
 
 import "ape/ape"
 import "re/re"
@@ -74,22 +76,26 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     ape_set_global_constant(this.ape, "DEBUG", ape_object_make_bool(lita.options.isDebug))
     ape_set_global_constant(this.ape, "REFLECTION", ape_object_make_bool(lita.options.typeOption != TypeInfoOption.NONE))
     ape_set_global_constant(this.ape, "TESTING", ape_object_make_bool(lita.options.testsOnly))
+    ape_set_global_constant(this.ape, "INSTRUMENT", ape_object_make_bool(lita.options.instrument))
 
     ape_set_native_function(this.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
     ape_set_native_function(this.ape, "getSymbolsByNote", ApeGetSymbolsWithNote, &this.callContext)
     ape_set_native_function(this.ape, "getSymbolsToTest", ApeGetSymbolsToTest, &this.callContext)
     ape_set_native_function(this.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
+    ape_set_native_function(this.ape, "replaceDeclaration", ApeReplaceDeclaration, &this.callContext)
     ape_set_native_function(this.ape, "addImport", ApeAddImport, &this.callContext)
 
     ape_set_native_function(this.ape, "getMainSymbol", ApeGetMainSymbol, &this.callContext)
     ape_set_native_function(this.ape, "setMainSymbol", ApeSetMainSymbol, &this.callContext)
-    ape_set_native_function(this.ape, "getInputModuleName", ApeGetInputModuleName, &this.callContext)
+    ape_set_native_function(this.ape, "getInputModuleFilename", ApeGetInputModuleFilename, &this.callContext)
+    ape_set_native_function(this.ape, "getCurrentModuleFilename", ApeGetCurrentModuleFilename, &this.callContext)
     ape_set_native_function(this.ape, "astInsert", ApeAstInsert, &this.callContext)
     ape_set_native_function(this.ape, "emit", ApeEmit, &this.callContext)
     ape_set_native_function(this.ape, "emitClear", ApeEmitClear, &this.callContext)
     ape_set_native_function(this.ape, "emitStr", ApeEmitStr, &this.callContext)
 }
 
+@profile
 func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
     var result = ape_execute(this.ape, comp.expr)
     if(ape_has_errors(this.ape)) {
@@ -115,6 +121,7 @@ func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
     end: *CompStmt
     evaluatedStmt: *Stmt
 */
+@profile
 public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, comp: *CompStmt) {
     assert(comp != null)
 
@@ -172,6 +179,7 @@ public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, com
     }
 }
 
+@profile
 public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, comp: *CompStmt) : *Stmt {
     assert(comp != null)
 
@@ -286,7 +294,8 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     var declObj = ape_object_make_map(this.ape)
     ape_object_set_map_string(declObj, "name", sym.name)
     ape_object_set_map_string(declObj, "kind", StmtKindAsStr(sym.decl.kind))
-    ape_object_set_map_string(declObj, "moduleName", sym.declared.id.filename)
+    ape_object_set_map_string(declObj, "moduleFilename", sym.declared.id.filename)
+    ape_object_set_map_value(declObj, "moduleName", ape_object_make_stringf(this.ape, "%.*s", sym.declared.id.name.length, sym.declared.id.name.buffer))
     ape_object_set_map_value(declObj, "isPublic", ape_object_make_bool(sym.decl.attributes.isPublic))
     ape_object_set_map_value(declObj, "isGlobal", ape_object_make_bool(sym.decl.attributes.isGlobal))
     ape_object_set_map_value(declObj, "declPtr", ape_object_make_external(this.ape, sym.decl))
@@ -521,7 +530,7 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
 
     var moduleName = ape_object_get_string(args[0]) as (*const char)
     if(!moduleName) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module name")
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
         return ape_object_make_null()
     }
 
@@ -577,16 +586,86 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
     return ape_object_make_bool(true)
 }
 
-func ApeGetInputModuleName(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        return ape_object_make_null()
+    }
+
+    var code = ape_object_get_string(args[1]) as (*const char)
+    if(!code) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.modules.get(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var moduleStmt = module.ast
+
+    var original = StringViewInit(code)
+    var emitCode = original.copy(context.pp.lita.allocator)
+
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, context.pp.lita)
+    var stmts = parser.parseModule()
+
+    if(stmts) {
+        if(stmts.declarations.size()) {
+            moduleStmt.declarations.addAll(stmts.declarations)
+
+            context.checker.enterModule(module)
+            defer context.checker.leaveModule()
+
+            for(var i = 0; i < stmts.declarations.size(); i += 1) {
+                var decl = stmts.declarations.get(i)
+                var sym = context.checker.getTypeByName(decl.name.asString())
+                if(!sym) {
+                    context.pp.lita.result.addError(context.comp.startPos, "symbol '%s' not found for replacement", decl.name.asString())
+                    return ape_object_make_null()
+                }
+
+                sym.decl = decl
+                decl.sym = sym
+            }
+        }
+    }
+
+    return ape_object_make_bool(true)
+}
+
+
+func ApeGetInputModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
 
-    var moduleName = context.pp.lita.options.inputFile
-    var mainModule = context.pp.lita.modules.get(moduleName)
+    var moduleFilename = context.pp.lita.options.inputFile
+    var mainModule = context.pp.lita.modules.get(moduleFilename)
     if(!mainModule) {
         return ape_object_make_null()
     }
 
-    return ape_object_make_string(ape, moduleName)
+    return ape_object_make_string(ape, moduleFilename)
+}
+
+func ApeGetCurrentModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var moduleFilename = context.comp.startPos.filename
+    var mainModule = context.pp.lita.modules.get(moduleFilename)
+    if(!mainModule) {
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, moduleFilename)
 }
 
 
@@ -628,55 +707,13 @@ func ApeAstInsert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
     var parser = ParserInit(astNode.startPos.filename, code, context.pp.lita)
     var stmt = parser.statement()
 
-    context.astInsert(astNode, stmt, index)
+    AstInsert(astNode, stmt, index, context.pp.lita.allocator)
     return ape_object_make_null()
-}
-
-func (this: *CallContext) astInsert(node: *Node, stmt: *Stmt, index: i32) {
-
-    switch(node.kind) {
-        case StmtKind.FUNC_DECL: {
-            var funcDecl = node as (*FuncDecl)
-            if(!funcDecl.body) {
-                funcDecl.body = funcDecl.node.becomeParentOf(stmt)
-            }
-            else {
-                if(funcDecl.body.kind == StmtKind.FUNC_BODY_STMT) {
-                    var body = funcDecl.body as (*FuncBodyStmt)
-                    body.stmts.insertAt(index, stmt)
-                    body.node.becomeParentOf(stmt)
-                }
-                else {
-                    var stmts = ArrayInit<*Stmt>(8, this.pp.lita.allocator)
-                    if(index) {
-                        stmts.add(funcDecl.body)
-                        stmts.add(stmt)
-                    }
-                    else {
-                        stmts.add(stmt)
-                        stmts.add(funcDecl.body)
-                    }
-
-                    funcDecl.body = NewFuncBodyStmt(index ? funcDecl.body.startPos : stmt.startPos,
-                                                    index ? stmt.endPos : funcDecl.body.endPos,
-                                                    stmts,
-                                                    this.pp.lita.allocator)
-
-                }
-            }
-            break
-        }
-        default: {
-            // NOT implemented yet!!
-            printf("Assert AstInsert: %s\n", StmtKindAsStr(node.kind))
-            assert(false)
-        }
-    }
 }
 
 
 func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
-    @static var moduleNameIndex: i32;
+    //@static var moduleNameIndex: i32;
 
     var context = data as (*CallContext)
     if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
@@ -687,7 +724,7 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
     var moduleName = ape_object_get_string(args[0]) as (*const char)
     if(!moduleName) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module name")
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
         return ape_object_make_null()
     }
 
@@ -714,50 +751,13 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
         return ape_object_make_null()
     }
 
-    for(var i = 0; i < module.ast.imports.size(); i += 1) {
-        var importStmt = module.ast.imports.get(i)
-        if(strcmp(importStmt.moduleId.filename, importModule.id.filename) == 0) {
-            if(importStmt.alias.type == TokenType.IDENTIFIER) {
-                return ape_object_make_string(ape, importStmt.alias.asString())
-            }
-            else {
-                // this is already being imported and doesn't have an alias
-                return ape_object_make_null()
-            }
-        }
+    var alias = AstAddImport(context.pp.lita, context.checker, module, importModule)
+    if(!alias) {
+        // this is already being imported and doesn't have an alias
+        return ape_object_make_null()
     }
 
-    // this module isn't being imported, so we must inject an import
-    // statement for it; but also give it an alias that *shouldn't*
-    // collide with other imports
-    var name = Token {
-        .type = TokenType.IDENTIFIER,
-        .pos = module.ast.startPos,
-        .value = Value{.str = importModule.id.name}
-    }
-    var sb = StringBufferInit(16, context.pp.lita.allocator)
-    sb.append("____%d", moduleNameIndex += 1)
-
-    var alias = Token {
-        .type = TokenType.IDENTIFIER,
-        .pos = module.ast.startPos,
-        .value = Value{ .str = StringViewInit(sb.cStr(), sb.length)}
-    }
-    var importStmt = NewImportDecl(module.ast.startPos,
-                                    module.ast.startPos,
-                                    name,
-                                    alias,
-                                    false,
-                                    context.pp.lita.allocator) as (*ImportDecl)
-
-    importStmt.moduleId = &importModule.id
-    module.ast.imports.add(importStmt)
-
-    context.checker.enterModule(module)
-    defer context.checker.leaveModule()
-    context.checker.createImportSymbols(importStmt)
-
-    return ape_object_make_string(ape, sb.cStr())
+    return ape_object_make_string(ape, alias)
 }
 
 
@@ -771,7 +771,7 @@ func ApeSetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) 
 
     var moduleName = ape_object_get_string(args[0]) as (*const char)
     if(!moduleName) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module name")
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
         return ape_object_make_null()
     }
 

@@ -240,7 +240,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.INT_NUMBER] = "INT_NUMBER",
     [TokenType.FLOAT_NUMBER] = "FLOAT_NUMBER",
     [TokenType.ERROR] = "ERROR",
-    [TokenType.END_OF_FILE] = "\0",
+    [TokenType.END_OF_FILE] = "EOF",
 };
 
 const charToDigit = [256]i32 {

@@ -10,6 +10,10 @@ import "libc"
     Protocol specifications from: https://microsoft.github.io/language-server-protocol/specifications
 """);
 
+public struct Position {
+    line: i32
+    character: i32
+}
 
 @asStr
 public enum SymbolInfoKind {
@@ -117,7 +121,7 @@ public func SymbolToSymbolInformation(sym: *sym::Symbol, rootPath: *const char, 
     result.putBool("deprecated", (sym.flags & sym::SymbolFlags.IS_TYPE) && sym.decl.hasNote("deprecated"))
 
     var kind = SymbolKindFromSymbol(sym) as (i32)
-    result.putNumber("kind", kind as (f64))
+    result.putIntNumber("kind", kind as (i64))
 
     if(sym.decl) {
         result.put("location", SrcPosToLocation(sym.decl.startPos, rootPath, alloc))
@@ -143,16 +147,17 @@ public func SrcPosToLocation(pos: SrcPos, rootPath: *const char,  alloc: *const 
 
 
 public func SrcPosToRange(pos: SrcPos, alloc: *const Allocator) : *JsonNode {
-    var lineNumber = MAX(pos.lineNumber - 1, 0) as (f64)
+    var lineNumber = MAX(pos.lineNumber - 1, 0) as (i64)
 
     var start = CreateJsonObject(alloc)
-    start.putNumber("line", lineNumber)
-    start.putNumber("character", 0_f64)
+    start.putIntNumber("line", lineNumber)
+    var offset = MAX(0i64, (pos.start - pos.lineStart) as (i64))
+    start.putIntNumber("character", offset)
 
     var end = CreateJsonObject(alloc)
-    end.putNumber("line", lineNumber)
-    var length = (pos.end - pos.start) as (i64)
-    end.putNumber("character", length as (f64))
+    end.putIntNumber("line", lineNumber)
+    var length = MAX(1i64, (pos.end - pos.start) as (i64))
+    end.putIntNumber("character", offset + length)
 
     var range = CreateJsonObject(alloc)
     range.put("start", start)

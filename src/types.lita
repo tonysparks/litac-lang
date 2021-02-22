@@ -572,6 +572,10 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
     assert(this != null)
     assert(other != null)
 
+    if(other.typeid == this.typeid) {
+        return true
+    }
+
     // this = other
     switch(this.kind) {
         case TypeKind.BOOL: {
