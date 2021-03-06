@@ -28,12 +28,12 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
     if(decl.sym.flags & SymbolFlags.IS_CONSTANT && decl.expr.isConstExpr()) {
         assert(decl.expr != null)
 
-        buf.append("\n#define ")
-        this.emit(name)
+        buf.appendStr("\n#define ")
+        this.emitStr(name)
 
-        buf.append(" (")
+        buf.appendStrn(" (", 2)
         this.emitStmt(decl.expr)
-        buf.append(")")
+        buf.appendStrn(")", 1)
 
 
         // If this isn't a global variable, we need to #undef
@@ -47,12 +47,12 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         }
     }
     else {
-        buf.append("%s", this.cTypeDecl(decl.sym.type, name))
+        buf.appendStr(this.cTypeDecl(decl.sym.type, name))
         if(decl.expr) {
-            buf.append(" = ")
+            buf.appendStrn(" = ", 3)
             this.emitStmt(decl.expr)
         }
-        buf.append(";")
+        buf.appendStrn(";", 1)
     }
 }
 
@@ -80,42 +80,42 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     var tmp = StringBufferInit(256, this.allocator)
     for(; i < funcInfo.decl.params.size(); i += 1) {
         if(i > 0) {
-            buf.append(",")
+            buf.appendStrn(",", 1)
         }
 
         var param = funcInfo.decl.params.get(i)
-        buf.append("%s", this.cTypeDecl(param.sym.type, this.prefix(param.sym.name, &tmp), decayArrays))
+        buf.appendStr(this.cTypeDecl(param.sym.type, this.prefix(param.sym.name, &tmp), decayArrays))
         tmp.clear()
     }
 
     if(funcInfo.decl.flags & FuncFlags.HAS_VARARGS) {
         if(i > 0) {
-            buf.append(",")
+            buf.appendStrn(",", 1)
         }
-        buf.append("...")
+        buf.appendStrn("...", 3)
     }
 
-    buf.append(")")
+    buf.appendStrn(")", 1)
 
     if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
         var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
-        buf.append(")  (")
+        buf.appendStrn(")  (", 4)
 
         var j = 0
         for(; j < funcPtrInfo.paramDecls.size(); j+=1) {
             if(j > 0) {
-                buf.append(",")
+                buf.appendStrn(",", 1)
             }
 
-            buf.append("%s", this.cType(funcPtrInfo.paramDecls.get(j)))
+            buf.appendStr(this.cType(funcPtrInfo.paramDecls.get(j)))
         }
         if(funcPtrInfo.hasVarargs) {
             if(j > 0) {
-                buf.append(",")
+                buf.appendStrn(",", 1)
             }
-            buf.append("...")
+            buf.appendStrn("...", 3)
         }
-        buf.append(")")
+        buf.appendStrn(")", 1)
     }
 }
 
@@ -130,13 +130,13 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
 
     var name = this.cName(decl.sym)
     this.emitFuncDeclSignature(decl, name)
-    this.emit(" {")
+    this.emitStrn(" {", 2)
     if(decl.body) {
         this.currentFunc = decl.sym.type as (*FuncTypeInfo)
         this.emitStmt(decl.body)
         this.currentFunc = null
     }
-    this.emit("}\n")
+    this.emitStrn("}\n", 2)
 }
 
 
@@ -188,13 +188,14 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
             }
         }
     }
-    this.emit("}")
+    this.emitStrn("}", 1)
     if(this.aggregateLevel > 1) {
         if(decl.name.str.length) {
-            this.emit(" %.*s", decl.name.str.length, decl.name.str.buffer)
+            this.emitStrn(" ", 1)
+            this.emitStrn(decl.name.str.buffer, decl.name.str.length)
         }
     }
-    this.emit(";\n")
+    this.emitStrn(";\n", 2)
     this.emitNotes(decl.attributes, false)
 }
 
@@ -223,7 +224,7 @@ public func (this: using *CGen) emitEnumDecl(decl: *EnumDecl) {
         var field = decl.fields.get(i)
         this.emit("%s_%.*s", name, field.name.str.length, field.name.str.buffer)
         if(field.value) {
-            this.emit(" = ")
+            this.emitStrn(" = ", 3)
             this.emitStmt(field.value)
         }
     }

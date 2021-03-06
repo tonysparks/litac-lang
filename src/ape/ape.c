@@ -75,8 +75,8 @@ typedef struct src_pos {
     int column;
 } src_pos_t;
 
-typedef void * (*ape_malloc_fn)(size_t size);
-typedef void (*ape_free_fn)(void *ptr);
+typedef void * (*ape_malloc_fn)(size_t size, void* mallocArg);
+typedef void (*ape_free_fn)(void *ptr, void* freeArg);
 
 typedef struct ape_config {
     struct {
@@ -117,6 +117,8 @@ APE_INTERNAL char* ape_strdup(const char *string);
 APE_INTERNAL uint64_t ape_double_to_uint64(double val);
 APE_INTERNAL double ape_uint64_to_double(uint64_t val);
 
+extern void* ape_mallocArg;
+extern void* ape_freeArg;
 extern ape_malloc_fn ape_malloc;
 extern ape_free_fn ape_free;
 
@@ -164,8 +166,8 @@ THE SOFTWARE.
 // Collections
 //-----------------------------------------------------------------------------
 
-typedef void * (*collections_malloc_fn)(size_t size);
-typedef void (*collections_free_fn)(void *ptr);
+typedef void * (*collections_malloc_fn)(size_t size, void* mallocArg);
+typedef void (*collections_free_fn)(void *ptr, void* freeArg);
 typedef unsigned long (*collections_hash_fn)(const void* val);
 typedef bool (*collections_equals_fn)(const void *a, const void *b);
 
@@ -1449,7 +1451,7 @@ char *ape_stringf(const char *format, ...) {
     int to_write = vsnprintf(NULL, 0, format, args);
     va_end(args);
     va_start(args, format);
-    char *res = (char*)ape_malloc(to_write + 1);
+    char *res = (char*)ape_malloc(to_write + 1, ape_mallocArg);
     int written = vsprintf(res, format, args);
     (void)written;
     APE_ASSERT(written == to_write);
@@ -1473,7 +1475,7 @@ void ape_log(const char *file, int line, const char *format, ...) {
 }
 
 char* ape_strndup(const char *string, size_t n) {
-    char *output_string = (char*)ape_malloc(n + 1);
+    char *output_string = (char*)ape_malloc(n + 1, ape_mallocArg);
     if (!output_string) {
         return NULL;
     }
@@ -1551,13 +1553,22 @@ THE SOFTWARE.
 #undef malloc
 #undef free
 
+
+static void* apeMalloc(size_t size, void* allocArgs) {
+    return malloc(size);
+}
+
+static void apeFree(void* mem, void* freeArgs) {
+    free(mem);
+}
+
 static char* collections_strndup(const char *string, size_t n);
 static char* collections_strdup(const char *string);
 static unsigned long collections_hash(const void *ptr, size_t len); /* djb2 */
 static unsigned int upper_power_of_two(unsigned int v);
 
-static collections_malloc_fn collections_malloc = malloc;
-static collections_free_fn collections_free = free;
+static collections_malloc_fn collections_malloc = apeMalloc;
+static collections_free_fn collections_free = apeFree;
 
 void collections_set_memory_functions(collections_malloc_fn malloc_fn, collections_free_fn free_fn) {
     collections_malloc = malloc_fn;
@@ -1565,7 +1576,7 @@ void collections_set_memory_functions(collections_malloc_fn malloc_fn, collectio
 }
 
 static char* collections_strndup(const char *string, size_t n) {
-    char *output_string = (char*)collections_malloc(n + 1);
+    char *output_string = (char*)collections_malloc(n + 1, ape_mallocArg);
     if (!output_string) {
         return NULL;
     }
@@ -1630,13 +1641,13 @@ static bool dict_set_internal(dict_t_ *dict, const char *ckey, char *mkey, void 
 
 // Public
 dict_t_* dict_make(void) {
-    dict_t_ *dict = collections_malloc(sizeof(dict_t_));
+    dict_t_ *dict = collections_malloc(sizeof(dict_t_), ape_mallocArg);
     if (dict == NULL) {
         return NULL;
     }
     bool succeeded = dict_init(dict, DICT_INITIAL_SIZE);
     if (succeeded == false) {
-        collections_free(dict);
+        collections_free(dict, ape_freeArg);
         return NULL;
     }
     return dict;
@@ -1647,7 +1658,7 @@ void dict_destroy(dict_t_ *dict) {
         return;
     }
     dict_deinit(dict, true);
-    collections_free(dict);
+    collections_free(dict, ape_freeArg);
 }
 
 void dict_destroy_with_items_(dict_t_ *dict, dict_item_destroy_fn destroy_fn) {
@@ -1720,7 +1731,7 @@ bool dict_remove(dict_t_ *dict, const char *key) {
     }
 
     unsigned int item_ix = dict->cells[cell];
-    collections_free(dict->keys[item_ix]);
+    collections_free(dict->keys[item_ix], ape_freeArg);
     unsigned int last_item_ix = dict->count - 1;
     if (item_ix < last_item_ix) {
         dict->keys[item_ix] = dict->keys[last_item_ix];
@@ -1752,7 +1763,7 @@ bool dict_remove(dict_t_ *dict, const char *key) {
 
 void dict_clear(dict_t_ *dict) {
     for (unsigned int i = 0; i < dict->count; i++) {
-        collections_free(dict->keys[i]);
+        collections_free(dict->keys[i], ape_freeArg);
     }
     dict->count = 0;
     for (unsigned int i = 0; i < dict->cell_capacity; i++) {
@@ -1772,11 +1783,11 @@ static bool dict_init(dict_t_ *dict, unsigned int initial_capacity) {
     dict->cell_capacity = initial_capacity;
     dict->item_capacity = (unsigned int)(initial_capacity * 0.7f);
 
-    dict->cells = collections_malloc(dict->cell_capacity * sizeof(*dict->cells));
-    dict->keys = collections_malloc(dict->item_capacity * sizeof(*dict->keys));
-    dict->values = collections_malloc(dict->item_capacity * sizeof(*dict->values));
-    dict->cell_ixs = collections_malloc(dict->item_capacity * sizeof(*dict->cell_ixs));
-    dict->hashes = collections_malloc(dict->item_capacity * sizeof(*dict->hashes));
+    dict->cells = collections_malloc(dict->cell_capacity * sizeof(*dict->cells), ape_mallocArg);
+    dict->keys = collections_malloc(dict->item_capacity * sizeof(*dict->keys), ape_mallocArg);
+    dict->values = collections_malloc(dict->item_capacity * sizeof(*dict->values), ape_mallocArg);
+    dict->cell_ixs = collections_malloc(dict->item_capacity * sizeof(*dict->cell_ixs), ape_mallocArg);
+    dict->hashes = collections_malloc(dict->item_capacity * sizeof(*dict->hashes), ape_mallocArg);
     if (dict->cells == NULL
         || dict->keys == NULL
         || dict->values == NULL
@@ -1789,29 +1800,29 @@ static bool dict_init(dict_t_ *dict, unsigned int initial_capacity) {
     }
     return true;
 error:
-    collections_free(dict->cells);
-    collections_free(dict->keys);
-    collections_free(dict->values);
-    collections_free(dict->cell_ixs);
-    collections_free(dict->hashes);
+    collections_free(dict->cells, ape_freeArg);
+    collections_free(dict->keys, ape_freeArg);
+    collections_free(dict->values, ape_freeArg);
+    collections_free(dict->cell_ixs, ape_freeArg);
+    collections_free(dict->hashes, ape_freeArg);
     return false;
 }
 
 static void dict_deinit(dict_t_ *dict, bool free_keys) {
     if (free_keys) {
         for (unsigned int i = 0; i < dict->count; i++) {
-            collections_free(dict->keys[i]);
+            collections_free(dict->keys[i], ape_freeArg);
         }
     }
     dict->count = 0;
     dict->item_capacity = 0;
     dict->cell_capacity = 0;
 
-    collections_free(dict->cells);
-    collections_free(dict->keys);
-    collections_free(dict->values);
-    collections_free(dict->cell_ixs);
-    collections_free(dict->hashes);
+    collections_free(dict->cells, ape_freeArg);
+    collections_free(dict->keys, ape_freeArg);
+    collections_free(dict->values, ape_freeArg);
+    collections_free(dict->cell_ixs, ape_freeArg);
+    collections_free(dict->hashes, ape_freeArg);
 
     dict->cells = NULL;
     dict->keys = NULL;
@@ -1939,13 +1950,13 @@ valdict_t_* valdict_make_(size_t key_size, size_t val_size) {
 valdict_t_* valdict_make_with_capacity(unsigned int min_capacity, size_t key_size, size_t val_size) {
     unsigned int capacity = upper_power_of_two(min_capacity * 2);
 
-    valdict_t_ *dict = collections_malloc(sizeof(valdict_t_));
+    valdict_t_ *dict = collections_malloc(sizeof(valdict_t_), ape_mallocArg);
     if (dict == NULL) {
         return NULL;
     }
     bool succeeded = valdict_init(dict, key_size, val_size, capacity);
     if (succeeded == false) {
-        collections_free(dict);
+        collections_free(dict, ape_freeArg);
         return NULL;
     }
     return dict;
@@ -1956,7 +1967,7 @@ void valdict_destroy(valdict_t_ *dict) {
         return;
     }
     valdict_deinit(dict);
-    collections_free(dict);
+    collections_free(dict, ape_freeArg);
 }
 
 void  valdict_set_hash_function(valdict_t_ *dict, collections_hash_fn hash_fn) {
@@ -2098,11 +2109,11 @@ static bool valdict_init(valdict_t_ *dict, size_t key_size, size_t val_size, uns
     dict->_keys_equals = NULL;
     dict->_hash_key = NULL;
 
-    dict->cells = collections_malloc(dict->cell_capacity * sizeof(*dict->cells));
-    dict->keys = collections_malloc(dict->item_capacity * key_size);
-    dict->values = collections_malloc(dict->item_capacity * val_size);
-    dict->cell_ixs = collections_malloc(dict->item_capacity * sizeof(*dict->cell_ixs));
-    dict->hashes = collections_malloc(dict->item_capacity * sizeof(*dict->hashes));
+    dict->cells = collections_malloc(dict->cell_capacity * sizeof(*dict->cells), ape_mallocArg);
+    dict->keys = collections_malloc(dict->item_capacity * key_size, ape_mallocArg);
+    dict->values = collections_malloc(dict->item_capacity * val_size, ape_mallocArg);
+    dict->cell_ixs = collections_malloc(dict->item_capacity * sizeof(*dict->cell_ixs), ape_mallocArg);
+    dict->hashes = collections_malloc(dict->item_capacity * sizeof(*dict->hashes), ape_mallocArg);
     if (dict->cells == NULL
         || dict->keys == NULL
         || dict->values == NULL
@@ -2115,11 +2126,11 @@ static bool valdict_init(valdict_t_ *dict, size_t key_size, size_t val_size, uns
     }
     return true;
 error:
-    collections_free(dict->cells);
-    collections_free(dict->keys);
-    collections_free(dict->values);
-    collections_free(dict->cell_ixs);
-    collections_free(dict->hashes);
+    collections_free(dict->cells, ape_freeArg);
+    collections_free(dict->keys, ape_freeArg);
+    collections_free(dict->values, ape_freeArg);
+    collections_free(dict->cell_ixs, ape_freeArg);
+    collections_free(dict->hashes, ape_freeArg);
     return false;
 }
 
@@ -2130,11 +2141,11 @@ static void valdict_deinit(valdict_t_ *dict) {
     dict->item_capacity = 0;
     dict->cell_capacity = 0;
 
-    collections_free(dict->cells);
-    collections_free(dict->keys);
-    collections_free(dict->values);
-    collections_free(dict->cell_ixs);
-    collections_free(dict->hashes);
+    collections_free(dict->cells, ape_freeArg);
+    collections_free(dict->keys, ape_freeArg);
+    collections_free(dict->values, ape_freeArg);
+    collections_free(dict->cell_ixs, ape_freeArg);
+    collections_free(dict->hashes, ape_freeArg);
 
     dict->cells = NULL;
     dict->keys = NULL;
@@ -2227,13 +2238,13 @@ typedef struct ptrdict_ {
 
 // Public
 ptrdict_t_* ptrdict_make(void) {
-    ptrdict_t_ *dict = collections_malloc(sizeof(ptrdict_t_));
+    ptrdict_t_ *dict = collections_malloc(sizeof(ptrdict_t_), ape_mallocArg);
     if (dict == NULL) {
         return NULL;
     }
     bool succeeded = valdict_init(&dict->vd, sizeof(void*), sizeof(void*), DICT_INITIAL_SIZE);
     if (succeeded == false) {
-        collections_free(dict);
+        collections_free(dict, ape_freeArg);
         return NULL;
     }
     return dict;
@@ -2244,7 +2255,7 @@ void ptrdict_destroy(ptrdict_t_ *dict) {
         return;
     }
     valdict_deinit(&dict->vd);
-    collections_free(dict);
+    collections_free(dict, ape_freeArg);
 }
 
 void  ptrdict_set_hash_function(ptrdict_t_ *dict, collections_hash_fn hash_fn) {
@@ -2315,13 +2326,13 @@ array_t_* array_make_(size_t element_size) {
 }
 
 array_t_* array_make_with_capacity(unsigned int capacity, size_t element_size) {
-    array_t_ *arr = collections_malloc(sizeof(array_t_));
+    array_t_ *arr = collections_malloc(sizeof(array_t_), ape_mallocArg);
     if (arr == NULL) {
         return NULL;
     }
     bool succeeded = array_init_with_capacity(arr, capacity, element_size);
     if (succeeded == false) {
-        collections_free(arr);
+        collections_free(arr, ape_freeArg);
         return NULL;
     }
     return arr;
@@ -2332,7 +2343,7 @@ void array_destroy(array_t_ *arr) {
         return;
     }
     array_deinit(arr);
-    collections_free(arr);
+    collections_free(arr, ape_freeArg);
 }
 
 void array_destroy_with_items_(array_t_ *arr, array_item_deinit_fn deinit_fn) {
@@ -2344,7 +2355,7 @@ void array_destroy_with_items_(array_t_ *arr, array_item_deinit_fn deinit_fn) {
 }
 
 array_t_* array_copy(const array_t_ *arr) {
-    array_t_ *copy = collections_malloc(sizeof(array_t_));
+    array_t_ *copy = collections_malloc(sizeof(array_t_), ape_mallocArg);
     if (!copy) {
         return NULL;
     }
@@ -2352,10 +2363,10 @@ array_t_* array_copy(const array_t_ *arr) {
     copy->count = arr->count;
     copy->element_size = arr->element_size;
     copy->lock_capacity = arr->lock_capacity;
-    copy->data = collections_malloc(arr->capacity * arr->element_size);
+    copy->data = collections_malloc(arr->capacity * arr->element_size, ape_mallocArg);
     memcpy(copy->data, arr->data, arr->capacity * arr->element_size);
     if (!copy->data) {
-        collections_free(copy);
+        collections_free(copy, ape_freeArg);
         return NULL;
     }
     return copy;
@@ -2369,12 +2380,12 @@ bool array_add(array_t_ *arr, const void *value) {
             return false;
         }
         unsigned int new_capacity = arr->capacity > 0 ? arr->capacity * 2 : 1;
-        unsigned char *new_data = collections_malloc(new_capacity * arr->element_size);
+        unsigned char *new_data = collections_malloc(new_capacity * arr->element_size, ape_mallocArg);
         if (new_data == NULL) {
             return false;
         }
         memcpy(new_data, arr->data, arr->count * arr->element_size);
-        collections_free(arr->data);
+        collections_free(arr->data, ape_freeArg);
         arr->data = new_data;
         arr->capacity = new_capacity;
     }
@@ -2559,7 +2570,7 @@ void array_reverse(array_t_ *arr) {
     if (count < 2) {
         return;
     }
-    void *temp = collections_malloc(arr->element_size);
+    void *temp = collections_malloc(arr->element_size, ape_mallocArg);
     for (int a_ix = 0; a_ix < (count / 2); a_ix++) {
         int b_ix = count - a_ix - 1;
         void *a = array_get(arr, a_ix);
@@ -2568,12 +2579,12 @@ void array_reverse(array_t_ *arr) {
         array_set(arr, a_ix, b);
         array_set(arr, b_ix, temp);
     }
-    collections_free(temp);
+    collections_free(temp, ape_freeArg);
 }
 
 static bool array_init_with_capacity(array_t_ *arr, unsigned int capacity, size_t element_size) {
     if (capacity > 0) {
-        arr->data = collections_malloc(capacity * element_size);
+        arr->data = collections_malloc(capacity * element_size, ape_mallocArg);
         if (arr->data == NULL) {
             return false;
         }
@@ -2588,7 +2599,7 @@ static bool array_init_with_capacity(array_t_ *arr, unsigned int capacity, size_
 }
 
 static void array_deinit(array_t_ *arr) {
-    collections_free(arr->data);
+    collections_free(arr->data, ape_freeArg);
 }
 
 //-----------------------------------------------------------------------------
@@ -2604,13 +2615,13 @@ ptrarray_t_* ptrarray_make(void) {
 }
 
 ptrarray_t_* ptrarray_make_with_capacity(unsigned int capacity) {
-    ptrarray_t_ *ptrarr = collections_malloc(sizeof(ptrarray_t_));
+    ptrarray_t_ *ptrarr = collections_malloc(sizeof(ptrarray_t_), ape_mallocArg);
     if (ptrarr == NULL) {
         return NULL;
     }
     bool succeeded = array_init_with_capacity(&ptrarr->arr, capacity, sizeof(void*));
     if (succeeded == false) {
-        collections_free(ptrarr);
+        collections_free(ptrarr, ape_freeArg);
         return NULL;
     }
     return ptrarr;
@@ -2621,7 +2632,7 @@ void ptrarray_destroy(ptrarray_t_ *arr) {
         return;
     }
     array_deinit(&arr->arr);
-    collections_free(arr);
+    collections_free(arr, ape_freeArg);
 }
 
 void ptrarray_destroy_with_items_(ptrarray_t_ *arr, ptrarray_item_destroy_fn destroy_fn){
@@ -2776,14 +2787,14 @@ strbuf_t* strbuf_make(void) {
 }
 
 strbuf_t* strbuf_make_with_capacity(unsigned int capacity) {
-    strbuf_t *buf = collections_malloc(sizeof(strbuf_t));
+    strbuf_t *buf = collections_malloc(sizeof(strbuf_t), ape_mallocArg);
     if (buf == NULL) {
         return NULL;
     }
     memset(buf, 0, sizeof(strbuf_t));
-    buf->data = collections_malloc(capacity);
+    buf->data = collections_malloc(capacity, ape_mallocArg);
     if (buf->data == NULL) {
-        collections_free(buf);
+        collections_free(buf, ape_freeArg);
         return NULL;
     }
     buf->capacity = capacity;
@@ -2796,8 +2807,8 @@ void strbuf_destroy(strbuf_t *buf) {
     if (buf == NULL) {
         return;
     }
-    collections_free(buf->data);
-    collections_free(buf);
+    collections_free(buf->data, ape_freeArg);
+    collections_free(buf, ape_freeArg);
 }
 
 void strbuf_clear(strbuf_t *buf) {
@@ -2866,13 +2877,13 @@ char * strbuf_get_string_and_destroy(strbuf_t *buf) {
 }
 
 static bool strbuf_grow(strbuf_t *buf, size_t new_capacity) {
-    char *new_data = collections_malloc(new_capacity);
+    char *new_data = collections_malloc(new_capacity, ape_mallocArg);
     if (new_data == NULL) {
         return false;
     }
     memcpy(new_data, buf->data, buf->len);
     new_data[buf->len] = '\0';
-    collections_free(buf->data);
+    collections_free(buf->data, ape_freeArg);
     buf->data = new_data;
     buf->capacity = new_capacity;
     return true;
@@ -2924,14 +2935,14 @@ char* kg_canonicalise_path(const char *path) {
         char *item = ptrarray_get(split, i);
         char *next_item = ptrarray_get(split, i + 1);
         if (kg_streq(item, ".")) {
-            collections_free(item);
+            collections_free(item, ape_freeArg);
             ptrarray_remove_at(split, i);
             i = -1;
             continue;
         }
         if (kg_streq(next_item, "..")) {
-            collections_free(item);
-            collections_free(next_item);
+            collections_free(item, ape_freeArg);
+            collections_free(next_item, ape_freeArg);
             ptrarray_remove_at(split, i);
             ptrarray_remove_at(split, i);
             i = -1;
@@ -2963,7 +2974,7 @@ bool kg_streq(const char *a, const char *b) {
 #endif
 
 error_t* error_make_no_copy(error_type_t type, src_pos_t pos, char *message) {
-    error_t *err = ape_malloc(sizeof(error_t));
+    error_t *err = ape_malloc(sizeof(error_t), ape_mallocArg);
     memset(err, 0, sizeof(error_t));
     err->type = type;
     err->message = message;
@@ -2982,7 +2993,7 @@ error_t* error_makef(error_type_t type, src_pos_t pos, const char *format, ...) 
     int to_write = vsnprintf(NULL, 0, format, args);
     va_end(args);
     va_start(args, format);
-    char *res = (char*)ape_malloc(to_write + 1);
+    char *res = (char*)ape_malloc(to_write + 1, ape_mallocArg);
     vsprintf(res, format, args);
     va_end(args);
     return error_make_no_copy(type, pos, res);
@@ -2993,8 +3004,8 @@ void error_destroy(error_t *error) {
         return;
     }
     traceback_destroy(error->traceback);
-    ape_free(error->message);
-    ape_free(error);
+    ape_free(error->message, ape_freeArg);
+    ape_free(error, ape_freeArg);
 }
 
 const char *error_type_to_string(error_type_t type) {
@@ -3610,7 +3621,7 @@ void expression_destroy(expression_t *expr) {
             break;
         }
         case EXPRESSION_STRING_LITERAL: {
-            ape_free(expr->string_literal);
+            ape_free(expr->string_literal, ape_freeArg);
             break;
         }
         case EXPRESSION_NULL_LITERAL: {
@@ -3659,7 +3670,7 @@ void expression_destroy(expression_t *expr) {
             break;
         }
     }
-    ape_free(expr);
+    ape_free(expr, ape_freeArg);
 }
 
 expression_t* expression_copy(expression_t *expr) {
@@ -3893,7 +3904,7 @@ void statement_destroy(statement_t *stmt) {
             break;
         }
         case STATEMENT_IMPORT: {
-            ape_free(stmt->import.path);
+            ape_free(stmt->import.path, ape_freeArg);
             break;
         }
         case STATEMENT_RECOVER: {
@@ -3902,7 +3913,7 @@ void statement_destroy(statement_t *stmt) {
             break;
         }
     }
-    ape_free(stmt);
+    ape_free(stmt, ape_freeArg);
 }
 
 statement_t* statement_copy(statement_t *stmt) {
@@ -3985,7 +3996,7 @@ statement_t* statement_copy(statement_t *stmt) {
 }
 
 code_block_t* code_block_make(ptrarray(statement_t) *statements) {
-    code_block_t *stmt = ape_malloc(sizeof(code_block_t));
+    code_block_t *stmt = ape_malloc(sizeof(code_block_t), ape_mallocArg);
     stmt->statements = statements;
     return stmt;
 }
@@ -3995,7 +4006,7 @@ void code_block_destroy(code_block_t *block) {
         return;
     }
     ptrarray_destroy_with_items(block->statements, statement_destroy);
-    ape_free(block);
+    ape_free(block, ape_freeArg);
 }
 
 code_block_t* code_block_copy(code_block_t *block) {
@@ -4327,7 +4338,7 @@ const char *expression_type_to_string(expression_type_t type) {
 }
 
 void fn_literal_deinit(fn_literal_t *fn) {
-    ape_free(fn->name);
+    ape_free(fn->name, ape_freeArg);
     array_destroy_with_items(fn->params, ident_deinit);
     code_block_destroy(fn->body);
 }
@@ -4347,13 +4358,13 @@ ident_t ident_copy(ident_t ident) {
 }
 
 void ident_deinit(ident_t *ident) {
-    ape_free(ident->value);
+    ape_free(ident->value, ape_freeArg);
     ident->value = NULL;
     ident->pos = src_pos_invalid;
 }
 
 if_case_t *if_case_make(expression_t *test, code_block_t *consequence) {
-    if_case_t *res = ape_malloc(sizeof(if_case_t));
+    if_case_t *res = ape_malloc(sizeof(if_case_t), ape_mallocArg);
     res->test = test;
     res->consequence = consequence;
     return res;
@@ -4366,19 +4377,19 @@ void if_case_destroy(if_case_t *cond) {
 
     expression_destroy(cond->test);
     code_block_destroy(cond->consequence);
-    ape_free(cond);
+    ape_free(cond, ape_freeArg);
 }
 
 // INTERNAL
 static expression_t *expression_make(expression_type_t type) {
-    expression_t *res = ape_malloc(sizeof(expression_t));
+    expression_t *res = ape_malloc(sizeof(expression_t), ape_mallocArg);
     res->type = type;
     res->pos = src_pos_invalid;
     return res;
 }
 
 static statement_t* statement_make(statement_type_t type) {
-    statement_t *res = ape_malloc(sizeof(statement_t));
+    statement_t *res = ape_malloc(sizeof(statement_t), ape_mallocArg);
     res->type = type;
     res->pos = src_pos_invalid;
     return res;
@@ -4465,7 +4476,7 @@ static char escape_char(const char c);
 static char* process_and_copy_string(const char *input, size_t len);
 
 parser_t* parser_make(const ape_config_t *config, ptrarray(error_t) *errors) {
-    parser_t *parser = ape_malloc(sizeof(parser_t));
+    parser_t *parser = ape_malloc(sizeof(parser_t), ape_mallocArg);
     memset(parser, 0, sizeof(parser_t));
     APE_ASSERT(config);
 
@@ -4528,7 +4539,7 @@ void parser_destroy(parser_t *parser) {
         return;
     }
     memset(parser, 0, sizeof(parser_t));
-    ape_free(parser);
+    ape_free(parser, ape_freeArg);
 }
 
 ptrarray(statement_t)* parser_parse_all(parser_t *parser,  const char *input, compiled_file_t *file) {
@@ -5089,7 +5100,7 @@ static expression_t* parse_expression(parser_t *p, precedence_t prec) {
         error_t *err = error_makef(ERROR_PARSING, p->cur_token.pos,
                                   "No prefix parse function for \"%s\" found", literal);
         ptrarray_add(p->errors, err);
-        ape_free(literal);
+        ape_free(literal, ape_freeArg);
         return NULL;
     }
 
@@ -5135,7 +5146,7 @@ static expression_t* parse_number_literal(parser_t *p) {
         error_t *err = error_makef(ERROR_PARSING, p->cur_token.pos,
                                   "Parsing number literal \"%s\" failed", literal);
         ptrarray_add(p->errors, err);
-        ape_free(literal);
+        ape_free(literal, ape_freeArg);
         return NULL;
     }
     next_token(p);
@@ -5615,7 +5626,7 @@ static char escape_char(const char c) {
 }
 
 static char* process_and_copy_string(const char *input, size_t len) {
-    char *output = ape_malloc(len + 1);
+    char *output = ape_malloc(len + 1, ape_mallocArg);
 
     size_t in_i = 0;
     size_t out_i = 0;
@@ -5636,7 +5647,7 @@ static char* process_and_copy_string(const char *input, size_t len) {
     output[out_i] = '\0';
     return output;
 error:
-    ape_free(output);
+    ape_free(output, ape_freeArg);
     return NULL;
 }
 //FILE_END
@@ -5656,7 +5667,7 @@ static int next_symbol_index(symbol_table_t *table);
 static int count_num_definitions(symbol_table_t *table);
 
 symbol_t *symbol_make(const char *name, symbol_type_t type, int index, bool assignable) {
-    symbol_t *symbol = ape_malloc(sizeof(symbol_t));
+    symbol_t *symbol = ape_malloc(sizeof(symbol_t), ape_mallocArg);
     symbol->name = ape_strdup(name);
     symbol->type = type;
     symbol->index = index;
@@ -5668,8 +5679,8 @@ void symbol_destroy(symbol_t *symbol) {
     if (!symbol) {
         return;
     }
-    ape_free(symbol->name);
-    ape_free(symbol);
+    ape_free(symbol->name, ape_freeArg);
+    ape_free(symbol, ape_freeArg);
 }
 
 symbol_t* symbol_copy(const symbol_t *symbol) {
@@ -5677,7 +5688,7 @@ symbol_t* symbol_copy(const symbol_t *symbol) {
 }
 
 symbol_table_t *symbol_table_make(symbol_table_t *outer) {
-    symbol_table_t *table = ape_malloc(sizeof(symbol_table_t));
+    symbol_table_t *table = ape_malloc(sizeof(symbol_table_t), ape_mallocArg);
     memset(table, 0, sizeof(symbol_table_t));
     table->max_num_definitions = 0;
     table->outer = outer;
@@ -5703,11 +5714,11 @@ void symbol_table_destroy(symbol_table_t *table) {
     }
     ptrarray_destroy(table->block_scopes);
     ptrarray_destroy_with_items(table->free_symbols, symbol_destroy);
-    ape_free(table);
+    ape_free(table, ape_freeArg);
 }
 
 symbol_table_t* symbol_table_copy(symbol_table_t *table) {
-    symbol_table_t *copy = ape_malloc(sizeof(symbol_table_t));
+    symbol_table_t *copy = ape_malloc(sizeof(symbol_table_t), ape_mallocArg);
     memset(copy, 0, sizeof(symbol_table_t));
     copy->outer = table->outer;
     copy->block_scopes = ptrarray_copy_with_items(table->block_scopes, block_scope_copy);
@@ -5814,7 +5825,7 @@ bool symbol_table_symbol_is_defined(symbol_table_t *table, const char *name) { /
 }
 
 void symbol_table_push_block_scope(symbol_table_t *table) {
-    block_scope_t *new_scope = ape_malloc(sizeof(block_scope_t));
+    block_scope_t *new_scope = ape_malloc(sizeof(block_scope_t), ape_mallocArg);
     new_scope->store = dict_make();
     new_scope->num_definitions = 0;
     new_scope->offset = count_num_definitions(table);
@@ -5825,7 +5836,7 @@ void symbol_table_pop_block_scope(symbol_table_t *table) {
     block_scope_t *top_scope = ptrarray_top(table->block_scopes);
     ptrarray_pop(table->block_scopes);
     dict_destroy_with_items(top_scope->store, symbol_destroy);
-    ape_free(top_scope);
+    ape_free(top_scope, ape_freeArg);
 }
 
 block_scope_t* symbol_table_get_block_scope(symbol_table_t *table) {
@@ -5848,7 +5859,7 @@ bool symbol_table_is_top_global_scope(symbol_table_t *table) {
 
 // INTERNAL
 static block_scope_t* block_scope_copy(block_scope_t *scope) {
-    block_scope_t *copy = ape_malloc(sizeof(block_scope_t));
+    block_scope_t *copy = ape_malloc(sizeof(block_scope_t), ape_mallocArg);
     copy->num_definitions = scope->num_definitions;
     copy->offset = scope->offset;
     copy->store = dict_copy_with_items(scope->store, symbol_copy);
@@ -6112,7 +6123,7 @@ bool code_read_operands(opcode_definition_t *def, uint8_t *instr, uint64_t out_o
 #endif
 
 compilation_scope_t *compilation_scope_make(compilation_scope_t *outer) {
-    compilation_scope_t *scope = ape_malloc(sizeof(compilation_scope_t));
+    compilation_scope_t *scope = ape_malloc(sizeof(compilation_scope_t), ape_mallocArg);
     memset(scope, 0, sizeof(compilation_scope_t));
     scope->outer = outer;
     scope->bytecode = array_make(uint8_t);
@@ -6123,7 +6134,7 @@ compilation_scope_t *compilation_scope_make(compilation_scope_t *outer) {
 void compilation_scope_destroy(compilation_scope_t *scope) {
     array_destroy(scope->bytecode);
     array_destroy(scope->src_positions);
-    ape_free(scope);
+    ape_free(scope, ape_freeArg);
 }
 
 compilation_result_t* compilation_scope_orphan_result(compilation_scope_t *scope) {
@@ -6136,7 +6147,7 @@ compilation_result_t* compilation_scope_orphan_result(compilation_scope_t *scope
 }
 
 compilation_result_t* compilation_result_make(uint8_t *bytecode, src_pos_t *src_positions, int count) {
-    compilation_result_t *res = ape_malloc(sizeof(compilation_result_t));
+    compilation_result_t *res = ape_malloc(sizeof(compilation_result_t), ape_mallocArg);
     memset(res, 0, sizeof(compilation_result_t));
     res->bytecode = bytecode;
     res->src_positions = src_positions;
@@ -6148,9 +6159,9 @@ void compilation_result_destroy(compilation_result_t *res) {
     if (!res) {
         return;
     }
-    ape_free(res->bytecode);
-    ape_free(res->src_positions);
-    ape_free(res);
+    ape_free(res->bytecode, ape_freeArg);
+    ape_free(res->src_positions, ape_freeArg);
+    ape_free(res, ape_freeArg);
 }
 //FILE_END
 //FILE_START:compiler.c
@@ -6213,7 +6224,7 @@ static symbol_t* define_symbol(compiler_t *comp, src_pos_t pos, const char *name
 static bool is_comparison(operator_t op);
 
 compiler_t *compiler_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors) {
-    compiler_t *comp = ape_malloc(sizeof(compiler_t));
+    compiler_t *comp = ape_malloc(sizeof(compiler_t), ape_mallocArg);
     memset(comp, 0, sizeof(compiler_t));
     APE_ASSERT(config);
     comp->config = config;
@@ -6248,7 +6259,7 @@ void compiler_destroy(compiler_t *comp) {
     ptrarray_destroy(comp->file_scopes);
     ptrarray_destroy_with_items(comp->files, compiled_file_destroy);
     dict_destroy_with_items(comp->modules, module_destroy);
-    ape_free(comp);
+    ape_free(comp, ape_freeArg);
 }
 
 compilation_result_t* compiler_compile(compiler_t *comp, const char *code) {
@@ -6307,7 +6318,7 @@ compilation_result_t* compiler_compile_file(compiler_t *comp, const char *path) 
     file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     if (!file_scope) {
         APE_ASSERT(false);
-        ape_free(code);
+        ape_free(code, ape_freeArg);
         return NULL;
     }
     compiled_file_t *prev_file = file_scope->file;
@@ -6316,7 +6327,7 @@ compilation_result_t* compiler_compile_file(compiler_t *comp, const char *path) 
     compilation_result_t *res = compiler_compile(comp, code);
 
     file_scope->file = prev_file;
-    ape_free(code);
+    ape_free(code, ape_freeArg);
     return res;
 }
 
@@ -6487,7 +6498,7 @@ static bool import_module(compiler_t *comp, const statement_t *import_stmt) {
         push_file_scope(comp, filepath, module);
         bool ok = compile_code(comp, code);
         pop_file_scope(comp);
-        ape_free(code);
+        ape_free(code, ape_freeArg);
 
         if (!ok) {
             module_destroy(module);
@@ -6508,7 +6519,7 @@ static bool import_module(compiler_t *comp, const statement_t *import_stmt) {
     result = true;
 
 end:
-    ape_free(filepath);
+    ape_free(filepath, ape_freeArg);
     return result;
 }
 
@@ -7349,7 +7360,7 @@ static void push_file_scope(compiler_t *comp, const char *filepath, module_t *mo
     if (ptrarray_count(comp->file_scopes) > 0) {
         prev_st = compiler_get_symbol_table(comp);
     }
-    file_scope_t *file_scope = ape_malloc(sizeof(file_scope_t));
+    file_scope_t *file_scope = ape_malloc(sizeof(file_scope_t), ape_mallocArg);
     memset(file_scope, 0, sizeof(file_scope_t));
     file_scope->parser = parser_make(comp->config, comp->errors);
     file_scope->symbol_table = NULL;
@@ -7387,7 +7398,7 @@ static void pop_file_scope(compiler_t *comp) {
 
     parser_destroy(scope->parser);
 
-    ape_free(scope);
+    ape_free(scope, ape_freeArg);
     ptrarray_pop(comp->file_scopes);
 
     if (ptrarray_count(comp->file_scopes) > 0) {
@@ -7407,16 +7418,16 @@ static module_t* get_current_module(compiler_t *comp) {
 }
 
 static module_t* module_make(const char *name) {
-    module_t *module = ape_malloc(sizeof(module_t));
+    module_t *module = ape_malloc(sizeof(module_t), ape_mallocArg);
     module->name = ape_strdup(name);
     module->symbols = ptrarray_make();
     return module;
 }
 
 static void module_destroy(module_t *module) {
-    ape_free(module->name);
+    ape_free(module->name, ape_freeArg);
     ptrarray_destroy_with_items(module->symbols, symbol_destroy);
-    ape_free(module);
+    ape_free(module, ape_freeArg);
 }
 
 static void module_add_symbol(module_t *module, const symbol_t *symbol) {
@@ -7428,7 +7439,7 @@ static void module_add_symbol(module_t *module, const symbol_t *symbol) {
 }
 
 static compiled_file_t* compiled_file_make(const char *path) {
-    compiled_file_t *file = ape_malloc(sizeof(compiled_file_t));
+    compiled_file_t *file = ape_malloc(sizeof(compiled_file_t), ape_mallocArg);
     const char *last_slash_pos = strrchr(path, '/');
     if (last_slash_pos) {
         size_t len = last_slash_pos - path + 1;
@@ -7446,9 +7457,9 @@ static void compiled_file_destroy(compiled_file_t *file) {
         return;
     }
     ptrarray_destroy_with_items(file->lines, ape_free);
-    ape_free(file->dir_path);
-    ape_free(file->path);
-    ape_free(file);
+    ape_free(file->dir_path, ape_freeArg);
+    ape_free(file->path, ape_freeArg);
+    ape_free(file, ape_freeArg);
 }
 
 static const char* get_module_name(const char *path) {
@@ -7563,7 +7574,7 @@ object_t object_make_string_no_copy(gcmem_t *mem, char *string) {
     if ((len + 1) < OBJECT_STRING_BUF_SIZE) {
         memcpy(obj->string.value_buf, string, len + 1);
         obj->string.hash = object_hash_string(string);
-        ape_free(string);
+        ape_free(string, ape_freeArg);
         obj->string.is_allocated = false;
     } else {
         obj->string.hash = object_hash_string(string);
@@ -7580,7 +7591,7 @@ object_t object_make_stringf(gcmem_t *mem, const char *fmt, ...) {
     int to_write = vsnprintf(NULL, 0, fmt, args);
     va_end(args);
     va_start(args, fmt);
-    char *res = (char*)ape_malloc(to_write + 1);
+    char *res = (char*)ape_malloc(to_write + 1, ape_mallocArg);
     int written = vsprintf(res, fmt, args);
     (void)written;
     APE_ASSERT(written == to_write);
@@ -7640,7 +7651,7 @@ object_t object_make_errorf(gcmem_t *mem, const char *fmt, ...) {
     int to_write = vsnprintf(NULL, 0, fmt, args);
     va_end(args);
     va_start(args, fmt);
-    char *res = (char*)ape_malloc(to_write + 1);
+    char *res = (char*)ape_malloc(to_write + 1, ape_mallocArg);
     int written = vsprintf(res, fmt, args);
     (void)written;
     APE_ASSERT(written == to_write);
@@ -7663,7 +7674,7 @@ object_t object_make_function(gcmem_t *mem, const char *name, compilation_result
     obj->function.num_args = num_args;
     obj->function.free_vals_count = free_vals_count;
     if (free_vals_count >= APE_ARRAY_LEN(obj->function.free_vals_buf)) {
-        obj->function.free_vals_allocated = ape_malloc(sizeof(object_t) * free_vals_count);
+        obj->function.free_vals_allocated = ape_malloc(sizeof(object_t) * free_vals_count, ape_mallocArg);
     }
     return object_make(OBJECT_FUNCTION, obj);
 }
@@ -7691,17 +7702,17 @@ void object_data_deinit(object_data_t *data) {
         }
         case OBJECT_STRING: {
             if (data->string.is_allocated) {
-                ape_free(data->string.value_allocated);
+                ape_free(data->string.value_allocated, ape_freeArg);
             }
             break;
         }
         case OBJECT_FUNCTION: {
             if (data->function.owns_data) {
-                ape_free(data->function.name);
+                ape_free(data->function.name, ape_freeArg);
                 compilation_result_destroy(data->function.comp_result);
             }
             if (freevals_are_allocated(&data->function)) {
-                ape_free(data->function.free_vals_allocated);
+                ape_free(data->function.free_vals_allocated, ape_freeArg);
             }
             break;
         }
@@ -7714,7 +7725,7 @@ void object_data_deinit(object_data_t *data) {
             break;
         }
         case OBJECT_NATIVE_FUNCTION: {
-            ape_free(data->native_function.name);
+            ape_free(data->native_function.name, ape_freeArg);
             break;
         }
         case OBJECT_EXTERNAL: {
@@ -7724,7 +7735,7 @@ void object_data_deinit(object_data_t *data) {
             break;
         }
         case OBJECT_ERROR: {
-            ape_free(data->error.message);
+            ape_free(data->error.message, ape_freeArg);
             traceback_destroy(data->error.traceback);
             break;
         }
@@ -8311,9 +8322,9 @@ static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(ob
         }
         case OBJECT_FUNCTION: {
             function_t *function = object_get_function(obj);
-            uint8_t *bytecode_copy = ape_malloc(sizeof(uint8_t) * function->comp_result->count);
+            uint8_t *bytecode_copy = ape_malloc(sizeof(uint8_t) * function->comp_result->count, ape_mallocArg);
             memcpy(bytecode_copy, function->comp_result->bytecode, sizeof(uint8_t) * function->comp_result->count);
-            src_pos_t *src_positions_copy = ape_malloc(sizeof(src_pos_t) * function->comp_result->count);
+            src_pos_t *src_positions_copy = ape_malloc(sizeof(src_pos_t) * function->comp_result->count, ape_mallocArg);
             memcpy(src_positions_copy, function->comp_result->src_positions, sizeof(src_pos_t) * function->comp_result->count);
             compilation_result_t *comp_res_copy = compilation_result_make(bytecode_copy, src_positions_copy, function->comp_result->count);
             copy = object_make_function(mem, object_get_function_name(obj), comp_res_copy, true,
@@ -8321,7 +8332,7 @@ static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(ob
             valdict_set(copies, &obj, &copy);
             function_t *function_copy = object_get_function(copy);
             if (freevals_are_allocated(function)) {
-                function_copy->free_vals_allocated = ape_malloc(sizeof(object_t) * function->free_vals_count);
+                function_copy->free_vals_allocated = ape_malloc(sizeof(object_t) * function->free_vals_count, ape_mallocArg);
             }
             function_copy->free_vals_count = function->free_vals_count;
             for (int i = 0; i < function->free_vals_count; i++) {
@@ -8452,7 +8463,7 @@ typedef struct gcmem {
 } gcmem_t;
 
 gcmem_t *gcmem_make() {
-    gcmem_t *mem = ape_malloc(sizeof(gcmem_t));
+    gcmem_t *mem = ape_malloc(sizeof(gcmem_t), ape_mallocArg);
     memset(mem, 0, sizeof(gcmem_t));
     mem->objects = ptrarray_make();
     mem->objects_back = ptrarray_make();
@@ -8468,16 +8479,16 @@ void gcmem_destroy(gcmem_t *mem) {
     for (int i = 0; i < ptrarray_count(mem->objects); i++) {
         object_data_t *obj = ptrarray_get(mem->objects, i);
         object_data_deinit(obj);
-        ape_free(obj);
+        ape_free(obj, ape_freeArg);
     }
     ptrarray_destroy(mem->objects);
     ptrarray_destroy(mem->objects_back);
     array_destroy(mem->objects_not_gced);
     for (int i = 0; i <= mem->pool_index; i++) {
-        ape_free(mem->pool[i]);
+        ape_free(mem->pool[i], ape_freeArg);
     }
     memset(mem, 0, sizeof(gcmem_t));
-    ape_free(mem);
+    ape_free(mem, ape_freeArg);
 }
 
 object_data_t* gcmem_alloc_object_data(gcmem_t *mem, object_type_t type) {
@@ -8486,7 +8497,7 @@ object_data_t* gcmem_alloc_object_data(gcmem_t *mem, object_type_t type) {
         data = mem->pool[mem->pool_index];
         mem->pool_index--;
     } else {
-        data = ape_malloc(sizeof(object_data_t));
+        data = ape_malloc(sizeof(object_data_t), ape_mallocArg);
     }
     memset(data, 0, sizeof(object_data_t));
     ptrarray_add(mem->objects, data);
@@ -8566,7 +8577,7 @@ void gc_sweep(gcmem_t *mem) {
                 mem->pool_index++;
                 mem->pool[mem->pool_index] = data;
             } else {
-                ape_free(data);
+                ape_free(data, ape_freeArg);
             }
         }
     }
@@ -8807,7 +8818,7 @@ static object_t reverse_fn(vm_t *vm, void *data, int argc, object_t *args) {
     } else if (type == OBJECT_STRING) {
         const char *str = object_get_string(arg);
         int len = (int)strlen(str);
-        char *res_buf = ape_malloc(len + 1);
+        char *res_buf = ape_malloc(len + 1, ape_mallocArg);
         for (int i = 0; i < len; i++) {
             res_buf[len - i - 1] = str[i];
         }
@@ -9084,7 +9095,7 @@ static object_t concat_fn(vm_t *vm, void *data, int argc, object_t *args) {
         int len = (int)strlen(str);
         const char *arg_str = object_get_string(args[1]);
         int arg_str_len = (int)strlen(arg_str);
-        char *res_buf = ape_malloc(len + arg_str_len + 1);
+        char *res_buf = ape_malloc(len + arg_str_len + 1, ape_mallocArg);
         for (int i = 0; i < len; i++) {
             res_buf[i] = str[i];
         }
@@ -9413,7 +9424,7 @@ static bool check_args(vm_t *vm, bool generate_error, int argc, object_t *args, 
 #endif
 
 traceback_t* traceback_make(void) {
-    traceback_t *traceback = ape_malloc(sizeof(traceback_t));
+    traceback_t *traceback = ape_malloc(sizeof(traceback_t), ape_mallocArg);
     traceback->items = array_make(traceback_item_t);
     return traceback;
 }
@@ -9424,10 +9435,10 @@ void traceback_destroy(traceback_t *traceback) {
     }
     for (int i = 0; i < array_count(traceback->items); i++) {
         traceback_item_t *item = array_get(traceback->items, i);
-        ape_free(item->function_name);
+        ape_free(item->function_name, ape_freeArg);
     }
     array_destroy(traceback->items);
-    ape_free(traceback);
+    ape_free(traceback, ape_freeArg);
 }
 
 void traceback_append(traceback_t *traceback, const char *function_name, src_pos_t pos) {
@@ -9574,7 +9585,7 @@ static bool check_assign(vm_t *vm, object_t old_value, object_t new_value);
 static bool try_overload_operator(vm_t *vm, object_t left, object_t right, opcode_t op, bool *out_overload_found);
 
 vm_t *vm_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors) {
-    vm_t *vm = ape_malloc(sizeof(vm_t));
+    vm_t *vm = ape_malloc(sizeof(vm_t), ape_mallocArg);
     memset(vm, 0, sizeof(vm_t));
     vm->config = config;
     vm->mem = mem;
@@ -9623,7 +9634,7 @@ void vm_destroy(vm_t *vm) {
         return;
     }
     array_destroy(vm->native_functions);
-    ape_free(vm);
+    ape_free(vm, ape_freeArg);
 }
 
 void vm_reset(vm_t *vm) {
@@ -10672,21 +10683,26 @@ static size_t stdout_write_default(void* context, const void *data, size_t size)
 #undef malloc
 #undef free
 
-ape_malloc_fn ape_malloc = malloc;
-ape_free_fn ape_free = free;
+
+void* ape_mallocArg = NULL;
+void* ape_freeArg = NULL;
+ape_malloc_fn ape_malloc = apeMalloc;
+ape_free_fn ape_free = apeFree;
 
 //-----------------------------------------------------------------------------
 // Ape
 //-----------------------------------------------------------------------------
 
-void ape_set_memory_functions(ape_malloc_fn malloc_fn, ape_free_fn free_fn) {
+void ape_set_memory_functions(void* mallocArg, ape_malloc_fn malloc_fn, void* freeArg, ape_free_fn free_fn) {
+    ape_mallocArg = mallocArg;
     ape_malloc = malloc_fn;
+    ape_freeArg = freeArg;
     ape_free = free_fn;
     collections_set_memory_functions(malloc_fn, free_fn);
 }
 
 ape_t *ape_make(void) {
-    ape_t *ape = ape_malloc(sizeof(ape_t));
+    ape_t *ape = ape_malloc(sizeof(ape_t), ape_mallocArg);
     memset(ape, 0, sizeof(ape_t));
 
     set_default_config(ape);
@@ -10729,7 +10745,7 @@ void ape_destroy(ape_t *ape) {
     vm_destroy(ape->vm);
     compiler_destroy(ape->compiler);
     gcmem_destroy(ape->mem);
-    ape_free(ape);
+    ape_free(ape, ape_freeArg);
 }
 
 void ape_set_repl_mode(ape_t *ape, bool enabled) {
@@ -10765,7 +10781,7 @@ ape_program_t* ape_compile(ape_t *ape, const char *code) {
         goto err;
     }
 
-    ape_program_t *program = ape_malloc(sizeof(ape_program_t));
+    ape_program_t *program = ape_malloc(sizeof(ape_program_t), ape_mallocArg);
     program->ape = ape;
     program->comp_res = comp_res;
     return program;
@@ -10785,7 +10801,7 @@ ape_program_t* ape_compile_file(ape_t *ape, const char *path) {
         goto err;
     }
 
-    ape_program_t *program = ape_malloc(sizeof(ape_program_t));
+    ape_program_t *program = ape_malloc(sizeof(ape_program_t), ape_mallocArg);
     program->ape = ape;
     program->comp_res = comp_res;
     return program;
@@ -10824,7 +10840,7 @@ void ape_program_destroy(ape_program_t *program) {
         return;
     }
     compilation_result_destroy(program->comp_res);
-    ape_free(program);
+    ape_free(program, ape_freeArg);
 }
 
 ape_object_t ape_execute(ape_t *ape, const char *code) {
@@ -10916,7 +10932,7 @@ const ape_error_t* ape_get_error(const ape_t *ape, int index) {
 }
 
 bool ape_set_native_function(ape_t *ape, const char *name, ape_native_fn fn, void *data) {
-    native_fn_wrapper_t *wrapper = ape_malloc(sizeof(native_fn_wrapper_t));
+    native_fn_wrapper_t *wrapper = ape_malloc(sizeof(native_fn_wrapper_t), ape_mallocArg);
     memset(wrapper, 0, sizeof(native_fn_wrapper_t));
     wrapper->fn = fn;
     wrapper->ape = ape;
@@ -11018,7 +11034,7 @@ ape_object_t ape_object_make_stringf(ape_t *ape, const char *fmt, ...) {
     int to_write = vsnprintf(NULL, 0, fmt, args);
     va_end(args);
     va_start(args, fmt);
-    char *res = (char*)ape_malloc(to_write + 1);
+    char *res = (char*)ape_malloc(to_write + 1, ape_mallocArg);
     int written = vsprintf(res, fmt, args);
     (void)written;
     APE_ASSERT(written == to_write);
@@ -11039,7 +11055,7 @@ ape_object_t ape_object_make_map(ape_t *ape) {
 }
 
 ape_object_t ape_object_make_native_function(ape_t *ape, ape_native_fn fn, void *data) {
-    native_fn_wrapper_t *wrapper = ape_malloc(sizeof(native_fn_wrapper_t));
+    native_fn_wrapper_t *wrapper = ape_malloc(sizeof(native_fn_wrapper_t), ape_mallocArg);
     memset(wrapper, 0, sizeof(native_fn_wrapper_t));
     wrapper->fn = fn;
     wrapper->ape = ape;
@@ -11059,7 +11075,7 @@ ape_object_t ape_object_make_errorf(ape_t *ape, const char *fmt, ...) {
     int to_write = vsnprintf(NULL, 0, fmt, args);
     va_end(args);
     va_start(args, fmt);
-    char *res = (char*)ape_malloc(to_write + 1);
+    char *res = (char*)ape_malloc(to_write + 1, ape_mallocArg);
     int written = vsprintf(res, fmt, args);
     (void)written;
     APE_ASSERT(written == to_write);
@@ -11117,7 +11133,7 @@ void ape_set_runtime_errorf(ape_t *ape, const char *fmt, ...) {
     int to_write = vsnprintf(NULL, 0, fmt, args);
     va_end(args);
     va_start(args, fmt);
-    char *message = (char*)ape_malloc(to_write + 1);
+    char *message = (char*)ape_malloc(to_write + 1, ape_mallocArg);
     vsprintf(message, fmt, args);
     va_end(args);
 
@@ -11586,7 +11602,7 @@ static char* read_file_default(void *ctx, const char *filename){
     }
     size_to_read = pos;
     rewind(fp);
-    file_contents = (char*)ape_malloc(sizeof(char) * (size_to_read + 1));
+    file_contents = (char*)ape_malloc(sizeof(char) * (size_to_read + 1), ape_mallocArg);
     if (!file_contents) {
         fclose(fp);
         return NULL;

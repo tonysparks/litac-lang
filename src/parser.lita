@@ -85,7 +85,7 @@ public func ParserInit(filename: *const char,
     }
 
     var lex = LexerInit(filename, text, lita.allocator)
-    parser.tokens.init(512, lita.allocator)
+    parser.tokens.init(1024, lita.allocator)
 
     while(!lex.eof()) {
         var token = lex.nextToken()
@@ -1961,15 +1961,15 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
     }
 
     var sb = StringBufferInit(MAX_SYMBOL_NAME, p.allocator)
-    sb.append("%.*s", name.str.length, name.str.buffer)
+    sb.appendStrn(name.str.buffer, name.str.length)
 
     if(p.match(TokenType.COLON_COLON)) {
         var identifier = p.identifier()
         if(identifier.type != TokenType.IDENTIFIER) {
             goto err;
         }
-
-        sb.append("::%.*s", identifier.str.length, identifier.str.buffer)
+        sb.appendStrn("::", 2)
+        sb.appendStrn(identifier.str.buffer, identifier.str.length)
     }
 
     var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.allocator) as (*NameTypeSpec)
@@ -2579,12 +2579,9 @@ func (p: *Parser) prevPos() : SrcPos {
     return p.previous().pos
 }
 
+@inline
 func (p: *Parser) peek() : *Token {
-    var index = p.current
-    if(index >= p.tokens.size()) {
-        index = p.tokens.size() - 1
-    }
-    return &p.tokens.elements[index]
+    return &p.tokens.elements[p.current]
 }
 
 func (p: *Parser) rewind() {
@@ -2601,6 +2598,11 @@ func (p: *Parser) previous() : *Token {
 }
 
 func (p: *Parser) atEnd() : bool {
+    // the usual case -- fast check
+    if(p.current < p.tokens.size() - 1) {
+        return false
+    }
+
     return p.tokens.empty() ||
            p.current >= p.tokens.size() ||
            p.peek().type == TokenType.END_OF_FILE
@@ -2613,8 +2615,8 @@ func (p: *Parser) advance() : *Token {
     return p.previous()
 }
 
+@inline
 func (p: *Parser) check(type: TokenType) : bool {
-    if(p.atEnd()) return false
     return p.peek().type == type
 }
 

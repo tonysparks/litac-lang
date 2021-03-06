@@ -44,7 +44,11 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             continue
         }
 
-        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+        if(sym.flags & (SymbolFlags.IS_FOREIGN|SymbolFlags.IS_MAIN|SymbolFlags.IS_TEST)) {
+            continue
+        }
+
+        if(sym.decl.hasNote("no_profile")) {
             continue
         }
 
@@ -64,7 +68,11 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             continue
         }
 
-        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+        if(sym.flags & (SymbolFlags.IS_FOREIGN|SymbolFlags.IS_MAIN|SymbolFlags.IS_TEST)) {
+            continue
+        }
+
+        if(sym.decl.hasNote("no_profile")) {
             continue
         }
 
@@ -81,11 +89,6 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
     }
     sb.append("\n}\n")
 
-/*
-printf("\n%s = %s\n", module.id.filename, sb.cStr())
-printf("Module: ")
-module.print("WTF?")
-*/
     var parser = ParserInit(module.id.filename, sb.cStr(), lita)
     var stmts = parser.parseModule()
     if(stmts) {
@@ -109,23 +112,6 @@ module.print("WTF?")
             var entriesDecl = stmts.declarations.get(1)
             assert(entriesDecl.kind == StmtKind.CONST_DECL)
 
-/*
-            var entries = checker.resolveValueDecl(entriesDecl as (*VarDecl))
-             // TEMP: Remove once all types are implemented
-            if(!entries) {
-                if(checker.lita.result.hasErrors()) {
-                    var sb = StringBufferInit()
-                    for(var i = 0; i < checker.lita.result.errors.size(); i+=1) {
-                        var error = checker.lita.result.errors.get(i)
-                        PrintError(sb, error)
-                    }
-
-                    printf("ERRORS: \n%s\n", sb.cStr())
-                }
-            }
-            // END TEMP
-            assert(entries != null)*/
-
             var existingDecl = module.getType("profileEntries")
             assert(existingDecl != null)
 
@@ -145,7 +131,11 @@ module.print("WTF?")
             continue
         }
 
-        if(sym.flags & SymbolFlags.IS_FOREIGN) {
+        if(sym.flags & (SymbolFlags.IS_FOREIGN|SymbolFlags.IS_MAIN|SymbolFlags.IS_TEST)) {
+            continue
+        }
+
+        if(sym.decl.hasNote("no_profile")) {
             continue
         }
 
@@ -159,6 +149,7 @@ module.print("WTF?")
                 sb.clear()
                 sb.append("%s::StartWatch(%s::ProfileTag.%.*s__%s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
                 AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+
             }
             else {
                 sb.clear()

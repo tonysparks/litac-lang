@@ -423,10 +423,10 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
         case TypeKind.UNION:
         case TypeKind.ENUM:
         case TypeKind.GENERIC_PARAM:
-            sb.append(this.name)
+            sb.appendStr(this.name)
             break;
         case TypeKind.STR: {
-            sb.append("*const char")
+            sb.appendStr("*const char")
             break;
         }
         case TypeKind.ARRAY: {
@@ -435,69 +435,69 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
                 sb.append("[%llu]", arrayInfo.length)
             }
             else {
-                sb.append("[]")
+                sb.appendStrn("[]", 2)
             }
             arrayInfo.arrayOf.toString(sb)
             break;
         }
         case TypeKind.PTR: {
             var ptrInfo = this as (*PtrTypeInfo)
-            sb.append("*")
+            sb.appendStrn("*", 1)
             ptrInfo.ptrOf.toString(sb)
             break;
         }
         case TypeKind.CONST: {
             var constInfo = this as (*ConstTypeInfo)
-            sb.append("const ")
+            sb.appendStrn("const ", 6)
             constInfo.constOf.toString(sb)
             break;
         }
         case TypeKind.FUNC_PTR: {
             var funcPtrInfo = this as (*FuncPtrTypeInfo)
-            sb.append("func")
+            sb.appendStrn("func", 4)
             if(!funcPtrInfo.genericParams.empty()) {
-                sb.append("<")
+                sb.appendStrn("<", 1)
                 for(var i = 0; i < funcPtrInfo.genericParams.size(); i += 1) {
-                    if(i > 0) sb.append(",")
+                    if(i > 0) sb.appendStrn(",", 1)
                     var t = funcPtrInfo.genericParams.get(i).name
-                    sb.append("%.*s", t.value.str.length, t.value.str.buffer)
+                    sb.appendStrn(t.value.str.buffer, t.value.str.length)
                 }
-                sb.append(">")
+                sb.appendStrn(">", 1)
             }
-            sb.append("(")
+            sb.appendStrn("(", 1)
             for(var i = 0; i < funcPtrInfo.paramDecls.size(); i += 1) {
-                if(i > 0) sb.append(",")
+                if(i > 0) sb.appendStrn(",", 1)
                 var paramType = funcPtrInfo.paramDecls.get(i)
                 paramType.toString(sb)
             }
-            sb.append(") : ")
+            sb.appendStr(") : ")
             funcPtrInfo.returnType.toString(sb)
             break;
         }
         case TypeKind.FUNC: {
             var funcInfo = this as (*FuncTypeInfo)
-            sb.append("func")
+            sb.appendStrn("func", 4)
             if(!funcInfo.decl.genericParams.empty()) {
-                sb.append("<")
+                sb.appendStrn("<", 1)
                 for(var i = 0; i < funcInfo.decl.genericParams.size(); i += 1) {
-                    if(i > 0) sb.append(",")
+                    if(i > 0) sb.appendStrn(",", 1)
                     var t = funcInfo.decl.genericParams.get(i).name
-                    sb.append("%.*s", t.value.str.length, t.value.str.buffer)
+                    sb.appendStrn(t.value.str.buffer, t.value.str.length)
                 }
-                sb.append(">")
+                sb.appendStrn(">", 1)
             }
-            sb.append("(")
+            sb.appendStrn("(", 1)
             for(var i = 0; i < funcInfo.decl.params.size(); i += 1) {
-                if(i > 0) sb.append(",")
+                if(i > 0) sb.appendStrn(",", 1)
                 var paramType = funcInfo.decl.params.get(i)
                 paramType.typeInfo.toString(sb)
             }
-            sb.append(") : ")
+            sb.appendStr(") : ")
             funcInfo.returnType.toString(sb)
             break;
         }
         case TypeKind.POISON: {
-            sb.append("<poison>")
+            sb.appendStr("<poison>")
             break;
         }
         default: {

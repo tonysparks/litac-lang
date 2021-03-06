@@ -3,22 +3,23 @@ if [%LITAC_HOME%] == [] goto error_exit
 
 del ".\bin\litac.*" /q
 
-set BUILD_CMD="clang.exe -Wl,-stack_size -Wl,0x1000000 -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib"
+REM set BUILD_CMD="clang.exe -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib"
+set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib"
 java -jar %LITAC_HOME%/target/litac.jar -profile -buildCmd %BUILD_CMD% -outputDir "./bin" -output "litacc" "./src/main.lita" -types "none" -debug
 if errorlevel 1 (
     goto error_compiling
 )
 cd bin
 echo Running litaC...
-litacc.exe -debug -profile -instrument -cFormat -buildCmd %BUILD_CMD% "../src/main.lita"
+litacc.exe -debug -cFormat -profile -buildCmd %BUILD_CMD% "../src/main.lita"
 REM litacc.exe -cFormat -types all -debug -run -profile "../test/test_single.lita"
 REM litaC.exe -run -profile -buildCmd %BUILD_CMD% "../src/lsp.lita"
 
 cd output
-echo Running litaC inception!...
+REM echo Running litaC inception!...
 REM a.exe -debug -profile -instrument -cFormat -buildCmd %BUILD_CMD% "../../src/main.lita"
-a.exe -debug -profile -instrument -cFormat -buildCmd %BUILD_CMD% "../../test/test_single.lita"
-echo Inception complete
+a.exe -run -debug -profile -cFormat -buildCmd %BUILD_CMD% "../../test/test_single.lita"
+REM echo Inception complete
 goto end
 
 

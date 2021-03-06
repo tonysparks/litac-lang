@@ -708,12 +708,12 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
             return false
         }
 
-        var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+        var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
         nameStr.format("%s_%.*s", type.name, f.name.str.length, f.name.str.buffer)
         return true
     }
 
-    var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+    var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
     nameStr.format("%.*s", f.name.str.length, f.name.str.buffer)
     return true
 }

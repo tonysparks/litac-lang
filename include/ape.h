@@ -80,8 +80,8 @@ typedef enum ape_object_type {
 } ape_object_type_t;
 
 typedef ape_object_t (*ape_native_fn)(ape_t *ape, void *data, int argc, ape_object_t *args);
-typedef void*        (*ape_malloc_fn)(size_t size);
-typedef void         (*ape_free_fn)(void *ptr);
+typedef void*        (*ape_malloc_fn)(size_t size, void* mallocArg);
+typedef void         (*ape_free_fn)(void *ptr, void* freeArg);
 typedef void         (*ape_data_destroy_fn)(void* data);
 typedef void*        (*ape_data_copy_fn)(void* data);
 
@@ -92,7 +92,7 @@ typedef size_t (*ape_write_file_fn)(void* context, const char *path, const char 
 //-----------------------------------------------------------------------------
 // Ape API
 //-----------------------------------------------------------------------------
-void ape_set_memory_functions(ape_malloc_fn malloc_fn, ape_free_fn free_fn);
+void ape_set_memory_functions(void* mallocArg, ape_malloc_fn malloc_fn, void* freeArg, ape_free_fn free_fn);
 
 ape_t* ape_make(void);
 void   ape_destroy(ape_t *ape);

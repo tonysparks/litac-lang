@@ -32,9 +32,9 @@
                 var s = StringBuffer{}
                 s.init(16)
 
-                s.appendStr("hello", 5)
-                s.appendStr(" ", 1)
-                s.appendStr("world", 5)
+                s.appendStrn("hello", 5)
+                s.appendStrn(" ", 1)
+                s.appendStrn("world", 5)
 
                 assert(s.size() == 11)
 
@@ -67,7 +67,7 @@
                 var s = StringBuffer{}
                 s.init(16)
 
-                s.appendStr("hi", 2)
+                s.appendStrn("hi", 2)
                 //printf("'%.*s'\n", s.size(), s.buffer);
                 assert(strncmp(s.buffer, "hi", s.size()) == 0)
                 s.clear()
@@ -524,7 +524,7 @@
                     s.init(16)
                     defer s.free()
 
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
 
                     s.append("%s", AT)
                     //printf("'%s'\n", s.cStr())
@@ -537,7 +537,7 @@
                     s.init(16)
                     defer s.free()
 
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
 
                     s.append("%s", OVER)
                     //printf("'%s'\n", s.cStr())
@@ -550,7 +550,7 @@
                     s.init(16)
                     defer s.free()
 
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
 
                     s.append("%s", BEFORE)
                     //printf("'%s'\n", s.cStr())
@@ -580,7 +580,7 @@
                     defer s.free()
 
                     s.append("%s", AT)
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", AT)
@@ -592,7 +592,7 @@
                     defer s.free()
 
                     s.append("%s", OVER)
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", OVER)
@@ -604,7 +604,7 @@
                     defer s.free()
 
                     s.append("%s", BEFORE)
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", BEFORE)
@@ -616,7 +616,7 @@
                     defer s.free()
 
                     s.append("%s", WAYLES)
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", WAYLES)

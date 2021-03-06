@@ -107,6 +107,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
         if(decl.sym && decl.kind == StmtKind.FUNC_DECL &&
             strcmp(decl.sym.name, "main") == 0) {
             this.mainEntry = decl.sym
+            this.mainEntry.flags |= SymbolFlags.IS_MAIN
             break
         }
     }
@@ -156,11 +157,11 @@ func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeIn
 
     if(!a.canCastTo(b)) {
         var sb = StringBufferInit(256, this.allocator)
-        sb.append("'")
+        sb.appendStrn("'", 1)
         a.toString(sb)
-        sb.append("' can't be casted to '")
+        sb.appendStr("' can't be casted to '")
         b.toString(sb)
-        sb.append("'")
+        sb.appendStrn("'", 1)
 
         this.result.addErrorStr(src, sb)
         return false
@@ -175,11 +176,11 @@ func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *Type
 
     if(!a.isAssignable(b)) {
         var sb = StringBufferInit(256, this.allocator)
-        sb.append("'")
+        sb.appendStrn("'", 1)
         b.toString(sb)
-        sb.append("' can't be assigned to '")
+        sb.appendStr("' can't be assigned to '")
         a.toString(sb)
-        sb.append("'")
+        sb.appendStrn("'", 1)
 
         this.result.addErrorStr(src, sb)
         return false
@@ -194,11 +195,11 @@ func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *Type
 
     if(!a.isDeclarable(b)) {
         var sb = StringBufferInit(256, this.allocator)
-        sb.append("'")
+        sb.appendStrn("'", 1)
         b.toString(sb)
-        sb.append("' can't be assigned to '")
+        sb.appendStr("' can't be assigned to '")
         a.toString(sb)
-        sb.append("'")
+        sb.appendStrn("'", 1)
 
         this.result.addErrorStr(src, sb)
         return false
@@ -213,11 +214,11 @@ func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *
 
     if(!a.isAssignable(b)) {
         var sb = StringBufferInit(256, this.allocator)
-        sb.append("'")
+        sb.appendStrn("'", 1)
         b.toString(sb)
-        sb.append("' is not of type '")
+        sb.appendStr("' is not of type '")
         a.toString(sb)
-        sb.append("'")
+        sb.appendStrn("'", 1)
 
         this.result.addErrorStr(src, sb)
         return false
@@ -821,8 +822,19 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                     goto err;
                 }
 
-                length = expr.operand.val.intValue // TODO: fix: usize != i64
                 isLengthDefined = true
+                if(expr.kind == StmtKind.IDENTIFIER_EXPR) {
+                    var idExpr = expr as (*IdentifierExpr)
+                    if(idExpr.sym && (idExpr.sym.flags & SymbolFlags.IS_FOREIGN)) {
+                        // we don't know the actual length, because this type's value is
+                        // defined in C code..
+                        isLengthDefined = false
+                    }
+                }
+
+                if(isLengthDefined) {
+                    length = expr.operand.val.intValue // TODO: fix: usize != i64
+                }
             }
             spec.typeInfo = this.typeCache.newArrayTypeInfo(arrayOf, length, arraySpec.numElements, isLengthDefined) as (*TypeInfo)
             return spec.typeInfo

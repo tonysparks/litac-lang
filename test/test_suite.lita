@@ -9,7 +9,7 @@ import "mem"
 import "map"
 import "string_buffer"
 import "string"
-import "../src/system"
+import "system"
 import "../src/lita"
 import "../src/phase_result"
 import "../src/error_codes"
@@ -61,7 +61,7 @@ func main(len: i32, args: **char) : i32 {
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
          //"../test/tests/consts.json",
-        "../test/tests/typeof.json",
+        "../test/tests/typeof.json",/*
         "../test/tests/strings.json",
         "../test/tests/using.json",
         "../test/tests/notes.json",
@@ -88,7 +88,7 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",
+        "../test/tests/generics_inference.json",*/
         null
     }
 
@@ -368,8 +368,8 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuffer) : *const char {
     FilePath(this.binaryFilename, path)
 
     var len = strlen(path)
-    sb.append("cd ")
-    sb.appendStr(path, len)
+    sb.appendStrn("cd ", 3)
+    sb.appendStrn(path, len)
     sb.append(" && %s 2>&1", &this.binaryFilename[len + 1])
 
     var process = SystemExec(sb.cStr())
@@ -380,7 +380,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuffer) : *const char {
     var buffer = [1024]char{};
     var bytesRead = -1
     while((bytesRead = process.readOutput(buffer, 1024)) > 0) {
-        sb.append("%s", buffer)
+        sb.appendStr(buffer)
     }
 
     return sb.cStrConst()

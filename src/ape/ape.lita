@@ -57,8 +57,8 @@ public enum ape_object_type {
 @foreign public typedef void as ape_object_type_t;
 
 @foreign public typedef func(*ape_t, *void, i32, *ape_object_t) : ape_object_t as ape_native_fn;
-@foreign public typedef func(u64) : *void as ape_malloc_fn;
-@foreign public typedef func(*void) : void as ape_free_fn;
+@foreign public typedef func(u64, *void) : *void as ape_malloc_fn;
+@foreign public typedef func(*void, *void) : void as ape_free_fn;
 @foreign public typedef func(*void) : void as ape_data_destroy_fn;
 @foreign public typedef func(*void) : *void as ape_data_copy_fn;
 @foreign public typedef func(*void, *const void, u64) : u64 as ape_stdout_write_fn;
@@ -66,7 +66,7 @@ public enum ape_object_type {
 @foreign public typedef func(*void, *const char, *const char, u64) : u64 as ape_write_file_fn;
 
 @foreign
-public func ape_set_memory_functions(p0: ape_malloc_fn, p1: ape_free_fn) : void;
+public func ape_set_memory_functions(mallocArg: *void, p0: ape_malloc_fn, freeArg: *void, p1: ape_free_fn) : void;
 
 @foreign
 public func ape_make() : *ape_t;

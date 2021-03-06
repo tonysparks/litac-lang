@@ -85,7 +85,8 @@ public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
 
     var entry = ArrayEntry{.arrayOf = arrayOf, .expr = numOfElements, .length = length}
     var type = this.arrayCache.get(entry)
-    if(!type || type.length != length || type.isLengthDefined != isLengthDefined) {
+    if(!type || type.length != length || type.isLengthDefined != isLengthDefined
+     /*|| type.numOfElements != numOfElements*/) {
         type = new<ArrayTypeInfo>(this.allocator)
         type.kind = TypeKind.ARRAY
         type.typeid = NextTypeId()

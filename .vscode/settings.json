@@ -1,4 +1,5 @@
 {
-    "files.associations": {        
+    "files.associations": {
+        "stat.h": "c"
     }
 }

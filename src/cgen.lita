@@ -88,22 +88,22 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     assert(module != null)
     assert(module.ast != null)
 
-    buf.append("#ifndef _LITAC_HEADER_H\n")
-    buf.append("#define _LITAC_HEADER_H\n")
+    buf.appendStr("#ifndef _LITAC_HEADER_H\n")
+    buf.appendStr("#define _LITAC_HEADER_H\n")
 
     this.emitForward()
     this.emitPrimitiveConstDecls()
     this.emitModuleNotes()
     this.emitForwardDecls()
 
-    buf.append("\n#endif /* _LITAC_HEADER_H */\n")
+    buf.appendStr("\n#endif /* _LITAC_HEADER_H */\n")
 
 
-    buf.append("\n\n")
-    buf.append("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-    buf.append("// translated code begins\n")
-    buf.append("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
-    buf.append("\n\n")
+    buf.appendStr("\n\n")
+    buf.appendStr("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+    buf.appendStr("// translated code begins\n")
+    buf.appendStr("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+    buf.appendStr("\n\n")
 
     var graph = DependencyGraph{}
     graph.init(this.lita)
@@ -154,9 +154,9 @@ func (this: using *CGen) emitMain(sym: *Symbol) {
     this.currentFunc = sym.type as (*FuncTypeInfo)
     defer this.currentFunc = null
 
-    this.emit(" {")
+    this.emitStrn(" {", 2)
     this.emitStmt(decl.body)
-    this.emit("}")
+    this.emitStrn("}", 1)
 
 }
 
@@ -197,6 +197,15 @@ typedef size_t    %s%s;
 #define LITAC_EXPORT __attribute__((visibility("default")))
 #endif
 
+#if __TINYC__
+#define LITAC_THREADLOCAL __thread
+#define LITAC_INLINE
+#define LITAC_NOINLINE
+#define LITAC_PACKED __attribute__((packed))
+#define LITAC_PACKED_POP
+#define LITAC_EXPORT __attribute__((dllexport))
+#endif
+
 """,
     CurrentDateTime(),
     this.options.cPrefix, "i8",
@@ -221,7 +230,7 @@ typedef size_t    %s%s;
         buf.append("typedef char   %s%s;\n", this.options.cPrefix, "char")
     }
     else {
-        buf.append("""
+        buf.appendStr("""
 // Boolean type
 #if defined(__STDC__) && __STDC_VERSION__ >= 199901L
     #include <stdbool.h>
@@ -264,7 +273,7 @@ func (this: using *CGen) emitModuleNotes() {
             var note = module.ast.notes.get(i)
 
             this.emitPreludeNote(note)
-            this.emit("\n")
+            this.emitStrn("\n", 1)
         }
     }
 }
@@ -301,7 +310,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
             break;
         case StmtKind.FUNC_DECL: {
             this.emitFuncDeclSignature(decl as (*FuncDecl), name)
-            buf.append(";\n")
+            buf.appendStrn(";\n", 2)
             break;
         }
         case StmtKind.UNION_DECL:
@@ -330,7 +339,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
 
 func (this: using *CGen) escapeNameStr(name: *const char) : *char {
     var sb = StringBufferInit(256, this.allocator)
-    sb.appendStr(name, strlen(name))
+    sb.appendStrn(name, strlen(name))
     for(var i = 0; i < sb.length;) {
         var c = sb.buffer[i]
 
@@ -449,7 +458,7 @@ func (this: using *CGen) leaveScope(scope: *CGenScope) {
     for(var i = scope.defers.size() - 1; i >= 0; i-=1) {
         var deferStmt = scope.defers.get(i)
         this.emitStmt(deferStmt)
-        this.emit(";\n")
+        this.emitStrn(";\n", 2)
     }
 
     for(var i = 0; i < scope.constDefs.size(); i+=1) {
@@ -505,7 +514,8 @@ func (this: using *CGen) cType(type: *TypeInfo,
                 }
             }
             var cType = this.cType(ptrInfo.ptrOf, isCast, decay)
-            sb.append("%s*", cType)
+            sb.appendStr(cType)
+            sb.appendStrn("*", 1)
             return sb.cStrConst()
 
         }
@@ -513,11 +523,13 @@ func (this: using *CGen) cType(type: *TypeInfo,
             var constInfo = type as (*ConstTypeInfo)
             if(IsPtrLike(constInfo.constOf)) {
                 var cType = this.cType(constInfo.constOf, isCast, decay)
-                sb.append("%s const", cType)
+                sb.appendStr(cType)
+                sb.appendStrn(" const", 6)
                 return sb.cStrConst()
             }
             var cType = this.cType(constInfo.constOf, isCast, decay)
-            sb.append("const %s", cType)
+            sb.appendStrn("const ", 6)
+            sb.appendStr(cType)
             return sb.cStrConst()
         }
         case TypeKind.ARRAY: {
@@ -539,20 +551,20 @@ func (this: using *CGen) cType(type: *TypeInfo,
             do {
                 if(arrayInfo.length < 0) {
                     if(arrayInfo.numOfElements) {
-                        buf.append("[")
+                        buf.appendStrn("[", 1)
                         var cgen = CGen {
                             .lita = this.lita,
                             .buf = buf,
                             .line = line
                         }
                         cgen.emitStmt(arrayInfo.numOfElements)
-                        buf.append("]")
+                        buf.appendStrn("]", 1)
                     }
                     else if(!arrayInfo.isLengthDefined) {
-                        buf.append("[]")
+                        buf.appendStrn("[]", 2)
                     }
                     else {
-                        buf.append("[0]")
+                        buf.appendStrn("[0]", 3)
                     }
                 }
                 else {
@@ -568,7 +580,8 @@ func (this: using *CGen) cType(type: *TypeInfo,
             }
             while(arrayInfo);
 
-            sb.append("%s%s", baseName, buf.cStrConst())
+            sb.appendStr(baseName)
+            sb.appendStr(buf.cStrConst())
             return sb.cStrConst()
         }
         case TypeKind.FUNC_PTR: {
@@ -576,11 +589,11 @@ func (this: using *CGen) cType(type: *TypeInfo,
             var params = StringBufferInit(512, this.allocator)
             for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
                 if(i > 0) {
-                    params.append(",")
+                    params.appendStrn(",", 1)
                 }
 
                 var param = funcInfo.paramDecls.get(i)
-                params.append("%s", this.cType(param, isCast, true))
+                params.appendStr(this.cType(param, isCast, true))
             }
 
             sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, isCast, decay),
@@ -615,18 +628,23 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                 }
             }
             var cType = this.cType(type, false, decay)
-            sb.append("%s %s", cType, name)
+            sb.appendStr(cType)
+            sb.appendStrn(" ", 1)
+            sb.appendStr(name)
             return sb.cStrConst()
         }
         case TypeKind.CONST: {
             var constInfo = type as (*ConstTypeInfo)
             if(IsPtrLike(constInfo.constOf)) {
                 var cType = this.cType(constInfo.constOf, false, decay)
-                sb.append("%s const %s", cType, name)
+                sb.appendStr(cType)
+                sb.appendStrn(" const ", 7)
+                sb.appendStr(name)
                 return sb.cStrConst()
             }
             var cType = this.cTypeDecl(constInfo.constOf, name, decay)
-            sb.append("const %s", cType)
+            sb.appendStrn("const ", 6)
+            sb.appendStr(cType)
             return sb.cStrConst()
         }
         case TypeKind.ARRAY: {
@@ -648,21 +666,24 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             do {
                 if(arrayInfo.length == 0) {
                     if(arrayInfo.numOfElements) {
-                        buf.append("[")
+                        this.flush()
+
+                        buf.appendStrn("[", 1)
                         var cgen = CGen {
                             .lita = this.lita,
                             .buf = buf,
                             .line = line
                         }
+
                         cgen.emitStmt(arrayInfo.numOfElements)
                         buf = cgen.buf // the buffer has expanded
-                        buf.append("]")
+                        buf.appendStrn("]", 1)
                     }
                     else if(!arrayInfo.isLengthDefined) {
-                        buf.append("[]")
+                        buf.appendStrn("[]", 2)
                     }
                     else {
-                        buf.append("[0]")
+                        buf.appendStrn("[0]", 3)
                     }
                 }
                 else {
@@ -682,12 +703,15 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                 buf.insert(0, "%s", name)
                 return this.cTypeDecl(baseInfo, buf.cStrConst(), decay)
             }
-
-            sb.append("%s %s%s", baseName, name, buf.cStrConst())
+            sb.appendStr(baseName)
+            sb.appendStrn(" ", 1)
+            sb.appendStr(name)
+            sb.appendStr(buf.cStr())
             return sb.cStrConst()
         }
         case TypeKind.STR: {
-            sb.append("const char* %s", name)
+            sb.appendStr("const char* ")
+            sb.appendStr(name)
             return sb.cStrConst()
         }
         case TypeKind.FUNC_PTR: {
@@ -695,11 +719,11 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             var params = StringBufferInit(512, this.allocator)
             for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
                 if(i > 0) {
-                    params.append(",")
+                    params.appendStrn(",", 1)
                 }
 
                 var param = funcInfo.paramDecls.get(i)
-                params.append("%s", this.cType(param, false, true))
+                params.appendStr(this.cType(param, false, true))
             }
 
             sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, false, decay), name, params.cStrConst())
@@ -707,7 +731,9 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
         }
         default: {
             var cType = this.cType(type, false, decay)
-            sb.append("%s %s", cType, name)
+            sb.appendStr(cType)
+            sb.appendStrn(" ", 1)
+            sb.appendStr(name)
             return sb.cStrConst()
         }
     }
@@ -755,11 +781,14 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
         }
 
         var name = this.foreignName(sym.decl, this.baseTypeName(sym.decl.name.str))
-        sb.append("%.*s", name.length, name.buffer)
+        sb.appendStrn(name.buffer, name.length)
         return sb.cStrConst()
     }
 
-    sb.append("%s%.*s__%s", this.options.cPrefix, sym.declared.id.name.length, sym.declared.id.name.buffer, declName)
+    sb.appendStr(this.options.cPrefix)
+    sb.appendStrn(sym.declared.id.name.buffer, sym.declared.id.name.length)
+    sb.appendStrn("__", 2)
+    sb.appendStr(declName)
     return sb.cStrConst()
 }
 
@@ -780,7 +809,8 @@ func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
 }
 
 func (this: using *CGen) prefix(name: *const char, sb: *StringBuffer) : *const char {
-    sb.append("%s%s", this.options.cPrefix, name)
+    sb.appendStr(this.options.cPrefix)
+    sb.appendStr(name)
     return sb.cStrConst()
 }
 
@@ -793,56 +823,56 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
         }
         case TypeSpecKind.ARRAY: {
             var array = spec as (*ArrayTypeSpec)
-            buf.append("[");
+            buf.appendStrn("[", 1);
             if(array.numElements) {
                 this.emitStmt(array.numElements)
             }
-            buf.append("]");
+            buf.appendStrn("]", 1);
             this.emitTypeSpec(array.base)
             return;
         }
         case TypeSpecKind.PTR: {
             var ptr = spec as (*PtrTypeSpec)
-            buf.append("*");
+            buf.appendStrn("*", 1);
             this.emitTypeSpec(ptr.base)
             return;
         }
         case TypeSpecKind.CONST: {
             var c = spec as (*ConstTypeSpec)
-            buf.append("const ");
+            buf.appendStrn("const ", 6);
             this.emitTypeSpec(c.base)
             return;
         }
         case TypeSpecKind.NAME: {
             var name = spec as (*NameTypeSpec)
-            buf.append("%s", name.name)
+            buf.appendStr(name.name)
             if(!name.genericArgs.empty()) {
-                buf.append("<")
+                buf.appendStrn("<", 1)
                 for(var i = 0; i < name.genericArgs.size(); i += 1) {
-                    if(i > 0) buf.append(",")
+                    if(i > 0) buf.appendStrn(",", 1)
                     this.emitTypeSpec(name.genericArgs.get(i))
                 }
-                buf.append(">")
+                buf.appendStrn(">", 1)
             }
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
             var fn = spec as (*FuncPtrTypeSpec)
-            buf.append("func")
+            buf.appendStrn("func", 4)
             if(!fn.genericParams.empty()) {
-                buf.append("<")
+                buf.appendStrn("<", 1)
                 for(var i = 0; i < fn.genericParams.size(); i += 1) {
-                    if(i > 0) buf.append(",")
+                    if(i > 0) buf.appendStrn(",", 1)
                     this.emitName(fn.genericParams.get(i).name)
                 }
-                buf.append(">")
+                buf.appendStrn(">", 1)
             }
-            buf.append("(")
+            buf.appendStrn("(", 1)
             for(var i = 0; i < fn.args.size(); i += 1) {
                 if(i > 0) buf.append(",")
                 this.emitTypeSpec(fn.args.get(i))
             }
-            buf.append(") : ")
+            buf.appendStrn(") : ", 4)
             this.emitTypeSpec(fn.ret)
             return;
         }
@@ -853,20 +883,22 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
 }
 
 func (this: using *CGen) flush() {
-    WriteBytes(this.output, buf.buffer, buf.length)
-    buf.length = 0
+    if(this.output) {
+        WriteBytes(this.output, buf.buffer, buf.length)
+        buf.length = 0
+    }
 }
 
 func (this: using *CGen) emitName(tok: Token) {
     if(tok.type != TokenType.ERROR) {
-        buf.append("%.*s", tok.value.str.length, tok.value.str.buffer)
+        buf.appendStrn(tok.value.str.buffer, tok.value.str.length)
     }
 }
 
 func (this: using *CGen) emitln() {
     buf.appendChar('\n')
     for(var i = 0; i < indent; i += 1) {
-        buf.appendStr("    ", 4);
+        buf.appendStrn("    ", 4);
     }
 }
 
@@ -911,6 +943,43 @@ func (this: using *CGen) emit(strFormat: *const char, ...) {
     }
 }
 
+func (this: using *CGen) emitStr(str: *const char) {
+    var len = strlen(str)
+    this.emitStrn(str, len)
+}
+
+func (this: using *CGen) emitStrn(str: *const char, len: i32) {
+    if(this.format) {
+        for(var i = 0; i < len; i+=1) {
+            var c = str[i]
+            if(c == '\n') {
+                this.emitln()
+            }
+            else if(c == '{') {
+                buf.appendChar(c)
+                indent+=1
+                this.emitln()
+            }
+            else if(c == '}') {
+                indent-=1
+                this.emitln()
+                buf.appendChar(c)
+            }
+            else {
+                buf.appendChar(c)
+            }
+        }
+    }
+    else {
+        buf.appendStrn(str, len)
+    }
+
+    if(buf.length > (buf.capacity/2)) {
+        this.flush()
+    }
+}
+
+
 func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bool = true) {
     if(attributes.notes.empty()) {
         return;
@@ -919,13 +988,13 @@ func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bool = tr
     if(isPrelude) {
         for(var i = 0; i < attributes.notes.size(); i += 1) {
             this.emitPreludeNote(attributes.notes.get(i))
-            this.emit("\n")
+            this.emitStrn("\n", 1)
         }
     }
     else {
         for(var i = 0; i < attributes.notes.size(); i += 1) {
             this.emitPostludeNote(attributes.notes.get(i))
-            this.emit("\n")
+            this.emitStrn("\n", 1)
         }
     }
 
@@ -947,38 +1016,39 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(strncmp(note.name.str.buffer, "raw", note.name.str.length) == 0) {
         for(var i = 0; i < note.attributes.size(); i += 1) {
             var attr = note.attributes.get(i)
-            buf.appendStr(attr.str.buffer, attr.str.length)
+            buf.appendStrn(attr.str.buffer, attr.str.length)
         }
     }
     else if(strncmp(note.name.str.buffer, "inline", note.name.str.length) == 0) {
-        this.emit("LITAC_INLINE ")
+        this.emitStr("LITAC_INLINE ")
     }
     else if(strncmp(note.name.str.buffer, "noinline", note.name.str.length) == 0) {
-        this.emit("LITAC_NOINLINE ")
+        this.emitStr("LITAC_NOINLINE ")
     }
     else if(strncmp(note.name.str.buffer, "static", note.name.str.length) == 0) {
-        this.emit("static ")
+        this.emitStr("static ")
     }
     else if(strncmp(note.name.str.buffer, "atomic", note.name.str.length) == 0) {
-        this.emit("_Atomic ")
+        this.emitStr("_Atomic ")
     }
     else if(strncmp(note.name.str.buffer, "register", note.name.str.length) == 0) {
-        this.emit("register ")
+        this.emitStr("register ")
     }
     else if(strncmp(note.name.str.buffer, "threadlocal", note.name.str.length) == 0) {
-        this.emit("LITAC_THREADLOCAL ")
+        this.emitStr("LITAC_THREADLOCAL ")
     }
     else if(strncmp(note.name.str.buffer, "export", note.name.str.length) == 0) {
-        this.emit("LITAC_EXPORT ")
+        this.emitStr("LITAC_EXPORT ")
         // TODO
     }
     else if(strncmp(note.name.str.buffer, "packed", note.name.str.length) == 0) {
-        this.emit("LITAC_PACKED ")
+        this.emitStr("LITAC_PACKED ")
     }
     else if(strncmp(note.name.str.buffer, "cc", note.name.str.length) == 0) {
         if(!note.attributes.empty()) {
             var attr = note.attributes.get(0)
-            this.emit("%.*s ", attr.str.length, attr.str.buffer)
+            this.emitStrn(attr.str.buffer, attr.str.length)
+            this.emitStrn(" ", 1)
         }
     }
     else if(strncmp(note.name.str.buffer, "cFile", note.name.str.length) == 0) {
@@ -993,6 +1063,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
             filenameStr.adjust()
             filenameStr.append("/%.*s", arg.str.length, arg.str.buffer)
+
             if(!FileExists(filenameStr.cStr())) {
                 // TODO:
                 //      check relative to source directory
@@ -1025,7 +1096,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
 func (this: using *CGen) emitPostludeNote(note: *NoteStmt) {
     if(strncmp(note.name.str.buffer, "packed", note.name.str.length) == 0) {
-        this.emit(" LITAC_PACKED_POP ")
+        this.emitStr(" LITAC_PACKED_POP ")
     }
 }
 
@@ -1048,7 +1119,7 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
     }
 
     if(!(sym.flags & SymbolFlags.IS_USING)) {
-        this.emit("%s", this.cName(sym))
+        this.emitStr(this.cName(sym))
         return;
     }
 
@@ -1056,7 +1127,7 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
     assert(paramInfo != null)
 
     var aggType = paramInfo.type.getBaseType() as (*AggregateTypeInfo)
-    this.emit("%s", this.cName(paramInfo))
+    this.emitStr(this.cName(paramInfo))
 
     var path = FieldPath{}
     var isFound = aggType.getFieldPath(sym.name, &path)
@@ -1066,12 +1137,12 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
     for(var i = 0; i < path.numOfFields; i+=1) {
         var field = path.fields[i]
         if(nextType.kind == TypeKind.PTR) {
-            buf.append("->")
+            buf.appendStrn("->", 2)
         }
         else {
-            buf.append(".")
+            buf.appendStrn(".", 1)
         }
-        this.emit("%.*s", field.varField.name.str.length, field.varField.name.str.buffer)
+        this.emitStrn(field.varField.name.str.buffer, field.varField.name.str.length)
         nextType = field.typeInfo
     }
 }
@@ -1122,7 +1193,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.BLOCK_STMT: {
             var stmt = s as (*BlockStmt)
-            this.emit("{")
+            this.emitStrn("{", 1)
             {
                 this.pushScope(&CGenScope{})
                 defer this.popScope()
@@ -1131,19 +1202,19 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     var n = stmt.stmts.get(i)
                     this.emitStmt(n)
                     if(IsExpr(n)) {
-                        this.emit(";\n")
+                        this.emitStrn(";\n", 2)
                     }
                     else {
-                        this.emit("\n")
+                        this.emitStrn("\n", 1)
                     }
                 }
             }
-            this.emit("\n}")
+            this.emitStrn("\n}", 2)
             return;
         }
         case StmtKind.BREAK_STMT: {
             this.popLoopScope(true)
-            this.emit("break;")
+            this.emitStrn("break;", 6)
             return;
         }
         case StmtKind.COMP_STMT: {
@@ -1157,7 +1228,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.CONTINUE_STMT: {
             this.popLoopScope()
-            this.emit("continue;")
+            this.emitStrn("continue;", 9)
             return;
         }
         case StmtKind.DEFER_STMT: {
@@ -1171,19 +1242,19 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.DO_WHILE_STMT: {
             var stmt = s as (*DoWhileStmt)
-            this.emit("do {")
+            this.emitStrn("do {", 4)
             {
                 this.pushScope(&CGenScope{.isLoop = true})
                 defer this.popScope()
 
                 this.emitStmt(stmt.body)
                 if(IsExpr(stmt.body)) {
-                    this.emit(";\n")
+                    this.emitStrn(";\n", 2)
                 }
             }
-            this.emit("}\nwhile(")
+            this.emitStrn("}\nwhile(", 8)
             this.emitStmt(stmt.cond)
-            this.emit(");")
+            this.emitStrn(");", 2)
             return;
         }
         case StmtKind.EMPTY_STMT: {
@@ -1195,27 +1266,27 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.FOR_STMT: {
             var stmt = s as (*ForStmt)
-            this.emit("for(")
+            this.emitStrn("for(", 4)
             if(stmt.init) {
                 this.emitStmt(stmt.init)
                 if(IsExpr(stmt.init)) {
-                    this.emit(";\n")
+                    this.emitStrn(";\n", 2)
                 }
             }
             else {
-                this.emit(";")
+                this.emitStrn(";", 1)
             }
 
             if(stmt.cond) {
                 this.emitStmt(stmt.cond)
             }
 
-            this.emit(";")
+            this.emitStrn(";", 1)
 
             if(stmt.post) {
                 this.emitStmt(stmt.post)
             }
-            this.emit(") {")
+            this.emitStrn(") {", 3)
 
             if(stmt.body) {
                 this.pushScope(&CGenScope{.isLoop = true})
@@ -1224,13 +1295,13 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emitStmt(stmt.body)
 
                 if(IsExpr(stmt.body)) {
-                    this.emit(";\n")
+                    this.emitStrn(";\n", 2)
                 }
             }
             else {
-                this.emit(";")
+                this.emitStrn(";", 1)
             }
-            this.emit("}")
+            this.emitStrn("}", 1)
             return;
         }
         case StmtKind.FUNC_BODY_STMT: {
@@ -1242,57 +1313,57 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 var n = stmt.stmts.get(i)
                 this.emitStmt(n)
                 if(IsExpr(n)) {
-                    this.emit(";\n")
+                    this.emitStrn(";\n", 2)
                 }
                 else {
-                    this.emit("\n")
+                    this.emitStrn("\n", 1)
                 }
             }
             return;
         }
         case StmtKind.GOTO_STMT: {
             var stmt = s as (*GotoStmt)
-            this.emit("goto ")
+            this.emitStrn("goto ", 5)
             this.emitName(stmt.label)
-            this.emit(";\n")
+            this.emitStrn(";\n", 2)
             return;
         }
         case StmtKind.IF_STMT: {
             var stmt = s as (*IfStmt)
-            this.emit("if(")
+            this.emitStrn("if(", 3)
             this.emitStmt(stmt.cond)
-            this.emit(") {")
+            this.emitStrn(") {", 3)
             {
                 this.pushScope(&CGenScope{})
                 defer this.popScope()
 
                 this.emitStmt(stmt.then)
                 if(IsExpr(stmt.then)) {
-                    this.emit(";")
+                    this.emitStrn(";", 1)
                 }
-                this.emit("\n")
+                this.emitStrn("\n", 1)
             }
-            this.emit("} ")
+            this.emitStrn("} ", 2)
             if(stmt.elseStmt) {
-                this.emit("else {")
+                this.emitStrn("else {", 6)
                 {
                     this.pushScope(&CGenScope{})
                     defer this.popScope()
 
                     this.emitStmt(stmt.elseStmt)
                     if(IsExpr(stmt.elseStmt)) {
-                        this.emit(";")
+                        this.emitStrn(";", 1)
                     }
                 }
-                this.emit("} ")
+                this.emitStrn("} ", 2)
             }
-            this.emit("\n")
+            this.emitStrn("\n", 1)
             return;
         }
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
             this.emitName(stmt.label)
-            this.emit(":\n")
+            this.emitStrn(":;\n", 3)
             return;
         }
         case StmtKind.MODULE_STMT: {
@@ -1301,17 +1372,17 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.NOTE_STMT: {
             var stmt = s as (*NoteStmt)
-            this.emit("@")
+            this.emitStrn("@", 1)
             this.emitName(stmt.name)
             if(!stmt.attributes.empty()) {
-                this.emit("(")
+                this.emitStrn("(", 1)
                 for(var i = 0; i < stmt.attributes.size(); i += 1) {
-                    if(i > 0) this.emit(", ")
-                    this.emit("'")
+                    if(i > 0) this.emitStrn(", ", 2)
+                    this.emitStrn("'", 1)
                     this.emitName(stmt.attributes.get(i))
-                    this.emit("'")
+                    this.emitStrn("'", 1)
                 }
-                this.emit(")")
+                this.emitStrn(")", 1)
             }
             return;
         }
@@ -1327,29 +1398,29 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 assert(this.currentFunc != null)
                 this.emit("{%s = ", this.cTypeDecl(this.currentFunc.returnType, "___result"))
                 this.emitStmt(stmt.expr)
-                this.emit(";\n")
+                this.emitStrn(";\n", 2)
 
                 this.emitDefers()
-                this.emit("return ___result;\n}\n")
+                this.emitStr("return ___result;\n}\n")
             }
             else {
                 this.emitDefers()
 
-                this.emit("return");
+                this.emitStrn("return", 6);
                 if(stmt.expr) {
-                    this.emit(" ")
+                    this.emitStrn(" ", 1)
                     this.emitStmt(stmt.expr)
                 }
-                this.emit(";\n")
+                this.emitStrn(";\n", 2)
             }
             return;
         }
 
         case StmtKind.SWITCH_CASE_STMT: {
             var stmt = s as (*SwitchCaseStmt)
-            this.emit("case ")
+            this.emitStrn("case ", 5)
             this.emitStmt(stmt.cond)
-            this.emit(": ")
+            this.emitStrn(": ", 2)
             this.emitStmt(stmt.body)
             return;
         }
@@ -1359,19 +1430,19 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.pushScope(&CGenScope{.isSwitch = true})
             defer this.popScope()
 
-            this.emit("switch(")
+            this.emitStrn("switch(", 7)
             this.emitStmt(stmt.cond)
-            this.emit(") {")
+            this.emitStrn(") {", 3)
             for(var i = 0; i < stmt.cases.size(); i+=1) {
                 if(i > 0) this.emitln()
                 this.emitStmt(stmt.cases.get(i))
             }
 
             if(stmt.defaultStmt) {
-                this.emit("\ndefault: ")
+                this.emitStrn("\ndefault: ", 10)
                 this.emitStmt(stmt.defaultStmt)
             }
-            this.emit("}")
+            this.emitStrn("}", 1)
             return;
         }
         case StmtKind.VAR_FIELD_DECL: {
@@ -1382,42 +1453,43 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             var name: [MAX_SYMBOL_NAME]char;
             var nameStr = StringInit(name, MAX_SYMBOL_NAME)
-            nameStr.format("%.*s", decl.name.str.length, decl.name.str.buffer)
+            nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")
             if(aliasNote && !aliasNote.attributes.empty()) {
                 var aliasName = aliasNote.attributes.get(0)
 
                 nameStr.clear()
-                nameStr.format("%.*s", aliasName.str.length, aliasName.str.buffer)
+                nameStr.setStrn(aliasName.str.buffer, aliasName.str.length)
             }
 
-            this.emit("%s;\n", this.cTypeDecl(decl.type.typeInfo, nameStr.cStrConst()))
+            this.emitStr(this.cTypeDecl(decl.type.typeInfo, nameStr.cStrConst()))
+            this.emitStrn(";\n", 2)
             return;
         }
         case StmtKind.WHILE_STMT: {
             var stmt = s as (*WhileStmt)
-            this.emit("while(")
+            this.emitStrn("while(", 6)
             this.emitStmt(stmt.cond)
-            this.emit(") {")
+            this.emitStrn(") {", 3)
             {
                 this.pushScope(&CGenScope{.isLoop = true})
                 defer this.popScope()
 
                 this.emitStmt(stmt.body)
                 if(IsExpr(stmt.body)) {
-                    this.emit(";\n")
+                    this.emitStrn(";\n", 2)
                 }
             }
-            this.emit("}")
+            this.emitStrn("}", 1)
             return;
         }
 
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = s as (*ArrayDesignationExpr)
-            this.emit("[")
+            this.emitStrn("[", 1)
             this.emitStmt(expr.index)
-            this.emit("] = ")
+            this.emitStrn("] = ", 4)
             this.emitStmt(expr.value)
             return;
         }
@@ -1427,7 +1499,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             // TODO: I don't think this is needed?
             // this breaks struct initializers i.e., .TypeInfo {.params = []ParamInfo{} }
             if(false && expr.values.empty()) {
-                buf.append("{}")
+                buf.appendStrn("{}", 2)
             }
             else {
                 var requiresCast = false
@@ -1437,36 +1509,48 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
 
                 if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {
-                    this.emit("(%s)", this.cType(expr.type.typeInfo))
+                    this.emitStrn("(", 1)
+                    this.emitStr(this.cType(expr.type.typeInfo))
+                    this.emitStrn(")", 1)
                 }
 
-                this.emit(" {")
+                this.emitStrn(" {", 2)
                 for(var i = 0; i < expr.values.size(); i+=1) {
                     if(i > 0) {
-                        this.emit(",\n")
+                        this.emitStrn(",\n", 2)
                     }
                     this.emitStmt(expr.values.get(i))
                 }
 
-                this.emit("}")
+                this.emitStrn("}", 1)
             }
             return;
         }
         case StmtKind.BINARY_EXPR: {
             var expr = s as (*BinaryExpr)
             this.emitStmt(expr.left)
-            this.emit(" %s ", tokenText[expr.operator])
+            this.emitStrn(" ", 1)
+            this.emitStr(tokenText[expr.operator])
+            this.emitStrn(" ", 1)
             this.emitStmt(expr.right)
             break;
         }
         case StmtKind.BOOLEAN_EXPR: {
             var expr = s as (*BooleanExpr)
-            this.emit("%s%s", this.options.cPrefix, expr.boolean ? "true" : "false")
+            this.emitStr(this.options.cPrefix)
+            if(expr.boolean) {
+                this.emitStrn("true", 4)
+            }
+            else {
+                this.emitStrn("false", 5)
+            }
             return;
         }
         case StmtKind.CAST_EXPR: {
             var expr = s as (*CastExpr)
-            this.emit("(%s)", this.cType(expr.castTo.typeInfo, true))
+            this.emitStrn("(", 1)
+            this.emitStr(this.cType(expr.castTo.typeInfo, true))
+            this.emitStrn(")", 1)
             this.emitStmt(expr.exprToCast)
             return;
         }
@@ -1484,12 +1568,12 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.FUNC_CALL_EXPR: {
             var expr = s as (*FuncCallExpr)
             this.emitStmt(expr.object)
-            this.emit("(")
+            this.emitStrn("(", 1)
 
             var i = 0;
             for(; i < expr.arguments.size(); i+=1) {
                 if(i > 0) {
-                    this.emit(", ")
+                    this.emitStrn(", ", 2)
                 }
                 this.emitStmt(expr.arguments.get(i))
             }
@@ -1500,13 +1584,13 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     var param = funcType.decl.params.get(i)
                     if(param.defaultExpr) {
                         if(i > 0) {
-                            this.emit(", ")
+                            this.emitStrn(", ", 2)
                         }
                         this.emitStmt(param.defaultExpr)
                     }
                 }
             }
-            this.emit(")")
+            this.emitStrn(")", 1)
             return;
         }
         case StmtKind.IDENTIFIER_EXPR:
@@ -1517,7 +1601,8 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var sym: *Symbol = (type) ? type.sym : expr.sym;
 
             if(!sym) {
-                this.emit("%s%s", this.options.cPrefix, expr.type.name)
+                this.emitStr(this.options.cPrefix)
+                this.emitStr(expr.type.name)
             }
             else {
                 this.emitSymbol(sym)
@@ -1530,7 +1615,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             // handled by funcCallExpr
             if(expr.flags & GetExprFlags.IS_METHOD_CALL) {
-                this.emit("%s", this.cTypeName(expr.field.operand.typeInfo))
+                this.emitStr(this.cTypeName(expr.field.operand.typeInfo))
                 return;
             }
 
@@ -1538,10 +1623,12 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             if(expr.flags & GetExprFlags.IS_ENUM) {
                 if(objectType.sym && objectType.sym.flags & SymbolFlags.IS_FOREIGN) {
-                    buf.append("%s", expr.field.type.name)
+                    buf.appendStr(expr.field.type.name)
                 }
                 else {
-                    buf.append("%s_%s", this.cName(objectType.sym), expr.field.type.name)
+                    buf.appendStr(this.cName(objectType.sym))
+                    buf.appendStrn("_", 1)
+                    buf.appendStr(expr.field.type.name)
                 }
                 return;
             }
@@ -1550,10 +1637,10 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             if(!IsAggregateLike(objectType)) {
                 if(objectType.kind == TypeKind.PTR) {
-                    buf.append("->")
+                    buf.appendStrn("->", 2)
                 }
                 else {
-                    buf.append(".")
+                    buf.appendStrn(".", 1)
                 }
                 this.emitStmt(expr.field)
                 return;
@@ -1574,10 +1661,10 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 for(var i = 0; i < path.numOfFields; i+=1) {
                     var field = path.fields[i]
                     if(nextType.kind == TypeKind.PTR) {
-                        buf.append("->")
+                        buf.appendStrn("->", 2)
                     }
                     else {
-                        buf.append(".")
+                        buf.appendStrn(".", 1)
                     }
                     this.emitFieldName(field)
                     nextType = field.typeInfo
@@ -1585,10 +1672,10 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             else {
                 if(objectType.kind == TypeKind.PTR) {
-                    buf.append("->")
+                    buf.appendStrn("->", 2)
                 }
                 else {
-                    buf.append(".")
+                    buf.appendStrn(".", 1)
                 }
                 var field = aggInfo.getField(expr.field.type.name)
                 this.emitFieldName(field)
@@ -1598,9 +1685,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.GROUP_EXPR: {
             var expr = s as (*GroupExpr)
-            this.emit("(")
+            this.emitStrn("(", 1)
             this.emitStmt(expr.groupedExpr)
-            this.emit(")")
+            this.emitStrn(")", 1)
             return;
         }
         case StmtKind.INIT_ARG_EXPR: {
@@ -1621,22 +1708,22 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
                 var field = aggInfo.getField(expr.fieldName.asString())
                 if(field.kind == StmtKind.VAR_FIELD_DECL) {
-                    this.emit(".")
+                    this.emitStrn(".", 1)
                     this.emitFieldName(field)
-                    this.emit(" = ")
+                    this.emitStrn(" = ", 3)
                 }
                 else if(field.kind == StmtKind.STRUCT_FIELD_DECL ||
                         field.kind == StmtKind.UNION_FIELD_DECL) {
                     var decl = field.aggregateField
-                    this.emit(".")
+                    this.emitStrn(".", 1)
                     this.emitName(decl.name)
-                    this.emit(" = ")
+                    this.emitStrn(" = ", 3)
                 }
                 else if(field.kind == StmtKind.ENUM_FIELD_DECL) {
                     var decl = field.enumField
-                    this.emit(".")
+                    this.emitStrn(".", 1)
                     this.emitName(decl.name)
-                    this.emit(" = ")
+                    this.emitStrn(" = ", 3)
                 }
                 else {
                     assert(false)
@@ -1656,20 +1743,22 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
 
             if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {
-                this.emit("(%s)", this.cType(expr.type.typeInfo))
+                this.emitStrn("(", 1)
+                this.emitStr(this.cType(expr.type.typeInfo))
+                this.emitStrn(")", 1)
             }
-            this.emit(" {")
+            this.emitStrn(" {", 2)
             for(var i = 0; i < expr.arguments.size(); i += 1) {
                 if(i > 0) {
-                    this.emit(",\n")
+                    this.emitStrn(",\n", 2)
                 }
                 this.emitStmt(expr.arguments.get(i))
             }
-            this.emit("}")
+            this.emitStrn("}", 1)
             return;
         }
         case StmtKind.NULL_EXPR: {
-            this.emit("NULL")
+            this.emitStrn("NULL", 4)
             return;
         }
         case StmtKind.NUMBER_EXPR: {
@@ -1729,7 +1818,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     }
                 }
 
-                this.emit("%c", *start)
+                buf.appendChar(*start)
             }
 
             var type = expr.operand.typeInfo
@@ -1737,23 +1826,23 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 switch(type.kind) {
                     case TypeKind.F32: {
                         if(!hasDecimal) {
-                            this.emit(".")
+                            this.emitStrn(".", 1)
                         }
-                        this.emit("f")
+                        this.emitStrn("f", 1)
                         break;
                     }
                     case TypeKind.U8:
                     case TypeKind.U16:
                     case TypeKind.U32: {
-                        this.emit("U")
+                        this.emitStrn("U", 1)
                         break;
                     }
                     case TypeKind.U64: {
-                        this.emit("UL")
+                        this.emitStrn("UL", 2)
                         break;
                     }
                     case TypeKind.I64: {
-                        this.emit("L")
+                        this.emitStrn("L", 1)
                         break;
                     }
                     default: {
@@ -1788,12 +1877,12 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 for(var i = 0; i < path.numOfFields; i+=1) {
                     var field = path.fields[i]
                     if(nextType.kind == TypeKind.PTR) {
-                        buf.append("->")
+                        buf.appendStrn("->", 2)
                     }
                     else {
-                        buf.append(".")
+                        buf.appendStrn(".", 1)
                     }
-                    this.emit("%.*s", field.varField.name.str.length, field.varField.name.str.buffer)
+                    this.emitStrn(field.varField.name.str.buffer, field.varField.name.str.length)
                     nextType = field.typeInfo
                 }
 
@@ -1801,11 +1890,15 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             else {
                 if(objectType.kind == TypeKind.PTR) {
-                    buf.append("->%s %s ", expr.field.type.name, tokenText[expr.operator])
+                    buf.appendStrn("->", 2)
                 }
                 else {
-                    buf.append(".%s %s ", expr.field.type.name, tokenText[expr.operator])
+                    buf.appendStrn(".", 1)
                 }
+                buf.appendStr(expr.field.type.name)
+                buf.appendStrn(" ", 1)
+                buf.appendStr(tokenText[expr.operator])
+                buf.appendStrn(" ", 1)
             }
 
             this.emitStmt(expr.value)
@@ -1813,9 +1906,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.SIZE_OF_EXPR: {
             var expr = s as (*SizeOfExpr)
-            this.emit("sizeof(")
+            this.emitStrn("sizeof(", 7)
             this.emitStmt(expr.sizeOfExpr)
-            this.emit(")")
+            this.emitStrn(")", 1)
             return;
         }
         case StmtKind.STRING_EXPR: {
@@ -1827,7 +1920,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                     var c:char = expr.string.str.buffer[i]
                     var escaped = escapeStrings[c as (u32)]
                     if(escaped) {
-                        buf.append("%s", escaped)
+                        buf.appendStr(escaped)
                         continue
                     }
 
@@ -1837,50 +1930,54 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                         if(escapedChar) {
                             var chars = escapeChars[n]
                             assert(chars)
-                            buf.append("%s", chars)
+                            buf.appendStr(chars)
                             i += 1
                             continue
                         }
                         else {
-                            buf.append("\\")
+                            buf.appendStrn("\\", 1)
                         }
                     }
                     if(c == '"') {  // "
-                        buf.append("\\")
+                        buf.appendStrn("\\", 1)
                     }
                     buf.appendChar(c)
                 }
                 this.buf.appendChar('"') // "
             }
             else {
-                this.buf.append("\"%.*s\"", expr.string.str.length, expr.string.str.buffer)
+                this.buf.appendStrn("\"", 1)
+                this.buf.appendStrn(expr.string.str.buffer, expr.string.str.length)
+                this.buf.appendStrn("\"", 1)
             }
             return;
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
             var expr = s as (*SubscriptGetExpr)
             this.emitStmt(expr.object)
-            this.emit("[")
+            this.emitStrn("[", 1)
             this.emitStmt(expr.index)
-            this.emit("]")
+            this.emitStrn("]", 1)
             return;
         }
         case StmtKind.SUBSCRIPT_SET_EXPR: {
             var expr = s as (*SubscriptSetExpr)
             this.emitStmt(expr.object)
-            this.emit("[")
+            this.emitStrn("[", 1)
             this.emitStmt(expr.index)
-            this.emit("] %s ", tokenText[expr.operator])
+            this.emitStrn("] ", 2)
+            this.emitStr(tokenText[expr.operator])
+            this.emitStrn(" ", 1)
             this.emitStmt(expr.value)
             return;
         }
         case StmtKind.TERNARY_EXPR: {
             var expr = s as (*TernaryExpr)
-            this.emit("(")
+            this.emitStrn("(", 1)
             this.emitStmt(expr.cond)
-            this.emit(") ? ")
+            this.emitStrn(") ? ", 4)
             this.emitStmt(expr.then)
-            this.emit(" : ")
+            this.emitStrn(" : ", 3)
             this.emitStmt(expr.other)
             return;
         }
@@ -1888,7 +1985,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*TypeIdentifierExpr)
             // TODO: Simplify this...
             if(expr.type.typeInfo) {
-                this.emit("%s", this.cType(expr.type.typeInfo))
+                this.emitStr(this.cType(expr.type.typeInfo))
             }
             else {
                 if(expr.sym) {
@@ -1912,9 +2009,10 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.UNARY_EXPR: {
             var expr = s as (*UnaryExpr)
-            this.emit("%s(", tokenText[expr.operator])
+            this.emitStr(tokenText[expr.operator])
+            this.emitStrn("(", 1)
             this.emitStmt(expr.unaryExpr)
-            this.emit(")")
+            this.emitStrn(")", 1)
             return;
         }
         case StmtKind.POISON_EXPR: {

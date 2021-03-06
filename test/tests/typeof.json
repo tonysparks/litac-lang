@@ -33,6 +33,10 @@
             "name": "Typeof Array Caching",
             "disabled": false,
             "definitions": `
+                @raw("""
+                #define MAX_PATH (260)
+                """);
+                @foreign const MAX_PATH: i32;
                 const SIZE3 = 55
                 const SIZE1C = 4
                 const SIZE2C = 8
@@ -40,6 +44,12 @@
             "code": `
                 const SIZE1 = 4
                 const SIZE2 = 8
+
+                const BUFFER_SIZE = (1024*10)
+                var filename = [MAX_PATH]char{0}
+                var filedata = [BUFFER_SIZE]char{0}
+
+                assert(typeof(filedata) != typeof(filename))
 
                 assert(typeof(:[4]i32) == typeof(:[SIZE1]i32))
                 assert(typeof(:[4]i32) == typeof(:[SIZE1C]i32))

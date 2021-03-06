@@ -1358,9 +1358,9 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                 }
                 default: {
                     var sb = StringBufferInit(256, this.allocator)
-                    sb.append("'")
+                    sb.appendStrn("'", 1)
                     type.toString(sb)
-                    sb.append("' is not a pointer type")
+                    sb.appendStr("' is not a pointer type")
 
                     this.result.addErrorStr(expr.unaryExpr.startPos, sb)
                     return false
@@ -1457,7 +1457,7 @@ func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
     assert(expr != null)
 
     var typeInfo = this.resolveTypeSpec(expr.type)
-    if(!typeInfo) {
+    if(!typeInfo || typeInfo.kind == TypeKind.POISON) {
         return false
     }
 
@@ -1614,9 +1614,9 @@ func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("invalid index into '")
+    sb.appendStr("invalid index into '")
     type.toString(sb)
-    sb.append("'")
+    sb.appendStrn("'", 1)
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1626,9 +1626,9 @@ func (this: *TypeChecker) errorSetIndexingConstType(expr: *Expr, type: *TypeInfo
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("invalid read-only assignment to '")
+    sb.appendStr("invalid read-only assignment to '")
     type.toString(sb)
-    sb.append("'")
+    sb.appendStrn("'", 1)
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1638,10 +1638,10 @@ func (this: *TypeChecker) errorIndexType(expr: *Expr, type: *TypeInfo) {
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     type.toString(sb)
-    sb.append("'")
-    sb.append(" invalid index value")
+    sb.appendStrn("'", 1)
+    sb.appendStr(" invalid index value")
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1651,10 +1651,10 @@ func (this: *TypeChecker) errorNonAggregateType(expr: *Expr, type: *TypeInfo) {
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     type.toString(sb)
-    sb.append("'")
-    sb.append(" must be an aggregate type")
+    sb.appendStrn("'", 1)
+    sb.appendStr(" must be an aggregate type")
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1664,10 +1664,10 @@ func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     type.toString(sb)
-    sb.append("'")
-    sb.append(" must be function type")
+    sb.appendStrn("'", 1)
+    sb.appendStr(" must be function type")
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1679,7 +1679,7 @@ func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *cons
     var sb = StringBufferInit(256, this.allocator)
     sb.append("illegal, %s operand has type '", side)
     type.toString(sb)
-    sb.append("'")
+    sb.appendStrn("'", 1)
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1689,7 +1689,7 @@ func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field:
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("can't reassign enum '")
+    sb.appendStr("can't reassign enum '")
     type.toString(sb)
     sb.append("' field '%s'", field)
 
@@ -1701,9 +1701,9 @@ func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: *con
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     type.toString(sb)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     sb.append(" does not have field '%s'", field)
 
     this.result.addErrorStr(expr.startPos, sb)
@@ -1714,9 +1714,9 @@ func (this: *TypeChecker) errorNoFieldAt(expr: *Expr, type: *TypeInfo, position:
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     type.toString(sb)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     sb.append(" does not have a field at index '%d'", position)
 
     this.result.addErrorStr(expr.startPos, sb)
@@ -1727,9 +1727,9 @@ func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     type.toString(sb)
-    sb.append("'")
+    sb.appendStrn("'", 1)
     sb.append(" can't be accessed with field '%s'", field)
 
     this.result.addErrorStr(expr.startPos, sb)
@@ -1746,15 +1746,15 @@ func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Arra
     assert(params != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("unable to infer generic parameters [")
+    sb.appendStr("unable to infer generic parameters [")
     for(var i = 0; i < params.size(); i += 1) {
         if(i > 0) {
-            sb.append(", ")
+            sb.appendStrn(", ", 2)
         }
         var p = params.get(i)
         sb.append("'%.*s'", p.name.str.length, p.name.str.buffer)
     }
-    sb.append("]")
+    sb.appendStrn("]", 1)
     this.result.addErrorStr(expr.startPos, sb)
 }
 
@@ -1768,11 +1768,11 @@ func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: *c
     for(var i = 0; i < genericParams.size(); i += 1) {
         var param = genericParams.get(i)
         if(i > 0) {
-            sb.append(", ")
+            sb.appendStrn(", ", 1)
         }
         sb.append("'%.*s'", param.name.str.length, param.name.str.buffer)
     }
-    sb.append("]")
+    sb.appendStrn("]", 1)
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -1816,9 +1816,9 @@ func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) : bool {
 
     if(!IsBooleanable(type)) {
         var sb = StringBufferInit(256, this.allocator)
-        sb.append("'")
+        sb.appendStrn("'", 1)
         type.toString(sb)
-        sb.append("' can't be coerced to boolean")
+        sb.appendStr("' can't be coerced to boolean")
 
         this.result.addErrorStr(expr.startPos, sb)
         return false

@@ -187,8 +187,9 @@ public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
 
     if(moduleName) {
         var name = StringBufferInit(MAX_SYMBOL_NAME, this.allocator)
-        name.appendStr(moduleName.buffer, moduleName.length)
-        name.append("::%s", symbol.name)
+        name.appendStrn(moduleName.buffer, moduleName.length)
+        name.appendStrn("::", 2)
+        name.appendStr(symbol.name)
 
         this.symbols.importSymbol(name.cStrConst(), symbol)
     }

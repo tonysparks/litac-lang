@@ -24,8 +24,6 @@ import "cmdline"
 import "profile"
 
 func main(len: i32, args: **char) : i32 {
-    SystemInit()
-
     var startTime = SystemTimeMSec()
 
     var options = LitaOptions{}
@@ -213,7 +211,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     var outputFile = parser.hasOption("output") ? parser.getOption("output").value : "a"
     strncpy(options.outputFile, outputFile, MAX_PATH)
 
-    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "output"
+    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "./output"
     strncpy(options.outputPath, outputPath, MAX_PATH)
 
     var len = strlen(options.outputPath)
@@ -221,6 +219,10 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
         if(options.outputPath[len-1] != '/') {
             strcat(options.outputPath, "/")
         }
+
+        var output = [MAX_PATH]char{0}
+        GetAbsolutePath(CurrentWorkingPath(), options.outputPath, output)
+        strncpy(options.outputPath, output, MAX_PATH)
     }
 
     FilePath(options.inputFile, options.srcPath)

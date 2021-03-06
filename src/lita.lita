@@ -41,9 +41,6 @@ public struct Lita {
     programSymbols: ProgramSymbols
     genericSymbols: Map<*const char, *Symbol>
 
-    // all the generated C files for compilation
-    compilationUnitFilenames: [MAX_COMPILATION_UNITS][MAX_PATH]char;
-    numOfCompilationUnitFilenames: i32
 
     // Language Server support
     references: ReferenceDatabase
@@ -259,7 +256,7 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
     var commandStr = StringBufferInit(1024)
     defer commandStr.free()
 
-    commandStr.append("%s", this.options.compileCmd)
+    commandStr.appendStr(this.options.compileCmd)
 
     var index = commandStr.indexOf("%output%")
     if(index > -1) {
@@ -286,9 +283,10 @@ public func (this: *Lita) run() {
     FilePath(this.binaryFilename, path)
 
     var len = strlen(path)
-    sb.append("cd ")
-    sb.appendStr(path, len)
-    sb.append(" && %s", &this.binaryFilename[len + 1])
+    sb.appendStrn("cd ", 3)
+    sb.appendStrn(path, len)
+    sb.appendStrn(" && ", 4)
+    sb.appendStr(&this.binaryFilename[len + 1])
 
     system(sb.cStr())
 }
