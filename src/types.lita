@@ -691,6 +691,14 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo) : bool {
             return this.typeid == other.typeid
         }
         case TypeKind.FUNC_PTR: {
+            if(other.kind == TypeKind.NULL) {
+                return true
+            }
+
+            if(IsPtrOf(other, TypeKind.VOID)) {
+                return true
+            }
+
             if(!IsFuncLike(other)) {
                 return false
             }
@@ -846,6 +854,12 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
                 return true
             }
 
+            if(other.kind == TypeKind.FUNC_PTR) {
+                if(IsPtrOf(this, TypeKind.VOID)) {
+                    return true
+                }
+            }
+
             if(!IsPtrLike(other)) {
                 return false
             }
@@ -919,6 +933,9 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
                 case TypeKind.CONST: {
                     return false; // can't assign const to non const
                 }
+                case TypeKind.FUNC_PTR: {
+                    return true
+                }
                 default: {
                     return false
                 }
@@ -936,6 +953,14 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo) : bool {
         }
 
         case TypeKind.FUNC_PTR: {
+            if(other.kind == TypeKind.NULL) {
+                return true
+            }
+
+            if(IsPtrOf(other, TypeKind.VOID)) {
+                return true
+            }
+
             if(other.kind != TypeKind.FUNC_PTR) {
                 return false
             }

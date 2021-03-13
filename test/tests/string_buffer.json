@@ -563,7 +563,7 @@
                     s.init(16)
                     defer s.free()
 
-                    s.appendStr("Red", 3)
+                    s.appendStrn("Red", 3)
 
                     s.append("%s", WAYLES)
                     //printf("'%s'\n", s.cStr())

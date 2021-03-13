@@ -198,7 +198,7 @@ typedef size_t    %s%s;
 #endif
 
 #if __TINYC__
-#define LITAC_THREADLOCAL __thread
+#define LITAC_THREADLOCAL
 #define LITAC_INLINE
 #define LITAC_NOINLINE
 #define LITAC_PACKED __attribute__((packed))

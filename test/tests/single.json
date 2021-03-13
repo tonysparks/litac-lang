@@ -1,0 +1,49 @@
+{
+    "description": "Single",
+    "disabled": false,
+    "includeTypeInfos": true,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Offset of packed struct",
+            "disabled": false,
+            "definitions": `
+                import "libc"
+
+                @packed
+                struct Sprite {
+                    a: i32
+                    b: i64
+                    c: i8
+                    d: i8
+                }
+
+            `,
+            "code": `
+                printf("Sizeof(i32) == %lld\n", sizeof(:i32))
+                var A = offsetof(Sprite, a);
+                printf("A = %lld\n", A)
+                var B = offsetof(Sprite, b);
+                printf("B = %lld\n", B)
+                var C = offsetof(Sprite, c);
+                printf("C = %lld\n", C)
+                var D = offsetof(Sprite, d);
+                printf("D = %lld\n", D)
+
+                assert(A == 0)
+                assert(B == 4)
+                assert(C == 12)
+                assert(D == 13)
+            `,
+        },
+    ]
+}

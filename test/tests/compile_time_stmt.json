@@ -120,7 +120,7 @@
 
             `,
             "code": `
-                assert(OS == "Windows")
+                assert(strcmp(OS, "Windows") == 0)
             `
         },
         {

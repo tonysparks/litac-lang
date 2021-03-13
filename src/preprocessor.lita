@@ -37,7 +37,6 @@ func litaMalloc(len: u64, arg: *void) : *void {
     return lita.allocator.alloc(len)
 }
 
-
 public struct Preprocessor {
     lita: *Lita
     ape: *ape_t
@@ -67,8 +66,6 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     this.callContext.checker = null
     this.callContext.comp = null
     this.callContext.buffer.init(1024, lita.allocator)
-
-
 
     ape_set_repl_mode(this.ape, true) // allows redefinition of symbols if true
 //    ape_set_gc_interval(this.ape, 1000000)

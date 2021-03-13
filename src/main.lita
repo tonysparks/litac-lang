@@ -117,29 +117,29 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
 
     parser.header = "<usage> litac [options] [source file to compile]\nOPTIONS:";
     parser.addOption("languageServer", '\0', "Start the LitaC language server", 0, null);
-    parser.addOption("lib", '\0', "The LitaC library path", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("cPrefx", '\0', "The symbol prefix to use on the generated C code output", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("cFormat", '\0', "Formats the C output", 0, null);
-    parser.addOption("run", '\0', "Runs the program after a successful compile", 0, null);
-    parser.addOption("checkerOnly", '\0', "Only runs the type checker, does not compile", 0, null);
-    parser.addOption("cOnly", '\0', "Only creates the C output file, does not cimple the generated C code", 0, null);
-    parser.addOption("profile", '\0', "Reports profile metrics of the compiler", 0, null);
-    parser.addOption("disableLine", '\0', "Disables #line dorective in C output", 0, null);
-    parser.addOption("debug", '\0', "Enables debug mode", 0, null);
-    parser.addOption("verbose", '\0', "Enables verbose output", 0, null);
-    parser.addOption("instrument", '\0', "Enables profile instrumentation of @profile annotated functions", 0, null);
-    parser.addOption("srcDir", '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("doc", '\0', "Generates document output", 0, null);
-    parser.addOption("docDir", '\0', "Directory where the generated documents are written to, defaults to './output'", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("docAll", '\0', "Includes non-public types in the documentation generation", 0, null);
-    parser.addOption("output", 'o', "The name of the compiled binary", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("outputDir", '\0', "The directory in which the C ouput files are stored", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("version", 'v', "Displays the LitaC version", 0, null);
-    parser.addOption("help", 'h', "Displays this help", 0, null);
-    parser.addOption("types", 't', "Includes TypeInfo for reflection\n<arg> can be:\nall       Means all types will have reflection values\ntagged    Means only basic types and types annotated with @typeinfo will have reflection values", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("test", '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("testFile", '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
-    parser.addOption("buildCmd", 'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("lib",            '\0', "The LitaC library path", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("cPrefx",         '\0', "The symbol prefix to use on the generated C code output", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("cFormat",        '\0', "Formats the C output", 0, null);
+    parser.addOption("run",            '\0', "Runs the program after a successful compile", 0, null);
+    parser.addOption("checkerOnly",    '\0', "Only runs the type checker, does not compile", 0, null);
+    parser.addOption("cOnly",          '\0', "Only creates the C output file, does not cimple the generated C code", 0, null);
+    parser.addOption("profile",        '\0', "Reports profile metrics of the compiler", 0, null);
+    parser.addOption("disableLine",    '\0', "Disables #line dorective in C output", 0, null);
+    parser.addOption("debug",          '\0', "Enables debug mode", 0, null);
+    parser.addOption("verbose",        '\0', "Enables verbose output", 0, null);
+    parser.addOption("instrument",     '\0', "Enables profile instrumentation of @profile annotated functions", 0, null);
+    parser.addOption("srcDir",         '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("doc",            '\0', "Generates document output", 0, null);
+    parser.addOption("docDir",         '\0', "Directory where the generated documents are written to, defaults to './output'", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("docAll",         '\0', "Includes non-public types in the documentation generation", 0, null);
+    parser.addOption("output",         'o', "The name of the compiled binary", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("outputDir",      '\0', "The directory in which the C ouput files are stored", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("version",        'v', "Displays the LitaC version", 0, null);
+    parser.addOption("help",           'h', "Displays this help", 0, null);
+    parser.addOption("types",          't', "Includes TypeInfo for reflection\n<arg> can be:\nall       Means all types will have reflection values\ntagged    Means only basic types and types annotated with @typeinfo will have reflection values", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("test",           '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
+    parser.addOption("buildCmd",       'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated", OptionFlag.HAS_ARGUMENT, null);
 
     if(parser.parse(n, args) != CmdParserStatus.OK) {
         goto err_print;
@@ -225,7 +225,14 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
         strncpy(options.outputPath, output, MAX_PATH)
     }
 
-    FilePath(options.inputFile, options.srcPath)
+    if(parser.hasOption("srcDir")) {
+        strncpy(options.srcPath, parser.getOption("srcDir").value, MAX_PATH)
+    }
+
+    if(strnlen(options.srcPath, MAX_PATH) == 0) {
+        FilePath(options.inputFile, options.srcPath)
+    }
+
     return true
 
 err_print:
