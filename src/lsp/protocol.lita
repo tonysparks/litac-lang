@@ -5,6 +5,7 @@ import "lex"
 import "mem"
 import "system"
 import "libc"
+import "array"
 
 @doc("""
     Protocol specifications from: https://microsoft.github.io/language-server-protocol/specifications
@@ -173,4 +174,19 @@ public func SrcPosToRange(pos: SrcPos, alloc: *const Allocator) : *JsonNode {
     range.put("start", start)
     range.put("end", end)
     return range
+}
+
+public func SrcPosToLocations(rootPath: *const char, results: *Array<SrcPos>, alloc: *const Allocator) : *JsonNode {
+    if(results.empty()) {
+        return JSON_NULL
+    }
+
+    var locations = CreateJsonArray(alloc)
+
+    for(var i = 0; i < results.size(); i += 1) {
+        var pos = results.getPtr(i)
+        locations.add(SrcPosToLocation(pos, rootPath, alloc))
+    }
+
+    return locations
 }

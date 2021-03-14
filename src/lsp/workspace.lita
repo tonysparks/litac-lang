@@ -208,14 +208,41 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
             case StmtKind.IDENTIFIER_EXPR: {
                 break
             }
+            case StmtKind.GET_EXPR: {
+                var expr = location.node as (*GetExpr)
+                var base = expr.object.operand.typeInfo.getBaseType()
+                if(IsAggregate(base)) {
+                    var aggInfo = base as (*AggregateTypeInfo)
+                    var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
+                    this.lsp.log("Getting field position: %d\n", fieldResult.position)
+                    if(fieldResult.aggInfo) {
+                        return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
+                    }
+                }
+                break
+            }
+            case StmtKind.SET_EXPR: {
+                var expr = location.node as (*SetExpr)
+                var base = expr.object.operand.typeInfo.getBaseType()
+                if(IsAggregate(base)) {
+                    var aggInfo = base as (*AggregateTypeInfo)
+                    var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
+                    if(fieldResult.aggInfo) {
+                        return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
+                    }
+                }
+                break
+            }
         }
     }
     else if(location.kind == SourceLocationKind.TYPE) {
+        this.lsp.log("Found type: %s\n", TypeSpecKindAsStr(location.type.kind))
         if(!location.type.typeInfo) {
             return JSON_NULL
         }
 
         var typeid = location.type.typeInfo.typeid
+        this.lsp.log("~typeid: %llu\n", typeid)
         return this.findTypeReferences(typeid, alloc)
     }
 
@@ -227,19 +254,17 @@ func (this: *Workspace) findTypeReferences(typeid: Typeid, alloc: *const Allocat
     var results = ArrayInit<SrcPos>(64, alloc)
     this.lsp.lita.references.getTypeReferences(typeid, &results)
 
-    if(results.empty()) {
-        return JSON_NULL
-    }
-
-    var locations = CreateJsonArray(alloc)
-
-    for(var i = 0; i < results.size(); i += 1) {
-        var pos = results.getPtr(i)
-        locations.add(SrcPosToLocation(pos, this.rootPath, alloc))
-    }
-
-    return locations
+    return SrcPosToLocations(this.rootPath, &results, alloc)
 }
+
+
+func (this: *Workspace) findFieldReferences(typeid: Typeid, offset: i32, alloc: *const Allocator) : *JsonNode {
+    var results = ArrayInit<SrcPos>(64, alloc)
+    this.lsp.lita.references.getFieldReferences(typeid, offset, &results)
+
+    return SrcPosToLocations(this.rootPath, &results, alloc)
+}
+
 
 public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseResult {
     var startTime = SystemTimeMSec()

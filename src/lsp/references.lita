@@ -48,15 +48,26 @@ struct Reference {
     pos: SrcPos
 }
 
+struct FieldReference {
+    /* the parent structure typeid this fields belongs to */
+    parent: Typeid
+    /* the offset into the structure where the field is */
+    offset: i32
+    /* the source position */
+    pos: SrcPos
+}
+
 public struct ReferenceDatabase {
     allocator: *const Allocator
     typeReferences: Array<Reference>
+    fieldReferences: Array<FieldReference>
 }
 
 
 public func (this: *ReferenceDatabase) init(allocator: *const Allocator) {
     this.allocator = allocator
     this.typeReferences.init(1024, allocator)
+    this.fieldReferences.init(1024, allocator)
 }
 
 public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
@@ -87,10 +98,37 @@ public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
     })
 }
 
+
+public func (this: *ReferenceDatabase) addFieldReference(type: *NameTypeSpec, parent: *TypeInfo, offset: i32) {
+    if(!type) return;
+
+    /*
+    var base = parent.getBaseType()
+    if(!base) return;
+
+    var typeInfo = base.typeInfo
+    if(!typeInfo) return;*/
+
+    this.fieldReferences.add(FieldReference {
+        .parent = parent.typeid,
+        .offset = offset,
+        .pos = type.pos
+    })
+}
+
 public func (this: *ReferenceDatabase) getTypeReferences(typeid: Typeid, results: *Array<SrcPos>) {
     for(var i = 0; i < this.typeReferences.size(); i += 1) {
         var ref = this.typeReferences.getPtr(i)
         if(ref.type == typeid) {
+            results.add(ref.pos)
+        }
+    }
+}
+
+public func (this: *ReferenceDatabase) getFieldReferences(typeid: Typeid, offset: i32, results: *Array<SrcPos>) {
+    for(var i = 0; i < this.fieldReferences.size(); i += 1) {
+        var ref = this.fieldReferences.getPtr(i)
+        if(ref.parent == typeid && ref.offset == offset) {
             results.add(ref.pos)
         }
     }

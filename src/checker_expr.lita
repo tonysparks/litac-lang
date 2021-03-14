@@ -1047,9 +1047,33 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
         if(field.kind == StmtKind.POISON_EXPR) {
             this.errorNoField(expr.field, objectTypeInfo, expr.field.type.name)
             return false
-        }
+        }/*
+        else {
+            // Find the aggregate type of this field -- we have
+            // to do some object traversels because of the 'using'
+            var path = FieldPath{}
+            if(aggInfo.getFieldPath(expr.field.type.name, &path)) {
+                var fieldInfo = aggInfo
+                var index = path.numOfFields - 1
+                while(index > 0) {
+                    fieldInfo = path.fields[index].typeInfo
+                    if(IsAggregate(fieldInfo)) {
+                        break
+                    }
+
+                    index -= 1
+                }
+
+                this.lita.references.addFieldReference(expr.field.type,
+                                                       fieldInfo,
+                                                       fieldInfo.getFieldIndex(expr.field.type.name))
+            }
+        }*/
         expr.flags |= GetExprFlags.IS_USING
-    }
+    }/*
+    else {
+        this.lita.references.addFieldReference(expr.field.type, aggInfo, aggInfo.getFieldIndex(expr.field.type.name))
+    }*/
 
     expr.field.operand.typeInfo = field.typeInfo
     expr.operand.typeInfo = field.typeInfo
@@ -1268,6 +1292,8 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
             return false
         }
 
+        this.lita.references.addFieldReference(expr.field.type, enumInfo, enumInfo.getFieldIndex(expr.field.type.name))
+
         expr.flags |= GetExprFlags.IS_ENUM
         expr.operand.typeInfo = &I32_TYPE
         expr.operand.isConst = true
@@ -1284,6 +1310,8 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         // is this a vanilla field access?
         var field = aggInfo.getField(expr.field.type.name)
         if(field.kind != StmtKind.POISON_EXPR) {
+            this.lita.references.addFieldReference(expr.field.type, aggInfo, aggInfo.getFieldIndex(expr.field.type.name))
+
             expr.field.operand.typeInfo = field.typeInfo
             expr.operand.typeInfo = field.typeInfo
             return true
@@ -1292,6 +1320,32 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         // is this a using field access?
         field = aggInfo.getFieldWithUsing(expr.field.type.name)
         if(field.kind != StmtKind.POISON_EXPR) {
+            var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
+            if(fieldResult.aggInfo) {
+                this.lita.references.addFieldReference(expr.field.type,
+                                                       fieldResult.aggInfo,
+                                                       fieldResult.position)
+            }
+            // Find the aggregate type of this field -- we have
+            // to do some object traversels because of the 'using'
+            /*var path = FieldPath{}
+            if(aggInfo.getFieldPath(expr.field.type.name, &path)) {
+                var fieldInfo = aggInfo
+                var index = path.numOfFields - 1
+                while(index > 0) {
+                    fieldInfo = path.fields[index].typeInfo
+                    if(IsAggregate(fieldInfo)) {
+                        break
+                    }
+
+                    index -= 1
+                }
+
+                this.lita.references.addFieldReference(expr.field.type,
+                                                       fieldInfo,
+                                                       fieldInfo.getFieldIndex(expr.field.type.name))
+            }*/
+
             expr.flags |= GetExprFlags.IS_USING
             expr.field.operand.typeInfo = field.typeInfo
             expr.operand.typeInfo = field.typeInfo

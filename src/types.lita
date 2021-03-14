@@ -10,6 +10,7 @@ import "ast_new"
 import "libc"
 import "module"
 import "types_new"
+import "common"
 
 @asStr
 public enum TypeKind {
@@ -1302,6 +1303,19 @@ public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryD
     return null
 }
 
+public func (this: *EnumTypeInfo) getFieldIndex(name: *const char) : i32 {
+    assert(this != null)
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)
+        if(field.name.str.equals(name)) {
+            return i
+        }
+    }
+
+    return -1
+}
+
+
 public func (this: *AggregateTypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) : *const char {
     assert(this != null)
 
@@ -1368,7 +1382,10 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
                 // should be looked at for matching
                 if(aggField.name.type == TokenType.VOID) {
                     var aggType = aggField.sym.type as (*AggregateTypeInfo)
-                    return aggType.getField(name)
+                    var result = aggType.getField(name)
+                    if(result.kind != StmtKind.POISON_EXPR) {
+                        return result
+                    }
                 }
 
                 if(aggField.name.str.equals(name)) {
@@ -1387,6 +1404,102 @@ err:
         .kind = StmtKind.POISON_EXPR
     }
 }
+
+@doc("Gets the field position in this aggregate type (including anonymous aggregates) only")
+public func (this: *AggregateTypeInfo) getFieldIndex(name: *const char) : i32 {
+    assert(this != null)
+
+    var index = 0
+    for(var i = 0; i < this.decl.fields.size(); i+=1) {
+        var field = this.decl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                if(varField.name.str.equals(name)) {
+                    if(!field.typeInfo) {
+                        goto err;
+                    }
+                    return index
+                }
+                break;
+            }
+            case StmtKind.ENUM_FIELD_DECL: {
+                var enumField = field.enumField
+                if(enumField.name.str.equals(name)) {
+                    return index
+                }
+                break;
+            }
+            case StmtKind.UNION_FIELD_DECL:
+            case StmtKind.STRUCT_FIELD_DECL: {
+                var aggField = field.aggregateField
+
+                // if this is an anonymous aggregate, the fields
+                // should be looked at for matching
+                if(aggField.name.type == TokenType.VOID) {
+                    var aggType = aggField.sym.type as (*AggregateTypeInfo)
+                    var result = aggType.getFieldIndex(name)
+
+                    // build the appropriate index
+                    if(result < 0) {
+                        index += aggType.decl.fields.size()
+                    }
+                    else {
+                        return index + result
+                    }
+                }
+
+                if(aggField.name.str.equals(name)) {
+                    return index
+                }
+                // TODO: Account for using field aggregates
+                break;
+            }
+            default: {
+                goto err;
+            }
+        }
+    }
+err:
+    return -1
+}
+
+public struct FieldPositionResult {
+    aggInfo: *AggregateTypeInfo
+    position: i32
+}
+
+@doc("Gets the field position in this aggregate type and any using sub aggregates")
+public func (this: *AggregateTypeInfo) getFieldPosition(name: *const char) : FieldPositionResult {
+
+    // Find the aggregate type of this field -- we have
+    // to do some object traversels because of the 'using'
+    var path = FieldPath{}
+    if(this.getFieldPath(name, &path)) {
+        var aggInfo = this
+        var index = path.numOfFields - 1
+        while(index > 0) {
+            var fieldInfo = path.fields[index].typeInfo
+            if(IsAggregate(fieldInfo)) {
+                aggInfo = fieldInfo as (*AggregateTypeInfo)
+                break
+            }
+
+            index -= 1
+        }
+
+        return FieldPositionResult {
+            .aggInfo = aggInfo,
+            .position = aggInfo.getFieldIndex(name)
+        }
+    }
+
+    return FieldPositionResult {
+        .aggInfo = null,
+        .position = -1
+    }
+}
+
 
 @doc("""
 Gets the first field of the supplied type.  This should only be used for finding 'using'
@@ -1437,7 +1550,10 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo, 
                 // should be looked at for matching
                 if(aggField.name.type == TokenType.VOID) {
                     var aggType = aggField.sym.type as (*AggregateTypeInfo)
-                    return aggType.getFieldByType(type, false)
+                    var result = aggType.getFieldByType(type, false)
+                    if(result.kind != StmtKind.POISON_EXPR) {
+                        return result
+                    }
                 }
                 break;
             }
@@ -1493,6 +1609,7 @@ public func (this: *AggregateTypeInfo) getFieldWithUsing(name: *const char) : Fi
         .kind = StmtKind.POISON_EXPR
     }
 }
+
 
 public const MAX_FIELD_PATH = 256
 public struct FieldPath {

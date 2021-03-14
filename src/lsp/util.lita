@@ -671,6 +671,10 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
                 return true
             }
             if(this.visitExpr(expr.field)) {
+                // do the full get expression, so we know
+                // this is a field access
+                this.result.kind = SourceLocationKind.AST
+                this.result.node = &node.stmt.node
                 return true
             }
             break
@@ -737,6 +741,10 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
                 return true
             }
             if(this.visitExpr(expr.field)) {
+                // do the full get expression, so we know
+                // this is a field access
+                this.result.kind = SourceLocationKind.AST
+                this.result.node = &node.stmt.node
                 return true
             }
             if(this.visitExpr(expr.value)) {
