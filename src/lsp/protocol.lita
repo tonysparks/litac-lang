@@ -15,6 +15,16 @@ public struct Position {
     character: i32
 }
 
+public struct Range {
+    start: Position
+    end: Position
+}
+
+public struct Location {
+    uri: *const char
+    range: Range
+}
+
 @asStr
 public enum SymbolInfoKind {
     File = 1,

@@ -1,0 +1,579 @@
+import "lsp/lsp"
+import "lsp/protocol"
+import "lex"
+import "ast"
+import "libc"
+import "array"
+import "assert"
+
+public enum SourceLocationKind {
+    NONE,
+    AST,
+    TYPE,
+}
+
+@doc("The ast node at a particular location in the source code")
+public struct SourceLocation {
+    kind: SourceLocationKind
+    location: Location
+    union {
+        node: *Node
+        type: *TypeSpec
+    }
+}
+
+func PosToRange(srcPos: SrcPos, range: *Range) {
+    var lineNumber = MAX(0, srcPos.lineNumber - 1)
+
+    var offset = MAX(0, (srcPos.start - srcPos.lineStart) as (i32))
+    range.start.character = offset
+    range.start.line = lineNumber
+
+    offset = MAX(1, (srcPos.end - srcPos.start) as (i32))
+    range.end.character = offset
+    range.end.line = lineNumber
+}
+
+public func IsSrcPosAtPosition(srcPos: *SrcPos, pos: Position) : bool {
+    if(!srcPos) {
+        return false
+    }
+
+    if(!srcPos.start) {
+        return false
+    }
+
+    var fromIndex = srcPos.position
+    var toIndex = fromIndex + (srcPos.end - srcPos.start) as (i32)
+
+    if((pos.line+1) == srcPos.lineNumber) {
+        if(pos.character >= fromIndex && pos.character <= toIndex) {
+            return true
+        }
+    }
+
+    return false
+}
+
+public struct SourceLookup {
+    lsp: *LspServer
+    lookupPos: Position
+    result: SourceLocation
+}
+
+
+public func (this: *SourceLookup) findAstNodeByPosition(moduleAst: *ModuleStmt, pos: Position) : SourceLocation {
+    if(!moduleAst) {
+        return SourceLocation{}
+    }
+
+    this.visitStmt(moduleAst)
+
+    return this.result
+}
+
+func (this: *SourceLookup) isNodeAtPos(node: *Node) : bool {
+    if(!node) {
+        return false
+    }
+
+    var srcPos = node.startPos
+    if(this.isSrcAtPos(srcPos)) {
+        this.result.kind = SourceLocationKind.AST
+        this.result.node = node
+        PosToRange(srcPos, &this.result.location.range)
+        return true
+    }
+
+    return false
+}
+
+func (this: *SourceLookup) isSrcAtPos(srcPos: *SrcPos) : bool {
+    if(!srcPos) {
+        return false
+    }
+
+    if(IsSrcPosAtPosition(srcPos, this.lookupPos)) {
+        PosToRange(srcPos, &this.result.location.range)
+        return true
+    }
+
+    return false
+}
+
+func (this: *SourceLookup) isTokenAtPos(token: Token) : bool {
+    if(IsSrcPosAtPosition(token.pos, this.lookupPos)) {
+        PosToRange(token.pos, &this.result.location.range)
+        return true
+    }
+
+    return false
+}
+
+func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
+    if(!type) {
+        return false
+    }
+
+    switch(type.kind) {
+        case TypeSpecKind.ARRAY: {
+            var arraySpec = type as (*ArrayTypeSpec)
+            if(arraySpec.numElements) {
+                if(this.visitExpr(arraySpec.numElements)) {
+                    return true
+                }
+            }
+            if(this.isTypeAtPos(arraySpec.base)) {
+                return true
+            }
+            break
+        }
+        case TypeSpecKind.PTR: {
+            if(this.isTypeAtPos(type.base)) {
+                return true
+            }
+            break
+        }
+        case TypeSpecKind.CONST: {
+            if(this.isTypeAtPos(type.base)) {
+                return true
+            }
+            break
+        }
+        case TypeSpecKind.NAME: {
+            var name = type as (*NameTypeSpec)
+            for(var i = 0; i < name.genericArgs.size(); i += 1) {
+                var param = name.genericArgs.get(i)
+                if(this.isTypeAtPos(param)) {
+                    return true
+                }
+            }/*
+            this.lsp.log("No name: %d:%d len: %d vs %d:%d!!!\n",
+                type.pos.lineNumber, type.pos.position, (type.pos.end - type.pos.start) as (i32),
+                this.lookupPos.line + 1, this.lookupPos.character)*/
+            break
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            var funcPtr = type as (*FuncPtrTypeSpec)
+            for(var i = 0; i < funcPtr.genericParams.size(); i += 1) {
+                var param = funcPtr.genericParams.getPtr(i)
+                if(this.isTokenAtPos(param.name)) {
+                    return true
+                }
+            }
+
+            for(var i = 0; i < funcPtr.args.size(); i += 1) {
+                var param = funcPtr.args.get(i)
+                if(this.isTypeAtPos(param)) {
+                    return true
+                }
+            }
+
+            if(this.isTypeAtPos(funcPtr.base)) {
+                return true
+            }
+
+            if(this.isTypeAtPos(funcPtr.ret)) {
+                return true
+            }
+            break
+        }
+        case TypeSpecKind.NONE:
+        default: {
+        }
+    }
+
+    if(this.isSrcAtPos(type.pos)) {
+        this.result.kind = SourceLocationKind.TYPE
+        this.result.type = type
+        return true
+    }
+
+    return false
+}
+
+
+func (this: *SourceLookup) isDeclAtPos(decl: *Decl) : bool {
+    if(!decl) {
+        return false
+    }
+
+    if(this.isTokenAtPos(decl.name)) {
+        this.result.kind = SourceLocationKind.AST
+        this.result.node = &decl.stmt.node
+        PosToRange(decl.name.pos, &this.result.location.range)
+        return true
+    }
+
+    return this.isNodeAtPos(decl.node)
+}
+
+func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
+    if(!node) return false;
+
+    switch(node.kind) {
+        case StmtKind.IMPORT_DECL: {
+            var decl = node as (*ImportDecl)
+
+            if(decl.alias.type == TokenType.IDENTIFIER) {
+                if(this.isTokenAtPos(decl.alias)) {
+                    this.result.kind = SourceLocationKind.AST
+                    this.result.node = &decl.stmt.node
+                    return true
+                }
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL: {
+            var decl = node as (*VarDecl)
+
+            if(this.visitExpr(decl.expr)) {
+                return true
+            }
+
+            if(this.isTypeAtPos(decl.typeSpec)) {
+                return true
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.UNION_DECL: {
+            var decl = node as (*AggregateDecl)
+            for(var i = 0; i < decl.fields.size(); i += 1) {
+                var field = decl.fields.getPtr(i)
+                switch(field.kind) {
+                    case StmtKind.VAR_FIELD_DECL: {
+                        if(this.visitDecl(field.varField)) {
+                            return true
+                        }
+                        break
+                    }
+                    case StmtKind.ENUM_FIELD_DECL: {
+                        if(this.visitDecl(field.enumField)) {
+                            return true
+                        }
+                        break
+                    }
+                    case StmtKind.STRUCT_FIELD_DECL:
+                    case StmtKind.UNION_FIELD_DECL: {
+                        if(this.visitDecl(field.aggregateField)) {
+                            return true
+                        }
+                        break
+                    }
+                }
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.ENUM_DECL: {
+            var decl = node as (*EnumDecl)
+            for(var i = 0; i < decl.fields.size(); i += 1) {
+                var field = decl.fields.get(i)
+                if(this.visitDecl(field)) {
+                    return true
+                }
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.FUNC_DECL: {
+            var decl = node as (*FuncDecl)
+
+            if(this.visitStmt(decl.params)) {
+                return true
+            }
+
+            if(this.visitStmt(decl.body)) {
+                return true
+            }
+
+            if(this.isTypeAtPos(decl.returnType)) {
+                return true
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+
+            break
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            var decl = node as (*TypedefDecl)
+
+            if(this.isTypeAtPos(decl.type)) {
+                return true
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.PARAM_DECL: {
+            var decl = node as (*ParameterDecl)
+            if(decl.defaultExpr) {
+                if(this.visitExpr(decl.defaultExpr)) {
+                    return true
+                }
+            }
+            if(this.isTypeAtPos(decl.type)) {
+                return true
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.NATIVE_DECL: {
+            var decl = node as (*NativeDecl)
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.NOTES_DECL: {
+            // TODO - search all notes of the same type
+            break
+        }
+        case StmtKind.ENUM_FIELD_ENTRY_DECL: {
+            var decl = node as (*EnumFieldEntryDecl)
+
+            if(this.visitExpr(decl.value)) {
+                return true
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.VAR_FIELD_DECL: {
+            var decl = node as (*VarFieldDecl)
+
+            if(this.visitExpr(decl.defaultExpr)) {
+                return true
+            }
+
+            if(this.isTypeAtPos(decl.type)) {
+                return true
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.ENUM_FIELD_DECL:
+        case StmtKind.STRUCT_FIELD_DECL:
+        case StmtKind.UNION_FIELD_DECL: {
+            assert(false) // should be handled by respective declarations
+            break
+        }
+        case StmtKind.POISON_DECL: {
+            break
+        }
+    }
+
+    return false
+}
+
+
+func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
+    if(!node) return false;
+
+    if(IsExpr(node)) {
+        return this.visitExpr(node as (*Expr))
+    }
+
+    if(IsDecl(node)) {
+        return this.visitDecl(node as (*Decl))
+    }
+
+    switch(node.kind) {
+        case StmtKind.BLOCK_STMT: {
+            break
+        }
+        case StmtKind.BREAK_STMT: {
+            break
+        }
+        case StmtKind.COMP_STMT: {
+            break
+        }
+        case StmtKind.CONTINUE_STMT: {
+            break
+        }
+        case StmtKind.DEFER_STMT: {
+            break
+        }
+        case StmtKind.DO_WHILE_STMT: {
+            break
+        }
+        case StmtKind.EMPTY_STMT: {
+            break
+        }
+        //FIELD_STMT,
+        case StmtKind.FOR_STMT: {
+            break
+        }
+        case StmtKind.FUNC_BODY_STMT: {
+            break
+        }
+        case StmtKind.GOTO_STMT: {
+            break
+        }
+        case StmtKind.IF_STMT: {
+            break
+        }
+        case StmtKind.LABEL_STMT: {
+            break
+        }
+        case StmtKind.MODULE_STMT: {
+            var stmt = node as (*ModuleStmt)
+            for(var i = 0; i < stmt.imports.size(); i += 1) {
+                var imp = stmt.imports.get(i)
+                this.visitDecl(imp)
+            }
+
+            for(var i = 0; i < stmt.notes.size(); i += 1) {
+                var n = stmt.notes.get(i)
+                this.visitStmt(n)
+            }
+
+            for(var i = 0; i < stmt.declarations.size(); i += 1) {
+                var d = stmt.declarations.get(i)
+                this.visitDecl(d)
+            }
+            break
+        }
+        case StmtKind.NOTE_STMT: {
+            break
+        }
+        case StmtKind.PARAMETERS_STMT: {
+            var stmt = node as (*ParametersStmt)
+
+            for(var i = 0; i < stmt.params.size(); i += 1) {
+                var p = stmt.params.get(i)
+                this.visitDecl(p)
+            }
+            break
+        }
+        case StmtKind.RETURN_STMT: {
+            break
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            break
+        }
+        case StmtKind.SWITCH_STMT: {
+            break
+        }
+        case StmtKind.WHILE_STMT: {
+            break
+        }
+    }
+
+    return false
+}
+
+func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
+    if(!node) return false;
+
+    switch(node.kind) {
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            break
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            break
+        }
+        case StmtKind.BINARY_EXPR: {
+            break
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            break
+        }
+        case StmtKind.CAST_EXPR: {
+            break
+        }
+        case StmtKind.CHAR_EXPR: {
+            break
+        }
+        case StmtKind.FUNC_CALL_EXPR: {
+            break
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            break
+        }
+        case StmtKind.GET_EXPR: {
+            break
+        }
+        case StmtKind.GROUP_EXPR: {
+            break
+        }
+        case StmtKind.IDENTIFIER_EXPR: {
+            break
+        }
+        case StmtKind.INIT_EXPR: {
+            break
+        }
+        case StmtKind.INIT_ARG_EXPR: {
+            break
+        }
+        case StmtKind.NULL_EXPR: {
+            break
+        }
+        case StmtKind.NUMBER_EXPR: {
+            break
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            break
+        }
+        case StmtKind.SET_EXPR: {
+            break
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            break
+        }
+        case StmtKind.STRING_EXPR: {
+            break
+        }
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            break
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            break
+        }
+        case StmtKind.TERNARY_EXPR: {
+            break
+        }
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            break
+        }
+        case StmtKind.TYPE_OF_EXPR: {
+            break
+        }
+        case StmtKind.UNARY_EXPR: {
+            break
+        }
+        case StmtKind.POISON_EXPR: {
+            break
+        }
+    }
+
+    return false
+}

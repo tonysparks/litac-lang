@@ -10,10 +10,15 @@ import "lita"
 import "phase_result"
 import "symbols"
 import "checker"
+import "module"
+import "ast"
+import "lex"
+import "types"
 
 import "lsp/lsp"
 import "lsp/protocol"
 import "lsp/references"
+import "lsp/util"
 
 public struct Workspace {
     allocator: *const Allocator
@@ -151,8 +156,89 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
         .line = position.getInt("line", 0),
         .character = position.getInt("character", 0)
     }
-    FindTokenByPosition(this.lsp, alloc, doc, pos)
+
+    var lookup = SourceLookup {
+        .lsp = this.lsp,
+        .lookupPos = pos,
+        .result = SourceLocation {
+            .kind = SourceLocationKind.NONE,
+            .location = Location {
+                .uri = uri,
+            },
+        }
+    }
+
+    var module = this.lsp.lita.modules.get(doc.filename)
+    if(!module) {
+        this.lsp.log("No module found for: '%s'\n", doc.filename)
+        return JSON_NULL
+    }
+
+    this.lsp.log("Module for: '%s'\n", doc.filename)
+    var location = lookup.findAstNodeByPosition(module.ast, pos)
+    if(location.kind == SourceLocationKind.NONE) {
+        this.lsp.log("No ast node found at '%s:%d:%d'\n", doc.filename, pos.line, pos.character)
+        return JSON_NULL
+    }
+
+    if(location.kind == SourceLocationKind.AST) {
+        this.lsp.log("Found ast node: %s\n", StmtKindAsStr(location.node.kind))
+
+        switch(location.node.kind) {
+            case StmtKind.NATIVE_DECL:
+            case StmtKind.TYPEDEF_DECL:
+            case StmtKind.UNION_DECL:
+            case StmtKind.STRUCT_DECL:
+            case StmtKind.ENUM_DECL:
+            case StmtKind.FUNC_DECL: {
+                var decl = location.node as (*Decl)
+
+                // look for the type references
+                if(decl.sym && decl.sym.type) {
+
+                    var typeid = decl.sym.type.typeid
+                    return this.findTypeReferences(typeid, alloc)
+                }
+                break
+            }
+            case StmtKind.PARAM_DECL: {
+                // TODO: the name of the parameter (scope search)
+                break
+            }
+            case StmtKind.IDENTIFIER_EXPR: {
+                break
+            }
+        }
+    }
+    else if(location.kind == SourceLocationKind.TYPE) {
+        if(!location.type.typeInfo) {
+            return JSON_NULL
+        }
+
+        var typeid = location.type.typeInfo.typeid
+        return this.findTypeReferences(typeid, alloc)
+    }
+
     return JSON_NULL
+}
+
+
+func (this: *Workspace) findTypeReferences(typeid: Typeid, alloc: *const Allocator) : *JsonNode {
+    var results = ArrayInit<SrcPos>(64, alloc)
+    this.lsp.lita.references.getTypeReferences(typeid, &results)
+
+    if(results.empty()) {
+        return JSON_NULL
+    }
+
+    var locations = CreateJsonArray(alloc)
+
+    for(var i = 0; i < results.size(); i += 1) {
+        var pos = results.getPtr(i)
+        locations.add(SrcPosToLocation(pos, this.rootPath, alloc))
+    }
+
+    return locations
 }
 
 public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseResult {

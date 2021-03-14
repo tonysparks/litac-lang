@@ -8,10 +8,14 @@ import "mem"
 import "lex"
 import "parser"
 import "types"
+import "symbols"
+import "libc"
+import "assert"
 
 import "lsp/workspace"
 import "lsp/protocol"
 import "lsp/lsp"
+import "lsp/util"
 
 public func FindTokenByPosition(lsp: *LspServer, alloc: *const Allocator, doc: *TextDocument, pos: Position) : Token {
     var lex = LexerInit(doc.filename, doc.text.cStr(), alloc)
@@ -64,218 +68,33 @@ public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
     var typeInfo = base.typeInfo
     if(!typeInfo) return;
 
+    // if this is a generic type, make sure to add references
+    // to the base generic template - this allows for the generic template itself
+    // to look up references
+    if(IsGenericCapable(typeInfo)) {
+        if(typeInfo.sym && typeInfo.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+            var genInfo = typeInfo as (*GenericTypeInfo)
+            this.typeReferences.add(Reference {
+                .type = genInfo.genericTypeid,
+                .pos = type.pos
+            })
+        }
+    }
+
     this.typeReferences.add(Reference {
         .type = typeInfo.typeid,
         .pos = type.pos
     })
 }
 
+public func (this: *ReferenceDatabase) getTypeReferences(typeid: Typeid, results: *Array<SrcPos>) {
+    for(var i = 0; i < this.typeReferences.size(); i += 1) {
+        var ref = this.typeReferences.getPtr(i)
+        if(ref.type == typeid) {
+            results.add(ref.pos)
+        }
+    }
+}
+
 public func (this: *ReferenceDatabase) buildDatabase() {
-
 }
-/*
-func (this: *ReferenceDatabase) visitDecl(node: *Decl) {
-    if(!node) return;
-
-    switch(node.kind) {
-        case IMPORT_DECL: {
-            break
-        }
-        case CONST_DECL: {
-            break
-        }
-        case VAR_DECL: {
-            break
-        }
-        case STRUCT_DECL: {
-            break
-        }
-        case UNION_DECL: {
-            break
-        }
-        case ENUM_DECL: {
-            break
-        }
-        case FUNC_DECL: {
-            break
-        }
-        case TYPEDEF_DECL: {
-            break
-        }
-        case PARAM_DECL: {
-            break
-        }
-        case NATIVE_DECL: {
-            break
-        }
-        case NOTES_DECL: {
-            break
-        }
-        case VAR_FIELD_DECL: {
-            break
-        }
-        case ENUM_FIELD_ENTRY_DECL: {
-            break
-        }
-        case ENUM_FIELD_DECL: {
-            break
-        }
-        case STRUCT_FIELD_DECL: {
-            break
-        }
-        case UNION_FIELD_DECL: {
-            break
-        }
-        case POISON_DECL: {
-            break
-        }
-    }
-}
-func (this: *ReferenceDatabase) visitStmt(node: *Stmt) {
-    if(!node) return;
-
-    switch(node.kind) {
-        case BLOCK_STMT: {
-            break
-        }
-        case BREAK_STMT: {
-            break
-        }
-        case COMP_STMT: {
-            break
-        }
-        case CONTINUE_STMT: {
-            break
-        }
-        case DEFER_STMT: {
-            break
-        }
-        case DO_WHILE_STMT: {
-            break
-        }
-        case EMPTY_STMT: {
-            break
-        }
-        //FIELD_STMT,
-        case FOR_STMT: {
-            break
-        }
-        case FUNC_BODY_STMT: {
-            break
-        }
-        case GOTO_STMT: {
-            break
-        }
-        case IF_STMT: {
-            break
-        }
-        case LABEL_STMT: {
-            break
-        }
-        case MODULE_STMT: {
-            break
-        }
-        case NOTE_STMT: {
-            break
-        }
-        case PARAMETERS_STMT: {
-            break
-        }
-        case RETURN_STMT: {
-            break
-        }
-        case SWITCH_CASE_STMT: {
-            break
-        }
-        case SWITCH_STMT: {
-            break
-        }
-        case WHILE_STMT: {
-            break
-        }
-    }
-
-func (this: *ReferenceDatabase) visitExpr(node: *Expr) {
-    if(!node) return;
-
-    switch(node.kind) {
-        case ARRAY_DESIGNATION_EXPR: {
-            break
-        }
-        case ARRAY_INIT_EXPR: {
-            break
-        }
-        case BINARY_EXPR: {
-            break
-        }
-        case BOOLEAN_EXPR: {
-            break
-        }
-        case CAST_EXPR: {
-            break
-        }
-        case CHAR_EXPR: {
-            break
-        }
-        case FUNC_CALL_EXPR: {
-            break
-        }
-        case FUNC_IDENTIFIER_EXPR: {
-            break
-        }
-        case GET_EXPR: {
-            break
-        }
-        case GROUP_EXPR: {
-            break
-        }
-        case IDENTIFIER_EXPR: {
-            break
-        }
-        case INIT_EXPR: {
-            break
-        }
-        case INIT_ARG_EXPR: {
-            break
-        }
-        case NULL_EXPR: {
-            break
-        }
-        case NUMBER_EXPR: {
-            break
-        }
-        case OFFSET_OF_EXPR: {
-            break
-        }
-        case SET_EXPR: {
-            break
-        }
-        case SIZE_OF_EXPR: {
-            break
-        }
-        case STRING_EXPR: {
-            break
-        }
-        case SUBSCRIPT_GET_EXPR: {
-            break
-        }
-        case SUBSCRIPT_SET_EXPR: {
-            break
-        }
-        case TERNARY_EXPR: {
-            break
-        }
-        case TYPE_IDENTIFIER_EXPR: {
-            break
-        }
-        case TYPE_OF_EXPR: {
-            break
-        }
-        case UNARY_EXPR: {
-            break
-        }
-        case POISON_EXPR: {
-            break
-        }
-    }
-}*/
