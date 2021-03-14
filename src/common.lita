@@ -21,7 +21,7 @@ public func Logv(level: LogLevel, format: *const char, args: va_list) {
     if(!outputFile) {
         // Toggle for LSP debugging purposes - should we enable this via
         // command line?
-        // outputFile = fopen("./litac.log", "w")
+        outputFile = fopen("./litac.log", "w")
 
         if(!outputFile) {
             outputFile = stdout

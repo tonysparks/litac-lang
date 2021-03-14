@@ -11,7 +11,7 @@ import "assert"
 import "mem"
 import "module"
 import "checker"
-
+import "common"
 import "ast_print"
 
 public const MAX_GENERIC_NAME = 1024;
@@ -176,11 +176,28 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         var isValidArgs = true
         for(var i = 0; i < numOfGenericArgs; i+=1) {
             var arg = name.genericArgs.get(i)
-            if(!checker.resolveTypeSpec(arg)) {
+            var typeInfo = checker.resolveTypeSpec(arg)
+            if(!typeInfo || typeInfo.kind == TypeKind.POISON) {
                 isValidArgs = false
             }
 
             genericSym.genericArgs.add(arg.typeInfo)
+        }
+
+        if(!isValidArgs) {
+            goto err;
+        }
+    }
+    else {
+        // if this symbol is already resolved, we still need resolve the
+        // typespec arguments
+        var isValidArgs = true
+        for(var i = 0; i < name.genericArgs.size(); i+=1) {
+            var arg = name.genericArgs.get(i)
+            var typeInfo = checker.resolveTypeSpec(arg)
+            if(!typeInfo || typeInfo.kind == TypeKind.POISON) {
+                isValidArgs = false
+            }
         }
 
         if(!isValidArgs) {

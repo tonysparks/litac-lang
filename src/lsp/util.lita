@@ -4,6 +4,7 @@ import "lex"
 import "ast"
 import "libc"
 import "array"
+import "types"
 import "assert"
 
 public enum SourceLocationKind {
@@ -147,10 +148,7 @@ func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
                 if(this.isTypeAtPos(param)) {
                     return true
                 }
-            }/*
-            this.lsp.log("No name: %d:%d len: %d vs %d:%d!!!\n",
-                type.pos.lineNumber, type.pos.position, (type.pos.end - type.pos.start) as (i32),
-                this.lookupPos.line + 1, this.lookupPos.character)*/
+            }
             break
         }
         case TypeSpecKind.FUNC_PTR: {
@@ -408,40 +406,71 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
 
     switch(node.kind) {
         case StmtKind.BLOCK_STMT: {
-            break
-        }
-        case StmtKind.BREAK_STMT: {
-            break
-        }
-        case StmtKind.COMP_STMT: {
-            break
-        }
-        case StmtKind.CONTINUE_STMT: {
+            var stmt = node as (*BlockStmt)
+            for(var i = 0; i < stmt.stmts.size(); i += 1) {
+                var s = stmt.stmts.get(i)
+                if(this.visitStmt(s)) {
+                    return true
+                }
+            }
             break
         }
         case StmtKind.DEFER_STMT: {
+            var stmt = node as (*DeferStmt)
+            if(this.visitStmt(stmt.deferedStmt)) {
+                return true
+            }
             break
         }
         case StmtKind.DO_WHILE_STMT: {
+            var stmt = node as (*DoWhileStmt)
+            if(this.visitExpr(stmt.cond)) {
+                return true
+            }
+            if(this.visitStmt(stmt.body)) {
+                return true
+            }
             break
         }
-        case StmtKind.EMPTY_STMT: {
-            break
-        }
-        //FIELD_STMT,
         case StmtKind.FOR_STMT: {
+            var stmt = node as (*ForStmt)
+            if(this.visitStmt(stmt.init)) {
+                return true
+            }
+            if(this.visitExpr(stmt.cond)) {
+                return true
+            }
+            if(this.visitStmt(stmt.post)) {
+                return true
+            }
+            if(this.visitStmt(stmt.body)) {
+                return true
+            }
             break
         }
         case StmtKind.FUNC_BODY_STMT: {
-            break
-        }
-        case StmtKind.GOTO_STMT: {
+            var stmt = node as (*FuncBodyStmt)
+            for(var i = 0; i < stmt.stmts.size(); i += 1) {
+                var s = stmt.stmts.get(i)
+                if(this.visitStmt(s)) {
+                    return true
+                }
+            }
             break
         }
         case StmtKind.IF_STMT: {
-            break
-        }
-        case StmtKind.LABEL_STMT: {
+            var stmt = node as (*IfStmt)
+            if(this.visitExpr(stmt.cond)) {
+                return true
+            }
+
+            if(this.visitStmt(stmt.then)) {
+                return true
+            }
+
+            if(this.visitStmt(stmt.elseStmt)) {
+                return true
+            }
             break
         }
         case StmtKind.MODULE_STMT: {
@@ -462,9 +491,6 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
             }
             break
         }
-        case StmtKind.NOTE_STMT: {
-            break
-        }
         case StmtKind.PARAMETERS_STMT: {
             var stmt = node as (*ParametersStmt)
 
@@ -475,15 +501,69 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
             break
         }
         case StmtKind.RETURN_STMT: {
+            var stmt = node as (*ReturnStmt)
+            if(this.visitExpr(stmt.expr)) {
+                return true
+            }
             break
         }
         case StmtKind.SWITCH_CASE_STMT: {
+            var stmt = node as (*SwitchCaseStmt)
+            if(this.visitExpr(stmt.cond)) {
+                return true
+            }
+            if(this.visitStmt(stmt.body)) {
+                return true
+            }
             break
         }
         case StmtKind.SWITCH_STMT: {
+            var stmt = node as (*SwitchStmt)
+            if(this.visitExpr(stmt.cond)) {
+                return true
+            }
+
+            for(var i = 0; i < stmt.cases.size(); i += 1) {
+                var s = stmt.cases.get(i)
+                if(this.visitStmt(s)) {
+                    return true
+                }
+            }
+
+            if(this.visitStmt(stmt.defaultStmt)) {
+                return true
+            }
             break
         }
         case StmtKind.WHILE_STMT: {
+            var stmt = node as (*WhileStmt)
+            if(this.visitExpr(stmt.cond)) {
+                return true
+            }
+            if(this.visitStmt(stmt.body)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.BREAK_STMT: {
+            break
+        }
+        case StmtKind.CONTINUE_STMT: {
+            break
+        }
+        case StmtKind.EMPTY_STMT: {
+            break
+        }
+        case StmtKind.GOTO_STMT: {
+            break
+        }
+        case StmtKind.COMP_STMT: {
+            break
+        }
+        case StmtKind.LABEL_STMT: {
+            break
+        }
+        case StmtKind.NOTE_STMT: {
             break
         }
     }
@@ -496,80 +576,243 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
 
     switch(node.kind) {
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            var expr = node as (*ArrayDesignationExpr)
+            if(this.visitExpr(expr.value)) {
+                return true
+            }
+            if(this.visitExpr(expr.index)) {
+                return true
+            }
             break
         }
         case StmtKind.ARRAY_INIT_EXPR: {
+            var expr = node as (*ArrayInitExpr)
+
+            if(this.isTypeAtPos(expr.type)) {
+                return true
+            }
+
+            for(var i = 0; i < expr.values.size(); i += 1) {
+                var e = expr.values.get(i)
+                if(this.visitExpr(e)) {
+                    return true
+                }
+            }
             break
         }
         case StmtKind.BINARY_EXPR: {
-            break
-        }
-        case StmtKind.BOOLEAN_EXPR: {
+            var expr = node as (*BinaryExpr)
+            if(this.visitExpr(expr.left)) {
+                return true
+            }
+            if(this.visitExpr(expr.right)) {
+                return true
+            }
             break
         }
         case StmtKind.CAST_EXPR: {
-            break
-        }
-        case StmtKind.CHAR_EXPR: {
+            var expr = node as (*CastExpr)
+            if(this.visitExpr(expr.exprToCast)) {
+                return true
+            }
+            if(this.isTypeAtPos(expr.castTo)) {
+                return true
+            }
             break
         }
         case StmtKind.FUNC_CALL_EXPR: {
+            var expr = node as (*FuncCallExpr)
+
+            /* NOTE: This is already accounted for in the visitExpr(expr.object)
+            for(var i = 0; i < expr.genericArgs.size(); i += 1) {
+                var arg = expr.genericArgs.get(i)
+                if(this.isTypeAtPos(arg)) {
+                    var name = arg as (*NameTypeSpec)
+                    this.lsp.log("Found type: ~%s\n", name.name)
+                    if(name.typeInfo) {
+                        this.lsp.log("TypeInfo: ~%s\n", TypeKindAsStr(name.typeInfo.kind))
+                    }
+                    else {
+                        this.lsp.log("No TypeInfo\n")
+                    }
+                    return true
+                }
+            }*/
+
+            if(this.visitExpr(expr.object)) {
+                return true
+            }
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                var arg = expr.arguments.get(i)
+                if(this.visitExpr(arg)) {
+                    return true
+                }
+            }
             break
         }
-        case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            break
-        }
-        case StmtKind.GET_EXPR: {
-            break
-        }
-        case StmtKind.GROUP_EXPR: {
-            break
-        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR:
         case StmtKind.IDENTIFIER_EXPR: {
-            break
-        }
-        case StmtKind.INIT_EXPR: {
-            break
-        }
-        case StmtKind.INIT_ARG_EXPR: {
-            break
-        }
-        case StmtKind.NULL_EXPR: {
-            break
-        }
-        case StmtKind.NUMBER_EXPR: {
-            break
-        }
-        case StmtKind.OFFSET_OF_EXPR: {
-            break
-        }
-        case StmtKind.SET_EXPR: {
-            break
-        }
-        case StmtKind.SIZE_OF_EXPR: {
-            break
-        }
-        case StmtKind.STRING_EXPR: {
-            break
-        }
-        case StmtKind.SUBSCRIPT_GET_EXPR: {
-            break
-        }
-        case StmtKind.SUBSCRIPT_SET_EXPR: {
-            break
-        }
-        case StmtKind.TERNARY_EXPR: {
+            var expr = node as (*IdentifierExpr)
+            if(this.isTypeAtPos(expr.type)) {
+                return true
+            }
             break
         }
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            var expr = node as (*TypeIdentifierExpr)
+            if(this.isTypeAtPos(expr.type)) {
+                return true
+            }
             break
         }
+        case StmtKind.GET_EXPR: {
+            var expr = node as (*GetExpr)
+            if(this.visitExpr(expr.object)) {
+                return true
+            }
+            if(this.visitExpr(expr.field)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.GROUP_EXPR: {
+            var expr = node as (*GroupExpr)
+            if(this.visitExpr(expr.groupedExpr)) {
+                return true
+            }
+            break
+        }
+
+        case StmtKind.INIT_EXPR: {
+            var expr = node as (*InitExpr)
+            if(this.isTypeAtPos(expr.type)) {
+                return true
+            }
+            for(var i = 0; i < expr.genericArgs.size(); i += 1) {
+                var arg = expr.genericArgs.get(i)
+                if(this.isTypeAtPos(arg)) {
+                    return true
+                }
+            }
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                var arg = expr.arguments.get(i)
+                if(this.visitExpr(arg)) {
+                    return true
+                }
+            }
+            break
+        }
+        case StmtKind.INIT_ARG_EXPR: {
+            var expr = node as (*InitArgExpr)
+
+            if(this.visitExpr(expr.value)) {
+                return true
+            }
+
+            if(expr.fieldName.type == TokenType.IDENTIFIER) {
+                if(this.isTokenAtPos(expr.fieldName)) {
+                    // TODO: Field reference
+                    return true
+                }
+            }
+            break
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            var expr = node as (*OffsetOfExpr)
+            if(this.isTypeAtPos(expr.type)) {
+                return true
+            }
+
+            if(expr.field.type == TokenType.IDENTIFIER) {
+                if(this.isTokenAtPos(expr.field)) {
+                    // TODO: Field reference
+                    return true
+                }
+            }
+            break
+        }
+        case StmtKind.SET_EXPR: {
+            var expr = node as (*SetExpr)
+            if(this.visitExpr(expr.object)) {
+                return true
+            }
+            if(this.visitExpr(expr.field)) {
+                return true
+            }
+            if(this.visitExpr(expr.value)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var expr = node as (*SizeOfExpr)
+            if(this.visitExpr(expr.sizeOfExpr)) {
+                return true
+            }
+            break
+        }
+
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            var expr = node as (*SubscriptGetExpr)
+            if(this.visitExpr(expr.object)) {
+                return true
+            }
+            if(this.visitExpr(expr.index)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            var expr = node as (*SubscriptSetExpr)
+            if(this.visitExpr(expr.object)) {
+                return true
+            }
+            if(this.visitExpr(expr.index)) {
+                return true
+            }
+            if(this.visitExpr(expr.value)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.TERNARY_EXPR: {
+            var expr = node as (*TernaryExpr)
+            if(this.visitExpr(expr.cond)) {
+                return true
+            }
+            if(this.visitExpr(expr.then)) {
+                return true
+            }
+            if(this.visitExpr(expr.other)) {
+                return true
+            }
+            break
+        }
+
         case StmtKind.TYPE_OF_EXPR: {
+            var expr = node as (*TypeOfExpr)
+            if(this.isTypeAtPos(expr.type)) {
+                return true
+            }
+
+            if(this.visitExpr(expr.typeOfExpr)) {
+                return true
+            }
             break
         }
         case StmtKind.UNARY_EXPR: {
+            var expr = node as (*UnaryExpr)
+            if(this.visitExpr(expr.unaryExpr)) {
+                return true
+            }
             break
         }
+
+        case StmtKind.NULL_EXPR:
+        case StmtKind.NUMBER_EXPR:
+        case StmtKind.STRING_EXPR:
+        case StmtKind.CHAR_EXPR:
+        case StmtKind.BOOLEAN_EXPR:
         case StmtKind.POISON_EXPR: {
             break
         }

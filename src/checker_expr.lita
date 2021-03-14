@@ -591,13 +591,21 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         return false
     }
 
-    // to generic type inference
-    if(!funcPtr.genericParams.empty() && expr.genericArgs.empty()) {
-        funcPtr = this.inferFuncCallExpr(expr, funcPtr, suppliedArgs, isMethodCall)
+    // apply generic type inferences if there are generics and no generic arguments
+    if(!funcPtr.genericParams.empty()) {
+        if(expr.genericArgs.empty()) {
+            funcPtr = this.inferFuncCallExpr(expr, funcPtr, suppliedArgs, isMethodCall)
 
-        // unable to infer types
-        if(!funcPtr) {
-            return false
+            // unable to infer types
+            if(!funcPtr) {
+                return false
+            }
+        }
+        else {
+            for(var i = 0; i < expr.genericArgs.size(); i += 1) {
+                var arg = expr.genericArgs.get(i)
+                this.resolveTypeSpec(arg)
+            }
         }
     }
 
