@@ -260,7 +260,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
     defer if(hasGenerics) {
         this.genericParamStack.pop()
     }
-
+// TODO: Add field references!!
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 
@@ -292,6 +292,8 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                         // TODO: Recursively check for duplicate members
                     }
                 }
+
+
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {

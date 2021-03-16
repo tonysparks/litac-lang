@@ -1459,6 +1459,7 @@ public func (this: *AggregateTypeInfo) getFieldIndex(name: *const char) : i32 {
                 goto err;
             }
         }
+        index += 1
     }
 err:
     return -1
