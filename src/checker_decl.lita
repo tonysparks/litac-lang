@@ -14,6 +14,7 @@ import "string_view"
 import "string"
 import "generics"
 import "assert"
+import "common"
 
 import "ast_print"
 import "libc"
@@ -260,7 +261,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
     defer if(hasGenerics) {
         this.genericParamStack.pop()
     }
-// TODO: Add field references!!
+
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 
@@ -283,17 +284,6 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 }
 
                 this.checkAggregateFieldDuplicate(aggDecl, varField.name.str, i)
-
-                if(varField.attributes.isUsing) {
-                    if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
-                        this.result.addError(varField.startPos, "'using' can only be used on aggregate types (or pointer to an aggregate)")
-                    }
-                    else {
-                        // TODO: Recursively check for duplicate members
-                    }
-                }
-
-
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
@@ -389,8 +379,63 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             }
         }
     }
+
+    this.addFieldReferences(aggDecl, aggDecl.sym.type, 0)
     return true
 }
+
+
+func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentTypeInfo: *TypeInfo, position: i32) : i32 {
+    for(var i = 0; i < aggDecl.fields.size(); i+=1) {
+        var field = &aggDecl.fields.elements[i]
+        if(!field.typeInfo) {
+            position += 1
+            continue
+        }
+
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                this.lita.references.addFieldReference(field.varField.startPos, parentTypeInfo, position)
+
+                if(varField.attributes.isUsing) {
+                    if(IsAggregate(field.typeInfo) || IsPtrAggregate(field.typeInfo)) {
+                        var aggInfo = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
+                        position += aggInfo.decl.fields.size()
+                    }
+                }
+                else {
+                    position += 1
+                }
+                break;
+            }
+            case StmtKind.ENUM_FIELD_DECL: {
+                this.lita.references.addFieldReference(field.enumField.startPos, parentTypeInfo, position)
+                position += 1
+                break;
+            }
+            case StmtKind.UNION_FIELD_DECL:
+            case StmtKind.STRUCT_FIELD_DECL: {
+                if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
+                    this.lita.references.addFieldReference(field.aggregateField.startPos, parentTypeInfo, position)
+                    position += 1
+                }
+                else {
+                    position = this.addFieldReferences(field.aggregateField, parentTypeInfo, position)
+                }
+                break;
+            }
+            case StmtKind.POISON_EXPR: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+    return position
+}
+
 
 func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *EnumFieldEntryDecl, index: i32) : bool {
     var hasDuplicates = false
@@ -409,6 +454,7 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
 }
 
 public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
+    var parentTypeInfo = enumDecl.sym.type
     for(var i = 0; i < enumDecl.fields.size(); i+=1) {
         var field = enumDecl.fields.get(i)
         if(field.value) {
@@ -422,6 +468,7 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
         }
 
         this.checkEnumFieldDuplicate(enumDecl, field, i)
+        this.lita.references.addFieldReference(field.startPos, parentTypeInfo, i)
     }
     return true
 }

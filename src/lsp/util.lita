@@ -715,7 +715,8 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
 
             if(expr.fieldName.type == TokenType.IDENTIFIER) {
                 if(this.isTokenAtPos(expr.fieldName)) {
-                    // TODO: Field reference
+                    this.result.kind = SourceLocationKind.AST
+                    this.result.node = &node.stmt.node
                     return true
                 }
             }

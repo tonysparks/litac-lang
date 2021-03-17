@@ -1,0 +1,249 @@
+import "mem"
+
+// TODO: once generics is enhanced to accept literals, replace
+// this with a generic argument
+const BUCKET_SIZE = 32
+
+struct Bucket<T> {
+    elements: [BUCKET_SIZE]T
+    length: i8
+    next: *Bucket<T>
+}
+
+public struct BucketArray<T> {
+    allocator: *const Allocator
+    buckets: Bucket<T>
+    current: *Bucket<T>
+    length: i32
+}
+
+public func (this: *BucketArray<T>) init<T>(initialSize: i32 = 16,
+                                            alloc: *const Allocator = defaultAllocator) {
+    this.length = 0
+    this.allocator = alloc
+    this.buckets.length = 0
+    this.buckets.next = null
+    this.current = &this.bucket
+
+    var bucket = &this.buckets
+
+    do {
+        if(initialSize <= BUCKET_SIZE) {
+            return;
+        }
+
+        initialSize -= BUCKET_SIZE
+
+        var newBucket = this.allocator.alloc(sizeof(:Bucket<T>)) as (*Bucket<T>)
+        newBucket.length = 0
+        newBucket.next = 0
+        bucket.next = newBucket
+
+        bucket = newBucket
+    } while(bucket);
+}
+
+public func (this: *BucketArray<T>) free<T>() {
+    var bucket = this.buckets.next
+    while(bucket) {
+        var next = bucket.next
+        this.allocator.free(next)
+        bucket = next
+    }
+
+    this.length = 0
+    this.buckets.length = 0
+    this.buckets.next = 0
+}
+
+func (this: *BucketArray<T>) ensureCapacity<T>() {
+    if((this.current.length + 1) >= BUCKET_SIZE) {
+        var newBucket = this.current.next
+        if(!newBucket) {
+            newBucket = this.allocator.alloc(sizeof(:Bucket<T>)) as (*Bucket<T>)
+            newBucket.next = null
+        }
+
+        newBucket.length = 0
+
+        this.current.next = newBucket
+        this.current = newBucket
+    }
+}
+
+public func (this: *BucketArray<T>) add<T>(element: T) {
+    this.ensureCapacity()
+
+    #if (getTypeKind("element") == "ARRAY")
+        memcpy(&this.current.elements[this.current.length], element as (*void), sizeof(:T));
+    #else
+        this.current.elements[this.current.length] = element;
+    #end
+
+    this.current.length += 1
+    this.length += 1
+}
+
+public func (this: *BucketArray<T>) push<T>(element: T) {
+    this.add<T>(element)
+}
+
+func (this: *BucketArray<T>) getBucketAt<T>(index: i32) : *Bucket<T> {
+    var bucket = &this.buckets
+
+    do {
+        if(index < BUCKET_SIZE) {
+            return bucket
+        }
+        index -= BUCKET_SIZE
+        bucket = bucket.next
+    } while(bucket);
+
+    return bucket
+}
+
+public func (this: *BucketArray<T>) get<T>(index: i32) : T {
+    assert(index >= 0 && index < this.length)
+
+    var bucket = this.getBucketAt<T>(index)
+    assert(bucket != null)
+
+    var bucketIndex = (index % BUCKET_SIZE)
+    return bucket.elements[bucketIndex]
+}
+
+public func (a: *BucketArray<T>) getPtr<T>(index: i32) : *T {
+    assert(index >= 0 && index < this.length)
+
+    var bucket = this.getBucketAt<T>(index)
+    assert(bucket != null)
+
+    var bucketIndex = (index % BUCKET_SIZE)
+    return &bucket.elements[bucketIndex]
+}
+
+public func (this: *BucketArray<T>) set<T>(index: i32, element: T) {
+    assert(index >= 0 && index < this.length)
+
+    var bucket = this.getBucketAt<T>(index)
+    assert(bucket != null)
+
+    var bucketIndex = (index % BUCKET_SIZE)
+
+    #if (getTypeKind("element") == "ARRAY")
+        memcpy(&bucket.elements[bucketIndex], element as (*void), sizeof(:T));
+    #else
+        bucket.elements[bucketIndex] = element;
+    #end
+}
+
+public func (this: *BucketArray<T>) first<T>() : T {
+    assert(this.length != 0)
+
+    return this.buckets.elements[0]
+}
+
+public func (a: *BucketArray<T>) last<T>() : T {
+    assert(this.length != 0)
+
+    return this.current.elements[this.current.length - 1]
+}
+
+public func (this: *BucketArray<T>) pop<T>() : T {
+    assert(this.length != 0)
+
+    var r = this.current.elements[this.current.length - 1]
+
+    this.current.length -= 1
+    this.length         -= 1
+
+    if(this.current.length < 1) {
+        this.current = this.getBucketAt(this.length)
+    }
+    return r
+}
+
+/* TODO: This is a pretty costly operation...
+public func (this: *BucketArray<T>) removeAt<T>(index: i32) : T {
+    assert(index >= 0 && index < this.length)
+
+    var r = a.elements[index]
+    if(index < a.length - 1) {
+        memmove((&a.elements[index]) as (*void),
+                (&a.elements[index + 1]) as (*const void),
+                ((a.length - 1) - index) * sizeof(:T))
+    }
+
+    a.length -= 1
+    return r
+}*/
+
+/* TODO: This is a pretty costly operation...
+public func (a: *BucketArray<T>) insertAt<T>(index: i32, element: T) {
+    assert(index >= 0 && index <= a.length)
+
+    if(index == a.length) {
+        a.add(element)
+        return;
+    }
+
+    a.length += 1
+
+    // not optimal at all -- potential repeated mem moves
+    if(a.length + 1 > a.capacity) {
+        ArrayGrow<T>(a, 1)
+    }
+
+    memmove((&a.elements[index + 1]) as (*void),
+            (&a.elements[index]) as (*const void),
+            (a.length - index) * sizeof(:T))
+
+    a.set<T>(index, element)
+}*/
+
+public func (this: *BucketArray<T>) addAll<T>(other: *Array<T>) {
+    if(!other || other.length == 0) {
+        return;
+    }
+
+    for(var i = 0; i < other.length; i += 1) {
+        var element = other.get(i)
+        this.add(element)
+    }
+}
+
+public func (this: *BucketArray<T>) forEach<T>(fn : func<T>(T) : bool) {
+    var bucket = &this.buckets
+
+    do {
+        for(var i = 0; i < bucket.length; i+=1) {
+            if(fn<T>(bucket.elements[i])) {
+                break;
+            }
+        }
+
+        bucket = bucket.next
+    } while(bucket);
+}
+
+@inline
+public func (this: *BucketArray<T>) empty<T>() : bool {
+    return this.length == 0
+}
+
+@inline
+public func (this: *BucketArray<T>) size<T>() : i32 {
+    return this.length
+}
+
+@inline
+public func (a: *BucketArray<T>) clear<T>() {
+    var bucket = &this.buckets
+
+    do {
+        bucket.length = 0
+        bucket = bucket.next
+    } while(bucket);
+
+    this.length = 0
+}

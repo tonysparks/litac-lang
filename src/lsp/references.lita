@@ -99,8 +99,8 @@ public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
 }
 
 
-public func (this: *ReferenceDatabase) addFieldReference(type: *NameTypeSpec, parent: *TypeInfo, offset: i32) {
-    if(!type) return;
+public func (this: *ReferenceDatabase) addFieldReference(srcPos: SrcPos, parent: *TypeInfo, offset: i32) {
+    if(!parent) return;
 
     /*
     var base = parent.getBaseType()
@@ -112,7 +112,7 @@ public func (this: *ReferenceDatabase) addFieldReference(type: *NameTypeSpec, pa
     this.fieldReferences.add(FieldReference {
         .parent = parent.typeid,
         .offset = offset,
-        .pos = type.pos
+        .pos = srcPos
     })
 }
 
@@ -134,5 +134,3 @@ public func (this: *ReferenceDatabase) getFieldReferences(typeid: Typeid, offset
     }
 }
 
-public func (this: *ReferenceDatabase) buildDatabase() {
-}

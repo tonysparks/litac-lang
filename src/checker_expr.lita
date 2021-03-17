@@ -14,6 +14,7 @@ import "string"
 import "array"
 import "checker"
 import "assert"
+import "common"
 
 import "ast_print"
 import "libc"
@@ -853,6 +854,36 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
     return true
 }
 
+
+func (this: *TypeChecker) addInitArgumentsReferences(type: *TypeInfo, expr: *InitExpr) {
+    assert(expr != null)
+    assert(type != null)
+
+    if(IsAggregate(type)) {
+        var fieldName:[MAX_SYMBOL_NAME]char;
+        var fieldNameStr = StringInit(fieldName, MAX_SYMBOL_NAME)
+
+        var aggInfo = type as (*AggregateTypeInfo)
+        for(var i = 0; i < expr.arguments.size(); i += 1) {
+            var arg = expr.arguments.get(i)
+            var field: FieldStmt;
+
+            if(arg.fieldName.type == TokenType.IDENTIFIER) {
+                fieldNameStr.format("%.*s", arg.fieldName.str.length, arg.fieldName.str.buffer)
+                field = aggInfo.getField(fieldNameStr.cStr())
+
+                var fieldResult = aggInfo.getFieldPosition(fieldNameStr.cStr())
+                if(fieldResult.aggInfo) {
+                    this.lita.references.addFieldReference(arg.startPos,
+                                                           fieldResult.aggInfo,
+                                                           fieldResult.position)
+                }
+            }
+        }
+    }
+}
+
+
 func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) : bool {
     assert(expr != null)
     assert(type != null)
@@ -1003,6 +1034,8 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
         }
     }
 
+    this.addInitArgumentsReferences(type, expr)
+
     expr.operand.typeInfo = type
     return this.checkInitArguments(type, expr)
 }
@@ -1053,7 +1086,7 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
 
     var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
     if(fieldResult.aggInfo) {
-        this.lita.references.addFieldReference(expr.field.type,
+        this.lita.references.addFieldReference(expr.field.type.pos,
                                                 fieldResult.aggInfo,
                                                 fieldResult.position)
     }
@@ -1275,7 +1308,7 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
             return false
         }
 
-        this.lita.references.addFieldReference(expr.field.type, enumInfo, enumInfo.getFieldIndex(expr.field.type.name))
+        this.lita.references.addFieldReference(expr.field.type.pos, enumInfo, enumInfo.getFieldIndex(expr.field.type.name))
 
         expr.flags |= GetExprFlags.IS_ENUM
         expr.operand.typeInfo = &I32_TYPE
@@ -1293,7 +1326,7 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         // is this a vanilla field access?
         var field = aggInfo.getField(expr.field.type.name)
         if(field.kind != StmtKind.POISON_EXPR) {
-            this.lita.references.addFieldReference(expr.field.type, aggInfo, aggInfo.getFieldIndex(expr.field.type.name))
+            this.lita.references.addFieldReference(expr.field.type.pos, aggInfo, aggInfo.getFieldIndex(expr.field.type.name))
 
             expr.field.operand.typeInfo = field.typeInfo
             expr.operand.typeInfo = field.typeInfo
@@ -1305,7 +1338,7 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         if(field.kind != StmtKind.POISON_EXPR) {
             var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
             if(fieldResult.aggInfo) {
-                this.lita.references.addFieldReference(expr.field.type,
+                this.lita.references.addFieldReference(expr.field.type.pos,
                                                        fieldResult.aggInfo,
                                                        fieldResult.position)
             }

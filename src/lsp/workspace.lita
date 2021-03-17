@@ -201,8 +201,48 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                 }
                 break
             }
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = location.node as (*VarFieldDecl)
+                var parentNode = varField.parent
+                while(parentNode && (parentNode.kind == StmtKind.UNION_DECL || parentNode.kind == StmtKind.STRUCT_DECL)) {
+                    var decl = parentNode as (*AggregateDecl)
+                    if(decl.flags & AggregateFlags.IS_ANONYMOUS) {
+                        parentNode = decl.parent
+                    }
+                    else {
+                        var parentType = decl.sym.type
+                        if(parentType) {
+                            var aggInfo = parentType as (*AggregateTypeInfo)
+                            var fieldResult = aggInfo.getFieldPosition(varField.name.asString())
+                            this.lsp.log("Getting field position: %d\n", fieldResult.position)
+                            if(fieldResult.aggInfo) {
+                                return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
+                            }
+                        }
+                        break
+                    }
+                }
+                break
+            }
             case StmtKind.PARAM_DECL: {
                 // TODO: the name of the parameter (scope search)
+                break
+            }
+            case StmtKind.INIT_ARG_EXPR: {
+                var arg = location.node as (*InitArgExpr)
+                var parentNode = arg.parent
+                if(parentNode && (parentNode.kind == StmtKind.INIT_EXPR)) {
+                    var init = parentNode as (*InitExpr)
+                    var parentType = init.operand.typeInfo
+                    if(IsAggregate(parentType)) {
+                        var aggInfo = parentType as (*AggregateTypeInfo)
+                        var fieldResult = aggInfo.getFieldPosition(arg.fieldName.asString())
+                        this.lsp.log("Getting field position: %d\n", fieldResult.position)
+                        if(fieldResult.aggInfo) {
+                            return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
+                        }
+                    }
+                }
                 break
             }
             case StmtKind.IDENTIFIER_EXPR: {
@@ -219,6 +259,12 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                         return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
                     }
                 }
+                else if (base.kind == TypeKind.ENUM) {
+                    var enumInfo = base as (*EnumTypeInfo)
+                    var index = enumInfo.getFieldIndex(expr.field.type.name)
+                    this.lsp.log("Getting enum position: %d\n", index)
+                    return this.findFieldReferences(enumInfo.typeid, index, alloc)
+                }
                 break
             }
             case StmtKind.SET_EXPR: {
@@ -230,6 +276,12 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     if(fieldResult.aggInfo) {
                         return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
                     }
+                }
+                else if (base.kind == TypeKind.ENUM) {
+                    var enumInfo = base as (*EnumTypeInfo)
+                    var index = enumInfo.getFieldIndex(expr.field.type.name)
+                    this.lsp.log("Getting enum position: %d\n", index)
+                    return this.findFieldReferences(enumInfo.typeid, index, alloc)
                 }
                 break
             }
