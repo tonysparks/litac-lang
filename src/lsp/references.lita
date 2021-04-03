@@ -61,6 +61,7 @@ public struct ReferenceDatabase {
     allocator: *const Allocator
     typeReferences: Array<Reference>
     fieldReferences: Array<FieldReference>
+    symbols: Map<usize, Array<SrcPos>>
 }
 
 
@@ -68,7 +69,22 @@ public func (this: *ReferenceDatabase) init(allocator: *const Allocator) {
     this.allocator = allocator
     this.typeReferences.init(1024, allocator)
     this.fieldReferences.init(1024, allocator)
+    this.symbols.init(Array<SrcPos>{}, 1024, PtrHashFn<usize>, PtrEqualFn<usize>, allocator)
 }
+
+public func (this: *ReferenceDatabase) addSymbolReference(symbol: *Symbol, pos: SrcPos) {
+    if(!symbol) return;
+
+    var ptr = symbol as (usize)
+    if(!this.symbols.contains(ptr)) {
+        var locations = ArrayInit<SrcPos>(16, this.allocator)
+        this.symbols.put(ptr, locations)
+    }
+
+    var locations = this.symbols.get(ptr)
+    locations.add(pos)
+}
+
 
 public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
     if(!type) return;
@@ -76,8 +92,14 @@ public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
     var base = type.getBaseType()
     if(!base) return;
 
-    var typeInfo = base.typeInfo
+    this.addTypeReferenceByTypeInfo(type.pos, base.typeInfo)
+}
+
+
+public func (this: *ReferenceDatabase) addTypeReferenceByTypeInfo(srcPos: SrcPos, typeInfo: *TypeInfo) {
     if(!typeInfo) return;
+
+    typeInfo = typeInfo.getBaseType()
 
     // if this is a generic type, make sure to add references
     // to the base generic template - this allows for the generic template itself
@@ -87,27 +109,19 @@ public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
             var genInfo = typeInfo as (*GenericTypeInfo)
             this.typeReferences.add(Reference {
                 .type = genInfo.genericTypeid,
-                .pos = type.pos
+                .pos = srcPos
             })
         }
     }
 
     this.typeReferences.add(Reference {
         .type = typeInfo.typeid,
-        .pos = type.pos
+        .pos = srcPos
     })
 }
 
-
 public func (this: *ReferenceDatabase) addFieldReference(srcPos: SrcPos, parent: *TypeInfo, offset: i32) {
     if(!parent) return;
-
-    /*
-    var base = parent.getBaseType()
-    if(!base) return;
-
-    var typeInfo = base.typeInfo
-    if(!typeInfo) return;*/
 
     this.fieldReferences.add(FieldReference {
         .parent = parent.typeid,

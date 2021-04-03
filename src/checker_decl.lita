@@ -25,6 +25,12 @@ import "checker_expr"
 public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     assert(decl != null)
 
+    defer {
+        if(decl.sym && decl.sym.type) {
+            this.references.addTypeReferenceByTypeInfo(decl.startPos, decl.sym.type)
+        }
+    }
+
     switch(decl.kind) {
         case StmtKind.IMPORT_DECL: {
             return true;
@@ -343,6 +349,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     // using the appropriate generic arguments create the concrete
                     // symbol
                     sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
+                    sym.flags |= SymbolFlags.IS_INCOMPLETE
                 }
 
                 if(!sym) {
@@ -351,7 +358,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
                 field.aggregateField.sym = sym
 
-                sym.flags |= SymbolFlags.IS_INCOMPLETE
+                //sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
                 this.finishResolveSymbol(sym)
 
@@ -380,7 +387,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
         }
     }
 
+    Info("Aggregate: %s %llu\n", aggDecl.sym.type.toStringDebug(), aggDecl.sym.type.typeid)
+    //this.references.addTypeReferenceByTypeInfo(aggDecl.startPos, aggDecl.sym.type)
     this.addFieldReferences(aggDecl, aggDecl.sym.type, 0)
+
     return true
 }
 
@@ -417,6 +427,7 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
+                    Info("Aggregate Field: %s.%s  %llu %d\n", parentTypeInfo.toStringDebug(), field.aggregateField.name.asString(), parentTypeInfo.typeid, position)
                     this.lita.references.addFieldReference(field.aggregateField.startPos, parentTypeInfo, position)
                     position += 1
                 }

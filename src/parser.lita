@@ -297,7 +297,7 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
         alias = *identifier
     }
 
-    return NewImportDecl(pos, p.pos(), moduleName, alias, isUsing, p.allocator) as (*ImportDecl)
+    return NewImportDecl(pos, p.prevPos(), moduleName, alias, isUsing, p.allocator) as (*ImportDecl)
 
 err:
     return null;
@@ -336,7 +336,7 @@ func (p: *Parser) notes(notes: *Array<*NoteStmt>) : bool {
             }
         }
 
-        var note = NewNoteStmt(pos, p.pos(), name, attributes, p.allocator) as (*NoteStmt)
+        var note = NewNoteStmt(pos, p.prevPos(), name, attributes, p.allocator) as (*NoteStmt)
         notes.add(note)
     }
 
@@ -375,7 +375,7 @@ func (p: *Parser) varDeclaration() : *Decl {
         expr = p.expression()
     }
 
-    return NewVarDecl(pos, p.pos(), name, type, expr, p.allocator)
+    return NewVarDecl(pos, p.prevPos(), name, type, expr, p.allocator)
 
 err:
     return p.poisonDecl(pos)
@@ -468,7 +468,7 @@ func (p: *Parser) funcDeclaration() : *Decl {
 
     p.funcLevel -= 1;
 
-    return NewFuncDecl(pos, p.pos(), name, genericParams, parameters, body, returnType, flags, p.allocator)
+    return NewFuncDecl(pos, p.prevPos(), name, genericParams, parameters, body, returnType, flags, p.allocator)
 
 err:
     return p.poisonDecl(pos)
@@ -538,7 +538,7 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
     }
     p.aggregateLevel -= 1;
 
-    return NewAggregateDecl(pos, p.pos(), kind, name, genericParams, fields, flags, p.allocator)
+    return NewAggregateDecl(pos, p.prevPos(), kind, name, genericParams, fields, flags, p.allocator)
 
 err:
     return p.poisonDecl(pos)
@@ -578,7 +578,7 @@ func (p: *Parser) enumDeclaration() : *Decl {
         goto err;
     }
 
-    return NewEnumDecl(pos, p.pos(), name, fields, p.allocator)
+    return NewEnumDecl(pos, p.prevPos(), name, fields, p.allocator)
 
 err:
     return p.poisonDecl(pos)
@@ -606,7 +606,7 @@ func (p: *Parser) typedefDeclaration() : *Decl {
         }
     }
 
-    return NewTypedefDecl(pos, p.pos(), name, genericParams, aliasedType, p.allocator)
+    return NewTypedefDecl(pos, p.prevPos(), name, genericParams, aliasedType, p.allocator)
 
 err:
     return p.poisonDecl(pos)
@@ -636,7 +636,7 @@ func (p: *Parser) paramDeclaration() : *ParameterDecl {
         defaultExpr = p.constExpression()
     }
 
-    return NewParameterDecl(pos, p.pos(), name, type, defaultExpr, isUsing, p.allocator) as (*ParameterDecl)
+    return NewParameterDecl(pos, p.prevPos(), name, type, defaultExpr, isUsing, p.allocator) as (*ParameterDecl)
 
 err:
     return null

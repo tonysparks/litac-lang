@@ -106,6 +106,8 @@ public func (this: *LspServer) readMessage() {
         return;
     }
 
+    var startTime = SystemTimeMSec()
+    defer this.log(">>> Request Handling Time: %.4fms\n\n", SystemTimeMSec() - startTime)
     // free memory
     defer this.requestAllocator.currentOffset = 0
 
@@ -209,6 +211,9 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
     else if(strcmp(method, "textDocument/references") == 0) {
         this.handleTextDocumentReferencesMessage(msg, params)
     }
+    else if(strcmp(method, "textDocument/definition") == 0) {
+        this.handleTextDocumentDefinitionMessage(msg, params)
+    }
     else if(strcmp(method, "$/cancelRequest") == 0) {
         // TODO: do nothing for right now
     }
@@ -311,6 +316,23 @@ public func (this: *LspServer) handleTextDocumentReferencesMessage(msg: *JsonNod
     this.writeResponse(resp)
 }
 
+
+public func (this: *LspServer) handleTextDocumentDefinitionMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    var pos = params.getObject("position")
+    var results = this.workspace.goToDefinition(uri, pos, this.requestAlloc())
+
+    var resp = this.createResponse(msg.getInt("id"))
+    resp.put("result", results)
+    resp.put("error", JSON_NULL)
+
+    this.writeResponse(resp)
+}
 
 public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
     this.log("Running diagnostics for: '%s'\n", docUri)

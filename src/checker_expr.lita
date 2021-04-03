@@ -1920,6 +1920,8 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     expr.sym = sym
     expr.operand.typeInfo = typeInfo
 
+    this.lita.references.addSymbolReference(sym, expr.startPos)
+
     // if we are able to determine the constant of this symbol,
     // make sure this expression contains the constant
     if(sym.flags & SymbolFlags.IS_CONSTANT) {

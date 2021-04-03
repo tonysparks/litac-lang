@@ -157,6 +157,21 @@ public func SrcPosToLocation(pos: SrcPos, rootPath: *const char,  alloc: *const 
 }
 
 
+public func SrcPosWithEndToLocation(startPos: SrcPos, endPos: SrcPos, rootPath: *const char,  alloc: *const Allocator) : *JsonNode {
+    if(!startPos.filename) return null;
+
+    var absPath = [MAX_PATH]char{0}
+    GetAbsolutePath(rootPath, startPos.filename, absPath)
+
+    var uri = [MAX_PATH]char{0}
+    FilePathToUri(absPath, uri)
+
+    var result = CreateJsonObject(alloc)
+    result.putStr("uri", uri)
+    result.put("range", SrcPosWithEndToRange(startPos, endPos, alloc))
+    return result
+}
+
 public func SrcPosToRange(pos: SrcPos, alloc: *const Allocator) : *JsonNode {
     var lineNumber = MAX(pos.lineNumber - 1, 0) as (i64)
 
@@ -169,6 +184,26 @@ public func SrcPosToRange(pos: SrcPos, alloc: *const Allocator) : *JsonNode {
     end.putIntNumber("line", lineNumber)
     var length = MAX(1i64, (pos.end - pos.start) as (i64))
     end.putIntNumber("character", offset + length)
+
+    var range = CreateJsonObject(alloc)
+    range.put("start", start)
+    range.put("end", end)
+    return range
+}
+
+public func SrcPosWithEndToRange(startPos: SrcPos, endPos: SrcPos, alloc: *const Allocator) : *JsonNode {
+    var startLineNumber = MAX(startPos.lineNumber - 1, 0) as (i64)
+
+    var start = CreateJsonObject(alloc)
+    start.putIntNumber("line", startLineNumber)
+    var startOffset = MAX(0i64, (startPos.start - startPos.lineStart) as (i64))
+    start.putIntNumber("character", startOffset)
+
+    var endLineNumber = MAX(endPos.lineNumber - 1, 0) as (i64)
+    var end = CreateJsonObject(alloc)
+    end.putIntNumber("line", endLineNumber)
+    var endOffset = MAX(1i64, (endPos.end - endPos.start) as (i64))
+    end.putIntNumber("character", endOffset)
 
     var range = CreateJsonObject(alloc)
     range.put("start", start)

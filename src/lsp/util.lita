@@ -4,7 +4,9 @@ import "lex"
 import "ast"
 import "libc"
 import "array"
+import "map"
 import "types"
+import "symbols"
 import "assert"
 
 public enum SourceLocationKind {
@@ -61,7 +63,6 @@ public struct SourceLookup {
     lookupPos: Position
     result: SourceLocation
 }
-
 
 public func (this: *SourceLookup) findAstNodeByPosition(moduleAst: *ModuleStmt, pos: Position) : SourceLocation {
     if(!moduleAst) {
