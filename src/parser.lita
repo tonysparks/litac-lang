@@ -375,7 +375,7 @@ func (p: *Parser) varDeclaration() : *Decl {
         expr = p.expression()
     }
 
-    return NewVarDecl(pos, p.prevPos(), name, type, expr, p.allocator)
+    return NewVarDecl(pos, p.pos(), name, type, expr, p.allocator)
 
 err:
     return p.poisonDecl(pos)
@@ -587,7 +587,7 @@ err:
 func (p: *Parser) typedefDeclaration() : *Decl {
     var pos = p.prevPos()
     var aliasedType = p.type()
-    if(!aliasedType)    {
+    if(!aliasedType) {
         goto err;
     }
 
@@ -606,7 +606,7 @@ func (p: *Parser) typedefDeclaration() : *Decl {
         }
     }
 
-    return NewTypedefDecl(pos, p.prevPos(), name, genericParams, aliasedType, p.allocator)
+    return NewTypedefDecl(pos, p.pos(), name, genericParams, aliasedType, p.allocator)
 
 err:
     return p.poisonDecl(pos)
@@ -619,6 +619,7 @@ func (p: *Parser) paramDeclaration() : *ParameterDecl {
     if(!identifier) {
         goto err;
     }
+
     var name = *identifier
 
     if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
@@ -636,7 +637,7 @@ func (p: *Parser) paramDeclaration() : *ParameterDecl {
         defaultExpr = p.constExpression()
     }
 
-    return NewParameterDecl(pos, p.prevPos(), name, type, defaultExpr, isUsing, p.allocator) as (*ParameterDecl)
+    return NewParameterDecl(pos, p.pos(), name, type, defaultExpr, isUsing, p.allocator) as (*ParameterDecl)
 
 err:
     return null

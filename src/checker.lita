@@ -19,6 +19,7 @@ import "generics"
 import "introspection"
 import "instrument"
 import "system"
+import "common"
 
 import "checker_decl"
 import "checker_expr"
@@ -428,6 +429,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             if(!typedefDecl.genericParams.empty()) {
                 sym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
             }
+
             this.symbolTypes.add(sym)
             break;
         }
@@ -876,6 +878,8 @@ func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol 
     if(sym) {
         sym.type = typeInfo
         this.resolveSymbol(sym)
+
+        this.lita.references.addSymbolReference(sym, decl.startPos)
     }
 
     return sym

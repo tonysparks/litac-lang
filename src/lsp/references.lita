@@ -81,7 +81,7 @@ public func (this: *ReferenceDatabase) addSymbolReference(symbol: *Symbol, pos: 
         this.symbols.put(ptr, locations)
     }
 
-    var locations = this.symbols.get(ptr)
+    var locations = this.symbols.getPtr(ptr)
     locations.add(pos)
 }
 
@@ -129,6 +129,19 @@ public func (this: *ReferenceDatabase) addFieldReference(srcPos: SrcPos, parent:
         .pos = srcPos
     })
 }
+
+public func (this: *ReferenceDatabase) getSymbolReferences(symbol: *Symbol) : Array<SrcPos> {
+    if(!symbol) return Array<SrcPos>{}
+
+    var ptr = symbol as (usize)
+    if(this.symbols.contains(ptr)) {
+        var result = this.symbols.get(ptr)
+        return result
+    }
+
+    return Array<SrcPos>{}
+}
+
 
 public func (this: *ReferenceDatabase) getTypeReferences(typeid: Typeid, results: *Array<SrcPos>) {
     for(var i = 0; i < this.typeReferences.size(); i += 1) {

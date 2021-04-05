@@ -202,7 +202,7 @@ public func SrcPosWithEndToRange(startPos: SrcPos, endPos: SrcPos, alloc: *const
     var endLineNumber = MAX(endPos.lineNumber - 1, 0) as (i64)
     var end = CreateJsonObject(alloc)
     end.putIntNumber("line", endLineNumber)
-    var endOffset = MAX(1i64, (endPos.end - endPos.start) as (i64))
+    var endOffset = MAX(1i64, (endPos.start - endPos.lineStart) as (i64))
     end.putIntNumber("character", endOffset)
 
     var range = CreateJsonObject(alloc)

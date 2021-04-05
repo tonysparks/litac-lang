@@ -8,6 +8,8 @@ import "map"
 import "types"
 import "symbols"
 import "assert"
+import "common"
+import "module"
 
 public enum SourceLocationKind {
     NONE,
@@ -18,6 +20,7 @@ public enum SourceLocationKind {
 @doc("The ast node at a particular location in the source code")
 public struct SourceLocation {
     kind: SourceLocationKind
+    module: *Module
     location: Location
     union {
         node: *Node
@@ -655,6 +658,8 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
         case StmtKind.IDENTIFIER_EXPR: {
             var expr = node as (*IdentifierExpr)
             if(this.isTypeAtPos(expr.type)) {
+                this.result.kind = SourceLocationKind.AST
+                this.result.node = &expr.node
                 return true
             }
             break

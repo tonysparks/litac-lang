@@ -150,38 +150,6 @@ func (this: *Workspace) addDocumentSymbol(results: *JsonNode, sym: *Symbol, docF
 }
 
 public func (this: *Workspace) references(uri: *const char, position: *JsonNode, alloc: *const Allocator) : *JsonNode {
-    /*if(!uri) return null;
-
-    var doc = this.openedDocuments.get(uri)
-    var pos = Position {
-        .line = position.getInt("line", 0),
-        .character = position.getInt("character", 0)
-    }
-
-    var lookup = SourceLookup {
-        .lsp = this.lsp,
-        .lookupPos = pos,
-        .result = SourceLocation {
-            .kind = SourceLocationKind.NONE,
-            .location = Location {
-                .uri = uri,
-            },
-        }
-    }
-
-    var module = this.lsp.lita.modules.get(doc.filename)
-    if(!module) {
-        this.lsp.log("No module found for: '%s'\n", doc.filename)
-        return JSON_NULL
-    }
-
-    this.lsp.log("Module for: '%s'\n", doc.filename)
-    var location = lookup.findAstNodeByPosition(module.ast, pos)
-    if(location.kind == SourceLocationKind.NONE) {
-        this.lsp.log("No ast node found at '%s:%d:%d'\n", doc.filename, pos.line, pos.character)
-        return JSON_NULL
-    }*/
-
     this.lsp.log("looking up references...\n")
     if(!uri || !position) return JSON_NULL;
 
@@ -233,9 +201,12 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                 }
                 break
             }
+            case StmtKind.CONST_DECL:
+            case StmtKind.VAR_DECL:
             case StmtKind.PARAM_DECL: {
-                // TODO: the name of the parameter (scope search)
-                break
+                var decl = location.node as (*Decl)
+                var result = this.lsp.lita.references.getSymbolReferences(decl.sym)
+                return SrcPosToLocations(this.rootPath, &result, alloc)
             }
             case StmtKind.INIT_ARG_EXPR: {
                 var arg = location.node as (*InitArgExpr)
@@ -255,7 +226,22 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                 break
             }
             case StmtKind.IDENTIFIER_EXPR: {
-                break
+                var expr = location.node as (*IdentifierExpr)
+                var result = this.lsp.lita.references.getSymbolReferences(expr.sym)
+
+
+                this.lsp.log("Reference for an identifier locations: {\n")
+                for(var i = 0; i < result.size(); i += 1) {
+                    var pos = result.get(i)
+                    this.lsp.log("Filename: '%s':%d:%d\n", pos.filename, pos.lineNumber, pos.position)
+                }
+                for(var it = this.lsp.lita.references.symbols.iter(); it.hasNext();) {
+                    var n = it.next()
+                    this.lsp.log("Symbol: %p size: %d\n", n.key, n.value.size())
+                }
+                this.lsp.log("}\n")
+
+                return SrcPosToLocations(this.rootPath, &result, alloc)
             }
             case StmtKind.GET_EXPR: {
                 var expr = location.node as (*GetExpr)
@@ -343,6 +329,7 @@ func (this: *Workspace) getNodeAtSourcePos(uri: *const char, position: *JsonNode
         .lookupPos = pos,
         .result = SourceLocation {
             .kind = SourceLocationKind.NONE,
+            .module = null,
             .location = Location {
                 .uri = uri,
             },
@@ -359,6 +346,8 @@ func (this: *Workspace) getNodeAtSourcePos(uri: *const char, position: *JsonNode
 
     this.lsp.log("Module for: '%s'\n", doc.filename)
     var location = lookup.findAstNodeByPosition(module.ast, pos)
+    location.module = module
+
     return location
 }
 
@@ -412,8 +401,11 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                 }
                 break
             }
+
+            case StmtKind.CONST_DECL:
+            case StmtKind.VAR_DECL:
             case StmtKind.PARAM_DECL: {
-                // TODO: the name of the parameter (scope search)
+                // nothing to do here, we are already at the definition
                 break
             }
             case StmtKind.INIT_ARG_EXPR: {
@@ -449,8 +441,14 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                 }
                 break
             }
+            case StmtKind.FUNC_IDENTIFIER_EXPR:
             case StmtKind.IDENTIFIER_EXPR: {
-                // TODO!
+                var expr = location.node as (*IdentifierExpr)
+                if(expr.sym && expr.sym.decl) {
+                    var decl = expr.sym.decl
+                    return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
+                }
+
                 break
             }
             case StmtKind.GET_EXPR: {
@@ -523,12 +521,25 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
     }
     else if(location.kind == SourceLocationKind.TYPE) {
         this.lsp.log("Found type: %s\n", TypeSpecKindAsStr(location.type.kind))
-        if(!location.type.typeInfo || !location.type.typeInfo.sym) {
-            return JSON_NULL
+
+        var sym: *Symbol = null
+
+        // we must manually check for aliased types, because the typechecker
+        // completely replaces these typInfos with the real type
+        if(location.type.kind == TypeSpecKind.NAME && location.module) {
+            var name = location.type as (*NameTypeSpec)
+            sym = location.module.getType(name.name)
         }
 
-        var decl = location.type.typeInfo.sym.decl
-        this.lsp.log("Found decl from type: %s\n", decl.name.asString())
+        if(!sym) {
+            if(!location.type.typeInfo || !location.type.typeInfo.sym) {
+                return JSON_NULL
+            }
+
+            sym = location.type.typeInfo.sym
+        }
+
+        var decl = sym.decl
         return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
     }
 
