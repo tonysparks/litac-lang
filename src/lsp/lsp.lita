@@ -19,6 +19,7 @@ public struct LspServer {
     applicationAllocator: LinearAllocator
 
     lita: *Lita
+
     message: StringBuffer
     output: StringBuffer
     outbound: StringBuffer
@@ -36,7 +37,7 @@ public func (this: *LspServer) init(lita: *Lita) {
     this.isRunning = false
     this.isInitialized = false
 
-    this.logFile = fopen("lsp1.log", "w")
+    this.logFile = fopen("litac_lsp.log", "w")
     if(!this.logFile) {
         printf("Couldn't open log file!\n")
     }
@@ -83,7 +84,8 @@ public func (this: *LspServer) start() {
     defer this.log("terminating Lita Language Server\n")
 
     this.isRunning = true
-    while(this.isRunning) {
+
+    while(true) {
         this.readMessage()
     }
 }
@@ -102,7 +104,7 @@ public func (this: *LspServer) readMessage() {
     this.log("Waiting for message..\n")
     var size = this.readHeader()
     if(size < 0) {
-        this.writeErrorResponse(0, "error reading 'Content-Length'")
+        this.writeErrorResponse(0, ErrorCodes.ParseError, "error reading 'Content-Length'")
         return;
     }
 
@@ -185,8 +187,19 @@ func (this: *LspServer) readHeader() : i32 {
 public func (this: *LspServer) handleMessage(msg: *JsonNode) {
     var method = msg.getStr("method", null)
     if(!method) {
-        this.writeErrorResponse(0, "no method defined")
+        this.writeErrorResponse(0, ErrorCodes.MethodNotFound, "no method defined")
         return;
+    }
+
+    // we have been requested to shutdown...
+    if(!this.isRunning) {
+        if(strcmp(method, "exit") == 0) {
+            exit(0)
+        }
+        else {
+            this.writeErrorResponse(0, ErrorCodes.InvalidRequest, "not yet properly initialized")
+            return;
+        }
     }
 
     var params = msg.getObject("params")
@@ -197,10 +210,16 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
         this.isInitialized = true
     }
     else if(!this.isInitialized) {
-        this.writeErrorResponse(0, "not yet properly initialized")
+        this.writeErrorResponse(0, ErrorCodes.ServerNotInitialized, "not yet properly initialized")
     }
     else if(strcmp(method, "textDocument/didOpen") == 0) {
         this.handleTextDocumentOpenMessage(msg, params)
+    }
+    else if(strcmp(method, "textDocument/didClose") == 0) {
+        this.handleTextDocumentCloseMessage(msg, params)
+    }
+    else if(strcmp(method, "textDocument/didSave") == 0) {
+        this.handleTextDocumentSaveMessage(msg, params)
     }
     else if(strcmp(method, "textDocument/documentSymbol") == 0) {
         this.handleTextDocumentSymbolMessage(msg, params)
@@ -215,10 +234,13 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
         this.handleTextDocumentDefinitionMessage(msg, params)
     }
     else if(strcmp(method, "$/cancelRequest") == 0) {
-        // TODO: do nothing for right now
+        // do nothing for right now
+    }
+    else if(strcmp(method, "shutdown") == 0) {
+        this.isRunning = false
     }
     else {
-        this.writeErrorResponse(0, "unsupported method: '%s'", method)
+        this.writeErrorResponse(0, ErrorCodes.MethodNotFound, "unsupported method: '%s'", method)
     }
 }
 
@@ -272,6 +294,16 @@ public func (this: *LspServer) handleTextDocumentOpenMessage(msg: *JsonNode, par
     this.writeDiagnostic(uri)
 }
 
+public func (this: *LspServer) handleTextDocumentCloseMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    this.workspace.closeDocument(uri)
+}
+
 public func (this: *LspServer) handleTextDocumentSymbolMessage(msg: *JsonNode, params: *JsonNode) {
     var textDoc = params.getObject("textDocument")
     if(!textDoc) {
@@ -296,6 +328,41 @@ public func (this: *LspServer) handleTextDocumentSaveMessage(msg: *JsonNode, par
 
     var uri = textDoc.getStr("uri", null)
     this.workspace.saveDocument(uri)
+    this.writeDiagnostic(uri)
+}
+
+public func (this: *LspServer) handleTextDocumentChangeMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    var range = textDoc.getObject("range")
+    var text = textDoc.getStr("text", null)
+
+    var change = TextDocumentChangeEvent{
+        .range = null,
+        .text = text
+    }
+
+    var r = Range{}
+    if(range) {
+        var start = range.getObject("start")
+        if(start) {
+            r.start.line = start.getInt("line", 0)
+            r.start.character = start.getInt("character", 0)
+        }
+
+        var end = range.getObject("end")
+        if(end) {
+            r.end.line = end.getInt("line", 0)
+            r.end.character = end.getInt("character", 0)
+        }
+
+        change.range = &r
+    }
+    this.workspace.changeDocument(uri, &change)
     this.writeDiagnostic(uri)
 }
 
@@ -382,7 +449,7 @@ public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
     this.writeResponse(resp)
 }
 
-public func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, ...) {
+public func (this: *LspServer) writeErrorResponse(id: i64, code: i32, format: *const char, ...) {
     var args: va_list;
     va_start(args, format);
     var sb = StringBufferInit(512, this.requestAlloc())
@@ -392,6 +459,7 @@ public func (this: *LspServer) writeErrorResponse(id: i64, format: *const char, 
 
     var error = CreateJsonObject(this.requestAlloc())
     error.putStr("message", sb.cStr())
+    error.putIntNumber("code", code)
 
     var resp = this.createResponse(id)
     resp.put("error", error)

@@ -43,7 +43,7 @@ public func FindTokenByPosition(lsp: *LspServer, alloc: *const Allocator, doc: *
     return lex.eofToken()
 }
 
-struct Reference {
+public struct Reference {
     type: Typeid
     pos: SrcPos
 }
@@ -95,6 +95,11 @@ public func (this: *ReferenceDatabase) addTypeReference(type: *TypeSpec) {
     this.addTypeReferenceByTypeInfo(type.pos, base.typeInfo)
 }
 
+public func (this: *ReferenceDatabase) addTypeReferenceBySymbol(srcPos: SrcPos, sym: *Symbol) {
+    if(sym && sym.type) {
+        this.addTypeReferenceByTypeInfo(srcPos, sym.type)
+    }
+}
 
 public func (this: *ReferenceDatabase) addTypeReferenceByTypeInfo(srcPos: SrcPos, typeInfo: *TypeInfo) {
     if(!typeInfo) return;

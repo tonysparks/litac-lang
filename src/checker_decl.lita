@@ -25,12 +25,6 @@ import "checker_expr"
 public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     assert(decl != null)
 
-    defer {
-        if(decl.sym && decl.sym.type) {
-            this.references.addTypeReferenceByTypeInfo(decl.startPos, decl.sym.type)
-        }
-    }
-
     switch(decl.kind) {
         case StmtKind.IMPORT_DECL: {
             return true;
@@ -79,6 +73,8 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
 }
 
 public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
+    defer this.references.addTypeReferenceBySymbol(decl.startPos, decl.sym)
+
     if(!decl.expr && decl.kind == StmtKind.CONST_DECL) {
         if(!decl.hasNote("foreign")) {
             this.result.addError(decl.startPos, "const declaration must have an assignment (unless it is '@foreign')")
@@ -259,6 +255,8 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
 }
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
+    defer this.references.addTypeReferenceBySymbol(aggDecl.startPos, aggDecl.sym)
+
     var hasGenerics = aggDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
     if(hasGenerics) {
         this.genericParamStack.add(aggDecl.genericParams)
@@ -387,8 +385,6 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
         }
     }
 
-    Info("Aggregate: %s %llu\n", aggDecl.sym.type.toStringDebug(), aggDecl.sym.type.typeid)
-    //this.references.addTypeReferenceByTypeInfo(aggDecl.startPos, aggDecl.sym.type)
     this.addFieldReferences(aggDecl, aggDecl.sym.type, 0)
 
     return true
@@ -427,7 +423,6 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
-                    Info("Aggregate Field: %s.%s  %llu %d\n", parentTypeInfo.toStringDebug(), field.aggregateField.name.asString(), parentTypeInfo.typeid, position)
                     this.lita.references.addFieldReference(field.aggregateField.startPos, parentTypeInfo, position)
                     position += 1
                 }
@@ -465,6 +460,8 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
 }
 
 public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
+    defer this.references.addTypeReferenceBySymbol(enumDecl.startPos, enumDecl.sym)
+
     var parentTypeInfo = enumDecl.sym.type
     for(var i = 0; i < enumDecl.fields.size(); i+=1) {
         var field = enumDecl.fields.get(i)
@@ -495,6 +492,8 @@ func (this: *TypeChecker) checkLabels() {
 }
 
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
+    defer this.references.addTypeReferenceBySymbol(funcDecl.startPos, funcDecl.sym)
+
     this.enterModule(funcDecl.sym.declared)
     defer this.leaveModule()
 
@@ -533,6 +532,8 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
 public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : bool {
     assert(paramDecl != null)
 
+    defer this.references.addTypeReferenceBySymbol(paramDecl.startPos, paramDecl.sym)
+
     if(paramDecl.defaultExpr) {
         if(!this.resolveExpr(paramDecl.defaultExpr)) {
             return false
@@ -562,6 +563,8 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
 }
 
 public func (this: *TypeChecker) resolveTypedefDecl(typedefDecl: *TypedefDecl) : bool {
+    defer this.references.addTypeReferenceBySymbol(typedefDecl.startPos, typedefDecl.sym)
+
     // nothing to type check
     return true
 }

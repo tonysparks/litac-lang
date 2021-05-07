@@ -41,6 +41,7 @@ public enum SymbolFlags {
     IS_TEST                 = (1<<13),
     IS_ALIAS                = (1<<14),
     IS_MAIN                 = (1<<15),
+    IS_METHOD               = (1<<16),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -51,7 +52,7 @@ public struct Symbol {
     state: SymbolState
     decl: *Decl
     type: *TypeInfo
-    //usingParent: *TypeInfo
+
     usingParent: *Symbol
     declared: *Module
     usingModule: *Module
@@ -197,6 +198,11 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
             kind = SymbolKind.FUNC
             if(decl.hasNote("test")) {
                 flags |= SymbolFlags.IS_TEST
+            }
+
+            var funcDecl = decl as (*FuncDecl)
+            if(funcDecl.flags & FuncFlags.IS_METHOD) {
+                flags |= SymbolFlags.IS_METHOD
             }
             break;
         }

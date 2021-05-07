@@ -1,4 +1,5 @@
 import "mem"
+import "array"
 
 // TODO: once generics is enhanced to accept literals, replace
 // this with a generic argument

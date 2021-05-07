@@ -325,15 +325,17 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         return false
     }
 
-    var status = ReadFile(module.id.filename, &module.text, lita.allocator)
-    if(status == FileStatus.FileNotFoundError) {
-        lita.result.addError(pos, "Could not open file '%s'\n", module.id.filename)
-        return false
-    }
+    if(!module.text) {
+        var status = ReadFile(module.id.filename, &module.text, lita.allocator)
+        if(status == FileStatus.FileNotFoundError) {
+            lita.result.addError(pos, "Could not open file '%s'\n", module.id.filename)
+            return false
+        }
 
-    if(status == FileStatus.IOError) {
-        lita.result.addError(pos, "Could not read file '%s'\n", module.id.filename)
-        return false
+        if(status == FileStatus.IOError) {
+            lita.result.addError(pos, "Could not read file '%s'\n", module.id.filename)
+            return false
+        }
     }
 
     var parser = ParserInit(module.id.filename, module.text, lita)

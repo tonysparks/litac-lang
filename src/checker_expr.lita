@@ -147,6 +147,8 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
         return false
     }
 
+    //this.lita.references.addTypeReferenceBySymbol(expr.startPos, sym)
+
     expr.operand.typeInfo = sym.type
     expr.operand.isRightValue = true
     expr.sym = sym
@@ -560,6 +562,9 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         this.errorNonFuncType(expr.object, objectType)
         return false
     }
+
+//Info("Add TypeReference: %llu\n", objectType.typeid)
+//    this.lita.references.addTypeReferenceByTypeInfo(expr.startPos, objectType)
 
     var isMethod = false
     var numberOfDefaultArgs = 0
@@ -1260,6 +1265,8 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
                 return false
             }
         }
+
+        this.lita.references.addTypeReferenceByTypeInfo(expr.field.startPos, typeInfo)
 
         expr.field.operand.typeInfo = typeInfo
         expr.operand.typeInfo = typeInfo

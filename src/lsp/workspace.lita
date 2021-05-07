@@ -94,7 +94,21 @@ public func (this: *Workspace) openDocument(uri: *const char, text: *const char)
     this.openedDocuments.put(moduleUri, doc)
 }
 
+public func (this: *Workspace) closeDocument(uri: *const char) {
+    if(!uri) return;
+
+    var doc = this.openedDocuments.remove(uri)
+    if(!doc) {
+        // Remove from file cache
+    }
+}
+
 public func (this: *Workspace) saveDocument(uri: *const char) {
+    if(!uri) return;
+    // TODO: Implement...
+}
+
+public func (this: *Workspace) changeDocument(uri: *const char, change: *TextDocumentChangeEvent) {
     if(!uri) return;
     // TODO: Implement...
 }
@@ -225,11 +239,18 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                 }
                 break
             }
+            case StmtKind.FUNC_IDENTIFIER_EXPR: {
+                var expr = location.node as (*IdentifierExpr)
+                if(expr.sym && expr.sym.type) {
+                    return this.findTypeReferences(expr.sym.type.typeid, alloc)
+                }
+                break
+            }
             case StmtKind.IDENTIFIER_EXPR: {
                 var expr = location.node as (*IdentifierExpr)
                 var result = this.lsp.lita.references.getSymbolReferences(expr.sym)
 
-
+                /*
                 this.lsp.log("Reference for an identifier locations: {\n")
                 for(var i = 0; i < result.size(); i += 1) {
                     var pos = result.get(i)
@@ -239,7 +260,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     var n = it.next()
                     this.lsp.log("Symbol: %p size: %d\n", n.key, n.value.size())
                 }
-                this.lsp.log("}\n")
+                this.lsp.log("}\n")*/
 
                 return SrcPosToLocations(this.rootPath, &result, alloc)
             }
@@ -252,6 +273,34 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     this.lsp.log("Getting field position: %d\n", fieldResult.position)
                     if(fieldResult.aggInfo) {
                         return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
+                    }
+
+                    // This might be a method call, we must check all functions in the entire program
+                    // for the method declaration
+                    else {
+                        // use the field operand vs. the field.sym because it's the one that always
+                        // gets resolved in the type checker phase
+                        if(!expr.field.operand.typeInfo) {
+                            break
+                        }
+
+                        var fieldType = expr.field.operand.typeInfo.typeid
+
+                        for(var i = 0; i < this.lsp.lita.programSymbols.symbolFuncs.size(); i += 1) {
+                            var fn = this.lsp.lita.programSymbols.symbolFuncs.get(i)
+                            if(!(fn.flags & SymbolFlags.IS_METHOD)) {
+                                continue
+                            }
+
+                            if(fn.type.typeid == fieldType) {
+                                /*this.lsp.log("Found reference symbol: %s %llu vs. %llu\n", fn.name, fn.type.typeid, fieldType)
+                                for(var i = 0; i < this.lsp.lita.references.typeReferences.size(); i+= 1) {
+                                    var ref = this.lsp.lita.references.typeReferences.get(i)
+                                    this.lsp.log("TypeId: %llu\n", ref.type)
+                                }*/
+                                return this.findTypeReferences(fn.type.typeid, alloc)
+                            }
+                        }
                     }
                 }
                 else if (base.kind == TypeKind.ENUM) {
@@ -371,9 +420,9 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
             case StmtKind.STRUCT_DECL:
             case StmtKind.ENUM_DECL:
             case StmtKind.FUNC_DECL: {
+                // not really necessary, as this will just point back to where the user is currently
+                // asking for the definition -- but OK.
                 var decl = location.node as (*Decl)
-
-                // look for the type references
                 return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
             }
             case StmtKind.VAR_FIELD_DECL: {
@@ -473,6 +522,30 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                                 return SrcPosWithEndToLocation(aggField.startPos, aggField.endPos, this.rootPath, alloc)
                             }
                             default: {
+                            }
+                        }
+                    }
+                    // This might be a method call, we must check all functions in the entire program
+                    // for the method declaration
+                    else {
+
+                        // use the field operand vs. the field.sym because it's the one that always
+                        // gets resolved in the type checker phase
+                        if(!expr.field.operand.typeInfo) {
+                            break
+                        }
+
+                        var fieldType = expr.field.operand.typeInfo.typeid
+
+                        for(var i = 0; i < this.lsp.lita.programSymbols.symbolFuncs.size(); i += 1) {
+                            var fn = this.lsp.lita.programSymbols.symbolFuncs.get(i)
+                            if(!(fn.flags & SymbolFlags.IS_METHOD)) {
+                                continue
+                            }
+
+                            if(fn.type.typeid == fieldType) {
+                                var decl = fn.decl
+                                return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
                             }
                         }
                     }
