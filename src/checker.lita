@@ -156,7 +156,7 @@ func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeIn
     assert(a != null)
     assert(b != null)
 
-    if(!a.canCastTo(b)) {
+    if(!a.canCastTo(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
         sb.appendStrn("'", 1)
         a.toString(sb)
@@ -175,7 +175,7 @@ func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *Type
     assert(a != null)
     assert(b != null)
 
-    if(!a.isAssignable(b)) {
+    if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
         sb.appendStrn("'", 1)
         b.toString(sb)
@@ -194,7 +194,7 @@ func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *Type
     assert(a != null)
     assert(b != null)
 
-    if(!a.isDeclarable(b)) {
+    if(!a.isDeclarable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
         sb.appendStrn("'", 1)
         b.toString(sb)
@@ -213,7 +213,7 @@ func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *
     assert(a != null)
     assert(b != null)
 
-    if(!a.isAssignable(b)) {
+    if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
         sb.appendStrn("'", 1)
         b.toString(sb)
@@ -744,6 +744,31 @@ func (this: *TypeChecker) getTypeByName(typeName: *const char) : *Symbol {
 
     return type
 }
+
+func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *AggregateTypeInfo) : bool {
+    assert(agg != null)
+    assert(iface != null)
+
+    var symbols = [MAX_METHODS_FOR_TYPE]*Symbol{}
+    var numOfMethods = this.current.getMethodsForType(agg, symbols)
+
+    for(var i = 0; i < iface.decl.fields.size(); i += 1) {
+        var field = iface.decl.fields.get(i)
+
+        assert(field.typeInfo)
+
+        // check to see if the method is in the found symbols
+        if(field.kind == StmtKind.VAR_FIELD_DECL) {
+            printf("Field name: %s\n", field.varField.decl.sym.name)
+        }
+        else {
+            printf("Not a var field\n")
+        }
+
+    }
+    return true
+}
+
 
 func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
     if(!spec) {

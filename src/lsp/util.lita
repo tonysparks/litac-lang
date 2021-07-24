@@ -272,6 +272,7 @@ func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
                         }
                         break
                     }
+                    default: assert(false)
                 }
             }
 
@@ -391,6 +392,7 @@ func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
         case StmtKind.POISON_DECL: {
             break
         }
+        default:
     }
 
     return false
@@ -570,6 +572,7 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
         case StmtKind.NOTE_STMT: {
             break
         }
+        default:
     }
 
     return false
@@ -831,6 +834,7 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
         case StmtKind.POISON_EXPR: {
             break
         }
+        default:
     }
 
     return false

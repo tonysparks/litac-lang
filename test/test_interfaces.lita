@@ -1,0 +1,32 @@
+import "assert"
+import "libc"
+
+@interface
+struct List {
+    size: func() : i32
+    add: func(i32) : void
+}
+
+struct ArrayList {
+    size: i32
+}
+
+func (this: *ArrayList) size() : i32 {
+    return this.size
+}
+func (this: *ArrayList) add(item : i32) {
+    this.size += item
+}
+
+func DoSomething(x: *List, item: i32) : i32 {
+    x.add(item)
+    return x.size()
+}
+
+func main(len:i32, args:**char) : i32 {
+    printf("hello world\n")
+
+    var array = ArrayList{}
+    DoSomething(&array, 4)
+    return 0
+}

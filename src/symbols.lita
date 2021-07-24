@@ -42,6 +42,7 @@ public enum SymbolFlags {
     IS_ALIAS                = (1<<14),
     IS_MAIN                 = (1<<15),
     IS_METHOD               = (1<<16),
+    IS_INTERFACE            = (1<<17),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -192,6 +193,11 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             kind = SymbolKind.TYPE
+            // TEMP(tony) - until interface is a keyword,
+            // we will cheat and use a note
+            if(decl.hasNote("interface")) {
+                flags |= SymbolFlags.IS_INTERFACE
+            }
             break;
         }
         case StmtKind.FUNC_DECL: {

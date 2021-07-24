@@ -95,6 +95,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     this.emitPrimitiveConstDecls()
     this.emitModuleNotes()
     this.emitForwardDecls()
+    this.emitInterfaceForwardDecls()
 
     buf.appendStr("\n#endif /* _LITAC_HEADER_H */\n")
 
@@ -137,6 +138,10 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 
         this.emitStmt(sym.decl)
         this.emitln()
+
+        if(sym.flags & SymbolFlags.IS_INTERFACE) {
+            this.emitInterfaceDecl(sym)
+        }
     }
 
     this.emitln()
@@ -276,6 +281,33 @@ func (this: using *CGen) emitModuleNotes() {
             this.emitStrn("\n", 1)
         }
     }
+}
+
+func (this: using *CGen) emitInterfaceForwardDecls() {
+    var program = &this.lita.programSymbols
+    for(var i = 0; i < program.symbolTypes.size(); i += 1) {
+        var sym = program.symbolTypes.get(i)
+
+        if(sym.flags & SymbolFlags.IS_INTERFACE) {
+            var name = this.cName(sym)
+
+            this.emit("// struct interface \n")
+            this.emit("typedef struct %sVTable %sVTable;\n", name, name)
+        }
+    }
+}
+
+
+func (this: using *CGen) emitInterfaceDecl(sym: *Symbol) {
+    assert(sym.flags & SymbolFlags.IS_INTERFACE)
+    var name = this.cName(sym)
+
+    this.emit("// struct interface \n")
+    this.emit("struct %sVTable {", name)
+    this.emit("void* this;\n")
+    this.emit("%s* vtable;\n", name)
+    this.emit("};\n")
+    //this.emit("*/\n")
 }
 
 func (this: using *CGen) emitForwardDecls() {

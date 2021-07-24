@@ -1,0 +1,49 @@
+{
+    "description": "Interfaces",
+    "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    @include("stdio.h");
+    @foreign func printf(...):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
+    "tests": [
+        {
+            "name" : "Interfaces",
+            "definitions": `
+                @interface
+                struct List {
+                    size: func() : i32
+                    add: func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.size += item
+                }
+
+                func DoSomething(x: *List, item: i32) : i32 {
+                    x.add(item)
+                    return x.size()
+                }
+            `,
+            "code": `
+                var array = ArrayList{}
+                DoSomething(&array, 4)
+            `,
+        },
+    ]
+}

@@ -188,6 +188,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
             }
         }
     }
+
     this.emitStrn("}", 1)
     if(this.aggregateLevel > 1) {
         if(decl.name.str.length) {
