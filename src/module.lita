@@ -149,7 +149,7 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
                 continue
             }
 
-            printf("Method found: %s\n", sym.name)
+            //printf("Method found: %s\n", sym.name)
             result[numOfSymbols] = sym
             numOfSymbols += 1
         }

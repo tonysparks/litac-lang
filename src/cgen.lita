@@ -26,6 +26,10 @@ public struct CGen {
     indent: i32
     aggregateLevel: i32
 
+    bufferFlush: bool
+    funcIndex: i32
+    tmpVar: i32
+
     currentFunc: *FuncTypeInfo
     currentScope: *CGenScope
 
@@ -79,6 +83,7 @@ public func (this: *CGen) init(lita: *Lita, output: *FILE) {
     this.aggregateLevel = 0
     this.currentFunc = null
     this.currentScope = null
+    this.bufferFlush = false
 
     this.format = lita.options.cFormat
     this.output = output
@@ -88,6 +93,8 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     assert(module != null)
     assert(module.ast != null)
 
+    this.bufferFlush = true
+
     buf.appendStr("#ifndef _LITAC_HEADER_H\n")
     buf.appendStr("#define _LITAC_HEADER_H\n")
 
@@ -95,16 +102,17 @@ public func (this: using *CGen) emitProgram(module: *Module) {
     this.emitPrimitiveConstDecls()
     this.emitModuleNotes()
     this.emitForwardDecls()
-    this.emitInterfaceForwardDecls()
+    this.emitTraitForwardDecls()
 
     buf.appendStr("\n#endif /* _LITAC_HEADER_H */\n")
-
 
     buf.appendStr("\n\n")
     buf.appendStr("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
     buf.appendStr("// translated code begins\n")
     buf.appendStr("// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
     buf.appendStr("\n\n")
+
+    this.bufferFlush = false
 
     var graph = DependencyGraph{}
     graph.init(this.lita)
@@ -139,10 +147,15 @@ public func (this: using *CGen) emitProgram(module: *Module) {
         this.emitStmt(sym.decl)
         this.emitln()
 
-        if(sym.flags & SymbolFlags.IS_INTERFACE) {
+        /*
+        if(sym.flags & SymbolFlags.IS_TRAIT) {
             this.emitInterfaceDecl(sym)
-        }
+        }*/
+
+        this.flush()
     }
+
+    this.emitTraitVTables()
 
     this.emitln()
 
@@ -160,6 +173,7 @@ func (this: using *CGen) emitMain(sym: *Symbol) {
     defer this.currentFunc = null
 
     this.emitStrn(" {", 2)
+    this.funcIndex = this.buf.length
     this.emitStmt(decl.body)
     this.emitStrn("}", 1)
 
@@ -282,24 +296,231 @@ func (this: using *CGen) emitModuleNotes() {
         }
     }
 }
-
-func (this: using *CGen) emitInterfaceForwardDecls() {
+/*
+func (this: using *CGen) emitTraitForwardDecls() {
     var program = &this.lita.programSymbols
     for(var i = 0; i < program.symbolTypes.size(); i += 1) {
         var sym = program.symbolTypes.get(i)
 
-        if(sym.flags & SymbolFlags.IS_INTERFACE) {
+        if(sym.flags & SymbolFlags.IS_TRAIT) {
             var name = this.cName(sym)
 
             this.emit("// struct interface \n")
             this.emit("typedef struct %sVTable %sVTable;\n", name, name)
         }
     }
+}*/
+
+func (this: using *CGen) findSymbolByTypeid(id: Typeid) : *Symbol {
+    var symbols = this.lita.programSymbols.symbolTypes
+    for(var i = 0; i < symbols.size(); i += 1) {
+        var sym = symbols.get(i)
+        if(sym.type && sym.type.typeid == id) {
+            return sym
+        }
+    }
+
+    return null
 }
 
 
+func (this: using *CGen) emitTraitForwardDecls() {
+    var interfaceImpls = this.lita.programSymbols.interfaceImpls
+
+    this.emit("\n\n// Generated code for interfaces\n")
+
+    for(var it = interfaceImpls.iter(); it.hasNext();) {
+        var entry = it.next()
+        var traitSym = this.findSymbolByTypeid(entry.key)
+        assert(traitSym)
+        assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
+
+        var traitDecl = traitSym.decl as (*AggregateDecl)
+        var traitName = this.cTypeName(traitSym.type)
+
+        this.emit("// Generated code %s\n", traitName)
+
+        // Generate Wrapper functions
+        {
+            for(var i = 0; i < entry.value.size(); i += 1) {
+                var implSym = this.findSymbolByTypeid(entry.value.get(i))
+                assert(implSym)
+
+                var implName = this.cTypeName(implSym.type)
+                for(var j = 0; j < traitDecl.fields.size(); j += 1) {
+                    var field = traitDecl.fields.get(j)
+                    assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+
+                    var fieldName = field.traitField.name.asString()
+
+                    assert(field.typeInfo && field.typeInfo.kind == TypeKind.FUNC_PTR)
+                    var fn = field.typeInfo as (*FuncPtrTypeInfo)
+
+                    this.emit("%s __%s_%s_wrapper(void* this", this.cTypeName(fn.returnType), implName, fieldName)
+                    for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+                        var param = fn.paramDecls.get(p)
+                        this.emit(", %s _%d", this.cTypeName(param), p)
+                    }
+
+                    if(fn.hasVarargs) {
+                        this.emit(", ...")
+                    }
+
+                    this.emitStrn(");\n", 3)
+                }
+            }
+            this.emitStrn("\n", 1)
+        }
+
+        // Generate Casting functions
+        {
+            for(var i = 0; i < entry.value.size(); i += 1) {
+                var implSym = this.findSymbolByTypeid(entry.value.get(i))
+                assert(implSym)
+
+                printf("Impl: %s\n", implSym.name)
+
+                var implName = this.cTypeName(implSym.type)
+                this.emit("%s %s__to__%s(%s* x);\n", traitName, implName, traitName, implName)
+            }
+        }
+        this.emitStrn("\n", 1)
+    }
+}
+
+
+func (this: using *CGen) emitTraitVTables() {
+    var interfaceImpls = this.lita.programSymbols.interfaceImpls
+    for(var it = interfaceImpls.iter(); it.hasNext();) {
+        var entry = it.next()
+        var traitSym = this.findSymbolByTypeid(entry.key)
+        assert(traitSym)
+        assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
+        printf("Interface: %s {\n", traitSym.name)
+
+        var traitDecl = traitSym.decl as (*AggregateDecl)
+
+        var traitName = this.cTypeName(traitSym.type)
+
+        // Generate Wrapper functions
+        {
+            for(var i = 0; i < entry.value.size(); i += 1) {
+                var implSym = this.findSymbolByTypeid(entry.value.get(i))
+                assert(implSym)
+
+                printf("Impl: %s\n", implSym.name)
+
+                var implName = this.cTypeName(implSym.type)
+                for(var j = 0; j < traitDecl.fields.size(); j += 1) {
+                    var field = traitDecl.fields.get(j)
+                    assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+
+                    var fieldName = field.traitField.name.asString()
+
+                    assert(field.typeInfo && field.typeInfo.kind == TypeKind.FUNC_PTR)
+                    var fn = field.typeInfo as (*FuncPtrTypeInfo)
+
+                    //printf("%s_%s__wrapper\n", implSym.name, traitField.name.asString())
+                    this.emit("%s __%s_%s_wrapper(void* this", this.cTypeName(fn.returnType), implName, fieldName)
+                    for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+                        var param = fn.paramDecls.get(p)
+                        this.emit(", %s _%d", this.cTypeName(param), p)
+                    }
+
+                    if(fn.hasVarargs) {
+                        this.emit(", ...")
+                    }
+
+                    this.emitStrn(") {", 3)
+
+                    this.emit("%s* _this = (%s*)this;\n", implName, implName)
+                    if(fn.returnType.kind != TypeKind.VOID) {
+                        this.emitStrn("return ", 7)
+                    }
+
+                    this.emit("%s_%s(_this", implName, fieldName)
+                    for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+                        var param = fn.paramDecls.get(p)
+                        this.emit(", _%d", p)
+                    }
+
+                    if(fn.hasVarargs) {
+                        this.emit(", ...")
+                    }
+
+                    this.emitStrn(");\n", 3)
+
+                    //, traitName, implName)
+                    //this.emit("return (%s) {", traitName)
+                    //this.emit(".%s = %s_%s__wrapper,\n", fieldName, implName, fieldName)
+                    this.emitStrn("}", 1)
+                    this.emit("\n")
+                }
+                //this.emit(".this = x")
+                //this.emitStrn("}", 1)
+                //this.emitStrn(";\n", 2)
+                //this.emitStrn("}", 1)
+                this.emit("\n")
+            }
+        }
+
+        // Generate Casting functions
+        {
+            for(var i = 0; i < entry.value.size(); i += 1) {
+                var implSym = this.findSymbolByTypeid(entry.value.get(i))
+                assert(implSym)
+
+                printf("Impl: %s\n", implSym.name)
+
+                var implName = this.cTypeName(implSym.type)
+                this.emit("%s %s__to__%s(%s* x) {", traitName, implName, traitName, implName)
+                this.emit("return (%s) {", traitName)
+                for(var j = 0; j < traitDecl.fields.size(); j += 1) {
+                    var field = traitDecl.fields.get(j)
+                    assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+
+                    var fieldName = field.traitField.name.asString()
+                    //printf("%s_%s__wrapper\n", implSym.name, traitField.name.asString())
+                    this.emit(".%s = __%s_%s_wrapper,\n", fieldName, implName, fieldName)
+                }
+                this.emit(".__this = x")
+                this.emitStrn("}", 1)
+                this.emitStrn(";\n", 2)
+                this.emitStrn("}\n", 2)
+            }
+        }
+        printf("}\n")
+    }
+}
+
+public func (this: using *CGen) emitTraitCast(expr: *Expr) : *Expr {
+    if(!expr) {
+        return expr;
+    }
+
+    if(IsTrait(expr.expectedType)) {
+        //printf("Expected type: %s\n", TypeKindAsStr(arg.expectedType.kind))
+        if(expr.operand.typeInfo != null && !IsTrait(expr.operand.typeInfo)) {
+            var traitName = this.cTypeName(expr.expectedType.getBaseType())
+            var implName = this.cTypeName(expr.operand.typeInfo.getBaseType())
+
+            this.emit("%s__to__%s(", implName, traitName)
+            if(!IsPtr(expr.operand.typeInfo)) {
+                this.emitStrn("&", 1)
+            }
+            this.emitStrn("(", 1)
+            this.emitStmt(expr)
+            this.emitStrn("))", 2)
+            return null
+        }
+
+    }
+
+    return expr;
+}
+/*
 func (this: using *CGen) emitInterfaceDecl(sym: *Symbol) {
-    assert(sym.flags & SymbolFlags.IS_INTERFACE)
+    assert(sym.flags & SymbolFlags.IS_TRAIT)
     var name = this.cName(sym)
 
     this.emit("// struct interface \n")
@@ -307,8 +528,7 @@ func (this: using *CGen) emitInterfaceDecl(sym: *Symbol) {
     this.emit("void* this;\n")
     this.emit("%s* vtable;\n", name)
     this.emit("};\n")
-    //this.emit("*/\n")
-}
+}*/
 
 func (this: using *CGen) emitForwardDecls() {
     var program = &this.lita.programSymbols
@@ -346,11 +566,12 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
             break;
         }
         case StmtKind.UNION_DECL:
-        case StmtKind.STRUCT_DECL: {
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.TRAIT_DECL: {
             var aggDecl = decl as (*AggregateDecl)
             //if(!(aggDecl.flags & AggregateFlags.IS_EMBEDDED))
             {
-                this.buf.append("typedef %s %s %s;\n", aggDecl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", name, name)
+                this.buf.append("typedef %s %s %s;\n", aggDecl.kind == StmtKind.UNION_DECL ? "union" : "struct", name, name)
             }
             break;
         }
@@ -367,6 +588,17 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
             assert(false)
         }
     }
+}
+
+func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]char) : *const char {
+    var name = StringInit(buffer, MAX_SYMBOL_NAME)
+    name.format("__tmp%d", this.tmpVar)
+    this.tmpVar += 1
+
+    var decl = this.cTypeDecl(type, name.cStr(), false)
+    this.buf.insert(this.funcIndex, "    %s;\n", decl)
+
+    return name.cStr()
 }
 
 func (this: using *CGen) escapeNameStr(name: *const char) : *char {
@@ -619,8 +851,11 @@ func (this: using *CGen) cType(type: *TypeInfo,
         case TypeKind.FUNC_PTR: {
             var funcInfo = type as (*FuncPtrTypeInfo)
             var params = StringBufferInit(512, this.allocator)
+            if(funcInfo.isTrait) {
+                params.appendStrn("void*", 5)
+            }
             for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
-                if(i > 0) {
+                if(i > 0 || funcInfo.isTrait) {
                     params.appendStrn(",", 1)
                 }
 
@@ -749,8 +984,11 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
         case TypeKind.FUNC_PTR: {
             var funcInfo = type as (*FuncPtrTypeInfo)
             var params = StringBufferInit(512, this.allocator)
+            if(funcInfo.isTrait) {
+                params.appendStrn("void*", 5)
+            }
             for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
-                if(i > 0) {
+                if(i > 0 || funcInfo.isTrait) {
                     params.appendStrn(",", 1)
                 }
 
@@ -970,8 +1208,10 @@ func (this: using *CGen) emit(strFormat: *const char, ...) {
         va_end(args)
     }
 
-    if(buf.length > (buf.capacity/2)) {
-        this.flush()
+    if(this.bufferFlush) {
+        if(buf.length > (buf.capacity/2)) {
+            this.flush()
+        }
     }
 }
 
@@ -1006,8 +1246,10 @@ func (this: using *CGen) emitStrn(str: *const char, len: i32) {
         buf.appendStrn(str, len)
     }
 
-    if(buf.length > (buf.capacity/2)) {
-        this.flush()
+    if(this.bufferFlush) {
+        if(buf.length > (buf.capacity/2)) {
+            this.flush()
+        }
     }
 }
 
@@ -1192,6 +1434,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitVarDecl(decl)
             return;
         }
+        case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var decl = s as (*AggregateDecl)
@@ -1429,7 +1672,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             if(stmt.expr && stmt.expr.operand.typeInfo != &VOID_TYPE && this.hasPendingDefers()) {
                 assert(this.currentFunc != null)
                 this.emit("{%s = ", this.cTypeDecl(this.currentFunc.returnType, "___result"))
-                this.emitStmt(stmt.expr)
+                this.emitStmt(this.emitTraitCast(stmt.expr))
                 this.emitStrn(";\n", 2)
 
                 this.emitDefers()
@@ -1441,7 +1684,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emitStrn("return", 6);
                 if(stmt.expr) {
                     this.emitStrn(" ", 1)
-                    this.emitStmt(stmt.expr)
+                    this.emitStmt(this.emitTraitCast(stmt.expr))
                 }
                 this.emitStrn(";\n", 2)
             }
@@ -1475,6 +1718,28 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emitStmt(stmt.defaultStmt)
             }
             this.emitStrn("}", 1)
+            return;
+        }
+        case StmtKind.TRAIT_FIELD_DECL: {
+            var decl = s as (*TraitFieldDecl)
+            this.emitLineInfo(decl)
+
+            this.emitNotes(&decl.attributes)
+
+            var name: [MAX_SYMBOL_NAME]char;
+            var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+            nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
+
+            var aliasNote = decl.getNote("alias")
+            if(aliasNote && !aliasNote.attributes.empty()) {
+                var aliasName = aliasNote.attributes.get(0)
+
+                nameStr.clear()
+                nameStr.setStrn(aliasName.str.buffer, aliasName.str.length)
+            }
+
+            this.emitStr(this.cTypeDecl(decl.type.typeInfo, nameStr.cStrConst()))
+            this.emitStrn(";\n", 2)
             return;
         }
         case StmtKind.VAR_FIELD_DECL: {
@@ -1599,17 +1864,100 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.FUNC_CALL_EXPR: {
             var expr = s as (*FuncCallExpr)
-            this.emitStmt(expr.object)
-            this.emitStrn("(", 1)
+            var objectType = expr.object.operand.typeInfo
+
+            // If this is a function call on a trait, we must
+            // modify the call so that the trait is passed as
+            // the first argument.  This can get tricky because
+            // we have to account for side-effects and therefore
+            // have to do some code injection to ensure side-effects
+            // are only done once
+            var isTrait = false
+            if(objectType.kind == TypeKind.FUNC_PTR) {
+                var funcPtr = objectType as (*FuncPtrTypeInfo)
+                if(funcPtr.isTrait) {
+                    isTrait = true
+
+                    switch(expr.object.kind) {
+                        case StmtKind.GET_EXPR: {
+                            var getExpr = expr.object as (*GetExpr)
+                            var type = getExpr.object.operand.typeInfo
+                            if(getExpr.object.kind == StmtKind.IDENTIFIER_EXPR) {
+                                this.emitStmt(expr.object)
+
+                                this.emitStrn("(", 1)
+                                this.emitStmt(getExpr.object)
+
+                                if(IsPtr(type)) {
+                                    this.emitStrn("->", 2)
+                                }
+                                else {
+                                    this.emitStrn(".", 1)
+                                }
+
+                                this.emitStrn("__this", 6)
+                            }
+                            else {
+                                // Because the object may have side effects,
+                                // we must first assign it to a temp variable and
+                                // reuse the variable
+                                var buffer:[MAX_SYMBOL_NAME]char;
+                                var tmpName = this.allocTemp(type, buffer)
+
+                                this.emit("(%s = ", tmpName)
+                                this.emitStmt(getExpr.object)
+                                this.emit(", %s)", tmpName)
+
+                                if(IsPtr(type)) {
+                                    this.emitStrn("->", 2)
+                                }
+                                else {
+                                    this.emitStrn(".", 1)
+                                }
+
+                                assert(IsAggregateLike(type))
+
+                                var aggInfo = AsAggregate(type)
+                                var field = aggInfo.getField(getExpr.field.type.name)
+                                this.emitFieldName(field)
+
+                                this.emit("(%s", tmpName)
+                                if(IsPtr(type)) {
+                                    this.emitStrn("->", 2)
+                                }
+                                else {
+                                    this.emitStrn(".", 1)
+                                }
+                                this.emitStrn("__this", 6)
+                            }
+                            break
+                        }
+                        default: {
+                            assert(false)
+                        }
+                    }
+
+                    if(expr.arguments.size() > 0) {
+                        this.emitStrn(", ", 2)
+                    }
+                }
+            }
+
+            if(!isTrait) {
+                this.emitStmt(expr.object)
+                this.emitStrn("(", 1)
+            }
 
             var i = 0;
             for(; i < expr.arguments.size(); i+=1) {
                 if(i > 0) {
                     this.emitStrn(", ", 2)
                 }
-                this.emitStmt(expr.arguments.get(i))
+
+                this.emitStmt(this.emitTraitCast(expr.arguments.get(i)))
             }
-            var objectType = expr.object.operand.typeInfo
+
+            // fill out default parameters
             if(objectType.kind == TypeKind.FUNC) {
                 var funcType = objectType as (*FuncTypeInfo)
                 for(; i < funcType.decl.params.size(); i+=1) {
@@ -1680,7 +2028,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             var baseInfo = objectType.getBaseType()
             assert(baseInfo != null)
-            assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
+            assert(IsAggregate(baseInfo)) //.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
 
             var aggInfo = baseInfo as (*AggregateTypeInfo)
 
@@ -1762,7 +2110,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
             }
 
-            this.emitStmt(expr.value)
+            this.emitStmt(this.emitTraitCast(expr.value))
             return;
         }
         case StmtKind.INIT_EXPR: {

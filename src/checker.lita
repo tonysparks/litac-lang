@@ -61,6 +61,9 @@ public struct TypeChecker {
     genericParamStack: Array<Array<GenericParam>>
     genericTemplates: Array<*Symbol>
 
+
+    interfaceImpls: Map<Typeid, Array<Typeid>>
+
     labels: [MAX_LABELS]LabelInfo;
     numOfLabels: i32
 
@@ -82,6 +85,8 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
     this.genericContext.callsite = null
+
+    this.interfaceImpls.init(Array<Typeid>{}, 128, PtrHashFn<Typeid>, PtrEqualFn<Typeid>, lita.allocator, 0)
 
     this.bypassing = false
 
@@ -149,6 +154,7 @@ exit:
         .symbolTypes = this.symbolTypes,
         .symbolFuncs = this.symbolFuncs,
         .mainEntry = this.mainEntry,
+        .interfaceImpls = this.interfaceImpls
     };
 }
 
@@ -381,6 +387,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             this.symbolTypes.add(sym)
             break;
         }
+        case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var aggDecl = decl as (*AggregateDecl)
@@ -393,6 +400,9 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 var field = &aggDecl.fields.elements[i]
 
                 switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        break;
+                    }
                     case StmtKind.VAR_FIELD_DECL: {
                         break;
                     }
@@ -575,6 +585,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     sym.type = aliasedType
                     break;
                 }
+                case StmtKind.TRAIT_DECL:
                 case StmtKind.STRUCT_DECL:
                 case StmtKind.UNION_DECL: {
                     var aggregateDecl = sym.decl as (*AggregateDecl)
@@ -664,6 +675,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     sym.flags &= ~SymbolFlags.IS_INCOMPLETE
 
     switch(sym.decl.kind) {
+        case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
             var aggDecl = sym.decl as (*AggregateDecl)
@@ -749,24 +761,77 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
     assert(agg != null)
     assert(iface != null)
 
+    if(agg.typeid == iface.typeid) {
+        return true
+    }
+
+    // check the cache to see if this type has already been
+    // marked as an implementation
+    if(this.interfaceImpls.contains(iface.typeid)) {
+        var impls = this.interfaceImpls.getPtr(iface.typeid)
+
+        for(var i = 0; i < impls.size(); i += 1) {
+            if(impls.get(i) == agg.typeid) {
+                return true
+            }
+        }
+    }
+
     var symbols = [MAX_METHODS_FOR_TYPE]*Symbol{}
     var numOfMethods = this.current.getMethodsForType(agg, symbols)
 
-    for(var i = 0; i < iface.decl.fields.size(); i += 1) {
+    var numOfTraitFns = iface.decl.fields.size()
+
+    if(numOfMethods < numOfTraitFns) {
+        return false
+    }
+
+    var matchedCount = 0
+
+    for(var i = 0; i < numOfTraitFns; i += 1) {
         var field = iface.decl.fields.get(i)
 
         assert(field.typeInfo)
+        assert(field.typeInfo.kind == TypeKind.FUNC_PTR)
+        assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
         // check to see if the method is in the found symbols
-        if(field.kind == StmtKind.VAR_FIELD_DECL) {
-            printf("Field name: %s\n", field.varField.decl.sym.name)
-        }
-        else {
-            printf("Not a var field\n")
-        }
+        var functionName = field.traitField.decl.name.asString()
+        var traitFn = field.typeInfo as (*FuncPtrTypeInfo)
 
+        for(var index = 0; index < numOfMethods; index += 1) {
+            var sym = symbols[index]
+            var str = StringViewInit(sym.name)
+            var start = str.indexOf("_")
+            if(start < 0) {
+                continue
+            }
+
+            // this atleast has the same name, now check if
+            // the function types are compatible
+            if(str.substring(start + 1).equals(functionName)) {
+                if(IsFuncImpl(traitFn, sym.type, this)) {
+                    matchedCount += 1
+                    break;
+                }
+            }
+            printf("Sym name: %s\n", sym.name)
+        }
     }
-    return true
+
+    var isImpl = matchedCount == numOfTraitFns
+    if(isImpl) {
+
+        if(!this.interfaceImpls.contains(iface.typeid)) {
+            var impls = ArrayInit<Typeid>(32, this.lita.allocator)
+            this.interfaceImpls.put(iface.typeid, impls)
+        }
+        var impls = this.interfaceImpls.getPtr(iface.typeid)
+        impls.add(agg.typeid)
+        printf("Adding: %u\n", agg.typeid)
+    }
+
+    return isImpl
 }
 
 
@@ -939,6 +1004,7 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
                 }
                 break;
             }
+            case StmtKind.TRAIT_FIELD_DECL:
             case StmtKind.ENUM_FIELD_DECL:
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL:
@@ -966,6 +1032,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.VAR_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL:
+        case StmtKind.TRAIT_DECL:
         case StmtKind.ENUM_DECL:
         case StmtKind.FUNC_DECL:
         case StmtKind.TYPEDEF_DECL:
@@ -1223,7 +1290,8 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.ENUM_FIELD_ENTRY_DECL:
         case StmtKind.STRUCT_FIELD_DECL:
         case StmtKind.UNION_FIELD_DECL:
-        case StmtKind.VAR_FIELD_DECL:{
+        case StmtKind.TRAIT_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL: {
             // handled in the resolveAggregateDecl
             assert(false)
             return false;

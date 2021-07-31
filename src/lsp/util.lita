@@ -247,12 +247,19 @@ func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
             }
             break
         }
+        case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
             var decl = node as (*AggregateDecl)
             for(var i = 0; i < decl.fields.size(); i += 1) {
                 var field = decl.fields.getPtr(i)
                 switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        if(this.visitDecl(field.traitField)) {
+                            return true
+                        }
+                        break
+                    }
                     case StmtKind.VAR_FIELD_DECL: {
                         if(this.visitDecl(field.varField)) {
                             return true
@@ -359,6 +366,18 @@ func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
             var decl = node as (*EnumFieldEntryDecl)
 
             if(this.visitExpr(decl.value)) {
+                return true
+            }
+
+            if(this.isDeclAtPos(decl)) {
+                return true
+            }
+            break
+        }
+        case StmtKind.TRAIT_FIELD_DECL: {
+            var decl = node as (*TraitFieldDecl)
+
+            if(this.isTypeAtPos(decl.type)) {
                 return true
             }
 

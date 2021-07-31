@@ -367,6 +367,7 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
             var expectedPtrInfo = expectedType as (*PtrTypeInfo)
             return this.inferredType(name, ptrInfo.ptrOf, expectedPtrInfo.ptrOf)
         }
+        case TypeKind.TRAIT:
         case TypeKind.UNION:
         case TypeKind.STRUCT: {
             var aggInfo = paramType as (*AggregateTypeInfo)
@@ -402,6 +403,11 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
             for(var i = 0; i < aggInfo.decl.fields.size(); i += 1) {
                 var field = aggInfo.decl.fields.get(i)
                 switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        var traitField = field.traitField
+                        traitField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        break;
+                    }
                     case StmtKind.VAR_FIELD_DECL: {
                         var varField = field.varField
                         varField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
@@ -1326,7 +1332,7 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
     else {
         var info = objectTypeInfo.getBaseType()
         assert(info != null)
-        assert(info.kind == TypeKind.STRUCT || info.kind == TypeKind.UNION)
+        assert(IsAggregate(info))
 
         var aggInfo = info as (*AggregateTypeInfo)
 

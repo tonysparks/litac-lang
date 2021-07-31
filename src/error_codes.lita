@@ -19,6 +19,7 @@ public enum ErrorCode {
     INVALID_LABEL_STMT,
     INVALID_COMP_STMT,
     INVALID_DEFAULT_ASSIGNMENT,
+    INVALID_TRAIT_MEMBER,
 
     MISSING_COMMA,
     MISSING_SEMICOLON,
@@ -69,6 +70,7 @@ public const errorCodeText = []*const char {
     [ErrorCode.INVALID_LABEL_STMT] = "Invalid label statement, goto labels are only valid in functions",
     [ErrorCode.INVALID_COMP_STMT] = "Invalid compile time statement",
     [ErrorCode.INVALID_DEFAULT_ASSIGNMENT] = "Invalid default assignment statement, only allowed for 'struct'",
+    [ErrorCode.INVALID_TRAIT_MEMBER] = "Invalid trait member, only function pointers are allowed",
 
     [ErrorCode.MISSING_COMMA] = "Missing ,",
     [ErrorCode.MISSING_SEMICOLON] = "Missing ;",

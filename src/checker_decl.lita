@@ -39,6 +39,7 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
             this.addSymbol(decl, type)
             return true;
         }
+        case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
             var aggDecl = decl as (*AggregateDecl)
@@ -123,6 +124,15 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
 
 func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {
     switch(field.kind) {
+        case StmtKind.TRAIT_FIELD_DECL: {
+            var traitField = field.traitField
+            if(traitField.name.type != TokenType.IDENTIFIER) {
+                break
+            }
+
+            this.checkAggregateFieldDuplicate(aggDecl, traitField.name.str, index)
+            break;
+        }
         case StmtKind.VAR_FIELD_DECL: {
             var varField = field.varField
             if(varField.name.type != TokenType.IDENTIFIER) {
@@ -166,6 +176,11 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
     return true
 }
 
+func (this: *TypeChecker) errorInvalidMemberForTrait(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
+    this.result.addError(pos, "invalid member '%.*s', only function pointers are allowed for traits",
+                         fieldName.length, fieldName.buffer)
+}
+
 func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
     if(aggDecl.name.str.length) {
         this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types (or pointer to an aggregate) are allowed",
@@ -205,6 +220,19 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
 
         var field = aggDecl.fields.get(i)
         switch(field.kind) {
+            case StmtKind.TRAIT_FIELD_DECL: {
+                var traitField = field.traitField
+                if(traitField.name.type != TokenType.IDENTIFIER) {
+                    continue
+                }
+
+                if(traitField.name.str.equalsStringView(fieldName)) {
+                    this.errorDuplicateMember(aggDecl, fieldName, traitField.startPos)
+                    isValid = false
+                }
+
+                break;
+            }
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 if(varField.name.type != TokenType.IDENTIFIER) {
@@ -266,14 +294,39 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
         this.genericParamStack.pop()
     }
 
+    var isTrait = aggDecl.sym.flags & SymbolFlags.IS_TRAIT
+
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 
         switch(field.kind) {
+            case StmtKind.TRAIT_FIELD_DECL: {
+                assert(isTrait)
+
+                var traitField = field.traitField
+                field.typeInfo = this.resolveTypeSpec(traitField.type)
+                assert(field.typeInfo)
+
+                if(field.typeInfo.kind != TypeKind.FUNC_PTR) {
+                    this.errorInvalidMemberForTrait(aggDecl, traitField.name.str, traitField.startPos)
+                    return false
+                }
+
+                var traitFn = field.typeInfo as (*FuncPtrTypeInfo)
+                traitFn.isTrait = true
+
+                this.checkAggregateFieldDuplicate(aggDecl, traitField.name.str, i)
+                break
+            }
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 field.typeInfo = this.resolveTypeSpec(varField.type)
                 assert(field.typeInfo)
+
+                if(isTrait) {
+                    this.errorInvalidMemberForTrait(aggDecl, varField.name.str, varField.startPos)
+                    return false
+                }
 
                 if(varField.defaultExpr) {
                     if(!this.resolveExpr(varField.defaultExpr)) {
@@ -291,6 +344,11 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
+                if(isTrait) {
+                    this.errorInvalidMemberForTrait(aggDecl, field.enumField.name.str, field.enumField.startPos)
+                    return false
+                }
+
                 var sym = field.enumField.sym
                 if(!sym) {
                     return false
@@ -307,10 +365,16 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 if(field.enumField.name.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.enumField.name.str, i)
                 }
+
                 break;
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
+                if(isTrait) {
+                    this.errorInvalidMemberForTrait(aggDecl, field.aggregateField.name.str, field.aggregateField.startPos)
+                    return false
+                }
+
                 // if this is from a generic template, we must make sure
                 // any generic arguments are accounted for
                 var sym: *Symbol = field.aggregateField.sym
@@ -400,6 +464,11 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
         }
 
         switch(field.kind) {
+            case StmtKind.TRAIT_FIELD_DECL: {
+                this.lita.references.addFieldReference(field.traitField.startPos, parentTypeInfo, position)
+                position += 1
+                break;
+            }
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 this.lita.references.addFieldReference(field.varField.startPos, parentTypeInfo, position)

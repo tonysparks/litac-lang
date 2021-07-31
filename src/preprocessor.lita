@@ -308,11 +308,15 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
         case StmtKind.FUNC_DECL: {
             break;
         }
+        case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var aggObj = ape_object_make_map(this.ape)
             if(StmtKind.UNION_DECL == sym.decl.kind) {
                 ape_object_set_map_value(declObj, "unionDecl", aggObj)
+            }
+            else if(StmtKind.TRAIT_DECL == sym.decl.kind) {
+                ape_object_set_map_value(declObj, "traitDecl", aggObj)
             }
             else {
                 ape_object_set_map_value(declObj, "structDecl", aggObj)
@@ -325,6 +329,14 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
 
                 var fieldObj = ape_object_make_map(this.ape)
                 switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        var varField = field.traitField
+
+                        var name = ape_object_make_stringf(this.ape, "%.*s", varField.name.str.length, varField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+                        this.addNotes(fieldObj, varField.attributes)
+                        break
+                    }
                     case StmtKind.VAR_FIELD_DECL: {
                         var varField = field.varField
 

@@ -180,6 +180,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
             case StmtKind.TYPEDEF_DECL:
             case StmtKind.UNION_DECL:
             case StmtKind.STRUCT_DECL:
+            case StmtKind.TRAIT_DECL:
             case StmtKind.ENUM_DECL:
             case StmtKind.FUNC_DECL: {
                 var decl = location.node as (*Decl)
@@ -189,6 +190,29 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
 
                     var typeid = decl.sym.type.typeid
                     return this.findTypeReferences(typeid, alloc)
+                }
+                break
+            }
+            case StmtKind.TRAIT_FIELD_DECL: {
+                var varField = location.node as (*TraitFieldDecl)
+                var parentNode = varField.parent
+                while(parentNode && (parentNode.kind == StmtKind.UNION_DECL || parentNode.kind == StmtKind.STRUCT_DECL)) {
+                    var decl = parentNode as (*AggregateDecl)
+                    if(decl.flags & AggregateFlags.IS_ANONYMOUS) {
+                        parentNode = decl.parent
+                    }
+                    else {
+                        var parentType = decl.sym.type
+                        if(parentType) {
+                            var aggInfo = parentType as (*AggregateTypeInfo)
+                            var fieldResult = aggInfo.getFieldPosition(varField.name.asString())
+                            this.lsp.log("Getting field position: %d\n", fieldResult.position)
+                            if(fieldResult.aggInfo) {
+                                return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
+                            }
+                        }
+                        break
+                    }
                 }
                 break
             }
@@ -418,12 +442,38 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
             case StmtKind.TYPEDEF_DECL:
             case StmtKind.UNION_DECL:
             case StmtKind.STRUCT_DECL:
+            case StmtKind.TRAIT_DECL:
             case StmtKind.ENUM_DECL:
             case StmtKind.FUNC_DECL: {
                 // not really necessary, as this will just point back to where the user is currently
                 // asking for the definition -- but OK.
                 var decl = location.node as (*Decl)
                 return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
+            }
+            case StmtKind.TRAIT_FIELD_DECL: {
+                var varField = location.node as (*TraitFieldDecl)
+                var parentNode = varField.parent
+                while(parentNode && (parentNode.kind == StmtKind.UNION_DECL || parentNode.kind == StmtKind.STRUCT_DECL)) {
+                    var decl = parentNode as (*AggregateDecl)
+                    /*
+                    if(decl.flags & AggregateFlags.IS_ANONYMOUS) {
+                        parentNode = decl.parent
+                    }
+                    else */{
+                        var parentType = decl.sym.type
+                        if(parentType) {
+                            var aggInfo = parentType as (*AggregateTypeInfo)
+                            var fieldResult = aggInfo.getFieldPosition(varField.name.asString())
+                            this.lsp.log("Getting field position: %d\n", fieldResult.position)
+                            if(fieldResult.aggInfo && fieldResult.aggInfo.sym) {
+                                var decl = fieldResult.aggInfo.sym.decl
+                                return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
+                            }
+                        }
+                        break
+                    }
+                }
+                break
             }
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = location.node as (*VarFieldDecl)
@@ -508,6 +558,10 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                     var field = aggInfo.getField(expr.field.type.name)
                     if(field.kind != StmtKind.POISON_EXPR) {
                         switch(field.kind) {
+                            case StmtKind.TRAIT_FIELD_DECL: {
+                                var varField = field.traitField
+                                return SrcPosWithEndToLocation(varField.startPos, varField.endPos, this.rootPath, alloc)
+                            }
                             case StmtKind.VAR_FIELD_DECL: {
                                 var varField = field.varField
                                 return SrcPosWithEndToLocation(varField.startPos, varField.endPos, this.rootPath, alloc)
@@ -568,6 +622,10 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                     var field = aggInfo.getField(expr.field.type.name)
                     if(field.kind != StmtKind.POISON_EXPR) {
                         switch(field.kind) {
+                            case StmtKind.TRAIT_FIELD_DECL: {
+                                var varField = field.traitField
+                                return SrcPosWithEndToLocation(varField.startPos, varField.endPos, this.rootPath, alloc)
+                            }
                             case StmtKind.VAR_FIELD_DECL: {
                                 var varField = field.varField
                                 return SrcPosWithEndToLocation(varField.startPos, varField.endPos, this.rootPath, alloc)

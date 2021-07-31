@@ -118,10 +118,12 @@ public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
             return copy
         }
         case StmtKind.STRUCT_DECL:
-        case StmtKind.UNION_DECL: {
+        case StmtKind.UNION_DECL:
+        case StmtKind.TRAIT_DECL: {
             return CopyAggregateDecl(decl as (*AggregateDecl), allocator) as (*Decl)
         }
         case StmtKind.ENUM_DECL:
+            assert(false) // not implemented yet??
         case StmtKind.FUNC_DECL: {
             return CopyFuncDecl(decl as (*FuncDecl), allocator) as (*Decl)
         }
@@ -554,6 +556,7 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
         case StmtKind.ENUM_FIELD_ENTRY_DECL:
         case StmtKind.STRUCT_FIELD_DECL:
         case StmtKind.UNION_FIELD_DECL:
+        case StmtKind.TRAIT_FIELD_DECL:
         case StmtKind.VAR_FIELD_DECL:{
             assert(false) // shouldn't reach here -- handled in CopyAggregateDecl
         }
@@ -589,6 +592,23 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
     for(var i = 0; i < decl.fields.size(); i+=1) {
         var field = decl.fields.get(i)
         switch(field.kind) {
+            case StmtKind.TRAIT_FIELD_DECL: {
+                var o = field.traitField
+                var traitField = NewTraitFieldDecl(o.startPos,
+                                                  o.endPos,
+                                                  o.name,
+                                                  CopyTypeSpec(o.type, allocator),
+                                                  o.attributes,
+                                                  allocator) as (*TraitFieldDecl)
+
+                var copyField = FieldStmt {
+                    .kind = StmtKind.TRAIT_FIELD_DECL,
+                    .traitField = traitField
+                }
+                copy.fields.add(copyField)
+                copy.node.becomeParentOf(traitField)
+                break
+            }
             case StmtKind.VAR_FIELD_DECL: {
                 var o = field.varField
                 var varField = NewVarFieldDecl(o.startPos,

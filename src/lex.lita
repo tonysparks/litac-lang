@@ -12,6 +12,7 @@ public enum TokenType {
 
     STRUCT,
     UNION,
+    TRAIT,
     ENUM,
     FUNC,
     TYPEDEF,
@@ -131,6 +132,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
 
     [TokenType.STRUCT] = "struct",
     [TokenType.UNION] = "union",
+    [TokenType.TRAIT] = "trait",
     [TokenType.ENUM] = "enum",
     [TokenType.FUNC] = "func",
     [TokenType.TYPEDEF] = "typedef",
@@ -322,6 +324,7 @@ const keywordCache = [MAX_KEYWORD_CACHE]**const char {
         null
     },
     [5] = []*const char {
+        "trait",
         "union",
         "const",
         "false",
@@ -387,6 +390,7 @@ const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
         TokenType.GOTO,
     },
     [5] = []TokenType {
+        TokenType.TRAIT,
         TokenType.UNION,
         TokenType.CONST,
         TokenType.FALSE,

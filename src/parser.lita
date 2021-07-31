@@ -18,7 +18,7 @@ import "string"
 
 import "ast_print"
 
-const DECL_ADJUST_TOKENS_COUNT = 10
+const DECL_ADJUST_TOKENS_COUNT = 11
 const DECL_ADJUST_TOKENS = [DECL_ADJUST_TOKENS_COUNT]TokenType {
     TokenType.IMPORT,
     TokenType.HASH,
@@ -28,6 +28,7 @@ const DECL_ADJUST_TOKENS = [DECL_ADJUST_TOKENS_COUNT]TokenType {
     TokenType.FUNC,
     TokenType.STRUCT,
     TokenType.UNION,
+    TokenType.TRAIT,
     TokenType.ENUM,
     TokenType.TYPEDEF,
 }
@@ -41,6 +42,7 @@ const STMT_ADJUST_TOKENS = []TokenType {
     TokenType.FUNC,
     TokenType.STRUCT,
     TokenType.UNION,
+    TokenType.TRAIT,
     TokenType.ENUM,
     TokenType.TYPEDEF
 }
@@ -180,6 +182,10 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             var decl = p.unionDeclaration()
             moduleStmt.declarations.add(decl)
         }
+        else if(p.match(TokenType.TRAIT)) {
+            var decl = p.traitDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
         else if(p.match(TokenType.ENUM)) {
             var decl = p.enumDeclaration()
             moduleStmt.declarations.add(decl)
@@ -241,6 +247,9 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
         }
         else if(p.match(TokenType.UNION)) {
             decl = p.unionDeclaration()
+        }
+        else if(p.match(TokenType.TRAIT)) {
+            decl = p.traitDeclaration()
         }
         else if(p.match(TokenType.ENUM)) {
             decl = p.enumDeclaration()
@@ -482,6 +491,10 @@ func (p: *Parser) unionDeclaration() : *Decl {
     return p.aggregateDeclaration(StmtKind.UNION_DECL)
 }
 
+func (p: *Parser) traitDeclaration() : *Decl {
+    return p.aggregateDeclaration(StmtKind.TRAIT_DECL)
+}
+
 func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
     var pos = p.prevPos()
 
@@ -522,7 +535,7 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
                 break;
             }
 
-            var field = p.fieldStatement(kind == StmtKind.STRUCT_DECL);
+            var field = p.fieldStatement(kind);
             if(field.kind == StmtKind.POISON_EXPR) {
                 goto err;
             }
@@ -2345,84 +2358,119 @@ func (p: *Parser) tryArrayDesignationExpr() : *Expr {
     return designatorExpr
 }
 
-func (p: *Parser) fieldStatement(isStruct: bool) : FieldStmt {
+func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
     var pos = p.pos()
     var notes = Array<*NoteStmt>{}
     if(!p.notes(&notes)) {
         goto err;
     }
 
-    switch(p.peek().type) {
-        case TokenType.IDENTIFIER: {
-            var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-            if(!identifier) {
-                goto err;
-            }
-            var fieldName = *identifier
+    var isTrait  = aggKind == StmtKind.TRAIT_DECL
+    if(isTrait) {
+        var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+        if(!identifier) {
+            goto err;
+        }
+        var fieldName = *identifier
 
-            if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
-                goto err;
-            }
+        if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
+            goto err;
+        }
 
-            var attributes = Attributes{}
-            attributes.isUsing = p.match(TokenType.USING)
-            attributes.notes = notes
+        var attributes = Attributes{}
+        attributes.notes = notes
 
-            var defaultExpr: *Expr = null
-            var type = p.type()
-            if(!type) {
-                goto err;
-            }
+        var type = p.type()
+        if(!type) {
+            goto err;
+        }
 
-            if(p.match(TokenType.EQUALS)) {
-                if(!isStruct) {
-                    p.errorAtToken(p.previous(), ErrorCode.INVALID_DEFAULT_ASSIGNMENT)
+        if(type.kind != TypeSpecKind.FUNC_PTR) {
+            p.errorAtToken(p.previous(), ErrorCode.INVALID_TRAIT_MEMBER)
+            goto err;
+        }
+
+        var traitField = NewTraitFieldDecl(pos, p.pos(), fieldName, type, attributes, p.allocator);
+        return FieldStmt {
+            .kind = StmtKind.TRAIT_FIELD_DECL,
+            .traitField = traitField as (*TraitFieldDecl)
+        }
+    }
+    else {
+        var isStruct = aggKind == StmtKind.STRUCT_DECL
+
+        switch(p.peek().type) {
+            case TokenType.IDENTIFIER: {
+                var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+                if(!identifier) {
+                    goto err;
+                }
+                var fieldName = *identifier
+
+                if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
                     goto err;
                 }
 
-                defaultExpr = p.constExpression()
-            }
+                var attributes = Attributes{}
+                attributes.isUsing = p.match(TokenType.USING)
+                attributes.notes = notes
 
-            var varField = NewVarFieldDecl(pos, p.pos(), fieldName, type, attributes, defaultExpr, p.allocator);
-            return FieldStmt {
-                .kind = StmtKind.VAR_FIELD_DECL,
-                .varField = varField as (*VarFieldDecl)
+                var defaultExpr: *Expr = null
+                var type = p.type()
+                if(!type) {
+                    goto err;
+                }
+
+                if(p.match(TokenType.EQUALS)) {
+                    if(!isStruct) {
+                        p.errorAtToken(p.previous(), ErrorCode.INVALID_DEFAULT_ASSIGNMENT)
+                        goto err;
+                    }
+
+                    defaultExpr = p.constExpression()
+                }
+
+                var varField = NewVarFieldDecl(pos, p.pos(), fieldName, type, attributes, defaultExpr, p.allocator);
+                return FieldStmt {
+                    .kind = StmtKind.VAR_FIELD_DECL,
+                    .varField = varField as (*VarFieldDecl)
+                }
             }
-        }
-        case TokenType.STRUCT: {
-            p.advance()
-            var structField = p.structDeclaration()
-            structField.startPos = pos
-            structField.attributes.notes = notes
-            return FieldStmt {
-                .kind = StmtKind.STRUCT_FIELD_DECL,
-                .aggregateField = structField as (*AggregateDecl)
+            case TokenType.STRUCT: {
+                p.advance()
+                var structField = p.structDeclaration()
+                structField.startPos = pos
+                structField.attributes.notes = notes
+                return FieldStmt {
+                    .kind = StmtKind.STRUCT_FIELD_DECL,
+                    .aggregateField = structField as (*AggregateDecl)
+                }
             }
-        }
-        case TokenType.UNION: {
-            p.advance()
-            var unionField = p.unionDeclaration()
-            unionField.startPos = pos
-            unionField.attributes.notes = notes
-            return FieldStmt {
-                .kind = StmtKind.UNION_FIELD_DECL,
-                .aggregateField = unionField as (*AggregateDecl)
+            case TokenType.UNION: {
+                p.advance()
+                var unionField = p.unionDeclaration()
+                unionField.startPos = pos
+                unionField.attributes.notes = notes
+                return FieldStmt {
+                    .kind = StmtKind.UNION_FIELD_DECL,
+                    .aggregateField = unionField as (*AggregateDecl)
+                }
             }
-        }
-        case TokenType.ENUM: {
-            p.advance()
-            var enumField = p.enumDeclaration()
-            enumField.startPos = pos
-            enumField.attributes.notes = notes
-            return FieldStmt {
-                .kind = StmtKind.ENUM_FIELD_DECL,
-                .enumField = enumField as (*EnumDecl)
+            case TokenType.ENUM: {
+                p.advance()
+                var enumField = p.enumDeclaration()
+                enumField.startPos = pos
+                enumField.attributes.notes = notes
+                return FieldStmt {
+                    .kind = StmtKind.ENUM_FIELD_DECL,
+                    .enumField = enumField as (*EnumDecl)
+                }
             }
-        }
-        default: {
-            p.errorAtToken(p.peek(), ErrorCode.INVALID_FIELD)
-            p.advance()
-            goto err;
+            default: {
+                p.errorAtToken(p.peek(), ErrorCode.INVALID_FIELD)
+                p.advance()
+                goto err;
+            }
         }
     }
 

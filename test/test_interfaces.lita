@@ -1,8 +1,9 @@
 import "assert"
 import "libc"
 
-@interface
-struct List {
+trait List {
+    //size: func(*void) : i32
+    //add: func(*void, i32) : void
     size: func() : i32
     add: func(i32) : void
 }
@@ -18,7 +19,13 @@ func (this: *ArrayList) add(item : i32) {
     this.size += item
 }
 
-func DoSomething(x: *List, item: i32) : i32 {
+var number = 0
+func AllocInterface() : List {
+    number += 1
+    return ArrayList{}
+}
+
+func DoSomething(x: List, item: i32) : i32 {
     x.add(item)
     return x.size()
 }
@@ -28,5 +35,7 @@ func main(len:i32, args:**char) : i32 {
 
     var array = ArrayList{}
     DoSomething(&array, 4)
+
+    AllocInterface().size();
     return 0
 }

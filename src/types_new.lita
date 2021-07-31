@@ -5,6 +5,7 @@ import "array"
 import "map"
 import "ast"
 import "libc"
+import "assert"
 
 
 public struct TypeCache {
@@ -120,7 +121,24 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
                                                     aggregateDecl: *AggregateDecl) : *AggregateTypeInfo {
 
     var type = new<AggregateTypeInfo>(this.allocator)
-    type.kind = aggregateDecl.kind == StmtKind.STRUCT_DECL ? TypeKind.STRUCT : TypeKind.UNION
+    switch(aggregateDecl.kind) {
+        case StmtKind.TRAIT_DECL: {
+            type.kind = TypeKind.TRAIT
+            break;
+        }
+        case StmtKind.UNION_DECL: {
+            type.kind = TypeKind.UNION
+            break;
+        }
+        case StmtKind.STRUCT_DECL: {
+            type.kind = TypeKind.STRUCT
+            break;
+        }
+        default: {
+            assert(false)
+        }
+
+    }
     type.typeid = NextTypeId()
     type.name = sym.name
     type.decl = aggregateDecl

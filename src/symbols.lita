@@ -42,7 +42,8 @@ public enum SymbolFlags {
     IS_ALIAS                = (1<<14),
     IS_MAIN                 = (1<<15),
     IS_METHOD               = (1<<16),
-    IS_INTERFACE            = (1<<17),
+    IS_TRAIT                = (1<<17),
+    IS_TRAIT_METHOD         = (1<<18),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -81,6 +82,7 @@ public struct ProgramSymbols {
     symbolTypes: Array<*Symbol>
     symbolFuncs: Array<*Symbol>
     mainEntry: *Symbol
+    interfaceImpls: Map<Typeid, Array<Typeid>>
 }
 
 public struct Scope {
@@ -162,6 +164,7 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
     var isNewType = (decl.kind == StmtKind.FUNC_DECL   ||
                      decl.kind == StmtKind.STRUCT_DECL ||
                      decl.kind == StmtKind.UNION_DECL  ||
+                     decl.kind == StmtKind.TRAIT_DECL  ||
                      decl.kind == StmtKind.TYPEDEF_DECL||
                      decl.kind == StmtKind.ENUM_DECL)
 
@@ -190,13 +193,13 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
             // fallthru
         }
         case StmtKind.ENUM_DECL:
+        case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             kind = SymbolKind.TYPE
-            // TEMP(tony) - until interface is a keyword,
-            // we will cheat and use a note
-            if(decl.hasNote("interface")) {
-                flags |= SymbolFlags.IS_INTERFACE
+
+            if(decl.kind == StmtKind.TRAIT_DECL) {
+                flags |= SymbolFlags.IS_TRAIT
             }
             break;
         }
