@@ -50,7 +50,9 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         buf.appendStr(this.cTypeDecl(decl.sym.type, name))
         if(decl.expr) {
             buf.appendStrn(" = ", 3)
-            this.emitStmt(this.emitTraitCast(decl.expr))
+            if(!this.emitTraitCast(decl.expr)) {
+                this.emitStmt(decl.expr)
+            }
         }
         buf.appendStrn(";", 1)
     }
@@ -134,10 +136,6 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     // mark our current index into this function, so that
     // we can add in temp variables
     this.funcIndex = this.buf.length
-    //printf("FuncIndex = %d, %s\n", this.funcIndex, name)
-    // PROBLEM - what's saved to disk doesn't match the state of the buffer,
-    // aka it's unreliable -- need to flush to disk and move what's flushed to disk
-    // when adding temp variables...
 
     if(decl.body) {
         this.currentFunc = decl.sym.type as (*FuncTypeInfo)

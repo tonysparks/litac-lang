@@ -357,13 +357,28 @@ public func IsTrait(type: *TypeInfo) : bool {
         return IsTrait(constInfo.constOf)
     }
 
-    if(type.kind == TypeKind.PTR) {
-        var ptrInfo = type as (*PtrTypeInfo)
-        return IsTrait(ptrInfo.ptrOf)
-    }
     return type.kind == TypeKind.TRAIT
 }
 
+public func IsPtrTrait(type: *TypeInfo) : bool {
+    if(!IsPtr(type)) {
+        return false;
+    }
+
+    var ptrInfo: *TypeInfo = null
+    if(type.kind == TypeKind.CONST) {
+        var constInfo = type as (*ConstTypeInfo)
+        ptrInfo = constInfo.constOf
+    }
+    else {
+        ptrInfo = (type as (*PtrTypeInfo)).ptrOf
+    }
+    return IsTrait(ptrInfo)
+}
+
+public func IsTraitLike(type: *TypeInfo) : bool {
+    return IsTrait(type) || IsPtrTrait(type)
+}
 
 public func IsFieldAccessible(type: *TypeInfo) : bool {
     if(!type) {
@@ -736,12 +751,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeCheck
             return this.typeid == other.typeid
         }
         case TypeKind.TRAIT: {
-            if(!IsAggregate(other)) {
-                return false
-            }
-
-            var aggInfo = other as (*AggregateTypeInfo)
-            return aggInfo.implementsTrait(this, checker)
+            return this.isDeclarable(other, checker)
         }
         case TypeKind.ENUM: {
             if(IsInteger(other)) {
@@ -957,19 +967,14 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo, checker: *TypeCheck
                         return true
                     }
 
-
-                    if(IsAggregateLike(this)) {
-                        var thisAgg = AsAggregate(this)
-                        if(thisAgg.implementsTrait(other, checker)) {
-                            return true
+                    // only allow var p: *Trait = *Trait
+                    if(IsTrait(ptrOf)) {
+                        var otherPtrOf = otherPtr.getBaseType()
+                        if(IsTrait(otherPtrOf)) {
+                            return ptrOf.typeid == otherPtrOf.typeid
                         }
-                    }
 
-                    if(IsAggregateLike(other)) {
-                        var otherAgg = AsAggregate(this)
-                        if(otherAgg.implementsTrait(this, checker)) {
-                            return true
-                        }
+                        return false
                     }
 
                     // determine if we can do a using coersion
@@ -1106,11 +1111,11 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo, checker: *TypeCheck
                 return true
             }
 
-            if(!IsAggregate(other)) {
+            if(!IsPtrAggregate(other)) {
                 return false
             }
 
-            var aggInfo = other as (*AggregateTypeInfo)
+            var aggInfo = other.getBaseType() as (*AggregateTypeInfo)
             return aggInfo.implementsTrait(this, checker)
         }
         case TypeKind.ENUM: {

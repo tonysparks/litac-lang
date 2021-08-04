@@ -158,12 +158,80 @@ exit:
     };
 }
 
+func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeInfo, description: *const char) : bool {
+    // get more descriptive information if this is trait
+    // comparisons, as they are not as intuitive as other types
+    if(IsTraitLike(a)) {
+        var aTrait = a.getBaseType()
+        if(IsPtr(a)) {
+            if(!IsPtrTrait(b)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr(description)
+                a.toString(sb)
+                sb.appendStrn("'", 1)
+
+                sb.appendStr("; assigned trait pointers can only be assigned from a trait type and not an implementation type")
+                return true
+            }
+        }
+
+        if(!IsPtr(b) && IsAggregate(b)) {
+            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            if(aggInfo.implementsTrait(aTrait, this)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr(description)
+                a.toString(sb)
+                sb.appendStrn("'", 1)
+
+                sb.appendStr("; assigned trait implementations must be pointers: e.g. '*")
+                b.toString(sb)
+                sb.appendStrn("'", 1)
+                return true
+            }
+        }
+        else if(IsPtrAggregate(b)) {
+            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            if(!aggInfo.implementsTrait(aTrait, this)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr(description)
+                a.toString(sb)
+                sb.appendStrn("'; '", 4)
+                b.toString(sb)
+
+                sb.appendStr("' doesn't implement all of '")
+                a.toString(sb)
+                sb.appendStr("' trait methods")
+                return true
+            }
+        }
+        else {
+            sb.appendStrn("'", 1)
+            b.toString(sb)
+            sb.appendStr(description)
+            a.toString(sb)
+            sb.appendStr("'; only aggregate types can implement traits")
+            return true
+        }
+    }
+
+    return false
+}
+
 func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
     assert(a != null)
     assert(b != null)
 
     if(!a.canCastTo(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+
+        if(this.checkTrait(sb, a, b, "' can't be casted to '")) {
+            this.result.addErrorStr(src, sb)
+            return false
+        }
+
         sb.appendStrn("'", 1)
         a.toString(sb)
         sb.appendStr("' can't be casted to '")
@@ -177,12 +245,37 @@ func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeIn
     return true
 }
 
+
+
 func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
     assert(a != null)
     assert(b != null)
 
     if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+        // get more descriptive information if this is trait
+        // comparisons, as they are not as intuitive as other types
+        if(IsTraitLike(a)) {
+            var aTrait = a.getBaseType()
+            if(!IsPtr(b) && IsAggregate(b)) {
+                var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+                if(aggInfo.implementsTrait(aTrait, this)) {
+                    sb.appendStrn("'", 1)
+                    b.toString(sb)
+                    sb.appendStr("' can't be assigned to '")
+                    a.toString(sb)
+                    sb.appendStrn("'", 1)
+
+                    sb.appendStr("; assigned trait implementations must be pointers: e.g. '*")
+                    b.toString(sb)
+                    sb.appendStrn("'", 1)
+
+                    this.result.addErrorStr(src, sb)
+                    return false
+                }
+            }
+        }
+
         sb.appendStrn("'", 1)
         b.toString(sb)
         sb.appendStr("' can't be assigned to '")
@@ -202,6 +295,12 @@ func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *Type
 
     if(!a.isDeclarable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+
+        if(this.checkTrait(sb, a, b, "' can't be assigned to '")) {
+            this.result.addErrorStr(src, sb)
+            return false
+        }
+
         sb.appendStrn("'", 1)
         b.toString(sb)
         sb.appendStr("' can't be assigned to '")
@@ -221,6 +320,12 @@ func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *
 
     if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+
+        if(this.checkTrait(sb, a, b, "' is not of type '")) {
+            this.result.addErrorStr(src, sb)
+            return false
+        }
+
         sb.appendStrn("'", 1)
         b.toString(sb)
         sb.appendStr("' is not of type '")
@@ -815,7 +920,6 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
                     break;
                 }
             }
-            printf("Sym name: %s\n", sym.name)
         }
     }
 
@@ -828,7 +932,6 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
         }
         var impls = this.interfaceImpls.getPtr(iface.typeid)
         impls.add(agg.typeid)
-        printf("Adding: %u\n", agg.typeid)
     }
 
     return isImpl

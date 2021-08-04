@@ -2,8 +2,6 @@ import "assert"
 import "libc"
 
 trait List {
-    //size: func(*void) : i32
-    //add: func(*void, i32) : void
     size: func() : i32
     add: func(i32) : void
 }
@@ -19,13 +17,23 @@ func (this: *ArrayList) add(item : i32) {
     this.size += item
 }
 
+
+struct ArrayList2 {
+    size: i32
+}
+
+func (this: *ArrayList2) size() : i32 {
+    return this.size
+}
+
 var number = 0
 func AllocInterface() : List {
     number += 1
-    return ArrayList{}
+    return &ArrayList{}
 }
 
 func DoSomething(x: List, item: i32) : i32 {
+    printf("List type: %d\n", typeof(x))
     x.add(item)
     return x.size()
 }
@@ -34,8 +42,41 @@ func main(len:i32, args:**char) : i32 {
     printf("hello world\n")
 
     var array = ArrayList{}
-    DoSomething(&array, 4)
+    DoSomething(&array, 5)
 
-    AllocInterface().size();
+    printf("Array type: %d\n", typeof(array))
+    
+/*
+    // should be valid
+    var t1: List = &array
+    var tp: *List = &t1
+    var ty: List = t1
+
+
+    var array2 = ArrayList2{}
+    var tx: List = &array2
+*/
+    //var xx: List = ArrayList{}
+
+    /*array = ty
+    array = &ty
+
+    var array2: *ArrayList = &array
+
+    array2 = ty
+    array2 = &ty*/
+
+    // should be invalid
+    //var tp1: *List = &array
+    //var t: List = array
+    //var tp2: *List = array
+
+
+    /*var n = DoSomething(array, 4)
+    printf("n: %d\n", n)
+
+    var size = AllocInterface().size();
+    printf("Size: %d\n", size)*/
+
     return 0
 }

@@ -254,7 +254,7 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
             continue
         }
 
-        if(!IsAggregateLike(paramInfo)) {
+        if(!IsAggregateLike(paramInfo) || IsTraitLike(paramInfo)) {
             continue
         }
 

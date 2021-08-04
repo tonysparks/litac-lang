@@ -1,0 +1,278 @@
+{
+    "description": "Traits",
+    "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    @include("stdio.h");
+    @foreign func printf(...):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
+    "tests": [
+        {
+            "name" : "Traits",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.size += item
+                }
+
+                func DoSomething(x: List, item: i32) : i32 {
+                    x.add(item)
+                    return x.size()
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .size = 0
+                }
+                var result = DoSomething(&array, 4)
+                assert(result == 4)
+
+                result = DoSomething(&array, 2)
+                assert(result == 6)
+            `,
+        },
+        {
+            "name" : "Traits Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.size += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .size = 0
+                }
+
+                var list: List = &array
+                var pList: *List = &list
+
+                list.add(2)
+                assert(list.size() == 2)
+                pList.add(3)
+                assert(list.size() == 5)
+            `,
+        },
+
+        {
+            "name" : "Traits Invalid Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.size += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .size = 0
+                }
+
+                var list: *List = &array
+                assert(false)
+            `,
+            "error": "'*ArrayList' can't be assigned to '*List'; assigned trait pointers can only be assigned from a trait type and not an implementation type"
+        },
+
+        {
+            "name" : "Traits Invalid Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.size += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .size = 0
+                }
+
+                var list: *List = array
+                assert(false)
+            `,
+            "error": "'ArrayList' can't be assigned to '*List'; assigned trait pointers can only be assigned from a trait type and not an implementation type"
+        },
+
+        {
+            "name" : "Traits Invalid Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.size += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .size = 0
+                }
+
+                var list: List = array
+                assert(false)
+            `,
+            "error": "'ArrayList' can't be assigned to 'List'; assigned trait implementations must be pointers: e.g. '*ArrayList'"
+        },
+
+        {
+            "name" : "Traits Side Effects",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.size += item
+                }
+
+                var counter = 0
+                var globalArray = ArrayList{
+                    .size = 0
+                }
+                func NewArrayList() : List {
+                    counter += 1
+                    return &globalArray
+                }
+
+            `,
+            "code": `
+                assert(counter == 0)
+                var s = NewArrayList().size()
+                assert(s == 0)
+                assert(counter == 1)
+                var list = NewArrayList()
+                list.add(4)
+                assert(counter == 2)
+                assert(list.size() == 4)
+            `,
+        },
+
+        {
+            "name" : "Traits Invalid Type",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func size(this: *i32) : i32 {
+                    return 16
+                }
+                func add(this: *i32, item : i32) {
+                }
+            `,
+            "code": `
+                var this = 4;
+                var list: List = &this;
+            `,
+            "error": "'*i32' can't be assigned to 'List'; only aggregate types can implement traits"
+        },
+
+        {
+            "name" : "Traits Partial Implementation",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    size: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.size
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .size = 0
+                }
+
+                var list: List = &array
+                assert(false)
+            `,
+            "error": "'*ArrayList' can't be assigned to 'List'; '*ArrayList' doesn't implement all of 'List' trait methods"
+        },
+    ]
+}

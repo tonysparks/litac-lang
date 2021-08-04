@@ -133,7 +133,7 @@ public func (this: *Module) getType(type: *const char) : *Symbol {
     return this.genericSymbols.get(type)
 }
 
-public const MAX_METHODS_FOR_TYPE = 2048; // this should be big enough??
+public const MAX_METHODS_FOR_TYPE = 2048; // TODO: this should be big enough??
 
 public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METHODS_FOR_TYPE]*Symbol) : i32 {
     var numOfSymbols = 0
@@ -149,7 +149,21 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
                 continue
             }
 
-            //printf("Method found: %s\n", sym.name)
+            var fn = sym.type as (*FuncTypeInfo)
+            if(fn.decl.params.size() == 0) {
+                continue
+            }
+
+            var firstArg = fn.decl.params.get(0)
+            if(!firstArg.typeInfo) {
+                continue
+            }
+
+            var base = firstArg.typeInfo.getBaseType()
+            if(base.typeid != type.typeid) {
+                continue
+            }
+
             result[numOfSymbols] = sym
             numOfSymbols += 1
         }
@@ -157,6 +171,7 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
         currentSyms = currentSyms.parent ? currentSyms.parent : null
     }
 
+    // TODO: check generic types?
     //return this.genericSymbols.get(type)
     return numOfSymbols
 }
