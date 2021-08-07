@@ -20,6 +20,7 @@ import "introspection"
 import "instrument"
 import "system"
 import "common"
+import "traits"
 
 import "checker_decl"
 import "checker_expr"
@@ -130,7 +131,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     }
 
     this.resolveSymbols()
-
+/*
     for(var it = this.current.genericSymbols.iter(); it.hasNext();) {
         var entry = it.next()
         var sym = entry.value
@@ -141,7 +142,19 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
         else {
             this.symbolTypes.add(sym)
         }
+    }*/
+
+    var traitDecls = CreateTraitWrappers(this)
+    this.bypassing = true
+    for(var i = 0; i < traitDecls.size(); i += 1) {
+        var decl = traitDecls.get(i)
+        var sym = this.createDeclSymbol(decl)
+        //printf("Decl: %s vs %s\n", decl.name.asString(), sym.name)
+
+        this.resolveSymbol(sym)
+        this.finishResolveSymbol(sym)
     }
+    this.bypassing = false
 
     if(!this.lita.result.hasErrors()) {
         var introspect = Introspect{.lita = this.lita}
@@ -885,7 +898,8 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
     var symbols = [MAX_METHODS_FOR_TYPE]*Symbol{}
     var numOfMethods = this.current.getMethodsForType(agg, symbols)
 
-    var numOfTraitFns = iface.decl.fields.size()
+    // -1 to account for the "this pointer"
+    var numOfTraitFns = iface.decl.fields.size() - 1
 
     if(numOfMethods < numOfTraitFns) {
         return false

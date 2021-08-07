@@ -135,32 +135,54 @@ public func (this: *Module) getType(type: *const char) : *Symbol {
 
 public const MAX_METHODS_FOR_TYPE = 2048; // TODO: this should be big enough??
 
+func (this: *Module) isMethodForType(type: *TypeInfo, sym: *Symbol) : bool {
+    if(!(sym.flags & SymbolFlags.IS_METHOD)) {
+        return false
+    }
+
+    var fn = sym.type as (*FuncTypeInfo)
+    if(fn.decl.params.size() == 0) {
+        return false
+    }
+
+    var firstArg = fn.decl.params.get(0)
+    if(!firstArg.typeInfo) {
+        return false
+    }
+
+    var base = firstArg.typeInfo.getBaseType()
+    if(IsGenericCapable(type)) {
+        var gen = type as (*GenericTypeInfo)
+
+        if(IsGenericCapable(base)) {
+            var param = base as (*GenericTypeInfo)
+            if(gen.genericTypeid == param.genericTypeid) {
+                return true
+            }
+        }
+
+        if(gen.genericTypeid == base.typeid) {
+            return true
+        }
+    }
+
+    if(base.typeid != type.typeid) {
+        return false
+    }
+
+    return true
+}
+
 public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METHODS_FOR_TYPE]*Symbol) : i32 {
     var numOfSymbols = 0
 
     var currentSyms: *Scope = &this.symbols
     while(currentSyms) {
-        for(var it = currentSyms.symbols.iter();
-            it.hasNext();) {
+        for(var it = currentSyms.symbols.iter(); it.hasNext();) {
             var n = it.next()
             var sym = n.value
 
-            if(!(sym.flags & SymbolFlags.IS_METHOD)) {
-                continue
-            }
-
-            var fn = sym.type as (*FuncTypeInfo)
-            if(fn.decl.params.size() == 0) {
-                continue
-            }
-
-            var firstArg = fn.decl.params.get(0)
-            if(!firstArg.typeInfo) {
-                continue
-            }
-
-            var base = firstArg.typeInfo.getBaseType()
-            if(base.typeid != type.typeid) {
+            if(!this.isMethodForType(type, sym)) {
                 continue
             }
 
@@ -171,8 +193,19 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
         currentSyms = currentSyms.parent ? currentSyms.parent : null
     }
 
-    // TODO: check generic types?
-    //return this.genericSymbols.get(type)
+/* I don't think this is needed?
+    for(var it = this.genericSymbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var sym = entry.value
+
+        if(!this.isMethodForType(type, sym)) {
+            continue
+        }
+
+        result[numOfSymbols] = sym
+        numOfSymbols += 1
+    }
+*/
     return numOfSymbols
 }
 

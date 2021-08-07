@@ -341,7 +341,7 @@ func (this: using *CGen) emitTraitForwardDecls() {
         this.emit("// Generated code %s\n", traitName)
 
         // Generate Wrapper functions
-        {
+        {/*
             for(var i = 0; i < entry.value.size(); i += 1) {
                 var implSym = this.findSymbolByTypeid(entry.value.get(i))
                 assert(implSym)
@@ -370,6 +370,7 @@ func (this: using *CGen) emitTraitForwardDecls() {
                 }
             }
             this.emitStrn("\n", 1)
+            */
         }
 
         // Generate Casting functions
@@ -399,13 +400,13 @@ func (this: using *CGen) emitTraitVTables() {
         var traitName = this.cTypeName(traitSym.type)
 
         // Generate Wrapper functions
-        {
+        {/*
             for(var i = 0; i < entry.value.size(); i += 1) {
                 var implSym = this.findSymbolByTypeid(entry.value.get(i))
                 assert(implSym)
 
                 var implName = this.cTypeName(implSym.type)
-                for(var j = 0; j < traitDecl.fields.size(); j += 1) {
+                for(var j = 0; j < traitDecl.fields.size() - 1; j += 1) {
                     var field = traitDecl.fields.get(j)
                     assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
@@ -445,7 +446,7 @@ func (this: using *CGen) emitTraitVTables() {
                     this.emitStrn("}\n", 2)
                 }
                 this.emitStrn("\n", 1)
-            }
+            }*/
         }
 
         // Generate Casting functions
@@ -457,13 +458,7 @@ func (this: using *CGen) emitTraitVTables() {
                 var implName = this.cTypeName(implSym.type)
                 this.emit("%s %s__to__%s(%s* x) {", traitName, implName, traitName, implName)
                 this.emit("return (%s) {", traitName)
-                for(var j = 0; j < traitDecl.fields.size(); j += 1) {
-                    var field = traitDecl.fields.get(j)
-                    assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
-
-                    var fieldName = field.traitField.name.asString()
-                    this.emit(".%s = __%s_%s_wrapper,\n", fieldName, implName, fieldName)
-                }
+                this.emit(".__vtable = %s__vtables[%d],\n", traitName, i)
                 this.emit(".__this = x")
                 this.emitStrn("}", 1)
                 this.emitStrn(";\n", 2)
@@ -1853,64 +1848,75 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 if(funcPtr.isTrait) {
                     isTrait = true
 
-                    switch(expr.object.kind) {
-                        case StmtKind.GET_EXPR: {
-                            var getExpr = expr.object as (*GetExpr)
-                            var type = getExpr.object.operand.typeInfo
-                            if(getExpr.object.kind == StmtKind.IDENTIFIER_EXPR) {
-                                this.emitStmt(expr.object)
+                    assert(expr.object.kind == StmtKind.GET_EXPR)
 
-                                this.emitStrn("(", 1)
-                                this.emitStmt(getExpr.object)
+                    var getExpr = expr.object as (*GetExpr)
+                    var type = getExpr.object.operand.typeInfo
 
-                                if(IsPtr(type)) {
-                                    this.emitStrn("->", 2)
-                                }
-                                else {
-                                    this.emitStrn(".", 1)
-                                }
-
-                                this.emitStrn("__this", 6)
-                            }
-                            else {
-                                // Because the object may have side effects,
-                                // we must first assign it to a temp variable and
-                                // reuse the variable
-                                var buffer:[MAX_SYMBOL_NAME]char;
-                                var tmpName = this.allocTemp(type, buffer)
-
-                                this.emit("(%s = ", tmpName)
-                                this.emitStmt(getExpr.object)
-                                this.emit(", %s)", tmpName)
-
-                                if(IsPtr(type)) {
-                                    this.emitStrn("->", 2)
-                                }
-                                else {
-                                    this.emitStrn(".", 1)
-                                }
-
-                                assert(IsAggregateLike(type))
-
-                                var aggInfo = AsAggregate(type)
-                                var field = aggInfo.getField(getExpr.field.type.name)
-                                this.emitFieldName(field)
-
-                                this.emit("(%s", tmpName)
-                                if(IsPtr(type)) {
-                                    this.emitStrn("->", 2)
-                                }
-                                else {
-                                    this.emitStrn(".", 1)
-                                }
-                                this.emitStrn("__this", 6)
-                            }
-                            break
+                    // for identifiers, we don't have to worry about side-effects
+                    if(getExpr.object.kind == StmtKind.IDENTIFIER_EXPR) {
+                        this.emitStmt(getExpr.object)
+                        if(IsPtr(type)) {
+                            this.emitStrn("->", 2)
                         }
-                        default: {
-                            assert(false)
+                        else {
+                            this.emitStrn(".", 1)
                         }
+                        this.emitStr("__vtable->")
+
+                        assert(IsAggregateLike(type))
+
+                        var aggInfo = AsAggregate(type)
+                        var field = aggInfo.getField(getExpr.field.type.name)
+                        this.emitFieldName(field)
+
+                        this.emitStrn("(", 1)
+                        this.emitStmt(getExpr.object)
+
+                        if(IsPtr(type)) {
+                            this.emitStrn("->", 2)
+                        }
+                        else {
+                            this.emitStrn(".", 1)
+                        }
+
+                        this.emitStrn("__this", 6)
                     }
+                    else {
+                        // Because the object may have side effects,
+                        // we must first assign it to a temp variable and
+                        // reuse the variable
+                        var buffer:[MAX_SYMBOL_NAME]char;
+                        var tmpName = this.allocTemp(type, buffer)
+
+                        this.emit("(%s = ", tmpName)
+                        this.emitStmt(getExpr.object)
+                        this.emit(", %s", tmpName)
+
+                        if(IsPtr(type)) {
+                            this.emitStrn("->", 2)
+                        }
+                        else {
+                            this.emitStrn(".", 1)
+                        }
+                        this.emitStrn("__vtable)->", 11)
+
+                        assert(IsAggregateLike(type))
+
+                        var aggInfo = AsAggregate(type)
+                        var field = aggInfo.getField(getExpr.field.type.name)
+                        this.emitFieldName(field)
+
+                        this.emit("(%s", tmpName)
+                        if(IsPtr(type)) {
+                            this.emitStrn("->", 2)
+                        }
+                        else {
+                            this.emitStrn(".", 1)
+                        }
+                        this.emitStrn("__this", 6)
+                    }
+
 
                     if(expr.arguments.size() > 0) {
                         this.emitStrn(", ", 2)

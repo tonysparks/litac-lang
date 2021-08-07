@@ -274,5 +274,40 @@
             `,
             "error": "'*ArrayList' can't be assigned to 'List'; '*ArrayList' doesn't implement all of 'List' trait methods"
         },
+
+        {
+            "name" : "Traits Impl With Generics",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList<T> {
+                    size: i32
+                    element: T
+                }
+
+                func (this: *ArrayList<T>) size<T>() : i32 {
+                    return this.size
+                }
+
+                func (this: *ArrayList<T>) add<T>(item : i32) {
+                    this.size += item
+                }
+            `,
+            "code": `
+                var array = ArrayList<i32>{
+                    .size = 0,
+                    .element = 32
+                }
+
+                var list: List = &array
+                list.add(4)
+                assert(list.size() == 4)
+                assert(array.element == 32)
+            `,
+        },
     ]
 }

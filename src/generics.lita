@@ -211,6 +211,13 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     checker.resolveSymbol(genericSym)
     checker.finishResolveSymbol(genericSym)
 
+    if(genericSym.decl.kind == StmtKind.FUNC_DECL) {
+        checker.symbolFuncs.add(genericSym)
+    }
+    else {
+        checker.symbolTypes.add(genericSym)
+    }
+
     name.typeInfo = genericSym.type
     if(IsGenericCapable(genericSym.type) && sym.type) {
         var genericType = genericSym.type as (*GenericTypeInfo)

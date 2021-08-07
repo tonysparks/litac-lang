@@ -177,7 +177,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         var field = decl.fields.get(i)
         switch(field.kind) {
             case StmtKind.TRAIT_FIELD_DECL: {
-                this.emitStmt(field.traitField)
+                //this.emitStmt(field.traitField)
                 break;
             }
             case StmtKind.VAR_FIELD_DECL: {
@@ -200,6 +200,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
     }
 
     if(decl.sym.flags & SymbolFlags.IS_TRAIT) {
+        this.emit("%s__VirtualTable* __vtable;\n", name)
         this.emitStrn("void* __this;", 13)
     }
 
