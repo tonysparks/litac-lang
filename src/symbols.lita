@@ -44,6 +44,7 @@ public enum SymbolFlags {
     IS_METHOD               = (1<<16),
     IS_TRAIT                = (1<<17),
     IS_TRAIT_METHOD         = (1<<18),
+    IS_TRAIT_GENERATED      = (1<<19),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -78,6 +79,7 @@ public enum ScopeKind {
 }
 
 public struct ProgramSymbols {
+    root: *Module
     values: Array<*Symbol>
     symbolTypes: Array<*Symbol>
     symbolFuncs: Array<*Symbol>

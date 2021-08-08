@@ -1,5 +1,6 @@
 import "ast"
 import "string_buffer"
+import "string"
 import "types"
 import "module"
 import "symbols"
@@ -199,8 +200,18 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         }
     }
 
+    // for traits, we add the virtual table and this pointers
     if(decl.sym.flags & SymbolFlags.IS_TRAIT) {
-        this.emit("%s__VirtualTable* __vtable;\n", name)
+        var root = this.lita.programSymbols.root
+        assert(root != null)
+
+        // we put all generated trait tables in the root module, so therefore we have to manually
+        // name mangle the vtable name
+        var vtableName = [MAX_SYMBOL_NAME]char;
+        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME)
+        vtableNameStr.format("%.*s__%s", root.id.name.length, root.id.name.buffer, this.escapeNameStr(decl.sym.name))
+
+        this.emit("%s__VirtualTable* __vtable;\n", vtableNameStr.cStr())
         this.emitStrn("void* __this;", 13)
     }
 

@@ -14,6 +14,77 @@ import "parser"
 import "lex"
 import "module"
 
+/*
+    Traits need the following:
+
+LitaC:
+    trait List {
+        fn: func() : i32
+    }
+
+    struct LinkedList {
+        // ...
+    }
+
+    func (this: *LinkedList) fn() : i32 {
+        // ...
+    }
+
+C:
+    // the trait itself becomes this structure
+    struct List {
+        ListVirtualTable* vtable; // the virtual table containing the function pointers
+        void* this;               // a pointer to the concrete implementation type
+    }
+
+    // generated Virtual table
+    struct ListVirtualTable {
+        i32 (*fn)(void*);  // the function pointer, with void* this as the first parameter
+    }
+
+    // Wrapper function that basically just casts the void* to the concrete type and calls the
+    // concrete function
+    i32 LinkedList_fn_wrapper(void* this) {
+        LinkedList* _this = (LinkedList*)this;
+        return LinkedList_fn(_this); // calls the actual LinkedList.fn function
+    }
+
+    // global of all implementations mapping to their concrete functions for each type
+    static ListVirtualTable** ListVtables = {
+        [0] = &(ListVirtualTable) {
+            .fn = LinkedList_fn_wrapper
+        },
+        ...
+    }
+
+    // Create a casting function that converts the concrete type to the trait type.  In doing so, we must
+    // ensure the proper vtable implementation functions are populated
+    List LinkedList_to_List(LinkedList* list) {
+        return List {
+            .vtable = ListVtables[0], // uses the global virtual table, matches the index to the proper implementation
+            .this = list              // sets the this pointer to the concrete type
+        }
+    }
+
+    Most of this code can be generated on the LitaC side, however, given that LitaC currently doesn't know about
+    the actual trait vtable and this entries, these are delegated to the cgen module for creation.  The cgen module
+    also must know when a trait method is being called and do the following:
+
+    LitaC:
+        list.fn()
+    C:
+        list->vtable->fn(list->this)   // we must convert the trait call to call the vtable and also pass in the 'this' pointer
+
+    Also, the cgen module handles casting between concrete types and traits:
+
+    LitaC:
+        var ll = LinkedList {...}
+        var list: List = &ll
+    C:
+        LinkedList ll {...}
+        List list = LinkedList_to_List(&ll)   // Cast the LinkedList to List type
+*/
+
 public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
     var decls = ArrayInit<*Decl>(512, checker.lita.allocator)
@@ -28,24 +99,9 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = traitSym.name
 
-        printf("Trait: %s\n", traitName)
-
         // Generate VTable
         {
-            /*
-            var vtableDecl = CopyAggregateDecl(traitDecl, checker.lita.allocator)
-
-            var name = StringBufferInit(256, checker.lita.allocator)
-            name.append("__%s_vtable", traitName)
-            vtableDecl.name = Token {
-                .type = TokenType.IDENTIFIER,
-                .pos = vtableDecl.startPos,
-                .value = Value { .str = StringViewInit(name.cStr(), name.length) }
-            }
-            vtableDecl.kind = StmtKind.STRUCT_DECL
-
-            decls.add(vtableDecl as (*Decl))*/
-
+            //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
             sb.append("struct %s__VirtualTable", traitName)
             PrintGenerics(traitSym.genericParams, sb)
             sb.append(" {\n")
@@ -70,16 +126,6 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                   sb.append(";\n")
             }
             sb.append("}\n")
-
-            /*{
-                printf("Trait Virtual Table: \n%s\n", sb.cStr())
-                var module = traitSym.declared
-                var parser = ParserInit(module.id.filename, sb.cStr(), checker.lita)
-                var stmts = parser.parseModule()
-                decls.addAll(stmts.declarations)
-
-                sb.clear()
-            }*/
         }
 
         // Generate Wrapper functions
@@ -88,23 +134,24 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                 var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
                 assert(implSym)
 
-                var implName = implSym.name //this.cTypeName(implSym.type)
+                var implName = implSym.name
 
-                var isFromGeneric = false
                 if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-                    isFromGeneric = true
                     var genericTypeid = (implSym.type as (*GenericTypeInfo)).genericTypeid
                     var genSym = FindSymbolByTypeid(checker.symbolTypes, genericTypeid)
+                    if(genSym.flags & SymbolFlags.IS_TRAIT_GENERATED) {
+                        continue
+                    }
+
+                    genSym.flags |= SymbolFlags.IS_TRAIT_GENERATED
                     implName = genSym.name
                 }
 
                 for(var j = 0; j < traitDecl.fields.size(); j += 1) {
                     var field = traitDecl.fields.get(j)
                     assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
-
-                    //var fieldName = field.traitField.name.asString()
-
                     assert(field.typeInfo && field.typeInfo.kind == TypeKind.FUNC_PTR)
+
                     var fn = field.typeInfo as (*FuncPtrTypeInfo)
 
                     sb.append("func __%s_%s_wrapper", implName, field.traitField.name.asString())
@@ -153,70 +200,17 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                     sb.append("\n}\n")
                 }
             }
-
-            /*{
-
-                printf("Trait Wrapper Functions: \n%s\n", sb.cStr())
-                var module = traitSym.declared
-                var parser = ParserInit(module.id.filename, sb.cStr(), checker.lita)
-                var stmts = parser.parseModule()
-                decls.addAll(stmts.declarations)
-
-                sb.clear()
-            }*/
         }
-
-        // Generate Casting functions
-        /*
-        {
-            for(var i = 0; i < entry.value.size(); i += 1) {
-                var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
-                assert(implSym)
-
-                var implName = implSym.name //this.cTypeName(implSym.type)
-
-                var isFromGeneric = false
-                if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-                    isFromGeneric = true
-                    var genericTypeid = (implSym.type as (*GenericTypeInfo)).genericTypeid
-                    var genSym = FindSymbolByTypeid(checker.symbolTypes, genericTypeid)
-                    implName = genSym.name
-                }
-
-                sb.append("%s %s__to__%s", traitName, implName, traitName)
-                PrintGenerics(implSym, sb)
-
-                sb.append("(x: *%s", implName)
-                PrintGenerics(implSym, sb)
-                sb.append(") {\n")
-
-                {
-                    sb.append("    return %s {\n", traitName)
-                    for(var j = 0; j < traitDecl.fields.size(); j += 1) {
-                        var field = traitDecl.fields.get(j)
-                        assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
-
-                        var fieldName = field.traitField.name.asString()
-                        sb.append("        .%s = __%s_%s_wrapper", fieldName, implName, fieldName)
-                        PrintGenerics(implSym, sb)
-                        sb.append(",\n")
-                    }
-                    sb.append("        .__this = x\n")
-                    sb.append("    }\n")
-                }
-                sb.append("}\n")
-            }
-        }
-        */
 
         // Generate Vtables implementations
         {
+            //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
             sb.append("const %s__vtables = []*%s__VirtualTable {\n", traitName, traitName)
             for(var i = 0; i < entry.value.size(); i += 1) {
                 var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
                 assert(implSym)
 
-                var implName = implSym.name //this.cTypeName(implSym.type)
+                var implName = implSym.name
 
                 var isFromGeneric = false
                 if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
@@ -262,7 +256,8 @@ func PrintGenerics(genericParams: *Array<GenericParam>, sb: *StringBuffer) {
         if(x > 0) {
             sb.append(", ")
         }
-        sb.append("%s", genericParams.get(x).name.asString())
+        var name = genericParams.get(x).name
+        sb.append("%s", name.asString())
     }
     if(genericParams.size() > 0) {
         sb.append(">")
@@ -296,4 +291,11 @@ func FindSymbolByTypeid(symbols: Array<*Symbol>, id: Typeid) : *Symbol {
     }
 
     return null
+}
+
+
+func Parse(sb: *StringBuffer, checker: *TypeChecker, decls: *Array<*Decl>) {
+    var parser = ParserInit("generated", sb.cStr(), checker.lita)
+    var stmts = parser.parseModule()
+    decls.addAll(stmts.declarations)
 }

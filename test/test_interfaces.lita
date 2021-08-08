@@ -70,10 +70,19 @@ func main(len:i32, args:**char) : i32 {
     var list: List = &array
     //var list = &array
     list.add(4);
-    (list).add(8)
+    (list).add(8);
     var plist: *List = &list
     plist.add(4);
-    (plist).add(8)
+    (plist).add(8);
+
+    var array2 = ArrayList<f32>{
+        .len = 0,
+        .element = 32
+    }
+    var list2: List = &array2
+    list2.add(8);
+    (list2.size() == 8);
+    (array2.element == 32);
     //assert(list.size() == 4)
     //assert(array.element == 32)
 

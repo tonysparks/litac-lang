@@ -448,34 +448,6 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
         }
     }
 
-    // add the implicit __this pointer
-    /* TEMP
-    if(isTrait) {
-        var ptrType = NewTypeSpec(TypeSpecKind.PTR, aggDecl.startPos, this.lita.allocator)
-        ptrType.base = NewVoidTypeSpec(aggDecl.startPos, this.lita.allocator)
-
-        var traitField = NewTraitFieldDecl(
-                            aggDecl.startPos,
-                            aggDecl.endPos,
-                            Token {
-                                .type = TokenType.IDENTIFIER,
-                                .pos = aggDecl.startPos,
-                                .value = Value { .str = StringViewInit("__this") }
-                            },
-                            ptrType,
-                            Attributes{},
-                            this.lita.allocator) as (*TraitFieldDecl)
-
-        var field = FieldStmt {
-            .kind = StmtKind.TRAIT_FIELD_DECL,
-            .traitField = traitField,
-            .typeInfo = this.resolveTypeSpec(traitField.type)
-        }
-
-        assert(field.typeInfo)
-        aggDecl.fields.add(field)
-    }*/
-
     this.addFieldReferences(aggDecl, aggDecl.sym.type, 0)
 
     return true
