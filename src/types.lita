@@ -285,6 +285,37 @@ public func IsBooleanable(type: *TypeInfo) : bool {
     }
 }
 
+/**
+    Converts the trait method into a function pointer.  This adds the first
+    void pointer argument
+*/
+public func AsTraitFuncPtr(type: *TypeInfo, name: *const char, typeCache: *TypeCache) : *FuncPtrTypeInfo {
+    if(!type) {
+        return null
+    }
+
+    assert(type.kind == TypeKind.FUNC_PTR)
+
+    var funcPtr = type as (*FuncPtrTypeInfo)
+
+    assert(funcPtr.isTrait)
+
+    var params = ArrayInit<*TypeInfo>(funcPtr.paramDecls.size() + 1, typeCache.allocator)
+    params.add(typeCache.newPtrTypeInfo(&VOID_TYPE) as (*TypeInfo))
+    for(var i = 0; i < funcPtr.paramDecls.size(); i += 1) {
+        params.add(funcPtr.paramDecls.get(i))
+    }
+
+    var result = typeCache.newFuncPtrTypeInfo(funcPtr.genericParams,
+                                              funcPtr.returnType,
+                                              params,
+                                              funcPtr.hasVarargs)
+
+    result.name = name
+    return result
+
+}
+
 public func AsAggregate(type: *TypeInfo) : *AggregateTypeInfo {
     assert(IsAggregateLike(type))
 
@@ -1429,7 +1460,10 @@ public func (this: *FuncTypeInfo) asPtr(typeCache: *TypeCache) : *FuncPtrTypeInf
         var p = this.decl.params.get(i)
         paramDecls.add(p.typeInfo)
     }
-    return typeCache.newFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.decl.flags & FuncFlags.HAS_VARARGS)
+    var funcPtr = typeCache.newFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.decl.flags & FuncFlags.HAS_VARARGS)
+    funcPtr.name = this.name
+
+    return funcPtr
 }
 
 

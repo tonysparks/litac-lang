@@ -569,9 +569,6 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         return false
     }
 
-//Info("Add TypeReference: %llu\n", objectType.typeid)
-//    this.lita.references.addTypeReferenceByTypeInfo(expr.startPos, objectType)
-
     var isMethod = false
     var numberOfDefaultArgs = 0
     var suppliedArgs = ArrayInit<*Expr>(expr.arguments.size() + 1, this.allocator)
@@ -579,6 +576,8 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
 
     var funcPtr: *FuncPtrTypeInfo = null
 
+    // TODO: This is massively wasteful, creating func pointer typeinfos for
+    // each function call...
     if(objectType.kind == TypeKind.FUNC) {
         var funcInfo = objectType as (*FuncTypeInfo)
         isMethod = (funcInfo.decl.flags & FuncFlags.IS_METHOD)
@@ -593,6 +592,19 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     }
     else {
         funcPtr = objectType as (*FuncPtrTypeInfo)
+
+        // ??? This looks like this might be a ticking time bomb with overriding the name each time ???
+        // The thought here is that if this is a function pointer, which don't have
+        // a name, get assigned the name on invocation -- this name becomes relavent for
+        // error output
+        if(expr.object.kind == StmtKind.FUNC_IDENTIFIER_EXPR) {
+            var idExpr = expr.object as (*IdentifierExpr)
+            funcPtr.name = idExpr.type.name
+        }
+        else if(expr.object.kind == StmtKind.GET_EXPR) {
+            var getExpr = expr.object as (*GetExpr)
+            funcPtr.name = getExpr.field.type.name
+        }
     }
 
     var isMethodCall = isMethod && this.isMethodSyntax(expr, funcPtr, &suppliedArgs)
@@ -1343,6 +1355,14 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
 
             expr.field.operand.typeInfo = field.typeInfo
             expr.operand.typeInfo = field.typeInfo
+
+            // if this is a trait method reference (i.e., not a function call), we must convert this to
+            // a trait function pointer
+            if(aggInfo.kind == TypeKind.TRAIT && expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+                var funcPtr = AsTraitFuncPtr(field.typeInfo, expr.field.type.name, this.typeCache) as (*TypeInfo)
+                expr.field.operand.typeInfo = funcPtr
+                expr.operand.typeInfo = funcPtr
+            }
             return true
         }
 
@@ -1359,6 +1379,15 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
             expr.flags |= GetExprFlags.IS_USING
             expr.field.operand.typeInfo = field.typeInfo
             expr.operand.typeInfo = field.typeInfo
+
+            // if this is a trait method reference (i.e., not a function call), we must convert this to
+            // a trait function pointer
+            if(fieldResult.aggInfo.kind == TypeKind.TRAIT && expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+                var funcPtr = AsTraitFuncPtr(field.typeInfo, expr.field.type.name, this.typeCache) as (*TypeInfo)
+                expr.field.operand.typeInfo = funcPtr
+                expr.operand.typeInfo = funcPtr
+            }
+
             return true
         }
 

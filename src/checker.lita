@@ -826,6 +826,10 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
             sym.state = SymbolState.RESOLVED
             break;
         }
+        case StmtKind.POISON_DECL: {
+            sym.state = SymbolState.RESOLVED
+            break;
+        }
         default: {
             assert(false)
         }

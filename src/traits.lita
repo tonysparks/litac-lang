@@ -102,6 +102,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         // Generate VTable
         {
             //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
+           // printf("Sym: %s vs %s\n", traitName, traitDecl.name.asString())
             sb.append("struct %s__VirtualTable", traitName)
             PrintGenerics(traitSym.genericParams, sb)
             sb.append(" {\n")
@@ -239,7 +240,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     }
 
     {
-        // printf("Traits Source: \n%s\n", sb.cStr())
+        printf("Traits Source: \n%s\n", sb.cStr())
         var parser = ParserInit("generated", sb.cStr(), checker.lita)
         var stmts = parser.parseModule()
         decls.addAll(stmts.declarations)

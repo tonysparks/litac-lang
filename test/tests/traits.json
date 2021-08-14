@@ -635,7 +635,6 @@
                 assert(c2.count(2) == 10)
             `,
         },
-*/
         {
             "name" : "Traits Function Pointer",
             "definitions": `
@@ -658,8 +657,149 @@
                 }
 
                 var function: Function = &impl
+                function.fn()
                 var callback = function.fn
-                assert(callback() == 4)
+                assert(callback(&impl) == 4)
+            `,
+        },
+
+        {
+            "name" : "Traits Function Pointer Invalid",
+            "definitions": `
+
+                trait Function {
+                    fn: func() : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn() : i32 {
+                    return this.i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn()
+                var callback = function.fn
+                assert(callback() != 4)
+            `,
+            "error": "'callback' called with too few arguments"
+        },
+
+
+        {
+            "name" : "Traits Function Too few Args",
+            "definitions": `
+
+                trait Function {
+                    fn: func(i32) : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn()
+                assert(false)
+            `,
+            "error": "'fn' called with too few arguments"
+        },
+
+        {
+            "name" : "Traits Function Pointer With Arg",
+            "definitions": `
+
+                trait Function {
+                    fn: func(i32) : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn(1)
+                var callback = function.fn
+                assert(callback(&impl, 4) == 8)
+            `,
+        },
+        {
+            "name" : "Traits Function Pointer Invalid with Arg",
+            "definitions": `
+
+                trait Function {
+                    fn: func(i32) : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn(1)
+                var callback = function.fn
+                assert(callback(4) != 8)
+            `,
+            "error": "'callback' called with too few arguments"
+        },
+*/
+        {
+            "name" : "Traits With Generics",
+            "definitions": `
+
+                trait Function<T> {
+                    fn: func(T) : T
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function<i32> = &impl
+                function.fn(1)
             `,
         },
     ]
