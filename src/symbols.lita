@@ -42,6 +42,9 @@ public enum SymbolFlags {
     IS_ALIAS                = (1<<14),
     IS_MAIN                 = (1<<15),
     IS_METHOD               = (1<<16),
+    IS_TRAIT                = (1<<17),
+    IS_TRAIT_METHOD         = (1<<18),
+    IS_TRAIT_GENERATED      = (1<<19),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -76,10 +79,12 @@ public enum ScopeKind {
 }
 
 public struct ProgramSymbols {
+    root: *Module
     values: Array<*Symbol>
     symbolTypes: Array<*Symbol>
     symbolFuncs: Array<*Symbol>
     mainEntry: *Symbol
+    interfaceImpls: Map<Typeid, Array<Typeid>>
 }
 
 public struct Scope {
@@ -161,6 +166,7 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
     var isNewType = (decl.kind == StmtKind.FUNC_DECL   ||
                      decl.kind == StmtKind.STRUCT_DECL ||
                      decl.kind == StmtKind.UNION_DECL  ||
+                     decl.kind == StmtKind.TRAIT_DECL  ||
                      decl.kind == StmtKind.TYPEDEF_DECL||
                      decl.kind == StmtKind.ENUM_DECL)
 
@@ -189,9 +195,14 @@ public func (this: *Scope) addSymbol(name:[MAX_SYMBOL_NAME]const char,
             // fallthru
         }
         case StmtKind.ENUM_DECL:
+        case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             kind = SymbolKind.TYPE
+
+            if(decl.kind == StmtKind.TRAIT_DECL) {
+                flags |= SymbolFlags.IS_TRAIT
+            }
             break;
         }
         case StmtKind.FUNC_DECL: {

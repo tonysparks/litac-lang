@@ -1,5 +1,6 @@
 import "ast"
 import "string_buffer"
+import "string"
 import "types"
 import "module"
 import "symbols"
@@ -50,7 +51,9 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         buf.appendStr(this.cTypeDecl(decl.sym.type, name))
         if(decl.expr) {
             buf.appendStrn(" = ", 3)
-            this.emitStmt(decl.expr)
+            if(!this.emitTraitCast(decl.expr)) {
+                this.emitStmt(decl.expr)
+            }
         }
         buf.appendStrn(";", 1)
     }
@@ -131,6 +134,10 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     var name = this.cName(decl.sym)
     this.emitFuncDeclSignature(decl, name)
     this.emitStrn(" {", 2)
+    // mark our current index into this function, so that
+    // we can add in temp variables
+    this.funcIndex = this.buf.length
+
     if(decl.body) {
         this.currentFunc = decl.sym.type as (*FuncTypeInfo)
         this.emitStmt(decl.body)
@@ -166,10 +173,14 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         name = ""
     }
 
-    this.emit("%s %s {", decl.kind == StmtKind.STRUCT_DECL ? "struct" : "union", name)
+    this.emit("%s %s {", decl.kind == StmtKind.UNION_DECL ? "union" : "struct", name)
     for(var i = 0; i < decl.fields.size(); i+=1) {
         var field = decl.fields.get(i)
         switch(field.kind) {
+            case StmtKind.TRAIT_FIELD_DECL: {
+                //this.emitStmt(field.traitField)
+                break;
+            }
             case StmtKind.VAR_FIELD_DECL: {
                 this.emitStmt(field.varField)
                 break;
@@ -188,6 +199,22 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
             }
         }
     }
+
+    // for traits, we add the virtual table and this pointers
+    if(decl.sym.flags & SymbolFlags.IS_TRAIT) {
+        var root = this.lita.programSymbols.root
+        assert(root != null)
+
+        // we put all generated trait tables in the root module, so therefore we have to manually
+        // name mangle the vtable name
+        var vtableName = [MAX_SYMBOL_NAME]char;
+        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME)
+        vtableNameStr.format("%s%.*s__%s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, this.escapeNameStr(decl.sym.name))
+
+        this.emit("%s__VirtualTable* __vtable;\n", vtableNameStr.cStr())
+        this.emitStrn("void* __this;", 13)
+    }
+
     this.emitStrn("}", 1)
     if(this.aggregateLevel > 1) {
         if(decl.name.str.length) {

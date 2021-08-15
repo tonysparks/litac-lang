@@ -17,7 +17,8 @@ REM litaC.exe -run -profile -buildCmd %BUILD_CMD% "../src/lsp.lita"
 
 echo Running litaC inception!...
 REM a.exe -debug -profile -instrument -cFormat -buildCmd %BUILD_CMD% "../../src/main.lita"
-inception.exe -run -debug -profile -cFormat -buildCmd %BUILD_CMD% "../test/test_single.lita"
+REM inception.exe -run -debug -profile -cFormat -buildCmd %BUILD_CMD% "../test/test_single.lita"
+inception.exe -run -debug -profile -cFormat -buildCmd %BUILD_CMD% "../test/test_interfaces.lita"
 REM echo Inception complete
 goto end
 

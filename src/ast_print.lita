@@ -178,6 +178,10 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                         PrintStmt(field.varField, indent+1)
                         break;
                     }
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        PrintStmt(field.traitField, indent+1)
+                        break;
+                    }
                     default:{}
                 }
                 printf("\n")
@@ -224,6 +228,49 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                     }
                     case StmtKind.VAR_FIELD_DECL: {
                         PrintStmt(field.varField, indent+1)
+                        break;
+                    }
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        PrintStmt(field.traitField, indent+1)
+                        break;
+                    }
+                    default:{}
+                }
+                printf("\n")
+            }
+            Printf(indent, "}")
+            return;
+        }
+        case StmtKind.TRAIT_DECL: {
+            var decl = s as (*AggregateDecl)
+            if(!decl.attributes.notes.empty()) {
+                for(var i = 0; i < decl.attributes.notes.size(); i += 1) {
+                    PrintStmt(decl.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+
+            Printf(indent, "")
+            if(decl.attributes.isPublic) {
+                printf("public ")
+            }
+            printf("trait ")
+            PrintName(decl.name)
+            if(!decl.genericParams.empty()) {
+                printf("<")
+                for(var i = 0; i < decl.genericParams.size(); i += 1) {
+                    if(i > 0) Printf(indent, ",")
+                    var t = decl.genericParams.get(i).name
+                    printf("%.*s", t.value.str.length, t.value.str.buffer)
+                }
+                printf(">")
+            }
+            printf(" {\n")
+            for(var i = 0; i < decl.fields.size(); i+=1) {
+                var field = decl.fields.get(i)
+                switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        PrintStmt(field.traitField as (*Stmt), indent+1)
                         break;
                     }
                     default:{}
@@ -571,6 +618,20 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             stmt.decl = null
             return stmt as (*Stmt)
         }*/
+        case StmtKind.TRAIT_FIELD_DECL: {
+            var stmt = s as (*TraitFieldDecl)
+            if(!stmt.attributes.notes.empty()) {
+                for(var i = 0; i < stmt.attributes.notes.size(); i += 1) {
+                    PrintStmt(stmt.attributes.notes.get(i), indent)
+                    printf("\n")
+                }
+            }
+            Printf(indent, "")
+            PrintName(stmt.name)
+            printf(": ")
+            PrintTypeSpec(stmt.type)
+            return;
+        }
         case StmtKind.VAR_FIELD_DECL: {
             var stmt = s as (*VarFieldDecl)
             if(!stmt.attributes.notes.empty()) {

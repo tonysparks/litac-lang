@@ -1,4 +1,6 @@
 import "libc"
+import "mem"
+import "string_buffer"
 
 public enum LogLevel {
     TRACE,
@@ -68,4 +70,44 @@ public func Panic(format: *const char, ...) {
     va_start(args, format);
     Logv(LogLevel.FATAL, format, args)
     va_end(args)
+}
+
+
+public func EscapeName(name: *const char, sb: *StringBuffer) : *char {
+    sb.appendStrn(name, strlen(name))
+    for(var i = 0; i < sb.length;) {
+        var c = sb.buffer[i]
+
+        switch(c) {
+            case '*': sb.replace(i, i+1, "_ptr_"); i+=5; break;
+            case '<': sb.replace(i, i+1, "_cb_");  i+=4; break;
+            case '>': sb.replace(i, i+1, "_ce_");  i+=4; break;
+            case '[': sb.replace(i, i+1, "_bb_");  i+=4; break;
+            case ']': sb.replace(i, i+1, "_be_");  i+=4; break;
+            case '(': sb.replace(i, i+1, "_pb_");  i+=4; break;
+            case ')': sb.replace(i, i+1, "_pe_");  i+=4; break;
+            case ',': sb.replace(i, i+1, "_c_");   i+=3; break;
+            case ' ': sb.replace(i, i+1, "_");     i+=1; break;
+            case ':': {
+                var n = i + 1;
+                if(n < sb.length) {
+                    var nc = sb.buffer[n]
+                    if(nc == ':') {
+                        sb.replace(i, i+1, "__")
+                        i+=2;
+                        break;
+                    }
+                }
+                sb.replace(i, i+1, "_r_")
+                i+=3;
+                break;
+            }
+            default: {
+                i+=1;
+                break;
+            }
+        }
+    }
+
+    return sb.cStr()
 }

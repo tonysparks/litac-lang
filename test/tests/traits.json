@@ -1,0 +1,950 @@
+{
+    "description": "Traits",
+    "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    @include("stdio.h");
+    @foreign func printf(...):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
+    "tests": [
+        {
+            "name" : "Traits",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.len += item
+                }
+
+                func DoSomething(x: List, item: i32) : i32 {
+                    x.add(item)
+                    return x.size()
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0
+                }
+                var result = DoSomething(&array, 4)
+                assert(result == 4)
+
+                result = DoSomething(&array, 2)
+                assert(result == 6)
+            `,
+        },
+        {
+            "name" : "Traits Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.len += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0
+                }
+
+                var list: List = &array
+                var pList: *List = &list
+
+                list.add(2)
+                assert(list.size() == 2)
+                pList.add(3)
+                assert(list.size() == 5)
+            `,
+        },
+
+        {
+            "name" : "Traits Invalid Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.len += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0
+                }
+
+                var list: *List = &array
+                assert(false)
+            `,
+            "error": "'*ArrayList' can't be assigned to '*List'; assigned trait pointers can only be assigned from a trait type and not an implementation type"
+        },
+
+        {
+            "name" : "Traits Invalid Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.len += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0
+                }
+
+                var list: *List = array
+                assert(false)
+            `,
+            "error": "'ArrayList' can't be assigned to '*List'; assigned trait pointers can only be assigned from a trait type and not an implementation type"
+        },
+
+        {
+            "name" : "Traits Invalid Assignment",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.len += item
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0
+                }
+
+                var list: List = array
+                assert(false)
+            `,
+            "error": "'ArrayList' can't be assigned to 'List'; assigned trait implementations must be pointers: e.g. '*ArrayList'"
+        },
+
+        {
+            "name" : "Traits Side Effects",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+                func (this: *ArrayList) add(item : i32) {
+                    this.len += item
+                }
+
+                var counter = 0
+                var globalArray = ArrayList{
+                    .len = 0
+                }
+                func NewArrayList() : List {
+                    counter += 1
+                    return &globalArray
+                }
+
+            `,
+            "code": `
+                assert(counter == 0)
+                var s = NewArrayList().size()
+                assert(s == 0)
+                assert(counter == 1)
+                var list = NewArrayList()
+                list.add(4)
+                assert(counter == 2)
+                assert(list.size() == 4)
+            `,
+        },
+
+        {
+            "name" : "Traits Invalid Type",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func size(this: *i32) : i32 {
+                    return 16
+                }
+                func add(this: *i32, item : i32) {
+                }
+            `,
+            "code": `
+                var this = 4;
+                var list: List = &this;
+            `,
+            "error": "'*i32' can't be assigned to 'List'; only aggregate types can implement traits"
+        },
+
+        {
+            "name" : "Traits Partial Implementation",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0
+                }
+
+                var list: List = &array
+                assert(false)
+            `,
+            "error": "'*ArrayList' can't be assigned to 'List'; '*ArrayList' doesn't implement all of 'List' trait methods"
+        },
+
+        {
+            "name" : "Traits Impl With Generics",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList<T> {
+                    len: i32
+                    element: T
+                }
+
+                func (this: *ArrayList<T>) size<T>() : i32 {
+                    return this.len
+                }
+
+                func (this: *ArrayList<T>) add<T>(item : i32) {
+                    this.len += item
+                }
+            `,
+            "code": `
+                var array = ArrayList<i32>{
+                    .len = 0,
+                    .element = 32
+                }
+
+                var array2 = ArrayList<f32>{
+                    .len = 0,
+                    .element = 32
+                }
+
+                var list: List = &array
+                list.add(4)
+                assert(list.size() == 4)
+                assert(array.element == 32)
+
+                var list2: List = &array2
+                list2.add(8)
+                assert(list2.size() == 8)
+                assert(array2.element == 32)
+            `,
+        },
+
+        {
+            "name" : "Traits Impl With Generics And Normal",
+            "definitions": `
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct ArrayList<T> {
+                    len: i32
+                    element: T
+                }
+
+                func (this: *ArrayList<T>) size<T>() : i32 {
+                    return this.len
+                }
+
+                func (this: *ArrayList<T>) add<T>(item : i32) {
+                    this.len += item
+                }
+
+                struct LinkedList {
+                    len: i32
+                }
+
+                func (this: *LinkedList) size() : i32 {
+                    return this.len
+                }
+
+                func (this: *LinkedList) add(item : i32) {
+                    this.len += item
+                }
+            `,
+            "code": `
+                var array = ArrayList<i32>{
+                    .len = 0,
+                    .element = 32
+                }
+
+                var array2 = ArrayList<f32>{
+                    .len = 0,
+                    .element = 32
+                }
+
+                var list: List = &array
+                list.add(4)
+                assert(list.size() == 4)
+                assert(array.element == 32)
+
+                var list2: List = &array2
+                list2.add(8)
+                assert(list2.size() == 8)
+                assert(array2.element == 32)
+
+                var linked = LinkedList {
+                    .len = 0
+                }
+                var ll: List = &linked
+                ll.add(16)
+                assert(ll.size() == 16)
+            `,
+        },
+
+
+        {
+            "name" : "Traits Impl Across Modules",
+            "modules": [
+                {
+                    "name": "a",
+                    "program": `
+                    public struct ArrayList {
+                        len: i32
+                    }
+
+                    public func (this: *ArrayList) size() : i32 {
+                        return this.len
+                    }
+                    `
+                },
+                {
+                    "name": "b",
+                    "program": `
+                    import "a"
+
+                    public func (this: *ArrayList) add(item : i32) {
+                        this.len += item
+                    }
+                    `
+                }
+            ],
+            "definitions": `
+                import "a"
+                import "b"
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0,
+                }
+
+                var array2 = ArrayList{
+                    .len = 0,
+                }
+
+                var list: List = &array
+                list.add(4)
+                assert(list.size() == 4)
+
+                var list2: List = &array2
+                list2.add(8)
+                assert(list2.size() == 8)
+            `,
+        },
+
+        {
+            "name" : "Traits Impl Across Modules With Generics",
+            "modules": [
+                {
+                    "name": "a",
+                    "program": `
+                    public struct ArrayList<T> {
+                        len: i32
+                    }
+
+                    public func (this: *ArrayList<T>) size<T>() : i32 {
+                        return this.len
+                    }
+                    `
+                },
+                {
+                    "name": "b",
+                    "program": `
+                    import "a"
+
+                    public func (this: *ArrayList<T>) add<T>(item : i32) {
+                        this.len += item
+                    }
+                    `
+                }
+            ],
+            "definitions": `
+                import "a"
+                import "b"
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+            `,
+            "code": `
+                var array = ArrayList<i32>{
+                    .len = 0,
+                }
+
+                var array2 = ArrayList<f32>{
+                    .len = 0,
+                }
+
+                var list: List = &array
+                list.add(4)
+                assert(list.size() == 4)
+
+                var list2: List = &array2
+                list2.add(8)
+                assert(list2.size() == 8)
+            `,
+        },
+
+        {
+            "name" : "Traits Impl Across Modules With Multiple Impls",
+            "modules": [
+                {
+                    "name": "a",
+                    "program": `
+                    public struct ArrayList<T> {
+                        len: i32
+                    }
+
+                    public func (this: *ArrayList<T>) size<T>() : i32 {
+                        return this.len
+                    }
+                    `
+                },
+                {
+                    "name": "b",
+                    "program": `
+                    import "a"
+
+                    public func (this: *ArrayList<T>) add<T>(item : i32) {
+                        this.len += item
+                    }
+                    `
+                }
+            ],
+            "definitions": `
+                import "a"
+                import "b"
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                struct LinkedList {
+                    len: i32
+                }
+
+                func (this: *LinkedList) size() : i32 {
+                    return this.len
+                }
+
+                func (this: *LinkedList) add(item : i32) {
+                    this.len += item
+                }
+            `,
+            "code": `
+                var array = ArrayList<i32>{
+                    .len = 0,
+                }
+
+                var array2 = ArrayList<f32>{
+                    .len = 0,
+                }
+
+                var list: List = &array
+                list.add(4)
+                assert(list.size() == 4)
+
+                var list2: List = &array2
+                list2.add(8)
+                assert(list2.size() == 8)
+
+                var linked = LinkedList {
+                    .len = 0
+                }
+                var ll: List = &linked
+                ll.add(16)
+                assert(ll.size() == 16)
+            `,
+        },
+
+
+        {
+            "name" : "Multiple Traits Impl Across Modules",
+            "modules": [
+                {
+                    "name": "a",
+                    "program": `
+                    public trait Counter {
+                        count: func(i32) : i32
+                    }
+
+                    public struct ArrayList {
+                        len: i32
+                    }
+
+                    public func (this: *ArrayList) size() : i32 {
+                        return this.len
+                    }
+                    `
+                },
+                {
+                    "name": "b",
+                    "program": `
+                    import "a"
+
+                    public func (this: *ArrayList) add(item : i32) {
+                        this.len += item
+                    }
+                    `
+                }
+            ],
+            "definitions": `
+                import "a"
+                import "b"
+
+                trait List {
+                    size: func() : i32
+                    add:  func(i32) : void
+                }
+
+                public func (this: *ArrayList) count(item : i32) : i32{
+                    this.len += item
+                    return this.len
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0,
+                }
+
+                var array2 = ArrayList{
+                    .len = 0,
+                }
+
+                var list: List = &array
+                list.add(4)
+                assert(list.size() == 4)
+
+                var list2: List = &array2
+                list2.add(8)
+                assert(list2.size() == 8)
+
+                var c1: Counter = &array
+                assert(c1.count(2) == 6)
+
+                var c2: Counter = &array2
+                assert(c2.count(2) == 10)
+            `,
+        },
+        {
+            "name" : "Traits Function Pointer",
+            "definitions": `
+
+                trait Function {
+                    fn: func() : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn() : i32 {
+                    return this.i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn()
+                var callback = function.fn
+                assert(callback(&impl) == 4)
+            `,
+        },
+
+        {
+            "name" : "Traits Function Pointer Invalid",
+            "definitions": `
+
+                trait Function {
+                    fn: func() : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn() : i32 {
+                    return this.i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn()
+                var callback = function.fn
+                assert(callback() != 4)
+            `,
+            "error": "'callback' called with too few arguments"
+        },
+
+
+        {
+            "name" : "Traits Function Too few Args",
+            "definitions": `
+
+                trait Function {
+                    fn: func(i32) : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn()
+                assert(false)
+            `,
+            "error": "'fn' called with too few arguments"
+        },
+
+        {
+            "name" : "Traits Function Pointer With Arg",
+            "definitions": `
+
+                trait Function {
+                    fn: func(i32) : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn(1)
+                var callback = function.fn
+                assert(callback(&impl, 4) == 8)
+            `,
+        },
+        {
+            "name" : "Traits Function Pointer Invalid with Arg",
+            "definitions": `
+
+                trait Function {
+                    fn: func(i32) : i32
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function = &impl
+                function.fn(1)
+                var callback = function.fn
+                assert(callback(4) != 8)
+            `,
+            "error": "'callback' called with too few arguments"
+        },
+
+        {
+            "name" : "Traits With Generics",
+            "definitions": `
+
+                trait Function<T> {
+                    fn: func(T) : T
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function<i32> = &impl
+                assert(function.fn(1) == 5)
+            `,
+        },
+
+        {
+            "name" : "Traits With Generics and Impl Generics",
+            "definitions": `
+
+                trait Function<T> {
+                    fn: func(T) : T
+                }
+
+                struct FunctionImpl<Z> {
+                    i: Z
+                }
+
+                func (this: *FunctionImpl<Z>) fn<Z>(i: Z) : Z {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl<i32> {
+                    .i = 4
+                }
+                impl.fn(1) // Bug, this method must be generated by the checker
+
+                var implf = FunctionImpl<f32> {
+                    .i = 4f
+                }
+                implf.fn(1f) // Bug, this method must be generated by the checker
+
+                var function: Function<i32> = &impl
+                assert(function.fn(1) == 5)
+
+                var functionf: Function<f32> = &implf
+                assert(functionf.fn(1f) == 5f)
+            `,
+        },
+
+
+        {
+            "name" : "Traits With Generics and Impl Generics x2",
+            "definitions": `
+
+                trait Function<T> {
+                    fn: func(T) : T
+                }
+
+                struct FunctionImpl<Z> {
+                    i: Z
+                }
+
+                func (this: *FunctionImpl<Z>) fn<Z>(i: Z) : Z {
+                    return this.i + i
+                }
+
+                struct FunctionImpl2<Y> {
+                    i: Y
+                }
+
+                func (this: *FunctionImpl2<Z>) fn<Z>(i: Z) : Z {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl<i32> {
+                    .i = 4
+                }
+
+                var implf = FunctionImpl<f32> {
+                    .i = 4f
+                }
+
+                var function: Function<i32> = &impl
+                assert(function.fn(1) == 5)
+
+                var functionf: Function<f32> = &implf
+                assert(functionf.fn(1f) == 5f)
+
+
+                var impl2 = FunctionImpl2<i32> {
+                    .i = 4
+                }
+
+                var implf2 = FunctionImpl2<f32> {
+                    .i = 4f
+                }
+
+                var function2: Function<i32> = &impl2
+                assert(function2.fn(1) == 5)
+
+                var functionf2: Function<f32> = &implf2
+                assert(functionf2.fn(1f) == 5f)
+            `,
+        },
+
+        {
+            "name" : "Traits With Generics x2 and Impl Generics",
+            "definitions": `
+
+                trait Function<P, R> {
+                    fn: func(P) : R
+                }
+
+                struct FunctionImpl<Z> {
+                    i: Z
+                }
+
+                func (this: *FunctionImpl<Z>) fn<Z>(i: Z) : i32 {
+                    return 4
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl<bool> {
+                    .i = true
+                }
+
+                var function: Function<bool, i32> = &impl
+                assert(function.fn(false) == 4)
+            `,
+        },
+
+        {
+            "name" : "Traits With Generics x2 and Impl Generics x2",
+            "definitions": `
+
+                trait Function<P, R> {
+                    fn: func(P) : R
+                }
+
+                struct FunctionImpl<Z> {
+                    i: Z
+                }
+
+                func (this: *FunctionImpl<Z>) fn<Z, Y>(i: Y) : Z {
+                    return this.i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl<i32> {
+                    .i = 4
+                }
+
+                var function: Function<bool, i32> = &impl
+                assert(function.fn(false) == 4)
+            `,
+        },
+    ]
+}

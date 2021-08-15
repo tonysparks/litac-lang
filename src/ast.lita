@@ -17,6 +17,7 @@ public enum StmtKind {
     VAR_DECL,
     STRUCT_DECL,
     UNION_DECL,
+    TRAIT_DECL,
     ENUM_DECL,
     FUNC_DECL,
     TYPEDEF_DECL,
@@ -28,6 +29,7 @@ public enum StmtKind {
     ENUM_FIELD_DECL,
     STRUCT_FIELD_DECL,
     UNION_FIELD_DECL,
+    TRAIT_FIELD_DECL,
     POISON_DECL,
 
     BLOCK_STMT,
@@ -371,6 +373,11 @@ public struct VarFieldDecl {
     defaultExpr: *Expr
 }
 
+public struct TraitFieldDecl {
+    decl: using Decl
+    type: *TypeSpec
+}
+
 public struct FieldStmt {
     kind: StmtKind
     typeInfo: *TypeInfo
@@ -378,6 +385,7 @@ public struct FieldStmt {
         enumField: *EnumDecl
         aggregateField: *AggregateDecl
         varField: *VarFieldDecl
+        traitField: *TraitFieldDecl
         poisonField: *Expr
     }
 }
@@ -612,6 +620,7 @@ public func IsDecl(node: *Node) : bool {
         case StmtKind.VAR_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL:
+        case StmtKind.TRAIT_DECL:
         case StmtKind.ENUM_DECL:
         case StmtKind.FUNC_DECL:
         case StmtKind.TYPEDEF_DECL:

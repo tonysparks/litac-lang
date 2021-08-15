@@ -290,6 +290,7 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
 
             break
         }
+        case TypeKind.TRAIT:
         case TypeKind.UNION:
         case TypeKind.STRUCT: {
             var aggInfo = type as (*AggregateTypeInfo)
@@ -306,6 +307,26 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                     var field = decl.fields.get(i)
 
                     switch(field.kind) {
+                        case StmtKind.TRAIT_FIELD_DECL: {
+                            var traitField = field.traitField
+                            if(traitField.name.type != TokenType.IDENTIFIER) {
+                                break
+                            }
+
+                            var typeid = (field.typeInfo) ? field.typeInfo.typeid : 0_i64;
+
+                            scratch.append("""
+                                FieldInfo {
+                                    .kind = FieldInfoKind.VAR_FIELD,
+                                    .name = "%s",
+                                    .type = %llu,
+                                    .modifiers = Modifiers.%s,
+                                    .offset = offsetof(%.*s::%s, %s)
+                                },
+                            """, traitField.name.asString(), typeid, "None", sym.declared.id.name.length, sym.declared.id.name.buffer, type.name, traitField.name.asString())
+
+                            break;
+                        }
                         case StmtKind.VAR_FIELD_DECL: {
                             var varField = field.varField
                             if(varField.name.type != TokenType.IDENTIFIER) {

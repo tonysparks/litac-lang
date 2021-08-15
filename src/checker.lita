@@ -20,6 +20,7 @@ import "introspection"
 import "instrument"
 import "system"
 import "common"
+import "traits"
 
 import "checker_decl"
 import "checker_expr"
@@ -61,6 +62,9 @@ public struct TypeChecker {
     genericParamStack: Array<Array<GenericParam>>
     genericTemplates: Array<*Symbol>
 
+
+    interfaceImpls: Map<Typeid, Array<Typeid>>
+
     labels: [MAX_LABELS]LabelInfo;
     numOfLabels: i32
 
@@ -82,6 +86,8 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
     this.genericContext.callsite = null
+
+    this.interfaceImpls.init(Array<Typeid>{}, 128, PtrHashFn<Typeid>, PtrEqualFn<Typeid>, lita.allocator, 0)
 
     this.bypassing = false
 
@@ -126,17 +132,24 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
 
     this.resolveSymbols()
 
-    for(var it = this.current.genericSymbols.iter(); it.hasNext();) {
-        var entry = it.next()
-        var sym = entry.value
+    this.enterModule(root)
+    {
+        var traitDecls = CreateTraitWrappers(this)
+        this.bypassing = true
+        for(var i = 0; i < traitDecls.size(); i += 1) {
+            var decl = traitDecls.get(i)
 
-        if(sym.decl.kind == StmtKind.FUNC_DECL) {
-            this.symbolFuncs.add(sym)
+            var sym = this.createDeclSymbol(decl)
+            if(sym == null) {
+                continue
+            }
+
+            this.resolveSymbol(sym)
+            this.finishResolveSymbol(sym)
         }
-        else {
-            this.symbolTypes.add(sym)
-        }
+        this.bypassing = false
     }
+    this.leaveModule()
 
     if(!this.lita.result.hasErrors()) {
         var introspect = Introspect{.lita = this.lita}
@@ -145,19 +158,89 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
 
 exit:
     return ProgramSymbols {
+        .root = root,
         .values = this.pendingValues,
         .symbolTypes = this.symbolTypes,
         .symbolFuncs = this.symbolFuncs,
         .mainEntry = this.mainEntry,
+        .interfaceImpls = this.interfaceImpls
     };
+}
+
+func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeInfo, description: *const char) : bool {
+    // get more descriptive information if this is trait
+    // comparisons, as they are not as intuitive as other types
+    if(IsTraitLike(a)) {
+        var aTrait = a.getBaseType()
+        if(IsPtr(a)) {
+            if(!IsPtrTrait(b)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr(description)
+                a.toString(sb)
+                sb.appendStrn("'", 1)
+
+                sb.appendStr("; assigned trait pointers can only be assigned from a trait type and not an implementation type")
+                return true
+            }
+        }
+
+        if(!IsPtr(b) && IsAggregate(b)) {
+            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            if(aggInfo.implementsTrait(aTrait, this)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr(description)
+                a.toString(sb)
+                sb.appendStrn("'", 1)
+
+                sb.appendStr("; assigned trait implementations must be pointers: e.g. '*")
+                b.toString(sb)
+                sb.appendStrn("'", 1)
+                return true
+            }
+        }
+        else if(IsPtrAggregate(b)) {
+            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            if(!aggInfo.implementsTrait(aTrait, this)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr(description)
+                a.toString(sb)
+                sb.appendStrn("'; '", 4)
+                b.toString(sb)
+
+                sb.appendStr("' doesn't implement all of '")
+                a.toString(sb)
+                sb.appendStr("' trait methods")
+                return true
+            }
+        }
+        else {
+            sb.appendStrn("'", 1)
+            b.toString(sb)
+            sb.appendStr(description)
+            a.toString(sb)
+            sb.appendStr("'; only aggregate types can implement traits")
+            return true
+        }
+    }
+
+    return false
 }
 
 func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
     assert(a != null)
     assert(b != null)
 
-    if(!a.canCastTo(b)) {
+    if(!a.canCastTo(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+
+        if(this.checkTrait(sb, a, b, "' can't be casted to '")) {
+            this.result.addErrorStr(src, sb)
+            return false
+        }
+
         sb.appendStrn("'", 1)
         a.toString(sb)
         sb.appendStr("' can't be casted to '")
@@ -171,12 +254,37 @@ func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeIn
     return true
 }
 
+
+
 func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
     assert(a != null)
     assert(b != null)
 
-    if(!a.isAssignable(b)) {
+    if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+        // get more descriptive information if this is trait
+        // comparisons, as they are not as intuitive as other types
+        if(IsTraitLike(a)) {
+            var aTrait = a.getBaseType()
+            if(!IsPtr(b) && IsAggregate(b)) {
+                var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+                if(aggInfo.implementsTrait(aTrait, this)) {
+                    sb.appendStrn("'", 1)
+                    b.toString(sb)
+                    sb.appendStr("' can't be assigned to '")
+                    a.toString(sb)
+                    sb.appendStrn("'", 1)
+
+                    sb.appendStr("; assigned trait implementations must be pointers: e.g. '*")
+                    b.toString(sb)
+                    sb.appendStrn("'", 1)
+
+                    this.result.addErrorStr(src, sb)
+                    return false
+                }
+            }
+        }
+
         sb.appendStrn("'", 1)
         b.toString(sb)
         sb.appendStr("' can't be assigned to '")
@@ -194,8 +302,14 @@ func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *Type
     assert(a != null)
     assert(b != null)
 
-    if(!a.isDeclarable(b)) {
+    if(!a.isDeclarable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+
+        if(this.checkTrait(sb, a, b, "' can't be assigned to '")) {
+            this.result.addErrorStr(src, sb)
+            return false
+        }
+
         sb.appendStrn("'", 1)
         b.toString(sb)
         sb.appendStr("' can't be assigned to '")
@@ -213,8 +327,14 @@ func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *
     assert(a != null)
     assert(b != null)
 
-    if(!a.isAssignable(b)) {
+    if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
+
+        if(this.checkTrait(sb, a, b, "' is not of type '")) {
+            this.result.addErrorStr(src, sb)
+            return false
+        }
+
         sb.appendStrn("'", 1)
         b.toString(sb)
         sb.appendStr("' is not of type '")
@@ -381,6 +501,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             this.symbolTypes.add(sym)
             break;
         }
+        case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var aggDecl = decl as (*AggregateDecl)
@@ -393,6 +514,9 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 var field = &aggDecl.fields.elements[i]
 
                 switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        break;
+                    }
                     case StmtKind.VAR_FIELD_DECL: {
                         break;
                     }
@@ -575,6 +699,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     sym.type = aliasedType
                     break;
                 }
+                case StmtKind.TRAIT_DECL:
                 case StmtKind.STRUCT_DECL:
                 case StmtKind.UNION_DECL: {
                     var aggregateDecl = sym.decl as (*AggregateDecl)
@@ -664,6 +789,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     sym.flags &= ~SymbolFlags.IS_INCOMPLETE
 
     switch(sym.decl.kind) {
+        case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
             var aggDecl = sym.decl as (*AggregateDecl)
@@ -697,6 +823,10 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
         case StmtKind.VAR_DECL: {
             var varDecl = sym.decl as (*VarDecl)
             sym.type = this.resolveValueDecl(varDecl)
+            sym.state = SymbolState.RESOLVED
+            break;
+        }
+        case StmtKind.POISON_DECL: {
             sym.state = SymbolState.RESOLVED
             break;
         }
@@ -744,6 +874,83 @@ func (this: *TypeChecker) getTypeByName(typeName: *const char) : *Symbol {
 
     return type
 }
+
+func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *AggregateTypeInfo) : bool {
+    assert(agg != null)
+    assert(iface != null)
+
+    if(agg.typeid == iface.typeid) {
+        return true
+    }
+
+    // check the cache to see if this type has already been
+    // marked as an implementation
+    if(this.interfaceImpls.contains(iface.typeid)) {
+        var impls = this.interfaceImpls.getPtr(iface.typeid)
+
+        for(var i = 0; i < impls.size(); i += 1) {
+            if(impls.get(i) == agg.typeid) {
+                return true
+            }
+        }
+    }
+
+    var symbols = [MAX_METHODS_FOR_TYPE]*Symbol{}
+    var numOfMethods = this.current.getMethodsForType(agg, symbols)
+
+    var numOfTraitFns = iface.decl.fields.size()
+
+    if(numOfMethods < numOfTraitFns) {
+        return false
+    }
+
+    var matchedCount = 0
+
+    for(var i = 0; i < numOfTraitFns; i += 1) {
+        var field = iface.decl.fields.get(i)
+
+        assert(field.typeInfo)
+        assert(field.typeInfo.kind == TypeKind.FUNC_PTR)
+        assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+
+        // check to see if the method is in the found symbols
+        var functionName = field.traitField.decl.name.asString()
+        var traitFn = field.typeInfo as (*FuncPtrTypeInfo)
+
+        for(var index = 0; index < numOfMethods; index += 1) {
+            var sym = symbols[index]
+            var str = StringViewInit(sym.name)
+            var start = str.indexOf("_")
+            if(start < 0) {
+                continue
+            }
+            var end = str.indexOf("<")
+
+            // this atleast has the same name, now check if
+            // the function types are compatible
+            if(str.substring(start + 1, end).equals(functionName)) {
+                if(IsFuncImpl(traitFn, sym.type, this)) {
+                    matchedCount += 1
+                    break;
+                }
+            }
+        }
+    }
+
+    var isImpl = matchedCount == numOfTraitFns
+    if(isImpl) {
+
+        if(!this.interfaceImpls.contains(iface.typeid)) {
+            var impls = ArrayInit<Typeid>(32, this.lita.allocator)
+            this.interfaceImpls.put(iface.typeid, impls)
+        }
+        var impls = this.interfaceImpls.getPtr(iface.typeid)
+        impls.add(agg.typeid)
+    }
+
+    return isImpl
+}
+
 
 func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
     if(!spec) {
@@ -914,6 +1121,7 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
                 }
                 break;
             }
+            case StmtKind.TRAIT_FIELD_DECL:
             case StmtKind.ENUM_FIELD_DECL:
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL:
@@ -941,6 +1149,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.VAR_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL:
+        case StmtKind.TRAIT_DECL:
         case StmtKind.ENUM_DECL:
         case StmtKind.FUNC_DECL:
         case StmtKind.TYPEDEF_DECL:
@@ -1198,7 +1407,8 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.ENUM_FIELD_ENTRY_DECL:
         case StmtKind.STRUCT_FIELD_DECL:
         case StmtKind.UNION_FIELD_DECL:
-        case StmtKind.VAR_FIELD_DECL:{
+        case StmtKind.TRAIT_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL: {
             // handled in the resolveAggregateDecl
             assert(false)
             return false;

@@ -116,6 +116,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
                 genericDecl = CreateFuncDecl(sym.decl as (*FuncDecl), name.genericArgs, checker.allocator)
                 break;
             }
+            case StmtKind.TRAIT_DECL:
             case StmtKind.UNION_DECL:
             case StmtKind.STRUCT_DECL: {
                 genericDecl = CreateAggregateDecl(sym.decl as (*AggregateDecl), name.genericArgs, checker.allocator)
@@ -146,7 +147,14 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
 
         genericSym.genericCallsiteModule = checker.current
         genericSym.genericParams = genericDecl.genericParams.copy()
+
         checker.current.genericSymbols.put(newNameStr, genericSym)
+        if(genericSym.decl.kind == StmtKind.FUNC_DECL) {
+            checker.symbolFuncs.add(genericSym)
+        }
+        else {
+            checker.symbolTypes.add(genericSym)
+        }
 
         // if this still has generic parameters, add in the original
         // parameters
@@ -353,12 +361,18 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
     if(!ast) return true;
 
     switch(ast.kind) {
+        case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var aggDecl = ast as (*AggregateDecl)
             for(var i = 0; i < aggDecl.fields.size(); i+=1) {
                 var field = aggDecl.fields.get(i)
                 switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        var traitField = field.traitField
+                        traitField.type = template.replaceTypeSpec(traitField.type)
+                        break;
+                    }
                     case StmtKind.VAR_FIELD_DECL: {
                         var varField = field.varField
                         varField.type = template.replaceTypeSpec(varField.type)
@@ -550,7 +564,8 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
         case StmtKind.ENUM_FIELD_ENTRY_DECL:
         case StmtKind.STRUCT_FIELD_DECL:
         case StmtKind.UNION_FIELD_DECL:
-        case StmtKind.VAR_FIELD_DECL:{
+        case StmtKind.TRAIT_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL: {
             // TODO: Is this needed??
             break;
         }

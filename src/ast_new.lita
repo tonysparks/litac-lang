@@ -169,6 +169,10 @@ public func NewAggregateDecl(startPos: SrcPos,
                 decl.node.becomeParentOf(field.aggregateField)
                 break
             }
+            case StmtKind.TRAIT_FIELD_DECL: {
+                decl.node.becomeParentOf(field.traitField)
+                break
+            }
             case StmtKind.VAR_FIELD_DECL: {
                 decl.node.becomeParentOf(field.varField)
                 break
@@ -206,6 +210,18 @@ public func NewUnionDecl(startPos: SrcPos,
                          allocator: *const Allocator) : *Decl {
 
     return NewAggregateDecl(startPos, endPos, StmtKind.UNION_DECL,
+                                name, genericParams, fields, flags, allocator)
+}
+
+public func NewTraitDecl(startPos: SrcPos,
+                         endPos: SrcPos,
+                         name: Token,
+                         genericParams: Array<GenericParam>,
+                         fields: Array<FieldStmt>,
+                         flags: i32,
+                         allocator: *const Allocator) : *Decl {
+
+    return NewAggregateDecl(startPos, endPos, StmtKind.TRAIT_DECL,
                                 name, genericParams, fields, flags, allocator)
 }
 
@@ -950,6 +966,22 @@ public func NewVarFieldDecl(startPos: SrcPos,
     stmt.type = type
     stmt.attributes = attributes
     stmt.defaultExpr = stmt.node.becomeParentOf(defaultExpr)
+    return stmt as (*Stmt)
+}
+
+public func NewTraitFieldDecl(startPos: SrcPos,
+                            endPos: SrcPos,
+                            fieldName: Token,
+                            type: *TypeSpec,
+                            attributes: Attributes,
+                            allocator: *const Allocator) : *Stmt {
+    var stmt = new<TraitFieldDecl>(allocator)
+    stmt.kind = StmtKind.TRAIT_FIELD_DECL
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.name = fieldName
+    stmt.type = type
+    stmt.attributes = attributes
     return stmt as (*Stmt)
 }
 
