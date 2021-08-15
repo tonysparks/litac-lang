@@ -25,7 +25,8 @@ func main(len:i32, args:**char):i32 {
 # Features
 * functions, structures, unions, enums, typedefs
 * no headers, no need for forward declarations
-* generics for structs, unions and functions
+* generics for structs, unions, traits and functions
+* traits, with implicit implementations (like Go)
 * `using` which allows for flattening field access in structs, unions and function arguments
 * default parameters
 * type inference
@@ -130,7 +131,183 @@ printf("%s is %d old\n", donald.name, donald.age);
 
 **Unions**
 
-TODO
+Unions behave exactly like in C; where members share the same memory space.
+
+```C
+union Value {
+    strValue: *const char
+    intValue: i64
+    floatValue: f64
+}
+
+var val = Value {
+    .intValue = 31
+}
+```
+
+**Traits**
+
+Traits allow for indirection of implementations.  Much like `Go`, in LitaC you define a trait
+and a type is said to implement a trait if it implements all of the trait methods.
+
+```C
+// Create a graphics renderer trait, in which will allow a codebase to switch
+// between implementations
+trait Renderer {
+    drawImage: func(*Image, f32, f32) : void
+    drawRect: func(f32, f32, f32, f32) : void
+}
+
+struct OpenGLRenderer {
+    // ...
+}
+
+func (this: *OpenGLRenderer) drawImage(image: *Image, x: f32, y: f32) : void {
+    // ...
+    printf("Drawing an OpenGL image\n")
+}
+
+func (this: *OpenGLRenderer) drawRect(x: f32, y: f32, width: f32, height: f32) : void {
+    // ...
+    printf("Drawing an OpenGL rectangle\n")
+}
+
+
+struct DX12Renderer {
+    // ...
+}
+
+func (this: *DX12Renderer) drawImage(image: *Image, x: f32, y: f32) : void {
+    // ...
+    printf("Drawing a DirectX image\n")
+}
+
+func (this: *DX12Renderer) drawRect(x: f32, y: f32, width: f32, height: f32) : void {
+    // ...
+    printf("Drawing a DirectX rectangle\n")
+}
+
+
+func Draw(renderer: Renderer) {
+    var image: *Image = ...
+    renderer.drawImage(image, 24, 24)
+    renderer.drawRect(2, 16, 32, 32)
+}
+
+func main(len: i32, args: **char) : i32 {
+    // both OpenGLRenderer and DX12Renderer implement the Renderer trait because
+    // it implements the trait methods
+    var openGL = OpenGLRenderer {}
+    var dx = DX12Renderer{}
+
+    var useOpenGL: bool = ...
+
+    // determine which trait implementation to use
+    // at runtime.
+    var renderer: Renderer;
+
+    if(useOpenGL) {
+        // notice we are taking the address of the openGL, we can only assign pointers to
+        // trait types, and trait types themselves must be values
+        renderer = &openGL
+    }
+    else {
+        renderer = &dx
+    }
+
+    Draw(renderer)
+}
+```
+
+**Trait Assignment**
+
+Traits are special types in `LitaC` in that assignment to them behave slightly differently than other types.
+
+```C
+var renderer: Renderer = &openGL; // only pointers of implementation types are allowed to be assigned
+var otherRenderer: *Renderer = &renderer; // only a pointer to trait can be assigned by addressing a trait type
+
+// these are invalid assignments:
+var renderer: Renderer = openGL; // INVALID: because openGL is a value and not a pointer
+var renderer: *Renderer = openGL; // INVALID: because assigning to a trait pointer can only be done thru addressing a trait type
+var renderer: *Renderer = otherRenderer; // INVALID: because assigning to a trait pointer can only be done thru addressing a trait type
+```
+
+**Trait Implementation**
+
+When `traits` get compiled to `C` they use a [virtual table](https://en.wikipedia.org/wiki/Virtual_method_table) to store pointers to the actual implementation function.  There is a performance cost to using the dynamic nature of `traits`.
+
+Rough `C` code translation:
+
+```C
+//LitaC:
+trait List {
+    fn: func() : i32
+}
+
+struct LinkedList {
+    // ...
+}
+
+func (this: *LinkedList) fn() : i32 {
+    // ...
+}
+
+//C:
+// the trait itself becomes this structure
+struct List {
+    ListVirtualTable* vtable; // the virtual table containing the function pointers
+    void* this;               // a pointer to the concrete implementation type
+}
+
+// generated Virtual table
+struct ListVirtualTable {
+    i32 (*fn)(void*);  // the function pointer, with void* this as the first parameter
+}
+
+// Wrapper function that basically just casts the void* to the concrete type and calls the
+// concrete function
+i32 LinkedList_fn_wrapper(void* this) {
+    LinkedList* _this = (LinkedList*)this;
+    return LinkedList_fn(_this); // calls the actual LinkedList.fn function
+}
+
+// global of all implementations mapping to their concrete functions for each type
+static ListVirtualTable** ListVtables = {
+    [0] = &(ListVirtualTable) {
+        .fn = LinkedList_fn_wrapper
+    },
+    ...
+}
+
+// Create a casting function that converts the concrete type to the trait type.  In doing so, we must
+// ensure the proper vtable implementation functions are populated
+List LinkedList_to_List(LinkedList* list) {
+    return List {
+        .vtable = ListVtables[0], // uses the global virtual table, matches the index to the proper implementation
+        .this = list              // sets the this pointer to the concrete type
+    }
+}
+
+// Calling a trait method:
+//////////////////////////////
+
+//LitaC:
+    list.fn()
+//C:
+    list->vtable->fn(list->this)   // we must convert the trait call to call the vtable and also pass in the 'this' pointer
+
+
+// Assignment
+//////////////////////////////
+
+//LitaC:
+    var ll = LinkedList {...}
+    var list: List = &ll
+//C:
+    LinkedList ll {...}
+    List list = LinkedList_to_List(&ll)   // Cast the LinkedList to List type
+```
 
 **Full Examples**
 ```C
