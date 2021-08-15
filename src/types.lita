@@ -618,8 +618,12 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
         return false
     }
 
-    if(other.kind != this.kind) {
-        return false
+    if(this.kind != TypeKind.GENERIC_PARAM &&
+       other.kind != TypeKind.GENERIC_PARAM) {
+
+        if(other.kind != this.kind) {
+            return false
+        }
     }
 
     switch(this.kind) {
@@ -659,7 +663,18 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
             }
             return true
         }
+        case TypeKind.GENERIC_PARAM: {
+            if(other.kind == TypeKind.GENERIC_PARAM) {
+                return strcmp(this.name, other.name) == 0
+            }
+
+            return true
+        }
         default: {
+            if(other.kind == TypeKind.GENERIC_PARAM) {
+                return true
+            }
+
             return this.typeid == other.typeid
         }
     }

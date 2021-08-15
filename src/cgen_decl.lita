@@ -209,7 +209,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
         var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME)
-        vtableNameStr.format("%.*s__%s", root.id.name.length, root.id.name.buffer, this.escapeNameStr(decl.sym.name))
+        vtableNameStr.format("%s%.*s__%s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, this.escapeNameStr(decl.sym.name))
 
         this.emit("%s__VirtualTable* __vtable;\n", vtableNameStr.cStr())
         this.emitStrn("void* __this;", 13)

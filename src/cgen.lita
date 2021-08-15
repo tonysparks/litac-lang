@@ -354,7 +354,7 @@ func (this: using *CGen) emitTraitDecls() {
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
         var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME)
-        vtableNameStr.format("%.*s__%s", root.id.name.length, root.id.name.buffer, this.escapeNameStr(traitSym.name))
+        vtableNameStr.format("%s%.*s__%s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, this.escapeNameStr(traitSym.name))
 
         // Generate Casting functions;
         // we generate the casting functions in C code and not in lita
@@ -479,42 +479,7 @@ func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]cha
 
 func (this: using *CGen) escapeNameStr(name: *const char) : *char {
     var sb = StringBufferInit(256, this.allocator)
-    sb.appendStrn(name, strlen(name))
-    for(var i = 0; i < sb.length;) {
-        var c = sb.buffer[i]
-
-        switch(c) {
-            case '*': sb.replace(i, i+1, "_ptr_"); i+=5; break;
-            case '<': sb.replace(i, i+1, "_cb_");  i+=4; break;
-            case '>': sb.replace(i, i+1, "_ce_");  i+=4; break;
-            case '[': sb.replace(i, i+1, "_bb_");  i+=4; break;
-            case ']': sb.replace(i, i+1, "_be_");  i+=4; break;
-            case '(': sb.replace(i, i+1, "_pb_");  i+=4; break;
-            case ')': sb.replace(i, i+1, "_pe_");  i+=4; break;
-            case ',': sb.replace(i, i+1, "_c_");   i+=3; break;
-            case ' ': sb.replace(i, i+1, "_");     i+=1; break;
-            case ':': {
-                var n = i + 1;
-                if(n < sb.length) {
-                    var nc = sb.buffer[n]
-                    if(nc == ':') {
-                        sb.replace(i, i+1, "__")
-                        i+=2;
-                        break;
-                    }
-                }
-                sb.replace(i, i+1, "_r_")
-                i+=3;
-                break;
-            }
-            default: {
-                i+=1;
-                break;
-            }
-        }
-    }
-
-    return sb.cStr()
+    return EscapeName(name, sb)
 }
 
 func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {

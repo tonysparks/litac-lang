@@ -924,10 +924,11 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
             if(start < 0) {
                 continue
             }
+            var end = str.indexOf("<")
 
             // this atleast has the same name, now check if
             // the function types are compatible
-            if(str.substring(start + 1).equals(functionName)) {
+            if(str.substring(start + 1, end).equals(functionName)) {
                 if(IsFuncImpl(traitFn, sym.type, this)) {
                     matchedCount += 1
                     break;

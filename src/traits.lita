@@ -6,6 +6,7 @@ import "lita"
 import "symbols"
 import "string_buffer"
 import "string_view"
+import "string"
 import "ast"
 import "ast_copy"
 import "assert"
@@ -13,6 +14,7 @@ import "libc"
 import "parser"
 import "lex"
 import "module"
+import "common"
 
 /*
     Traits need the following:
@@ -90,6 +92,11 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     var decls = ArrayInit<*Decl>(512, checker.lita.allocator)
     var sb = StringBufferInit(2048, checker.lita.allocator)
 
+    //var traitNameBuffer: [MAX_SYMBOL_NAME]char;
+    var traitBuffer      = StringBufferInit(MAX_SYMBOL_NAME, checker.lita.allocator)
+    var traitFieldBuffer = StringBufferInit(MAX_SYMBOL_NAME, checker.lita.allocator)
+
+    sb.append("// %d number of traits found.\n", checker.interfaceImpls.size())
     for(var it = checker.interfaceImpls.iter(); it.hasNext();) {
         var entry = it.next()
         var traitSym = FindSymbolByTypeid(checker.symbolTypes, entry.key)
@@ -97,14 +104,14 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
         var traitDecl = traitSym.decl as (*AggregateDecl)
-        var traitName = traitSym.name
+        var traitName = GetTraitName(traitSym, traitBuffer)
 
+        sb.append("// Trait: '%.*s' has %d impls\n", traitDecl.name.str.length, traitDecl.name.str.buffer, entry.value.size())
         // Generate VTable
         {
             //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
            // printf("Sym: %s vs %s\n", traitName, traitDecl.name.asString())
             sb.append("struct %s__VirtualTable", traitName)
-            PrintGenerics(traitSym.genericParams, sb)
             sb.append(" {\n")
 
             for(var j = 0; j < traitDecl.fields.size(); j += 1) {
@@ -135,16 +142,13 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                 var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
                 assert(implSym)
 
+                var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
+
                 var implName = implSym.name
 
                 if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
                     var genericTypeid = (implSym.type as (*GenericTypeInfo)).genericTypeid
                     var genSym = FindSymbolByTypeid(checker.symbolTypes, genericTypeid)
-                    if(genSym.flags & SymbolFlags.IS_TRAIT_GENERATED) {
-                        continue
-                    }
-
-                    genSym.flags |= SymbolFlags.IS_TRAIT_GENERATED
                     implName = genSym.name
                 }
 
@@ -155,8 +159,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
                     var fn = field.typeInfo as (*FuncPtrTypeInfo)
 
-                    sb.append("func __%s_%s_wrapper", implName, field.traitField.name.asString())
-                    PrintGenerics(implSym.genericParams, sb)
+                    sb.append("func __%s_%s_wrapper", implEscapedName, field.traitField.name.asString())
                     sb.append("(this: *void")
                     for(var p = 0; p < fn.paramDecls.size(); p += 1) {
                         var param = fn.paramDecls.get(p)
@@ -175,7 +178,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                     {
                         var moduleName = implSym.declared.id.name
                         sb.append("    var __this = this as (*%.*s::%s", moduleName.length, moduleName.buffer, implName)
-                        PrintGenerics(implSym.genericParams, sb)
+                        PrintGenericArgs(implSym.genericArgs, sb)
                         sb.append(")\n")
 
                         if(fn.returnType.kind != TypeKind.VOID) {
@@ -186,7 +189,6 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                         }
 
                         sb.append("__this.%s", field.traitField.name.asString())
-                        PrintGenerics(implSym.genericParams, sb)
 
                         sb.append("(")
                         for(var p = 0; p < fn.paramDecls.size(); p += 1) {
@@ -211,16 +213,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                 var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
                 assert(implSym)
 
-                var implName = implSym.name
-
-                var isFromGeneric = false
-                if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-                    isFromGeneric = true
-                    var genericTypeid = (implSym.type as (*GenericTypeInfo)).genericTypeid
-                    var genSym = FindSymbolByTypeid(checker.symbolTypes, genericTypeid)
-                    implName = genSym.name
-                }
-
+                var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
                 sb.append("    [%d] = &%s__VirtualTable {\n", i, traitName)
                 {
                     for(var j = 0; j < traitDecl.fields.size(); j += 1) {
@@ -228,8 +221,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                         assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
                         var fieldName = field.traitField.name.asString()
-                        sb.append("        .%s = __%s_%s_wrapper", fieldName, implName, fieldName)
-                        PrintGenericArgs(implSym.genericArgs, sb)
+                        sb.append("        .%s = __%s_%s_wrapper", fieldName, implEscapedName, fieldName)
                         sb.append(",\n")
                     }
                 }
@@ -240,7 +232,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     }
 
     {
-        printf("Traits Source: \n%s\n", sb.cStr())
+        //printf("Traits Source: \n%s\n", sb.cStr())
         var parser = ParserInit("generated", sb.cStr(), checker.lita)
         var stmts = parser.parseModule()
         decls.addAll(stmts.declarations)
@@ -294,6 +286,18 @@ func FindSymbolByTypeid(symbols: Array<*Symbol>, id: Typeid) : *Symbol {
     return null
 }
 
+func GetTraitName(traitSym: *Symbol, sb: *StringBuffer) : *const char {
+
+    // if this isn't a generic generated trait, just use the symbol name
+    if(!(traitSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
+        return traitSym.name
+    }
+
+    sb.clear()
+
+    // otherwise, we have to calculate the new name using the generic type arguments
+    return EscapeName(traitSym.name, sb)
+}
 
 func Parse(sb: *StringBuffer, checker: *TypeChecker, decls: *Array<*Decl>) {
     var parser = ParserInit("generated", sb.cStr(), checker.lita)
