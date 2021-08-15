@@ -15,7 +15,7 @@
     }
     `,
     "tests": [
-/*        {
+        {
             "name" : "Traits",
             "definitions": `
 
@@ -894,7 +894,6 @@
                 assert(functionf2.fn(1f) == 5f)
             `,
         },
-*/
 
         {
             "name" : "Traits With Generics x2 and Impl Generics",
