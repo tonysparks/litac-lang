@@ -15,7 +15,7 @@ With that disclaimer out of the way, what I'd like LitaC to do:
 The syntax:
 
 ```C
-import "libc"
+import "std/libc"
 
 func main(len:i32, args:**char):i32 {
     printf("Hello World")
@@ -313,7 +313,7 @@ List LinkedList_to_List(LinkedList* list) {
 ```C
 // imports a module, namespace it with adding "as c", otherwise the public attributes
 // will be placed in this modules scope
-import "libc" as c
+import "std/libc" as c
 
 
 // Defines a structure
@@ -440,7 +440,7 @@ public func getBestWR() : *const char {
 ```
 **main.lita**
 ```C
-import "libc"
+import "std/libc"
 import "packers" // we only need to include the 'packers' module and we will have full visibility to 'donald' and 'brett' modules
 
 func main(n:i32, args:**char) {
@@ -457,7 +457,7 @@ func main(n:i32, args:**char) {
 
 
 ```C
-import "libc" // place libc public types in this scope
+import "std/libc" // place libc public types in this scope
 
 func main(len:i32, args:**char):i32 {
     if (true) {
