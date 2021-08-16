@@ -1,0 +1,210 @@
+@raw("""
+
+#if _MSC_VER
+#define LITAC_THREADLOCAL __declspec(thread)
+#define LITAC_INLINE static inline __forceinline
+#define LITAC_NOINLINE __declspec(noinline)
+#define LITAC_PACKED __pragma(pack(push, 1))
+#define LITAC_PACKED_POP __pragma(pack(pop))
+#define LITAC_EXPORT __declspec(dllexport)
+#endif
+
+#if __GNUC__
+#define LITAC_THREADLOCAL __thread
+#define LITAC_INLINE static inline __attribute__((always_inline))
+#define LITAC_NOINLINE __attribute__((noinline))
+#define LITAC_PACKED __attribute__((packed))
+#define LITAC_PACKED_POP
+#define LITAC_EXPORT __attribute__((visibility("default")))
+#endif
+
+
+#if __TINYC__
+#define LITAC_THREADLOCAL
+#define LITAC_INLINE
+#define LITAC_NOINLINE
+#define LITAC_PACKED __attribute__((packed))
+#define LITAC_PACKED_POP
+#define LITAC_EXPORT __attribute__((dllexport))
+#endif
+""");
+
+
+typedef u64 as typeid;
+
+public struct any {
+    value: *void
+    id: typeid
+}
+
+
+/*
+#if (REFLECTION)
+    import "type";
+#end
+*/
+
+/**
+    Compiler script to generate Enum AsStr functions when they are noted with 'asStr'.
+
+    Example:
+    @asStr("TestAsString")
+    enum Test {
+        ONE,
+
+        @asStr("DOS")
+        TWO,
+    }
+
+    Will create this function:
+
+    func TestAsString(type: Test) : *const char {
+        switch(type) {
+            case Test.ONE: return "ONE";
+            case Test.TWO: return "DOS";
+            default: return null;
+        }
+    }
+*/
+#precheck
+    for(sym in getSymbolsByNote("asStr")) {
+        if(sym.kind == "ENUM_DECL") {
+            emitClear()
+            var symName = ""
+
+            // Look to see if there is a custom name in the enums note
+            if(sym.notes) {
+                for(note in sym.notes) {
+                    if(note.name == "asStr" && note.attributes) {
+                        symName = note.attributes[0].name
+                    }
+                }
+            }
+
+            if(symName == "") {
+                symName = concat(sym.name, "AsStr")
+            }
+
+            if(sym.isPublic) {
+                emit("public ")
+            }
+            emit("func %s(enumType: %s) : *const char {
+                      switch(enumType) {\n", symName, sym.name);
+            for(field in sym.enumDecl.fields) {
+                var fieldName = field.name
+
+                // Look to see if there is a custom name for the field
+                if(field.notes) {
+                    for(note in field.notes) {
+                        if(note.name == "asStr" && note.attributes) {
+                            fieldName = note.attributes[0].name
+                        }
+                    }
+                }
+                emit("        case %s.%s: return \"%s\";\n", sym.name, field.name, fieldName);
+            }
+            emit("        default: return null;
+                      }
+                }\n")
+
+            addDeclaration(sym.moduleFilename, emitStr())
+        }
+    }
+#end
+
+/**
+    Create a test main if we are in testing mode
+
+    This will replace the current 'main' entry point of the program with a new
+    function '__LitaTestMain()' which will call each @test method that either
+    matches the options.testsRegex or options.testFileOnly options
+
+*/
+#precheck
+    // if we are testing only, create a new main entry point
+    if(TESTING) {
+        var moduleName = getInputModuleFilename()
+
+        emitClear()
+        var testFunctionName = "__LitaTestMain"
+        emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
+        emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
+        for(sym in getSymbolsToTest("test")) {
+            emit("  __lita_test_printf(\"Testing '%s'\\n\")", sym.name)
+            var alias = addImport(moduleName, sym.moduleFilename)
+            if(alias) {
+                emit("  %s::%s()\n", alias, sym.name)
+            }
+            else {
+                emit("  %s()\n", sym.name)
+            }
+        }
+        emit("  return 0;
+                }")
+
+        addDeclaration(moduleName, emitStr())
+        setMainSymbol(moduleName, testFunctionName)
+
+    }
+#end
+
+/**
+    Compiler script to inject module init and destroy functions; these
+    function must be public in order for them to be accessible to the
+    main function
+
+    Example:
+    @module_init
+    public func moduleInitialize() {
+
+    }
+
+    @module_destroy
+    public func moduleInitialize() {
+
+    }
+
+    Will modify the main function to:
+
+    func main(argc:i32, args:**char) : i32 {
+        moduleInitialize()
+        defer moduleDestroy()
+        // main code
+    }
+*/
+#precheck
+    var mainSym = getMainSymbol()
+    if(mainSym) {
+        for(sym in getSymbolsByNote("module_destroy")) {
+            if(sym.kind == "FUNC_DECL" && sym.isPublic) {
+                var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
+                if(alias) {
+                    emitClear()
+                    emit("defer %s::%s()", alias, sym.name)
+                    astInsert(mainSym.declPtr, emitStr(), 0)
+                }
+                else {
+                    emitClear()
+                    emit("defer %s()", sym.name)
+                    astInsert(mainSym.declPtr, emitStr(), 0)
+                }
+            }
+        }
+        for(sym in getSymbolsByNote("module_init")) {
+            if(sym.kind == "FUNC_DECL" && sym.isPublic) {
+                var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
+                if(alias) {
+                    emitClear()
+                    emit("%s::%s()", alias, sym.name)
+                    astInsert(mainSym.declPtr, emitStr(), 0)
+                }
+                else {
+                    emitClear()
+                    emit("%s()", sym.name)
+                    astInsert(mainSym.declPtr, emitStr(), 0)
+                }
+            }
+        }
+    }
+#end
+

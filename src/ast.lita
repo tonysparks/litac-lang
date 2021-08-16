@@ -1,14 +1,15 @@
-import "assert"
+import "std/assert"
+import "std/string_view"
+import "std/string"
+import "std/libc"
+import "std/array"
+import "std/mem"
+
 import "symbols"
 import "types"
 import "lex"
-import "array"
-import "mem"
 import "common"
 import "module"
-import "string_view"
-import "string"
-import "libc"
 
 @asStr
 public enum StmtKind {

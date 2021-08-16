@@ -1,18 +1,19 @@
+import "std/array"
+import "std/map"
+import "std/string"
+import "std/string_view"
+import "std/string_buffer"
+import "std/system"
+import "std/libc"
+import "std/mem"
+
+import "phase_result"
+import "symbols"
+import "lita"
+import "types"
 import "ast"
 import "ast_new"
 import "lex"
-import "array"
-import "map"
-import "phase_result"
-import "string"
-import "string_view"
-import "string_buffer"
-import "system"
-import "lita"
-import "libc"
-import "mem"
-import "symbols"
-import "types"
 
 public enum ModuleFlags {
     TYPE_CHECKED  = (1<<0),
@@ -67,7 +68,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
 
     var filename: [MAX_PATH]char;
     var pathStr = StringInit(filename, MAX_PATH);
-    pathStr.format("%s/lib/builtins.lita", lita.options.litaPath)
+    pathStr.format("%s/stdlib/std/builtins.lita", lita.options.litaPath)
     builtins.id.fromFile(lita, pathStr.cStr())
 
     AddBuiltin(lita, &BOOL_TYPE)

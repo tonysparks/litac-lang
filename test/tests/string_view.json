@@ -2,12 +2,12 @@
     "description": "StringView",
     "disabled": false,
     "program": `
-        import "string_view";
+        import "std/string_view";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;
 
-        import "io";
+        import "std/io";
 
         @include("<string.h>");
         @foreign func strncmp(a:*const char, b:*const char, len: i32) : i32;

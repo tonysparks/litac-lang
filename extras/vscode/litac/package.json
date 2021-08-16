@@ -1,0 +1,90 @@
+{
+	"name": "litac",
+	"displayName": "litac",
+	"description": "LitaC Programming Language",
+	"version": "0.0.3",
+	"publisher": "tonysparks",
+	"engines": {
+		"vscode": "^1.35.0"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"activationEvents": [
+		"onLanguage:litac"
+	],
+	"main": "./extension.js",
+	"contributes": {
+		"languages": [
+			{
+				"id": "litac",
+				"aliases": [
+					"LitaC",
+					"litac"
+				],
+				"extensions": [
+					".litac",
+					".lita"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "litac",
+				"scopeName": "source.litac",
+				"path": "./syntaxes/litac.tmLanguage.json"
+			}
+		],
+		"configuration": {
+			"title": "LitaC",
+			"properties": {
+				"litac.languageServerPath": {
+					"type": "string",
+					"default": "",
+					"description": "Path of the LitaC language server binary (e.g. \"C:/litac-lsp.exe\")"
+				},
+				"litac.languageServerArguments": {
+					"type": "string",
+					"default": "-languageServer",
+					"description": "Command line arguments for the LitaC language server"
+				},
+				"litac.failFast": {
+					"type": "boolean",
+					"default": "",
+					"description": "Prevents the server from being restarted after it has crashed"
+				},
+				"litac.languageServerLog": {
+					"type": "boolean",
+					"default": "false",
+					"description": "Outputs a log file for debuging the LitaC Language Server"
+				},
+				"litac.libraryPath": {
+					"type": "string",
+					"default": "",
+					"description": "The path to the LitaC library, this should be your litac/lib directory"
+				},
+				"litac.testOutputPath": {
+					"type": "string",
+					"default": "",
+					"description": "The path to write out test output files"
+				},
+				"litac.clearTestOutput": {
+					"type": "boolean",
+					"default": "true",
+					"description": "Clears the output before each test run"
+				}
+			}
+		},
+		"commands": [
+			{
+				"command": "litac.runTestsInCurrentFile",
+				"title": "LitaC: Run tests in current file"
+			}
+		]
+	},
+	"dependencies": {
+		"vscode-languageclient": "^4.4.2"
+	},
+	"devDependencies": {}
+}

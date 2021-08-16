@@ -1,8 +1,9 @@
 
-import "libc"
+import "std/libc"
+import "std/array"
+
 import "ast"
 import "lex"
-import "array"
 import "common"
 
 public func PrintTypeSpec(spec: *TypeSpec) {

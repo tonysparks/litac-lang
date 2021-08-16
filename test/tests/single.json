@@ -17,7 +17,7 @@
             "name": "Offset of packed struct",
             "disabled": false,
             "definitions": `
-                import "libc"
+                import "std/libc"
 
                 @packed
                 struct Sprite {

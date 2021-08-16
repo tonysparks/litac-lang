@@ -1,0 +1,196 @@
+import "std/mem" as mem;
+import "std/io" as io;
+import "std/assert";
+import "std/string_view";
+import "std/libc";
+
+public struct String {
+    buffer: *char
+    length: i32
+    capacity: i32
+}
+
+public func StringInit(str: *char, capacity: i32, len: i32 = -1) : String {
+    if(str == null) {
+        return String {
+            .buffer = null,
+            .length = 0,
+            .capacity = 0
+        }
+    }
+
+    if(len < 0) {
+        len = strlen(str)
+    }
+
+    if(len > capacity) {
+        len = capacity
+    }
+
+    return String {
+        .buffer = str,
+        .length = len,
+        .capacity = capacity
+    }
+}
+
+public func (s: *String) format(format: *const char, ...) : i32{
+    // get the variable args
+    var args:va_list;
+    va_start(args, format);
+
+    // have to call vsnprintf at least once - might as well use a small
+    // fixed-size buffer just in case the final string fits in it
+    var len = vsnprintf(s.buffer, s.capacity, format, args);
+    va_end(args);
+
+    if(len < 0) {
+        return len
+    }
+
+    s.length = len
+    return len
+}
+
+public func (s: *String) append(format: *const char, ...) : i32 {
+    // get the variable args
+    var args1:va_list;
+    va_start(args1, format);
+
+    // have to call vsnprintf at least once - might as well use a small
+    // fixed-size buffer just in case the final string fits in it
+    var len = vsnprintf(s.buffer + s.length, s.capacity - s.length, format, args1);
+    va_end(args1);
+
+    if(len < 0) {
+        return len
+    }
+
+    s.length += len
+    return len
+}
+
+public func (s: *String) setStrn(str: *const char, len: i32) {
+    if(str == null || len < 1) {
+        return;
+    }
+
+    if(len > s.capacity) {
+        len = s.capacity
+    }
+
+    memcpy((&s.buffer[0]) as (*void),
+             str as (*const void),
+             len * sizeof(:char))
+    s.length = len
+}
+
+public func (s: *String) appendChar(c: char) {
+    if(s.length >= s.capacity) {
+        return;
+    }
+
+    s.buffer[s.length] = c
+    s.length += 1
+}
+
+public func (s: String) substring(start: i32, end: i32) : StringView {
+    if(start < 0 || end < start) {
+        return StringView{
+            .buffer = null,
+            .length = 0
+        }
+    }
+
+    var len = end - start
+    return StringView {
+        .buffer = s.buffer + start,
+        .length = len
+    }
+}
+
+public func (s: String) asView() : StringView {
+    return StringView {
+        .buffer = s.buffer,
+        .length = s.length
+    }
+}
+
+public func (s: String) memset(value: i32 = 0) {
+    if(s.capacity < 1) return;
+
+    memset(s.buffer as (*void), value, s.capacity * sizeof(:char))
+}
+
+
+public func (s: String) toLower() {
+    for(var i = 0; i < s.length; i+=1) {
+        s.buffer[i] = tolower(s.buffer[i]) as (char)
+    }
+}
+
+public func (s: String) toUpper() {
+    for(var i = 0; i < s.length; i+=1) {
+        s.buffer[i] = toupper(s.buffer[i]) as (char)
+    }
+}
+
+public func (s: String) copy(allocator: *const mem::Allocator = mem::defaultAllocator) : String {
+    if(s.length < 1) {
+        return String {
+            .buffer = null,
+            .length = 0,
+            .capacity = 0
+        }
+    }
+
+    var copiedStr = allocator.alloc((s.length + 1) * sizeof(:char)) as (*char)
+    memcpy(copiedStr, s.buffer, s.length)
+
+    copiedStr[s.length] = '\0'
+
+    return String{
+        .buffer = copiedStr,
+        .length = s.length,
+        .capacity = s.length
+    }
+}
+
+public func (s: *String) adjust() {
+    s.length = strnlen(s.buffer, s.capacity)
+}
+
+public func (s: *String) clear() {
+    s.memset(0)
+    s.length = 0
+}
+
+public func (s: String) empty() : bool {
+    return s.length < 1
+}
+
+public func (s: String) size() : i32 {
+    return s.length
+}
+
+public func (s: String) cStr() : *char {
+    s.buffer[s.length] = '\0'
+    return s.buffer
+}
+
+public func (s: String) cStrConst() : *const char {
+    s.buffer[s.length] = '\0'
+    return s.buffer as (*const char)
+}
+
+public func StringCopy(original: *const char, len: i32 = -1, allocator: *const mem::Allocator = mem::defaultAllocator) : *char {
+    if(len < 0) {
+        len = strlen(original)
+    }
+
+    var copiedStr = allocator.alloc((len + 1) * sizeof(:char)) as (*char)
+    memcpy(copiedStr, original, len)
+
+    copiedStr[len] = '\0'
+    return copiedStr
+}

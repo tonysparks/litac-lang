@@ -1,10 +1,10 @@
+import "std/array"
+import "std/string_buffer"
+import "std/mem"
+import "std/libc"
 
 import "lex"
 import "common"
-import "array"
-import "string_buffer"
-import "mem"
-import "libc"
 
 public enum ErrorType {
     WARN,

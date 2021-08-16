@@ -1,15 +1,16 @@
 /*
     Test Suite Application
 */
-import "libc"
-import "json"
-import "io"
-import "array"
-import "mem"
-import "map"
-import "string_buffer"
-import "string"
-import "system"
+import "std/libc"
+import "std/json"
+import "std/io"
+import "std/array"
+import "std/mem"
+import "std/map"
+import "std/string_buffer"
+import "std/string"
+import "std/system"
+
 import "../src/lita"
 import "../src/phase_result"
 import "../src/error_codes"

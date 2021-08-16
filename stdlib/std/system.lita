@@ -1,29 +1,51 @@
 @raw("""
 #include <stdlib.h>
+
+#if defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__)
+#define OS_WIN
+#endif
+
+#if defined(OS_WIN) && !defined(__TINYC__)
 #include <windows.h>
 #include <libloaderapi.h>
+#endif
+
+#if defined(__TINYC__)
+#include <winapi/windows.h>
+#endif
+
 #include <stdio.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+/*
 #ifndef WIN32
 #include <unistd.h>
 #endif
+*/
 
-#ifdef WIN32
+#if defined(__TINYC__)
+#include <sys/unistd.h>
+size_t __cdecl strnlen(const char *_Str,size_t _MaxCount);
+#endif
+
+#ifdef OS_WIN
 #define stat _stat
 #endif
+
+#include <errno.h>
 
 typedef struct stat FileStat;
 typedef struct tm tm;
 """);
 
-import "libc"
-import "assert"
-import "string"
-import "string_view"
+import "std/libc"
+import "std/assert"
+import "std/string"
+import "std/string_view"
 
-@foreign
+@foreign("_MAX_PATH")
 public const MAX_PATH: i32;
 
 @foreign
@@ -67,22 +89,26 @@ func QueryPerformanceFrequency(freq: *LARGE_INTEGER) : bool;
 func QueryPerformanceCounter(time: *LARGE_INTEGER);
 
 var systemFreq: f64;
-var systemStart: u64;
+var systemStart: u64 = 0;
 
 @foreign
 func getenv(varname: *const char) : *char;
 
+@module_init
+@no_profile
 public func SystemInit() : bool {
-    var freq: LARGE_INTEGER;
-    if(!QueryPerformanceFrequency(&freq)) {
-        return false
+    if(systemStart == 0) {
+        var freq: LARGE_INTEGER;
+        if(!QueryPerformanceFrequency(&freq)) {
+            return false
+        }
+
+        systemFreq = freq.QuadPart as (f64) / 1_000.0
+
+        var time: LARGE_INTEGER;
+        QueryPerformanceCounter(&time);
+        systemStart = time.QuadPart
     }
-
-    systemFreq = freq.QuadPart as (f64) / 1_000.0
-
-    var time: LARGE_INTEGER;
-    QueryPerformanceCounter(&time);
-    systemStart = time.QuadPart
 
     return true
 }
@@ -109,6 +135,16 @@ public func FileExists(filename: *const char) : bool {
 
 public func Mkdir(dir: *const char) : bool {
     CreateDirectoryA(dir, null)
+
+    var view = StringViewInit(dir)
+    // we have to do this non-sense because tinycc stat doesn't like
+    // trailing /
+    if(view.endsWith("/")) {
+        var path = [MAX_PATH]char{0}
+        var normalized = StringInit(path, MAX_PATH)
+        normalized.format("%.*s", view.length - 1, view.buffer)
+        return FileExists(normalized.cStr())
+    }
     return FileExists(dir)
 }
 
@@ -381,17 +417,20 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
 
 // TODO
 public func IsFile(filename: *const char) : bool {
+    assert(false)
     return false
 }
 
 // TODO
 public func DirectoryContents(dirname: *const char) {
-
+    assert(false)
 }
 
+@no_profile
 public func SystemTimeMSec() : f64 {
     var time: LARGE_INTEGER;
     QueryPerformanceCounter(&time);
+    assert(systemFreq != 0)
 
     return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;
 }

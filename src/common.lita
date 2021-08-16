@@ -1,6 +1,6 @@
-import "libc"
-import "mem"
-import "string_buffer"
+import "std/libc"
+import "std/mem"
+import "std/string_buffer"
 
 public enum LogLevel {
     TRACE,

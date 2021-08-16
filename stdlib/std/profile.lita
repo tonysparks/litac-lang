@@ -1,0 +1,127 @@
+import "std/system"
+import "std/assert"
+import "std/libc"
+
+// must be first
+@generated
+public enum ProfileTag {
+    MAX_PROFILE_TAGS
+};
+
+
+// must be second
+@generated
+public const profileEntries = [1]ProfileEntry{
+}
+
+
+public struct ProfileEntry {
+    functionName: *const char
+    count: u64
+    startTime: f64
+    totalTime: f64
+}
+
+@no_profile
+public func StartWatch(tag: ProfileTag) {
+    var entry = &profileEntries[tag]
+    entry.count += 1
+    entry.startTime = SystemTimeMSec()
+}
+
+@no_profile
+public func StopWatch(tag: ProfileTag) {
+    var endTime = SystemTimeMSec()
+    var entry = &profileEntries[tag]
+    entry.totalTime += (endTime - entry.startTime)
+}
+
+@no_profile
+public func ExportTimings(filename: *const char) {
+    printf("Exporting '%s' with %d instrumented functions...\n", filename, ProfileTag.MAX_PROFILE_TAGS)
+/*
+    printf("%-65s %-9s %-10s %-20s\n", "Function", "Count", "Total(ms)", "Avg(ms)")
+    printf("==================================================================================================\n")
+    for(var i = 0; i < ProfileTag.MAX_PROFILE_TAGS; i += 1) {
+        var entry = profileEntries[i]
+        var avgTime = entry.totalTime
+        if(entry.count > 0) {
+            avgTime = entry.totalTime / entry.count as (f64)
+        }
+        printf("%-60s %10llu %10.4f %10.4f\n", entry.functionName, entry.count, entry.totalTime, avgTime)
+    }
+    printf("\n")*/
+}
+
+#precheck
+    var mainSym = getMainSymbol()
+    if(mainSym && INSTRUMENT) {
+        var currentModule = getCurrentModuleFilename()
+        var alias = addImport(mainSym.moduleFilename, currentModule)
+        print("Output path: '", OUTPUT_PATH, OUTPUT_NAME, "'\n")
+        if(alias) {
+            emitClear()
+            emit("defer %s::ExportTimings(\".json\")", alias, OUTPUT_NAME)
+            astInsert(mainSym.declPtr, emitStr(), 0)
+        }
+        else {
+            emitClear()
+            emit("defer ExportTimings(\"%s%s.json\")", OUTPUT_PATH, OUTPUT_NAME)
+            print(emitStr(), "\n")
+            astInsert(mainSym.declPtr, emitStr(), 0)
+        }
+    }
+#end
+
+/*
+Does the instrumentation via script -- very slow!!
+
+#precheck
+    if(INSTRUMENT) {
+        var profiledSyms = getSymbolsByNote("profile")
+        if(len(profiledSyms) > 0) {
+            var currentModule = getCurrentModuleFilename()
+
+            // First make the ProfileTag enum with all functions
+            // as enum values for reference
+            {
+                emitClear()
+                emit("@generated public enum ProfileTag {\n")
+                for(sym in profiledSyms) {
+                    emit("    %s__%s,\n", sym.moduleName, sym.name)
+                }
+                emit("\n}\n")
+                replaceDeclaration(currentModule, emitStr())
+            }
+
+            // Now instrument each function marked with @profile
+            {
+                for(sym in profiledSyms) {
+                    if(sym.kind == "FUNC_DECL") {
+                        var alias = addImport(sym.moduleFilename, currentModule)
+                        if(alias) {
+                            emitClear()
+                            emit("defer %s::StopWatch(%s::ProfileTag.%s__%s)\n", alias, alias, sym.moduleName, sym.name)
+                            astInsert(sym.declPtr, emitStr(), 0)
+
+                            emitClear()
+                            emit("%s::StartWatch(%s::ProfileTag.%s__%s)\n", alias, alias, sym.moduleName, sym.name)
+                            astInsert(sym.declPtr, emitStr(), 0)
+                        }
+                        else {
+                            emitClear()
+                            emit("defer StopWatch(ProfileTag.%s__%s)\n", sym.moduleName, sym.name)
+                            astInsert(sym.declPtr, emitStr(), 0)
+
+                            emitClear()
+                            emit("StartWatch(ProfileTag.%s__%s)\n", sym.moduleName, sym.name)
+                            astInsert(sym.declPtr, emitStr(), 0)
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+#end
+*/

@@ -43,13 +43,13 @@
         {
             "name": "Arena Allocator",
             "definitions": `
-                import "mem";
-                import "array";
-                import "io";
-                import "map";
-                import "json";
-                import "string_buffer"
-                import "libc"
+                import "std/mem";
+                import "std/array";
+                import "std/io";
+                import "std/map";
+                import "std/json";
+                import "std/string_buffer"
+                import "std/libc"
 
             `,
             "code": `
@@ -112,13 +112,13 @@
         {
             "name": "Arena Allocator with Default",
             "definitions": `
-                import "mem";
-                import "array";
-                import "io";
-                import "map";
-                import "json";
-                import "string_buffer"
-                import "libc"
+                import "std/mem";
+                import "std/array";
+                import "std/io";
+                import "std/map";
+                import "std/json";
+                import "std/string_buffer"
+                import "std/libc"
 
             `,
             "code": `

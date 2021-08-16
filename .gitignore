@@ -27,4 +27,9 @@ bin/output/*.exe
 bin/output/*.pdb
 bin/output/**
 vstudio/**
+bootstrap/*.exe
+bootstrap/*.exp
+bootstrap/*.lib
+bootstrap/*.pdb
+/**/node_modules/**
 *.log

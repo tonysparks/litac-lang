@@ -1,0 +1,101 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "LitaC",
+	"patterns": [
+		{
+			"name": "keyword.control.litac",
+			"match": "\\b(#if|#else|#elseif|#end|var|const|func|struct|union|trait|enum|import|if|else|do|while|for|break|continue|switch|case|default|public|null|true|false|return|void|using|as|sizeof|typeof|offsetof|defer|typedef|goto)\\b"
+		},
+		{
+			"name": "keyword.other.litac",
+			"match": "\\b(bool|i8|u8|i16|u16|i32|u32|i64|u64|i128|u128|f32|f64|char|usize)\\b"
+		},
+		{
+			"name": "meta.tag.litac",
+			"match": "\\b(@[A-Za-z0-9_]+)"
+		},
+
+		{
+			"name": "comment.line.double-dash.litac",
+			"match": "(//).*$\n?"
+		},
+		{
+			"name": "comment.block.litac",
+			"begin": "/\\*",
+			"end": "\\*/"
+		},
+
+		{
+			"match": "%=|\\+=|-=|\\*=|(?<!\\()/=",
+			"name": "keyword.other.assignment.compound.litac"
+		},
+		{
+			"match": "&=|\\^=|<<=|>>=|\\|=",
+			"name": "keyword.other.assignment.compound.bitwise.litac"
+		},
+		{
+			"match": "<<|>>",
+			"name": "keyword.other.bitwise.shift.litac"
+		},
+		{
+			"match": "!=|<=|>=|==|<|>",
+			"name": "keyword.other.comparison.litac"
+		},
+		{
+			"match": "&&|!|\\|\\|",
+			"name": "keyword.other.logical.litac"
+		},
+		{
+			"match": "&|\\||\\^|~",
+			"name": "keyword.other.litac"
+		},
+		{
+			"match": "=",
+			"name": "constant.other.litac"
+		},
+		{
+			"match": "%|\\*|/|-|\\+",
+			"name": "keyword.other.litac"
+		},
+
+		{
+			"match": "\\(|\\)|\\{|\\}|\\,|\\.|\\*|;",
+			"name": "keyword.other.litac"
+		},
+		{
+			"match": "(?<!\\w)(?=\\d|\\.\\d)",
+			"name": "constant.numeric.litac"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#multistrings"
+		}
+	],
+	"repository": {
+		"strings": {
+			"name": "string.quoted.double.litac",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.litac",
+					"match": "\\\\."
+				}
+			]
+		},
+		"multistrings": {
+			"name": "string.quoted.double.litac",
+			"begin": "\"\"\"",
+			"end": "\"\"\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.litac",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.litac"
+}

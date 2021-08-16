@@ -1,13 +1,14 @@
-import "array"
-import "map"
+import "std/libc"
+import "std/array"
+import "std/map"
+import "std/mem"
+
 import "ast"
 import "lex"
 import "types"
 import "module"
 import "lita"
-import "mem"
 import "phase_result"
-import "libc"
 
 @asStr
 public enum SymbolKind {

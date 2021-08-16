@@ -1,0 +1,177 @@
+import "std/array"
+import "std/io"
+import "std/mem"
+import "std/string_buffer"
+import "std/libc" as c
+
+const MAX_MESSAGE_SIZE = 256
+
+public enum CmdParserStatus {
+    OK,
+    MISSING_ARGUMENT,
+    MISSING_REQUIRED,
+}
+
+public enum OptionFlag {
+    HAS_ARGUMENT = (1<<0),
+    IS_REQUIRED  = (1<<1),
+
+    // private flags
+    IS_USED      = (1<<2),
+}
+
+public struct Option {
+    name: *const char
+    shortName: char
+    description: *const char
+    value: *const char
+    defaultValue: *const char
+    flags: i32
+}
+
+public struct CmdParser {
+    options: Array<Option>
+    args: Array<*const char>
+    errors: [MAX_MESSAGE_SIZE]char
+    status: CmdParserStatus
+    header: *const char
+}
+
+public func CmdParserInit(allocator: *const Allocator = defaultAllocator) : CmdParser {
+    var parser = CmdParser{}
+    parser.init(allocator)
+
+    return parser
+}
+
+public func (p: *CmdParser) init(allocator: *const Allocator = defaultAllocator) {
+    p.options = ArrayInit<Option>(16, allocator)
+    p.args = ArrayInit<*const char>(16, allocator)
+    p.status = CmdParserStatus.OK
+}
+
+public func (p: *CmdParser) free() {
+    p.options.free()
+    p.args.free()
+}
+
+public func (p: *CmdParser) addOption(longName: *const char,
+                                      shortName: char,
+                                      description: *const char,
+                                      flags: i32,
+                                      defaultValue: *const char) {
+
+    p.options.add(Option {
+        .name = longName,
+        .shortName = shortName,
+        .description = description,
+        .value = null,
+        .flags = flags,
+        .defaultValue = defaultValue
+    })
+}
+
+public func (p: *CmdParser) getOption(longName: *const char) : *Option {
+    for(var i = 0; i < p.options.size(); i += 1) {
+        var opt = &p.options.elements[i]
+        if(c::strcmp(opt.name, longName) == 0) {
+            return opt
+        }
+    }
+
+    return null
+}
+
+public func (p: *CmdParser) getOptionShort(shortName: char) : *Option {
+    for(var i = 0; i < p.options.size(); i += 1) {
+        var opt = &p.options.elements[i]
+        if(opt.shortName == shortName) {
+            return opt
+        }
+    }
+
+    return null
+}
+
+public func (p: *CmdParser) hasOption(longName: *const char) : bool {
+    var opt = p.getOption(longName)
+    if(!opt) {
+        return false
+    }
+
+    return opt.flags & OptionFlag.IS_USED
+}
+
+public func (p: *CmdParser) hasOptionShort(shortName: char) : bool {
+    var opt = p.getOptionShort(shortName)
+    if(!opt) {
+        return false
+    }
+
+    return opt.flags & OptionFlag.IS_USED
+}
+
+public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
+    // TODO: Account for required arguments
+    for(var i = 0; i < argc; i+=1) {
+        var arg = argv[i]
+        var len = c::strlen(arg)
+
+        var opt: *Option = null;
+        if(len && arg[0] == '-') {
+            var normalizedArg = arg + 1
+            opt = len < 3 ? p.getOptionShort(normalizedArg[0]) : p.getOption(normalizedArg)
+        }
+
+        if(opt) {
+            if(opt.flags & OptionFlag.HAS_ARGUMENT) {
+                if(i + 1 >= argc) {
+                    c::snprintf(p.errors, MAX_MESSAGE_SIZE, "'%s' is missing argument", arg)
+                    p.status = CmdParserStatus.MISSING_ARGUMENT
+                    return p.status;
+                }
+
+                opt.value = argv[i+1]
+                i+=1
+            }
+
+            opt.flags |= OptionFlag.IS_USED
+        }
+        else {
+            p.args.add(arg)
+        }
+    }
+
+    return CmdParserStatus.OK
+}
+
+public func (p: *CmdParser) printHelp(sb: *StringBuffer) {
+    if(p.header) {
+        sb.append("%s\n", p.header)
+    }
+
+    for(var i = 0; i < p.options.size(); i += 1) {
+        var opt = &p.options.elements[i]
+        if(opt.shortName != '\0') {
+            sb.append("    -%c, -%-16s", opt.shortName, opt.name)
+        }
+        else {
+            sb.append("    -%-20s", opt.name)
+        }
+
+        var it = opt.description
+        while(*it) {
+            var c = *it
+            defer it+=1
+
+            if(c == '\n') {
+                sb.append("\n%25s", "")
+            }
+            else {
+                sb.append("%c", c)
+            }
+
+        }
+        sb.append("\n")
+    }
+}

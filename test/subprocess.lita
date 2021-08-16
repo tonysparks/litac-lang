@@ -3,7 +3,7 @@
 typedef struct subprocess_s subprocess_s;
 """);
 
-import "libc"
+import "std/libc"
 
 @foreign
 public struct subprocess_s;

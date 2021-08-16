@@ -1,13 +1,15 @@
+import "std/libc"
+import "std/array"
+import "std/map"
+import "std/assert"
+
 import "lsp/lsp"
 import "lsp/protocol"
+
 import "lex"
 import "ast"
-import "libc"
-import "array"
-import "map"
 import "types"
 import "symbols"
-import "assert"
 import "common"
 import "module"
 

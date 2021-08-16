@@ -1,6 +1,7 @@
+import "std/string_buffer"
+import "std/libc"
+
 import "phase_result"
-import "string_buffer"
-import "libc"
 
 public enum ErrorCode {
     INVALID_ASSIGNMENT,

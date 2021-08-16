@@ -1,9 +1,10 @@
-import "string_view"
-import "string_buffer"
-import "libc"
-import "mem"
+import "std/string_view"
+import "std/string_buffer"
+import "std/libc"
+import "std/mem"
+import "std/string"
+
 import "types"
-import "string"
 
 @asStr
 public enum TokenType {

@@ -1,0 +1,765 @@
+import "std/libc" as c;
+import "std/array";
+import "std/assert"
+
+@raw("""
+#define LITAC_DEFAULT_ALIGNMENT (2*sizeof(void*))
+""");
+
+/**
+=========================================================
+// new allocates a type T
+=========================================================
+*/
+
+#if (DEBUG)
+
+    public func new<T>(a: *const Allocator = defaultAllocator,
+                      file: *const char = c::__FILE__,
+                      line: u64 = c::__LINE__) : *T {
+
+        var result = a.calloc(1, sizeof(:T), file, line) as (*T)
+        return result
+    }
+
+#else
+
+    public func new<T>(a: *const Allocator = defaultAllocator) : *T {
+        var result = a.calloc(1, sizeof(:T)) as (*T)
+        return result
+    }
+
+#end
+
+/**
+=========================================================
+// Duplicates the supplied memory
+=========================================================
+*/
+public func memduplicate(p: *const void,
+                         len: usize,
+                         a: *const Allocator = defaultAllocator) : *void {
+    var copy = a.alloc(len)
+    c::memcpy(copy, p, len)
+
+    return copy
+}
+
+///
+// From GingerBill!!
+// Reference: http://www.gingerbill.org/article/2019/02/08/memory-allocation-strategies-002/
+///
+func isPowerOfTwo(x: usize) : bool {
+    return (x & (x-1)) == 0
+}
+
+public func alignForward(ptr: usize, align: usize) : usize {
+    assert(isPowerOfTwo(align))
+
+    var p:usize = ptr;
+    var a:usize = align;
+    var modulo:usize = p & (a - 1);
+
+    if(modulo != 0) {
+        p += (a - modulo)
+    }
+
+    return p
+}
+
+/**
+=========================================================
+// Allocator interface
+=========================================================
+*/
+
+#if (DEBUG)
+    public struct Allocator {
+        allocFn:   func(*const Allocator, usize, *const char, u64): *void
+        callocFn:  func(*const Allocator, usize, usize, *const char, u64): *void
+        reallocFn: func(*const Allocator, *void, usize, usize, *const char, u64) : *void
+        freeFn:    func(*const Allocator, *void) : void
+    }
+
+    @inline
+    public func (a: *const Allocator) alloc(size: usize,
+                                            file: *const char = c::__FILE__,
+                                            line: u64 = c::__LINE__) : *void {
+        return a.allocFn(a, size, file, line)
+    }
+
+    @inline
+    public func (a: *const Allocator) calloc(num: usize,
+                                             size: usize,
+                                             file: *const char = c::__FILE__,
+                                             line: u64 = c::__LINE__) : *void {
+        return a.callocFn(a, num, size, file, line)
+    }
+
+    @inline
+    public func (a: *const Allocator) realloc(ptr: *void,
+                                              oldsize: usize,
+                                              newsize: usize,
+                                              file: *const char = c::__FILE__,
+                                              line: u64 = c::__LINE__) : *void {
+        return a.reallocFn(a, ptr, oldsize, newsize, file, line)
+    }
+
+    @inline
+    public func (a: *const Allocator) free(ptr: *void) {
+        return a.freeFn(a, ptr)
+    }
+
+#else
+
+    public struct Allocator {
+        allocFn:   func(*const Allocator, usize): *void
+        callocFn:  func(*const Allocator, usize, usize): *void
+        reallocFn: func(*const Allocator, *void, usize, usize) : *void
+        freeFn:    func(*const Allocator, *void) : void
+    }
+
+    @inline
+    public func (a: *const Allocator) alloc(size: usize) : *void {
+        return a.allocFn(a, size)
+    }
+
+    @inline
+    public func (a: *const Allocator) calloc(num: usize, size: usize) : *void {
+        return a.callocFn(a, num, size)
+    }
+
+    @inline
+    public func (a: *const Allocator) realloc(ptr: *void, oldsize: usize, newsize: usize) : *void {
+        return a.reallocFn(a, ptr, oldsize, newsize)
+    }
+
+    @inline
+    public func (a: *const Allocator) free(ptr: *void) {
+        a.freeFn(a, ptr)
+    }
+
+#end
+
+
+
+
+
+
+/**
+=========================================================
+// C Library allocator
+=========================================================
+*/
+public const cAllocator : *const Allocator = (&Allocator {
+    .allocFn:   &cMalloc,
+    .callocFn:  &cCalloc,
+    .reallocFn: &cRealloc,
+    .freeFn:    &cFree
+}) as (*const Allocator);
+
+#if (DEBUG)
+
+    func cMalloc(a: *const Allocator,
+                 size: usize,
+                 file: *const char = c::__FILE__,
+                 line: u64 = c::__LINE__) : *void {
+        return c::malloc(size);
+    }
+
+    func cCalloc(a: *const Allocator,
+                 num: usize,
+                 size: usize,
+                 file: *const char = c::__FILE__,
+                 line: u64 = c::__LINE__) : *void {
+        return c::calloc(num, size);
+    }
+
+    func cRealloc(a: *const Allocator,
+                  ptr: *void,
+                  oldSize: usize,
+                  size: usize,
+                  file: *const char = c::__FILE__,
+                  line: u64 = c::__LINE__) : *void {
+        return c::realloc(ptr, size);
+    }
+
+    func cFree(a: *const Allocator, ptr: *void) {
+        return c::free(ptr)
+    }
+
+
+#else
+
+    func cMalloc(a: *const Allocator, size: usize) : *void {
+        return c::malloc(size);
+    }
+
+    func cCalloc(a: *const Allocator, num: usize, size: usize) : *void {
+        return c::calloc(num, size);
+    }
+
+    func cRealloc(a: *const Allocator, ptr: *void, oldSize: usize, size: usize) : *void {
+        return c::realloc(ptr, size);
+    }
+
+    func cFree(a: *const Allocator, ptr: *void) {
+        return c::free(ptr)
+    }
+
+#end
+
+
+/**
+=========================================================
+// Arena allocator
+=========================================================
+*/
+public struct Arena {
+    alloc: Allocator
+    decorated: *const Allocator
+    region: *u8
+    size: usize
+    current: usize
+    next: *Arena
+}
+
+const PAGE_SIZE:usize = 4096_u64 as (usize)
+
+public func (arena: *Arena) init(size: usize = PAGE_SIZE,
+                                 alloc: *const Allocator = defaultAllocator) {
+    arena.decorated = alloc
+    arena.region = alloc.calloc(size, sizeof(:u8)) as (*u8)
+    arena.current = 0
+    arena.size = size
+    arena.next = null
+    arena.alloc = Allocator {
+        .allocFn:   &ArenaMalloc,
+        .callocFn:  &ArenaCalloc,
+        .reallocFn: &ArenaRealloc,
+        .freeFn:    &ArenaFree
+    }
+}
+
+public func (arena: *Arena) free() {
+    var alloc = arena.decorated
+    alloc.free(arena.region as (*void))
+
+    var next: *Arena = null
+    var last = arena.next;
+
+    if(last == null) {
+        return;
+    }
+
+    do {
+        next = last.next
+        alloc.free(last.region as (*void))
+        alloc.free(last as (*void))
+        last = next
+    }
+    while(next != null)
+}
+
+
+#if (DEBUG)
+    public func (arena: *Arena) malloc(size: usize,
+                                       file: *const char = c::__FILE__,
+                                       line: u64 = c::__LINE__) : *void {
+        var a = arena
+        var last = arena
+
+        do {
+            if((a.size - a.current) > size) {
+                a.current += size
+                return (a.region + (a.current - size)) as (*void)
+            }
+
+            last = a
+        }
+        while((a = a.next) != null);
+
+        var asize = size > PAGE_SIZE ? size : PAGE_SIZE
+        var next = new<Arena>(arena.decorated, file, line)
+        next.init(asize, arena.decorated)
+
+        last.next = next
+        next.current += size
+        return next.region as (*void)
+    }
+
+
+    func ArenaMalloc(alloc: *const Allocator,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: u64 = c::__LINE__) : *void {
+        var arena = alloc as (*Arena);
+        return arena.malloc(size);
+    }
+
+    func ArenaCalloc(alloc: *const Allocator,
+                     num: usize,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: u64 = c::__LINE__) : *void {
+        var arena = alloc as (*Arena);
+        var result = arena.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func ArenaRealloc(alloc: *const Allocator,
+                      ptr: *void,
+                      oldSize: usize,
+                      size: usize,
+                      file: *const char = c::__FILE__,
+                      line: u64 = c::__LINE__) : *void {
+        if(ptr == null) {
+            return ArenaMalloc(alloc, size)
+        }
+
+        var arena = alloc as (*Arena);
+
+        var result = arena.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+
+            ArenaFree(alloc, ptr)
+        }
+
+        return result
+
+    }
+
+#else
+
+    public func (arena: *Arena) malloc(size: usize) : *void {
+        var a = arena
+        var last = arena
+
+        do {
+            if((a.size - a.current) > size) {
+                a.current += size
+                return (a.region + (a.current - size)) as (*void)
+            }
+
+            last = a
+        }
+        while((a = a.next) != null);
+
+        var asize = size > PAGE_SIZE ? size : PAGE_SIZE
+        var next = new<Arena>(arena.decorated)
+        next.init(asize, arena.decorated)
+
+        last.next = next
+        next.current += size
+        return next.region as (*void)
+    }
+
+    func ArenaMalloc(alloc: *const Allocator, size: usize) : *void {
+        var arena = alloc as (*Arena);
+        return arena.malloc(size);
+    }
+
+    func ArenaCalloc(alloc: *const Allocator, num: usize, size: usize) : *void {
+        var arena = alloc as (*Arena);
+        var result = arena.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func ArenaRealloc(alloc: *const Allocator, ptr: *void, oldSize: usize, size: usize) : *void {
+        if(ptr == null) {
+            return ArenaMalloc(alloc, size)
+        }
+
+        var arena = alloc as (*Arena);
+
+        var result = arena.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+
+            ArenaFree(alloc, ptr)
+        }
+
+        return result
+
+    }
+
+#end
+
+func ArenaFree(alloc: *const Allocator, ptr: *void) {
+    // do nothing
+}
+
+
+/**
+=========================================================
+// Linear allocator
+=========================================================
+*/
+public struct LinearAllocator {
+    alloc: Allocator
+    mem: *void
+    size: usize
+    currentOffset: usize
+
+    totalAllocations: u32
+    totalBytesAllocated: usize
+}
+
+public func (this: *LinearAllocator) init(mem: *void, size: usize) {
+    this.alloc = Allocator {
+        .allocFn:   &LinearMalloc,
+        .callocFn:  &LinearCalloc,
+        .reallocFn: &LinearRealloc,
+        .freeFn:    &LinearFree
+    }
+    this.mem = mem
+    this.size = size
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
+@foreign
+const LITAC_DEFAULT_ALIGNMENT: usize;
+
+public func (this: *LinearAllocator) malloc(size: usize) : *void {
+    var currPtr = this.mem as (usize) + this.currentOffset
+    var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
+    offset -= this.mem as (usize)
+
+    if((offset + size) > this.size) {
+        c::printf("Failed to allocate: %zu\n", size)
+        return null
+    }
+
+    this.currentOffset = (size + offset)
+    this.totalBytesAllocated = (size + offset)
+    this.totalAllocations += 1
+
+    //var ptr = &this.mem[offset]
+    var ptr = (this.mem as (*char)) + offset
+    return ptr;
+}
+
+#if (DEBUG)
+    func LinearMalloc(alloc: *const Allocator,
+                        size: usize,
+                        file: *const char = c::__FILE__,
+                        line: u64 = c::__LINE__) : *void {
+        var this = alloc as (*LinearAllocator);
+        return this.malloc(size);
+    }
+
+    func LinearCalloc(alloc: *const Allocator,
+                        num: usize,
+                        size: usize,
+                        file: *const char = c::__FILE__,
+                        line: u64 = c::__LINE__) : *void {
+        var this = alloc as (*LinearAllocator);
+        var result = this.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func LinearRealloc(alloc: *const Allocator,
+                        ptr: *void,
+                        oldSize: usize,
+                        size: usize,
+                        file: *const char = c::__FILE__,
+                        line: u64 = c::__LINE__) : *void {
+        if(ptr == null) {
+            return LinearMalloc(alloc, size)
+        }
+
+        var this = alloc as (*LinearAllocator);
+
+        var result = this.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+        }
+
+        return result
+    }
+
+#else
+    func LinearMalloc(alloc: *const Allocator,
+                        size: usize) : *void {
+        var this = alloc as (*LinearAllocator);
+        return this.malloc(size);
+    }
+
+    func LinearCalloc(alloc: *const Allocator,
+                        num: usize,
+                        size: usize) : *void {
+        var this = alloc as (*LinearAllocator);
+        var result = this.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func LinearRealloc(alloc: *const Allocator,
+                        ptr: *void,
+                        oldSize: usize,
+                        size: usize) : *void {
+        if(ptr == null) {
+            return LinearMalloc(alloc, size)
+        }
+
+        var this = alloc as (*LinearAllocator);
+
+        var result = this.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+        }
+
+        return result
+    }
+#end
+
+func LinearFree(alloc: *const Allocator, ptr: *void) {
+    // DO NOTHING
+}
+
+/**
+=========================================================
+// Debug Leak Detection allocator
+=========================================================
+*/
+const MAX_PATH = 256
+public struct Allocation {
+    addr: *void
+    size: usize
+    line: u64
+    filename: [MAX_PATH]char
+}
+
+public struct DebugAllocator {
+    alloc: Allocator
+    decorated: *const Allocator
+    allocations: Array<*Allocation>
+    totalAllocations: u32
+    totalBytesAllocated: usize
+    totalBytesFreed: usize
+}
+
+public const debugAllocator = (&DebugAllocator {
+})
+
+public func (d: *DebugAllocator) init(alloc: *const Allocator = defaultAllocator) {
+    d.alloc = Allocator {
+        .allocFn:   &DebugMalloc,
+        .callocFn:  &DebugCalloc,
+        .reallocFn: &DebugRealloc,
+        .freeFn:    &DebugFree
+    }
+    d.decorated = alloc
+    d.allocations.init(128, alloc)
+    d.totalBytesAllocated = 0
+    d.totalAllocations = 0
+}
+
+public func (d: *DebugAllocator) free() {
+    d.allocations.free()
+}
+
+public func (d: *DebugAllocator) report() {
+    c::printf("Leaked Allocations: {\n")
+    for(var i = 0; i < d.allocations.size(); i += 1) {
+        var a = d.allocations.get(i)
+        c::printf("   Leak at %p allocated in '%s' at line: %ju\n", a.addr, a.filename, a.line)
+    }
+    c::printf("}\n")
+}
+
+public func (d: *DebugAllocator) malloc(size: usize,
+                                        file: *const char,
+                                        line: u64) : *void {
+    var mem = d.decorated.alloc(size)
+    if(mem) {
+        var allocation = new<Allocation>(d.decorated);
+        allocation.addr = mem
+        allocation.size = size
+        allocation.line = line
+        c::strncpy(allocation.filename, file, MAX_PATH)
+
+        d.allocations.add(allocation)
+        d.totalBytesAllocated += size
+        d.totalAllocations += 1
+    }
+
+    return mem;
+}
+
+#if (DEBUG)
+    func DebugMalloc(alloc: *const Allocator,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: u64 = c::__LINE__) : *void {
+        var debug = alloc as (*DebugAllocator);
+        return debug.malloc(size, file, line);
+    }
+
+    func DebugCalloc(alloc: *const Allocator,
+                     num: usize,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: u64 = c::__LINE__) : *void {
+        var debug = alloc as (*DebugAllocator);
+        var result = debug.malloc(size * num, file, line);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func DebugRealloc(alloc: *const Allocator,
+                      ptr: *void,
+                      oldSize: usize,
+                      size: usize,
+                      file: *const char = c::__FILE__,
+                      line: u64 = c::__LINE__) : *void {
+        if(ptr == null) {
+            return DebugMalloc(alloc, size)
+        }
+
+        var debug = alloc as (*DebugAllocator);
+
+        var result = debug.malloc(size, file, line);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+
+            DebugFree(alloc, ptr)
+        }
+
+        return result
+    }
+
+#else
+
+    func DebugMalloc(alloc: *const Allocator, size: usize) : *void {
+        var debug = alloc as (*DebugAllocator);
+        return debug.malloc(size, "", 0);
+    }
+
+    func DebugCalloc(alloc: *const Allocator, num: usize, size: usize) : *void {
+        var debug = alloc as (*DebugAllocator);
+        var result = debug.malloc(size * num, "", 0);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func DebugRealloc(alloc: *const Allocator, ptr: *void, oldSize: usize, size: usize) : *void {
+        if(ptr == null) {
+            return DebugMalloc(alloc, size)
+        }
+
+        var debug = alloc as (*DebugAllocator);
+
+        var result = debug.malloc(size, "", 0);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+
+            DebugFree(alloc, ptr)
+        }
+
+        return result
+    }
+
+#end
+
+func DebugFree(alloc: *const Allocator, ptr: *void) {
+    if(ptr == null) {
+        return;
+    }
+
+    var debug = alloc as (*DebugAllocator);
+    var addr = ptr;
+
+    var found = false
+    for(var i = 0; i < debug.allocations.size();) {
+        var allocation = debug.allocations.get(i)
+        if(allocation.addr == addr) {
+            debug.totalBytesFreed += allocation.size
+            debug.allocations.removeAt(i)
+            debug.decorated.free(allocation)
+            found = true
+            break
+        }
+        else {
+            i += 1
+        }
+    }
+
+    if(!found) {
+        c::printf("Allocation not found: %p\n", ptr)
+    }
+
+    debug.decorated.free(ptr)
+}
+
+
+
+/**
+=========================================================
+// Default allocator
+=========================================================
+*/
+
+#if (DEBUG)
+
+   // @threadlocal
+    // TODO: This isn't thread safe :(
+    public var defaultAllocator: *const Allocator = (&DebugAllocator {
+    }) as (*const Allocator);
+
+    @module_init
+    public func ModuleInit() {
+        var debugAllocator = defaultAllocator as (*DebugAllocator)
+        debugAllocator.init(cAllocator);
+        //c::printf("Module Init!\n")
+    }
+
+    @module_destroy
+    public func ModuleDestroy() {
+        var debugAllocator = defaultAllocator as (*DebugAllocator)
+        debugAllocator.report();
+        debugAllocator.free();
+        //c::printf("Module Destroy!\n")
+    }
+
+#else
+
+    @threadlocal
+    public var defaultAllocator: *const Allocator = (&Allocator {
+            .allocFn:   &cMalloc,
+            .callocFn:  &cCalloc,
+            .reallocFn: &cRealloc,
+            .freeFn:    &cFree
+        }) as (*const Allocator);
+
+#end

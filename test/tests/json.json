@@ -17,10 +17,10 @@
             "name": "Json Parse",
            // disabled: true,
             "definitions": `
-                import "json";
-                import "string_buffer";
-                import "io";
-                import "libc";
+                import "std/json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
 
             `,
             "code": `
@@ -69,10 +69,10 @@
         {
             "name": "Json Create",
             "definitions": `
-                import "json";
-                import "string_buffer";
-                import "io";
-                import "libc";
+                import "std/json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
 
             `,
             "code": `
@@ -108,10 +108,10 @@
         {
             "name": "Json Error",
             "definitions": `
-                import "json";
-                import "string_buffer";
-                import "io";
-                import "libc";
+                import "std/json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
 
             `,
             "code": `
@@ -141,10 +141,10 @@
         {
             "name": "Json Token Error",
             "definitions": `
-                import "json";
-                import "string_buffer";
-                import "io";
-                import "libc";
+                import "std/json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
 
             `,
             "code": `
@@ -168,10 +168,10 @@
         {
             "name": "Json Token in complex Error",
             "definitions": `
-                import "json";
-                import "string_buffer";
-                import "io";
-                import "libc";
+                import "std/json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
 
             `,
             "code": `
@@ -202,10 +202,10 @@
         {
             "name": "Json Token Stream Error",
             "definitions": `
-                import "json";
-                import "string_buffer";
-                import "io";
-                import "libc";
+                import "std/json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
 
             `,
             "code": `

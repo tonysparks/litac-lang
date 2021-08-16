@@ -2,7 +2,7 @@
     "description": "Map",
     "disabled": false,
     "program": `
-        import "map";
+        import "std/map";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;

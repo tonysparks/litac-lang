@@ -1,11 +1,12 @@
+import "std/json"
+import "std/mem"
+import "std/system"
+import "std/libc"
+import "std/array"
+
 import "symbols" as sym
 import "types"
-import "json"
 import "lex"
-import "mem"
-import "system"
-import "libc"
-import "array"
 
 @doc("""
     Protocol specifications from: https://microsoft.github.io/language-server-protocol/specifications

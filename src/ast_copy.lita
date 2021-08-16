@@ -1,18 +1,20 @@
+import "std/mem"
+import "std/array"
+import "std/assert"
+import "std/string_buffer"
+import "std/string_view"
+import "std/libc"
+import "std/system"
+
 import "ast"
 import "ast_new"
 import "lex"
 import "symbols"
 import "types"
-import "mem"
-import "array"
 import "common"
-import "assert"
 import "lita"
 import "module"
 import "checker"
-import "string_buffer"
-import "string_view"
-import "libc"
 import "parser"
 
 public func NewTokenName(token: Token, allocator: *const Allocator) : *const char {
@@ -769,7 +771,7 @@ public func AstAddImport(lita: *Lita,
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var importStmt = module.ast.imports.get(i)
-        if(strcmp(importStmt.moduleId.filename, importModule.id.filename) == 0) {
+        if(strncmp(importStmt.moduleId.filename, importModule.id.filename, MAX_PATH) == 0) {
             if(importStmt.alias.type == TokenType.IDENTIFIER) {
                 return importStmt.alias.asString()
             }

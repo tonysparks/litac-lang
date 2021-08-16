@@ -1,25 +1,27 @@
-import "mem"
-import "phase_result"
-import "array"
-import "map"
-import "module"
-import "libc"
-import "string_view"
-import "system"
+import "std/io"
+import "std/mem"
+import "std/array"
+import "std/map"
+import "std/libc"
+import "std/system"
+import "std/string_buffer"
+import "std/string_view"
+import "std/string"
+
 import "symbols"
 import "preprocessor"
-import "string"
-import "string_buffer"
 import "lex"
+import "module"
 import "parser"
+import "phase_result"
 import "ast"
 import "ast_new"
 import "checker"
 import "cgen"
-import "io"
 import "lsp/references"
 
 public const MAX_PREFIX_SIZE = 32
+public const LITA_VERSION = "0.1.1-alpha"
 
 public struct Lita {
     allocator: *const Allocator
@@ -180,7 +182,12 @@ public func (this: *Lita) parse() : *Module {
         return null;
     }
 
-    var builtinImport = NewImportDecl(SrcPos{}, SrcPos{}, BUILTIN_IMPORT_TOKEN, Token{.type = TokenType.VOID}, false, this.allocator) as (*ImportDecl)
+    var builtinImport = NewImportDecl(SrcPos{},
+                                      SrcPos{},
+                                      BUILTIN_IMPORT_TOKEN,
+                                      Token{.type = TokenType.VOID},
+                                      false,
+                                      this.allocator) as (*ImportDecl)
     builtinImport.moduleId = &builtin.id
     root.ast.imports.add(builtinImport)
 
@@ -311,7 +318,7 @@ public func FindModulePath(lita: *Lita,
         return true
     }
 
-    pathStr.format("%s/lib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
+    pathStr.format("%s/stdlib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
     if(FileExists(pathStr.cStrConst())) {
         return true
     }

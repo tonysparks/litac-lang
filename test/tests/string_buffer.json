@@ -2,13 +2,13 @@
     "description": "StringBuffer",
     "disabled": false,
     "program": `
-        import "string_buffer";
+        import "std/string_buffer";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;
 
-        import "libc";
-        import "io";
+        import "std/libc";
+        import "std/io";
         /*
         @include("<string.h>");
         @foreign func strncmp(a:*const char, b:*const char, len: i32) : i32;

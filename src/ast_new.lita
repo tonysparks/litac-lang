@@ -1,11 +1,12 @@
+import "std/mem"
+import "std/array"
+import "std/assert"
+
 import "ast"
 import "lex"
 import "symbols"
 import "types"
-import "mem"
-import "array"
 import "common"
-import "assert"
 import "module"
 
 public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpec {

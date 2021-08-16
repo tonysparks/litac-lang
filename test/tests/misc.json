@@ -108,12 +108,12 @@
         {
             "name": "Arena Allocator",
             "definitions": `
-                import "mem";
-                import "array";
-                import "io";
-                import "map";
-                import "json";
-                import "string_buffer"
+                import "std/mem";
+                import "std/array";
+                import "std/io";
+                import "std/map";
+                import "std/json";
+                import "std/string_buffer"
 
             `,
             "code": `
@@ -173,12 +173,12 @@
         {
             "name": "Arena Allocator with Default",
             "definitions": `
-                import "mem";
-                import "array";
-                import "io";
-                import "map";
-                import "json";
-                import "string_buffer"
+                import "std/mem";
+                import "std/array";
+                import "std/io";
+                import "std/map";
+                import "std/json";
+                import "std/string_buffer"
 
             `,
             "code": `
@@ -241,7 +241,7 @@
         {
             "name": "Simple",
             "definitions": `
-                import "array"
+                import "std/array"
                 struct X<T> {
                     i:T
                 }
@@ -497,8 +497,8 @@
         {
             "name": "Init inferrence",
             "definitions": `
-                import "mem"
-                import "clib" as c
+                import "std/mem"
+                import "std/clib" as c
 
             `,
             "code": `
@@ -677,7 +677,7 @@
         {
             "name": "Foreign Generic",
             "definitions": `
-                import "clib" as c
+                import "std/clib" as c
 
             `,
             "code": `
@@ -997,12 +997,12 @@
         {
             "name": "Arena Allocator",
             "definitions": `
-                import "mem";
-                import "array";
-                import "io";
-                import "map";
-                import "json";
-                import "string_buffer"
+                import "std/mem";
+                import "std/array";
+                import "std/io";
+                import "std/map";
+                import "std/json";
+                import "std/string_buffer"
 
             `,
             "code": `

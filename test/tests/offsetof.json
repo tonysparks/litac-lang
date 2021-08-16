@@ -16,7 +16,7 @@
             "name": "Offset of struct",
             "disabled": false,
             "definitions": `
-                import "io"
+                import "std/io"
 
                 struct Sprite {
                     a: i32
@@ -46,7 +46,7 @@
             "name": "Offset of packed struct",
             "disabled": false,
             "definitions": `
-                import "io"
+                import "std/io"
 
                 @packed
                 struct Sprite {

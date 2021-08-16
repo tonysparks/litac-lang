@@ -1,5 +1,5 @@
-import "assert"
-import "libc"
+import "std/assert"
+import "std/libc"
 
 //import "test_module"
 

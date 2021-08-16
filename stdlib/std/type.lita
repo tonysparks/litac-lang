@@ -1,0 +1,156 @@
+import "std/libc"
+
+@generated public const typeInfos: **TypeInfo = [1]*TypeInfo{0};
+@generated public const numOfTypeInfos : usize = 0;
+
+
+@asStr
+public enum TypeKind {
+    BOOL,
+    CHAR,
+    I8,  U8,
+    I16, U16,
+    I32, U32,
+    I64, U64,
+    F32, F64,
+    USIZE,
+    NULL,
+    VOID,
+
+    STR,
+    ARRAY,
+    PTR,
+    FUNC_PTR,
+
+    STRUCT,
+    UNION,
+    TRAIT,
+    ENUM,
+    FUNC,
+
+    CONST,
+    GENERIC_PARAM,
+
+    POISON,
+
+    MAX_TYPE_KIND
+}
+
+public enum FieldInfoKind {
+    VAR_FIELD,
+    TRAIT_FIELD,
+    ENUM_FIELD,
+    STRUCT_FIELD,
+    UNION_FIELD,
+}
+
+/*
+typedef u64 as typeid; // TODO: Make this part of builtins
+
+// TODO: Make this a builtin type
+public struct any {
+    data: *void
+    id: typeid
+}*/
+
+
+public enum Modifiers {
+    None  = 0,
+    Using = (1<<0),
+}
+
+public struct GenericInfo {
+    args: **const char
+    numOfArgs: i32
+}
+
+public struct ParamInfo {
+    genInfo: using GenericInfo
+    name: *const char
+    type: typeid
+    modifiers: Modifiers
+}
+
+public struct FieldInfo {
+    kind: FieldInfoKind
+    name: *const char
+    type: typeid
+    modifiers: Modifiers
+    offset: usize
+}
+
+public struct EnumFieldInfo {
+    name: *const char
+    value: i32
+}
+
+public struct TypeInfo {
+    kind:   TypeKind;
+    name:   *const char;
+    id:     typeid;
+
+    union {
+        struct arrayType {
+            length:  i32
+            arrayOfType: typeid
+        }
+        struct ptrType {
+            ptrOfType: typeid
+        }
+        struct constType {
+            constOfType: typeid
+        }
+        struct funcPtrType {
+            genInfo: using GenericInfo
+            returnType: typeid
+            params: *ParamInfo
+            numOfParams: i32
+            ptr: *void
+        }
+        struct funcType {
+            genInfo: using GenericInfo
+            isVararg: bool
+            returnType: typeid
+            params: *ParamInfo
+            numOfParams: i32
+        }
+        struct aggType {
+            fields: *FieldInfo
+            numOfFields: i32
+        }
+        struct enumType {
+            fields: *EnumFieldInfo
+            numOfFields: i32
+        }
+    }
+}
+
+public func getTypeInfo(id: typeid) : *TypeInfo {
+    if (id < 0_i64 || id >= numOfTypeInfos) {
+        return null;
+    }
+
+    return typeInfos[id];
+}
+
+public func getFieldValue(agg: any, fieldName: *const char) : any {
+    var typeInfo = getTypeInfo(agg.id)
+
+    if(typeInfo.kind != TypeKind.UNION &&
+       typeInfo.kind != TypeKind.STRUCT &&
+       typeInfo.kind != TypeKind.TRAIT) {
+        return any{}
+    }
+
+    for(var i = 0; i < typeInfo.aggType.numOfFields; i += 1) {
+        var field = typeInfo.aggType.fields[i]
+        if(strcmp(fieldName, field.name) == 0) {
+            return any {
+                    .value = (agg.value as (usize) + field.offset) as (*void),
+                    .id = field.type
+            }
+        }
+    }
+
+    return any{}
+}

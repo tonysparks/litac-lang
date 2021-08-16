@@ -1,0 +1,272 @@
+import "std/libc"
+import "std/mem" as mem
+import "std/assert"
+
+public struct StringView {
+    buffer: *const char
+    length: i32
+}
+
+public func StringViewInit(str: *const char, len: i32 = -1) : StringView {
+    if(str == null) {
+        return StringView {
+            .buffer = null,
+            .length = 0
+        }
+    }
+
+    return StringView {
+        .buffer = str,
+        .length = (len < 0) ? strlen(str) : len
+    }
+}
+
+public func (b: StringView) hash() : u32 {
+    var hash = 5381_u32;
+    for(var i = 0; i < b.length; i+=1) {
+        hash = ((hash << 5_u32) + hash) ^ ((b.buffer[i]) as (u32));
+    }
+    return hash;
+}
+
+public func (b: StringView) substring(start: i32, end: i32 = -1) : StringView {
+    var endIndex = end < 0 ? b.length : end
+
+    if(endIndex <= start || start < 0 || start >= b.length) {
+        return StringView {
+            .buffer = null,
+            .length = 0
+        }
+    }
+
+    return StringView {
+        .buffer = &b.buffer[start],
+        .length = endIndex - start
+    }
+}
+
+public func (b: StringView) startsWith(prefix: *const char, len: i32 = -1, fromIndex: i32 = 0) : bool {
+    if(!prefix) return false;
+
+    var ta = b.buffer;
+    var to = fromIndex;
+    var pa = prefix;
+    var po = 0;
+    var pc = (len < 0) ? strlen(prefix) : len;
+
+    if ((fromIndex < 0) || (fromIndex > b.length - pc)) {
+        return false;
+    }
+
+    while ((pc -= 1) >= 0) {
+        if (ta[to] != pa[po]) {
+            return false;
+        }
+        to+=1
+        po+=1
+    }
+    return true;
+}
+
+public func (b: StringView) endsWith(suffix: *const char, len: i32 = -1) : bool {
+    if(!suffix) return false;
+
+    len = (len < 0) ? strlen(suffix) : len;
+    return b.startsWith(suffix, len, b.length - len)
+}
+
+public func (b: StringView) equals(str: *const char, len: i32 = -1) : bool {
+    if(!str) {
+        return b.buffer == null;
+    }
+
+    len = (len < 0) ? strlen(str) : len;
+    if(b.length != len) {
+        return false;
+    }
+
+    return strncmp(b.buffer, str, len) == 0
+}
+
+public func (b: StringView) equalsStringView(other: StringView) : bool {
+    return b.equals(other.buffer, other.length)
+}
+
+public func (b: StringView) contains(str: *const char, len: i32 = -1) : bool {
+    return b.indexOf(str, len) > -1;
+}
+
+public func (b: StringView) indexOf(str: *const char, len: i32 = -1) : i32 {
+    return b.indexOfAt(str, len, 0)
+}
+
+public func (b: StringView) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
+    if(!str) return -1;
+
+    var target = str
+    var source = b.buffer
+
+    var targetOffset = 0;
+    var sourceOffset = 0;
+
+    var first = target[0];
+
+    var targetCount = len
+    if(len < 0) {
+        targetCount = strlen(str);
+    }
+
+    var max = sourceOffset + (b.length - targetCount);
+
+    for (var i = sourceOffset + fromIndex; i <= max; i += 1) {
+        /* Look for first character. */
+        if (source[i] != first) {
+            while (i <= max && source[i] != first) {
+                i+=1
+            }
+        }
+
+        /* Found first character, now look at the rest of v2 */
+        if (i <= max) {
+            var j = i + 1;
+            var end = j + targetCount - 1;
+            for (var k = targetOffset + 1; j < end && source[j] == target[k];) {
+                j += 1;
+                k += 1;
+            }
+
+            if (j == end) {
+                /* Found whole string. */
+                return i - sourceOffset;
+            }
+        }
+    }
+    return -1;
+}
+
+public func (b: StringView) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
+    if(!buf || len == 0) return 0;
+
+    var bytesCopied = len
+    if(b.length < len) {
+        bytesCopied = b.length
+    }
+
+    memcpy(buf as (*void),
+          (&b.buffer[0]) as (*const void),
+           bytesCopied * sizeof(:char))
+
+    if(addZero) buf[bytesCopied] = '\0'
+
+    return (bytesCopied)
+}
+
+public func (s: StringView) copy(allocator: *const mem::Allocator = mem::defaultAllocator) : StringView {
+    if(s.length < 1) {
+        return StringView {
+            .buffer = null,
+            .length = 0
+        }
+    }
+
+    var copiedStr = allocator.alloc((s.length + 1) * sizeof(:char)) as (*char)
+    memcpy(copiedStr, s.buffer, s.length)
+
+    copiedStr[s.length] = '\0'
+
+    return StringView{
+        .buffer = copiedStr,
+        .length = s.length
+    }
+}
+
+public func (b: StringView) forEach(fn : func(char) : bool) {
+    for(var i = 0; i < b.length; i+=1) {
+        if(fn(b.buffer[i])) {
+            break;
+        }
+    }
+}
+
+public func (b: StringView) empty() : bool {
+    return b.length == 0
+}
+
+public func (b: StringView) size() : i32 {
+    return b.length
+}
+
+public func (b: StringView) clear() {
+    b.length = 0
+}
+
+public func (b: StringView) get(index: i32) : char {
+    if(index < 0 || index >= b.length) {
+        return '\0'
+    }
+
+    return b.buffer[index]
+}
+
+@test("equals")
+func testEquals() {
+    var a = StringViewInit("Hello World")
+    var b = StringViewInit("Bye World")
+    var c = a
+    var d = StringViewInit("HelloWorld")
+    var e = StringViewInit(null)
+
+    assert(a.equals(c.buffer, c.length) == true)
+    assert(a.equals("Hell") == false)
+    assert(a.equals("Hello World") == true)
+    assert(a.equals(b.buffer, b.length) == false)
+    assert(a.equals(d.buffer, d.length) == false)
+    assert(e.equals(d.buffer, d.length) == false)
+    assert(a.equals(e.buffer, e.length) == false)
+}
+
+
+@test("contains")
+func testContains() {
+    var a = StringViewInit("Hello World")
+    var e = StringViewInit(null)
+
+    assert(a.contains("World") == true)
+    assert(a.contains("d") == true)
+    assert(a.contains("H") == true)
+    assert(a.contains("Which", 1) == true)
+    assert(e.contains("World") == false)
+    assert(a.contains(e.buffer, e.length) == false)
+}
+
+@test("startsWith")
+func testStartsWith() {
+    var a = StringViewInit("Hello World")
+    var e = StringViewInit(null)
+
+    assert(a.startsWith("World") == false)
+    assert(a.startsWith("d") == false)
+    assert(a.startsWith("H") == true)
+    assert(a.startsWith("Hell") == true)
+    assert(a.startsWith("Hello World") == true)
+    assert(a.startsWith("Hello World!") == false)
+    assert(a.startsWith("Which", 1) == false)
+    assert(a.startsWith("Hhich", 1) == true)
+    assert(e.startsWith("World") == false)
+    assert(a.startsWith(e.buffer, e.length) == false)
+}
+
+@test("indexOf")
+func testIndexOf() {
+    var a = StringViewInit("Hello World")
+    var e = StringViewInit(null)
+
+    assert(a.indexOfAt("World", 2) == 6)
+    assert(a.indexOfAt("World", 7) == -1)
+    assert(a.indexOfAt("d") == 10)
+    assert(a.indexOfAt("H") == 0)
+    assert(a.indexOfAt("H", 2) == -1)
+
+    assert(e.indexOfAt("World") == -1)
+    assert(a.indexOfAt(e.buffer, e.length) == -1)
+}

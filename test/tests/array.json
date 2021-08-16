@@ -2,7 +2,7 @@
     "description": "Array",
     "disabled": false,
     "program": `
-        import "array";
+        import "std/array";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;

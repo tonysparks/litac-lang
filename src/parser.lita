@@ -1,22 +1,22 @@
+import "std/string_buffer"
+import "std/string"
+import "std/mem"
+import "std/array"
+import "std/libc"
+import "std/assert"
+
 import "ast"
 import "ast_new"
 import "ast_copy"
+import "ast_print"
 import "lex"
 import "symbols"
 import "types"
-import "mem"
-import "array"
 import "phase_result"
 import "error_codes"
 import "lita"
 import "common"
-import "libc"
-import "assert"
 import "module"
-import "string_buffer"
-import "string"
-
-import "ast_print"
 
 const DECL_ADJUST_TOKENS_COUNT = 11
 const DECL_ADJUST_TOKENS = [DECL_ADJUST_TOKENS_COUNT]TokenType {

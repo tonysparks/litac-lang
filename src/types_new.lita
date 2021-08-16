@@ -1,11 +1,12 @@
-import "mem"
+import "std/mem"
+import "std/libc"
+import "std/assert"
+import "std/array"
+import "std/map"
+
 import "types"
 import "symbols"
-import "array"
-import "map"
 import "ast"
-import "libc"
-import "assert"
 
 
 public struct TypeCache {
@@ -87,7 +88,7 @@ public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
     var entry = ArrayEntry{.arrayOf = arrayOf, .expr = numOfElements, .length = length}
     var type = this.arrayCache.get(entry)
     if(!type || type.length != length || type.isLengthDefined != isLengthDefined
-     /*|| type.numOfElements != numOfElements*/) {
+      || type.numOfElements != numOfElements /* this was commented out! */) {
         type = new<ArrayTypeInfo>(this.allocator)
         type.kind = TypeKind.ARRAY
         type.typeid = NextTypeId()

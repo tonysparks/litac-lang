@@ -1,12 +1,13 @@
+import "std/assert"
+import "std/mem"
+import "std/libc"
+import "std/map"
+import "std/array"
+
 import "lita"
-import "map"
-import "array"
 import "symbols"
 import "types"
-import "assert"
 import "ast"
-import "mem"
-import "libc"
 
 @doc("""
     Creates an ordering for C to handle compilation unit correction.  LitaC allows for

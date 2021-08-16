@@ -1,16 +1,17 @@
+import "std/assert"
+import "std/string_buffer"
+import "std/string"
+import "std/libc"
+import "std/array"
+
 import "ast"
-import "string_buffer"
-import "string"
 import "types"
 import "module"
 import "symbols"
 import "lita"
 import "phase_result"
 import "lex"
-import "libc"
-import "array"
 import "common"
-import "assert"
 import "cgen"
 
 public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {

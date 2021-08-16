@@ -1,6 +1,15 @@
-import "libc"
-import "mem"
-import "io"
+import "std/libc"
+import "std/mem"
+import "std/io"
+import "std/cmdline"
+import "std/system"
+import "std/array"
+import "std/map"
+import "std/string"
+import "std/string_view"
+import "std/string_buffer"
+import "std/profile"
+
 import "lex"
 import "lita"
 import "types"
@@ -9,26 +18,19 @@ import "ast_new"
 import "ast_print"
 import "parser"
 import "phase_result"
-import "system"
-import "array"
-import "map"
 import "error_codes"
 import "module"
-import "string"
-import "string_view"
-import "string_buffer"
 import "checker"
 import "cgen"
 import "lsp/lsp"
-import "cmdline"
-import "profile"
 
 func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
 
     var options = LitaOptions{}
-    if(!ParseArgs(len, args, &options)) {
-        return -1;
+    var status = ParseArgs(len, args, &options)
+    if(status != ParseStatus.OK) {
+        return ParseStatus.TERMINATE == status ? 0 : -1;
     }
 
     var lita = Lita{}
@@ -111,7 +113,13 @@ report:
     return 0
 }
 
-func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
+enum ParseStatus {
+    OK,
+    ERROR,
+    TERMINATE,
+}
+
+func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     var parser = CmdParserInit()
     defer parser.free()
 
@@ -141,12 +149,29 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
     parser.addOption("buildCmd",       'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated", OptionFlag.HAS_ARGUMENT, null);
 
+
     if(parser.parse(n, args) != CmdParserStatus.OK) {
         goto err_print;
     }
 
-    options.languageServer = parser.hasOption("languageServer")
 
+    if(parser.hasOption("version")) {
+        printf("Version: %s\n", LITA_VERSION)
+        goto terminate;
+    }
+
+    if(parser.hasOption("help")) {
+        {
+            var sb = StringBufferInit()
+            defer sb.free()
+
+            parser.printHelp(sb)
+            printf("%s\n", sb.cStr())
+        }
+        goto terminate;
+    }
+
+    options.languageServer = parser.hasOption("languageServer")
     if(!options.languageServer) {
         if(parser.args.size() < 2) {
             printf("Missing input file\n")
@@ -160,14 +185,6 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
     if(!lib) lib = "";
 
     GetAbsolutePath("", lib, options.litaPath)
-
-    if(parser.hasOption("help")) {
-        var sb = StringBufferInit()
-        defer sb.free()
-
-        parser.printHelp(sb)
-        printf("%s", sb.cStr())
-    }
 
     options.checkerOnly = parser.hasOption("checkerOnly")
     options.cOutputOnly = parser.hasOption("cOnly")
@@ -233,7 +250,10 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : bool {
         FilePath(options.inputFile, options.srcPath)
     }
 
-    return true
+    return ParseStatus.OK
+
+terminate:
+    return ParseStatus.TERMINATE
 
 err_print:
     {
@@ -244,5 +264,5 @@ err_print:
         printf("%s", sb.cStr())
     }
 err:
-    return false
+    return ParseStatus.ERROR
 }

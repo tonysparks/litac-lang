@@ -1,0 +1,23 @@
+import "std/re/re"
+
+
+public struct Regex {
+    reg: re_t
+}
+
+
+public func RegexCompile(pattern: *const char): Regex {
+    var result: Regex {}
+    result.reg = re_compile(pattern)
+    return result
+}
+
+/* Finds matches of the compiled pattern inside text. */
+public func (this: *Regex) match(text: *const char, matchlength: *i32) : i32 {
+    return re_matchp(this.reg, text, matchlength)
+}
+
+/* Finds matches of pattern inside text (compiles first automatically). */
+public func RegexMatch(pattern: *const char, text: *const char, matchlength: *i32) : i32 {
+    return re_match(pattern, text, matchlength)
+}
