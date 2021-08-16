@@ -610,17 +610,20 @@ If you only want to run a subset of unit tests, you can define a Regular Express
 
 # Building
 In order to build litaC compiler you will need:
-* A LitaC compiler - either a binary from this repository or the [bootstrap](https://github.com/tonysparks/litac) implementation
-* C compiler (I have only tested using Clang v6.0.1)
+* C compiler (tcc, clang and gcc should work -- I haven't tested Visual Studio's compiler)
 
-Once you have those dependencies installed, to build the litaC compiler, simply do:
+_NOTE_: Currently, only tested and buildable for Windows x64
+
+Admittedly, this process isn't as friendly right now as it should be.  At some point I will write some robust build scripts.  For now, `clang` is hardcoded in the scripts - but should be easy enough to switch to another compiler (tcc or gcc).
 
 ```
 git clone https://github.com/tonysparks/litac-lang.git
 cd litac-lang
+build_bootstrap.bat
 build.bat
 ```
 
+The `build_bootstrap.bat` will compile the `bootstrap/litac.c` file creating a `litac.exe`.  The `build.bat` file will use the `bootstrap/litac.exe` to build the compiler from lita source (`src/`) and output a new binary in `bin/litac.exe`.
 
 # Using LitaC Compiler
 Once you have built the `litac` executable (which will be located in the `/bin` folder after `build.bat`), you can verify the build is valid by:
@@ -667,11 +670,11 @@ OPTIONS:
 Here is an example command line options:
 
 ```
-set LITAC_PATH=C:\Users\antho\eclipse-workspace\litac\lib
+set LITAC_PATH=C:\Users\antho\git\litac-lang\stdlib
 litac -run -lib "%LITAC_PATH%" -buildCmd "clang.exe -o %%output%% %%input%% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -lraylib.lib" -outputDir "./bin" -output "mini" "./src/main.lita"
 ```
 
-This example, builds an executable named `mini` from the `./src/main.lita` source file.  It will run the executable after it compiles (only if there are no errors).  It uses clang to compile the generated C code, I also set some clang compiler options such as an include directory and static libraries to use in my project.  This also specifies where the litac standard library exists (which is the `lib` folder in the litac project source.
+This example, builds an executable named `mini` from the `./src/main.lita` source file.  It will run the executable after it compiles (only if there are no errors).  It uses clang to compile the generated C code.   This also specifies where the litac standard library exists (which is the `stdlib` folder in the litac project source.
 
 Environment Variable
 ==
