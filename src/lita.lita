@@ -282,6 +282,8 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
     if(tcc_compile_string(state, sourceCode) < 0) {
         return false
     }
+
+    return true
 }
 
 public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool {
