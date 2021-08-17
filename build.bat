@@ -4,15 +4,8 @@ if [%LITAC_HOME%] == [] goto error_exit
 del ".\bin\litacc.*" /q
 del ".\bin\litac.*" /q
 
-REM set LIB="../stdlib/std"
 REM set BUILD_CMD="clang.exe -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib"
-set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib"
-
-REM java -jar %LITAC_HOME%/target/litac.jar -profile -buildCmd %BUILD_CMD% -outputDir "./bin" -output "litacc" "./src/main.lita" -types "none" -debug
-REM if errorlevel 1 (
-REM     goto error_compiling
-REM )
-REM cd bin
+set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
 
 
 echo Running bootstrapped litaC...

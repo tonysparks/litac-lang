@@ -18,7 +18,10 @@ import "ast"
 import "ast_new"
 import "checker"
 import "cgen"
+import "common"
 import "lsp/references"
+
+import "tcc/libtcc"
 
 public const MAX_PREFIX_SIZE = 32
 public const LITA_VERSION = "0.1.1-alpha"
@@ -224,26 +227,68 @@ public func (this: *Lita) transpile(module: *Module) : bool {
     strcat(this.binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
     strcat(this.sourceFilename, ".c")
 
-    if(!this.emitC(module, this.sourceFilename)) {
-        return false
-    }
-
     if(this.options.cOutputOnly) {
+        if(!this.emitC(module, this.sourceFilename)) {
+            return false
+        }
         return false
     }
 
-    if(!this.compileC(module, this.sourceFilename, this.binaryFilename)) {
-        return false
+    // if there is no build cmd, attempt to compile using libtcc
+    if(!this.options.compileCmd) {
+
+        if(!this.compileWithLibtcc(module, this.binaryFilename)) {
+            return false
+        }
+    }
+    else {
+        //
+        // there is a build cmd, so the user opted for an external C compiler
+        //
+
+        if(!this.emitC(module, this.sourceFilename)) {
+            return false
+        }
+
+        if(!this.compileC(module, this.sourceFilename, this.binaryFilename)) {
+            return false
+        }
     }
 
     return true
+}
+
+func LibtccErrorFunc(data: *void, msg: *const char) : void {
+    Error("%s\n", msg)
+}
+
+public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *const char) : bool {
+    this.startCapture(MetricType.CGEN)
+    var cgen = CGen{}
+    cgen.init(this, null)
+    cgen.emitProgram(module)
+    this.endCapture(MetricType.CGEN)
+
+    var sourceCode = cgen.buf.cStr()
+
+    var state = tcc_new()
+    defer if(state) tcc_delete(state)
+
+    tcc_set_error_func(state, this, LibtccErrorFunc)
+
+    tcc_set_output_type(state, TCC_OUTPUT_EXE)
+    tcc_output_file(state, binaryFilename)
+
+    if(tcc_compile_string(state, sourceCode) < 0) {
+        return false
+    }
 }
 
 public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool {
     this.startCapture(MetricType.CGEN)
     var fp = fopen(cFilename, "w")
     if(fp == null) {
-        return FileStatus.FileNotFoundError;
+        return false;
     }
     defer fclose(fp)
 

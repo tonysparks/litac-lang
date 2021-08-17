@@ -1,0 +1,124 @@
+@include("<libtcc.h>");
+
+@foreign
+public struct TCCState;
+
+@foreign
+public typedef func(*void, *const char) : void as TCCErrorFunc;
+
+/* create a new TCC compilation context */
+@foreign
+public func tcc_new() : *TCCState;
+
+/* free a TCC compilation context */
+@foreign
+public func tcc_delete(s: *TCCState) : void;
+
+/* set CONFIG_TCCDIR at runtime */
+@foreign
+public func tcc_set_lib_path(s: *TCCState, path: *const char) : void;
+
+/* set error/warning display callback */
+@foreign
+public func tcc_set_error_func(s: *TCCState, error_opaque: *void, error_func: TCCErrorFunc) : void;
+
+/* return error/warning callback */
+@foreign
+public func tcc_get_error_func(s: *TCCState) : TCCErrorFunc;
+
+/* return error/warning callback opaque pointer */
+@foreign
+public func tcc_get_error_opaque(s: *TCCState) : *void;
+
+/* set options as from command line (multiple supported) */
+@foreign
+public func tcc_set_options(s: *TCCState, str: *const char) : void;
+
+/*****************************/
+/* preprocessor */
+
+/* add include path */
+@foreign
+public func tcc_add_include_path(s: *TCCState, pathname: *const char) : i32;
+
+/* add in system include path */
+@foreign
+public func tcc_add_sysinclude_path(s: *TCCState, pathname: *const char) : i32;
+
+/* define preprocessor symbol 'sym'. value can be NULL, sym can be "sym=val" */
+@foreign
+public func tcc_define_symbol(s: *TCCState, sym: *const char, value: *const char) : void;
+
+/* undefine preprocess symbol 'sym' */
+@foreign
+public func  tcc_undefine_symbol(s: *TCCState, sym:*const char ) : void;
+
+/*****************************/
+/* compiling */
+
+/* add a file (C file, dll, object, library, ld script). Return -1 if error. */
+@foreign
+public func tcc_add_file(s: *TCCState, filename: *const char) : i32;
+
+/* compile a string containing a C source. Return -1 if error. */
+@foreign
+public func tcc_compile_string(s: *TCCState, buf: *const char) : i32;
+
+/*****************************/
+/* linking commands */
+
+/* set output type. MUST BE CALLED before any compilation */
+@foreign
+public func tcc_set_output_type(s: *TCCState, output_type: i32) : i32;
+
+@foreign
+public const  TCC_OUTPUT_MEMORY: i32 =  1 /* output will be run in memory (default) */
+@foreign
+public const  TCC_OUTPUT_EXE =     2 /* executable file */
+@foreign
+public const  TCC_OUTPUT_DLL =     3 /* dynamic library */
+@foreign
+public const  TCC_OUTPUT_OBJ =     4 /* object file */
+@foreign
+public const TCC_OUTPUT_PREPROCESS: i32 = 5 /* only preprocess (used internally) */
+
+/* equivalent to -Lpath option */
+@foreign
+public func tcc_add_library_path(s: *TCCState, pathname: *const char) : i32;
+
+/* the library name is the same as the argument of the '-l' option */
+@foreign
+public func tcc_add_library(s: *TCCState, libraryname: *const char) : i32;
+
+/* add a symbol to the compiled program */
+@foreign
+public func tcc_add_symbol(s: *TCCState, name: *const char, val: *const void) : i32;
+
+/* output an executable, library or object file. DO NOT call
+   tcc_relocate() before. */
+@foreign
+public func tcc_output_file(s: *TCCState, filename: *const char) : i32;
+
+/* link and run main() function and return its value. DO NOT call
+   tcc_relocate() before. */
+@foreign
+public func tcc_run(s: *TCCState, argc: i32, argv: **char) : i32;
+
+/* do all relocations (needed before using tcc_get_symbol()) */
+@foreign
+public func tcc_relocate(s1: *TCCState, tpr: *void) : i32;
+/* possible values for 'ptr':
+   - TCC_RELOCATE_AUTO : Allocate and manage memory internally
+   - NULL              : return required memory size for the step below
+   - memory address    : copy code to memory passed by the caller
+   returns -1 if error. */
+@foreign
+public const TCC_RELOCATE_AUTO: *void;
+
+/* return symbol value or NULL if not found */
+@foreign
+public func tcc_get_symbol(s: *TCCState, name: *const char) : *void;
+
+/* return symbol value or NULL if not found */
+@foreign
+public func tcc_list_symbols(s: *TCCState, ctx: *void, symbol_cb: func(*void, *const char, *const void) : void) : void;
