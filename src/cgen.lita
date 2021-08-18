@@ -1876,6 +1876,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var objectType = expr.object.operand.typeInfo
 
             if(expr.flags & GetExprFlags.IS_ENUM) {
+                // TODO: Allow for Alias field names for foreign types!
                 if(objectType.sym && objectType.sym.flags & SymbolFlags.IS_FOREIGN) {
                     buf.appendStr(expr.field.type.name)
                 }

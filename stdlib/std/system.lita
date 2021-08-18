@@ -21,11 +21,118 @@ import "std/string_view"
 @raw("""
 typedef struct stat FileStat;
 typedef struct tm tm;
+
+typedef enum Lita_OSType {
+    Lita_OSType_WINDOWS,
+    Lita_OSType_ANDROID,
+    Lita_OSType_LINUX,
+    Lita_OSType_BSD,
+    Lita_OSType_IOS,
+    Lita_OSType_MAC,
+    Lita_OSType_OTHER
+} Lita_OSType;
+
+
+#if defined(_WIN32)
+    // Windows
+    Lita_OSType litaOS = Lita_OSType_WINDOWS;
+#elif defined(_WIN64)
+    // Windows
+    Lita_OSType litaOS = Lita_OSType_WINDOWS;
+#elif defined(__CYGWIN__) && !defined(_WIN32)
+    // Windows (Cygwin POSIX under Microsoft Window)
+    Lita_OSType litaOS = Lita_OSType_WINDOWS;
+#elif defined(__ANDROID__)
+    // Android (implies Linux, so it must come first)
+    Lita_OSType litaOS = Lita_OSType_ANDROID;
+#elif defined(__linux__)
+    // Debian, Ubuntu, Gentoo, Fedora, openSUSE, RedHat, Centos and other
+    Lita_OSType litaOS = Lita_OSType_LINUX;
+#elif defined(__unix__) || !defined(__APPLE__) && defined(__MACH__)
+    #include <sys/param.h>
+    #if defined(BSD)
+        // FreeBSD, NetBSD, OpenBSD, DragonFly BSD
+        Lita_OSType litaOS = Lita_OSType_BSD;
+    #endif
+#elif defined(__hpux)
+    // HP-UX
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+#elif defined(_AIX)
+    // IBM AIX
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+#elif defined(__APPLE__) && defined(__MACH__) // Apple OSX and iOS (Darwin)
+    #include <TargetConditionals.h>
+    #if TARGET_IPHONE_SIMULATOR == 1
+        // Apple iOS
+        Lita_OSType litaOS = Lita_OSType_IOS;
+    #elif TARGET_OS_IPHONE == 1
+        // Apple iOS
+        Lita_OSType litaOS = Lita_OSType_IOS;
+    #elif TARGET_OS_MAC == 1
+        // Apple OSX
+        Lita_OSType litaOS = Lita_OSType_MAC;
+    #endif
+#elif defined(__sun) && defined(__SVR4)
+    // Oracle Solaris, Open Indiana
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+#else
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+#endif
+
 """);
 
 // TODO - should allow for 'compile time interface' types
 // defined in OS specific module...
 //public const MAX_PATH: i32;
+
+@foreign("Lita_OSType")
+//@asStr TODO, this isn't working, function not in scope??
+enum OS {
+    @alias("Lita_OSType_WINDOWS")
+    @asStr("WINDOWS")
+    Lita_OSType_WINDOWS,
+
+    @alias("Lita_OSType_ANDROID")
+    @asStr("ANDROID")
+    Lita_OSType_ANDROID,
+
+    @alias("Lita_OSType_LINUX")
+    @asStr("LINUX")
+    Lita_OSType_LINUX,
+
+    @alias("Lita_OSType_BSD")
+    @asStr("BSD")
+    Lita_OSType_BSD,
+
+    @alias("Lita_OSType_IOS")
+    @asStr("IOS")
+    Lita_OSType_IOS,
+
+    @alias("Lita_OSType_MAC")
+    @asStr("MAC")
+    Lita_OSType_MAC,
+
+    @alias("Lita_OSType_OTHER")
+    @asStr("OTHER")
+    Lita_OSType_OTHER
+}
+
+// TODO: Why is asStr annotation not working???
+public func OSAsStr(type: OS) : *const char {
+    switch(type) {
+        case OS.Lita_OSType_WINDOWS: return "WINDOWS";
+        case OS.Lita_OSType_ANDROID: return "ANDROID";
+        case OS.Lita_OSType_LINUX: return "LINUX";
+        case OS.Lita_OSType_BSD: return "BSD";
+        case OS.Lita_OSType_IOS: return "IOS";
+        case OS.Lita_OSType_MAC: return "MAC";
+        case OS.Lita_OSType_OTHER: return "OTHER";
+        default: return null;
+    }
+}
+
+@foreign("litaOS")
+const os: OS;
 
 @foreign
 struct FileStat;
@@ -42,6 +149,10 @@ func getenv(varname: *const char) : *char;
 @no_profile
 public func SystemInit() : bool {
     return _SystemInit()
+}
+
+public func GetOS() : OS {
+    return os;
 }
 
 public func GetEnv(varName: *const char) : *char {

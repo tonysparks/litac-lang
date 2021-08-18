@@ -92,16 +92,20 @@ public struct any {
                       switch(enumType) {\n", symName, sym.name);
             for(field in sym.enumDecl.fields) {
                 var fieldName = field.name
+                var valueName = field.name
 
                 // Look to see if there is a custom name for the field
                 if(field.notes) {
                     for(note in field.notes) {
                         if(note.name == "asStr" && note.attributes) {
-                            fieldName = note.attributes[0].name
+                            valueName = note.attributes[0].name
                         }
+                        //else if(note.name == "alias" && note.attributes) {
+                        //    fieldName = note.attributes[0].name
+                        //}
                     }
                 }
-                emit("        case %s.%s: return \"%s\";\n", sym.name, field.name, fieldName);
+                emit("        case %s.%s: return \"%s\";\n", sym.name, fieldName, valueName);
             }
             emit("        default: return null;
                       }
