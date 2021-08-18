@@ -17,7 +17,7 @@ public const MAX_PATH: i32; /* NAME_MAX=255, PATH_MAX=4096 */
 
 @module_init
 @no_profile
-public func SystemInit() : bool {
+public func _SystemInit() : bool {
     return true
 }
 
@@ -25,7 +25,7 @@ public func SystemInit() : bool {
 func getcwd(buf: *char, size: usize) : *char;
 
 const pwd = [MAX_PATH]char{0};
-public func CurrentWorkingPath() : *const char {
+public func _CurrentWorkingPath() : *const char {
     @static var path: [MAX_PATH]char;
     if(pwd[0] == 0) {
         getcwd(path, MAX_PATH)
@@ -51,7 +51,7 @@ const S_IXOTH:i32;
 @foreign
 func mkdir(path: *const char, mode: mode_t) : i32;
 
-public func Mkdir(dir: *const char) : bool {
+public func _Mkdir(dir: *const char) : bool {
     mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
     var view = StringViewInit(dir)
