@@ -1,0 +1,86 @@
+@raw("""
+
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <limits.h>
+""");
+
+import "std/libc"
+import "std/assert"
+import "std/string"
+import "std/string_view"
+
+@foreign("PATH_MAX")
+public const MAX_PATH: i32; /* NAME_MAX=255, PATH_MAX=4096 */
+
+
+@module_init
+@no_profile
+public func SystemInit() : bool {
+    return true
+}
+
+@foreign
+func getcwd(buf: *char, size: usize) : *char;
+
+const pwd = [MAX_PATH]char{0};
+public func CurrentWorkingPath() : *const char {
+    @static var path: [MAX_PATH]char;
+    if(pwd[0] == 0) {
+        getcwd(path, MAX_PATH)
+        GetAbsolutePath("", path, pwd)
+    }
+
+    return pwd;
+}
+
+@foreign
+typedef i32 as mode_t;
+
+@foreign
+const S_IRWXU :i32;
+@foreign
+const S_IRWXG:i32;
+@foreign
+const S_IROTH:i32;
+@foreign
+const S_IXOTH:i32;
+
+
+@foreign
+func mkdir(path: *const char, mode: mode_t) : i32;
+
+public func Mkdir(dir: *const char) : bool {
+    mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
+
+    var view = StringViewInit(dir)
+    // we have to do this non-sense because tinycc stat doesn't like
+    // trailing /
+    if(view.endsWith("/")) {
+        var path = [MAX_PATH]char{0}
+        var normalized = StringInit(path, MAX_PATH)
+        normalized.format("%.*s", view.length - 1, view.buffer)
+        return FileExists(normalized.cStr())
+    }
+    return FileExists(dir)
+}
+
+@foreign
+struct timeval {
+    tv_sec: f64
+    tv_usec: f64
+}
+
+@foreign
+func gettimeofday(t: *timeval, tzp: *void) : i32;
+
+
+
+@no_profile
+public func _SystemTimeMSec() : f64 {
+    var t0: timeval;
+    gettimeofday(&t0, null);
+
+    return (t0.tv_sec * 1000f64) + (t0.tv_usec / 1000f64)
+}

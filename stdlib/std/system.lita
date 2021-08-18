@@ -1,131 +1,55 @@
-@raw("""
-#include <stdlib.h>
-
-#if defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__)
-#define OS_WIN
-#endif
-
-#if defined(OS_WIN) && !defined(__TINYC__)
-#include <windows.h>
-#include <libloaderapi.h>
-#endif
-
-#if defined(__TINYC__)
-#include <winapi/windows.h>
-#endif
-
-#include <stdio.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-
-/*
-#ifndef WIN32
-#include <unistd.h>
-#endif
-*/
-
-#if defined(__TINYC__)
-#include <sys/unistd.h>
-size_t __cdecl strnlen(const char *_Str,size_t _MaxCount);
-#endif
-
-#ifdef OS_WIN
-#define stat _stat
-#endif
-
-#include <errno.h>
-
-typedef struct stat FileStat;
-typedef struct tm tm;
-""");
 
 import "std/libc"
 import "std/assert"
 import "std/string"
 import "std/string_view"
 
-@foreign("_MAX_PATH")
-public const MAX_PATH: i32;
+
+@raw("""
+#include <stdlib.h>
+
+#include <stdio.h>
+#include <time.h>
+""");
+
+#if (OS == "WINDOWS")
+    import using "std/system_win"
+#else
+    import using "std/system_posix"
+#end
+
+@raw("""
+typedef struct stat FileStat;
+typedef struct tm tm;
+""");
+
+// TODO - should allow for 'compile time interface' types
+// defined in OS specific module...
+//public const MAX_PATH: i32;
 
 @foreign
 struct FileStat;
 
 @foreign
-struct LARGE_INTEGER {
-    QuadPart: u64
-}
-
-@foreign
-struct time_t;
-
-@foreign
-struct tm;
-
-@foreign
-func time(t: *time_t);
-
-@foreign
-func localtime(t: *time_t) : *tm;
-
-
-@foreign
-func asctime(t: *tm) : *const char;
-
-
-@foreign
 func stat(filename: *const char, s: *FileStat) : i32;
 
-@foreign
-func CreateDirectoryA(pathname: *const char, attr: *void) : bool;
-
-@foreign
-func GetCurrentDirectory(len: i32, buffer: *char): i32;
-
-@foreign
-func QueryPerformanceFrequency(freq: *LARGE_INTEGER) : bool;
-
-@foreign
-func QueryPerformanceCounter(time: *LARGE_INTEGER);
-
-var systemFreq: f64;
-var systemStart: u64 = 0;
 
 @foreign
 func getenv(varname: *const char) : *char;
 
+
 @module_init
 @no_profile
 public func SystemInit() : bool {
-    if(systemStart == 0) {
-        var freq: LARGE_INTEGER;
-        if(!QueryPerformanceFrequency(&freq)) {
-            return false
-        }
-
-        systemFreq = freq.QuadPart as (f64) / 1_000.0
-
-        var time: LARGE_INTEGER;
-        QueryPerformanceCounter(&time);
-        systemStart = time.QuadPart
-    }
-
-    return true
+    return _SystemInit()
 }
 
 public func GetEnv(varName: *const char) : *char {
     return getenv(varName)
 }
 
-const pwd = [MAX_PATH]char{0};
 public func CurrentWorkingPath() : *const char {
-    @static var path: [MAX_PATH]char;
-    if(pwd[0] == 0) {
-        GetCurrentDirectory(MAX_PATH, path)
-        GetAbsolutePath("", path, pwd)
-    }
-
-    return pwd;
+    return _CurrentWorkingPath()
 
 }
 public func FileExists(filename: *const char) : bool {
@@ -134,18 +58,7 @@ public func FileExists(filename: *const char) : bool {
 }
 
 public func Mkdir(dir: *const char) : bool {
-    CreateDirectoryA(dir, null)
-
-    var view = StringViewInit(dir)
-    // we have to do this non-sense because tinycc stat doesn't like
-    // trailing /
-    if(view.endsWith("/")) {
-        var path = [MAX_PATH]char{0}
-        var normalized = StringInit(path, MAX_PATH)
-        normalized.format("%.*s", view.length - 1, view.buffer)
-        return FileExists(normalized.cStr())
-    }
-    return FileExists(dir)
+    return _Mkdir(dir)
 }
 
 public func FilePath(filename: *const char, out:[MAX_PATH]char) : *char {
@@ -415,26 +328,26 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
     return outputStr.cStr()
 }
 
-// TODO
-public func IsFile(filename: *const char) : bool {
-    assert(false)
-    return false
-}
-
-// TODO
-public func DirectoryContents(dirname: *const char) {
-    assert(false)
-}
-
 @no_profile
 public func SystemTimeMSec() : f64 {
-    var time: LARGE_INTEGER;
-    QueryPerformanceCounter(&time);
-    assert(systemFreq != 0)
-
-    return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;
+    return _SystemTimeMSec()
 }
 
+@foreign
+struct time_t;
+
+@foreign
+struct tm;
+
+@foreign
+func time(t: *time_t);
+
+@foreign
+func localtime(t: *time_t) : *tm;
+
+
+@foreign
+func asctime(t: *tm) : *const char;
 
 public func CurrentDateTime() : *const char {
     var rawtime: time_t;
@@ -445,10 +358,21 @@ public func CurrentDateTime() : *const char {
     return asctime(timeinfo)
 }
 
-@foreign("_popen")
+
+@foreign("popen")
 func popen(command: *const char, mode: *const char) : *FILE;
-@foreign("_pclose")
+
+@foreign("pclose")
 func pclose(pipe: *FILE) : void;
+
+
+public func SystemExec(command: *const char) : Process {
+    var pipe = popen(command, "rt")
+    return Process{
+        .pipe = pipe
+    }
+}
+
 
 public struct Process {
     pipe: *FILE
@@ -470,20 +394,9 @@ public func (this: *Process) writeInput(buffer: *char, length: usize) : u64 {
     return fwrite(buffer, sizeof(:char), length, this.pipe)
 }
 
-public func SystemExec(command: *const char) : Process {
-    var pipe = popen(command, "rt")
-    return Process{
-        .pipe = pipe
-    }
-}
-
 public func (this: *Process) close() {
     if(this.pipe) pclose(this.pipe)
 }
-
-
-
-
 
 
 /**
