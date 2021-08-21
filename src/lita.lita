@@ -340,7 +340,7 @@ public func (this: *Lita) run() {
     var len = strlen(path)
     sb.appendStrn("cd ", 3)
     sb.appendStrn(path, len)
-    sb.appendStrn(" && ", 4)
+    sb.appendStrn(" && ./", 6)
     sb.appendStr(&this.binaryFilename[len + 1])
 
     system(sb.cStr())
