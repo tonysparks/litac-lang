@@ -10,6 +10,20 @@
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
 #define ABS(x)    ((x < 0) ? (x) * -1 : (x))
+
+
+#if defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__)
+#define OS_WIN
+#endif
+
+#if !defined(OS_WIN) || defined(__TINYC__)
+size_t strnlen(const char * s, size_t len) {
+    size_t i = 0;
+    for ( ; i < len && s[i] != '\0'; ++i);
+    return i;
+}
+#endif
+
 """);
 
 // mem

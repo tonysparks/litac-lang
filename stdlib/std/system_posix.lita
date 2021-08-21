@@ -1,12 +1,18 @@
+
+// TODO: fix bug with module notes being included, even if
+// the module isn't included because of a compile_time if
+
 @raw("""
+#if !defined(_WIN32) && !defined(_WIN64) && !defined(__CYGWIN__)
+    #include <sys/time.h>
+    #include <sys/stat.h>
+    #include <unistd.h>
+    #include <limits.h>
 
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <limits.h>
-
-typedef struct timeval timeval;
+    typedef struct timeval timeval;
+#endif
 """);
+
 
 import "std/libc"
 import "std/assert"

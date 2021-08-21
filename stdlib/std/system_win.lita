@@ -17,16 +17,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if defined(__TINYC__)
-#include <sys/unistd.h>
-size_t __cdecl strnlen(const char *_Str,size_t _MaxCount);
-#endif
-
-#ifdef OS_WIN
-#define stat _stat
-#define popen _popen
-#define pclose _pclose
-#endif
+//#if defined(__TINYC__)
+//#include <sys/unistd.h>
+//size_t __cdecl strnlen(const char *_Str,size_t _MaxCount);
+//#endif
 
 #include <errno.h>
 """);

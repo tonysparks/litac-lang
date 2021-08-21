@@ -137,9 +137,27 @@ const os: OS;
 @foreign
 struct FileStat;
 
-@foreign
-func stat(filename: *const char, s: *FileStat) : i32;
+#if OS == "WINDOWS"
+    @foreign("_stat")
+    func stat(filename: *const char, s: *FileStat) : i32;
 
+
+    @foreign("_popen")
+    func popen(command: *const char, mode: *const char) : *FILE;
+
+    @foreign("_pclose")
+    func pclose(pipe: *FILE) : void;
+
+#else
+    @foreign("stat")
+    func stat(filename: *const char, s: *FileStat) : i32;
+
+    @foreign("popen")
+    func popen(command: *const char, mode: *const char) : *FILE;
+
+    @foreign("pclose")
+    func pclose(pipe: *FILE) : void;
+#end
 
 @foreign
 func getenv(varname: *const char) : *char;
@@ -469,12 +487,6 @@ public func CurrentDateTime() : *const char {
     return asctime(timeinfo)
 }
 
-
-@foreign("popen")
-func popen(command: *const char, mode: *const char) : *FILE;
-
-@foreign("pclose")
-func pclose(pipe: *FILE) : void;
 
 
 public func SystemExec(command: *const char) : Process {
