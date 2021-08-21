@@ -139,10 +139,9 @@ public const __LINE__: u64;
     @foreign public func _vscprintf(format: *const char, args: va_list) : i32;
 #else
     public func _vscprintf(format: *const char, args: va_list) : i32 {
-        var retval: i32;
-        argcopy: va_lit;
+        var argcopy: va_list;
         va_copy(argcopy, args);
-        retval = vsnprintf(NULL, 0, format, argcopy);
+        var retval: i32 = vsnprintf(null, 0, format, argcopy);
         va_end(argcopy);
 
         return retval;
