@@ -379,7 +379,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuffer) : *const char {
     var len = strlen(path)
     sb.appendStrn("cd ", 3)
     sb.appendStrn(path, len)
-    sb.append(" && ./%s 2>&1", &this.binaryFilename[len + 1])
+    sb.append(" && .%s%s 2>&1", PATH_SEPARATOR, &this.binaryFilename[len + 1])
 
     var process = SystemExec(sb.cStr())
     if(!process.pipe) {

@@ -150,6 +150,8 @@ struct FileStat;
     @foreign("_pclose")
     func pclose(pipe: *FILE) : void;
 
+    // TODO: Move this into io module?
+    public const PATH_SEPARATOR = "\\"
 #else
     const OPEN_MODE = "r";
 
@@ -161,6 +163,9 @@ struct FileStat;
 
     @foreign("pclose")
     func pclose(pipe: *FILE) : void;
+
+    // TODO: Move this into io module?
+    public const PATH_SEPARATOR = "/"
 #end
 
 @foreign

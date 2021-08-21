@@ -226,7 +226,7 @@ public func (this: *Lita) transpile(module: *Module) : bool {
 
 #if OS == "WINDOWS"
     strcat(this.binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
-#end    
+#end
     strcat(this.sourceFilename, ".c")
 
     if(this.options.cOutputOnly) {
@@ -340,7 +340,7 @@ public func (this: *Lita) run() {
     var len = strlen(path)
     sb.appendStrn("cd ", 3)
     sb.appendStrn(path, len)
-    sb.appendStrn(" && ./", 6)
+    sb.append(" && .%s", PATH_SEPARATOR)
     sb.appendStr(&this.binaryFilename[len + 1])
 
     system(sb.cStr())
