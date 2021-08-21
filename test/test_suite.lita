@@ -38,6 +38,7 @@ struct TestModule {
 struct Test {
     programText: StringBuffer
     name: *const char
+    buildCmd: *const char
 
     modules: Array<TestModule>
     //definitions: *const char
@@ -243,6 +244,7 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
     output.expectedOutput = testNode.getStr("output", null)
     output.expectedErrorOutput = testNode.getStr("error", null)
     output.disabled = testNode.getBool("disabled", false)
+    output.buildCmd = testNode.getStr("buildCmd", null)
 
     var modules = testNode.getArray("modules")
     if(modules) {
@@ -290,8 +292,13 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     options.showProfileInfo = false
     options.run = false // we run outselves
     options.cFormat = true
-    //options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
-    options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+    if(test.buildCmd) {
+        options.compileCmd = test.buildCmd
+    }
+    else {
+        //options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+        options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+    }
 
 
     strncpy(options.inputFile, tmpSrcFile, MAX_PATH)

@@ -490,7 +490,7 @@ public func (t: *Token) asString() : *const char {
 public func (token: *Token) print() {
     printf("%s: '%s' '%.*s' ", TokenTypeAsStr(token.type), token.asString(), (token.pos.end - token.pos.start) as (i32), token.pos.start)
     if(token.type == TokenType.INT_NUMBER) {
-        printf("value: '%lu'", token.value.intValue)
+        printf("value: '%ld'", token.value.intValue)
         printf(" typeInfo: %s", TypeKindAsStr(token.typeInfo.kind))
     }
     else if(token.type == TokenType.FLOAT_NUMBER) {

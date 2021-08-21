@@ -44,6 +44,7 @@
         },
         {
             "name": "Offset of packed struct",
+            "buildCmd": "gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
             "disabled": false,
             "definitions": `
                 import "std/io"
