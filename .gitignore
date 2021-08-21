@@ -6,7 +6,6 @@ bin/*.rdbg
 bin/*.exp
 bin/*.lib
 bin/test.txt
-lib/*.lib
 .vscode/ipch
 bin/litaC.exp
 bin/litaC.lib
