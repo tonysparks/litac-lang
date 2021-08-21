@@ -6059,7 +6059,7 @@ void code_to_string(uint8_t *code, src_pos_t *source_positions, size_t code_size
                 double val_double = ape_uint64_to_double(operands[i]);
                 strbuf_appendf(res, " %1.17g", val_double);
             } else {
-                strbuf_appendf(res, " %llu", operands[i]);
+                strbuf_appendf(res, " %lu", operands[i]);
             }
             pos += def->operand_widths[i];
         }

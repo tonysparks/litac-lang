@@ -99,7 +99,7 @@ report:
         }
         printf("\n")
         printf("Total time:         %f\n", totalTime)
-        printf("Total memory:       %llu\n", allocator.totalBytesAllocated)
+        printf("Total memory:       %lu\n", allocator.totalBytesAllocated)
         printf("Total allocations:  %u\n", allocator.totalAllocations)
         printf("Total source lines: %u\n", lita.totalSourceLines)
         printf("\n")

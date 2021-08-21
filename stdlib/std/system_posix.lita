@@ -85,5 +85,6 @@ public func _SystemTimeMSec() : f64 {
     var t0: timeval;
     gettimeofday(&t0, null);
 
-    return (t0.tv_sec * 1000f64) + (t0.tv_usec / 1000f64)
+    var time = ((t0.tv_sec as (f64) * 1000f64) + (t0.tv_usec as (f64) / 1000f64))
+    return time / 1_000f64
 }

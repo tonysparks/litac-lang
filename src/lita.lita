@@ -224,7 +224,9 @@ public func (this: *Lita) transpile(module: *Module) : bool {
 
     strcpy(this.binaryFilename, this.sourceFilename)
 
+#if OS == "WINDOWS"
     strcat(this.binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
+#end    
     strcat(this.sourceFilename, ".c")
 
     if(this.options.cOutputOnly) {

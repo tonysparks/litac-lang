@@ -5,6 +5,7 @@ bin/*.pdb
 bin/*.rdbg
 bin/*.exp
 bin/*.lib
+bin/litac_linux
 bin/test.txt
 .vscode/ipch
 bin/litaC.exp
@@ -30,5 +31,6 @@ bootstrap/*.exe
 bootstrap/*.exp
 bootstrap/*.lib
 bootstrap/*.pdb
+bootstrap/litacc
 /**/node_modules/**
 *.log
