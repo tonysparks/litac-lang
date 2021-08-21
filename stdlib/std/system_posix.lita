@@ -10,6 +10,7 @@
     #include <limits.h>
 
     typedef struct timeval timeval;
+    typedef struct stat FileStat;
 #endif
 """);
 

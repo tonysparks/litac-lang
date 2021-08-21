@@ -19,9 +19,6 @@ import "std/string_view"
 #end
 
 @raw("""
-typedef struct stat FileStat;
-typedef struct tm tm;
-
 typedef enum Lita_OSType {
     Lita_OSType_WINDOWS,
     Lita_OSType_ANDROID,
@@ -78,6 +75,9 @@ typedef enum Lita_OSType {
 #else
     Lita_OSType litaOS = Lita_OSType_OTHER;
 #endif
+
+
+typedef struct tm tm;
 
 """);
 
