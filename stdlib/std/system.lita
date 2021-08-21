@@ -138,6 +138,8 @@ const os: OS;
 struct FileStat;
 
 #if OS == "WINDOWS"
+    const OPEN_MODE = "rt";
+
     @foreign("_stat")
     func stat(filename: *const char, s: *FileStat) : i32;
 
@@ -149,6 +151,8 @@ struct FileStat;
     func pclose(pipe: *FILE) : void;
 
 #else
+    const OPEN_MODE = "r";
+
     @foreign("stat")
     func stat(filename: *const char, s: *FileStat) : i32;
 
@@ -490,7 +494,7 @@ public func CurrentDateTime() : *const char {
 
 
 public func SystemExec(command: *const char) : Process {
-    var pipe = popen(command, "rt")
+    var pipe = popen(command, OPEN_MODE)
     return Process{
         .pipe = pipe
     }
