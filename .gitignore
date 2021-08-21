@@ -16,6 +16,7 @@ bin/litaC
 bin/test_output
 bin/litaC_test.*
 bin/litaC_test
+bin/litac_tests
 bin_release/litaC.c
 bin_release/litaC.exe
 bin/litaC.pdb
