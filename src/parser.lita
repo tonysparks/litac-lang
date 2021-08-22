@@ -76,6 +76,7 @@ public func ParserInit(filename: *const char,
         .result = &lita.result,
         .lita = lita,
         .filename = filename,
+        .current = 0,
         .breakLevel = 0,
         .loopLevel = 0,
         .switchLevel = 0,
@@ -2628,8 +2629,12 @@ func (p: *Parser) prevPos() : SrcPos {
     return p.previous().pos
 }
 
-@inline
+//@inline
 func (p: *Parser) peek() : *Token {
+    assert(p.current >= 0 && p.current <= p.tokens.size())
+    if(p.current >= p.tokens.size()) {
+        return &p.tokens.elements[p.tokens.size() - 1]
+    }
     return &p.tokens.elements[p.current]
 }
 
@@ -2652,8 +2657,9 @@ func (p: *Parser) atEnd() : bool {
         return false
     }
 
-    return p.tokens.empty() ||
-           p.current >= p.tokens.size() ||
+    assert(!p.tokens.empty())
+
+    return p.current >= p.tokens.size() ||
            p.peek().type == TokenType.END_OF_FILE
 }
 
@@ -2666,7 +2672,10 @@ func (p: *Parser) advance() : *Token {
 
 @inline
 func (p: *Parser) check(type: TokenType) : bool {
-    return p.peek().type == type
+    var token = p.peek()
+    assert(token != null)
+
+    return token.type == type
 }
 
 func (p: *Parser) match(type: TokenType) : bool {
@@ -2758,6 +2767,7 @@ func (p: *Parser) errorUnexpectedToken(token: *Token, errorCode: ErrorCode) {
         }
 
         p.panicMode = true
+        Error("Current index: %d out of %d\n", p.current, p.tokens.size())
         p.result.addError(p.pos(), "Unexpected token: '%s' - %s", tokenText[token.type], errorCodeText[errorCode])
     }
     else {

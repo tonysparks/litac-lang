@@ -504,17 +504,23 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
             var stmt = node as (*ModuleStmt)
             for(var i = 0; i < stmt.imports.size(); i += 1) {
                 var imp = stmt.imports.get(i)
-                this.visitDecl(imp)
+                if(this.visitDecl(imp)) {
+                    return true
+                }
             }
 
             for(var i = 0; i < stmt.notes.size(); i += 1) {
                 var n = stmt.notes.get(i)
-                this.visitStmt(n)
+                if(this.visitStmt(n)) {
+                    return true
+                }
             }
 
             for(var i = 0; i < stmt.declarations.size(); i += 1) {
                 var d = stmt.declarations.get(i)
-                this.visitDecl(d)
+                if(this.visitDecl(d)) {
+                    return true
+                }
             }
             break
         }
@@ -523,7 +529,9 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
 
             for(var i = 0; i < stmt.params.size(); i += 1) {
                 var p = stmt.params.get(i)
-                this.visitDecl(p)
+                if(this.visitDecl(p)) {
+                    return true
+                }
             }
             break
         }

@@ -430,6 +430,14 @@ public func (this: *LinearAllocator) init(mem: *void, size: usize) {
     this.currentOffset = 0
 }
 
+@doc("Zero out all allocated memory and reset current offset")
+public func (this: *LinearAllocator) clear() {
+    c::memset(this.mem, 0, this.size)
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
 @foreign
 const LITAC_DEFAULT_ALIGNMENT: usize;
 

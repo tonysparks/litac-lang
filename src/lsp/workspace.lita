@@ -16,6 +16,7 @@ import "module"
 import "ast"
 import "lex"
 import "types"
+import "common"
 
 import "lsp/lsp"
 import "lsp/protocol"
@@ -432,6 +433,11 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
     var location = this.getNodeAtSourcePos(uri, position)
     if(location.kind == SourceLocationKind.NONE) {
         //this.lsp.log("No ast node found at '%s:%d:%d'\n", uri, pos.line, pos.character)
+        var pos = Position {
+            .line = position.getInt("line", 0),
+            .character = position.getInt("character", 0)
+        }
+        this.lsp.log("No ast node found at '%s:%d:%d'\n", uri, pos.line, pos.character)
         return JSON_NULL
     }
 
@@ -439,6 +445,24 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
         this.lsp.log("Found ast node: %s\n", StmtKindAsStr(location.node.kind))
 
         switch(location.node.kind) {
+            case StmtKind.IMPORT_DECL: {
+                var importDecl = location.node as (*ImportDecl)
+                if(!importDecl.moduleId) {
+                    this.lsp.log("ImportDecl.moduleId is null!\n")
+                    return JSON_NULL
+                }
+
+                var pos = SrcPos {
+                    .filename = importDecl.moduleId.filename,
+                    .lineStart = null,
+                    .start = null,
+                    .end = null,
+                    .lineNumber = 1,
+                    .position = 0
+                }
+
+                return SrcPosWithEndToLocation(pos, pos, this.rootPath, alloc)
+            }
             case StmtKind.NATIVE_DECL:
             case StmtKind.TYPEDEF_DECL:
             case StmtKind.UNION_DECL:
@@ -554,6 +578,10 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
             case StmtKind.GET_EXPR: {
                 var expr = location.node as (*GetExpr)
                 var base = expr.object.operand.typeInfo.getBaseType()
+                if(!base) {
+                    break
+                }
+
                 if(IsAggregate(base)) {
                     var aggInfo = base as (*AggregateTypeInfo)
                     var field = aggInfo.getField(expr.field.type.name)
