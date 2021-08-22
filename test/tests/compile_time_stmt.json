@@ -112,15 +112,17 @@
             "name": "If OS",
             "definitions": `
                 import "std/libc"
+                import "std/system"
                 #if(OS == "WINDOWS")
-                    const OS = "Windows"
+                    const OS = "WINDOWS"
                 #else
-                    const OS ="NotWindows"
+                    // TODO: expand this when we add more OS's
+                    const OS = "LINUX"
                 #end
 
             `,
             "code": `
-                assert(strcmp(OS, "Windows") == 0)
+                assert(strcmp(OS, OSAsStr(GetOS())) == 0)
             `
         },
         {
