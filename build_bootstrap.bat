@@ -3,7 +3,8 @@ if [%LITAC_HOME%] == [] goto error_exit
 
 cd bootstrap
 REM clang -std=c99 -g -gcodeview -fsanitize=undefined,address -o litacc.exe litacc.c -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc
-clang -std=c99 -o litacc.exe litacc.c -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc
+clang -std=c99 -O3 -o litacc.exe litacc.c -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc
+
 if errorlevel 1 (
     goto error_compiling
 )
