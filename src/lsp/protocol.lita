@@ -170,6 +170,9 @@ public func SymbolKindFromSymbol(sym: *sym::Symbol) : SymbolInfoKind {
                 case TypeKind.UNION: {
                     return SymbolInfoKind.Struct;
                 }
+                case TypeKind.TRAIT: {
+                    return SymbolInfoKind.Interface;
+                }
                 case TypeKind.VOID: {
                     return SymbolInfoKind.Null;
                 }
