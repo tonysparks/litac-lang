@@ -679,7 +679,7 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
                 return true
             }
             for(var i = 0; i < expr.arguments.size(); i += 1) {
-                var arg = expr.arguments.get(i)
+                var arg = expr.arguments.get(i).argExpr
                 if(this.visitExpr(arg)) {
                     return true
                 }

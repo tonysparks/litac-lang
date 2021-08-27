@@ -623,7 +623,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             }
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
-                ReplaceTypes(template, expr.arguments.get(i))
+                ReplaceTypes(template, expr.arguments.get(i).argExpr)
             }
             break;
         }

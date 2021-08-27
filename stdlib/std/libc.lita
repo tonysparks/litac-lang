@@ -90,6 +90,9 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func vsnprintf_s(ptr: *void, len: u64, max: u64, format: *const char, args: va_list) : i32;
 @foreign public func fputs(format: *const char,f:*FILE);
 
+// algorithms
+@foreign public func qsort<T>(ptr: *void, count: usize, size: usize, comp: func<T>(T, T) : i32);
+
 // system
 @foreign public func exit(code: i32);
 @foreign public func system(cmd: *const char) : i32;

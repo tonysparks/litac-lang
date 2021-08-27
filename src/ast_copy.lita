@@ -154,6 +154,23 @@ public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
     return null
 }
 
+public func CopyCallArgs(args: *Array<CallArg>, allocator: *const Allocator) : Array<CallArg> {
+    if(args.empty()) {
+        return Array<CallArg>{}
+    }
+    var result = ArrayInit<CallArg>(args.size(), allocator)
+    for(var i = 0; i < args.size(); i += 1) {
+        var arg = args.get(i)
+        var argExpr = CopyExpr(arg.argExpr, allocator)
+        result.add(CallArg {
+            .argExpr = argExpr,
+            .argName = arg.argName
+        })
+    }
+
+    return result
+}
+
 public func CopyExprs(exprs: *Array<*Expr>, allocator: *const Allocator) : Array<*Expr> {
     if(exprs.empty()) {
         return Array<*Expr>{}
@@ -233,7 +250,7 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var copy = NewFuncCallExpr(original.startPos,
                                        original.endPos,
                                        CopyExpr(original.object, allocator),
-                                       CopyExprs(original.arguments, allocator),
+                                       CopyCallArgs(original.arguments, allocator),
                                        CopyTypeSpecs(original.genericArgs, allocator),
                                        allocator)
             return copy

@@ -1,0 +1,34 @@
+{
+    "description": "Tests Function Named Arguments",
+    "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    @include("stdio.h");
+    @foreign func printf(...):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
+    "tests": [
+        {
+            "name" : "Simple Names",
+            "definitions": `
+                func Test(a: i32, b: i32) : i32 {
+                    assert(a == 1)
+                    assert(b == 2)
+                    return b
+                }
+            `,
+            "code": `
+                assert(Test(.a = 1, .b = 2) == 2)
+                assert(Test(.b = 2, .a = 1) == 2)
+                assert(Test(1, .b = 2) == 2)
+            `,
+        },
+    ]
+}

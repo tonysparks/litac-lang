@@ -178,6 +178,13 @@ public func (a: *Array<T>) clear<T>() {
     a.length = 0
 }
 
+
+public typedef func<T>(T, T) : i32 as SortFunc<T>;
+
+public func (a: *Array<T>) sort<T>(sorter: SortFunc<T>) {
+    qsort<T>(a.elements, a.length, sizeof(:T), sorter)
+}
+
 public func (a: *Array<T>) copy<T>(allocator: *const mem::Allocator = null) : Array<T> {
     var copy = ArrayInit<T>(a.length, allocator ? allocator : a.alloc)
     memcpy(copy.elements, a.elements, a.length * sizeof(:T))
