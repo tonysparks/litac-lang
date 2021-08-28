@@ -193,6 +193,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     options.isDebug = parser.hasOption("debug")
     options.cFormat = parser.hasOption("cFormat")
     options.instrument = parser.hasOption("instrument")
+    options.disableLineSync = parser.hasOption("disableLine")
 
     options.typeOption = TypeInfoOption.NONE
     if(parser.hasOption("types")) {

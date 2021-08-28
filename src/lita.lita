@@ -102,6 +102,7 @@ public struct LitaOptions {
 
     cPrefix: [MAX_PREFIX_SIZE]char // Prefix for types/variables defined in C
     cFormat: bool                  // format the C output
+    disableLineSync: bool          // disables C #line directives sync with Lita source code
 }
 
 

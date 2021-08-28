@@ -27,6 +27,9 @@ public struct CGen {
     indent: i32
     aggregateLevel: i32
 
+    currentLine: i32
+    currentFile: *const char
+
     bufferFlush: bool
     funcIndex: i32
     tmpVar: i32
@@ -82,6 +85,8 @@ public func (this: *CGen) init(lita: *Lita, output: *FILE) {
     this.buf.init(1024 * 2, lita.allocator)
     this.line.init(1024 * 2, lita.allocator)
     this.aggregateLevel = 0
+    this.currentLine = 0
+    this.currentFile = null
     this.currentFunc = null
     this.currentScope = null
     this.bufferFlush = false
@@ -595,8 +600,39 @@ func (this: using *CGen) emitDefers() {
 }
 
 func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
-    // TODO
-    //this.emitln()
+    if(!stmt || this.options.disableLineSync) {
+        return;
+    }
+
+    var pos = stmt.startPos
+
+    if(this.currentLine != pos.lineNumber ||
+       this.currentFile != pos.filename) {
+
+        this.currentFile = pos.filename
+        this.currentLine = pos.lineNumber
+
+        if(this.currentFile) {
+            this.emit("\n#line %d \"", this.currentLine)
+
+            var len = strlen(this.currentFile)
+            for(var i = 0; i < len; i += 1) {
+                var c:char = this.currentFile[i]
+                var escaped = escapeStrings[c as (u32)]
+                if(escaped) {
+                    this.emitStr(escaped)
+                    continue
+                }
+                else {
+                    buf.appendChar(c)
+                }
+            }
+            this.emitStrn("\"\n", 2)
+        }
+        else {
+            this.emit("\n#line %d \n", this.currentLine)
+        }
+    }
 }
 
 /**
@@ -1352,6 +1388,8 @@ func (this: using *CGen) emitTraitFuncCall(expr: *FuncCallExpr) {
 
 func (this: using *CGen) emitStmt(s: *Stmt) {
     if(!s) return;
+
+    this.emitLineInfo(s)
 
     switch(s.kind) {
         case StmtKind.IMPORT_DECL: {
