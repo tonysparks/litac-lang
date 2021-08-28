@@ -178,6 +178,13 @@ public func (a: *Array<T>) clear<T>() {
     a.length = 0
 }
 
+
+public typedef func<T>(T, T) : i32 as SortFunc<T>;
+
+public func (a: *Array<T>) sort<T>(sorter: SortFunc<T>) {
+    QuickSort<T>(a, sorter)
+}
+
 public func (a: *Array<T>) copy<T>(allocator: *const mem::Allocator = null) : Array<T> {
     var copy = ArrayInit<T>(a.length, allocator ? allocator : a.alloc)
     memcpy(copy.elements, a.elements, a.length * sizeof(:T))
@@ -198,4 +205,67 @@ func ArrayGrow<T>(a: *Array<T>, increment: i32) {
     var oldlength = (sizeof(:T) * a.capacity as(usize));
     a.elements = a.alloc.realloc(a.elements as (*void), oldlength, newlength) as (*T)
     a.capacity = n;
+}
+
+
+const MAX_LEVELS = 300
+func QuickSort<T>(array: *Array<T>, comp: SortFunc<T>) {
+    var beg = [MAX_LEVELS]i32{}
+    var end = [MAX_LEVELS]i32{}
+
+    var i = 0
+    var L = 0
+    var R = 0
+    var swap = 0
+
+    var piv: T;
+
+    beg[0] = 0;
+    end[0] = array.length;
+
+    while(i >= 0) {
+        L = beg[i];
+        R = end[i]-1;
+
+        if(L < R) {
+            piv = array.elements[L];
+
+            while(L < R) {
+                while (L < R && comp(array.elements[R], piv) >= 0) {
+                    R -= 1;
+                }
+                if (L < R) {
+                    array.elements[L] = array.elements[R];
+                    L+=1
+                }
+
+                while (L < R && comp(array.elements[L], piv) <= 0) {
+                    L += 1;
+                }
+                if (L < R) {
+                    array.elements[R] = array.elements[L];
+                    R -= 1
+                }
+
+                array.elements[L] = piv;
+                beg[i+1] = L+1;
+                end[i+1] = end[i];
+                end[i+0] = L;
+                i+=1
+
+                if (end[i]-beg[i]>end[i-1]-beg[i-1]) {
+                    swap = beg[i];
+                    beg[i] = beg[i-1];
+                    beg[i-1] = swap;
+
+                    swap = end[i];
+                    end[i] = end[i-1];
+                    end[i-1] = swap;
+                }
+            }
+        }
+        else {
+            i -= 1;
+        }
+    }
 }

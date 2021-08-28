@@ -183,6 +183,18 @@ public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) : *Array<T
     return children
 }
 
+public func (n: *Node) becomeParentOfChildrenCallArgs(children: *Array<CallArg>) : *Array<CallArg> {
+    var size = children.size()
+    for(var i = 0; i < size; i += 1) {
+        var child = children.get(i).argExpr
+        if(child) {
+            n.becomeParentOf(child)
+        }
+    }
+
+    return children
+}
+
 public struct Decl {
     stmt: using Stmt
     sym: *Symbol
@@ -437,11 +449,17 @@ public struct CharExpr {
     character: Token
 }
 
+public struct CallArg {
+    argExpr: *Expr
+    argName: Token
+    index: i32
+}
+
 public struct FuncCallExpr {
     expr: using Expr
     object: *Expr
     genericArgs: Array<*TypeSpec>
-    arguments: Array<*Expr>
+    arguments: Array<CallArg>
 }
 
 public enum GetExprFlags {
@@ -812,4 +830,8 @@ public func (expr: *Expr) isConstExpr() : bool {
         }
     }
     return false
+}
+
+public func CallArgSort(a: CallArg, b: CallArg) : i32 {
+    return a.index - b.index
 }

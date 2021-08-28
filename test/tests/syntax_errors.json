@@ -38,5 +38,18 @@
             `,
             "error": "Unexpected token"
         }
+        {
+            "name" : "Invalid Func Param Syntax Error",
+            "definitions": `
+                //func something(array: [NOT_VALID]char)
+                func hello(x: *const char) {
+
+                }
+            `,
+            "code": `
+                hello("hi"\n)
+            `,
+            "error": "Unexpected token: 'ERROR' - Missing )"
+        },
     ]
 }

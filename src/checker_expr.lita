@@ -155,7 +155,7 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
     return true
 }
 
-func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, funcPtr: *FuncPtrTypeInfo, suppliedArgs: *Array<*Expr>) : bool {
+func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, suppliedArgs: *Array<CallArg>) : bool {
     assert(expr != null)
     if(expr.object.kind != StmtKind.GET_EXPR) {
         return false
@@ -171,7 +171,7 @@ func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, funcPtr: *FuncPtrT
     }
 
     getExpr.flags |= GetExprFlags.IS_METHOD_ARG
-    suppliedArgs.insertAt(0, getExpr.object)
+    suppliedArgs.insertAt(0, CallArg { .argExpr = getExpr.object })
     return true
 }
 
@@ -234,69 +234,98 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
 }
 
 func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
-                                         funcPtr: *FuncPtrTypeInfo,
-                                         suppliedArgs: *Array<*Expr>) : bool {
+                                         funcType: *TypeInfo,
+                                         suppliedArgs: *Array<CallArg>) : bool {
 
-    for(var i = 0; i < funcPtr.paramDecls.size() && i < suppliedArgs.size(); i += 1) {
-        var argExpr = suppliedArgs.get(i)
-        if(!this.resolveExpr(argExpr)) {
-            return false
-        }
+    assert(IsFuncLike(funcType))
 
-        var paramInfo = funcPtr.paramDecls.get(i)
-        var argInfo = argExpr.operand.typeInfo
+    if(funcType.kind == TypeKind.FUNC_PTR) {
+        var funcPtr = funcType as (*FuncPtrTypeInfo)
+        for(var i = 0; i < funcPtr.paramDecls.size() && i < suppliedArgs.size(); i += 1) {
+            var argExpr = suppliedArgs.get(i).argExpr
+            var paramInfo = funcPtr.paramDecls.get(i)
 
-        if(argInfo.kind == TypeKind.ARRAY) {
-            continue
-        }
-
-        if(!IsAggregateLike(argInfo)) {
-            continue
-        }
-
-        if(!IsAggregateLike(paramInfo) || IsTraitLike(paramInfo)) {
-            continue
-        }
-
-        argExpr = this.coerceTypeWithUsing(argExpr, argInfo, paramInfo)
-        argInfo = argExpr.operand.typeInfo
-
-        // promote the argument to a pointer
-        if(IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) {
-            // can't take the address of a right value
-            if(argExpr.operand.isRightValue) {
-                continue
-            }
-
-            var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
-            argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.BAND, groupExpr, this.allocator)
-            if(!this.resolveExpr(argExpr)) {
+            if(!this.coerceFuncArg(expr, i, argExpr, paramInfo, suppliedArgs)) {
                 return false
             }
         }
-        else if(IsAggregate(paramInfo) && IsPtrAggregate(argInfo)) {
-            var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
-            argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.STAR, groupExpr, this.allocator)
-            if(!this.resolveExpr(argExpr)) {
+    }
+    else {
+        var funcInfo  = funcType as (*FuncTypeInfo)
+        for(var i = 0; i < funcInfo.decl.params.size() && i < suppliedArgs.size(); i += 1) {
+            var argExpr = suppliedArgs.get(i).argExpr
+            var paramInfo = funcInfo.decl.params.get(i).typeInfo
+
+            if(!this.coerceFuncArg(expr, i, argExpr, paramInfo, suppliedArgs)) {
                 return false
             }
         }
-
-        expr.node.becomeParentOf(argExpr)
-        suppliedArgs.set(i, argExpr)
     }
 
     return true
 }
 
+func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
+                                        index: i32,
+                                        argExpr: *Expr,
+                                        paramInfo: *TypeInfo,
+                                        suppliedArgs: *Array<CallArg>) : bool {
+    if(!this.resolveExpr(argExpr)) {
+        return false
+    }
+
+    var argInfo = argExpr.operand.typeInfo
+
+    if(argInfo.kind == TypeKind.ARRAY) {
+        return true
+    }
+
+    if(!IsAggregateLike(argInfo)) {
+        return true
+    }
+
+    if(!IsAggregateLike(paramInfo) || IsTraitLike(paramInfo)) {
+        return true
+    }
+
+    argExpr = this.coerceTypeWithUsing(argExpr, argInfo, paramInfo)
+    argInfo = argExpr.operand.typeInfo
+
+    // promote the argument to a pointer
+    if(IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) {
+        // can't take the address of a right value
+        if(argExpr.operand.isRightValue) {
+            return true
+        }
+
+        var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
+        argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.BAND, groupExpr, this.allocator)
+        if(!this.resolveExpr(argExpr)) {
+            return false
+        }
+    }
+    else if(IsAggregate(paramInfo) && IsPtrAggregate(argInfo)) {
+        var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
+        argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.STAR, groupExpr, this.allocator)
+        if(!this.resolveExpr(argExpr)) {
+            return false
+        }
+    }
+
+    expr.node.becomeParentOf(argExpr)
+    suppliedArgs.set(index, CallArg { .argExpr = argExpr })
+    return true
+}
+
+
 func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
                                             funcName: *const char,
-                                            funcPtr: *FuncPtrTypeInfo,
+                                            maxNumOfArgs: i32,
+                                            hasVarargs: bool,
                                             numberOfSuppliedArgs: i32,
                                             numberOfDefaultArgs: i32) : bool {
     assert(expr != null)
 
-    var maxNumOfArgs = funcPtr.paramDecls.size()
     if(maxNumOfArgs == numberOfSuppliedArgs) {
         return true
     }
@@ -310,7 +339,7 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
         return false
     }
 
-    if(funcPtr.hasVarargs) {
+    if(hasVarargs) {
         return true
     }
 
@@ -474,10 +503,12 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
     return null
 }
 
-func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncPtrTypeInfo, suppliedArgs: *Array<*Expr>, isMethodCall: bool) : *FuncPtrTypeInfo {
+func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *TypeInfo, suppliedArgs: *Array<CallArg>, isMethodCall: bool) : *TypeInfo {
+    assert(IsFuncLike(funcType))
+
     for(var i = 0; i < expr.arguments.size(); i += 1) {
         var arg = expr.arguments.get(i)
-        if(!this.resolveExpr(arg)) {
+        if(!this.resolveExpr(arg.argExpr)) {
             goto err;
         }
     }
@@ -489,44 +520,85 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
     }
 
     if(objectExpr.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
-        return funcPtr
+        return funcType
     }
 
     var funcExpr = objectExpr as (*IdentifierExpr);
     var nameSpec = funcExpr.type
 
     nameSpec.typeInfo = null // clear out the cached value, so it can be created with the generic types
-    var size = funcPtr.genericParams.size()
 
-    nameSpec.genericArgs.init(size, this.allocator)
-    expr.genericArgs.init(size, this.allocator)
+    // TODO: Clean this up, too much duplicate code...
+    var genericParams: Array<GenericParam>;
+    if(funcType.kind == TypeKind.FUNC_PTR) {
+        var funcPtr = funcType as (*FuncPtrTypeInfo)
+        genericParams = funcPtr.genericParams;
+        var size = genericParams.size()
 
-    var suppliedArgsSize = suppliedArgs.size()
-    for(var i = 0; i < size; i+=1) {
-        var genericParam = funcPtr.genericParams.get(i)
+        nameSpec.genericArgs.init(size, this.allocator)
+        expr.genericArgs.init(size, this.allocator)
 
-        for(var j = 0; j < funcPtr.paramDecls.size(); j+=1) {
-            var paramType = funcPtr.paramDecls.get(j)
+        var suppliedArgsSize = suppliedArgs.size()
+        for(var i = 0; i < size; i+=1) {
+            var genericParam = genericParams.get(i)
 
-            if(j >= suppliedArgsSize) {
-                break
-            }
+            for(var j = 0; j < funcPtr.paramDecls.size(); j+=1) {
+                var paramType = funcPtr.paramDecls.get(j)
 
-            var argType = suppliedArgs.get(j).operand.typeInfo
-            assert(argType != null)
-            assert(paramType != null)
+                if(j >= suppliedArgsSize) {
+                    break
+                }
 
-            var inferredType = this.inferredType(genericParam.name, paramType, argType)
-            if(inferredType) {
-                nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
-                break
+                var argType = suppliedArgs.get(j).argExpr.operand.typeInfo
+                assert(argType != null)
+                assert(paramType != null)
+
+                var inferredType = this.inferredType(genericParam.name, paramType, argType)
+                if(inferredType) {
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
+                    break
+                }
             }
         }
+
+    }
+    else {
+        var funcInfo = funcType as (*FuncTypeInfo)
+        genericParams = funcInfo.decl.genericParams;
+
+        var size = genericParams.size()
+
+        nameSpec.genericArgs.init(size, this.allocator)
+        expr.genericArgs.init(size, this.allocator)
+
+        var suppliedArgsSize = suppliedArgs.size()
+        for(var i = 0; i < size; i+=1) {
+            var genericParam = genericParams.get(i)
+
+            for(var j = 0; j < funcInfo.decl.params.size(); j+=1) {
+                var paramType = funcInfo.decl.params.get(j).typeInfo
+
+                if(j >= suppliedArgsSize) {
+                    break
+                }
+
+                var argType = suppliedArgs.get(j).argExpr.operand.typeInfo
+                assert(argType != null)
+                assert(paramType != null)
+
+                var inferredType = this.inferredType(genericParam.name, paramType, argType)
+                if(inferredType) {
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
+                    break
+                }
+            }
+        }
+
     }
 
     if(!this.resolveExpr(expr.object)) {
-        for(var i = expr.genericArgs.size(); i < funcPtr.genericParams.size(); i += 1) {
-            var param = funcPtr.genericParams.get(i)
+        for(var i = expr.genericArgs.size(); i < genericParams.size(); i += 1) {
+            var param = genericParams.get(i)
             this.errorInferGenericParameter(expr, &param)
         }
         goto err;
@@ -544,16 +616,126 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcPtr: *FuncP
         goto err;
     }
 
-    // if this is a function, return it as a function pointer
-    if(type.kind == TypeKind.FUNC) {
-        var funcInfo = type as (*FuncTypeInfo)
-        return funcInfo.asPtr(this.typeCache)
-    }
-
-    return type as (*FuncPtrTypeInfo)
+    return type
 
 err:
     return null
+}
+
+func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *TypeInfo, suppliedArgs: *Array<CallArg>) : bool {
+    assert(funcType != null)
+    assert(IsFuncLike(funcType))
+
+    var numberOfSuppliedArgs = suppliedArgs.size()
+    var success = true
+    var hasVarargs = false
+    var i = 0;
+
+    if(funcType.kind == TypeKind.FUNC_PTR) {
+        var funcPtr = funcType as (*FuncPtrTypeInfo)
+        hasVarargs = funcPtr.hasVarargs
+
+        for(; i < funcPtr.paramDecls.size(); i+=1) {
+            var p = funcPtr.paramDecls.get(i)
+            if(i < numberOfSuppliedArgs) {
+                var callArg = suppliedArgs.getPtr(i)
+                var arg = callArg.argExpr
+
+                // For now, we don't allow function pointers to contain
+                // named arguments, only because we currently don't allow names in the
+                // parameters in the TypeInfo
+                if(callArg.argName.type == TokenType.IDENTIFIER) {
+                    this.errorNamedArgumentsForFuncPtr(arg)
+                    success = false
+                }
+
+                callArg.index = i
+
+                this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo)
+                arg.expectedType = p;
+            }
+        }
+
+
+    }
+    else {
+        var funcInfo = funcType as (*FuncTypeInfo)
+        var hasNamedArg = false
+        hasVarargs = funcInfo.decl.params.isVararg
+
+        for(; i < funcInfo.decl.params.size(); i+=1) {
+            var p = funcInfo.decl.params.get(i)
+            if(i < numberOfSuppliedArgs) {
+                var callArg = suppliedArgs.getPtr(i)
+                var paramIndex = i
+
+                if(callArg.argName.type == TokenType.IDENTIFIER) {
+                    hasNamedArg = true
+                    paramIndex = -1
+
+                    for(var index = 0; index < funcInfo.decl.params.size(); index += 1) {
+                        var param = funcInfo.decl.params.get(index)
+                        if(param.name.str.equalsStringView(callArg.argName.str)) {
+                            paramIndex = index
+                            break
+                        }
+                    }
+
+                    if(paramIndex < 0) {
+                        this.errorInvalidNamedArgument(callArg.argName.pos, callArg.argName.str, funcInfo)
+                        success = false
+                    }
+                }
+                else if(hasNamedArg) {
+                    // allow for in-order names to follow fixed arguments
+                    if(!p.name.str.equalsStringView(callArg.argName.str)) {
+                        this.errorFixedArgumentAfterNamed(callArg.argExpr)
+                        success = false
+                    }
+                }
+
+                var arg = callArg.argExpr
+                callArg.index = paramIndex
+                this.checkTypeCompatibility(arg.startPos, p.typeInfo, arg.operand.typeInfo)
+                arg.expectedType = p.typeInfo;
+            }
+        }
+
+        // now populate the any default arguments
+        for(var index = 0; index < funcInfo.decl.params.size(); index+=1) {
+            var param = funcInfo.decl.params.get(index)
+            if(param.defaultExpr) {
+                var hasValue = false
+                for(var j = 0; j < suppliedArgs.size(); j += 1) {
+                    var callArg = suppliedArgs.getPtr(j)
+                    if(callArg.index == index) {
+                        hasValue = true
+                        break
+                    }
+                }
+
+                if(!hasValue) {
+                    suppliedArgs.add(CallArg {
+                        .argExpr = param.defaultExpr,
+                        .index = index
+                    })
+                }
+            }
+        }
+    }
+
+    if(hasVarargs) {
+        for(; i < numberOfSuppliedArgs; i+=1) {
+            var arg = suppliedArgs.getPtr(i)
+            arg.index = i
+
+            if(!this.resolveExpr(arg.argExpr)) {
+                return false
+            }
+        }
+    }
+
+    return success
 }
 
 func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
@@ -571,17 +753,23 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
 
     var isMethod = false
     var numberOfDefaultArgs = 0
-    var suppliedArgs = ArrayInit<*Expr>(expr.arguments.size() + 1, this.allocator)
+    var suppliedArgs = ArrayInit<CallArg>(expr.arguments.size() + 1, this.allocator)
     suppliedArgs.addAll(expr.arguments)
 
-    var funcPtr: *FuncPtrTypeInfo = null
+    var hasVarargs = false
+    var maxNumOfArgs = 0
+    var returnType: *TypeInfo = null
+    var genericParams: Array<GenericParam>;
 
-    // TODO: This is massively wasteful, creating func pointer typeinfos for
-    // each function call...
+    // TODO: there is a lot of duplicate code here, should we
+    // represent FUNC and FUNC_PTR's in the same structure??
     if(objectType.kind == TypeKind.FUNC) {
         var funcInfo = objectType as (*FuncTypeInfo)
         isMethod = (funcInfo.decl.flags & FuncFlags.IS_METHOD)
-        funcPtr = funcInfo.asPtr(this.typeCache)
+        maxNumOfArgs = funcInfo.decl.params.size()
+        hasVarargs = funcInfo.decl.params.isVararg
+        returnType = funcInfo.returnType
+        genericParams = funcInfo.decl.genericParams
 
         for(var i = 0; i < funcInfo.decl.params.size(); i += 1) {
             var p = funcInfo.decl.params.get(i)
@@ -591,7 +779,11 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         }
     }
     else {
-        funcPtr = objectType as (*FuncPtrTypeInfo)
+        var funcPtr = objectType as (*FuncPtrTypeInfo)
+        maxNumOfArgs = funcPtr.paramDecls.size()
+        hasVarargs = funcPtr.hasVarargs
+        returnType = funcPtr.returnType
+        genericParams = funcPtr.genericParams
 
         // ??? This looks like this might be a ticking time bomb with overriding the name each time ???
         // The thought here is that if this is a function pointer, which don't have
@@ -607,22 +799,33 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         }
     }
 
-    var isMethodCall = isMethod && this.isMethodSyntax(expr, funcPtr, &suppliedArgs)
+    var isMethodCall = isMethod && this.isMethodSyntax(expr, &suppliedArgs)
     var numberOfSuppliedArgs = suppliedArgs.size()
-    this.checkNumberOfArgs(expr, objectType.name, funcPtr, numberOfSuppliedArgs, numberOfDefaultArgs)
+    this.checkNumberOfArgs(expr, objectType.name, maxNumOfArgs, hasVarargs, numberOfSuppliedArgs, numberOfDefaultArgs)
 
-    if(!this.coerceFuncArgs(expr, funcPtr, suppliedArgs)) {
+    if(!this.coerceFuncArgs(expr, objectType, suppliedArgs)) {
         return false
     }
 
     // apply generic type inferences if there are generics and no generic arguments
-    if(!funcPtr.genericParams.empty()) {
+    if(!genericParams.empty()) {
         if(expr.genericArgs.empty()) {
-            funcPtr = this.inferFuncCallExpr(expr, funcPtr, suppliedArgs, isMethodCall)
+            objectType = this.inferFuncCallExpr(expr, objectType, suppliedArgs, isMethodCall)
 
             // unable to infer types
-            if(!funcPtr) {
+            if(!objectType) {
                 return false
+            }
+
+            assert(IsFuncLike(objectType))
+
+            if(objectType.kind == TypeKind.FUNC) {
+                var funcInfo = objectType as (*FuncTypeInfo)
+                returnType = funcInfo.returnType
+            }
+            else {
+                var funcPtr = objectType as (*FuncPtrTypeInfo)
+                returnType = funcPtr.returnType
             }
         }
         else {
@@ -633,31 +836,28 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         }
     }
 
-    var i = 0;
-    for(; i < funcPtr.paramDecls.size(); i+=1) {
-        var p = funcPtr.paramDecls.get(i)
-        if(i < numberOfSuppliedArgs) {
-            var arg = suppliedArgs.get(i)
-
-            this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo)
-            arg.expectedType = p;
-        }
+    if(!this.checkFuncCallArgs(expr, objectType, suppliedArgs)) {
+        return false
     }
 
-    if(funcPtr.hasVarargs) {
-        for(; i < numberOfSuppliedArgs; i+=1) {
-            var arg = suppliedArgs.get(i)
-            if(!this.resolveExpr(arg)) {
-                return false
-            }
-        }
-    }
+    assert(returnType != null)
 
-    expr.arguments = *expr.node.becomeParentOfChildren(suppliedArgs)
-    expr.operand.typeInfo = funcPtr.returnType
+    suppliedArgs.sort(CallArgSort)
+
+    expr.arguments = *expr.node.becomeParentOfChildrenCallArgs(suppliedArgs)
+    expr.operand.typeInfo = returnType
     expr.operand.isRightValue = true
     return true
 }
+
+/*
+func Print(text: *const char, suppliedArgs: *Array<CallArg>) {
+    printf("%s:\n", text)
+    for(var i = 0; i < suppliedArgs.size(); i += 1) {
+        var arg = suppliedArgs.get(i)
+        printf("   index: %d\n", arg.index)
+    }
+}*/
 
 func (this: *TypeChecker) resolveBooleanExpr(expr: *BooleanExpr) : bool {
     assert(expr != null)
@@ -1876,6 +2076,46 @@ func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: *c
     sb.appendStrn("]", 1)
 
     this.result.addErrorStr(expr.startPos, sb)
+}
+
+func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Expr) {
+    assert(arg != null)
+
+    var sb = StringBufferInit(128, this.allocator)
+    sb.appendStr("Named argument specifications must appear after all fixed arguments have been specified")
+
+    this.result.addErrorStr(arg.startPos, sb)
+}
+
+
+func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Expr) {
+    assert(expr != null)
+
+    var sb = StringBufferInit(128, this.allocator)
+    sb.appendStr("Named arguments are not allowed on function pointers")
+
+    this.result.addErrorStr(expr.startPos, sb)
+}
+
+func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *StringView, funcInfo: *FuncTypeInfo) {
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("Invalid named parameter: '%.*s'; no parameter with that name found in 'func %s(",
+        name.length, name.buffer, funcInfo.name)
+
+    for(var i = 0; i < funcInfo.decl.params.size(); i+=1) {
+        var param = funcInfo.decl.params.get(i)
+        if(i > 0) {
+            sb.append(", ")
+        }
+        sb.append("%s: ", param.name.asString())
+        if(param.typeInfo) {
+            param.typeInfo.toString(sb)
+        }
+    }
+
+    sb.append(")'")
+
+    this.result.addErrorStr(pos, sb)
 }
 
 func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {

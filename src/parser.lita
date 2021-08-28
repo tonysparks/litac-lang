@@ -1234,7 +1234,7 @@ err:
 
 func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
     var pos = p.pos()
-    var arguments = Array<*Expr>{}
+    var arguments = Array<CallArg>{}
     if(!p.arguments(&arguments)) {
         goto err;
     }
@@ -2170,13 +2170,34 @@ err:
     return false
 }
 
-func (p: *Parser) arguments(arguments: *Array<*Expr>) : bool {
+func (p: *Parser) arguments(arguments: *Array<CallArg>) : bool {
     if(!p.check(TokenType.RIGHT_PAREN)) {
         arguments.init(8, p.allocator)
 
         do {
-            var expr = p.expression()
-            arguments.add(expr)
+            var arg = CallArg{}
+            if(p.match(TokenType.DOT)) {
+                var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+                if(!identifier) {
+                    goto err;
+                }
+
+                arg.argName = *identifier
+
+                if(p.check(TokenType.COLON)) {
+                    p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
+                }
+                else if(p.check(TokenType.EQUALS)) {
+                    p.consume(TokenType.EQUALS, ErrorCode.MISSING_EQUALS)
+                }
+                else {
+                    p.errorAtToken(p.peek(), ErrorCode.MISSING_COLON)
+                    goto err;
+                }
+            }
+
+            arg.argExpr = p.expression()
+            arguments.add(arg)
         }
         while(p.match(TokenType.COMMA))
     }

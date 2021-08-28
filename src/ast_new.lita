@@ -379,7 +379,7 @@ public func NewInitExpr(startPos: SrcPos,
 public func NewFuncCallExpr(startPos: SrcPos,
                             endPos: SrcPos,
                             object: *Expr,
-                            arguments: Array<*Expr>,
+                            arguments: Array<CallArg>,
                             genericArgs: Array<*TypeSpec>,
                             allocator: *const Allocator) : *Expr {
     var expr = new<FuncCallExpr>(allocator)
@@ -387,9 +387,11 @@ public func NewFuncCallExpr(startPos: SrcPos,
     expr.startPos = startPos
     expr.endPos = endPos
     expr.object = expr.node.becomeParentOf(object)
-    expr.arguments = *expr.node.becomeParentOfChildren(arguments)
     expr.genericArgs = genericArgs
-
+    for(var i = 0; i < arguments.size(); i+= 1) {
+        expr.node.becomeParentOf(arguments.get(i).argExpr)
+    }
+    expr.arguments = arguments
     return expr as (*Expr)
 }
 

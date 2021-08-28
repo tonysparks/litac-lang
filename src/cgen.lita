@@ -1825,7 +1825,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 if(i > 0) {
                     this.emitStrn(", ", 2)
                 }
-                var arg = expr.arguments.get(i)
+                var arg = expr.arguments.get(i).argExpr
                 if(!this.emitTraitCast(arg)) {
                     this.emitStmt(arg)
                 }
