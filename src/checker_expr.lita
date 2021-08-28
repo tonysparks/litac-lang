@@ -628,16 +628,22 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
     var numberOfSuppliedArgs = suppliedArgs.size()
     var success = true
+    var hasVarargs = false
+    var i = 0;
 
     if(funcType.kind == TypeKind.FUNC_PTR) {
         var funcPtr = funcType as (*FuncPtrTypeInfo)
-        var i = 0;
+        hasVarargs = funcPtr.hasVarargs
+
         for(; i < funcPtr.paramDecls.size(); i+=1) {
             var p = funcPtr.paramDecls.get(i)
             if(i < numberOfSuppliedArgs) {
-                var callArg = suppliedArgs.get(i)
+                var callArg = suppliedArgs.getPtr(i)
                 var arg = callArg.argExpr
 
+                // For now, we don't allow function pointers to contain
+                // named arguments, only because we currently don't allow names in the
+                // parameters in the TypeInfo
                 if(callArg.argName.type == TokenType.IDENTIFIER) {
                     this.errorNamedArgumentsForFuncPtr(arg)
                     success = false
@@ -650,28 +656,22 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
             }
         }
 
-        if(funcPtr.hasVarargs) {
-            for(; i < numberOfSuppliedArgs; i+=1) {
-                var arg = suppliedArgs.get(i)
-                if(!this.resolveExpr(arg.argExpr)) {
-                    return false
-                }
-            }
-        }
+
     }
     else {
         var funcInfo = funcType as (*FuncTypeInfo)
-        var i = 0;
         var hasNamedArg = false
+        hasVarargs = funcInfo.decl.params.isVararg
 
         for(; i < funcInfo.decl.params.size(); i+=1) {
             var p = funcInfo.decl.params.get(i)
             if(i < numberOfSuppliedArgs) {
-                var callArg = suppliedArgs.get(i)
+                var callArg = suppliedArgs.getPtr(i)
                 var paramIndex = i
 
                 if(callArg.argName.type == TokenType.IDENTIFIER) {
                     hasNamedArg = true
+                    paramIndex = -1
 
                     for(var index = 0; index < funcInfo.decl.params.size(); index += 1) {
                         var param = funcInfo.decl.params.get(index)
@@ -682,7 +682,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                     }
 
                     if(paramIndex < 0) {
-                        this.errorInvalidNamedArgument(callArg.argExpr, callArg.argName.str, funcInfo)
+                        this.errorInvalidNamedArgument(callArg.argName.pos, callArg.argName.str, funcInfo)
                         success = false
                     }
                 }
@@ -701,14 +701,36 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
             }
         }
 
-        if(funcInfo.decl.params.isVararg) {
-            for(; i < numberOfSuppliedArgs; i+=1) {
-                var arg = suppliedArgs.get(i)
-                arg.index = i
-
-                if(!this.resolveExpr(arg.argExpr)) {
-                    return false
+        // now populate the any default arguments
+        for(var index = 0; index < funcInfo.decl.params.size(); index+=1) {
+            var param = funcInfo.decl.params.get(index)
+            if(param.defaultExpr) {
+                var hasValue = false
+                for(var j = 0; j < suppliedArgs.size(); j += 1) {
+                    var callArg = suppliedArgs.getPtr(j)
+                    if(callArg.index == index) {
+                        hasValue = true
+                        break
+                    }
                 }
+
+                if(!hasValue) {
+                    suppliedArgs.add(CallArg {
+                        .argExpr = param.defaultExpr,
+                        .index = index
+                    })
+                }
+            }
+        }
+    }
+
+    if(hasVarargs) {
+        for(; i < numberOfSuppliedArgs; i+=1) {
+            var arg = suppliedArgs.getPtr(i)
+            arg.index = i
+
+            if(!this.resolveExpr(arg.argExpr)) {
+                return false
             }
         }
     }
@@ -739,8 +761,8 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     var returnType: *TypeInfo = null
     var genericParams: Array<GenericParam>;
 
-    // TODO: This is massively wasteful, creating func pointer typeinfos for
-    // each function call...
+    // TODO: there is a lot of duplicate code here, should we
+    // represent FUNC and FUNC_PTR's in the same structure??
     if(objectType.kind == TypeKind.FUNC) {
         var funcInfo = objectType as (*FuncTypeInfo)
         isMethod = (funcInfo.decl.flags & FuncFlags.IS_METHOD)
@@ -827,6 +849,15 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     expr.operand.isRightValue = true
     return true
 }
+
+/*
+func Print(text: *const char, suppliedArgs: *Array<CallArg>) {
+    printf("%s:\n", text)
+    for(var i = 0; i < suppliedArgs.size(); i += 1) {
+        var arg = suppliedArgs.get(i)
+        printf("   index: %d\n", arg.index)
+    }
+}*/
 
 func (this: *TypeChecker) resolveBooleanExpr(expr: *BooleanExpr) : bool {
     assert(expr != null)
@@ -2066,15 +2097,25 @@ func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Expr) {
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorInvalidNamedArgument(expr: *Expr, name: *StringView, type: *TypeInfo) {
-    assert(expr != null)
+func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *StringView, funcInfo: *FuncTypeInfo) {
+    var sb = StringBufferInit(256, this.allocator)
+    sb.append("Invalid named parameter: '%.*s'; no parameter with that name found in 'func %s(",
+        name.length, name.buffer, funcInfo.name)
 
-    var sb = StringBufferInit(128, this.allocator)
-    sb.append("Invalid named parameter: '%.*s'; no parameter with that name found in '", name.length, name.buffer)
-    type.toString(sb)
-    sb.append("'")
+    for(var i = 0; i < funcInfo.decl.params.size(); i+=1) {
+        var param = funcInfo.decl.params.get(i)
+        if(i > 0) {
+            sb.append(", ")
+        }
+        sb.append("%s: ", param.name.asString())
+        if(param.typeInfo) {
+            param.typeInfo.toString(sb)
+        }
+    }
 
-    this.result.addErrorStr(expr.startPos, sb)
+    sb.append(")'")
+
+    this.result.addErrorStr(pos, sb)
 }
 
 func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {

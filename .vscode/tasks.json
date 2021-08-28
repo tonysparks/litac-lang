@@ -172,12 +172,36 @@
             "type": "shell",
             "command": "sh",
             "args": [
-                "build_bootstrap.sh",
-                "${file}"
+                "build_bootstrap.sh"
             ],
             "windows": {
-                "command": "build_bootstrap.bat",
-                "args": ["${file}"]
+                "command": "build_bootstrap.bat"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "BuildTemp",
+            "type": "shell",
+            "command": "sh",
+            "args": [
+                "build_temp.sh"
+            ],
+            "windows": {
+                "command": "build_temp.bat"
             },
             "problemMatcher": [
                 "$gcc"
