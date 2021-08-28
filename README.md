@@ -29,6 +29,7 @@ func main(len:i32, args:**char):i32 {
 * traits, with implicit implementations (like Go)
 * `using` which allows for flattening field access in structs, unions and function arguments
 * default parameters
+* named argument parameters
 * type inference
 * generic type inference
 * struct/union "methods"
@@ -76,7 +77,7 @@ var str3: const* const char = "Hi";
 
 **Arrays**
 
-TODO
+TODO documentation - array's are currently identical behavior as C
 
 **String**
 
@@ -576,6 +577,22 @@ func main(len:i32, args:**char) : i32 {
 
 ```
 
+# Functions
+Functions can define default parameters and function calls can include named arguments.
+
+```C
+// Non default parameters can't be defined after a default parameter,
+// e.g.  func Test(a: i32 = 1, b: i32) { // INVALID because b: i32 which doesn't have a default parameter is defined after a: i32 = 1.
+func Test(a: i32, b: i32 = 2) {
+    // do stuff
+}
+
+Test(a) // will evaluate to Test(a, 2)
+Test(.a = 1) // will evaluate to Test(1, 2)
+Test(.b = 3, .a = 2) // will evaluate to Test(2, 3)
+Test(.b = 1)  // INVALID, because no default parameter for 'a'
+Test(.b = 1, 1)  // INVALID, because fixed parameters can't come after named parameters
+```
 
 # Tests
 Write tests right along side your application code.  When compiling for library/executable, the test code will not be included in the
@@ -612,10 +629,11 @@ If you only want to run a subset of unit tests, you can define a Regular Express
 In order to build litaC compiler you will need:
 * C compiler (tcc, clang and gcc should work -- I haven't tested Visual Studio's compiler)
 
-_NOTE_: Currently, only tested and buildable for Windows x64
+_NOTE_: Currently, only tested and buildable for Windows x64 and Linux (Ubuntu)
 
 Admittedly, this process isn't as friendly right now as it should be.  At some point I will write some robust build scripts.  For now, `clang` is hardcoded in the scripts - but should be easy enough to switch to another compiler (tcc or gcc).
 
+Windows
 ```
 git clone https://github.com/tonysparks/litac-lang.git
 cd litac-lang
@@ -623,7 +641,15 @@ build_bootstrap.bat
 build.bat
 ```
 
-The `build_bootstrap.bat` will compile the `bootstrap/litac.c` file creating a `litac.exe`.  The `build.bat` file will use the `bootstrap/litac.exe` to build the compiler from lita source (`src/`) and output a new binary in `bin/litac.exe`.
+Linux
+```
+git clone https://github.com/tonysparks/litac-lang.git
+cd litac-lang
+build_bootstrap.sh
+build.sh
+```
+
+The `build_bootstrap.bat` will compile the `bootstrap/litac.c` file creating a `litac.exe` (`litac` on Ubuntu).  The `build.bat` file will use the `bootstrap/litac.exe` to build the compiler from lita source (`src/`) and output a new binary in `bin/litac.exe`.
 
 # Using LitaC Compiler
 Once you have built the `litac` executable (which will be located in the `/bin` folder after `build.bat`), you can verify the build is valid by:
