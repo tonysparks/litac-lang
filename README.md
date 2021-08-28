@@ -1,7 +1,7 @@
 # LitaC
 LitaC (pronounced Lee-ta-see) is a C like language.  In fact, its main goal is to be C with some minor syntax sugar.  It compiles to ISO-C99 (C11 for some features) which has the benefits of being fairly easy to use existing C libraries and code, and can target any platform with a C99 compiler.
 
-This is the self-hosted compiler implementation -- the original bootstrap implementation can be found [here.](https://github.com/tonysparks/litac).  This implementation is currently heavily in development and lacks features available in the bootstrap version.
+This is the self-hosted compiler implementation -- the original bootstrap implementation can be found [here.](https://github.com/tonysparks/litac).  This implementation is currently heavily in development and the bootstrap version is no longer supported and lacks current features.
 
 # Goals & Purpose
 First what's not a goal: LitaC is not meant to replace any existing languages.  It isn't trying to conquer the programming world.
