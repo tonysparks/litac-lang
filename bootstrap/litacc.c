@@ -1,7 +1,7 @@
 #ifndef _LITAC_HEADER_H
 #define _LITAC_HEADER_H
 
-// Generated on Sun Aug 22 14:45:58 2021
+// Generated on Fri Aug 27 20:28:59 2021
 
 #include <stdint.h>
 #include <stddef.h>
@@ -53,6 +53,8 @@ typedef char   litaC_char;
 litaC_usize litaC_mem__PAGE_SIZE = (litaC_usize)4096UL;
 
 #define litaC_mem__MAX_PATH (256)
+
+#define litaC_array__MAX_LEVELS (300)
 
 #define litaC_cmdline__MAX_MESSAGE_SIZE (256)
 
@@ -12805,6 +12807,7 @@ typedef struct litaC_ast__BinaryExpr litaC_ast__BinaryExpr;
 typedef struct litaC_ast__BooleanExpr litaC_ast__BooleanExpr;
 typedef struct litaC_ast__CastExpr litaC_ast__CastExpr;
 typedef struct litaC_ast__CharExpr litaC_ast__CharExpr;
+typedef struct litaC_ast__CallArg litaC_ast__CallArg;
 typedef struct litaC_ast__FuncCallExpr litaC_ast__FuncCallExpr;
 typedef enum litaC_ast__GetExprFlags {
     litaC_ast__GetExprFlags_IS_NORMAL = 0,
@@ -13098,6 +13101,7 @@ typedef struct litaC_array__Array_cb_Token_ce_ litaC_array__Array_cb_Token_ce_;
 typedef struct litaC_array__Array_cb__ptr_ParameterDecl_ce_ litaC_array__Array_cb__ptr_ParameterDecl_ce_;
 typedef struct litaC_array__Array_cb__ptr_SwitchCaseStmt_ce_ litaC_array__Array_cb__ptr_SwitchCaseStmt_ce_;
 typedef struct litaC_array__Array_cb__ptr_Expr_ce_ litaC_array__Array_cb__ptr_Expr_ce_;
+typedef struct litaC_array__Array_cb_CallArg_ce_ litaC_array__Array_cb_CallArg_ce_;
 typedef struct litaC_array__Array_cb__ptr_InitArgExpr_ce_ litaC_array__Array_cb__ptr_InitArgExpr_ce_;
 typedef struct litaC_array__Array_cb__ptr_Symbol_ce_ litaC_array__Array_cb__ptr_Symbol_ce_;
 typedef struct litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_ litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_;
@@ -13400,7 +13404,7 @@ litaC_ast__Expr* litaC_ast_new__NewTernaryExpr(litaC_lex__SrcPos litaC_startPos,
 litaC_ast__Expr* litaC_ast_new__NewBinaryExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_left,litaC_lex__TokenType litaC_operator,litaC_ast__Expr* litaC_right,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewUnaryExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_lex__TokenType litaC_operator,litaC_ast__Expr* litaC_expr,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewInitExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__NameTypeSpec* litaC_type,litaC_array__Array_cb__ptr_InitArgExpr_ce_ litaC_arguments,const litaC_mem__Allocator* litaC_allocator);
-litaC_ast__Expr* litaC_ast_new__NewFuncCallExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_object,litaC_array__Array_cb__ptr_Expr_ce_ litaC_arguments,litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_genericArgs,const litaC_mem__Allocator* litaC_allocator);
+litaC_ast__Expr* litaC_ast_new__NewFuncCallExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_object,litaC_array__Array_cb_CallArg_ce_ litaC_arguments,litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_genericArgs,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewSubscriptGetExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_object,litaC_ast__Expr* litaC_index,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewSubscriptSetExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_object,litaC_ast__Expr* litaC_index,litaC_lex__TokenType litaC_operator,litaC_ast__Expr* litaC_value,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewGetExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_object,litaC_ast__IdentifierExpr* litaC_field,const litaC_mem__Allocator* litaC_allocator);
@@ -13444,6 +13448,7 @@ litaC_ast__Stmt* litaC_ast_new__NewVarFieldDecl(litaC_lex__SrcPos litaC_startPos
 litaC_ast__Stmt* litaC_ast_new__NewTraitFieldDecl(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_lex__Token litaC_fieldName,litaC_ast__TypeSpec* litaC_type,litaC_ast__Attributes litaC_attributes,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Stmt* litaC_ast_new__NewEnumFieldEntryDecl(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_lex__Token litaC_fieldName,litaC_ast__Expr* litaC_value,litaC_ast__Attributes litaC_attributes,const litaC_mem__Allocator* litaC_allocator);
 litaC_void litaC_ast__Node_setSrcPos(litaC_ast__Node* litaC_n,litaC_lex__SrcPos litaC_start,litaC_lex__SrcPos litaC_end);
+litaC_array__Array_cb_CallArg_ce_* litaC_ast__Node_becomeParentOfChildrenCallArgs(litaC_ast__Node* litaC_n,litaC_array__Array_cb_CallArg_ce_* litaC_children);
 litaC_bool litaC_ast__IsExpr(litaC_ast__Node* litaC_node);
 litaC_bool litaC_ast__IsDecl(litaC_ast__Node* litaC_node);
 litaC_bool litaC_ast__Decl_hasNote(litaC_ast__Decl* litaC_d,const litaC_char* litaC_name);
@@ -13453,6 +13458,7 @@ litaC_bool litaC_ast__FuncDecl_getName(litaC_ast__FuncDecl* litaC_f,litaC_char* 
 litaC_bool litaC_ast__Expr_isIdentifier(litaC_ast__Expr* litaC_expr);
 litaC_bool litaC_ast__Expr_isConstNumberExpr(litaC_ast__Expr* litaC_expr);
 litaC_bool litaC_ast__Expr_isConstExpr(litaC_ast__Expr* litaC_expr);
+litaC_i32 litaC_ast__CallArgSort(litaC_ast__CallArg litaC_a,litaC_ast__CallArg litaC_b);
 litaC_bool litaC_symbols__Symbol_isGenericCapable(litaC_symbols__Symbol* litaC_this);
 litaC_symbols__Scope* litaC_symbols__NewScope(litaC_symbols__ScopeKind litaC_kind,litaC_symbols__Scope* litaC_parent,litaC_phase_result__PhaseResult* litaC_result,const litaC_mem__Allocator* litaC_allocator);
 litaC_void litaC_symbols__Scope_init(litaC_symbols__Scope* litaC_scope,litaC_symbols__ScopeKind litaC_kind,litaC_symbols__Scope* litaC_parent,litaC_phase_result__PhaseResult* litaC_result,const litaC_mem__Allocator* litaC_allocator);
@@ -13541,6 +13547,7 @@ const litaC_char* litaC_ast_copy__NewTokenName(litaC_lex__Token litaC_token,cons
 litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_ast_copy__CopyTypeSpecs(litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_specs,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__TypeSpec* litaC_ast_copy__CopyTypeSpec(litaC_ast__TypeSpec* litaC_spec,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Decl* litaC_ast_copy__CopyDecl(litaC_ast__Decl* litaC_decl,const litaC_mem__Allocator* litaC_allocator);
+litaC_array__Array_cb_CallArg_ce_ litaC_ast_copy__CopyCallArgs(litaC_array__Array_cb_CallArg_ce_* litaC_args,const litaC_mem__Allocator* litaC_allocator);
 litaC_array__Array_cb__ptr_Expr_ce_ litaC_ast_copy__CopyExprs(litaC_array__Array_cb__ptr_Expr_ce_* litaC_exprs,const litaC_mem__Allocator* litaC_allocator);
 litaC_array__Array_cb__ptr_Stmt_ce_ litaC_ast_copy__CopyStmts(litaC_array__Array_cb__ptr_Stmt_ce_* litaC_stmts,const litaC_mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_copy__CopyExpr(litaC_ast__Expr* litaC_expr,const litaC_mem__Allocator* litaC_allocator);
@@ -13628,12 +13635,14 @@ litaC_bool litaC_checker_decl__TypeChecker_resolveTypedefDecl(litaC_checker__Typ
 litaC_bool litaC_checker_expr__TypeChecker_resolveConstExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr);
 litaC_bool litaC_checker_expr__TypeChecker_resolveExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr);
 litaC_bool litaC_checker_expr__TypeChecker_resolveFuncIdentifierExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__IdentifierExpr* litaC_expr);
-litaC_bool litaC_checker_expr__TypeChecker_isMethodSyntax(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_array__Array_cb__ptr_Expr_ce_* litaC_suppliedArgs);
+litaC_bool litaC_checker_expr__TypeChecker_isMethodSyntax(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs);
 litaC_ast__Expr* litaC_checker_expr__TypeChecker_coerceTypeWithUsing(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr,litaC_types__TypeInfo* litaC_sourceType,litaC_types__TypeInfo* litaC_targetType);
-litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_array__Array_cb__ptr_Expr_ce_* litaC_suppliedArgs);
-litaC_bool litaC_checker_expr__TypeChecker_checkNumberOfArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,const litaC_char* litaC_funcName,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_i32 litaC_numberOfSuppliedArgs,litaC_i32 litaC_numberOfDefaultArgs);
+litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__TypeInfo* litaC_funcType,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs);
+litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArg(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_i32 litaC_index,litaC_ast__Expr* litaC_argExpr,litaC_types__TypeInfo* litaC_paramInfo,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs);
+litaC_bool litaC_checker_expr__TypeChecker_checkNumberOfArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,const litaC_char* litaC_funcName,litaC_i32 litaC_maxNumOfArgs,litaC_bool litaC_hasVarargs,litaC_i32 litaC_numberOfSuppliedArgs,litaC_i32 litaC_numberOfDefaultArgs);
 litaC_types__TypeInfo* litaC_checker_expr__TypeChecker_inferredType(litaC_checker__TypeChecker* litaC_this,litaC_lex__Token litaC_name,litaC_types__TypeInfo* litaC_paramType,litaC_types__TypeInfo* litaC_expectedType);
-litaC_types__FuncPtrTypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_array__Array_cb__ptr_Expr_ce_* litaC_suppliedArgs,litaC_bool litaC_isMethodCall);
+litaC_types__TypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__TypeInfo* litaC_funcType,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs,litaC_bool litaC_isMethodCall);
+litaC_bool litaC_checker_expr__TypeChecker_checkFuncCallArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__TypeInfo* litaC_funcType,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs);
 litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr);
 litaC_bool litaC_checker_expr__TypeChecker_resolveBooleanExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__BooleanExpr* litaC_expr);
 litaC_bool litaC_checker_expr__TypeChecker_resolveCharExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__CharExpr* litaC_expr);
@@ -13675,6 +13684,9 @@ litaC_void litaC_checker_expr__TypeChecker_errorNoFieldAccess(litaC_checker__Typ
 litaC_void litaC_checker_expr__TypeChecker_errorInferGenericParameter(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr,litaC_ast__GenericParam* litaC_param);
 litaC_void litaC_checker_expr__TypeChecker_errorInferGenericParameters(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr,litaC_array__Array_cb_GenericParam_ce_* litaC_params);
 litaC_void litaC_checker_expr__TypeChecker_errorMissingGenericArguments(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr,const litaC_char* litaC_typeName,litaC_array__Array_cb_GenericParam_ce_* litaC_genericParams);
+litaC_void litaC_checker_expr__TypeChecker_errorFixedArgumentAfterNamed(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_arg);
+litaC_void litaC_checker_expr__TypeChecker_errorNamedArgumentsForFuncPtr(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr);
+litaC_void litaC_checker_expr__TypeChecker_errorInvalidNamedArgument(litaC_checker__TypeChecker* litaC_this,litaC_lex__SrcPos litaC_pos,litaC_string_view__StringView* litaC_name,litaC_types__FuncTypeInfo* litaC_funcInfo);
 litaC_bool litaC_checker_expr__TypeChecker_checkConstant(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr);
 litaC_bool litaC_checker_expr__TypeChecker_checkTruthyness(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr,litaC_types__TypeInfo* litaC_type);
 litaC_bool litaC_checker_expr__TypeChecker_checkRightValue(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr);
@@ -13744,7 +13756,7 @@ litaC_ast__ArrayTypeSpec* litaC_parser__Parser_arrayType(litaC_parser__Parser* l
 litaC_ast__FuncPtrTypeSpec* litaC_parser__Parser_funcPtrType(litaC_parser__Parser* litaC_p);
 litaC_ast__ParametersStmt* litaC_parser__Parser_parametersStatement(litaC_parser__Parser* litaC_p);
 litaC_bool litaC_parser__Parser_structArguments(litaC_parser__Parser* litaC_p,litaC_array__Array_cb__ptr_InitArgExpr_ce_* litaC_arguments);
-litaC_bool litaC_parser__Parser_arguments(litaC_parser__Parser* litaC_p,litaC_array__Array_cb__ptr_Expr_ce_* litaC_arguments);
+litaC_bool litaC_parser__Parser_arguments(litaC_parser__Parser* litaC_p,litaC_array__Array_cb_CallArg_ce_* litaC_arguments);
 litaC_bool litaC_parser__Parser_genericParameters(litaC_parser__Parser* litaC_p,litaC_array__Array_cb_GenericParam_ce_* litaC_arguments);
 litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_parser__Parser_genericArguments(litaC_parser__Parser* litaC_p);
 litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_parser__Parser_tryGenericArguments(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
@@ -14098,10 +14110,9 @@ litaC_i32 litaC_array__Array_size_cb__ptr_InitArgExpr_ce_(litaC_array__Array_cb_
 litaC_ast__InitArgExpr* litaC_array__Array_get_cb__ptr_InitArgExpr_ce_(litaC_array__Array_cb__ptr_InitArgExpr_ce_* litaC_a,litaC_i32 litaC_index);
 litaC_ast__InitArgExpr* litaC_ast__Node_becomeParentOf_cb_InitArgExpr_ce_(litaC_ast__Node* litaC_n,litaC_ast__InitArgExpr* litaC_child);
 litaC_ast__FuncCallExpr* litaC_mem__new_cb_FuncCallExpr_ce_(const litaC_mem__Allocator* litaC_a);
-litaC_array__Array_cb__ptr_Expr_ce_* litaC_ast__Node_becomeParentOfChildren_cb__ptr_Expr_ce_(litaC_ast__Node* litaC_n,litaC_array__Array_cb__ptr_Expr_ce_* litaC_children);
 LITAC_INLINE 
-litaC_i32 litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a);
-litaC_ast__Expr* litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index);
+litaC_i32 litaC_array__Array_size_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a);
+litaC_ast__CallArg litaC_array__Array_get_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index);
 litaC_ast__SubscriptGetExpr* litaC_mem__new_cb_SubscriptGetExpr_ce_(const litaC_mem__Allocator* litaC_a);
 litaC_ast__SubscriptSetExpr* litaC_mem__new_cb_SubscriptSetExpr_ce_(const litaC_mem__Allocator* litaC_a);
 litaC_ast__GetExpr* litaC_mem__new_cb_GetExpr_ce_(const litaC_mem__Allocator* litaC_a);
@@ -14119,6 +14130,10 @@ litaC_ast__StringExpr* litaC_mem__new_cb_StringExpr_ce_(const litaC_mem__Allocat
 litaC_ast__CharExpr* litaC_mem__new_cb_CharExpr_ce_(const litaC_mem__Allocator* litaC_a);
 litaC_ast__GroupExpr* litaC_mem__new_cb_GroupExpr_ce_(const litaC_mem__Allocator* litaC_a);
 litaC_ast__ArrayInitExpr* litaC_mem__new_cb_ArrayInitExpr_ce_(const litaC_mem__Allocator* litaC_a);
+litaC_array__Array_cb__ptr_Expr_ce_* litaC_ast__Node_becomeParentOfChildren_cb__ptr_Expr_ce_(litaC_ast__Node* litaC_n,litaC_array__Array_cb__ptr_Expr_ce_* litaC_children);
+LITAC_INLINE 
+litaC_i32 litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a);
+litaC_ast__Expr* litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index);
 LITAC_INLINE 
 litaC_bool litaC_array__Array_empty_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a);
 litaC_ast__SizeOfExpr* litaC_mem__new_cb_SizeOfExpr_ce_(const litaC_mem__Allocator* litaC_a);
@@ -14223,6 +14238,12 @@ LITAC_INLINE
 litaC_i32 litaC_array__Array_size_cb__ptr_TypeSpec_ce_(litaC_array__Array_cb__ptr_TypeSpec_ce_* litaC_a);
 litaC_ast__TypeSpec* litaC_array__Array_get_cb__ptr_TypeSpec_ce_(litaC_array__Array_cb__ptr_TypeSpec_ce_* litaC_a,litaC_i32 litaC_index);
 litaC_void litaC_array__Array_add_cb_GenericParam_ce_(litaC_array__Array_cb_GenericParam_ce_* litaC_a,litaC_ast__GenericParam litaC_element);
+LITAC_INLINE 
+litaC_bool litaC_array__Array_empty_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a);
+litaC_array__Array_cb_CallArg_ce_ litaC_array__ArrayInit_cb_CallArg_ce_(litaC_i32 litaC_initialSize,const litaC_mem__Allocator* litaC_alloc);
+litaC_void litaC_array__Array_init_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_mem__Allocator* litaC_alloc);
+litaC_void litaC_array__Array_add_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_ast__CallArg litaC_element);
+litaC_void litaC_array__ArrayGrow_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_increment);
 litaC_array__Array_cb__ptr_Expr_ce_ litaC_array__ArrayInit_cb__ptr_Expr_ce_(litaC_i32 litaC_initialSize,const litaC_mem__Allocator* litaC_alloc);
 litaC_void litaC_array__Array_init_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_mem__Allocator* litaC_alloc);
 litaC_void litaC_array__Array_add_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_ast__Expr* litaC_element);
@@ -14331,9 +14352,12 @@ litaC_map__MapEntry_cb_i64_c__ptr_ConstTypeInfo_ce_ litaC_map__MapIterator_next_
 litaC_void litaC_array__Array_add_cb__ptr_FuncTypeInfo_ce_(litaC_array__Array_cb__ptr_FuncTypeInfo_ce_* litaC_a,litaC_types__FuncTypeInfo* litaC_element);
 litaC_void litaC_array__ArrayGrow_cb__ptr_FuncTypeInfo_ce_(litaC_array__Array_cb__ptr_FuncTypeInfo_ce_* litaC_a,litaC_i32 litaC_increment);
 litaC_types__FuncTypeInfo* litaC_array__Array_pop_cb__ptr_FuncTypeInfo_ce_(litaC_array__Array_cb__ptr_FuncTypeInfo_ce_* litaC_a);
-litaC_void litaC_array__Array_insertAt_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__Expr* litaC_element);
-litaC_void litaC_array__Array_set_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__Expr* litaC_element);
-litaC_void litaC_array__Array_addAll_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_array__Array_cb__ptr_Expr_ce_* litaC_other);
+litaC_void litaC_array__Array_insertAt_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__CallArg litaC_element);
+litaC_void litaC_array__Array_set_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__CallArg litaC_element);
+litaC_ast__CallArg* litaC_array__Array_getPtr_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index);
+litaC_void litaC_array__Array_addAll_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_array__Array_cb_CallArg_ce_* litaC_other);
+litaC_void litaC_array__Array_sort_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 (*litaC_sorter)(litaC_ast__CallArg,litaC_ast__CallArg));
+litaC_void litaC_array__QuickSort_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_array,litaC_i32 (*litaC_comp)(litaC_ast__CallArg,litaC_ast__CallArg));
 litaC_void litaC_array__Array_init_cb_Token_ce_(litaC_array__Array_cb_Token_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_mem__Allocator* litaC_alloc);
 litaC_void litaC_array__Array_add_cb_Token_ce_(litaC_array__Array_cb_Token_ce_* litaC_a,litaC_lex__Token litaC_element);
 litaC_void litaC_array__ArrayGrow_cb_Token_ce_(litaC_array__Array_cb_Token_ce_* litaC_a,litaC_i32 litaC_increment);
@@ -14463,19 +14487,104 @@ litaC_ast__FieldStmt* litaC_array__Array_getPtr_cb_FieldStmt_ce_(litaC_array__Ar
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-struct litaC_string__String {
-    litaC_char* buffer;
+struct litaC_array__Array_cb__ptr_Expr_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
+    litaC_ast__Expr** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapEntry_cb_i64_c__ptr_ConstTypeInfo_ce_ {
+    litaC_i64 key;
+    litaC_types__ConstTypeInfo* value;
+    litaC_types__ConstTypeInfo** valuePtr;
+    
+};
+
+struct litaC_array__Array_cb__ptr_InitArgExpr_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__InitArgExpr** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_array__Array_cb_FieldReference_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_references__FieldReference* elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_json__SrcPos {
+    const litaC_char* name;
+    litaC_i32 line;
+    
+};
+
+struct litaC_map__MapIterator_cb__ptr_const_char_c__ptr_Symbol_ce_ {
+    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_* m;
+    litaC_i32 it;
+    litaC_i32 count;
+    
+};
+
+struct litaC_array__Array_cb__ptr_Dependency_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_dependency_graph__Dependency** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapIterator_cb_i64_c__ptr_PtrTypeInfo_ce_ {
+    litaC_map__Map_cb_i64_c__ptr_PtrTypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 count;
     
 };
 
 
-struct litaC_lita__Metric {
-    litaC_usize bytesAllocated;
-    litaC_u32 allocationCount;
-    litaC_f64 executionTime;
-    litaC_f64 startTime;
+struct litaC_json__Entry {
+    const litaC_char* key;
+    litaC_json__JsonNode* value;
+    
+};
+
+struct litaC_array__Array_cb__ptr_FuncTypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_types__FuncTypeInfo** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_array__Array_cb__ptr_TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_types__TypeInfo** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_checker__GenericContext {
+    litaC_module__Module* callsite;
+    
+};
+
+struct litaC_types_new__ArrayEntry {
+    litaC_types__TypeInfo* arrayOf;
+    litaC_ast__Expr* expr;
+    litaC_usize length;
+    
+};
+
+struct litaC_cgen__CompilationUnit {
+    litaC_module__Module* module;
+    litaC_char filename[_MAX_PATH];
+    FILE* file;
     
 };
 
@@ -14516,33 +14625,24 @@ struct litaC_map__Map_cb__ptr_const_char_c__ptr_TextDocument_ce_ {
     
 };
 
-struct litaC_array__Array_cb__ptr_TypeSpec_ce_ {
+struct litaC_module__ModuleImport {
+    litaC_module__Module* module;
+    litaC_string_view__StringView* alias;
+    litaC_bool isUsing;
+    
+};
+
+struct litaC_protocol__Position {
+    litaC_i32 line;
+    litaC_i32 character;
+    
+};
+
+struct litaC_array__Array_cb__ptr_NoteStmt_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__TypeSpec** elements;
+    litaC_ast__NoteStmt** elements;
     const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_profile__ProfileEntry {
-    const litaC_char* functionName;
-    litaC_u64 count;
-    litaC_f64 startTime;
-    litaC_f64 totalTime;
-    
-};
-
-struct litaC_types__FieldPositionResult {
-    litaC_types__AggregateTypeInfo* aggInfo;
-    litaC_i32 position;
-    
-};
-
-struct litaC_workspace__Workspace {
-    const litaC_mem__Allocator* allocator;
-    litaC_lsp__LspServer* lsp;
-    const litaC_char* rootPath;
-    litaC_map__Map_cb__ptr_const_char_c__ptr_TextDocument_ce_ openedDocuments;
     
 };
 
@@ -14554,35 +14654,10 @@ struct litaC_array__Array_cb__ptr_Symbol_ce_ {
     
 };
 
-struct litaC_array__Array_cb__ptr_Allocation_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_mem__Allocation** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_mem__Allocation {
-    litaC_void* addr;
-    litaC_usize size;
-    litaC_u64 line;
-    litaC_char filename[256];
-    
-};
-
-struct litaC_array__Array_cb__ptr_const_char_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_char** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_array__Array_cb__ptr_ParameterDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__ParameterDecl** elements;
-    const litaC_mem__Allocator* alloc;
+struct litaC_map__MapEntry_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ {
+    litaC_types_new__ArrayEntry key;
+    litaC_types__ArrayTypeInfo* value;
+    litaC_types__ArrayTypeInfo** valuePtr;
     
 };
 
@@ -14599,246 +14674,33 @@ struct litaC_map__Map_cb__ptr_const_char_c_i32_ce_ {
     
 };
 
-struct litaC_generics__Template {
-    litaC_array__Array_cb_GenericParam_ce_* genericParams;
-    litaC_array__Array_cb__ptr_TypeSpec_ce_* genericArgs;
+struct litaC_dependency_graph__Dependency {
+    litaC_dependency_graph__State state;
+    litaC_symbols__Symbol* sym;
+    litaC_array__Array_cb__ptr_Dependency_ce_ dependsOn;
     
 };
 
-
-struct litaC_array__Array_cb__ptr_Stmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Stmt** elements;
-    const litaC_mem__Allocator* alloc;
+struct litaC_protocol__TextDocumentChangeEvent {
+    litaC_protocol__Range* range;
+    const litaC_char* text;
     
 };
 
-struct litaC_string_view__StringView {
-    const litaC_char* buffer;
-    litaC_i32 length;
-    
-};
-
-struct litaC_array__Array_cb__ptr_Decl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Decl** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_array__Array_cb_FieldStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__FieldStmt* elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-union litaC_lex__Value {
-    litaC_f64 floatValue;
-    litaC_i64 intValue;
-    litaC_u64 uintValue;
-    litaC_string_view__StringView str;
-    
-};
-
-struct litaC_ast__Operand {
-    litaC_types__TypeInfo* typeInfo;
-    litaC_bool isRightValue;
-    litaC_bool isConst;
-    litaC_lex__Value val;
-    
-};
-
-
-
-struct litaC_array__Array_cb__ptr_Expr_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Expr** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_map__Map_cb_i64_c__ptr_PtrTypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32 (*hashFn)(litaC_i64);
-    litaC_bool (*equalFn)(litaC_i64,litaC_i64);
-    const litaC_mem__Allocator* alloc;
-    litaC_i64* keys;
-    litaC_types__PtrTypeInfo** values;
-    litaC_types__PtrTypeInfo* emptyValue;
-    litaC_i64 emptyKey;
-    
-};
-
-struct litaC_map__MapIterator_cb_i64_c__ptr_ConstTypeInfo_ce_ {
-    litaC_map__Map_cb_i64_c__ptr_ConstTypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 count;
-    
-};
-
-struct litaC_module__ModuleImport {
-    litaC_module__Module* module;
-    litaC_string_view__StringView* alias;
-    litaC_bool isUsing;
-    
-};
-
-union litaC_json__JsonValue {
-    litaC_bool boolValue;
-    litaC_f64 doubleValue;
-    litaC_i64 intValue;
-    const litaC_char* strValue;
-    litaC_json__JsonObject* objValue;
-    litaC_array__Array_cb__ptr_JsonNode_ce_* arrayValue;
-    
-};
-
-struct litaC_map__Map_cb__ptr_const_char_c__ptr_TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32 (*hashFn)(const litaC_char*);
-    litaC_bool (*equalFn)(const litaC_char*,const litaC_char*);
-    const litaC_mem__Allocator* alloc;
-    const litaC_char** keys;
-    litaC_types__TypeInfo** values;
-    litaC_types__TypeInfo* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_introspection__Introspect {
-    litaC_lita__Lita* lita;
-    
-};
-
-struct litaC_mem__Allocator {
-    litaC_void* (*allocFn)(const litaC_mem__Allocator*,litaC_usize);
-    litaC_void* (*callocFn)(const litaC_mem__Allocator*,litaC_usize,litaC_usize);
-    litaC_void* (*reallocFn)(const litaC_mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
-    litaC_void (*freeFn)(const litaC_mem__Allocator*,litaC_void*);
-    
-};
-
-struct litaC_array__Array_cb_Reference_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_references__Reference* elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_map__MapIterator_cb_i64_c_Array_cb_i64_ce__ce_ {
-    litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_* m;
-    litaC_i32 it;
-    litaC_i32 count;
-    
-};
-
-struct litaC_map__MapEntry_cb__ptr_const_char_c__ptr_Symbol_ce_ {
-    const litaC_char* key;
-    litaC_symbols__Symbol* value;
-    litaC_symbols__Symbol** valuePtr;
-    
-};
-
-struct litaC_checker__LabelInfo {
-    litaC_string_view__StringView name;
-    litaC_bool defined;
-    litaC_ast__Stmt* stmt;
-    
-};
-
-struct litaC_array__Array_cb__ptr_TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_types__TypeInfo** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32 (*hashFn)(const litaC_char*);
-    litaC_bool (*equalFn)(const litaC_char*,const litaC_char*);
-    const litaC_mem__Allocator* alloc;
-    const litaC_char** keys;
-    litaC_symbols__Symbol** values;
-    litaC_symbols__Symbol* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_array__Array_cb_Array_cb_GenericParam_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_array__Array_cb_GenericParam_ce_* elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_json__SrcPos {
+struct litaC_cmdline__Option {
     const litaC_char* name;
-    litaC_i32 line;
+    litaC_char shortName;
+    const litaC_char* description;
+    const litaC_char* value;
+    const litaC_char* defaultValue;
+    litaC_i32 flags;
     
 };
 
-struct litaC_mem__DebugAllocator {
-    litaC_mem__Allocator alloc;
-    const litaC_mem__Allocator* decorated;
-    litaC_array__Array_cb__ptr_Allocation_ce_ allocations;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    litaC_usize totalBytesFreed;
-    
-};
-
-struct litaC_array__Array_cb__ptr_NoteStmt_ce_ {
+struct litaC_string_buffer__StringBuffer {
+    litaC_char* buffer;
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__NoteStmt** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_map__Map_cb__ptr_const_char_c__ptr_Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32 (*hashFn)(const litaC_char*);
-    litaC_bool (*equalFn)(const litaC_char*,const litaC_char*);
-    const litaC_mem__Allocator* alloc;
-    const litaC_char** keys;
-    litaC_module__Module** values;
-    litaC_module__Module* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_map__MapEntry_cb_i64_c__ptr_PtrTypeInfo_ce_ {
-    litaC_i64 key;
-    litaC_types__PtrTypeInfo* value;
-    litaC_types__PtrTypeInfo** valuePtr;
-    
-};
-
-struct litaC_array__Array_cb_ModuleImport_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_module__ModuleImport* elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_array__Array_cb__ptr_Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_module__Module** elements;
     const litaC_mem__Allocator* alloc;
     
 };
@@ -14850,107 +14712,9 @@ struct litaC_map__MapIterator_cb__ptr_Symbol_c_Dependency_ce_ {
     
 };
 
-struct litaC_phase_result__PhaseResult {
-    const litaC_mem__Allocator* allocator;
-    litaC_array__Array_cb_PhaseError_ce_ errors;
-    litaC_bool enabled;
-    
-};
-
-struct litaC_json__Entry {
-    const litaC_char* key;
-    litaC_json__JsonNode* value;
-    
-};
-
-struct litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32 (*hashFn)(litaC_i64);
-    litaC_bool (*equalFn)(litaC_i64,litaC_i64);
-    const litaC_mem__Allocator* alloc;
-    litaC_i64* keys;
-    litaC_array__Array_cb_i64_ce_* values;
-    litaC_array__Array_cb_i64_ce_ emptyValue;
-    litaC_i64 emptyKey;
-    
-};
-
-struct litaC_map__MapEntry_cb__ptr_const_char_c__ptr_Module_ce_ {
-    const litaC_char* key;
-    litaC_module__Module* value;
-    litaC_module__Module** valuePtr;
-    
-};
-
-struct litaC_map__MapIterator_cb__ptr_const_char_c__ptr_Symbol_ce_ {
-    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_* m;
-    litaC_i32 it;
-    litaC_i32 count;
-    
-};
-
-struct litaC_map__MapIterator_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ {
-    litaC_map__Map_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 count;
-    
-};
-
-struct litaC_ast__FieldStmt {
-    litaC_ast__StmtKind kind;
-    litaC_types__TypeInfo* typeInfo;
-    union  {
-        litaC_ast__EnumDecl* enumField;
-        litaC_ast__AggregateDecl* aggregateField;
-        litaC_ast__VarFieldDecl* varField;
-        litaC_ast__TraitFieldDecl* traitField;
-        litaC_ast__Expr* poisonField;
-        
-    };
-    
-};
-
-struct litaC_symbols__Scope {
-    litaC_symbols__ScopeKind kind;
-    const litaC_mem__Allocator* allocator;
-    litaC_phase_result__PhaseResult* result;
-    litaC_symbols__Scope* parent;
-    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_ symbols;
-    litaC_module__Module* module;
-    
-};
-
-struct litaC_cgen__CompilationUnit {
-    litaC_module__Module* module;
-    litaC_char filename[_MAX_PATH];
-    FILE* file;
-    
-};
-
-struct litaC_map__Map_cb_i64_c__ptr_ConstTypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32 (*hashFn)(litaC_i64);
-    litaC_bool (*equalFn)(litaC_i64,litaC_i64);
-    const litaC_mem__Allocator* alloc;
-    litaC_i64* keys;
-    litaC_types__ConstTypeInfo** values;
-    litaC_types__ConstTypeInfo* emptyValue;
-    litaC_i64 emptyKey;
-    
-};
-
-struct litaC_json__JsonNode {
-    const litaC_mem__Allocator* alloc;
-    litaC_json__JsonType type;
-    litaC_json__JsonValue value;
-    
-};
-
-struct litaC_protocol__Position {
-    litaC_i32 line;
-    litaC_i32 character;
+struct litaC_builtins__any {
+    litaC_void* value;
+    litaC_u64 id;
     
 };
 
@@ -14970,11 +14734,11 @@ struct litaC_array__Array_cb__ptr_SwitchCaseStmt_ce_ {
     
 };
 
-struct litaC_array__Array_cb_Entry_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_json__Entry* elements;
-    const litaC_mem__Allocator* alloc;
+struct litaC_types__TypeInfo {
+    litaC_types__TypeKind kind;
+    litaC_i64 typeid;
+    const litaC_char* name;
+    litaC_symbols__Symbol* sym;
     
 };
 
@@ -15002,11 +14766,163 @@ struct litaC_array__Array_cb_Token_ce_ {
     
 };
 
-struct litaC_types__TypeInfo {
-    litaC_types__TypeKind kind;
-    litaC_i64 typeid;
-    const litaC_char* name;
-    litaC_symbols__Symbol* sym;
+struct litaC_map__MapIterator_cb_i64_c__ptr_ConstTypeInfo_ce_ {
+    litaC_map__Map_cb_i64_c__ptr_ConstTypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 count;
+    
+};
+
+struct litaC_map__MapIterator_cb_i64_c_Array_cb_i64_ce__ce_ {
+    litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_* m;
+    litaC_i32 it;
+    litaC_i32 count;
+    
+};
+
+struct litaC_array__Array_cb_CallArg_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__CallArg* elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__Map_cb_i64_c__ptr_PtrTypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32 (*hashFn)(litaC_i64);
+    litaC_bool (*equalFn)(litaC_i64,litaC_i64);
+    const litaC_mem__Allocator* alloc;
+    litaC_i64* keys;
+    litaC_types__PtrTypeInfo** values;
+    litaC_types__PtrTypeInfo* emptyValue;
+    litaC_i64 emptyKey;
+    
+};
+
+struct litaC_phase_result__PhaseResult {
+    const litaC_mem__Allocator* allocator;
+    litaC_array__Array_cb_PhaseError_ce_ errors;
+    litaC_bool enabled;
+    
+};
+
+struct litaC_map__Map_cb__ptr_const_char_c__ptr_TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32 (*hashFn)(const litaC_char*);
+    litaC_bool (*equalFn)(const litaC_char*,const litaC_char*);
+    const litaC_mem__Allocator* alloc;
+    const litaC_char** keys;
+    litaC_types__TypeInfo** values;
+    litaC_types__TypeInfo* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_system__Process {
+    FILE* pipe;
+    
+};
+
+struct litaC_lex__SrcPos {
+    const litaC_char* filename;
+    const litaC_char* lineStart;
+    const litaC_char* start;
+    const litaC_char* end;
+    litaC_i32 lineNumber;
+    litaC_i32 position;
+    
+};
+
+struct litaC_types__ConstTypeInfo {
+    litaC_types__TypeInfo info;
+    litaC_types__TypeInfo* constOf;
+    
+};
+
+struct litaC_generics__Template {
+    litaC_array__Array_cb_GenericParam_ce_* genericParams;
+    litaC_array__Array_cb__ptr_TypeSpec_ce_* genericArgs;
+    
+};
+
+struct litaC_array__Array_cb_Reference_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_references__Reference* elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapEntry_cb__ptr_const_char_c__ptr_Module_ce_ {
+    const litaC_char* key;
+    litaC_module__Module* value;
+    litaC_module__Module** valuePtr;
+    
+};
+
+struct litaC_workspace__Workspace {
+    const litaC_mem__Allocator* allocator;
+    litaC_lsp__LspServer* lsp;
+    const litaC_char* rootPath;
+    litaC_map__Map_cb__ptr_const_char_c__ptr_TextDocument_ce_ openedDocuments;
+    
+};
+
+struct litaC_protocol__Range {
+    litaC_protocol__Position start;
+    litaC_protocol__Position end;
+    
+};
+
+struct litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32 (*hashFn)(const litaC_char*);
+    litaC_bool (*equalFn)(const litaC_char*,const litaC_char*);
+    const litaC_mem__Allocator* alloc;
+    const litaC_char** keys;
+    litaC_symbols__Symbol** values;
+    litaC_symbols__Symbol* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_string_view__StringView {
+    const litaC_char* buffer;
+    litaC_i32 length;
+    
+};
+
+struct litaC_array__Array_cb__ptr_JsonNode_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_json__JsonNode** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_array__Array_cb_Array_cb_GenericParam_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_array__Array_cb_GenericParam_ce_* elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapEntry_cb_i64_c__ptr_PtrTypeInfo_ce_ {
+    litaC_i64 key;
+    litaC_types__PtrTypeInfo* value;
+    litaC_types__PtrTypeInfo** valuePtr;
+    
+};
+
+struct litaC_string__String {
+    litaC_char* buffer;
+    litaC_i32 length;
+    litaC_i32 capacity;
     
 };
 
@@ -15034,194 +14950,24 @@ struct litaC_lita__LitaOptions {
     
 };
 
-struct litaC_map__MapIterator_cb__ptr_const_char_c__ptr_Module_ce_ {
-    litaC_map__Map_cb__ptr_const_char_c__ptr_Module_ce_* m;
-    litaC_i32 it;
-    litaC_i32 count;
-    
-};
-
-struct litaC_array__Array_cb_SrcPos_ce_ {
+struct litaC_map__Map_cb__ptr_const_char_c__ptr_Module_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_lex__SrcPos* elements;
+    litaC_u32 (*hashFn)(const litaC_char*);
+    litaC_bool (*equalFn)(const litaC_char*,const litaC_char*);
     const litaC_mem__Allocator* alloc;
+    const litaC_char** keys;
+    litaC_module__Module** values;
+    litaC_module__Module* emptyValue;
+    const litaC_char* emptyKey;
     
 };
 
-struct litaC_checker__GenericContext {
-    litaC_module__Module* callsite;
-    
-};
-
-struct litaC_types_new__ArrayEntry {
-    litaC_types__TypeInfo* arrayOf;
-    litaC_ast__Expr* expr;
-    litaC_usize length;
-    
-};
-
-struct litaC_protocol__TextDocumentChangeEvent {
-    litaC_protocol__Range* range;
-    const litaC_char* text;
-    
-};
-
-struct litaC_array__Array_cb__ptr_InitArgExpr_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__InitArgExpr** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_map__MapEntry_cb_i64_c__ptr_ConstTypeInfo_ce_ {
-    litaC_i64 key;
-    litaC_types__ConstTypeInfo* value;
-    litaC_types__ConstTypeInfo** valuePtr;
-    
-};
-
-struct litaC_map__MapEntry_cb_i64_c_Array_cb_i64_ce__ce_ {
-    litaC_i64 key;
-    litaC_array__Array_cb_i64_ce_ value;
-    litaC_array__Array_cb_i64_ce_* valuePtr;
-    
-};
-
-struct litaC_builtins__any {
-    litaC_void* value;
-    litaC_u64 id;
-    
-};
-
-struct litaC_array__Array_cb_FieldReference_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_references__FieldReference* elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_system__Process {
-    FILE* pipe;
-    
-};
-
-struct litaC_lex__SrcPos {
-    const litaC_char* filename;
-    const litaC_char* lineStart;
-    const litaC_char* start;
-    const litaC_char* end;
-    litaC_i32 lineNumber;
-    litaC_i32 position;
-    
-};
-
-struct litaC_types__ConstTypeInfo {
-    litaC_types__TypeInfo info;
-    litaC_types__TypeInfo* constOf;
-    
-};
-
-struct litaC_cgen__CGenScope {
-    litaC_cgen__CGenScope* parent;
-    litaC_array__Array_cb__ptr_Stmt_ce_ defers;
-    litaC_array__Array_cb__ptr_const_char_ce_ constDefs;
-    litaC_bool isLoop;
-    litaC_bool isSwitch;
-    
-};
-
-struct litaC_json__Token {
-    litaC_json__TokenKind kind;
-    litaC_json__SrcPos pos;
-    const litaC_char* start;
-    const litaC_char* end;
-    union  {
-        litaC_i64 intNumValue;
-        litaC_f64 realNumValue;
-        const litaC_char* strValue;
-        const litaC_char* name;
-        
-    };
-    
-};
-
-struct litaC_map__Map_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32 (*hashFn)(litaC_types_new__ArrayEntry);
-    litaC_bool (*equalFn)(litaC_types_new__ArrayEntry,litaC_types_new__ArrayEntry);
-    const litaC_mem__Allocator* alloc;
-    litaC_types_new__ArrayEntry* keys;
-    litaC_types__ArrayTypeInfo** values;
-    litaC_types__ArrayTypeInfo* emptyValue;
-    litaC_types_new__ArrayEntry emptyKey;
-    
-};
-
-struct litaC_array__Array_cb__ptr_JsonNode_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_json__JsonNode** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_array__Array_cb__ptr_Dependency_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_dependency_graph__Dependency** elements;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_module__ModuleId {
-    litaC_char filename[_MAX_PATH];
-    litaC_string_view__StringView packageName;
-    litaC_string_view__StringView name;
-    
-};
-
-struct litaC_json__JsonObject {
-    litaC_map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
-    litaC_array__Array_cb_Entry_ce_ values;
-    
-};
-
-struct litaC_mem__LinearAllocator {
-    litaC_mem__Allocator alloc;
-    litaC_void* mem;
+struct litaC_mem__Allocation {
+    litaC_void* addr;
     litaC_usize size;
-    litaC_usize currentOffset;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    
-};
-
-struct litaC_cmdline__Option {
-    const litaC_char* name;
-    litaC_char shortName;
-    const litaC_char* description;
-    const litaC_char* value;
-    const litaC_char* defaultValue;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_string_buffer__StringBuffer {
-    litaC_char* buffer;
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_mem__Allocator* alloc;
-    
-};
-
-struct litaC_map__MapIterator_cb_i64_c__ptr_PtrTypeInfo_ce_ {
-    litaC_map__Map_cb_i64_c__ptr_PtrTypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 count;
+    litaC_u64 line;
+    litaC_char filename[256];
     
 };
 
@@ -15233,11 +14979,102 @@ struct litaC_array__Array_cb_GenericParam_ce_ {
     
 };
 
-struct litaC_array__Array_cb__ptr_FuncTypeInfo_ce_ {
+struct litaC_array__Array_cb_ModuleImport_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_types__FuncTypeInfo** elements;
+    litaC_module__ModuleImport* elements;
     const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_array__Array_cb__ptr_Module_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_module__Module** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_profile__ProfileEntry {
+    const litaC_char* functionName;
+    litaC_u64 count;
+    litaC_f64 startTime;
+    litaC_f64 totalTime;
+    
+};
+
+struct litaC_types__FieldPositionResult {
+    litaC_types__AggregateTypeInfo* aggInfo;
+    litaC_i32 position;
+    
+};
+
+struct litaC_ast__TypeSpec {
+    litaC_ast__TypeSpecKind kind;
+    litaC_lex__SrcPos pos;
+    litaC_ast__TypeSpec* base;
+    litaC_types__TypeInfo* typeInfo;
+    
+};
+
+struct litaC_ast__FieldStmt {
+    litaC_ast__StmtKind kind;
+    litaC_types__TypeInfo* typeInfo;
+    union  {
+        litaC_ast__EnumDecl* enumField;
+        litaC_ast__AggregateDecl* aggregateField;
+        litaC_ast__VarFieldDecl* varField;
+        litaC_ast__TraitFieldDecl* traitField;
+        litaC_ast__Expr* poisonField;
+        
+    };
+    
+};
+
+struct litaC_introspection__Introspect {
+    litaC_lita__Lita* lita;
+    
+};
+
+
+struct litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32 (*hashFn)(litaC_i64);
+    litaC_bool (*equalFn)(litaC_i64,litaC_i64);
+    const litaC_mem__Allocator* alloc;
+    litaC_i64* keys;
+    litaC_array__Array_cb_i64_ce_* values;
+    litaC_array__Array_cb_i64_ce_ emptyValue;
+    litaC_i64 emptyKey;
+    
+};
+
+struct litaC_map__MapIterator_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ {
+    litaC_map__Map_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 count;
+    
+};
+
+struct litaC_array__Array_cb__ptr_TypeSpec_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__TypeSpec** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapIterator_cb__ptr_const_char_c__ptr_Module_ce_ {
+    litaC_map__Map_cb__ptr_const_char_c__ptr_Module_ce_* m;
+    litaC_i32 it;
+    litaC_i32 count;
+    
+};
+
+struct litaC_types__FieldPath {
+    litaC_ast__FieldStmt fields[256];
+    litaC_i32 numOfFields;
     
 };
 
@@ -15247,13 +15084,184 @@ struct litaC_types__GenericTypeInfo {
     
 };
 
-struct litaC_types__FuncPtrTypeInfo {
-    litaC_types__GenericTypeInfo info;
-    litaC_array__Array_cb_GenericParam_ce_ genericParams;
-    litaC_types__TypeInfo* returnType;
-    litaC_array__Array_cb__ptr_TypeInfo_ce_ paramDecls;
-    litaC_bool hasVarargs;
-    litaC_bool isTrait;
+struct litaC_preprocessor__CallContext {
+    litaC_preprocessor__Preprocessor* pp;
+    litaC_checker__TypeChecker* checker;
+    litaC_ast__CompStmt* comp;
+    litaC_string_buffer__StringBuffer buffer;
+    
+};
+
+struct litaC_checker__LabelInfo {
+    litaC_string_view__StringView name;
+    litaC_bool defined;
+    litaC_ast__Stmt* stmt;
+    
+};
+
+struct litaC_references__Reference {
+    litaC_i64 type;
+    litaC_lex__SrcPos pos;
+    
+};
+
+
+
+struct litaC_map__Map_cb_i64_c__ptr_ConstTypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32 (*hashFn)(litaC_i64);
+    litaC_bool (*equalFn)(litaC_i64,litaC_i64);
+    const litaC_mem__Allocator* alloc;
+    litaC_i64* keys;
+    litaC_types__ConstTypeInfo** values;
+    litaC_types__ConstTypeInfo* emptyValue;
+    litaC_i64 emptyKey;
+    
+};
+
+struct litaC_ast__PtrTypeSpec {
+    litaC_ast__TypeSpec spec;
+    
+};
+
+struct litaC_ast__Attributes {
+    litaC_bool isPublic;
+    litaC_bool isGlobal;
+    litaC_bool isUsing;
+    litaC_array__Array_cb__ptr_NoteStmt_ce_ notes;
+    
+};
+
+struct litaC_module__ModuleId {
+    litaC_char filename[_MAX_PATH];
+    litaC_string_view__StringView packageName;
+    litaC_string_view__StringView name;
+    
+};
+
+union litaC_json__JsonValue {
+    litaC_bool boolValue;
+    litaC_f64 doubleValue;
+    litaC_i64 intValue;
+    const litaC_char* strValue;
+    litaC_json__JsonObject* objValue;
+    litaC_array__Array_cb__ptr_JsonNode_ce_* arrayValue;
+    
+};
+
+struct litaC_array__Array_cb_Entry_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_json__Entry* elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_array__Array_cb__ptr_Allocation_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_mem__Allocation** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapEntry_cb_i64_c_Array_cb_i64_ce__ce_ {
+    litaC_i64 key;
+    litaC_array__Array_cb_i64_ce_ value;
+    litaC_array__Array_cb_i64_ce_* valuePtr;
+    
+};
+
+struct litaC_array__Array_cb__ptr_const_char_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_char** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_array__Array_cb__ptr_ParameterDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__ParameterDecl** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapEntry_cb__ptr_const_char_c__ptr_Symbol_ce_ {
+    const litaC_char* key;
+    litaC_symbols__Symbol* value;
+    litaC_symbols__Symbol** valuePtr;
+    
+};
+
+struct litaC_array__Array_cb__ptr_Stmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Stmt** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+union litaC_lex__Value {
+    litaC_f64 floatValue;
+    litaC_i64 intValue;
+    litaC_u64 uintValue;
+    litaC_string_view__StringView str;
+    
+};
+
+struct litaC_types__PtrTypeInfo {
+    litaC_types__TypeInfo info;
+    litaC_types__TypeInfo* ptrOf;
+    
+};
+
+struct litaC_lita__Metric {
+    litaC_usize bytesAllocated;
+    litaC_u32 allocationCount;
+    litaC_f64 executionTime;
+    litaC_f64 startTime;
+    
+};
+
+struct litaC_array__Array_cb__ptr_Decl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Decl** elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_mem__Allocator {
+    litaC_void* (*allocFn)(const litaC_mem__Allocator*,litaC_usize);
+    litaC_void* (*callocFn)(const litaC_mem__Allocator*,litaC_usize,litaC_usize);
+    litaC_void* (*reallocFn)(const litaC_mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
+    litaC_void (*freeFn)(const litaC_mem__Allocator*,litaC_void*);
+    
+};
+
+struct litaC_array__Array_cb_FieldStmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__FieldStmt* elements;
+    const litaC_mem__Allocator* alloc;
+    
+};
+
+struct litaC_map__MapEntry_cb__ptr_Symbol_c_Dependency_ce_ {
+    litaC_symbols__Symbol* key;
+    litaC_dependency_graph__Dependency value;
+    litaC_dependency_graph__Dependency* valuePtr;
+    
+};
+
+struct litaC_array__Array_cb_SrcPos_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lex__SrcPos* elements;
+    const litaC_mem__Allocator* alloc;
     
 };
 
@@ -15279,19 +15287,208 @@ struct litaC_lex__Token {
     
 };
 
-struct litaC_ast__Attributes {
-    litaC_bool isPublic;
-    litaC_bool isGlobal;
-    litaC_bool isUsing;
-    litaC_array__Array_cb__ptr_NoteStmt_ce_ notes;
-    
-};
-
 struct litaC_ast__Decl {
     litaC_ast__Stmt stmt;
     litaC_symbols__Symbol* sym;
     litaC_lex__Token name;
     litaC_ast__Attributes attributes;
+    
+};
+
+struct litaC_ast__EnumDecl {
+    litaC_ast__Decl decl;
+    litaC_array__Array_cb__ptr_EnumFieldEntryDecl_ce_ fields;
+    
+};
+
+struct litaC_ast__ContinueStmt {
+    litaC_ast__Stmt stmt;
+    
+};
+
+struct litaC_ast__IfStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* cond;
+    litaC_ast__Stmt* then;
+    litaC_ast__Stmt* elseStmt;
+    
+};
+
+struct litaC_ast__VarFieldDecl {
+    litaC_ast__Decl decl;
+    litaC_ast__TypeSpec* type;
+    litaC_ast__Expr* defaultExpr;
+    
+};
+
+struct litaC_ast__Operand {
+    litaC_types__TypeInfo* typeInfo;
+    litaC_bool isRightValue;
+    litaC_bool isConst;
+    litaC_lex__Value val;
+    
+};
+
+struct litaC_ast__Expr {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Operand operand;
+    litaC_types__TypeInfo* expectedType;
+    
+};
+
+struct litaC_ast__BinaryExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* left;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* right;
+    
+};
+
+struct litaC_ast__GroupExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* groupedExpr;
+    
+};
+
+struct litaC_ast__SizeOfExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* sizeOfExpr;
+    
+};
+
+struct litaC_ast__PoisonExpr {
+    litaC_ast__Expr expr;
+    
+};
+
+struct litaC_symbols__Symbol {
+    litaC_symbols__SymbolKind kind;
+    litaC_char name[256];
+    litaC_symbols__SymbolState state;
+    litaC_ast__Decl* decl;
+    litaC_types__TypeInfo* type;
+    litaC_symbols__Symbol* usingParent;
+    litaC_module__Module* declared;
+    litaC_module__Module* usingModule;
+    litaC_i32 flags;
+    litaC_lex__Value val;
+    litaC_module__Module* genericCallsiteModule;
+    litaC_array__Array_cb__ptr_TypeInfo_ce_ genericArgs;
+    litaC_array__Array_cb_GenericParam_ce_ genericParams;
+    
+};
+
+struct litaC_parser__Parser {
+    const litaC_mem__Allocator* allocator;
+    litaC_phase_result__PhaseResult* result;
+    litaC_lita__Lita* lita;
+    const litaC_char* filename;
+    litaC_i32 totalLines;
+    litaC_array__Array_cb_Token_ce_ tokens;
+    litaC_i32 current;
+    litaC_lex__SrcPos currentPos;
+    litaC_i32 breakLevel;
+    litaC_i32 loopLevel;
+    litaC_i32 switchLevel;
+    litaC_i32 funcLevel;
+    litaC_i32 aggregateLevel;
+    litaC_u32 tryLevel;
+    litaC_u64 tryErrorCounter;
+    litaC_bool panicMode;
+    
+};
+
+struct litaC_workspace__TextDocument {
+    litaC_char filename[_MAX_PATH];
+    litaC_string_buffer__StringBuffer text;
+    
+};
+
+struct litaC_protocol__Location {
+    const litaC_char* uri;
+    litaC_protocol__Range range;
+    
+};
+
+struct litaC_types__EnumTypeInfo {
+    litaC_types__TypeInfo info;
+    litaC_ast__EnumDecl* decl;
+    
+};
+
+struct litaC_cgen__CGen {
+    litaC_lita__Lita* lita;
+    litaC_string_buffer__StringBuffer buf;
+    litaC_string_buffer__StringBuffer line;
+    litaC_bool format;
+    litaC_i32 indent;
+    litaC_i32 aggregateLevel;
+    litaC_bool bufferFlush;
+    litaC_i32 funcIndex;
+    litaC_i32 tmpVar;
+    litaC_types__FuncTypeInfo* currentFunc;
+    litaC_cgen__CGenScope* currentScope;
+    FILE* output;
+    
+};
+
+
+struct litaC_util__SourceLocation {
+    litaC_util__SourceLocationKind kind;
+    litaC_module__Module* module;
+    litaC_protocol__Location location;
+    union  {
+        litaC_ast__Node* node;
+        litaC_ast__TypeSpec* type;
+        
+    };
+    
+};
+
+
+struct litaC_util__SourceLookup {
+    litaC_lsp__LspServer* lsp;
+    litaC_protocol__Position lookupPos;
+    litaC_util__SourceLocation result;
+    
+};
+
+struct litaC_mem__DebugAllocator {
+    litaC_mem__Allocator alloc;
+    const litaC_mem__Allocator* decorated;
+    litaC_array__Array_cb__ptr_Allocation_ce_ allocations;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    litaC_usize totalBytesFreed;
+    
+};
+
+struct litaC_map__Map_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32 (*hashFn)(litaC_types_new__ArrayEntry);
+    litaC_bool (*equalFn)(litaC_types_new__ArrayEntry,litaC_types_new__ArrayEntry);
+    const litaC_mem__Allocator* alloc;
+    litaC_types_new__ArrayEntry* keys;
+    litaC_types__ArrayTypeInfo** values;
+    litaC_types__ArrayTypeInfo* emptyValue;
+    litaC_types_new__ArrayEntry emptyKey;
+    
+};
+
+struct litaC_ast__NameTypeSpec {
+    litaC_ast__TypeSpec spec;
+    const litaC_char* name;
+    litaC_array__Array_cb__ptr_TypeSpec_ce_ genericArgs;
+    
+};
+
+struct litaC_ast__FuncPtrTypeSpec {
+    litaC_ast__TypeSpec spec;
+    litaC_array__Array_cb__ptr_TypeSpec_ce_ args;
+    litaC_ast__TypeSpec* ret;
+    litaC_bool hasVarargs;
+    litaC_array__Array_cb_GenericParam_ce_ genericParams;
     
 };
 
@@ -15321,29 +15518,68 @@ struct litaC_ast__NoteStmt {
     
 };
 
-struct litaC_ast__Expr {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Operand operand;
-    litaC_types__TypeInfo* expectedType;
-    
-};
-
 struct litaC_ast__CharExpr {
     litaC_ast__Expr expr;
     litaC_lex__Token character;
     
 };
 
-struct litaC_ast__NullExpr {
+struct litaC_ast__InitExpr {
     litaC_ast__Expr expr;
+    litaC_array__Array_cb__ptr_TypeSpec_ce_ genericArgs;
+    litaC_ast__NameTypeSpec* type;
+    litaC_array__Array_cb__ptr_InitArgExpr_ce_ arguments;
     
 };
 
-struct litaC_ast__TernaryExpr {
+struct litaC_ast__SubscriptSetExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* cond;
-    litaC_ast__Expr* then;
-    litaC_ast__Expr* other;
+    litaC_ast__Expr* object;
+    litaC_ast__Expr* index;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* value;
+    
+};
+
+struct litaC_phase_result__PhaseError {
+    litaC_phase_result__ErrorType type;
+    const litaC_char* message;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_types__FuncTypeInfo {
+    litaC_types__GenericTypeInfo info;
+    litaC_types__TypeInfo* returnType;
+    litaC_ast__FuncDecl* decl;
+    
+};
+
+struct litaC_symbols__ProgramSymbols {
+    litaC_module__Module* root;
+    litaC_array__Array_cb__ptr_Symbol_ce_ values;
+    litaC_array__Array_cb__ptr_Symbol_ce_ symbolTypes;
+    litaC_array__Array_cb__ptr_Symbol_ce_ symbolFuncs;
+    litaC_symbols__Symbol* mainEntry;
+    litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_ interfaceImpls;
+    
+};
+
+struct litaC_mem__LinearAllocator {
+    litaC_mem__Allocator alloc;
+    litaC_void* mem;
+    litaC_usize size;
+    litaC_usize currentOffset;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    
+};
+
+struct litaC_preprocessor__Preprocessor {
+    litaC_lita__Lita* lita;
+    ape_t* ape;
+    litaC_preprocessor__CallContext callContext;
+    litaC_array__Array_cb__ptr_CompStmt_ce_ preCheckers;
     
 };
 
@@ -15368,10 +15604,47 @@ struct litaC_references__ReferenceDatabase {
     
 };
 
-struct litaC_dependency_graph__Dependency {
-    litaC_dependency_graph__State state;
-    litaC_symbols__Symbol* sym;
-    litaC_array__Array_cb__ptr_Dependency_ce_ dependsOn;
+struct litaC_lita__Lita {
+    const litaC_mem__Allocator* allocator;
+    litaC_mem__LinearAllocator linearAllocator;
+    litaC_preprocessor__Preprocessor preprocessor;
+    litaC_phase_result__PhaseResult result;
+    litaC_map__Map_cb__ptr_const_char_c__ptr_Module_ce_ modules;
+    litaC_lita__Metric metrics[litaC_lita__MetricType_MAX_METRIC_TYPES];
+    litaC_u32 totalSourceLines;
+    litaC_u32 totalAllocations;
+    litaC_lita__LitaOptions* options;
+    litaC_char binaryFilename[_MAX_PATH];
+    litaC_char sourceFilename[_MAX_PATH];
+    litaC_symbols__ProgramSymbols programSymbols;
+    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_ genericSymbols;
+    litaC_references__ReferenceDatabase references;
+    
+};
+
+struct litaC_regex__Regex {
+    re_t reg;
+    
+};
+
+struct litaC_references__FieldReference {
+    litaC_i64 parent;
+    litaC_i32 offset;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_lsp__LspServer {
+    litaC_mem__LinearAllocator requestAllocator;
+    litaC_mem__LinearAllocator applicationAllocator;
+    litaC_lita__Lita* lita;
+    litaC_string_buffer__StringBuffer message;
+    litaC_string_buffer__StringBuffer output;
+    litaC_string_buffer__StringBuffer outbound;
+    litaC_bool isInitialized;
+    litaC_bool isRunning;
+    litaC_workspace__Workspace workspace;
+    FILE* logFile;
     
 };
 
@@ -15388,60 +15661,8 @@ struct litaC_map__Map_cb__ptr_Symbol_c_Dependency_ce_ {
     
 };
 
-struct litaC_ast__TypeSpec {
-    litaC_ast__TypeSpecKind kind;
-    litaC_lex__SrcPos pos;
-    litaC_ast__TypeSpec* base;
-    litaC_types__TypeInfo* typeInfo;
-    
-};
-
-struct litaC_symbols__Symbol {
-    litaC_symbols__SymbolKind kind;
-    litaC_char name[256];
-    litaC_symbols__SymbolState state;
-    litaC_ast__Decl* decl;
-    litaC_types__TypeInfo* type;
-    litaC_symbols__Symbol* usingParent;
-    litaC_module__Module* declared;
-    litaC_module__Module* usingModule;
-    litaC_i32 flags;
-    litaC_lex__Value val;
-    litaC_module__Module* genericCallsiteModule;
-    litaC_array__Array_cb__ptr_TypeInfo_ce_ genericArgs;
-    litaC_array__Array_cb_GenericParam_ce_ genericParams;
-    
-};
-
-
-struct litaC_dependency_graph__DependencyGraph {
-    litaC_array__Array_cb__ptr_Symbol_ce_ sortedPrimitives;
-    litaC_array__Array_cb__ptr_Symbol_ce_ sortedGlobals;
-    litaC_array__Array_cb__ptr_Symbol_ce_ sortedAggregates;
-    litaC_array__Array_cb__ptr_Symbol_ce_ sortedFuncs;
-    litaC_array__Array_cb__ptr_Symbol_ce_ sortedSymbols;
-    litaC_map__Map_cb__ptr_Symbol_c_Dependency_ce_ dependencies;
-    litaC_lita__Lita* lita;
-    
-};
-
-
-struct litaC_protocol__Range {
-    litaC_protocol__Position start;
-    litaC_protocol__Position end;
-    
-};
-
-struct litaC_map__MapEntry_cb__ptr_Symbol_c_Dependency_ce_ {
-    litaC_symbols__Symbol* key;
-    litaC_dependency_graph__Dependency value;
-    litaC_dependency_graph__Dependency* valuePtr;
-    
-};
-
-struct litaC_types__FieldPath {
-    litaC_ast__FieldStmt fields[256];
-    litaC_i32 numOfFields;
+struct litaC_ast__ConstTypeSpec {
+    litaC_ast__TypeSpec spec;
     
 };
 
@@ -15485,93 +15706,45 @@ struct litaC_ast__ArrayDesignationExpr {
     
 };
 
-struct litaC_ast__GetExpr {
+struct litaC_ast__OffsetOfExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__IdentifierExpr* field;
-    litaC_i32 flags;
+    litaC_ast__TypeSpec* type;
+    litaC_lex__Token field;
     
 };
 
-struct litaC_ast__SetExpr {
+struct litaC_ast__TypeOfExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__IdentifierExpr* field;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* value;
-    litaC_i32 flags;
+    litaC_ast__Expr* typeOfExpr;
+    litaC_ast__TypeSpec* type;
     
 };
 
-struct litaC_ast__UnaryExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* unaryExpr;
+struct litaC_json__JsonNode {
+    const litaC_mem__Allocator* alloc;
+    litaC_json__JsonType type;
+    litaC_json__JsonValue value;
     
 };
 
-struct litaC_mem__Arena {
-    litaC_mem__Allocator alloc;
-    const litaC_mem__Allocator* decorated;
-    litaC_u8* region;
-    litaC_usize size;
-    litaC_usize current;
-    litaC_mem__Arena* next;
-    
-};
-
-struct litaC_ast__PtrTypeSpec {
-    litaC_ast__TypeSpec spec;
-    
-};
-
-struct litaC_phase_result__PhaseError {
-    litaC_phase_result__ErrorType type;
-    const litaC_char* message;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_types_new__TypeCache {
+struct litaC_lex__Lexer {
     const litaC_mem__Allocator* allocator;
-    litaC_map__Map_cb_i64_c__ptr_ConstTypeInfo_ce_ constCache;
-    litaC_map__Map_cb_i64_c__ptr_PtrTypeInfo_ce_ ptrCache;
-    litaC_map__Map_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ arrayCache;
-    litaC_map__Map_cb__ptr_const_char_c__ptr_TypeInfo_ce_ genericCache;
+    const litaC_char* filename;
+    litaC_lex__Token token;
+    const litaC_char* stream;
+    const litaC_char* lineStart;
+    litaC_i32 lineNumber;
+    litaC_i32 position;
+    const litaC_char* errorMsg;
     
 };
 
-struct litaC_checker__TypeChecker {
-    litaC_lita__Lita* lita;
-    litaC_module__Module* current;
-    litaC_array__Array_cb__ptr_Module_ce_ moduleStack;
-    litaC_array__Array_cb__ptr_FuncTypeInfo_ce_ funcDeclStack;
-    litaC_array__Array_cb__ptr_Symbol_ce_ pendingValues;
-    litaC_array__Array_cb__ptr_Symbol_ce_ symbolTypes;
-    litaC_array__Array_cb__ptr_Symbol_ce_ symbolFuncs;
-    litaC_symbols__Symbol* mainEntry;
-    litaC_checker__GenericContext genericContext;
-    litaC_array__Array_cb_Array_cb_GenericParam_ce__ce_ genericParamStack;
-    litaC_array__Array_cb__ptr_Symbol_ce_ genericTemplates;
-    litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_ interfaceImpls;
-    litaC_checker__LabelInfo labels[256];
-    litaC_i32 numOfLabels;
-    litaC_types_new__TypeCache typeCache;
-    litaC_u32 randomNameIndex;
-    litaC_bool bypassing;
-    
-};
-
-struct litaC_map__MapEntry_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ {
-    litaC_types_new__ArrayEntry key;
-    litaC_types__ArrayTypeInfo* value;
-    litaC_types__ArrayTypeInfo** valuePtr;
-    
-};
-
-struct litaC_types__PtrTypeInfo {
+struct litaC_types__ArrayTypeInfo {
     litaC_types__TypeInfo info;
-    litaC_types__TypeInfo* ptrOf;
+    litaC_types__TypeInfo* arrayOf;
+    litaC_usize length;
+    litaC_ast__Expr* numOfElements;
+    litaC_bool isLengthDefined;
     
 };
 
@@ -15605,88 +15778,57 @@ struct litaC_ast__BooleanExpr {
     
 };
 
-struct litaC_ast__InitArgExpr {
+struct litaC_ast__IdentifierExpr {
     litaC_ast__Expr expr;
-    litaC_lex__Token fieldName;
-    litaC_i32 argPosition;
-    litaC_ast__Expr* value;
+    litaC_ast__NameTypeSpec* type;
+    litaC_symbols__Symbol* sym;
     
 };
 
-struct litaC_ast__SubscriptGetExpr {
+struct litaC_ast__StringExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__Expr* index;
+    litaC_lex__Token string;
     
 };
 
-struct litaC_symbols__ProgramSymbols {
-    litaC_module__Module* root;
-    litaC_array__Array_cb__ptr_Symbol_ce_ values;
-    litaC_array__Array_cb__ptr_Symbol_ce_ symbolTypes;
-    litaC_array__Array_cb__ptr_Symbol_ce_ symbolFuncs;
-    litaC_symbols__Symbol* mainEntry;
-    litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_ interfaceImpls;
+struct litaC_types__AggregateTypeInfo {
+    litaC_types__GenericTypeInfo info;
+    litaC_ast__AggregateDecl* decl;
     
 };
 
-struct litaC_preprocessor__CallContext {
-    litaC_preprocessor__Preprocessor* pp;
-    litaC_checker__TypeChecker* checker;
-    litaC_ast__CompStmt* comp;
-    litaC_string_buffer__StringBuffer buffer;
+struct litaC_cgen__CGenScope {
+    litaC_cgen__CGenScope* parent;
+    litaC_array__Array_cb__ptr_Stmt_ce_ defers;
+    litaC_array__Array_cb__ptr_const_char_ce_ constDefs;
+    litaC_bool isLoop;
+    litaC_bool isSwitch;
     
 };
 
-struct litaC_preprocessor__Preprocessor {
-    litaC_lita__Lita* lita;
-    ape_t* ape;
-    litaC_preprocessor__CallContext callContext;
-    litaC_array__Array_cb__ptr_CompStmt_ce_ preCheckers;
+struct litaC_json__Token {
+    litaC_json__TokenKind kind;
+    litaC_json__SrcPos pos;
+    const litaC_char* start;
+    const litaC_char* end;
+    union  {
+        litaC_i64 intNumValue;
+        litaC_f64 realNumValue;
+        const litaC_char* strValue;
+        const litaC_char* name;
+        
+    };
     
 };
 
-struct litaC_lita__Lita {
-    const litaC_mem__Allocator* allocator;
-    litaC_mem__LinearAllocator linearAllocator;
-    litaC_preprocessor__Preprocessor preprocessor;
-    litaC_phase_result__PhaseResult result;
-    litaC_map__Map_cb__ptr_const_char_c__ptr_Module_ce_ modules;
-    litaC_lita__Metric metrics[litaC_lita__MetricType_MAX_METRIC_TYPES];
-    litaC_u32 totalSourceLines;
-    litaC_u32 totalAllocations;
-    litaC_lita__LitaOptions* options;
-    litaC_char binaryFilename[_MAX_PATH];
-    litaC_char sourceFilename[_MAX_PATH];
-    litaC_symbols__ProgramSymbols programSymbols;
-    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_ genericSymbols;
-    litaC_references__ReferenceDatabase references;
+struct litaC_ast__ArrayTypeSpec {
+    litaC_ast__TypeSpec spec;
+    litaC_ast__Expr* numElements;
     
 };
 
-struct litaC_regex__Regex {
-    re_t reg;
-    
-};
-
-struct litaC_references__Reference {
-    litaC_i64 type;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_cmdline__CmdParser {
-    litaC_array__Array_cb_Option_ce_ options;
-    litaC_array__Array_cb__ptr_const_char_ce_ args;
-    litaC_char errors[256];
-    litaC_cmdline__CmdParserStatus status;
-    const litaC_char* header;
-    
-};
-
-struct litaC_types__EnumTypeInfo {
-    litaC_types__TypeInfo info;
-    litaC_ast__EnumDecl* decl;
+struct litaC_ast__GenericParam {
+    litaC_lex__Token name;
     
 };
 
@@ -15722,90 +15864,69 @@ struct litaC_ast__WhileStmt {
     
 };
 
-struct litaC_ast__FuncCallExpr {
+struct litaC_ast__CallArg {
+    litaC_ast__Expr* argExpr;
+    litaC_lex__Token argName;
+    litaC_i32 index;
+    
+};
+
+struct litaC_ast__NullExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_array__Array_cb__ptr_TypeSpec_ce_ genericArgs;
-    litaC_array__Array_cb__ptr_Expr_ce_ arguments;
     
 };
 
-struct litaC_ast__NumberExpr {
+struct litaC_ast__TernaryExpr {
     litaC_ast__Expr expr;
-    litaC_lex__Token number;
+    litaC_ast__Expr* cond;
+    litaC_ast__Expr* then;
+    litaC_ast__Expr* other;
     
 };
 
-struct litaC_ast__TypeIdentifierExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__TypeSpec* type;
-    litaC_symbols__Symbol* sym;
+struct litaC_json__JsonObject {
+    litaC_map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
+    litaC_array__Array_cb_Entry_ce_ values;
     
 };
 
-struct litaC_json__JsonParser {
-    const litaC_mem__Allocator* alloc;
-    litaC_json__JsonParserStatus status;
-    litaC_char errorMsg[256];
-    litaC_json__Token token;
-    litaC_string_buffer__StringBuffer buffer;
-    const litaC_char* stream;
-    const litaC_char* lineStart;
-    
-};
-
-struct litaC_ast__NameTypeSpec {
-    litaC_ast__TypeSpec spec;
-    const litaC_char* name;
-    litaC_array__Array_cb__ptr_TypeSpec_ce_ genericArgs;
-    
-};
-
-struct litaC_ast__FuncPtrTypeSpec {
-    litaC_ast__TypeSpec spec;
-    litaC_array__Array_cb__ptr_TypeSpec_ce_ args;
-    litaC_ast__TypeSpec* ret;
-    litaC_bool hasVarargs;
-    litaC_array__Array_cb_GenericParam_ce_ genericParams;
-    
-};
-
-struct litaC_parser__Parser {
+struct litaC_symbols__Scope {
+    litaC_symbols__ScopeKind kind;
     const litaC_mem__Allocator* allocator;
     litaC_phase_result__PhaseResult* result;
+    litaC_symbols__Scope* parent;
+    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_ symbols;
+    litaC_module__Module* module;
+    
+};
+
+struct litaC_types_new__TypeCache {
+    const litaC_mem__Allocator* allocator;
+    litaC_map__Map_cb_i64_c__ptr_ConstTypeInfo_ce_ constCache;
+    litaC_map__Map_cb_i64_c__ptr_PtrTypeInfo_ce_ ptrCache;
+    litaC_map__Map_cb_ArrayEntry_c__ptr_ArrayTypeInfo_ce_ arrayCache;
+    litaC_map__Map_cb__ptr_const_char_c__ptr_TypeInfo_ce_ genericCache;
+    
+};
+
+struct litaC_checker__TypeChecker {
     litaC_lita__Lita* lita;
-    const litaC_char* filename;
-    litaC_i32 totalLines;
-    litaC_array__Array_cb_Token_ce_ tokens;
-    litaC_i32 current;
-    litaC_lex__SrcPos currentPos;
-    litaC_i32 breakLevel;
-    litaC_i32 loopLevel;
-    litaC_i32 switchLevel;
-    litaC_i32 funcLevel;
-    litaC_i32 aggregateLevel;
-    litaC_u32 tryLevel;
-    litaC_u64 tryErrorCounter;
-    litaC_bool panicMode;
-    
-};
-
-struct litaC_workspace__TextDocument {
-    litaC_char filename[_MAX_PATH];
-    litaC_string_buffer__StringBuffer text;
-    
-};
-
-struct litaC_protocol__Location {
-    const litaC_char* uri;
-    litaC_protocol__Range range;
-    
-};
-
-struct litaC_types__FuncTypeInfo {
-    litaC_types__GenericTypeInfo info;
-    litaC_types__TypeInfo* returnType;
-    litaC_ast__FuncDecl* decl;
+    litaC_module__Module* current;
+    litaC_array__Array_cb__ptr_Module_ce_ moduleStack;
+    litaC_array__Array_cb__ptr_FuncTypeInfo_ce_ funcDeclStack;
+    litaC_array__Array_cb__ptr_Symbol_ce_ pendingValues;
+    litaC_array__Array_cb__ptr_Symbol_ce_ symbolTypes;
+    litaC_array__Array_cb__ptr_Symbol_ce_ symbolFuncs;
+    litaC_symbols__Symbol* mainEntry;
+    litaC_checker__GenericContext genericContext;
+    litaC_array__Array_cb_Array_cb_GenericParam_ce__ce_ genericParamStack;
+    litaC_array__Array_cb__ptr_Symbol_ce_ genericTemplates;
+    litaC_map__Map_cb_i64_c_Array_cb_i64_ce__ce_ interfaceImpls;
+    litaC_checker__LabelInfo labels[256];
+    litaC_i32 numOfLabels;
+    litaC_types_new__TypeCache typeCache;
+    litaC_u32 randomNameIndex;
+    litaC_bool bypassing;
     
 };
 
@@ -15847,83 +15968,74 @@ struct litaC_ast__ArrayInitExpr {
     
 };
 
-struct litaC_ast__GroupExpr {
+struct litaC_ast__GetExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* groupedExpr;
+    litaC_ast__Expr* object;
+    litaC_ast__IdentifierExpr* field;
+    litaC_i32 flags;
     
 };
 
-struct litaC_ast__SizeOfExpr {
+struct litaC_ast__SetExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* sizeOfExpr;
+    litaC_ast__Expr* object;
+    litaC_ast__IdentifierExpr* field;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* value;
+    litaC_i32 flags;
     
 };
 
-struct litaC_ast__PoisonExpr {
+struct litaC_ast__UnaryExpr {
     litaC_ast__Expr expr;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* unaryExpr;
     
 };
 
-struct litaC_cgen__CGen {
-    litaC_lita__Lita* lita;
-    litaC_string_buffer__StringBuffer buf;
-    litaC_string_buffer__StringBuffer line;
-    litaC_bool format;
-    litaC_i32 indent;
-    litaC_i32 aggregateLevel;
-    litaC_bool bufferFlush;
-    litaC_i32 funcIndex;
-    litaC_i32 tmpVar;
-    litaC_types__FuncTypeInfo* currentFunc;
-    litaC_cgen__CGenScope* currentScope;
-    FILE* output;
-    
-};
-
-
-struct litaC_util__SourceLocation {
-    litaC_util__SourceLocationKind kind;
-    litaC_module__Module* module;
-    litaC_protocol__Location location;
-    union  {
-        litaC_ast__Node* node;
-        litaC_ast__TypeSpec* type;
-        
-    };
-    
-};
-
-
-struct litaC_util__SourceLookup {
-    litaC_lsp__LspServer* lsp;
-    litaC_protocol__Position lookupPos;
-    litaC_util__SourceLocation result;
-    
-};
-
-struct litaC_ast__ConstTypeSpec {
-    litaC_ast__TypeSpec spec;
-    
-};
-
-struct litaC_lex__Lexer {
+struct litaC_module__Module {
+    litaC_module__ModuleId id;
+    litaC_char* text;
+    litaC_ast__ModuleStmt* ast;
+    litaC_symbols__Scope symbols;
+    litaC_symbols__Scope* currentScope;
+    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_* genericSymbols;
+    litaC_i32 flags;
+    litaC_array__Array_cb_ModuleImport_ce_ importedBy;
     const litaC_mem__Allocator* allocator;
-    const litaC_char* filename;
-    litaC_lex__Token token;
-    const litaC_char* stream;
-    const litaC_char* lineStart;
-    litaC_i32 lineNumber;
-    litaC_i32 position;
-    const litaC_char* errorMsg;
     
 };
 
-struct litaC_types__ArrayTypeInfo {
-    litaC_types__TypeInfo info;
-    litaC_types__TypeInfo* arrayOf;
-    litaC_usize length;
-    litaC_ast__Expr* numOfElements;
-    litaC_bool isLengthDefined;
+
+struct litaC_dependency_graph__DependencyGraph {
+    litaC_array__Array_cb__ptr_Symbol_ce_ sortedPrimitives;
+    litaC_array__Array_cb__ptr_Symbol_ce_ sortedGlobals;
+    litaC_array__Array_cb__ptr_Symbol_ce_ sortedAggregates;
+    litaC_array__Array_cb__ptr_Symbol_ce_ sortedFuncs;
+    litaC_array__Array_cb__ptr_Symbol_ce_ sortedSymbols;
+    litaC_map__Map_cb__ptr_Symbol_c_Dependency_ce_ dependencies;
+    litaC_lita__Lita* lita;
+    
+};
+
+
+struct litaC_types__FuncPtrTypeInfo {
+    litaC_types__GenericTypeInfo info;
+    litaC_array__Array_cb_GenericParam_ce_ genericParams;
+    litaC_types__TypeInfo* returnType;
+    litaC_array__Array_cb__ptr_TypeInfo_ce_ paramDecls;
+    litaC_bool hasVarargs;
+    litaC_bool isTrait;
+    
+};
+
+struct litaC_mem__Arena {
+    litaC_mem__Allocator alloc;
+    const litaC_mem__Allocator* decorated;
+    litaC_u8* region;
+    litaC_usize size;
+    litaC_usize current;
+    litaC_mem__Arena* next;
     
 };
 
@@ -15955,60 +16067,27 @@ struct litaC_ast__CastExpr {
     
 };
 
-struct litaC_ast__InitExpr {
+struct litaC_ast__InitArgExpr {
     litaC_ast__Expr expr;
-    litaC_array__Array_cb__ptr_TypeSpec_ce_ genericArgs;
-    litaC_ast__NameTypeSpec* type;
-    litaC_array__Array_cb__ptr_InitArgExpr_ce_ arguments;
-    
-};
-
-struct litaC_ast__SubscriptSetExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__Expr* index;
-    litaC_lex__TokenType operator;
+    litaC_lex__Token fieldName;
+    litaC_i32 argPosition;
     litaC_ast__Expr* value;
     
 };
 
-struct litaC_references__FieldReference {
-    litaC_i64 parent;
-    litaC_i32 offset;
-    litaC_lex__SrcPos pos;
+struct litaC_ast__SubscriptGetExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* object;
+    litaC_ast__Expr* index;
     
 };
 
-struct litaC_lsp__LspServer {
-    litaC_mem__LinearAllocator requestAllocator;
-    litaC_mem__LinearAllocator applicationAllocator;
-    litaC_lita__Lita* lita;
-    litaC_string_buffer__StringBuffer message;
-    litaC_string_buffer__StringBuffer output;
-    litaC_string_buffer__StringBuffer outbound;
-    litaC_bool isInitialized;
-    litaC_bool isRunning;
-    litaC_workspace__Workspace workspace;
-    FILE* logFile;
-    
-};
-
-struct litaC_module__Module {
-    litaC_module__ModuleId id;
-    litaC_char* text;
-    litaC_ast__ModuleStmt* ast;
-    litaC_symbols__Scope symbols;
-    litaC_symbols__Scope* currentScope;
-    litaC_map__Map_cb__ptr_const_char_c__ptr_Symbol_ce_* genericSymbols;
-    litaC_i32 flags;
-    litaC_array__Array_cb_ModuleImport_ce_ importedBy;
-    const litaC_mem__Allocator* allocator;
-    
-};
-
-struct litaC_types__AggregateTypeInfo {
-    litaC_types__GenericTypeInfo info;
-    litaC_ast__AggregateDecl* decl;
+struct litaC_cmdline__CmdParser {
+    litaC_array__Array_cb_Option_ce_ options;
+    litaC_array__Array_cb__ptr_const_char_ce_ args;
+    litaC_char errors[256];
+    litaC_cmdline__CmdParserStatus status;
+    const litaC_char* header;
     
 };
 
@@ -16041,75 +16120,35 @@ struct litaC_ast__ReturnStmt {
     
 };
 
-struct litaC_ast__OffsetOfExpr {
+struct litaC_ast__FuncCallExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* object;
+    litaC_array__Array_cb__ptr_TypeSpec_ce_ genericArgs;
+    litaC_array__Array_cb_CallArg_ce_ arguments;
+    
+};
+
+struct litaC_ast__NumberExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__Token number;
+    
+};
+
+struct litaC_ast__TypeIdentifierExpr {
     litaC_ast__Expr expr;
     litaC_ast__TypeSpec* type;
-    litaC_lex__Token field;
-    
-};
-
-struct litaC_ast__TypeOfExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* typeOfExpr;
-    litaC_ast__TypeSpec* type;
-    
-};
-
-struct litaC_ast__ArrayTypeSpec {
-    litaC_ast__TypeSpec spec;
-    litaC_ast__Expr* numElements;
-    
-};
-
-struct litaC_ast__GenericParam {
-    litaC_lex__Token name;
-    
-};
-
-struct litaC_ast__EnumDecl {
-    litaC_ast__Decl decl;
-    litaC_array__Array_cb__ptr_EnumFieldEntryDecl_ce_ fields;
-    
-};
-
-struct litaC_ast__ContinueStmt {
-    litaC_ast__Stmt stmt;
-    
-};
-
-struct litaC_ast__IfStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* cond;
-    litaC_ast__Stmt* then;
-    litaC_ast__Stmt* elseStmt;
-    
-};
-
-struct litaC_ast__VarFieldDecl {
-    litaC_ast__Decl decl;
-    litaC_ast__TypeSpec* type;
-    litaC_ast__Expr* defaultExpr;
-    
-};
-
-struct litaC_ast__BinaryExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* left;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* right;
-    
-};
-
-struct litaC_ast__IdentifierExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__NameTypeSpec* type;
     litaC_symbols__Symbol* sym;
     
 };
 
-struct litaC_ast__StringExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__Token string;
+struct litaC_json__JsonParser {
+    const litaC_mem__Allocator* alloc;
+    litaC_json__JsonParserStatus status;
+    litaC_char errorMsg[256];
+    litaC_json__Token token;
+    litaC_string_buffer__StringBuffer buffer;
+    const litaC_char* stream;
+    const litaC_char* lineStart;
     
 };
 
@@ -26284,14 +26323,21 @@ litaC_ast__Expr* litaC_ast_new__NewInitExpr(litaC_lex__SrcPos litaC_startPos,lit
     
 }
 
-litaC_ast__Expr* litaC_ast_new__NewFuncCallExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_object,litaC_array__Array_cb__ptr_Expr_ce_ litaC_arguments,litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_genericArgs,const litaC_mem__Allocator* litaC_allocator) {
+litaC_ast__Expr* litaC_ast_new__NewFuncCallExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_object,litaC_array__Array_cb_CallArg_ce_ litaC_arguments,litaC_array__Array_cb__ptr_TypeSpec_ce_ litaC_genericArgs,const litaC_mem__Allocator* litaC_allocator) {
     litaC_ast__FuncCallExpr* litaC_expr = litaC_mem__new_cb_FuncCallExpr_ce_(litaC_allocator);
     litaC_expr->expr.stmt.node.kind = litaC_ast__StmtKind_FUNC_CALL_EXPR;
     litaC_expr->expr.stmt.node.startPos = litaC_startPos;
     litaC_expr->expr.stmt.node.endPos = litaC_endPos;
     litaC_expr->object = litaC_ast__Node_becomeParentOf_cb_Expr_ce_(&((litaC_expr->expr.stmt.node)), litaC_object);
-    litaC_expr->arguments = *(litaC_ast__Node_becomeParentOfChildren_cb__ptr_Expr_ce_(&((litaC_expr->expr.stmt.node)), &((litaC_arguments))));
     litaC_expr->genericArgs = litaC_genericArgs;
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb_CallArg_ce_(&((litaC_arguments)));litaC_i += 1) {
+        {
+            litaC_ast__Node_becomeParentOf_cb_Expr_ce_(&((litaC_expr->expr.stmt.node)), litaC_array__Array_get_cb_CallArg_ce_(&((litaC_arguments)), litaC_i).argExpr);
+            
+            
+        }
+    }
+    litaC_expr->arguments = litaC_arguments;
     return (litaC_ast__Expr*)litaC_expr;
     
     
@@ -26819,6 +26865,29 @@ litaC_void litaC_ast__Node_setSrcPos(litaC_ast__Node* litaC_n,litaC_lex__SrcPos 
     
 }
 
+litaC_array__Array_cb_CallArg_ce_* litaC_ast__Node_becomeParentOfChildrenCallArgs(litaC_ast__Node* litaC_n,litaC_array__Array_cb_CallArg_ce_* litaC_children) {
+    litaC_i32 litaC_size = litaC_array__Array_size_cb_CallArg_ce_(litaC_children);
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
+        {
+            litaC_ast__Expr* litaC_child = litaC_array__Array_get_cb_CallArg_ce_(litaC_children, litaC_i).argExpr;
+            if(litaC_child) {
+                {
+                    litaC_ast__Node_becomeParentOf_cb_Expr_ce_(litaC_n, litaC_child);
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+    }
+    return litaC_children;
+    
+    
+}
+
 litaC_bool litaC_ast__IsExpr(litaC_ast__Node* litaC_node) {
     if(!(litaC_node)) {
         return litaC_false;
@@ -27299,6 +27368,12 @@ litaC_bool litaC_ast__Expr_isConstExpr(litaC_ast__Expr* litaC_expr) {
         }
     }
     return litaC_false;
+    
+    
+}
+
+litaC_i32 litaC_ast__CallArgSort(litaC_ast__CallArg litaC_a,litaC_ast__CallArg litaC_b) {
+    return litaC_a.index - litaC_b.index;
     
     
 }
@@ -30547,6 +30622,37 @@ litaC_ast__Decl* litaC_ast_copy__CopyDecl(litaC_ast__Decl* litaC_decl,const lita
     
 }
 
+litaC_array__Array_cb_CallArg_ce_ litaC_ast_copy__CopyCallArgs(litaC_array__Array_cb_CallArg_ce_* litaC_args,const litaC_mem__Allocator* litaC_allocator) {
+    if(litaC_array__Array_empty_cb_CallArg_ce_(litaC_args)) {
+        {
+            return (litaC_array__Array_cb_CallArg_ce_) {
+                
+            };
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_array__Array_cb_CallArg_ce_ litaC_result = litaC_array__ArrayInit_cb_CallArg_ce_(litaC_array__Array_size_cb_CallArg_ce_(litaC_args), litaC_allocator);
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb_CallArg_ce_(litaC_args);litaC_i += 1) {
+        {
+            litaC_ast__CallArg litaC_arg = litaC_array__Array_get_cb_CallArg_ce_(litaC_args, litaC_i);
+            litaC_ast__Expr* litaC_argExpr = litaC_ast_copy__CopyExpr(litaC_arg.argExpr, litaC_allocator);
+            litaC_array__Array_add_cb_CallArg_ce_(&((litaC_result)), (litaC_ast__CallArg) {
+                .argExpr = litaC_argExpr,
+                .argName = litaC_arg.argName
+            });
+            
+            
+        }
+    }
+    return litaC_result;
+    
+    
+}
+
 litaC_array__Array_cb__ptr_Expr_ce_ litaC_ast_copy__CopyExprs(litaC_array__Array_cb__ptr_Expr_ce_* litaC_exprs,const litaC_mem__Allocator* litaC_allocator) {
     if(litaC_array__Array_empty_cb__ptr_Expr_ce_(litaC_exprs)) {
         {
@@ -30680,7 +30786,7 @@ litaC_ast__Expr* litaC_ast_copy__CopyExpr(litaC_ast__Expr* litaC_expr,const lita
         case litaC_ast__StmtKind_FUNC_CALL_EXPR: {
             {
                 litaC_ast__FuncCallExpr* litaC_original = (litaC_ast__FuncCallExpr*)litaC_expr;
-                litaC_ast__Expr* litaC_copy = litaC_ast_new__NewFuncCallExpr(litaC_original->expr.stmt.node.startPos, litaC_original->expr.stmt.node.endPos, litaC_ast_copy__CopyExpr(litaC_original->object, litaC_allocator), litaC_ast_copy__CopyExprs(&((litaC_original->arguments)), litaC_allocator), litaC_ast_copy__CopyTypeSpecs(litaC_original->genericArgs, litaC_allocator), litaC_allocator);
+                litaC_ast__Expr* litaC_copy = litaC_ast_new__NewFuncCallExpr(litaC_original->expr.stmt.node.startPos, litaC_original->expr.stmt.node.endPos, litaC_ast_copy__CopyExpr(litaC_original->object, litaC_allocator), litaC_ast_copy__CopyCallArgs(&((litaC_original->arguments)), litaC_allocator), litaC_ast_copy__CopyTypeSpecs(litaC_original->genericArgs, litaC_allocator), litaC_allocator);
                 return litaC_copy;
                 
                 
@@ -37302,9 +37408,9 @@ litaC_bool litaC_generics__ReplaceTypes(litaC_generics__Template* litaC_template
                         
                     }
                 }
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_Expr_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb_CallArg_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
                     {
-                        litaC_generics__ReplaceTypes(litaC_template, &((litaC_array__Array_get_cb__ptr_Expr_ce_(&((litaC_expr->arguments)), litaC_i)->stmt.node)));
+                        litaC_generics__ReplaceTypes(litaC_template, &((litaC_array__Array_get_cb_CallArg_ce_(&((litaC_expr->arguments)), litaC_i).argExpr->stmt.node)));
                         
                         
                     }
@@ -40045,7 +40151,7 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncIdentifierExpr(litaC_check
     
 }
 
-litaC_bool litaC_checker_expr__TypeChecker_isMethodSyntax(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_array__Array_cb__ptr_Expr_ce_* litaC_suppliedArgs) {
+litaC_bool litaC_checker_expr__TypeChecker_isMethodSyntax(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs) {
     assert(litaC_expr != NULL);
     if(litaC_expr->object->stmt.node.kind != litaC_ast__StmtKind_GET_EXPR) {
         {
@@ -40079,7 +40185,9 @@ litaC_bool litaC_checker_expr__TypeChecker_isMethodSyntax(litaC_checker__TypeChe
     } 
     
     litaC_getExpr->flags |= litaC_ast__GetExprFlags_IS_METHOD_ARG;
-    litaC_array__Array_insertAt_cb__ptr_Expr_ce_(litaC_suppliedArgs, 0, litaC_getExpr->object);
+    litaC_array__Array_insertAt_cb_CallArg_ce_(litaC_suppliedArgs, 0, (litaC_ast__CallArg) {
+        .argExpr = litaC_getExpr->object
+    });
     return litaC_true;
     
     
@@ -40188,65 +40296,16 @@ litaC_ast__Expr* litaC_checker_expr__TypeChecker_coerceTypeWithUsing(litaC_check
     
 }
 
-litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_array__Array_cb__ptr_Expr_ce_* litaC_suppliedArgs) {
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls))) && litaC_i < litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_suppliedArgs);litaC_i += 1) {
+litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__TypeInfo* litaC_funcType,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs) {
+    assert(litaC_types__IsFuncLike(litaC_funcType));
+    if(litaC_funcType->kind == litaC_types__TypeKind_FUNC_PTR) {
         {
-            litaC_ast__Expr* litaC_argExpr = litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_suppliedArgs, litaC_i);
-            if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_argExpr))) {
+            litaC_types__FuncPtrTypeInfo* litaC_funcPtr = (litaC_types__FuncPtrTypeInfo*)litaC_funcType;
+            for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls))) && litaC_i < litaC_array__Array_size_cb_CallArg_ce_(litaC_suppliedArgs);litaC_i += 1) {
                 {
-                    return litaC_false;
-                    
-                    
-                    
-                }
-                
-            } 
-            
-            litaC_types__TypeInfo* litaC_paramInfo = litaC_array__Array_get_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)), litaC_i);
-            litaC_types__TypeInfo* litaC_argInfo = litaC_argExpr->operand.typeInfo;
-            if(litaC_argInfo->kind == litaC_types__TypeKind_ARRAY) {
-                {
-                    continue;
-                    
-                    
-                }
-                
-            } 
-            
-            if(!(litaC_types__IsAggregateLike(litaC_argInfo))) {
-                {
-                    continue;
-                    
-                    
-                }
-                
-            } 
-            
-            if(!(litaC_types__IsAggregateLike(litaC_paramInfo)) || litaC_types__IsTraitLike(litaC_paramInfo)) {
-                {
-                    continue;
-                    
-                    
-                }
-                
-            } 
-            
-            litaC_argExpr = litaC_checker_expr__TypeChecker_coerceTypeWithUsing(litaC_this, litaC_argExpr, litaC_argInfo, litaC_paramInfo);
-            litaC_argInfo = litaC_argExpr->operand.typeInfo;
-            if(litaC_types__IsPtrAggregate(litaC_paramInfo) && (!(litaC_types__IsPtrAggregate(litaC_argInfo)) && litaC_argInfo->kind != litaC_types__TypeKind_NULL)) {
-                {
-                    if(litaC_argExpr->operand.isRightValue) {
-                        {
-                            continue;
-                            
-                            
-                        }
-                        
-                    } 
-                    
-                    litaC_ast__Expr* litaC_groupExpr = litaC_ast_new__NewGroupExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_argExpr, litaC_this->lita->allocator);
-                    litaC_argExpr = litaC_ast_new__NewUnaryExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_lex__TokenType_BAND, litaC_groupExpr, litaC_this->lita->allocator);
-                    if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_argExpr))) {
+                    litaC_ast__Expr* litaC_argExpr = litaC_array__Array_get_cb_CallArg_ce_(litaC_suppliedArgs, litaC_i).argExpr;
+                    litaC_types__TypeInfo* litaC_paramInfo = litaC_array__Array_get_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)), litaC_i);
+                    if(!(litaC_checker_expr__TypeChecker_coerceFuncArg(litaC_this, litaC_expr, litaC_i, litaC_argExpr, litaC_paramInfo, litaC_suppliedArgs))) {
                         {
                             return litaC_false;
                             
@@ -40259,21 +40318,122 @@ litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_checker__TypeChe
                     
                     
                 }
-                
-            } else {
-                if(litaC_types__IsAggregate(litaC_paramInfo) && litaC_types__IsPtrAggregate(litaC_argInfo)) {
-                    {
-                        litaC_ast__Expr* litaC_groupExpr = litaC_ast_new__NewGroupExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_argExpr, litaC_this->lita->allocator);
-                        litaC_argExpr = litaC_ast_new__NewUnaryExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_lex__TokenType_STAR, litaC_groupExpr, litaC_this->lita->allocator);
-                        if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_argExpr))) {
-                            {
-                                return litaC_false;
-                                
-                                
-                                
-                            }
+            }
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_types__FuncTypeInfo* litaC_funcInfo = (litaC_types__FuncTypeInfo*)litaC_funcType;
+            for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params))) && litaC_i < litaC_array__Array_size_cb_CallArg_ce_(litaC_suppliedArgs);litaC_i += 1) {
+                {
+                    litaC_ast__Expr* litaC_argExpr = litaC_array__Array_get_cb_CallArg_ce_(litaC_suppliedArgs, litaC_i).argExpr;
+                    litaC_types__TypeInfo* litaC_paramInfo = litaC_array__Array_get_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)), litaC_i)->typeInfo;
+                    if(!(litaC_checker_expr__TypeChecker_coerceFuncArg(litaC_this, litaC_expr, litaC_i, litaC_argExpr, litaC_paramInfo, litaC_suppliedArgs))) {
+                        {
+                            return litaC_false;
                             
-                        } 
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    
+                    
+                }
+            }
+            
+            
+        }
+    } 
+    
+    return litaC_true;
+    
+    
+}
+
+litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArg(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_i32 litaC_index,litaC_ast__Expr* litaC_argExpr,litaC_types__TypeInfo* litaC_paramInfo,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs) {
+    if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_argExpr))) {
+        {
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_types__TypeInfo* litaC_argInfo = litaC_argExpr->operand.typeInfo;
+    if(litaC_argInfo->kind == litaC_types__TypeKind_ARRAY) {
+        {
+            return litaC_true;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(!(litaC_types__IsAggregateLike(litaC_argInfo))) {
+        {
+            return litaC_true;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(!(litaC_types__IsAggregateLike(litaC_paramInfo)) || litaC_types__IsTraitLike(litaC_paramInfo)) {
+        {
+            return litaC_true;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_argExpr = litaC_checker_expr__TypeChecker_coerceTypeWithUsing(litaC_this, litaC_argExpr, litaC_argInfo, litaC_paramInfo);
+    litaC_argInfo = litaC_argExpr->operand.typeInfo;
+    if(litaC_types__IsPtrAggregate(litaC_paramInfo) && (!(litaC_types__IsPtrAggregate(litaC_argInfo)) && litaC_argInfo->kind != litaC_types__TypeKind_NULL)) {
+        {
+            if(litaC_argExpr->operand.isRightValue) {
+                {
+                    return litaC_true;
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_ast__Expr* litaC_groupExpr = litaC_ast_new__NewGroupExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_argExpr, litaC_this->lita->allocator);
+            litaC_argExpr = litaC_ast_new__NewUnaryExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_lex__TokenType_BAND, litaC_groupExpr, litaC_this->lita->allocator);
+            if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_argExpr))) {
+                {
+                    return litaC_false;
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } else {
+        if(litaC_types__IsAggregate(litaC_paramInfo) && litaC_types__IsPtrAggregate(litaC_argInfo)) {
+            {
+                litaC_ast__Expr* litaC_groupExpr = litaC_ast_new__NewGroupExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_argExpr, litaC_this->lita->allocator);
+                litaC_argExpr = litaC_ast_new__NewUnaryExpr(litaC_argExpr->stmt.node.startPos, litaC_argExpr->stmt.node.endPos, litaC_lex__TokenType_STAR, litaC_groupExpr, litaC_this->lita->allocator);
+                if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_argExpr))) {
+                    {
+                        return litaC_false;
                         
                         
                         
@@ -40281,22 +40441,25 @@ litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_checker__TypeChe
                     
                 } 
                 
-            } 
+                
+                
+            }
             
-            litaC_ast__Node_becomeParentOf_cb_Expr_ce_(&((litaC_expr->expr.stmt.node)), litaC_argExpr);
-            litaC_array__Array_set_cb__ptr_Expr_ce_(litaC_suppliedArgs, litaC_i, litaC_argExpr);
-            
-            
-        }
-    }
+        } 
+        
+    } 
+    
+    litaC_ast__Node_becomeParentOf_cb_Expr_ce_(&((litaC_expr->expr.stmt.node)), litaC_argExpr);
+    litaC_array__Array_set_cb_CallArg_ce_(litaC_suppliedArgs, litaC_index, (litaC_ast__CallArg) {
+        .argExpr = litaC_argExpr
+    });
     return litaC_true;
     
     
 }
 
-litaC_bool litaC_checker_expr__TypeChecker_checkNumberOfArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,const litaC_char* litaC_funcName,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_i32 litaC_numberOfSuppliedArgs,litaC_i32 litaC_numberOfDefaultArgs) {
+litaC_bool litaC_checker_expr__TypeChecker_checkNumberOfArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,const litaC_char* litaC_funcName,litaC_i32 litaC_maxNumOfArgs,litaC_bool litaC_hasVarargs,litaC_i32 litaC_numberOfSuppliedArgs,litaC_i32 litaC_numberOfDefaultArgs) {
     assert(litaC_expr != NULL);
-    litaC_i32 litaC_maxNumOfArgs = litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)));
     if(litaC_maxNumOfArgs == litaC_numberOfSuppliedArgs) {
         {
             return litaC_true;
@@ -40329,7 +40492,7 @@ litaC_bool litaC_checker_expr__TypeChecker_checkNumberOfArgs(litaC_checker__Type
         
     } 
     
-    if(litaC_funcPtr->hasVarargs) {
+    if(litaC_hasVarargs) {
         {
             return litaC_true;
             
@@ -40671,11 +40834,12 @@ litaC_types__TypeInfo* litaC_checker_expr__TypeChecker_inferredType(litaC_checke
     
 }
 
-litaC_types__FuncPtrTypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__FuncPtrTypeInfo* litaC_funcPtr,litaC_array__Array_cb__ptr_Expr_ce_* litaC_suppliedArgs,litaC_bool litaC_isMethodCall) {
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_Expr_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
+litaC_types__TypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__TypeInfo* litaC_funcType,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs,litaC_bool litaC_isMethodCall) {
+    assert(litaC_types__IsFuncLike(litaC_funcType));
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb_CallArg_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
         {
-            litaC_ast__Expr* litaC_arg = litaC_array__Array_get_cb__ptr_Expr_ce_(&((litaC_expr->arguments)), litaC_i);
-            if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_arg))) {
+            litaC_ast__CallArg litaC_arg = litaC_array__Array_get_cb_CallArg_ce_(&((litaC_expr->arguments)), litaC_i);
+            if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_arg.argExpr))) {
                 {
                     goto err;
                     
@@ -40702,7 +40866,7 @@ litaC_types__FuncPtrTypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(
     
     if(litaC_objectExpr->stmt.node.kind != litaC_ast__StmtKind_FUNC_IDENTIFIER_EXPR) {
         {
-            return litaC_funcPtr;
+            return litaC_funcType;
             
             
             
@@ -40713,39 +40877,48 @@ litaC_types__FuncPtrTypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(
     litaC_ast__IdentifierExpr* litaC_funcExpr = (litaC_ast__IdentifierExpr*)litaC_objectExpr;
     litaC_ast__NameTypeSpec* litaC_nameSpec = litaC_funcExpr->type;
     litaC_nameSpec->spec.typeInfo = NULL;
-    litaC_i32 litaC_size = litaC_array__Array_size_cb_GenericParam_ce_(&((litaC_funcPtr->genericParams)));
-    litaC_array__Array_init_cb__ptr_TypeSpec_ce_(&((litaC_nameSpec->genericArgs)), litaC_size, litaC_this->lita->allocator);
-    litaC_array__Array_init_cb__ptr_TypeSpec_ce_(&((litaC_expr->genericArgs)), litaC_size, litaC_this->lita->allocator);
-    litaC_i32 litaC_suppliedArgsSize = litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_suppliedArgs);
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
+    litaC_array__Array_cb_GenericParam_ce_ litaC_genericParams;
+    if(litaC_funcType->kind == litaC_types__TypeKind_FUNC_PTR) {
         {
-            litaC_ast__GenericParam litaC_genericParam = litaC_array__Array_get_cb_GenericParam_ce_(&((litaC_funcPtr->genericParams)), litaC_i);
-            for(litaC_i32 litaC_j = 0;litaC_j < litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)));litaC_j += 1) {
+            litaC_types__FuncPtrTypeInfo* litaC_funcPtr = (litaC_types__FuncPtrTypeInfo*)litaC_funcType;
+            litaC_genericParams = litaC_funcPtr->genericParams;
+            litaC_i32 litaC_size = litaC_array__Array_size_cb_GenericParam_ce_(&((litaC_genericParams)));
+            litaC_array__Array_init_cb__ptr_TypeSpec_ce_(&((litaC_nameSpec->genericArgs)), litaC_size, litaC_this->lita->allocator);
+            litaC_array__Array_init_cb__ptr_TypeSpec_ce_(&((litaC_expr->genericArgs)), litaC_size, litaC_this->lita->allocator);
+            litaC_i32 litaC_suppliedArgsSize = litaC_array__Array_size_cb_CallArg_ce_(litaC_suppliedArgs);
+            for(litaC_i32 litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
                 {
-                    litaC_types__TypeInfo* litaC_paramType = litaC_array__Array_get_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)), litaC_j);
-                    if(litaC_j >= litaC_suppliedArgsSize) {
+                    litaC_ast__GenericParam litaC_genericParam = litaC_array__Array_get_cb_GenericParam_ce_(&((litaC_genericParams)), litaC_i);
+                    for(litaC_i32 litaC_j = 0;litaC_j < litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)));litaC_j += 1) {
                         {
-                            break;
+                            litaC_types__TypeInfo* litaC_paramType = litaC_array__Array_get_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)), litaC_j);
+                            if(litaC_j >= litaC_suppliedArgsSize) {
+                                {
+                                    break;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            litaC_types__TypeInfo* litaC_argType = litaC_array__Array_get_cb_CallArg_ce_(litaC_suppliedArgs, litaC_j).argExpr->operand.typeInfo;
+                            assert(litaC_argType != NULL);
+                            assert(litaC_paramType != NULL);
+                            litaC_types__TypeInfo* litaC_inferredType = litaC_checker_expr__TypeChecker_inferredType(litaC_this, litaC_genericParam.name, litaC_paramType, litaC_argType);
+                            if(litaC_inferredType) {
+                                {
+                                    litaC_array__Array_add_cb__ptr_TypeSpec_ce_(&((litaC_nameSpec->genericArgs)), litaC_types__TypeInfo_asTypeSpec(litaC_inferredType, litaC_this->lita->allocator));
+                                    break;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
                             
                             
                         }
-                        
-                    } 
-                    
-                    litaC_types__TypeInfo* litaC_argType = litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_suppliedArgs, litaC_j)->operand.typeInfo;
-                    assert(litaC_argType != NULL);
-                    assert(litaC_paramType != NULL);
-                    litaC_types__TypeInfo* litaC_inferredType = litaC_checker_expr__TypeChecker_inferredType(litaC_this, litaC_genericParam.name, litaC_paramType, litaC_argType);
-                    if(litaC_inferredType) {
-                        {
-                            litaC_array__Array_add_cb__ptr_TypeSpec_ce_(&((litaC_nameSpec->genericArgs)), litaC_types__TypeInfo_asTypeSpec(litaC_inferredType, litaC_this->lita->allocator));
-                            break;
-                            
-                            
-                        }
-                        
-                    } 
-                    
+                    }
                     
                     
                 }
@@ -40753,12 +40926,62 @@ litaC_types__FuncPtrTypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(
             
             
         }
-    }
+        
+    } else {
+        {
+            litaC_types__FuncTypeInfo* litaC_funcInfo = (litaC_types__FuncTypeInfo*)litaC_funcType;
+            litaC_genericParams = litaC_funcInfo->decl->decl.genericParams;
+            litaC_i32 litaC_size = litaC_array__Array_size_cb_GenericParam_ce_(&((litaC_genericParams)));
+            litaC_array__Array_init_cb__ptr_TypeSpec_ce_(&((litaC_nameSpec->genericArgs)), litaC_size, litaC_this->lita->allocator);
+            litaC_array__Array_init_cb__ptr_TypeSpec_ce_(&((litaC_expr->genericArgs)), litaC_size, litaC_this->lita->allocator);
+            litaC_i32 litaC_suppliedArgsSize = litaC_array__Array_size_cb_CallArg_ce_(litaC_suppliedArgs);
+            for(litaC_i32 litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
+                {
+                    litaC_ast__GenericParam litaC_genericParam = litaC_array__Array_get_cb_GenericParam_ce_(&((litaC_genericParams)), litaC_i);
+                    for(litaC_i32 litaC_j = 0;litaC_j < litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)));litaC_j += 1) {
+                        {
+                            litaC_types__TypeInfo* litaC_paramType = litaC_array__Array_get_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)), litaC_j)->typeInfo;
+                            if(litaC_j >= litaC_suppliedArgsSize) {
+                                {
+                                    break;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            litaC_types__TypeInfo* litaC_argType = litaC_array__Array_get_cb_CallArg_ce_(litaC_suppliedArgs, litaC_j).argExpr->operand.typeInfo;
+                            assert(litaC_argType != NULL);
+                            assert(litaC_paramType != NULL);
+                            litaC_types__TypeInfo* litaC_inferredType = litaC_checker_expr__TypeChecker_inferredType(litaC_this, litaC_genericParam.name, litaC_paramType, litaC_argType);
+                            if(litaC_inferredType) {
+                                {
+                                    litaC_array__Array_add_cb__ptr_TypeSpec_ce_(&((litaC_nameSpec->genericArgs)), litaC_types__TypeInfo_asTypeSpec(litaC_inferredType, litaC_this->lita->allocator));
+                                    break;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            
+                            
+                        }
+                    }
+                    
+                    
+                }
+            }
+            
+            
+        }
+    } 
+    
     if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_expr->object))) {
         {
-            for(litaC_i32 litaC_i = litaC_array__Array_size_cb__ptr_TypeSpec_ce_(&((litaC_expr->genericArgs)));litaC_i < litaC_array__Array_size_cb_GenericParam_ce_(&((litaC_funcPtr->genericParams)));litaC_i += 1) {
+            for(litaC_i32 litaC_i = litaC_array__Array_size_cb__ptr_TypeSpec_ce_(&((litaC_expr->genericArgs)));litaC_i < litaC_array__Array_size_cb_GenericParam_ce_(&((litaC_genericParams)));litaC_i += 1) {
                 {
-                    litaC_ast__GenericParam litaC_param = litaC_array__Array_get_cb_GenericParam_ce_(&((litaC_funcPtr->genericParams)), litaC_i);
+                    litaC_ast__GenericParam litaC_param = litaC_array__Array_get_cb_GenericParam_ce_(&((litaC_genericParams)), litaC_i);
                     litaC_checker_expr__TypeChecker_errorInferGenericParameter(litaC_this, &((litaC_expr->expr)), &(litaC_param));
                     
                     
@@ -40786,22 +41009,219 @@ litaC_types__FuncPtrTypeInfo* litaC_checker_expr__TypeChecker_inferFuncCallExpr(
         
     } 
     
-    if(litaC_type->kind == litaC_types__TypeKind_FUNC) {
+    return litaC_type;
+    
+    err:;
+    
+    return NULL;
+    
+    
+}
+
+litaC_bool litaC_checker_expr__TypeChecker_checkFuncCallArgs(litaC_checker__TypeChecker* litaC_this,litaC_ast__FuncCallExpr* litaC_expr,litaC_types__TypeInfo* litaC_funcType,litaC_array__Array_cb_CallArg_ce_* litaC_suppliedArgs) {
+    assert(litaC_funcType != NULL);
+    assert(litaC_types__IsFuncLike(litaC_funcType));
+    litaC_i32 litaC_numberOfSuppliedArgs = litaC_array__Array_size_cb_CallArg_ce_(litaC_suppliedArgs);
+    litaC_bool litaC_success = litaC_true;
+    litaC_bool litaC_hasVarargs = litaC_false;
+    litaC_i32 litaC_i = 0;
+    if(litaC_funcType->kind == litaC_types__TypeKind_FUNC_PTR) {
         {
-            litaC_types__FuncTypeInfo* litaC_funcInfo = (litaC_types__FuncTypeInfo*)litaC_type;
-            return litaC_types__FuncTypeInfo_asPtr(litaC_funcInfo, &((litaC_this->typeCache)));
+            litaC_types__FuncPtrTypeInfo* litaC_funcPtr = (litaC_types__FuncPtrTypeInfo*)litaC_funcType;
+            litaC_hasVarargs = litaC_funcPtr->hasVarargs;
+            for(;litaC_i < litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)));litaC_i += 1) {
+                {
+                    litaC_types__TypeInfo* litaC_p = litaC_array__Array_get_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)), litaC_i);
+                    if(litaC_i < litaC_numberOfSuppliedArgs) {
+                        {
+                            litaC_ast__CallArg* litaC_callArg = litaC_array__Array_getPtr_cb_CallArg_ce_(litaC_suppliedArgs, litaC_i);
+                            litaC_ast__Expr* litaC_arg = litaC_callArg->argExpr;
+                            if(litaC_callArg->argName.type == litaC_lex__TokenType_IDENTIFIER) {
+                                {
+                                    litaC_checker_expr__TypeChecker_errorNamedArgumentsForFuncPtr(litaC_this, litaC_arg);
+                                    litaC_success = litaC_false;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            litaC_callArg->index = litaC_i;
+                            litaC_checker__TypeChecker_checkTypeCompatibility(litaC_this, litaC_arg->stmt.node.startPos, litaC_p, litaC_arg->operand.typeInfo);
+                            litaC_arg->expectedType = litaC_p;
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    
+                    
+                }
+            }
             
+            
+        }
+        
+    } else {
+        {
+            litaC_types__FuncTypeInfo* litaC_funcInfo = (litaC_types__FuncTypeInfo*)litaC_funcType;
+            litaC_bool litaC_hasNamedArg = litaC_false;
+            litaC_hasVarargs = litaC_funcInfo->decl->params->isVararg;
+            for(;litaC_i < litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)));litaC_i += 1) {
+                {
+                    litaC_ast__ParameterDecl* litaC_p = litaC_array__Array_get_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)), litaC_i);
+                    if(litaC_i < litaC_numberOfSuppliedArgs) {
+                        {
+                            litaC_ast__CallArg* litaC_callArg = litaC_array__Array_getPtr_cb_CallArg_ce_(litaC_suppliedArgs, litaC_i);
+                            litaC_i32 litaC_paramIndex = litaC_i;
+                            if(litaC_callArg->argName.type == litaC_lex__TokenType_IDENTIFIER) {
+                                {
+                                    litaC_hasNamedArg = litaC_true;
+                                    litaC_paramIndex = -(1);
+                                    for(litaC_i32 litaC_index = 0;litaC_index < litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)));litaC_index += 1) {
+                                        {
+                                            litaC_ast__ParameterDecl* litaC_param = litaC_array__Array_get_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)), litaC_index);
+                                            if(litaC_string_view__StringView_equalsStringView(litaC_param->decl.name.value.str, litaC_callArg->argName.value.str)) {
+                                                {
+                                                    litaC_paramIndex = litaC_index;
+                                                    break;
+                                                    
+                                                    
+                                                }
+                                                
+                                            } 
+                                            
+                                            
+                                            
+                                        }
+                                    }
+                                    if(litaC_paramIndex < 0) {
+                                        {
+                                            litaC_checker_expr__TypeChecker_errorInvalidNamedArgument(litaC_this, litaC_callArg->argName.pos, &((litaC_callArg->argName.value.str)), litaC_funcInfo);
+                                            litaC_success = litaC_false;
+                                            
+                                            
+                                        }
+                                        
+                                    } 
+                                    
+                                    
+                                    
+                                }
+                                
+                            } else {
+                                if(litaC_hasNamedArg) {
+                                    {
+                                        if(!(litaC_string_view__StringView_equalsStringView(litaC_p->decl.name.value.str, litaC_callArg->argName.value.str))) {
+                                            {
+                                                litaC_checker_expr__TypeChecker_errorFixedArgumentAfterNamed(litaC_this, litaC_callArg->argExpr);
+                                                litaC_success = litaC_false;
+                                                
+                                                
+                                            }
+                                            
+                                        } 
+                                        
+                                        
+                                        
+                                    }
+                                    
+                                } 
+                                
+                            } 
+                            
+                            litaC_ast__Expr* litaC_arg = litaC_callArg->argExpr;
+                            litaC_callArg->index = litaC_paramIndex;
+                            litaC_checker__TypeChecker_checkTypeCompatibility(litaC_this, litaC_arg->stmt.node.startPos, litaC_p->typeInfo, litaC_arg->operand.typeInfo);
+                            litaC_arg->expectedType = litaC_p->typeInfo;
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    
+                    
+                }
+            }
+            for(litaC_i32 litaC_index = 0;litaC_index < litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)));litaC_index += 1) {
+                {
+                    litaC_ast__ParameterDecl* litaC_param = litaC_array__Array_get_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)), litaC_index);
+                    if(litaC_param->defaultExpr) {
+                        {
+                            litaC_bool litaC_hasValue = litaC_false;
+                            for(litaC_i32 litaC_j = 0;litaC_j < litaC_array__Array_size_cb_CallArg_ce_(litaC_suppliedArgs);litaC_j += 1) {
+                                {
+                                    litaC_ast__CallArg* litaC_callArg = litaC_array__Array_getPtr_cb_CallArg_ce_(litaC_suppliedArgs, litaC_j);
+                                    if(litaC_callArg->index == litaC_index) {
+                                        {
+                                            litaC_hasValue = litaC_true;
+                                            break;
+                                            
+                                            
+                                        }
+                                        
+                                    } 
+                                    
+                                    
+                                    
+                                }
+                            }
+                            if(!(litaC_hasValue)) {
+                                {
+                                    litaC_array__Array_add_cb_CallArg_ce_(litaC_suppliedArgs, (litaC_ast__CallArg) {
+                                        .argExpr = litaC_param->defaultExpr,
+                                        .index = litaC_index
+                                    });
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    
+                    
+                }
+            }
+            
+            
+        }
+    } 
+    
+    if(litaC_hasVarargs) {
+        {
+            for(;litaC_i < litaC_numberOfSuppliedArgs;litaC_i += 1) {
+                {
+                    litaC_ast__CallArg* litaC_arg = litaC_array__Array_getPtr_cb_CallArg_ce_(litaC_suppliedArgs, litaC_i);
+                    litaC_arg->index = litaC_i;
+                    if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_arg->argExpr))) {
+                        {
+                            return litaC_false;
+                            
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    
+                    
+                }
+            }
             
             
         }
         
     } 
     
-    return (litaC_types__FuncPtrTypeInfo*)litaC_type;
-    
-    err:;
-    
-    return NULL;
+    return litaC_success;
     
     
 }
@@ -40832,14 +41252,20 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
     
     litaC_bool litaC_isMethod = litaC_false;
     litaC_i32 litaC_numberOfDefaultArgs = 0;
-    litaC_array__Array_cb__ptr_Expr_ce_ litaC_suppliedArgs = litaC_array__ArrayInit_cb__ptr_Expr_ce_(litaC_array__Array_size_cb__ptr_Expr_ce_(&((litaC_expr->arguments))) + 1, litaC_this->lita->allocator);
-    litaC_array__Array_addAll_cb__ptr_Expr_ce_(&((litaC_suppliedArgs)), &((litaC_expr->arguments)));
-    litaC_types__FuncPtrTypeInfo* litaC_funcPtr = NULL;
+    litaC_array__Array_cb_CallArg_ce_ litaC_suppliedArgs = litaC_array__ArrayInit_cb_CallArg_ce_(litaC_array__Array_size_cb_CallArg_ce_(&((litaC_expr->arguments))) + 1, litaC_this->lita->allocator);
+    litaC_array__Array_addAll_cb_CallArg_ce_(&((litaC_suppliedArgs)), &((litaC_expr->arguments)));
+    litaC_bool litaC_hasVarargs = litaC_false;
+    litaC_i32 litaC_maxNumOfArgs = 0;
+    litaC_types__TypeInfo* litaC_returnType = NULL;
+    litaC_array__Array_cb_GenericParam_ce_ litaC_genericParams;
     if(litaC_objectType->kind == litaC_types__TypeKind_FUNC) {
         {
             litaC_types__FuncTypeInfo* litaC_funcInfo = (litaC_types__FuncTypeInfo*)litaC_objectType;
             litaC_isMethod = (litaC_funcInfo->decl->flags & litaC_ast__FuncFlags_IS_METHOD);
-            litaC_funcPtr = litaC_types__FuncTypeInfo_asPtr(litaC_funcInfo, &((litaC_this->typeCache)));
+            litaC_maxNumOfArgs = litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)));
+            litaC_hasVarargs = litaC_funcInfo->decl->params->isVararg;
+            litaC_returnType = litaC_funcInfo->returnType;
+            litaC_genericParams = litaC_funcInfo->decl->decl.genericParams;
             for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)));litaC_i += 1) {
                 {
                     litaC_ast__ParameterDecl* litaC_p = litaC_array__Array_get_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)), litaC_i);
@@ -40862,7 +41288,11 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
         
     } else {
         {
-            litaC_funcPtr = (litaC_types__FuncPtrTypeInfo*)litaC_objectType;
+            litaC_types__FuncPtrTypeInfo* litaC_funcPtr = (litaC_types__FuncPtrTypeInfo*)litaC_objectType;
+            litaC_maxNumOfArgs = litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)));
+            litaC_hasVarargs = litaC_funcPtr->hasVarargs;
+            litaC_returnType = litaC_funcPtr->returnType;
+            litaC_genericParams = litaC_funcPtr->genericParams;
             if(litaC_expr->object->stmt.node.kind == litaC_ast__StmtKind_FUNC_IDENTIFIER_EXPR) {
                 {
                     litaC_ast__IdentifierExpr* litaC_idExpr = (litaC_ast__IdentifierExpr*)litaC_expr->object;
@@ -40889,10 +41319,10 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
         }
     } 
     
-    litaC_bool litaC_isMethodCall = litaC_isMethod && litaC_checker_expr__TypeChecker_isMethodSyntax(litaC_this, litaC_expr, litaC_funcPtr, &(litaC_suppliedArgs));
-    litaC_i32 litaC_numberOfSuppliedArgs = litaC_array__Array_size_cb__ptr_Expr_ce_(&((litaC_suppliedArgs)));
-    litaC_checker_expr__TypeChecker_checkNumberOfArgs(litaC_this, litaC_expr, litaC_objectType->name, litaC_funcPtr, litaC_numberOfSuppliedArgs, litaC_numberOfDefaultArgs);
-    if(!(litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_this, litaC_expr, litaC_funcPtr, &((litaC_suppliedArgs))))) {
+    litaC_bool litaC_isMethodCall = litaC_isMethod && litaC_checker_expr__TypeChecker_isMethodSyntax(litaC_this, litaC_expr, &(litaC_suppliedArgs));
+    litaC_i32 litaC_numberOfSuppliedArgs = litaC_array__Array_size_cb_CallArg_ce_(&((litaC_suppliedArgs)));
+    litaC_checker_expr__TypeChecker_checkNumberOfArgs(litaC_this, litaC_expr, litaC_objectType->name, litaC_maxNumOfArgs, litaC_hasVarargs, litaC_numberOfSuppliedArgs, litaC_numberOfDefaultArgs);
+    if(!(litaC_checker_expr__TypeChecker_coerceFuncArgs(litaC_this, litaC_expr, litaC_objectType, &((litaC_suppliedArgs))))) {
         {
             return litaC_false;
             
@@ -40902,12 +41332,12 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
         
     } 
     
-    if(!(litaC_array__Array_empty_cb_GenericParam_ce_(&((litaC_funcPtr->genericParams))))) {
+    if(!(litaC_array__Array_empty_cb_GenericParam_ce_(&((litaC_genericParams))))) {
         {
             if(litaC_array__Array_empty_cb__ptr_TypeSpec_ce_(&((litaC_expr->genericArgs)))) {
                 {
-                    litaC_funcPtr = litaC_checker_expr__TypeChecker_inferFuncCallExpr(litaC_this, litaC_expr, litaC_funcPtr, &((litaC_suppliedArgs)), litaC_isMethodCall);
-                    if(!(litaC_funcPtr)) {
+                    litaC_objectType = litaC_checker_expr__TypeChecker_inferFuncCallExpr(litaC_this, litaC_expr, litaC_objectType, &((litaC_suppliedArgs)), litaC_isMethodCall);
+                    if(!(litaC_objectType)) {
                         {
                             return litaC_false;
                             
@@ -40915,6 +41345,24 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
                             
                         }
                         
+                    } 
+                    
+                    assert(litaC_types__IsFuncLike(litaC_objectType));
+                    if(litaC_objectType->kind == litaC_types__TypeKind_FUNC) {
+                        {
+                            litaC_types__FuncTypeInfo* litaC_funcInfo = (litaC_types__FuncTypeInfo*)litaC_objectType;
+                            litaC_returnType = litaC_funcInfo->returnType;
+                            
+                            
+                        }
+                        
+                    } else {
+                        {
+                            litaC_types__FuncPtrTypeInfo* litaC_funcPtr = (litaC_types__FuncPtrTypeInfo*)litaC_objectType;
+                            litaC_returnType = litaC_funcPtr->returnType;
+                            
+                            
+                        }
                     } 
                     
                     
@@ -40942,52 +41390,20 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
         
     } 
     
-    litaC_i32 litaC_i = 0;
-    for(;litaC_i < litaC_array__Array_size_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)));litaC_i += 1) {
+    if(!(litaC_checker_expr__TypeChecker_checkFuncCallArgs(litaC_this, litaC_expr, litaC_objectType, &((litaC_suppliedArgs))))) {
         {
-            litaC_types__TypeInfo* litaC_p = litaC_array__Array_get_cb__ptr_TypeInfo_ce_(&((litaC_funcPtr->paramDecls)), litaC_i);
-            if(litaC_i < litaC_numberOfSuppliedArgs) {
-                {
-                    litaC_ast__Expr* litaC_arg = litaC_array__Array_get_cb__ptr_Expr_ce_(&((litaC_suppliedArgs)), litaC_i);
-                    litaC_checker__TypeChecker_checkTypeCompatibility(litaC_this, litaC_arg->stmt.node.startPos, litaC_p, litaC_arg->operand.typeInfo);
-                    litaC_arg->expectedType = litaC_p;
-                    
-                    
-                }
-                
-            } 
+            return litaC_false;
             
-            
-            
-        }
-    }
-    if(litaC_funcPtr->hasVarargs) {
-        {
-            for(;litaC_i < litaC_numberOfSuppliedArgs;litaC_i += 1) {
-                {
-                    litaC_ast__Expr* litaC_arg = litaC_array__Array_get_cb__ptr_Expr_ce_(&((litaC_suppliedArgs)), litaC_i);
-                    if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_arg))) {
-                        {
-                            return litaC_false;
-                            
-                            
-                            
-                        }
-                        
-                    } 
-                    
-                    
-                    
-                }
-            }
             
             
         }
         
     } 
     
-    litaC_expr->arguments = *(litaC_ast__Node_becomeParentOfChildren_cb__ptr_Expr_ce_(&((litaC_expr->expr.stmt.node)), &((litaC_suppliedArgs))));
-    litaC_expr->expr.operand.typeInfo = litaC_funcPtr->returnType;
+    assert(litaC_returnType != NULL);
+    litaC_array__Array_sort_cb_CallArg_ce_(&((litaC_suppliedArgs)), litaC_ast__CallArgSort);
+    litaC_expr->arguments = *(litaC_ast__Node_becomeParentOfChildrenCallArgs(&((litaC_expr->expr.stmt.node)), &((litaC_suppliedArgs))));
+    litaC_expr->expr.operand.typeInfo = litaC_returnType;
     litaC_expr->expr.operand.isRightValue = litaC_true;
     return litaC_true;
     
@@ -43073,6 +43489,56 @@ litaC_void litaC_checker_expr__TypeChecker_errorMissingGenericArguments(litaC_ch
     }
     litaC_string_buffer__StringBuffer_appendStrn(&((litaC_sb)), "]", 1);
     litaC_phase_result__PhaseResult_addErrorStr(&((litaC_this->lita->result)), litaC_expr->stmt.node.startPos, &((litaC_sb)));
+    
+}
+
+litaC_void litaC_checker_expr__TypeChecker_errorFixedArgumentAfterNamed(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_arg) {
+    assert(litaC_arg != NULL);
+    litaC_string_buffer__StringBuffer litaC_sb = litaC_string_buffer__StringBufferInit(128, litaC_this->lita->allocator);
+    litaC_string_buffer__StringBuffer_appendStr(&((litaC_sb)), "Named argument specifications must appear after all fixed arguments have been specified");
+    litaC_phase_result__PhaseResult_addErrorStr(&((litaC_this->lita->result)), litaC_arg->stmt.node.startPos, &((litaC_sb)));
+    
+}
+
+litaC_void litaC_checker_expr__TypeChecker_errorNamedArgumentsForFuncPtr(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr) {
+    assert(litaC_expr != NULL);
+    litaC_string_buffer__StringBuffer litaC_sb = litaC_string_buffer__StringBufferInit(128, litaC_this->lita->allocator);
+    litaC_string_buffer__StringBuffer_appendStr(&((litaC_sb)), "Named arguments are not allowed on function pointers");
+    litaC_phase_result__PhaseResult_addErrorStr(&((litaC_this->lita->result)), litaC_expr->stmt.node.startPos, &((litaC_sb)));
+    
+}
+
+litaC_void litaC_checker_expr__TypeChecker_errorInvalidNamedArgument(litaC_checker__TypeChecker* litaC_this,litaC_lex__SrcPos litaC_pos,litaC_string_view__StringView* litaC_name,litaC_types__FuncTypeInfo* litaC_funcInfo) {
+    litaC_string_buffer__StringBuffer litaC_sb = litaC_string_buffer__StringBufferInit(256, litaC_this->lita->allocator);
+    litaC_string_buffer__StringBuffer_append(&((litaC_sb)), "Invalid named parameter: '%.*s'; no parameter with that name found in 'func %s(", litaC_name->length, litaC_name->buffer, litaC_funcInfo->info.typeInfo.name);
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)));litaC_i += 1) {
+        {
+            litaC_ast__ParameterDecl* litaC_param = litaC_array__Array_get_cb__ptr_ParameterDecl_ce_(&((litaC_funcInfo->decl->params->params)), litaC_i);
+            if(litaC_i > 0) {
+                {
+                    litaC_string_buffer__StringBuffer_append(&((litaC_sb)), ", ");
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_string_buffer__StringBuffer_append(&((litaC_sb)), "%s: ", litaC_lex__Token_asString(&((litaC_param->decl.name))));
+            if(litaC_param->typeInfo) {
+                {
+                    litaC_types__TypeInfo_toString(litaC_param->typeInfo, &((litaC_sb)));
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+    }
+    litaC_string_buffer__StringBuffer_append(&((litaC_sb)), ")'");
+    litaC_phase_result__PhaseResult_addErrorStr(&((litaC_this->lita->result)), litaC_pos, &((litaC_sb)));
     
 }
 
@@ -45407,7 +45873,7 @@ litaC_ast__Expr* litaC_parser__Parser_primary(litaC_parser__Parser* litaC_p) {
 
 litaC_ast__Expr* litaC_parser__Parser_finishFunctionCall(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr) {
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_pos(litaC_p);
-    litaC_array__Array_cb__ptr_Expr_ce_ litaC_arguments =  {
+    litaC_array__Array_cb_CallArg_ce_ litaC_arguments =  {
         
     };
     if(!(litaC_parser__Parser_arguments(litaC_p, &(litaC_arguments)))) {
@@ -47181,14 +47647,64 @@ litaC_bool litaC_parser__Parser_structArguments(litaC_parser__Parser* litaC_p,li
     
 }
 
-litaC_bool litaC_parser__Parser_arguments(litaC_parser__Parser* litaC_p,litaC_array__Array_cb__ptr_Expr_ce_* litaC_arguments) {
+litaC_bool litaC_parser__Parser_arguments(litaC_parser__Parser* litaC_p,litaC_array__Array_cb_CallArg_ce_* litaC_arguments) {
     if(!(litaC_parser__Parser_check(litaC_p, litaC_lex__TokenType_RIGHT_PAREN))) {
         {
-            litaC_array__Array_init_cb__ptr_Expr_ce_(litaC_arguments, 8, litaC_p->allocator);
+            litaC_array__Array_init_cb_CallArg_ce_(litaC_arguments, 8, litaC_p->allocator);
             do {
                 {
-                    litaC_ast__Expr* litaC_expr = litaC_parser__Parser_expression(litaC_p);
-                    litaC_array__Array_add_cb__ptr_Expr_ce_(litaC_arguments, litaC_expr);
+                    litaC_ast__CallArg litaC_arg =  {
+                        
+                    };
+                    if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_DOT)) {
+                        {
+                            litaC_lex__Token* litaC_identifier = litaC_parser__Parser_consume(litaC_p, litaC_lex__TokenType_IDENTIFIER, litaC_error_codes__ErrorCode_MISSING_IDENTIFIER);
+                            if(!(litaC_identifier)) {
+                                {
+                                    goto err;
+                                    
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            litaC_arg.argName = *(litaC_identifier);
+                            if(litaC_parser__Parser_check(litaC_p, litaC_lex__TokenType_COLON)) {
+                                {
+                                    litaC_parser__Parser_consume(litaC_p, litaC_lex__TokenType_COLON, litaC_error_codes__ErrorCode_MISSING_COLON);
+                                    
+                                    
+                                }
+                                
+                            } else {
+                                if(litaC_parser__Parser_check(litaC_p, litaC_lex__TokenType_EQUALS)) {
+                                    {
+                                        litaC_parser__Parser_consume(litaC_p, litaC_lex__TokenType_EQUALS, litaC_error_codes__ErrorCode_MISSING_EQUALS);
+                                        
+                                        
+                                    }
+                                    
+                                } else {
+                                    {
+                                        litaC_parser__Parser_errorAtToken(litaC_p, litaC_parser__Parser_peek(litaC_p), litaC_error_codes__ErrorCode_MISSING_COLON);
+                                        goto err;
+                                        
+                                        
+                                        
+                                    }
+                                } 
+                                
+                            } 
+                            
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    litaC_arg.argExpr = litaC_parser__Parser_expression(litaC_p);
+                    litaC_array__Array_add_cb_CallArg_ce_(litaC_arguments, litaC_arg);
                     
                     
                 }
@@ -50990,7 +51506,7 @@ litaC_void litaC_cgen__CGen_emitTraitFuncCall(litaC_cgen__CGen* litaC_this,litaC
                     }
                 } 
                 
-                if(litaC_array__Array_size_cb__ptr_Expr_ce_(&((litaC_expr->arguments))) > 0) {
+                if(litaC_array__Array_size_cb_CallArg_ce_(&((litaC_expr->arguments))) > 0) {
                     {
                         litaC_cgen__CGen_emitStrn(litaC_this, ", ", 2);
                         
@@ -51983,7 +52499,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                 } 
                 
                 litaC_i32 litaC_i = 0;
-                for(;litaC_i < litaC_array__Array_size_cb__ptr_Expr_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
+                for(;litaC_i < litaC_array__Array_size_cb_CallArg_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
                     {
                         if(litaC_i > 0) {
                             {
@@ -51994,7 +52510,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                             
                         } 
                         
-                        litaC_ast__Expr* litaC_arg = litaC_array__Array_get_cb__ptr_Expr_ce_(&((litaC_expr->arguments)), litaC_i);
+                        litaC_ast__Expr* litaC_arg = litaC_array__Array_get_cb_CallArg_ce_(&((litaC_expr->arguments)), litaC_i).argExpr;
                         if(!(litaC_cgen__CGen_emitTraitCast(litaC_this, litaC_arg))) {
                             {
                                 litaC_cgen__CGen_emitStmt(litaC_this, &((litaC_arg->stmt)));
@@ -59941,9 +60457,9 @@ litaC_bool litaC_util__SourceLookup_visitExpr(litaC_util__SourceLookup* litaC_th
                     
                 } 
                 
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb__ptr_Expr_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_array__Array_size_cb_CallArg_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
                     {
-                        litaC_ast__Expr* litaC_arg = litaC_array__Array_get_cb__ptr_Expr_ce_(&((litaC_expr->arguments)), litaC_i);
+                        litaC_ast__Expr* litaC_arg = litaC_array__Array_get_cb_CallArg_ce_(&((litaC_expr->arguments)), litaC_i).argExpr;
                         if(litaC_util__SourceLookup_visitExpr(litaC_this, litaC_arg)) {
                             {
                                 return litaC_true;
@@ -63064,37 +63580,14 @@ litaC_ast__FuncCallExpr* litaC_mem__new_cb_FuncCallExpr_ce_(const litaC_mem__All
     
 }
 
-litaC_array__Array_cb__ptr_Expr_ce_* litaC_ast__Node_becomeParentOfChildren_cb__ptr_Expr_ce_(litaC_ast__Node* litaC_n,litaC_array__Array_cb__ptr_Expr_ce_* litaC_children) {
-    litaC_i32 litaC_size = litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_children);
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
-        {
-            litaC_ast__Expr* litaC_child = litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_children, litaC_i);
-            if(litaC_child) {
-                {
-                    litaC_ast__Node_becomeParentOf_cb_Expr_ce_(litaC_n, litaC_child);
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-    }
-    return litaC_children;
-    
-    
-}
-
 LITAC_INLINE 
-litaC_i32 litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a) {
+litaC_i32 litaC_array__Array_size_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a) {
     return litaC_a->length;
     
     
 }
 
-litaC_ast__Expr* litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index) {
+litaC_ast__CallArg litaC_array__Array_get_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index) {
     assert(litaC_index >= 0 && litaC_index < litaC_a->length);
     return litaC_a->elements[litaC_index];
     
@@ -63222,6 +63715,43 @@ litaC_ast__GroupExpr* litaC_mem__new_cb_GroupExpr_ce_(const litaC_mem__Allocator
 litaC_ast__ArrayInitExpr* litaC_mem__new_cb_ArrayInitExpr_ce_(const litaC_mem__Allocator* litaC_a) {
     litaC_ast__ArrayInitExpr* litaC_result = (litaC_ast__ArrayInitExpr*)litaC_mem__Allocator_calloc(litaC_a, 1, sizeof(litaC_ast__ArrayInitExpr));
     return litaC_result;
+    
+    
+}
+
+litaC_array__Array_cb__ptr_Expr_ce_* litaC_ast__Node_becomeParentOfChildren_cb__ptr_Expr_ce_(litaC_ast__Node* litaC_n,litaC_array__Array_cb__ptr_Expr_ce_* litaC_children) {
+    litaC_i32 litaC_size = litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_children);
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
+        {
+            litaC_ast__Expr* litaC_child = litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_children, litaC_i);
+            if(litaC_child) {
+                {
+                    litaC_ast__Node_becomeParentOf_cb_Expr_ce_(litaC_n, litaC_child);
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+    }
+    return litaC_children;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_i32 litaC_array__Array_size_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a) {
+    return litaC_a->length;
+    
+    
+}
+
+litaC_ast__Expr* litaC_array__Array_get_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index) {
+    assert(litaC_index >= 0 && litaC_index < litaC_a->length);
+    return litaC_a->elements[litaC_index];
     
     
 }
@@ -64550,6 +65080,85 @@ litaC_void litaC_array__Array_add_cb_GenericParam_ce_(litaC_array__Array_cb_Gene
         
     }
     litaC_a->length += 1;
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_array__Array_empty_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a) {
+    return litaC_a->length == 0;
+    
+    
+}
+
+litaC_array__Array_cb_CallArg_ce_ litaC_array__ArrayInit_cb_CallArg_ce_(litaC_i32 litaC_initialSize,const litaC_mem__Allocator* litaC_alloc) {
+    litaC_array__Array_cb_CallArg_ce_ litaC_array =  {
+        
+    };
+    litaC_array__Array_init_cb_CallArg_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
+    return litaC_array;
+    
+    
+}
+
+litaC_void litaC_array__Array_init_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_mem__Allocator* litaC_alloc) {
+    litaC_a->alloc = litaC_alloc;
+    litaC_a->length = 0;
+    litaC_a->capacity = litaC_initialSize;
+    litaC_usize litaC_length = (sizeof(litaC_ast__CallArg) * (litaC_u64)litaC_initialSize);
+    if(litaC_initialSize > 0) {
+        {
+            litaC_a->elements = (litaC_ast__CallArg*)litaC_mem__Allocator_alloc(litaC_alloc, litaC_length);
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_a->elements = NULL;
+            
+            
+        }
+    } 
+    
+    
+}
+
+litaC_void litaC_array__Array_add_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_ast__CallArg litaC_element) {
+    if(litaC_a->length + 1 > litaC_a->capacity) {
+        {
+            litaC_array__ArrayGrow_cb_CallArg_ce_(litaC_a, 1);
+            
+            
+        }
+        
+    } 
+    
+    {
+        litaC_a->elements[litaC_a->length] = litaC_element;
+        
+        
+    }
+    litaC_a->length += 1;
+    
+}
+
+litaC_void litaC_array__ArrayGrow_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_increment) {
+    litaC_i32 litaC_doubleCurrent = litaC_a->capacity * 2;
+    litaC_i32 litaC_minReq = litaC_a->length + litaC_increment;
+    litaC_i32 litaC_n = litaC_minReq;
+    if(litaC_doubleCurrent > litaC_minReq) {
+        {
+            litaC_n = litaC_doubleCurrent;
+            
+            
+        }
+        
+    } 
+    
+    litaC_usize litaC_newlength = (sizeof(litaC_ast__CallArg) * (litaC_usize)litaC_n);
+    litaC_usize litaC_oldlength = (sizeof(litaC_ast__CallArg) * (litaC_usize)litaC_a->capacity);
+    litaC_a->elements = (litaC_ast__CallArg*)litaC_mem__Allocator_realloc(litaC_a->alloc, (litaC_void*)litaC_a->elements, litaC_oldlength, litaC_newlength);
+    litaC_a->capacity = litaC_n;
     
 }
 
@@ -66627,11 +67236,11 @@ litaC_types__FuncTypeInfo* litaC_array__Array_pop_cb__ptr_FuncTypeInfo_ce_(litaC
     
 }
 
-litaC_void litaC_array__Array_insertAt_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__Expr* litaC_element) {
+litaC_void litaC_array__Array_insertAt_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__CallArg litaC_element) {
     assert(litaC_index >= 0 && litaC_index <= litaC_a->length);
     if(litaC_index == litaC_a->length) {
         {
-            litaC_array__Array_add_cb__ptr_Expr_ce_(litaC_a, litaC_element);
+            litaC_array__Array_add_cb_CallArg_ce_(litaC_a, litaC_element);
             return;
             
             
@@ -66643,19 +67252,19 @@ litaC_void litaC_array__Array_insertAt_cb__ptr_Expr_ce_(litaC_array__Array_cb__p
     litaC_a->length += 1;
     if(litaC_a->length + 1 > litaC_a->capacity) {
         {
-            litaC_array__ArrayGrow_cb__ptr_Expr_ce_(litaC_a, 1);
+            litaC_array__ArrayGrow_cb_CallArg_ce_(litaC_a, 1);
             
             
         }
         
     } 
     
-    memmove((litaC_void*)(&(litaC_a->elements[litaC_index + 1])), (const litaC_void*)(&(litaC_a->elements[litaC_index])), (litaC_a->length - litaC_index) * sizeof(litaC_ast__Expr*));
-    litaC_array__Array_set_cb__ptr_Expr_ce_(litaC_a, litaC_index, litaC_element);
+    memmove((litaC_void*)(&(litaC_a->elements[litaC_index + 1])), (const litaC_void*)(&(litaC_a->elements[litaC_index])), (litaC_a->length - litaC_index) * sizeof(litaC_ast__CallArg));
+    litaC_array__Array_set_cb_CallArg_ce_(litaC_a, litaC_index, litaC_element);
     
 }
 
-litaC_void litaC_array__Array_set_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__Expr* litaC_element) {
+litaC_void litaC_array__Array_set_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__CallArg litaC_element) {
     assert(litaC_index >= 0 && litaC_index < litaC_a->length);
     {
         litaC_a->elements[litaC_index] = litaC_element;
@@ -66665,7 +67274,14 @@ litaC_void litaC_array__Array_set_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Ex
     
 }
 
-litaC_void litaC_array__Array_addAll_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr_Expr_ce_* litaC_a,litaC_array__Array_cb__ptr_Expr_ce_* litaC_other) {
+litaC_ast__CallArg* litaC_array__Array_getPtr_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 litaC_index) {
+    assert(litaC_index >= 0 && litaC_index < litaC_a->length);
+    return &(litaC_a->elements[litaC_index]);
+    
+    
+}
+
+litaC_void litaC_array__Array_addAll_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_array__Array_cb_CallArg_ce_* litaC_other) {
     if(!(litaC_other) || litaC_other->length == 0) {
         {
             return;
@@ -66678,15 +67294,119 @@ litaC_void litaC_array__Array_addAll_cb__ptr_Expr_ce_(litaC_array__Array_cb__ptr
     
     if(litaC_a->length + litaC_other->length > litaC_a->capacity) {
         {
-            litaC_array__ArrayGrow_cb__ptr_Expr_ce_(litaC_a, litaC_other->length);
+            litaC_array__ArrayGrow_cb_CallArg_ce_(litaC_a, litaC_other->length);
             
             
         }
         
     } 
     
-    memcpy((litaC_void*)(&(litaC_a->elements[litaC_a->length])), (const litaC_void*)(&(litaC_other->elements[0])), litaC_other->length * sizeof(litaC_ast__Expr*));
+    memcpy((litaC_void*)(&(litaC_a->elements[litaC_a->length])), (const litaC_void*)(&(litaC_other->elements[0])), litaC_other->length * sizeof(litaC_ast__CallArg));
     litaC_a->length += litaC_other->length;
+    
+}
+
+litaC_void litaC_array__Array_sort_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_a,litaC_i32 (*litaC_sorter)(litaC_ast__CallArg,litaC_ast__CallArg)) {
+    litaC_array__QuickSort_cb_CallArg_ce_(litaC_a, litaC_sorter);
+    
+}
+
+litaC_void litaC_array__QuickSort_cb_CallArg_ce_(litaC_array__Array_cb_CallArg_ce_* litaC_array,litaC_i32 (*litaC_comp)(litaC_ast__CallArg,litaC_ast__CallArg)) {
+    litaC_i32 litaC_beg[300] =  {
+        
+    };
+    litaC_i32 litaC_end[300] =  {
+        
+    };
+    litaC_i32 litaC_i = 0;
+    litaC_i32 litaC_L = 0;
+    litaC_i32 litaC_R = 0;
+    litaC_i32 litaC_swap = 0;
+    litaC_ast__CallArg litaC_piv;
+    litaC_beg[0] = 0;
+    litaC_end[0] = litaC_array->length;
+    while(litaC_i >= 0) {
+        {
+            litaC_L = litaC_beg[litaC_i];
+            litaC_R = litaC_end[litaC_i] - 1;
+            if(litaC_L < litaC_R) {
+                {
+                    litaC_piv = litaC_array->elements[litaC_L];
+                    while(litaC_L < litaC_R) {
+                        {
+                            while(litaC_L < litaC_R && litaC_comp(litaC_array->elements[litaC_R], litaC_piv) >= 0) {
+                                {
+                                    litaC_R -= 1;
+                                    
+                                    
+                                }
+                            }
+                            if(litaC_L < litaC_R) {
+                                {
+                                    litaC_array->elements[litaC_L] = litaC_array->elements[litaC_R];
+                                    litaC_L += 1;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            while(litaC_L < litaC_R && litaC_comp(litaC_array->elements[litaC_L], litaC_piv) <= 0) {
+                                {
+                                    litaC_L += 1;
+                                    
+                                    
+                                }
+                            }
+                            if(litaC_L < litaC_R) {
+                                {
+                                    litaC_array->elements[litaC_R] = litaC_array->elements[litaC_L];
+                                    litaC_R -= 1;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            litaC_array->elements[litaC_L] = litaC_piv;
+                            litaC_beg[litaC_i + 1] = litaC_L + 1;
+                            litaC_end[litaC_i + 1] = litaC_end[litaC_i];
+                            litaC_end[litaC_i + 0] = litaC_L;
+                            litaC_i += 1;
+                            if(litaC_end[litaC_i] - litaC_beg[litaC_i] > litaC_end[litaC_i - 1] - litaC_beg[litaC_i - 1]) {
+                                {
+                                    litaC_swap = litaC_beg[litaC_i];
+                                    litaC_beg[litaC_i] = litaC_beg[litaC_i - 1];
+                                    litaC_beg[litaC_i - 1] = litaC_swap;
+                                    litaC_swap = litaC_end[litaC_i];
+                                    litaC_end[litaC_i] = litaC_end[litaC_i - 1];
+                                    litaC_end[litaC_i - 1] = litaC_swap;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            
+                            
+                        }
+                    }
+                    
+                    
+                }
+                
+            } else {
+                {
+                    litaC_i -= 1;
+                    
+                    
+                }
+            } 
+            
+            
+            
+        }
+    }
     
 }
 
