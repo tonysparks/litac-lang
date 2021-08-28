@@ -147,7 +147,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         }
 
         genericSym.genericCallsiteModule = checker.current
-        genericSym.genericParams = genericDecl.genericParams.copy()
+        genericSym.genericParams = genericDecl.genericParams.copy(checker.allocator)
 
         checker.current.genericSymbols.put(newNameStr, genericSym)
         if(genericSym.decl.kind == StmtKind.FUNC_DECL) {
@@ -164,7 +164,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
 
             var originalDecl = sym.decl as (*GenericDecl)
 
-            genericDecl.genericParams = originalDecl.genericParams.copy()
+            genericDecl.genericParams = originalDecl.genericParams.copy(checker.allocator)
         }
         else {
             // Remove any generic parameters from the declaration that

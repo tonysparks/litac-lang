@@ -604,7 +604,7 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
 }
 
 public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator) : *AggregateDecl {
-    var copy = NewAggregateDecl(decl.startPos, decl.endPos, decl.kind, decl.name, decl.genericParams.copy(), Array<FieldStmt>{}, decl.flags, allocator) as (*AggregateDecl)
+    var copy = NewAggregateDecl(decl.startPos, decl.endPos, decl.kind, decl.name, decl.genericParams.copy(allocator), Array<FieldStmt>{}, decl.flags, allocator) as (*AggregateDecl)
     copy.attributes = decl.attributes
     copy.fields = ArrayInit<FieldStmt>(decl.fields.size(), allocator)
 
@@ -682,7 +682,7 @@ public func CopyFuncDecl(decl: *FuncDecl, allocator: *const Allocator) : *FuncDe
     var copy = NewFuncDecl(decl.startPos,
                            decl.endPos,
                            decl.name,
-                           decl.genericParams.copy(),
+                           decl.genericParams.copy(allocator),
                            CopyParameters(decl.params, allocator),
                            CopyStmt(decl.body, allocator),
                            CopyTypeSpec(decl.returnType, allocator),
@@ -718,7 +718,7 @@ public func CopyParameters(params: ParametersStmt, allocator: *const Allocator) 
 
 
 public func CopyTypedefDecl(decl: *TypedefDecl, allocator: *const Allocator) : *TypedefDecl {
-    var copy = NewTypedefDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams.copy(), CopyTypeSpec(decl.type, allocator), allocator)
+    var copy = NewTypedefDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams.copy(allocator), CopyTypeSpec(decl.type, allocator), allocator)
     copy.attributes = decl.attributes
     return copy as (*TypedefDecl)
 }
