@@ -1,0 +1,46 @@
+{
+    "description": "Unicode Support",
+    "disabled": false,
+    "debug": true,
+    "disableLines": true,
+    "includeTypeInfos": false,
+
+    // Unicode escape sequences don't work with TCC :S
+    "buildCmd": "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
+
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Char Unicode Literals",
+            "definitions": `
+                //import "std/unicode/utf8"
+                import "std/libc"
+                //@foreign
+                //func strcmp(a: *const char, b: *const char) : i32;
+            `,
+            "code": `
+                var c = 'ⵙ'
+                assert(c == 'ⵙ') // test overflow
+
+                var z = '\u0021'
+                assert(z == '!')
+
+
+                var s = "ⵙ"
+
+                assert(strcmp(s, "ⵙ") == 0)
+                assert(strcmp(s, "\u2D59") == 0)
+            `,
+            //"output": `ⵙ`
+        },
+    ]
+}

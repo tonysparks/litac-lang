@@ -134,7 +134,7 @@ public struct any {
         emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
         emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
         for(sym in getSymbolsToTest("test")) {
-            emit("  __lita_test_printf(\"Testing '%s'\\n\")", sym.name)
+            emit("  __lita_test_printf(\"Testing '%s'\\\\n\")\n", sym.name)
             var alias = addImport(moduleName, sym.moduleFilename)
             if(alias) {
                 emit("  %s::%s()\n", alias, sym.name)
@@ -143,8 +143,7 @@ public struct any {
                 emit("  %s()\n", sym.name)
             }
         }
-        emit("  return 0;
-                }")
+        emit("  return 0; }")
 
         addDeclaration(moduleName, emitStr())
         setMainSymbol(moduleName, testFunctionName)

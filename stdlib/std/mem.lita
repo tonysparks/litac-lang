@@ -447,7 +447,7 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
     offset -= this.mem as (usize)
 
     if((offset + size) > this.size) {
-        c::printf("Failed to allocate: %zu\n", size)
+        c::printf("Failed to allocate: %zu, will exceed limit of %zu\n", size, this.size)
         return null
     }
 

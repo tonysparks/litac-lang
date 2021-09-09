@@ -107,7 +107,7 @@ public struct LitaOptions {
 
 
 public func (this: *Lita) init(options: *LitaOptions) {
-    var size: usize = 1024 * 1024 * 1000;
+    var size: usize = 1024 * 1024 * 1024;
     this.linearAllocator.init(defaultAllocator.alloc(size), size)
 
     var allocator = (&this.linearAllocator) as (*const Allocator)

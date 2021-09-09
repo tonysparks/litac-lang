@@ -1824,12 +1824,18 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.CHAR_EXPR: {
             var expr = s as (*CharExpr)
-            var c = escapeStrings[expr.character.intValue]
-            if(c != 0) {
-                this.buf.append("'%s'", c)
+            var value = expr.character.intValue
+            if(value < 256 && value >= 0) {
+                var c = escapeStrings[value]
+                if(c != 0) {
+                    this.buf.append("'%s'", c)
+                }
+                else {
+                    this.buf.append("'%c'", value as (char))
+                }
             }
             else {
-                this.buf.append("'%c'", expr.character.intValue as (char))
+                this.buf.append("%d", value)
             }
             return;
         }

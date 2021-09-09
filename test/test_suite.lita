@@ -27,6 +27,7 @@ struct TestSuite {
     description: *const char
     disabled: bool
     programTemplate: *const char
+    buildCmd: *const char
     tests: Array<Test>
 }
 
@@ -64,6 +65,7 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
+        "../test/tests/unicode_support.json",/*
         "../test/tests/func_named_args.json",
         "../test/tests/traits.json",
         "../test/tests/single.json",
@@ -94,7 +96,7 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",
+        "../test/tests/generics_inference.json",*/
         null
     }
 
@@ -118,6 +120,7 @@ func main(len: i32, args: **char) : i32 {
             .disabled = false,
             .filename = filename,
             .description = null,
+            .buildCmd = null,
             .programTemplate = """
             @include("assert.h");
             @foreign func assert(e:bool):void;
@@ -169,6 +172,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     suite.description = node.getStr("description", suite.description)
     suite.disabled = node.getBool("disabled", false)
     suite.programTemplate = node.getStr("program", suite.programTemplate)
+    suite.buildCmd = node.getStr("buildCmd", null)
 
     var tests = node.getArray("tests")
     if(!tests) {
@@ -300,8 +304,13 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
         options.compileCmd = test.buildCmd
     }
     else {
-        //options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
-        options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+        if(suite.buildCmd) {
+            options.compileCmd = suite.buildCmd
+        }
+        else {
+            //options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+            options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+        }
     }
 
 

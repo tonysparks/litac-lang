@@ -487,7 +487,14 @@ func ApeEmit(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_obj
                 }
             }
             else if(c == '\\') {
-                context.buffer.append("\\\\")
+                if(str[1] == '\\' && str[2] == 'n') {
+                    context.buffer.append("\\n")
+                    str += 3
+                    continue
+                }
+                else {
+                    context.buffer.append("\\\\")
+                }
             }
 
             context.buffer.append("%c", c)
@@ -506,6 +513,7 @@ func ApeEmitClear(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
 func ApeEmitStr(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
+    //printf("String: %s\n", context.buffer.cStr())
     return ape_object_make_string(ape, context.buffer.cStr())
 }
 

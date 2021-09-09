@@ -11,6 +11,14 @@
                 "build.sh"
             ],
             "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "cmd.exe",
+                        "args": [
+                            "/d", "/c"
+                        ]
+                    }
+                },
                 "command": "build.bat",
                 "args": []
             },
@@ -38,6 +46,14 @@
                 "build_test.sh"
             ],
             "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "cmd.exe",
+                        "args": [
+                            "/d", "/c"
+                        ]
+                    }
+                },
                 "command": "build_test.bat"
             },
             "problemMatcher": [
@@ -65,6 +81,14 @@
                 "${file}"
             ],
             "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "cmd.exe",
+                        "args": [
+                            "/d", "/c"
+                        ]
+                    }
+                },
                 "command": "build_lsp_test.bat",
                 "args": ["${file}"]
             },
@@ -93,6 +117,14 @@
                 "${file}"
             ],
             "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "cmd.exe",
+                        "args": [
+                            "/d", "/c"
+                        ]
+                    }
+                },
                 "command": "build_test_file.bat",
                 "args": ["${file}"]
             },
@@ -148,6 +180,14 @@
                 "build_release.sh"
             ],
             "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "cmd.exe",
+                        "args": [
+                            "/d", "/c"
+                        ]
+                    }
+                },
                 "command": "build_release.bat",
                 "args": []
             },
@@ -175,6 +215,14 @@
                 "build_bootstrap.sh"
             ],
             "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "cmd.exe",
+                        "args": [
+                            "/d", "/c"
+                        ]
+                    }
+                },
                 "command": "build_bootstrap.bat"
             },
             "problemMatcher": [
@@ -201,6 +249,14 @@
                 "build_temp.sh"
             ],
             "windows": {
+                "options": {
+                    "shell": {
+                        "executable": "cmd.exe",
+                        "args": [
+                            "/d", "/c"
+                        ]
+                    }
+                },
                 "command": "build_temp.bat"
             },
             "problemMatcher": [
