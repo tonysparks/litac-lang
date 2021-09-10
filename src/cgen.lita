@@ -213,8 +213,8 @@ typedef size_t    %s%s;
 #define LITAC_THREADLOCAL __thread
 #define LITAC_INLINE static inline __attribute__((always_inline))
 #define LITAC_NOINLINE __attribute__((noinline))
-#define LITAC_PACKED __attribute__((packed))
-#define LITAC_PACKED_POP
+#define LITAC_PACKED _Pragma("pack(push)")
+#define LITAC_PACKED_POP _Pragma("pack(pop)")
 #define LITAC_EXPORT __attribute__((visibility("default")))
 #endif
 

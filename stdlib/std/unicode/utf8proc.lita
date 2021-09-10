@@ -1,8 +1,8 @@
 
 @raw("#define UTF8PROC_STATIC");
 // @include("<utf8proc.h>"); using static library is just as slow as including the C source...
-@cInclude("utf8proc.h", "utf8proc_data.c", "utf8proc.c");
-//@cFile("utf8proc.h", "utf8proc_data.c", "utf8proc.c");
+//@cInclude("utf8proc.h", "utf8proc_data.c", "utf8proc.c");
+@cFile("utf8proc.h", "utf8proc_data.c", "utf8proc.c"); // inline the source, relying on cInclude hardcodes paths for bootstrapping (not good)
 
 @foreign public typedef i8 as utf8proc_int8_t;
 @foreign public typedef u8 as utf8proc_uint8_t;
