@@ -65,7 +65,7 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
-        "../test/tests/unicode_support.json",/*
+        "../test/tests/unicode_support.json",
         "../test/tests/func_named_args.json",
         "../test/tests/traits.json",
         "../test/tests/single.json",
@@ -96,11 +96,11 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",*/
+        "../test/tests/generics_inference.json",
         null
     }
 
-    var memSize = 1024*1024*5
+    var memSize = 1024*1024*50
     var linearAllocator = LinearAllocator{}
     var mem = defaultAllocator.alloc(memSize)
     defer defaultAllocator.free(mem)
@@ -300,6 +300,8 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     options.showProfileInfo = false
     options.run = false // we run outselves
     options.cFormat = true
+    options.maxMemory = 1024 * 1024 * 50
+    //options.isDebug = true
     if(test.buildCmd) {
         options.compileCmd = test.buildCmd
     }

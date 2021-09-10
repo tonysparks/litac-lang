@@ -1,5 +1,6 @@
 import "std/unicode/utf8proc"
 import "std/mem"
+import "std/libc"
 
 @doc("""
     A unicode codepoint
@@ -26,6 +27,17 @@ public func Utf8Decode(str: *const u8, len: i64, codepoints: *rune) : i64 {
     return utf8proc_iterate(str, len, codepoints) //as (i32)
 }
 
+public func Utf8HexDecode(str: *const char, len: i32) : rune {
+    const buffer = [9]char{}
+    len = len == 4 ? 4 : 8
+    for(var i = 0; i < len; i += 1) {
+        buffer[i] = str[i]
+    }
+    buffer[len] = '\0'
+
+    return strtol(buffer, null, 16) as (rune)
+}
+
 
 @doc("""
     Encodes the codepoint as an UTF-8 string in the byte array pointed to by dst. This array must be at least 4 bytes long.
@@ -44,6 +56,10 @@ public func Utf8Encode(codepoint: rune, dst: *u8) : i64 {
 """)
 public func Utf8CharWidth(codepoint: rune) : i32 {
     return utf8proc_charwidth(codepoint)
+}
+
+public func Utf8CodepointValid(codepoint: rune) : bool {
+    return utf8proc_codepoint_valid(codepoint)
 }
 
 public enum NormalizeType {
@@ -66,7 +82,13 @@ public func Utf8Normalize(str: *const u8,
 
 
 #if TESTING
-    import "std/libc"
+    func decode(str: *const char) {
+        var r: rune = 0
+        //var len = Utf8Decode(str as (*const u8), -1, &r)
+        var codepoint = strtol(str, null, 16) as (rune)
+
+        printf("%s = %d\n", str, codepoint)
+    }
 
     @test
     func Test_Uf8Decode() {
@@ -75,8 +97,8 @@ public func Utf8Normalize(str: *const u8,
         //var x = []u8 { 0xe2_u8, 0x0_u8, 0x93_u8, 0_u8 }
         var xx = 'ⵙ'
 
-        var z = '\u0021'
-        printf("Z = '%c'\n", z)
+        //var z = '\u0021'
+        //printf("Z = '%c'\n", z)
         var x = []u8 { 0xe2_u8, 0xb5_u8, 0x9a_u8, 0_u8 }
 
         var r: rune = 0
@@ -86,6 +108,12 @@ public func Utf8Normalize(str: *const u8,
 
         var codepoint = strtol("2D5A'", null, 16) as (rune)
         printf("Codepoint: %d InString: '\u2d5a'Z\U0002B8B9z\n", codepoint)
+
+        decode("0000")
+        decode("009f")
+        decode("0024")
+        decode("0040")
+        decode("0060")
         //var zzz = "\u2D5A"
         printf("\u2D59\n")
         /*

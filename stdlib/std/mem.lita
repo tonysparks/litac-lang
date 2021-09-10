@@ -447,14 +447,14 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
     offset -= this.mem as (usize)
 
     if((offset + size) > this.size) {
-        c::printf("Failed to allocate: %zu, will exceed limit of %zu\n", size, this.size)
+        c::printf("Failed to allocate: %zu, %zu + %zu will exceed limit of %zu\n", size, offset, size, this.size)
         return null
     }
 
     this.currentOffset = (size + offset)
     this.totalBytesAllocated = (size + offset)
     this.totalAllocations += 1
-
+//c::printf("Allocating: %zu - Allocation Count: %zu Total Bytes: %zu\n", size, this.totalAllocations, this.totalBytesAllocated)
     //var ptr = &this.mem[offset]
     var ptr = (this.mem as (*char)) + offset
     return ptr;
@@ -466,7 +466,8 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
                         file: *const char = c::__FILE__,
                         line: u64 = c::__LINE__) : *void {
         var this = alloc as (*LinearAllocator);
-        return this.malloc(size);
+        var result = this.malloc(size);
+        return result
     }
 
     func LinearCalloc(alloc: *const Allocator,

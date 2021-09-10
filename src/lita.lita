@@ -103,11 +103,13 @@ public struct LitaOptions {
     cPrefix: [MAX_PREFIX_SIZE]char // Prefix for types/variables defined in C
     cFormat: bool                  // format the C output
     disableLineSync: bool          // disables C #line directives sync with Lita source code
+
+    maxMemory: u64                 // max amount of memory that can be allocated
 }
 
 
 public func (this: *Lita) init(options: *LitaOptions) {
-    var size: usize = 1024 * 1024 * 1024;
+    var size: usize = options.maxMemory > 0 ? options.maxMemory : 1024 * 1024 * 1024;
     this.linearAllocator.init(defaultAllocator.alloc(size), size)
 
     var allocator = (&this.linearAllocator) as (*const Allocator)

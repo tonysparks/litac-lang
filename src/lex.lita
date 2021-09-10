@@ -986,7 +986,7 @@ func (l: *Lexer) scanChar() : Token {
         if(c == 'u' || c == 'U') {
             var count = 0
             var reqCount = c == 'u' ? 4 : 8
-            var pos = l.stream + 1
+            var pos = l.stream
 
             for(;;) {
                 c = l.nextChar()
@@ -999,7 +999,7 @@ func (l: *Lexer) scanChar() : Token {
                 }
 
                 if(!IsHex(c)) {
-                    l.error("invalid unicode codepoint literal: '%c' (hex: %x)", c, c)
+                    l.error("invalid unicode codepoint hex component: '%c'", c)
                     isValid = false
                 }
 
@@ -1007,12 +1007,16 @@ func (l: *Lexer) scanChar() : Token {
             }
 
             if(count != reqCount) {
-                l.error("invalid unicode codepoint literal: '%.*s', must be %d in length", count, pos - 1, reqCount)
+                l.error("invalid unicode codepoint literal: '%.*s', must be %d hex digits in length", count + 1, pos, reqCount)
                 isValid = false
             }
 
             if(isValid) {
-                value = strtol(pos, null, 16) as (rune)
+                value = strtol(pos + 1, null, 16) as (rune)
+            }
+
+            if(isValid && !l.validateCodepoint(pos, count)) {
+                isValid = false
             }
         }
         else if(c == 'x') {
@@ -1058,94 +1062,131 @@ func (l: *Lexer) scanChar() : Token {
     return l.token
 }
 
+func (l: *Lexer) validateCodepoint(str: *const char, len: i32) : bool {
+    if(len != 4 && len != 8) {
+        l.error("invalid unicode codepoint literal: '%.*s'", len + 1, str)
+        return false
+    }
+
+    var codepoint: rune = Utf8HexDecode(str + 1, len)
+    if(!Utf8CodepointValid(codepoint)) {
+        l.error("invalid unicode codepoint literal: '%.*s'", len + 1, str)
+        return false
+    }
+
+    if(codepoint >= 0 /*0x0000*/ && codepoint <= 159 /*0x009f*/) {
+        if(codepoint == 36 /*0x0024*/ || codepoint == 64 /*0x0040*/ || codepoint == 96 /*0x0060*/) {
+            // exceptions
+        }
+        else {
+            l.error("universal character name: '%.*s' refers to a control character.  A universal character name may not represent a character in the range 0000-009F, inclusive, with the exceptions of 0024 ('$'), 0040 ('@') and 0060 ('`')", len + 1, str)
+            return false
+        }
+    }
+
+    return true
+}
+
 func (l: *Lexer) scanString() : Token {
     var length = 0
     var isVerbatim = false
     var isValid = true
     var startPos: *const char = null
 
-    if(l.stream[0] == '"') {
-        if(l.stream[1] == '"' && l.stream[2] == '"') {
-            isVerbatim = true
-            l.nextChar()
-            l.nextChar()
+    assert(l.stream[0] == '"')
+
+    if(l.stream[1] == '"' && l.stream[2] == '"') {
+        isVerbatim = true
+        l.nextChar()
+        l.nextChar()
+    }
+
+    l.nextChar()
+
+    l.token.value.str.buffer = l.stream
+    startPos = l.stream
+
+    for(;;) {
+        if(l.stream[0] == '\0') {
+            l.error("string literal not terminated")
+            isValid = false
+            break
+        }
+
+        if(l.stream[0] == '\\') {
+            var c = l.nextChar()
+
+            // unicode codepoint
+            if(c == 'u' || c == 'U') {
+                var count = 0
+                var reqCount = c == 'u' ? 4 : 8
+                var pos = l.stream
+
+                for(;;) {
+                    c = l.nextChar()
+                    if(c < 0) {
+                        l.error("string literal not terminated")
+                        isValid = false
+                        break
+                    }
+
+                    if(count >= reqCount || c == ' ' || c == '\n' || c == '"') { // "
+                        break
+                    }
+
+                    if(!IsHex(c)) {
+                        l.error("invalid unicode codepoint hex component: '%c'", c)
+                        isValid = false
+                    }
+
+                    count += 1
+                }
+
+                if(count != reqCount && isValid) {
+                    l.error("invalid unicode codepoint literal: '%.*s', must be %d hex digits in length", count + 1, pos, reqCount)
+                    isValid = false
+                }
+
+                if(isValid && !l.validateCodepoint(pos, count)) {
+                    isValid = false
+                }
+
+                continue
+            }
+            else if(c == 'x') {
+                assert(false) // not done yet
+            }
+            else {
+                if(c >= 256) {
+                    l.error("Illegal escaped character, character out of byte range (hex value): '%x'", c)
+                    isValid = false
+                    continue
+                }
+
+                if(escapeToChar[c] == 0 && c != '0') {
+                    l.error("Illegal escaped character: '%c'", c)
+                    isValid = false
+                    continue
+                }
+            }
+        }
+        else if(l.stream[0] == '"') {
+            if(!isVerbatim) {
+                l.nextChar()
+                break;
+            }
+            else if(l.stream[1] == '"' && l.stream[2] == '"') {
+                l.nextChar()
+                l.nextChar()
+                l.nextChar()
+                break;
+            }
         }
 
         l.nextChar()
-
-        l.token.value.str.buffer = l.stream
-        startPos = l.stream
-
-        while(!l.eof()) {
-            if(l.stream[0] == '\\') {
-                var c = l.nextChar()
-
-                // unicode codepoint
-                if(c == 'u' || c == 'U') {
-                    var count = 0
-                    var reqCount = c == 'u' ? 4 : 8
-                    var pos = l.stream
-
-                    for(;;) {
-                        c = l.nextChar()
-                        if(c < 0) {
-                            l.error("string literal not terminated")
-                            isValid = false
-                            break
-                        }
-
-                        if(count >= reqCount || c == ' ' || c == '\n') {
-                            break
-                        }
-
-                        if(!IsHex(c)) {
-                            l.error("invalid unicode codepoint literal: '%c' (hex: %x)", c, c)
-                            isValid = false
-                        }
-
-                        count += 1
-                    }
-
-                    if(count != reqCount && isValid) {
-                        l.error("invalid unicode codepoint literal '%.*s', must be %d in length", count, pos, reqCount)
-                        isValid = false
-                    }
-
-                    continue
-                }
-                else if(c == 'x') {
-                    assert(false) // not done yet
-                }
-                else {
-                    if(c >= 256) {
-                        l.error("Illegal escaped character, character out of byte range (hex value): '%x'", c)
-                        isValid = false
-                        continue
-                    }
-
-                    if(escapeToChar[c] == 0 && c != '0') {
-                        l.error("Illegal escaped character: '%c'", c)
-                        isValid = false
-                        continue
-                    }
-                }
-            }
-            else if(l.stream[0] == '"') {
-                if(!isVerbatim) {
-                    l.nextChar()
-                    break;
-                }
-                else if(l.stream[1] == '"' && l.stream[2] == '"') {
-                    l.nextChar()
-                    l.nextChar()
-                    l.nextChar()
-                    break;
-                }
-            }
-
-            l.nextChar()
-        }
     }
+
+    isValid = isValid && !l.hasError()
 
     l.token.type = TokenType.STRING
     l.token.pos.end = l.stream
@@ -1430,6 +1471,12 @@ repeat:
                 return l.scanSymbol()
             }
 
+
+            var n = l.nextChar()
+            var invalidChar: [4]u8;
+            var len = Utf8Encode(n, invalidChar)
+
+            l.error("unexpected character: '%.*s'", len, invalidChar)
             return l.errorToken()
         }
     }

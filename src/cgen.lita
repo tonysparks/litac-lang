@@ -7,6 +7,7 @@ import "std/array"
 import "std/map"
 import "std/assert"
 import "std/system"
+import "std/unicode/utf8"
 
 import "ast"
 import "types"
@@ -1234,13 +1235,40 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             }
 
             this.flush()
-
+            this.emitStrn("\n", 1)
             var bytesRead = 0_i64;
             do {
                 bytesRead = fread(filedata, 1, BUFFER_SIZE, file)
                 fwrite(filedata as (*const void), sizeof(:char), bytesRead, this.output)
             }
             while(bytesRead > 0);
+            this.emitStrn("\n", 1)
+        }
+    }
+    else if(strncmp(note.name.str.buffer, "cInclude", note.name.str.length) == 0) {
+        const BUFFER_SIZE = 1024*10;
+        var filename = [MAX_PATH]char {0};
+        var filenameStr = StringInit(filename, MAX_PATH)
+        var filedata = [BUFFER_SIZE]char{0};
+
+        for(var i = 0; i < note.attributes.size(); i += 1) {
+            var arg = note.attributes.get(i)
+            FilePath(note.startPos.filename, filename)
+
+            filenameStr.adjust()
+            filenameStr.append("/%.*s", arg.str.length, arg.str.buffer)
+
+            if(!FileExists(filenameStr.cStr())) {
+                // TODO:
+                //      check relative to source directory
+                //      check working directory
+                //      check lib directory
+                //printf("FilePath: '%s'\n", filename)
+                this.result.addError(note.startPos, "unable to locate file: '%.*s'", arg.str.length, arg.str.buffer)
+                continue;
+            }
+
+            this.emit("#include \"%s\"\n", filename)
         }
     }
 }
@@ -2222,33 +2250,53 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*StringExpr)
 
             if(expr.string.mod == Mod.MULTISTR) {
-                this.buf.appendChar('"') // "
-                for(var i = 0; i < expr.string.str.length; i += 1) {
-                    var c:char = expr.string.str.buffer[i]
-                    var escaped = escapeStrings[c as (u32)]
-                    if(escaped) {
-                        buf.appendStr(escaped)
-                        continue
-                    }
+                var str = expr.string.str
 
-                    if(c == '\\') {
-                        var n = expr.string.str.buffer[i+1] as (u32)
-                        var escapedChar = escapeChars[n]
-                        if(escapedChar) {
-                            var chars = escapeChars[n]
-                            assert(chars)
-                            buf.appendStr(chars)
+                this.buf.appendChar('"') // "
+                for(var i = 0; i < str.length;) {
+                    var byte = str.buffer[i] as (u8)
+
+                    if(byte < 128) {
+                        var c:char = byte as (char)
+                        var n = str.buffer[i+1] as (u32)
+                        var isSeq = (n == 'u' || n == 'U' || n != 'x')
+
+                        var escaped = escapeStrings[c as (u32)]
+                        if(escaped && !(c == '\\' && isSeq)) {
+                            buf.appendStr(escaped)
                             i += 1
                             continue
                         }
-                        else {
+
+                        if(c == '\\') {
+                            var n = str.buffer[i+1] as (u32)
+                            var escapedChar = escapeChars[n]
+                            if(escapedChar) {
+                                var chars = escapeChars[n]
+                                assert(chars)
+                                buf.appendStr(chars)
+                                i += 2
+                                continue
+                            }
+                            else if(!isSeq) {
+                                buf.appendStrn("\\", 1)
+                            }
+                        }
+                        if(c == '"') {  // "
                             buf.appendStrn("\\", 1)
                         }
+
+                        buf.appendChar(c)
+                        i += 1
                     }
-                    if(c == '"') {  // "
-                        buf.appendStrn("\\", 1)
+                    else {
+                        var result: rune = 0
+                        var len = Utf8Decode((&str.buffer[i]) as (*const u8), -1, &result) as (i32)
+                        assert(len > 0)
+
+                        buf.appendStrn(&str.buffer[i], len)
+                        i += len
                     }
-                    buf.appendChar(c)
                 }
                 this.buf.appendChar('"') // "
             }

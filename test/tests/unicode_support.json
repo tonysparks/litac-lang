@@ -20,27 +20,338 @@
     `,
     "tests": [
         {
-            "name": "Char Unicode Literals",
+            "name": "Unicode Literals",
             "definitions": `
-                //import "std/unicode/utf8"
                 import "std/libc"
-                //@foreign
-                //func strcmp(a: *const char, b: *const char) : i32;
             `,
             "code": `
                 var c = 'ⵙ'
                 assert(c == 'ⵙ') // test overflow
 
-                var z = '\u0021'
-                assert(z == '!')
-
-
                 var s = "ⵙ"
+                var s2 = """ⵙ"""
+                var sx = """\u2D59"""
+                var ysx = """x\u2D59x"""
 
                 assert(strcmp(s, "ⵙ") == 0)
                 assert(strcmp(s, "\u2D59") == 0)
+                assert(strcmp(s, s2) == 0)
+                assert(strcmp(sx, s2) == 0)
+                assert(strcmp(ysx, "xⵙx") == 0)
+
+                var s3 = "\U0002B8B9"
+                var s4 = "𫢹"
+                assert(strcmp(s3, s4) == 0)
+
+                var xs3 = """\U0002B8B9"""
+                var xs4 = """𫢹"""
+                assert(strcmp(xs3, xs4) == 0)
+
+                var ys3 = """x\U0002B8B9x"""
+                var ys4 = """x𫢹x"""
+                assert(strcmp(ys3, ys4) == 0)
             `,
-            //"output": `ⵙ`
+        },
+        {
+            "name": "Invalid Hex Char Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\u0z21'
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint hex component: 'z'"
+        },
+        {
+            "name": "Invalid Length Short Char Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\u21'
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'u21', must be 4 hex digits in length"
+        },
+        {
+            "name": "Invalid Length Long Char Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\u00021'
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'u00021', must be 4 hex digits in length"
+        },
+        {
+            "name": "Invalid Termination Char Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\u0021
+                assert(false)
+            `,
+            "error": "Error token: char literal not terminated"
+        },
+
+        // 8 elements
+        {
+            "name": "Invalid Hex Char Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\U00z2B8B9'
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint hex component: 'z'"
+        },
+        {
+            "name": "Invalid Length Short Char Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\U21'
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'U21', must be 8 hex digits in length"
+        },
+        {
+            "name": "Invalid Length Long Char Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\U00000000021'
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'U00000000021', must be 8 hex digits in length"
+        },
+        {
+            "name": "Invalid Termination Char Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = '\U0021
+                assert(false)
+            `,
+            "error": "Error token: char literal not terminated"
+        },
+
+
+        // Strings
+        {
+            "name": "Invalid Hex String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\u0z21"
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint hex component: 'z'"
+        },
+        {
+            "name": "Invalid Length Short String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\u21"
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'u21', must be 4 hex digits in length"
+        },
+        {
+            "name": "Invalid Length Long String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\u00021"
+                assert(false)
+            `,
+            "error": "Error token: universal character name: 'u0002' refers to a control character.  A universal character name may not represent a character in the range 0000-009F, inclusive, with the exceptions of 0024 ('$'), 0040 ('@') and 0060 ('`')"
+        },
+        {
+            "name": "Invalid Termination String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\u2D59
+                assert(false)
+            `,
+            "error": "Error token: string literal not terminated"
+        },
+
+        // 8 elements
+        {
+            "name": "Invalid Hex String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\U00z2B8B9"
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint hex component: 'z'"
+        },
+        {
+            "name": "Invalid Length Short String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\U21"
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'U21', must be 8 hex digits in length"
+        },
+        {
+            "name": "Invalid Length Long String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\U00000000021"
+                assert(false)
+            `,
+            "error": "Error token: universal character name: 'U00000000' refers to a control character.  A universal character name may not represent a character in the range 0000-009F, inclusive, with the exceptions of 0024 ('$'), 0040 ('@') and 0060 ('`')"
+        },
+        {
+            "name": "Invalid Termination String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = "\U0021
+                assert(false)
+            `,
+            "error": "Error token: string literal not terminated"
+        },
+
+
+        // Verbatim Strings
+        {
+            "name": "Invalid Hex Verbatim String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\u0z21"""
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint hex component: 'z'"
+        },
+        {
+            "name": "Invalid Length Short Verbatim String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\u21"""
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'u21', must be 4 hex digits in length"
+        },
+        {
+            "name": "Invalid Length Long Verbatim String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\u00021"""
+                assert(false)
+            `,
+            "error": "Error token: universal character name: 'u0002' refers to a control character.  A universal character name may not represent a character in the range 0000-009F, inclusive, with the exceptions of 0024 ('$'), 0040 ('@') and 0060 ('`')"
+        },
+        {
+            "name": "Invalid Termination Verbatim String Unicode",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\u2D59
+                assert(false)
+            `,
+            "error": "Error token: string literal not terminated"
+        },
+
+        // 8 elements
+        {
+            "name": "Invalid Hex Verbatim String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\U00z2B8B9"""
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint hex component: 'z'"
+        },
+        {
+            "name": "Invalid Length Short Verbatim String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\U21"""
+                assert(false)
+            `,
+            "error": "Error token: invalid unicode codepoint literal: 'U21', must be 8 hex digits in length"
+        },
+        {
+            "name": "Invalid Length Long Verbatim String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\U00000000021"""
+                assert(false)
+            `,
+            "error": "Error token: universal character name: 'U00000000' refers to a control character.  A universal character name may not represent a character in the range 0000-009F, inclusive, with the exceptions of 0024 ('$'), 0040 ('@') and 0060 ('`')"
+        },
+        {
+            "name": "Invalid Termination Verbatim String Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var z = """\U0021
+                assert(false)
+            `,
+            "error": "Error token: string literal not terminated"
+        },
+
+
+        // Identifiers -- for now, don't allow unicode characters for identifiers
+        {
+            "name": "Identifier Unicode8",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var ⵙ = "Hello"
+                assert(false)
+            `,
+            "error": "Error token: unexpected character: 'ⵙ'"
+        },
+        {
+            "name": "Identifier Unicode8 Surround",
+            "definitions": `
+                import "std/libc"
+            `,
+            "code": `
+                var xⵙx = "Hello"
+                assert(false)
+            `,
+            "error": "Error token: unexpected character: 'ⵙ'"
         },
     ]
 }
