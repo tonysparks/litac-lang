@@ -32,6 +32,6 @@ jobs:
           echo test, and deploy your project.
           clang --version
           gcc --version
-          set LITAC_HOME=$GITHUB_WORKSPACE
+          export set LITAC_HOME=$GITHUB_WORKSPACE
           sh $GITHUB_WORKSPACE/build_bootstrap.sh
           sh $GITHUB_WORKSPACE/build_test.sh
