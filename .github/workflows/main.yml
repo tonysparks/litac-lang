@@ -24,14 +24,28 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      
+      # Print compiler information
+      - name: Compiler Info
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          echo Installed compilers
           clang --version
           gcc --version
+      # Build bootstrap LitaC
+      - name: Build Bootstrap
+        run: |
+          echo Building bootstrap
           export set LITAC_HOME=$GITHUB_WORKSPACE
           sh $GITHUB_WORKSPACE/build_bootstrap.sh
+
+      # Build LitaC Compiler
+      - name: Build LitaC Compiler
+        run: |
+          echo Building LitaC Compiler
+          sh $GITHUB_WORKSPACE/build.sh
+
+      # Test LitaC Compiler
+      - name: Test LitaC Compiler
+        run: |
+          echo Testing LitaC Compiler
           sh $GITHUB_WORKSPACE/build_test.sh
