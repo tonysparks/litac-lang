@@ -11882,9 +11882,9 @@ static size_t stdout_write_default(void* context, const void *data, size_t size)
 #endif
 
 #define UTF8PROC_STATIC
-#include "C:/Users/antho/git/litac-lang/stdlib/std/unicode/utf8proc.h"
-#include "C:/Users/antho/git/litac-lang/stdlib/std/unicode/utf8proc_data.c"
-#include "C:/Users/antho/git/litac-lang/stdlib/std/unicode/utf8proc.c"
+#include "/home/tonys/projects/litac-lang/stdlib/std/unicode/utf8proc.h"
+#include "/home/tonys/projects/litac-lang/stdlib/std/unicode/utf8proc_data.c"
+#include "/home/tonys/projects/litac-lang/stdlib/std/unicode/utf8proc.c"
 
 #include <libtcc.h>
 
