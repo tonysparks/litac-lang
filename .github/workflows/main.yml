@@ -42,10 +42,12 @@ jobs:
       - name: Build LitaC Compiler
         run: |
           echo Building LitaC Compiler
+          export set LITAC_HOME=$GITHUB_WORKSPACE
           sh $GITHUB_WORKSPACE/build.sh
 
       # Test LitaC Compiler
       - name: Test LitaC Compiler
         run: |
           echo Testing LitaC Compiler
+          export set LITAC_HOME=$GITHUB_WORKSPACE
           sh $GITHUB_WORKSPACE/build_test.sh
