@@ -27,16 +27,18 @@ run_tests() {
     
     cd ./bin
     ./litac_linux -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug
-    if [ $? -gt 0 ]; then
-        error_compiling()
-        return 1
+    result=$?
+    if [ $result -gt 0 ]; then
+        error_compiling
     fi
 
     echo "Running litaC tests..."
     ./litac_tests
-    if [ $? -gt 0 ]; then
-        error_tests()
-        return 4
+    result=$?
+
+    echo "Result: " $result
+    if [ $result -gt 0 ]; then 
+        error_tests
     fi
 
     echo Completed.
