@@ -10,6 +10,7 @@ error_compiling() {
     echo "ERROR: Compiling litac compiler           "
     echo "=========================================="
     echo ""
+    exit 1
 }
 
 run_tests() {
@@ -31,6 +32,7 @@ if [ -z "${LITAC_HOME}" ]; then
     echo "ERROR: It appears you do not have the 'LITAC_HOME' system variable defined.  Please make sure this is set to the home directory of litac"
     echo "=========================================="
     echo ""
+    exit 2
 else 
     run_tests
 fi
