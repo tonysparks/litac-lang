@@ -153,7 +153,7 @@ func main(len: i32, args: **char) : i32 {
     printf("\nRan %d tests with %d failures\n", testHarness.numberOfTests, testHarness.numberOfFailures)
     printf("Run time: %.4f\n", (SystemTimeMSec() - startTime))
     printf("Complete.\n")
-    return 0;
+    return testHarness.numberOfFailures > 0 ? 42 : 0;
 }
 
 func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
