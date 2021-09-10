@@ -32,3 +32,5 @@ jobs:
           echo test, and deploy your project.
           clang --version
           gcc --version
+          sh $GITHUB_WORKSPACE/build_bootstrap.sh
+          sh $GITHUB_WORKSPACE/build_test.sh
