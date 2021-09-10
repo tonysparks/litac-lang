@@ -37,7 +37,7 @@
                 var a = i32[]{1,2,3}
             `,
             "error": "Unexpected token"
-        }
+        },
         {
             "name" : "Invalid Func Param Syntax Error",
             "definitions": `
@@ -49,7 +49,7 @@
             "code": `
                 hello("hi"\n)
             `,
-            "error": "Unexpected token: 'ERROR' - Missing )"
+            "error": "Unexpected token: '\\' - Missing )"
         },
     ]
 }

@@ -192,6 +192,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.STAR] = "*",
     [TokenType.MOD] = "%",
     [TokenType.SLASH] = "/",
+    [TokenType.BACK_SLASH] = "\\",
     [TokenType.DOLLAR] = "$",
     [TokenType.HASH] = "#",
     [TokenType.DOT] = ".",
