@@ -27,6 +27,7 @@ struct TestSuite {
     description: *const char
     disabled: bool
     programTemplate: *const char
+    buildCmd: *const char
     tests: Array<Test>
 }
 
@@ -56,17 +57,25 @@ enum TestResult {
 }
 
 const testHarness = TestHarness{}
+const lita = Lita{}
 
 func main(len: i32, args: **char) : i32 {
     SystemInit()
+
+    var options = LitaOptions{
+        .maxMemory = 1024 * 1024 * 50
+    }
+    lita.init(&options)
+    defer lita.free()
 
     var startTime = SystemTimeMSec()
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
+        "../test/tests/single.json",
+        "../test/tests/unicode_support.json",
         "../test/tests/func_named_args.json",
         "../test/tests/traits.json",
-        "../test/tests/single.json",
         "../test/tests/typeof.json",
         "../test/tests/strings.json",
         "../test/tests/using.json",
@@ -98,7 +107,7 @@ func main(len: i32, args: **char) : i32 {
         null
     }
 
-    var memSize = 1024*1024*5
+    var memSize = 1024*1024*50
     var linearAllocator = LinearAllocator{}
     var mem = defaultAllocator.alloc(memSize)
     defer defaultAllocator.free(mem)
@@ -118,6 +127,7 @@ func main(len: i32, args: **char) : i32 {
             .disabled = false,
             .filename = filename,
             .description = null,
+            .buildCmd = null,
             .programTemplate = """
             @include("assert.h");
             @foreign func assert(e:bool):void;
@@ -161,7 +171,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
 
     if(!node) {
         if(parser.hasError()) {
-            printf("Test Json Syntax error: %s", parser.errorMsg)
+            printf("Test Json Syntax error: %s at %s\n", parser.errorMsg, filename)
         }
         goto err;
     }
@@ -169,6 +179,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     suite.description = node.getStr("description", suite.description)
     suite.disabled = node.getBool("disabled", false)
     suite.programTemplate = node.getStr("program", suite.programTemplate)
+    suite.buildCmd = node.getStr("buildCmd", null)
 
     var tests = node.getArray("tests")
     if(!tests) {
@@ -186,6 +197,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
         var test = CreateTest(suite, testNode, &suite.tests.elements[i])
         if(!test) {
             printf("FAILED to load test\n")
+            testHarness.numberOfFailures += 1
         }
         else {
             if(test.disabled) {
@@ -220,9 +232,10 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
             }
         }
     }
+    return 1
 
 err:
-    return 1
+    return 0
 }
 
 func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
@@ -295,13 +308,20 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     options.cOutputOnly = false
     options.showProfileInfo = false
     options.run = false // we run outselves
-    options.cFormat = true
+    options.cFormat = false
+    //options.maxMemory = 1024 * 1024 * 50
+    //options.isDebug = true
     if(test.buildCmd) {
         options.compileCmd = test.buildCmd
     }
     else {
-        //options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
-        options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+        if(suite.buildCmd) {
+            options.compileCmd = suite.buildCmd
+        }
+        else {
+            //options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+            options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+        }
     }
 
 
@@ -322,9 +342,12 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
 
     FilePath(options.inputFile, options.srcPath)
 
-    var lita = Lita{}
-    lita.init(&options)
-    defer lita.free()
+    lita.options = &options
+    lita.reset()
+
+    //var lita = Lita{}
+    //lita.init(&options)
+    //defer lita.free()
 
     var root = lita.parse()
     if(!root) {

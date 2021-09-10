@@ -92,6 +92,10 @@ public func ParserInit(filename: *const char,
 
     while(!lex.eof()) {
         var token = lex.nextToken()
+        if(token.type == TokenType.ERROR) {
+            parser.result.addError(token.pos, "Error token: %s", lex.errorMsg)
+        }
+
         parser.tokens.add(token)
     }
 
@@ -150,7 +154,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
 
         if(!compStmt || compStmt.kind != StmtKind.COMP_STMT) {
             // TODO: Mark error?
-            assert(false)
+            //assert(false)
             return;
         }
 
@@ -1227,13 +1231,17 @@ func (p: *Parser) primary() : *Expr {
         return NewIdentifierExpr(pos, p.pos(), name, p.allocator)
     }
 
+    if(p.match(TokenType.ERROR)) {
+        return p.poisonExpr(pos)
+    }
+
 err:
     p.errorAtToken(token, ErrorCode.UNEXPECTED_TOKEN)
     return p.poisonExpr(pos)
 }
 
 func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
-    var pos = p.pos()
+    var pos = expr.startPos
     var arguments = Array<CallArg>{}
     if(!p.arguments(&arguments)) {
         goto err;
@@ -2788,7 +2796,7 @@ func (p: *Parser) errorUnexpectedToken(token: *Token, errorCode: ErrorCode) {
         }
 
         p.panicMode = true
-        Error("Current index: %d out of %d\n", p.current, p.tokens.size())
+        //Error("Current index: %d out of %d\n", p.current, p.tokens.size())
         p.result.addError(p.pos(), "Unexpected token: '%s' - %s", tokenText[token.type], errorCodeText[errorCode])
     }
     else {

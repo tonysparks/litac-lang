@@ -15,7 +15,7 @@
     "tests": [
         {
             "name": "Offset of packed struct",
-            "buildCmd": "gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+            "buildCmd": "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
             "disabled": false,
             "definitions": `
                 import "std/libc"
@@ -30,21 +30,41 @@
 
             `,
             "code": `
-                printf("Sizeof(i32) == %lld\n", sizeof(:i32))
+                printf("Sizeof(i32) == %zu\n", sizeof(:i32))
                 var A = offsetof(Sprite, a);
-                printf("A = %lld\n", A)
+                printf("A = %zu\n", A)
                 var B = offsetof(Sprite, b);
-                printf("B = %lld\n", B)
+                printf("B = %zu\n", B)
                 var C = offsetof(Sprite, c);
-                printf("C = %lld\n", C)
+                printf("C = %zu\n", C)
                 var D = offsetof(Sprite, d);
-                printf("D = %lld\n", D)
+                printf("D = %zu\n", D)
 
                 assert(A == 0)
                 assert(B == 4)
                 assert(C == 12)
                 assert(D == 13)
             `,
+            "output":
+`Sizeof(i32) == 4
+A = 0
+B = 4
+C = 12
+D = 13
+`
+        },
+        {
+            "name" : "Invalid Func Param Syntax Error",
+            "definitions": `
+                //func something(array: [NOT_VALID]char)
+                func hello(x: *const char) {
+
+                }
+            `,
+            "code": `
+                hello("hi"\n)
+            `,
+            "error": "Unexpected token: '\\' - Missing )"
         },
     ]
 }

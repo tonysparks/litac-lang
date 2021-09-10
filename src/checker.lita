@@ -355,6 +355,19 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
     this.enterModule(module)
     defer this.leaveModule()
 
+    // filter out test declarations
+    if(!this.lita.options.testsOnly) {
+        for(var i = 0; i < module.ast.declarations.size();) {
+            var decl = module.ast.declarations.get(i)
+            if(decl.hasNote("test")) {
+                module.ast.declarations.removeAt(i)
+            }
+            else {
+                i += 1
+            }
+        }
+    }
+
     for(var i = 0; i < module.ast.declarations.size(); i += 1) {
         var decl = module.ast.declarations.get(i)
         this.createDeclSymbol(decl)
@@ -370,7 +383,6 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
         var imp = module.ast.imports.get(i)
         this.createImportSymbols(imp)
     }
-
 }
 
 func (this: *TypeChecker) enterModule(module: *Module) {

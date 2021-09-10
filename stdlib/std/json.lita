@@ -4,6 +4,7 @@ import "std/string_buffer";
 import "std/map";
 import "std/array";
 import "std/libc";
+import "std/unicode/utf8"
 
 @asStr
 public enum JsonType {
@@ -1073,27 +1074,43 @@ func (p: using *JsonParser) scanStr() {
     buffer.clear()
 
     while (*stream && *stream != '"' ) { //"
-        var val: char = *stream;
-        if (val == '\n') {
-            p.error("String literal cannot contain newline");
-            break;
-        } else if (val == '\\') {
-            stream += 1;
-            if (*stream == 'x') {
-                //  TODO
-                // val = scan_hex_escape();
-            } else {
-                val = escapeToChar[(*stream) as (i32)];
-                if (val == 0 && *stream != '0') {
-                    p.error("Invalid string literal escape '\\%c'", *stream);
+        var c = (*stream) as (u8)
+
+        // unicode code point
+        if(c >= 0x80) {
+            var result: rune = 0
+            var len = Utf8Decode(stream as (*const u8), -1, &result)
+            if(len < 0) {
+                p.error("Invalid codepoint");
+            }
+            else {
+                buffer.appendStrn(stream, len as (i32))
+                stream += len
+            }
+        }
+        else {
+            var val: char = *stream;
+            if (val == '\n') {
+                p.error("String literal cannot contain newline");
+                break;
+            } else if (val == '\\') {
+                stream += 1;
+                if (*stream == 'x') {
+                    //  TODO
+                    // val = scan_hex_escape();
+                } else {
+                    val = escapeToChar[(*stream) as (i32)];
+                    if (val == 0 && *stream != '0') {
+                        p.error("Invalid string literal escape '\\%c'", *stream);
+                    }
+                    stream += 1;
                 }
+            } else {
                 stream += 1;
             }
-        } else {
-            stream += 1;
-        }
 
-        buffer.append("%c", val)
+            buffer.append("%c", val)
+        }
     }
     if (*stream) {
         stream += 1;
@@ -1115,22 +1132,39 @@ func (p: using *JsonParser) scanMultiStr() {
     buffer.clear()
 
     while (*stream && *stream != '`' ) {
-        var val: char = *stream;
-        if (val == '\\') {
-            stream += 1;
-            if(*stream == '`') {
-                val = '`'
-                stream += 1
+        var c = (*stream) as (u8)
+
+        // unicode code point
+        if(c >= 0x80) {
+            var result: rune = 0
+            var len = Utf8Decode(stream as (*const u8), -1, &result)
+            if(len < 0) {
+                p.error("Invalid codepoint");
+            }
+            else {
+                buffer.appendStrn(stream, len as (i32))
+                stream += len
+            }
+        }
+        else {
+
+            var val: char = *stream;
+            if (val == '\\') {
+                stream += 1;
+                if(*stream == '`') {
+                    val = '`'
+                    stream += 1
+                } else {
+                    buffer.append("%c", val)
+                    val = *stream
+                    stream += 1;
+                }
             } else {
-                buffer.append("%c", val)
-                val = *stream
                 stream += 1;
             }
-        } else {
-            stream += 1;
-        }
 
-        buffer.append("%c", val)
+            buffer.append("%c", val)
+        }
     }
     if (*stream) {
         stream += 1;
