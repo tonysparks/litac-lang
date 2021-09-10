@@ -16,9 +16,6 @@ error_compiling() {
 run_tests() {
     echo "Running litaC tests..."
     
-    pwd
-    ls -la
-    mkdir ./bin
     cd ./bin
     ./litac_linux -buildCmd "${BUILD_CMD}" -cFormat -profile -run -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug
     if [ $? -gt 0 ]; then
