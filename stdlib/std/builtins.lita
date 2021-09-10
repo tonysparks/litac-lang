@@ -1,35 +1,3 @@
-@raw("""
-
-#if _MSC_VER
-#define LITAC_THREADLOCAL __declspec(thread)
-#define LITAC_INLINE static inline __forceinline
-#define LITAC_NOINLINE __declspec(noinline)
-#define LITAC_PACKED __pragma(pack(push, 1))
-#define LITAC_PACKED_POP __pragma(pack(pop))
-#define LITAC_EXPORT __declspec(dllexport)
-#endif
-
-#if __GNUC__
-#define LITAC_THREADLOCAL __thread
-#define LITAC_INLINE static inline __attribute__((always_inline))
-#define LITAC_NOINLINE __attribute__((noinline))
-#define LITAC_PACKED __attribute__((packed))
-#define LITAC_PACKED_POP
-#define LITAC_EXPORT __attribute__((visibility("default")))
-#endif
-
-
-#if __TINYC__
-#define LITAC_THREADLOCAL
-#define LITAC_INLINE
-#define LITAC_NOINLINE
-#define LITAC_PACKED __attribute__((packed))
-#define LITAC_PACKED_POP
-#define LITAC_EXPORT __attribute__((dllexport))
-#endif
-""");
-
-
 typedef u64 as typeid;
 
 public struct any {
