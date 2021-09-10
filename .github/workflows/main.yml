@@ -37,6 +37,7 @@ jobs:
           echo Installed compilers
           clang --version
           gcc --version
+          tcc -version
       # Build bootstrap LitaC
       - name: Build Bootstrap
         run: |
