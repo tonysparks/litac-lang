@@ -1,0 +1,147 @@
+import "std/mem"
+import "std/assert"
+import "std/libc" as c
+
+/**
+=========================================================
+// Linear allocator
+=========================================================
+*/
+public struct LinearAllocator {
+    alloc: Allocator
+    mem: *void
+    size: usize
+    currentOffset: usize
+
+    totalAllocations: u32
+    totalBytesAllocated: usize
+}
+
+public func (this: *LinearAllocator) init(mem: *void, size: usize) {
+    this.alloc = Allocator {
+        .allocFn:   &LinearMalloc,
+        .callocFn:  &LinearCalloc,
+        .reallocFn: &LinearRealloc,
+        .freeFn:    &LinearFree
+    }
+    this.mem = mem
+    this.size = size
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
+@doc("Zero out all allocated memory and reset current offset")
+public func (this: *LinearAllocator) clear() {
+    c::memset(this.mem, 0, this.size)
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
+public func (this: *LinearAllocator) malloc(size: usize) : *void {
+    var currPtr = this.mem as (usize) + this.currentOffset
+    var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
+    offset -= this.mem as (usize)
+
+    if((offset + size) > this.size) {
+        c::printf("Failed to allocate: %zu, %zu + %zu will exceed limit of %zu\n", size, offset, size, this.size)
+        return null
+    }
+
+    this.currentOffset = (size + offset)
+    this.totalBytesAllocated = (size + offset)
+    this.totalAllocations += 1
+//c::printf("Allocating: %zu - Allocation Count: %zu Total Bytes: %zu\n", size, this.totalAllocations, this.totalBytesAllocated)
+    //var ptr = &this.mem[offset]
+    var ptr = (this.mem as (*char)) + offset
+    return ptr;
+}
+
+#if (DEBUG)
+    func LinearMalloc(alloc: *const Allocator,
+                        size: usize,
+                        file: *const char = c::__FILE__,
+                        line: u64 = c::__LINE__) : *void {
+        var this = alloc as (*LinearAllocator);
+        var result = this.malloc(size);
+        return result
+    }
+
+    func LinearCalloc(alloc: *const Allocator,
+                        num: usize,
+                        size: usize,
+                        file: *const char = c::__FILE__,
+                        line: u64 = c::__LINE__) : *void {
+        var this = alloc as (*LinearAllocator);
+        var result = this.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func LinearRealloc(alloc: *const Allocator,
+                        ptr: *void,
+                        oldSize: usize,
+                        size: usize,
+                        file: *const char = c::__FILE__,
+                        line: u64 = c::__LINE__) : *void {
+        if(ptr == null) {
+            return LinearMalloc(alloc, size)
+        }
+
+        var this = alloc as (*LinearAllocator);
+
+        var result = this.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+        }
+
+        return result
+    }
+
+#else
+    func LinearMalloc(alloc: *const Allocator,
+                        size: usize) : *void {
+        var this = alloc as (*LinearAllocator);
+        return this.malloc(size);
+    }
+
+    func LinearCalloc(alloc: *const Allocator,
+                        num: usize,
+                        size: usize) : *void {
+        var this = alloc as (*LinearAllocator);
+        var result = this.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func LinearRealloc(alloc: *const Allocator,
+                        ptr: *void,
+                        oldSize: usize,
+                        size: usize) : *void {
+        if(ptr == null) {
+            return LinearMalloc(alloc, size)
+        }
+
+        var this = alloc as (*LinearAllocator);
+
+        var result = this.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+        }
+
+        return result
+    }
+#end
+
+func LinearFree(alloc: *const Allocator, ptr: *void) {
+    // DO NOTHING
+}

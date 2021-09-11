@@ -1,5 +1,6 @@
 import "std/io"
 import "std/mem"
+import "std/mem/linear_allocator"
 import "std/array"
 import "std/map"
 import "std/libc"
@@ -360,19 +361,44 @@ public func FindModulePath(lita: *Lita,
         GetAbsolutePath(CurrentWorkingPath(), pathStr.cStr(), filename)
     }
 
-    pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
-    if(FileExists(pathStr.cStrConst())) {
-        return true
+    // First check to see if there is a Lita source file
+    {
+        pathStr.format("%s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer)
+        if(FileExists(pathStr.cStrConst())) {
+            return true
+        }
+
+        pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
+        if(FileExists(pathStr.cStrConst())) {
+            return true
+        }
+
+        pathStr.format("%s/stdlib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
+        if(FileExists(pathStr.cStrConst())) {
+            return true
+        }
     }
 
-    pathStr.format("%s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer)
-    if(FileExists(pathStr.cStrConst())) {
-        return true
-    }
+    // If no Lita source file, check to see if there is a folder with the modules name; if one exists,
+    // there should be a Lita source file of the same name
+    {
+        var index = moduleName.lastIndexOfAt("/", 1)
+        var name = index < 0 ? moduleName : moduleName.substring(index + 1)
 
-    pathStr.format("%s/stdlib/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer)
-    if(FileExists(pathStr.cStrConst())) {
-        return true
+        pathStr.format("%s/%.*s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
+        if(FileExists(pathStr.cStrConst())) {
+            return true
+        }
+
+        pathStr.format("%s/%.*s/%.*s.lita", lita.options.libPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
+        if(FileExists(pathStr.cStrConst())) {
+            return true
+        }
+
+        pathStr.format("%s/stdlib/%.*s/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
+        if(FileExists(pathStr.cStrConst())) {
+            return true
+        }
     }
 
     pathStr.clear()

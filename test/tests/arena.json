@@ -44,6 +44,7 @@
             "name": "Arena Allocator",
             "definitions": `
                 import "std/mem";
+                import "std/mem/arena_allocator"
                 import "std/array";
                 import "std/io";
                 import "std/map";
@@ -113,6 +114,7 @@
             "name": "Arena Allocator with Default",
             "definitions": `
                 import "std/mem";
+                import "std/mem/arena_allocator"
                 import "std/array";
                 import "std/io";
                 import "std/map";

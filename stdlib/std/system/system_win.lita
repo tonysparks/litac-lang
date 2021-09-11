@@ -1,0 +1,117 @@
+@raw("""
+#include <stdlib.h>
+
+#if defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__)
+#define OS_WIN
+#endif
+
+#if defined(OS_WIN) && !defined(__TINYC__)
+#include <windows.h>
+#include <libloaderapi.h>
+#endif
+
+#if defined(__TINYC__)
+#include <winapi/windows.h>
+#endif
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+typedef struct _stat FileStat;
+
+//#if defined(__TINYC__)
+//#include <sys/unistd.h>
+//size_t __cdecl strnlen(const char *_Str,size_t _MaxCount);
+//#endif
+
+#include <errno.h>
+""");
+
+import "std/libc"
+import "std/assert"
+import "std/string"
+import "std/string_view"
+
+import "std/system"
+
+@foreign("_MAX_PATH")
+public const MAX_PATH: i32;
+
+@foreign
+struct LARGE_INTEGER {
+    QuadPart: u64
+}
+
+@foreign
+func CreateDirectoryA(pathname: *const char, attr: *void) : bool;
+
+@foreign
+func GetCurrentDirectory(len: i32, buffer: *char): i32;
+
+@foreign
+func QueryPerformanceFrequency(freq: *LARGE_INTEGER) : bool;
+
+@foreign
+func QueryPerformanceCounter(time: *LARGE_INTEGER);
+
+var systemFreq: f64;
+var systemStart: u64 = 0;
+
+@no_profile
+@inline
+public func _SystemInit() : bool {
+    if(systemStart == 0) {
+        var freq: LARGE_INTEGER;
+        if(!QueryPerformanceFrequency(&freq)) {
+            return false
+        }
+
+        systemFreq = freq.QuadPart as (f64) / 1_000.0
+
+        var time: LARGE_INTEGER;
+        QueryPerformanceCounter(&time);
+        systemStart = time.QuadPart
+    }
+
+    return true
+}
+
+const pwd = [MAX_PATH]char{0};
+
+@inline
+public func _CurrentWorkingPath() : *const char {
+    @static var path: [MAX_PATH]char;
+    if(pwd[0] == 0) {
+        GetCurrentDirectory(MAX_PATH, path)
+        GetAbsolutePath("", path, pwd)
+    }
+
+    return pwd;
+
+}
+
+@inline
+public func _Mkdir(dir: *const char) : bool {
+    CreateDirectoryA(dir, null)
+
+    var view = StringViewInit(dir)
+    // we have to do this non-sense because tinycc stat doesn't like
+    // trailing /
+    if(view.endsWith("/")) {
+        var path = [MAX_PATH]char{0}
+        var normalized = StringInit(path, MAX_PATH)
+        normalized.format("%.*s", view.length - 1, view.buffer)
+        return FileExists(normalized.cStr())
+    }
+    return FileExists(dir)
+}
+
+@inline
+@no_profile
+public func _SystemTimeMSec() : f64 {
+    var time: LARGE_INTEGER;
+    QueryPerformanceCounter(&time);
+    assert(systemFreq != 0)
+
+    return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;
+}

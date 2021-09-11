@@ -1,0 +1,141 @@
+import "std/mem"
+import "std/assert"
+import "std/libc" as c
+
+/**
+=========================================================
+// Bucket allocator
+=========================================================
+*/
+struct Bucket {
+    prev: *Bucket
+    mem: *u8
+    size: usize
+
+    // memory alignment; not used
+    padding: *void
+}
+
+public struct BucketAllocator {
+    allocator: using Allocator
+    decorated: *const Allocator
+
+    buckets: *Bucket
+    head: *Bucket
+
+    bucketSize: usize
+    currentOffset: usize
+    totalAllocations: u32
+    totalBytesAllocated: usize
+}
+
+public func (this: *BucketAllocator) init(decorated: *const Allocator, bucketSize: usize) {
+    this.allocator = Allocator {
+        .allocFn:   &GenericMalloc<BucketAllocator>,
+        .callocFn:  &GenericCalloc<BucketAllocator>,
+        .reallocFn: &GenericRealloc<BucketAllocator>,
+        .freeFn:    &BucketFree
+    }
+    this.decorated = decorated
+
+    bucketSize = c::MAX(bucketSize, LITAC_DEFAULT_ALIGNMENT)
+
+    var memory = decorated.alloc(sizeof(:Bucket) + bucketSize) as (*u8)
+    this.buckets = memory as (*Bucket)
+    this.buckets.mem = memory + sizeof(:Bucket)
+    this.buckets.size = bucketSize
+    this.buckets.prev = null
+
+    this.head = this.buckets
+    this.bucketSize = bucketSize
+
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
+public func (this: *BucketAllocator) clear() {
+    assert(this.buckets != null)
+
+    var n = this.head
+    while(n && n != this.buckets) {
+        var prev = n.prev
+        this.decorated.free(n as (*void))
+        n = prev
+    }
+
+    this.head = this.buckets
+    c::memset(this.head.mem, 0, this.head.size)
+
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
+@doc("Free all memory associated with this allocator.")
+public func (this: *BucketAllocator) free() {
+    var n = this.head
+    while(n) {
+        var prev = n.prev
+        this.decorated.free(n as (*void))
+        n = prev
+    }
+
+    this.head = null
+    this.buckets = null
+
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
+public func (this: *BucketAllocator) malloc(size: usize) : *void {
+    assert(this.head != null)
+
+    var currPtr = this.head.mem as (usize) + this.currentOffset
+    var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
+    offset -= this.head.mem as (usize)
+
+    var allocationSize:usize = (size + offset) - this.currentOffset
+
+   // c::printf("currentOffset: %zu newOffset: %zu, limit: %zu allocation: %zu actualAllocation: %zu\n",
+   //     this.currentOffset, offset, this.head.size, size, allocationSize)
+
+
+    // check to see if there is enough room in this bucket
+    if((offset + size) > this.head.size) {
+        const bucketSize = c::MAX(size, this.bucketSize)
+        //c::printf(">>>>>Creating a new bucket of size: %zu\n", bucketSize)
+
+        var memory = this.decorated.alloc(sizeof(:Bucket) + bucketSize) as (*u8)
+
+        var bucket = memory as (*Bucket)
+        bucket.prev = this.head
+        bucket.mem = memory + sizeof(:Bucket)
+        bucket.size = bucketSize
+
+        this.head = bucket
+
+        this.currentOffset = 0
+
+        currPtr = this.head.mem as (usize)
+        offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
+        allocationSize = size + (offset - currPtr)
+
+        offset -= this.head.mem as (usize)
+
+        //c::printf("AllocationSize: %zu  offset: %zu\n", allocationSize, offset)
+    }
+
+    this.currentOffset = (size + offset)
+    this.totalBytesAllocated += allocationSize
+    this.totalAllocations += 1
+    var ptr = this.head.mem + offset
+    //c::printf("Start: %p Result: %p  offset: %zu, delta: %zu\n",
+    //    this.head.mem, ptr, offset, (ptr - this.head.mem) as (usize))
+    return ptr;
+}
+
+func BucketFree(alloc: *const Allocator, ptr: *void) {
+    // DO NOTHING
+}

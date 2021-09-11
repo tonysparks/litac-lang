@@ -1,0 +1,194 @@
+import "std/mem"
+import "std/assert"
+import "std/libc" as c
+
+
+/**
+=========================================================
+// Arena allocator
+=========================================================
+*/
+public struct Arena {
+    alloc: Allocator
+    decorated: *const Allocator
+    region: *u8
+    size: usize
+    current: usize
+    next: *Arena
+}
+
+const PAGE_SIZE:usize = 4096_u64 as (usize)
+
+public func (arena: *Arena) init(size: usize = PAGE_SIZE,
+                                 alloc: *const Allocator = defaultAllocator) {
+    arena.decorated = alloc
+    arena.region = alloc.calloc(size, sizeof(:u8)) as (*u8)
+    arena.current = 0
+    arena.size = size
+    arena.next = null
+    arena.alloc = Allocator {
+        .allocFn:   &ArenaMalloc,
+        .callocFn:  &ArenaCalloc,
+        .reallocFn: &ArenaRealloc,
+        .freeFn:    &ArenaFree
+    }
+}
+
+public func (arena: *Arena) free() {
+    var alloc = arena.decorated
+    alloc.free(arena.region as (*void))
+
+    var next: *Arena = null
+    var last = arena.next;
+
+    if(last == null) {
+        return;
+    }
+
+    do {
+        next = last.next
+        alloc.free(last.region as (*void))
+        alloc.free(last as (*void))
+        last = next
+    }
+    while(next != null)
+}
+
+
+#if (DEBUG)
+    public func (arena: *Arena) malloc(size: usize,
+                                       file: *const char = c::__FILE__,
+                                       line: u64 = c::__LINE__) : *void {
+        var a = arena
+        var last = arena
+
+        do {
+            if((a.size - a.current) > size) {
+                a.current += size
+                return (a.region + (a.current - size)) as (*void)
+            }
+
+            last = a
+        }
+        while((a = a.next) != null);
+
+        var asize = size > PAGE_SIZE ? size : PAGE_SIZE
+        var next = new<Arena>(arena.decorated, file, line)
+        next.init(asize, arena.decorated)
+
+        last.next = next
+        next.current += size
+        return next.region as (*void)
+    }
+
+
+    func ArenaMalloc(alloc: *const Allocator,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: u64 = c::__LINE__) : *void {
+        var arena = alloc as (*Arena);
+        return arena.malloc(size);
+    }
+
+    func ArenaCalloc(alloc: *const Allocator,
+                     num: usize,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: u64 = c::__LINE__) : *void {
+        var arena = alloc as (*Arena);
+        var result = arena.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func ArenaRealloc(alloc: *const Allocator,
+                      ptr: *void,
+                      oldSize: usize,
+                      size: usize,
+                      file: *const char = c::__FILE__,
+                      line: u64 = c::__LINE__) : *void {
+        if(ptr == null) {
+            return ArenaMalloc(alloc, size)
+        }
+
+        var arena = alloc as (*Arena);
+
+        var result = arena.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+
+            ArenaFree(alloc, ptr)
+        }
+
+        return result
+
+    }
+
+#else
+
+    public func (arena: *Arena) malloc(size: usize) : *void {
+        var a = arena
+        var last = arena
+
+        do {
+            if((a.size - a.current) > size) {
+                a.current += size
+                return (a.region + (a.current - size)) as (*void)
+            }
+
+            last = a
+        }
+        while((a = a.next) != null);
+
+        var asize = size > PAGE_SIZE ? size : PAGE_SIZE
+        var next = new<Arena>(arena.decorated)
+        next.init(asize, arena.decorated)
+
+        last.next = next
+        next.current += size
+        return next.region as (*void)
+    }
+
+    func ArenaMalloc(alloc: *const Allocator, size: usize) : *void {
+        var arena = alloc as (*Arena);
+        return arena.malloc(size);
+    }
+
+    func ArenaCalloc(alloc: *const Allocator, num: usize, size: usize) : *void {
+        var arena = alloc as (*Arena);
+        var result = arena.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func ArenaRealloc(alloc: *const Allocator, ptr: *void, oldSize: usize, size: usize) : *void {
+        if(ptr == null) {
+            return ArenaMalloc(alloc, size)
+        }
+
+        var arena = alloc as (*Arena);
+
+        var result = arena.malloc(size);
+        if(result) {
+            var len = c::MIN(oldSize, size)
+            c::memcpy(result, ptr, len)
+
+            ArenaFree(alloc, ptr)
+        }
+
+        return result
+
+    }
+
+#end
+
+func ArenaFree(alloc: *const Allocator, ptr: *void) {
+    // do nothing
+}

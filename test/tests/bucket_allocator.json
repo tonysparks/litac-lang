@@ -1,0 +1,95 @@
+{
+    "description": "Tests Bucket Allocator",
+    "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    //@include("stdio.h");
+    //@foreign func printf(...):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
+    "tests": [
+        {
+            "name" : "Bucket Allocator",
+            "definitions": `
+                import "std/mem"
+                import "std/libc"
+                import "std/mem/bucket_allocator"
+
+                func Buffer(allocator: *const Allocator, str: *const char) : *char {
+                    var len = strlen(str)
+                    var buffer = allocator.alloc(sizeof(:char) * len + 1)
+                    memcpy(buffer, str as (*void), len + 1)
+
+                    assert(strcmp(str, buffer as (*const char))==0)
+
+                    return buffer as (*char)
+                }
+            `,
+            "code": `
+                var debugAllocator = DebugAllocator{}
+                debugAllocator.init(cAllocator)
+
+                var allocator = BucketAllocator{}
+
+                allocator.init(&debugAllocator.alloc, 16)
+                var n1 = allocator.alloc(sizeof(:i32)) as (*i32);
+                *n1 = 4
+                var n2 = allocator.alloc(sizeof(:i32)) as (*i32);
+                *n2 = 8
+
+                var n3 = allocator.alloc(32) as (*u8);
+                assert(allocator.totalAllocations == 3)
+                allocator.free()
+
+                //printf("Clean\n\n")
+                allocator.init(&debugAllocator.alloc, 256)
+                assert(allocator.alloc(28) != null)
+                assert(allocator.alloc(28) != null)
+                assert(allocator.alloc(64) != null)
+                assert(allocator.alloc(128) != null)
+                //printf("Bytes Allocated: %zu BucketSize: %zu\n", allocator.totalBytesAllocated, allocator.head.size)
+                assert(allocator.alloc(1) != null)
+                //printf("***Bytes Allocated: %zu BucketSize: %zu\n", allocator.totalBytesAllocated, allocator.head.size)
+
+                assert(allocator.totalAllocations == 5)
+
+                {
+                    var a = &allocator.allocator
+                    Buffer(a, "Hello World\n")
+                    Buffer(a, "Hello Universe\n")
+                    for(var i = 0; i < 1024 * 3; i += 1) {
+                        Buffer(a, "I start this off, without any words\n")
+                        Buffer(a, "The finest day, I've ever had, is when I learned to cry on demand\n")
+                    }
+                }
+                allocator.clear()
+                {
+                    var a = &allocator.allocator
+                    Buffer(a, "Hello World\n")
+                    Buffer(a, "Hello Universe\n")
+                    for(var i = 0; i < 1024 * 3; i += 1) {
+                        Buffer(a, "I start this off, without any words\n")
+                        Buffer(a, "The finest day, I've ever had, is when I learned to cry on demand\n")
+                    }
+                }
+
+                allocator.free()
+
+                assert(allocator.totalAllocations == 0)
+                debugAllocator.report()
+            `,
+            "output":
+`Leaked Allocations: {
+}
+`
+        },
+
+    ]
+}

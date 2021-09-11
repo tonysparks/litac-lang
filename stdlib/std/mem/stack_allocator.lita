@@ -1,0 +1,111 @@
+import "std/mem"
+import "std/assert"
+import "std/libc" as c
+
+/**
+=========================================================
+// Stack allocator
+=========================================================
+*/
+struct StackEntry {
+    prev: *StackEntry
+    mem: *void
+    size: usize
+}
+
+public struct StackAllocator {
+    allocator: using Allocator
+
+    decorated: *const Allocator
+    stack: *StackEntry
+    head:  *StackEntry
+
+    totalAllocations: u32
+    totalBytesAllocated: usize
+}
+
+public func (this: *StackAllocator) init(decorated: *const Allocator) {
+    this.allocator = Allocator {
+        .allocFn:   &GenericMalloc<StackAllocator>,
+        .callocFn:  &GenericCalloc<StackAllocator>,
+        .reallocFn: &GenericRealloc<StackAllocator>,
+        .freeFn:    &StackFree
+    }
+    this.decorated = decorated
+    this.stack = null
+    this.head = null
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+}
+
+public func (this: *StackAllocator) free() {
+    if(this.head) {
+        var n = this.head
+        while(n) {
+            var prev = n.prev
+            this.decorated.free(n as (*void))
+            n = prev
+        }
+    }
+
+    this.head = null
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+}
+
+
+public func (this: *StackAllocator) empty() : bool {
+    return this.head == null
+}
+
+public func (this: *StackAllocator) pop() {
+    if(!this.head) {
+        return;
+    }
+
+    var entry = this.head
+    this.head = entry.prev
+
+    this.totalBytesAllocated -= entry.size
+    this.totalAllocations -= 1
+
+    this.decorated.free(entry as (*void))
+}
+
+public func (this: *StackAllocator) malloc(size: usize) : *void {
+    var memory = this.decorated.alloc(sizeof(:StackEntry) + size)
+
+    var entry = memory as (*StackEntry)
+    entry.prev = this.head
+    entry.mem = &memory[sizeof(:StackEntry)]
+    entry.size = size
+
+    this.head = entry
+
+    this.totalBytesAllocated += size
+    this.totalAllocations += 1
+
+    return entry.mem
+}
+
+func StackFree(alloc: *const Allocator, ptr: *void) {
+    var this = alloc as (*StackAllocator);
+
+    var old: *StackEntry = null
+    var n = this.head
+    while(n) {
+        var prev = n.prev
+        if(n.mem == ptr) {
+            this.totalBytesAllocated -= n.size
+            this.totalAllocations -= 1
+
+            this.decorated.free(n as (*void))
+            if(old) {
+                prev = old.prev
+            }
+            break
+        }
+        old = n
+        n = prev
+    }
+}

@@ -1,5 +1,6 @@
 import "std/libc"
 import "std/mem"
+import "std/mem/linear_allocator"
 import "std/io"
 import "std/cmdline"
 import "std/system"

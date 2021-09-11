@@ -144,6 +144,58 @@ public func (b: StringView) indexOfAt(str: *const char, len: i32 = -1, fromIndex
     return -1;
 }
 
+public func (b: StringView) lastIndexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = -1) : i32 {
+    var sourceCount = b.length
+    var targetCount = len < 0 ? strlen(str) : len
+
+    var targetOffset = 0
+    var sourceOffset = 0
+
+    var source = b.buffer
+    var target = str
+
+    var rightIndex = sourceCount - targetCount;
+    if (fromIndex < 0) {
+        fromIndex = sourceCount
+    }
+    if (fromIndex > rightIndex) {
+        fromIndex = rightIndex;
+    }
+    /* Empty string always matches. */
+    if (targetCount == 0) {
+        return fromIndex;
+    }
+
+    var strLastIndex = targetOffset + targetCount - 1;
+    var strLastChar = target[strLastIndex];
+    var min = sourceOffset + targetCount - 1;
+    var i = min + fromIndex;
+
+startSearchForLastChar:
+    while (true) {
+        while (i >= min && source[i] != strLastChar) {
+            i-=1;
+        }
+        if (i < min) {
+            return -1;
+        }
+        var j = i - 1;
+        var start = j - (targetCount - 1);
+        var k = strLastIndex - 1;
+
+        while (j > start) {
+            if (source[j] != target[k]) {
+                i -= 1;
+                goto startSearchForLastChar;
+            }
+            j -= 1
+            k -= 1
+        }
+        return start - sourceOffset + 1;
+    }
+
+}
+
 public func (b: StringView) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
     if(!buf || len == 0) return 0;
 
@@ -269,4 +321,20 @@ func testIndexOf() {
 
     assert(e.indexOfAt("World") == -1)
     assert(a.indexOfAt(e.buffer, e.length) == -1)
+}
+
+
+@test("lastIndexOf")
+func testLastIndexOf() {
+    var a = StringViewInit("Hello World")
+    var e = StringViewInit(null)
+
+    assert(a.lastIndexOfAt("World") == 6)
+    assert(a.lastIndexOfAt("World", .fromIndex: 5) == -1)
+    assert(a.lastIndexOfAt("World", .fromIndex: 7) == 6)
+    assert(a.lastIndexOfAt("l") == 9)
+    assert(a.lastIndexOfAt("o") == 7)
+    assert(a.lastIndexOfAt("z") == -1)
+
+    assert(e.lastIndexOfAt("World") == -1)
 }

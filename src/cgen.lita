@@ -7,6 +7,7 @@ import "std/array"
 import "std/map"
 import "std/assert"
 import "std/system"
+import "std/mem"
 import "std/unicode/utf8"
 
 import "ast"
@@ -698,7 +699,7 @@ func (this: using *CGen) cType(type: *TypeInfo,
                         var cgen = CGen {
                             .lita = this.lita,
                             .buf = buf,
-                            .line = line
+                            .line = line,
                         }
                         cgen.emitStmt(arrayInfo.numOfElements)
                         buf.appendStrn("]", 1)
@@ -820,7 +821,6 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                             .buf = buf,
                             .line = line
                         }
-
                         cgen.emitStmt(arrayInfo.numOfElements)
                         buf = cgen.buf // the buffer has expanded
                         buf.appendStrn("]", 1)
