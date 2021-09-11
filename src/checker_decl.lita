@@ -115,13 +115,16 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
     }
 
     if(declaredType && inferredType) {
-        this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)
+        if(!this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)) {
+            return false
+        }
     }
 
     return declaredType ? declaredType : inferredType
 }
 
 func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {
+    var errors = this.errors()
     switch(field.kind) {
         case StmtKind.TRAIT_FIELD_DECL: {
             var traitField = field.traitField
@@ -172,7 +175,7 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
         }
     }
 
-    return true
+    return this.errors() == errors
 }
 
 func (this: *TypeChecker) errorInvalidMemberForTrait(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
@@ -266,7 +269,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
                     }
                 }
                 else if(aggField.name.type == TokenType.VOID) {
-                    this.checkAggregateFieldDuplicate(aggField, fieldName, -1)
+                    isValid = this.checkAggregateFieldDuplicate(aggField, fieldName, -1) && isValid
                 }
                 break;
             }
@@ -283,6 +286,8 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
     defer this.references.addTypeReferenceBySymbol(aggDecl.startPos, aggDecl.sym)
+
+    var errors = this.errors()
 
     var hasGenerics = aggDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
     if(hasGenerics) {
@@ -449,7 +454,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
     this.addFieldReferences(aggDecl, aggDecl.sym.type, 0)
 
-    return true
+    return this.errors() == errors
 }
 
 
@@ -529,6 +534,7 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
 public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
     defer this.references.addTypeReferenceBySymbol(enumDecl.startPos, enumDecl.sym)
 
+    var errors = this.errors()
     var parentTypeInfo = enumDecl.sym.type
     for(var i = 0; i < enumDecl.fields.size(); i+=1) {
         var field = enumDecl.fields.get(i)
@@ -545,7 +551,7 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
         this.checkEnumFieldDuplicate(enumDecl, field, i)
         this.lita.references.addFieldReference(field.startPos, parentTypeInfo, i)
     }
-    return true
+    return this.errors() == errors
 }
 
 func (this: *TypeChecker) checkLabels() {
@@ -560,6 +566,8 @@ func (this: *TypeChecker) checkLabels() {
 
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     defer this.references.addTypeReferenceBySymbol(funcDecl.startPos, funcDecl.sym)
+
+    var errors = this.errors()
 
     this.enterModule(funcDecl.sym.declared)
     defer this.leaveModule()
@@ -593,13 +601,15 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         this.checkLabels()
     }
 
-    return true
+    return this.errors() == errors
 }
 
 public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : bool {
     assert(paramDecl != null)
 
     defer this.references.addTypeReferenceBySymbol(paramDecl.startPos, paramDecl.sym)
+
+    var errors = this.errors()
 
     if(paramDecl.defaultExpr) {
         if(!this.resolveExpr(paramDecl.defaultExpr)) {
@@ -608,7 +618,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
     }
 
     var typeInfo = this.resolveTypeSpec(paramDecl.type)
-    if(!typeInfo) {
+    if(!typeInfo || typeInfo == &POISON_TYPE) {
         return false
     }
 
@@ -626,7 +636,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
         }
     }
 
-    return true
+    return this.errors() == errors
 }
 
 public func (this: *TypeChecker) resolveTypedefDecl(typedefDecl: *TypedefDecl) : bool {
