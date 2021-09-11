@@ -167,6 +167,11 @@ exit:
     };
 }
 
+@inline
+func (this: *TypeChecker) errors() : i32 {
+    return this.result.errors.size()
+}
+
 func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeInfo, description: *const char) : bool {
     // get more descriptive information if this is trait
     // comparisons, as they are not as intuitive as other types
@@ -1370,6 +1375,8 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.RETURN_STMT: {
             var ret = stmt as (*ReturnStmt)
+
+            var count = this.errors()
             var currentFuncDecl = this.funcDeclStack.last()
             if(ret.expr) {
                 if(!this.resolveExpr(ret.expr)) {
@@ -1384,7 +1391,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             else {
                 this.checkTypeCompatibility(ret.startPos, currentFuncDecl.returnType, &VOID_TYPE)
             }
-            return true;
+            return count == this.errors();
         }
         case StmtKind.SWITCH_CASE_STMT: {
             var caseStmt = stmt as (*SwitchCaseStmt)
