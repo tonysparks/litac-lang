@@ -23,7 +23,7 @@ import "error_codes"
 import "module"
 import "checker"
 import "cgen"
-import "lsp/lsp"
+import "lsp"
 
 func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()

@@ -406,7 +406,7 @@ public func (this: *LspServer) handleTextDocumentDefinitionMessage(msg: *JsonNod
 
 public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
     this.log("Running diagnostics for: '%s'\n", docUri)
-    var result = this.workspace.runDiagnostics(this.requestAlloc())
+    var result = this.workspace.runDiagnostics(this.requestAlloc(), docUri)
 
     var params = CreateJsonObject(this.requestAlloc())
     params.putStr("uri", docUri)

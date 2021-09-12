@@ -122,16 +122,18 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     this.lsp.log("Uri: '%s' has doc: %d\n", uri, doc != null)
     if(!doc) return null;
 
+    this.runDiagnostics(alloc, uri)
+
     var syms = &this.lsp.lita.programSymbols
     var results = CreateJsonArray(alloc)
 
     // Generics
-    for(var it = this.lsp.lita.genericSymbols.iter(); it.hasNext();) {
+    /*for(var it = this.lsp.lita.genericSymbols.iter(); it.hasNext();) {
         var entry = it.next()
         var sym = entry.value
 
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
-    }
+    }*/
 
     // Values
     for(var i = 0; i < syms.values.size(); i += 1) {
@@ -142,12 +144,20 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     // Types
     for(var i = 0; i < syms.symbolTypes.size(); i += 1) {
         var sym = syms.symbolTypes.get(i)
+        if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+            continue
+        }
+
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
     }
 
     // Show functions
     for(var i = 0; i < syms.symbolFuncs.size(); i += 1) {
         var sym = syms.symbolFuncs.get(i)
+        if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+            continue
+        }
+
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
     }
 
@@ -168,6 +178,8 @@ func (this: *Workspace) addDocumentSymbol(results: *JsonNode, sym: *Symbol, docF
 public func (this: *Workspace) references(uri: *const char, position: *JsonNode, alloc: *const Allocator) : *JsonNode {
     this.lsp.log("looking up references...\n")
     if(!uri || !position) return JSON_NULL;
+
+    this.runDiagnostics(alloc, uri)
 
     var location = this.getNodeAtSourcePos(uri, position)
     if(location.kind == SourceLocationKind.NONE) {
@@ -429,6 +441,8 @@ func (this: *Workspace) getNodeAtSourcePos(uri: *const char, position: *JsonNode
 public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonNode, alloc: *const Allocator) : *JsonNode {
     this.lsp.log("looking up definition...\n")
     if(!uri || !position) return JSON_NULL;
+
+    this.runDiagnostics(alloc, uri)
 
     var location = this.getNodeAtSourcePos(uri, position)
     if(location.kind == SourceLocationKind.NONE) {
@@ -707,9 +721,18 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
 }
 
 
-public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseResult {
+public func (this: *Workspace) runDiagnostics(alloc: *const Allocator, docUri: *const char) : *PhaseResult {
     var startTime = SystemTimeMSec()
     var lita = this.lsp.lita
+
+    // run this diagnostics from a particular module
+    if(docUri) {
+        this.lsp.log("Running diagnostics for: '%s'...\n", docUri)
+        UriToFilePath(docUri, lita.options.inputFile)
+
+        this.lsp.log("Source file: '%s', source path: '%s'...\n", lita.options.inputFile, lita.options.srcPath)
+    }
+
     lita.reset()
 
     var root = lita.parse()
@@ -724,7 +747,7 @@ public func (this: *Workspace) runDiagnostics(alloc: *const Allocator) : *PhaseR
         goto report
     }
 
-    var totalTime = SystemTimeMSec()
+    var totalTime = SystemTimeMSec() - startTime
     this.lsp.log("Successfully compiled in %.3f msec\n", totalTime)
 
 report:
