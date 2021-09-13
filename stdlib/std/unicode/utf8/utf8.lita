@@ -1,6 +1,8 @@
-import "std/unicode/utf8/utf8proc"
 import "std/mem"
 import "std/libc"
+
+@cFile("utf8.h");
+
 
 @doc("""
     A unicode codepoint
@@ -20,11 +22,13 @@ public const MAX_RUNE_BYTES = 4
     Reads a single codepoint from the UTF-8 sequence being pointed to by `str`. The maximum number of bytes read is `len`,
     unless `len` is negative (in which case up to 4 bytes are read).
 
-    If a valid codepoint could be read, it is stored in the variable pointed to by `codepoints`, otherwise that variable will be set to -1.
+    If a valid codepoint could be read, it is stored in the variable pointed to by `codepoint`, otherwise that variable will be set to -1.
     In case of success, the number of bytes read is returned; otherwise, a negative error code is returned.
 """)
-public func Utf8Decode(str: *const u8, len: i64, codepoints: *rune) : i64 {
-    return utf8proc_iterate(str, len, codepoints) //as (i32)
+public func Utf8Decode(str: *const u8, len: i32, codepoint: *rune) : i32 {
+    var dest = utf8codepoint(str as (*const void), codepoint) as (*const u8)
+    return (dest - str) as (i32)
+
 }
 
 public func Utf8HexDecode(str: *const char, len: i32) : rune {
@@ -46,22 +50,95 @@ public func Utf8HexDecode(str: *const char, len: i32) : rune {
 
     This function does not check whether codepoint is valid Unicode.
 """)
-public func Utf8Encode(codepoint: rune, dst: *u8) : i64 {
-    return utf8proc_encode_char(codepoint, dst)
+public func Utf8Encode(codepoint: rune, dst: *u8) : i32 {
+    /// Credit to https://github.com/JuliaStrings/utf8proc/blob/master/utf8proc.c#L177
+    if (codepoint < 0x00) {
+        return 0;
+    }
+    else if (codepoint < 0x80) {
+        dst[0] = codepoint as (u8);
+        return 1;
+    } else if (codepoint < 0x800) {
+        dst[0] = (0xC0 + (codepoint >> 6))  as (u8);
+        dst[1] = (0x80 + (codepoint & 0x3F))  as (u8);
+        return 2;
+        // Note: we allow encoding 0xd800-0xdfff here, so as not to change
+        // the API, however, these are actually invalid in UTF-8
+    } else if (codepoint < 0x10000) {
+        dst[0] = (0xE0 + (codepoint >> 12))  as (u8);
+        dst[1] = (0x80 + ((codepoint >> 6) & 0x3F))  as (u8);
+        dst[2] = (0x80 + (codepoint & 0x3F))  as (u8);
+        return 3;
+    } else if (codepoint < 0x110000) {
+        dst[0] = (0xF0 + (codepoint >> 18))  as (u8);
+        dst[1] = (0x80 + ((codepoint >> 12) & 0x3F))  as (u8);
+        dst[2] = (0x80 + ((codepoint >> 6) & 0x3F))  as (u8);
+        dst[3] = (0x80 + (codepoint & 0x3F))  as (u8);
+        return 4;
+    }
+    return 0;
 }
 
 @doc("""
-    Given a codepoint, return a character width.  Width of 0 is returned for
+    Given a codepoint, return a character width.  Width of -1 is returned for
     non-printable codepoints
 """)
 public func Utf8CharWidth(codepoint: rune) : i32 {
-    return utf8proc_charwidth(codepoint)
+
+    // the common case...
+    if(codepoint >= 32 && codepoint < 127) return 1;
+
+    // The null character (U+0000) has a column width of 0.
+    if(codepoint == 0) return 0;
+
+    // Other C0/C1 control characters and DEL will lead to a return value of -1.
+    if(codepoint > 0   && codepoint < 32) return -1;
+    if(codepoint > 159 && codepoint < 256) return -1;
+    if(codepoint == 127) return -1;
+
+    // Non-spacing and enclosing combining characters (general category code Mn or Me in the Unicode database) have a column width of 0.
+    if(codepoint == 0xD288 || codepoint == 0xD289 || codepoint == 0xE1AABE ||
+      (codepoint >= 0xE2839D && codepoint <= 0xE283A4) ||
+      (codepoint >= 0xEA99B0 && codepoint <= 0xEA99B2)) {
+          return 0;
+    }
+
+    if((codepoint >= 0xCC80 && codepoint <= 0xCDAF) ||
+       (codepoint >= 0xD283 && codepoint <= 0xD287) ||
+       (codepoint >= 0xD691 && codepoint <= 0xD787) ||
+       (codepoint >= 0xD890 && codepoint <= 0xDBAD) ||
+       (codepoint >= 0xDC91) ||
+       (codepoint >= 0xDCB0 && codepoint <= 0xDFBD)) { // TODO: Continue on... (U+07FD) https://codepoints.net/search?q=Mn
+           return 0;
+    }
+
+    // SOFT HYPHEN (U+00AD) has a column width of 1.
+    if(codepoint == 0xC2AD) return 1;
+
+    // Other format characters (general category code Cf in the Unicode database) and ZERO WIDTH SPACE (U+200B) have a column width of 0.
+    // TODO: https://www.compart.com/en/unicode/category/Cf
+    if(codepoint == 0xE2808B) {
+        return 0
+    }
+
+    // Hangul Jamo medial vowels and final consonants (U+1160-U+11FF) have a column width of 0.
+    if(codepoint >= 0xE185A0 && codepoint <= 0xE187BF) {
+        return 0
+    }
+
+    // Spacing characters in the East Asian Wide (W) or East Asian Full-width (F) category as defined in Unicode Technical Report #11 have a column width of 2.
+    // TODO
+
+    // All remaining characters (including all printable ISO 8859-1 and WGL4 characters, Unicode control characters, etc.) have a column width of 1.
+    return 1;
 }
 
 public func Utf8CodepointValid(codepoint: rune) : bool {
-    return utf8proc_codepoint_valid(codepoint)
+    return ((codepoint as (u32)) - 0xd800 > 0x07ff) &&
+            ((codepoint as (u32) < 0x110000));
 }
 
+/*
 public enum NormalizeType {
     NFD  = (utf8proc_option_t.UTF8PROC_NULLTERM | utf8proc_option_t.UTF8PROC_STABLE | utf8proc_option_t.UTF8PROC_DECOMPOSE),
     NFC  = (utf8proc_option_t.UTF8PROC_NULLTERM | utf8proc_option_t.UTF8PROC_STABLE | utf8proc_option_t.UTF8PROC_COMPOSE),
@@ -79,7 +156,13 @@ public func Utf8Normalize(str: *const u8,
     utf8proc_map(str, 0, &retval, type as (i32));
     return retval;
 }
+*/
 
+@foreign
+func utf8codepointsize(chr: i32) : usize;
+
+@foreign
+func utf8codepoint(str: *const void, out_codepoint: *i32) : *void;
 
 #if TESTING
     func decode(str: *const char) {
@@ -104,7 +187,7 @@ public func Utf8Normalize(str: *const u8,
         var r: rune = 0
         var len = Utf8Decode(x, strlen(x as (*const char)), &r)
         var width = Utf8CharWidth(r)
-        printf("Hello '%s' Rune: %d Len: %zu Width: %d ⵓ ⵙ\n", x, r, len, width)
+        printf("Hello '%s' Rune: %d Len: %d Width: %d ⵓ ⵙ\n", x, r, len, width)
 
         var codepoint = strtol("2D5A'", null, 16) as (rune)
         printf("Codepoint: %d InString: '\u2d5a'Z\U0002B8B9z\n", codepoint)
