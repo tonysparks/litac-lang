@@ -149,6 +149,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     parser.addOption("test",           '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
     parser.addOption("buildCmd",       'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("maxMemory",      '\0', "The max amount of memory allowed for allocation. NOTE: This is a temporary option", OptionFlag.HAS_ARGUMENT, null);
 
 
     if(parser.parse(n, args) != CmdParserStatus.OK) {
@@ -195,6 +196,30 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     options.cFormat = parser.hasOption("cFormat")
     options.instrument = parser.hasOption("instrument")
     options.disableLineSync = parser.hasOption("disableLine")
+
+    if(parser.hasOption("maxMemory")) {
+        var memoryStr = parser.getOption("maxMemory").value
+        var view = StringViewInit(memoryStr)
+
+
+
+        options.maxMemory = strtol(memoryStr, null, 10)
+        if(view.indexOf("GB") > -1 || view.indexOf("GiB") > -1 ||
+           view.indexOf("gb") > -1 || view.indexOf("gib") > -1) {
+            options.maxMemory *= GiB
+        }
+        else if(view.indexOf("MB") > -1 || view.indexOf("MiB") > -1 ||
+           view.indexOf("mb") > -1 || view.indexOf("mib") > -1) {
+            options.maxMemory *= MiB
+        }
+        else if(view.indexOf("KB") > -1 || view.indexOf("KiB") > -1 ||
+           view.indexOf("kb") > -1 || view.indexOf("kib") > -1) {
+            options.maxMemory *= KiB
+        }
+    }
+    else {
+        options.maxMemory = 300 * MiB
+    }
 
     options.typeOption = TypeInfoOption.NONE
     if(parser.hasOption("types")) {

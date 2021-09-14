@@ -10,7 +10,7 @@ REM set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I
 
 echo Running bootstrapped litaC...
 cd bootstrap
-litacc.exe -cFormat -profile -buildCmd %BUILD_CMD% "../src/main.lita" -outputDir "../bin/" -output "litac"
+litacc.exe -cFormat -profile -buildCmd %BUILD_CMD% "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
 REM litacc.exe -cFormat -types all -debug -run -profile "../test/test_single.lita"
 REM litaC.exe -run -profile -buildCmd %BUILD_CMD% "../src/lsp.lita"
 if errorlevel 1 (
@@ -28,7 +28,7 @@ REM echo Inception complete
 
 echo Running litaC inception!...
 cd ../bin
-litac.exe -profile -cFormat -buildCmd %BUILD_CMD% "../src/main.lita"
+litac.exe -profile -cFormat -buildCmd %BUILD_CMD% "../src/main.lita" -maxMemory 1GiB
 if errorlevel 1 (
     goto error_compiling
 )

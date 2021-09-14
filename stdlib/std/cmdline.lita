@@ -2,6 +2,7 @@ import "std/array"
 import "std/io"
 import "std/mem"
 import "std/string_buffer"
+import "std/string"
 import "std/libc" as c
 
 const MAX_MESSAGE_SIZE = 256
@@ -150,13 +151,27 @@ public func (p: *CmdParser) printHelp(sb: *StringBuffer) {
         sb.append("%s\n", p.header)
     }
 
+    var name: [256]char;
+    var nameStr = StringInit(name, 256);
+
     for(var i = 0; i < p.options.size(); i += 1) {
         var opt = &p.options.elements[i]
-        if(opt.shortName != '\0') {
-            sb.append("    -%c, -%-16s", opt.shortName, opt.name)
+        if(opt.flags & OptionFlag.HAS_ARGUMENT) {
+            nameStr.format("%s <arg>", opt.name)
+            if(opt.shortName != '\0') {
+                sb.append("    -%c, -%-16s", opt.shortName, nameStr.cStr())
+            }
+            else {
+                sb.append("    -%-20s", nameStr.cStr())
+            }
         }
         else {
-            sb.append("    -%-20s", opt.name)
+            if(opt.shortName != '\0') {
+                sb.append("    -%c, -%-16s", opt.shortName, opt.name)
+            }
+            else {
+                sb.append("    -%-20s", opt.name)
+            }
         }
 
         var it = opt.description

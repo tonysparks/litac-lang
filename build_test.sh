@@ -24,9 +24,9 @@ error_tests() {
 
 run_tests() {
     echo "Compiling litaC tests..."
-    
+
     cd ./bin
-    ./litac_linux -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug
+    ./litac_linux -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
     result=$?
     if [ $result -gt 0 ]; then
         error_compiling
@@ -37,7 +37,7 @@ run_tests() {
     result=$?
 
     echo "Result: " $result
-    if [ $result -gt 0 ]; then 
+    if [ $result -gt 0 ]; then
         error_tests
     fi
 
@@ -51,6 +51,6 @@ if [ -z "${LITAC_HOME}" ]; then
     echo "=========================================="
     echo ""
     exit 2
-else 
+else
     run_tests
 fi

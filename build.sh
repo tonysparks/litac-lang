@@ -15,10 +15,10 @@ error_compiling() {
 
 build_litac() {
     echo "Running bootstrapped litaC..."
-    
+
     cd bootstrap
-    
-    ./litacc -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac_linux"
+
+    ./litacc -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac_linux" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling()
         return 1
@@ -26,7 +26,7 @@ build_litac() {
 
     echo "Running litaC inception!..."
     cd ../bin
-    ./litac_linux -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita"
+    ./litac_linux -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling()
         return 1
@@ -42,7 +42,7 @@ if [ -z "${LITAC_HOME}" ]; then
     echo "=========================================="
     echo ""
     exit 2
-else 
+else
     build_litac
 fi
 

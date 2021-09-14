@@ -10,6 +10,10 @@ import "std/assert"
 @foreign
 public const LITAC_DEFAULT_ALIGNMENT: usize;
 
+public const KiB:usize = 1024;
+public const MiB:usize = 1024 * KiB;
+public const GiB:usize = 1024 * MiB;
+
 /**
 =========================================================
 // new allocates a type T
