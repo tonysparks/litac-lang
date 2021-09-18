@@ -1,0 +1,192 @@
+import "std/assert"
+import "std/string_buffer"
+
+import "ast"
+import "ast_new"
+import "common"
+import "checker"
+import "lex"
+
+
+func (this: *TypeChecker) errorDivideByZero(expr: *Expr) {
+    assert(expr != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.appendStr("divide by zero error")
+
+    this.result.addErrorStr(expr.startPos, sb)
+}
+
+public func (this: *TypeChecker) resolveConstBinaryExpr(expr: *BinaryExpr) : bool {
+    if(!this.resolveConstExpr(expr.left)) {
+        return false
+    }
+    if(!this.resolveConstExpr(expr.right)) {
+        return false
+    }
+    switch(expr.operator) {
+        case TokenType.EQUALS:
+        case TokenType.BAND_EQ:
+        case TokenType.BNOT_EQ:
+        case TokenType.BOR_EQ:
+        case TokenType.XOR_EQ:
+        case TokenType.LSHIFT_EQ:
+        case TokenType.RSHIFT_EQ:
+            return false
+        case TokenType.BAND: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue & expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.BNOT: {
+            //expr.operand.val.intValue = expr.left.operand.val.intValue expr.right.operand.val.intValue
+            //break
+            return false // isn't this a unary operator???
+        }
+        case TokenType.BOR: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue | expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.XOR: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue ^ expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.LSHIFT: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue << expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.RSHIFT: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue >> expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.AND: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue && expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.OR: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue || expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.EQUALS_EQUALS: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue == expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.NOT_EQUALS: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue != expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.GREATER_EQUALS: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue >= expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.GREATER_THAN: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue > expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.LESS_EQUALS: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue <= expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.LESS_THAN: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue < expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.MINUS_EQ:
+        case TokenType.PLUS_EQ:
+        case TokenType.MOD_EQ:
+        case TokenType.MUL_EQ:
+        case TokenType.DIV_EQ:
+            return false
+        case TokenType.MINUS: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue - expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.PLUS: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue + expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.MOD: {
+            if(expr.right.operand.val.intValue == 0) {
+                this.errorDivideByZero(expr.right)
+                return false
+            }
+
+            expr.operand.val.intValue = expr.left.operand.val.intValue % expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.STAR: {
+            expr.operand.val.intValue = expr.left.operand.val.intValue * expr.right.operand.val.intValue
+            return true
+        }
+        case TokenType.SLASH: {
+            if(expr.right.operand.val.intValue == 0) {
+                this.errorDivideByZero(expr.right)
+                return false
+            }
+
+            expr.operand.val.intValue = expr.left.operand.val.intValue / expr.right.operand.val.intValue
+            return true
+        }
+        default: {
+            assert(false)
+        }
+    }
+}
+
+public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
+    if(!expr) return false
+
+    switch(expr.kind) {
+        case StmtKind.BINARY_EXPR: {
+            return this.resolveConstBinaryExpr(expr as (*BinaryExpr))
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            return this.resolveConstBooleanExpr(expr as (*BooleanExpr))
+        }
+        case StmtKind.CAST_EXPR: {
+            return this.resolveConstCastExpr(expr as (*CastExpr))
+        }
+        case StmtKind.CHAR_EXPR: {
+            return this.resolveConstCharExpr(expr as (*CharExpr))
+        }
+        case StmtKind.GET_EXPR:{
+            return this.resolveConstGetExpr(expr as (*GetExpr))
+        }
+        case StmtKind.GROUP_EXPR: {
+            return this.resolveConstGroupExpr(expr as (*GroupExpr))
+        }
+        case StmtKind.IDENTIFIER_EXPR: {
+            return this.resolveConstIdentiferExpr(expr as (*IdentifierExpr))
+        }
+        case StmtKind.NULL_EXPR: {
+            return this.resolveConstNullExpr(expr as (*NullExpr))
+        }
+        case StmtKind.NUMBER_EXPR: {
+            return this.resolveConstNumberExpr(expr as (*NumberExpr))
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            return this.resolveConstOffsetOfExpr(expr as (*OffsetOfExpr))
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            return this.resolveConstSizeOfExpr(expr as (*SizeOfExpr))
+        }
+        case StmtKind.STRING_EXPR: {
+            return this.resolveConstStringExpr(expr as (*StringExpr))
+        }
+        case StmtKind.TERNARY_EXPR: {
+            return this.resolveConstTernaryExpr(expr as (*TernaryExpr))
+        }
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            return this.resolveConstTypeIdentifierExpr(expr as (*TypeIdentifierExpr))
+        }
+        case StmtKind.TYPE_OF_EXPR: {
+            return this.resolveConstTypeOfExpr(expr as (*TypeOfExpr))
+        }
+        case StmtKind.UNARY_EXPR: {
+            return this.resolveConstUnaryExpr(expr as (*UnaryExpr))
+        }
+        default: {
+            return false
+        }
+    }
+    return false
+}
