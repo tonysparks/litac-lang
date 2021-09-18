@@ -8,7 +8,7 @@ import "std/libc" as c
 =========================================================
 */
 public struct LinearAllocator {
-    alloc: Allocator
+    allocator: using Allocator
     mem: *void
     size: usize
     currentOffset: usize
@@ -18,7 +18,7 @@ public struct LinearAllocator {
 }
 
 public func (this: *LinearAllocator) init(mem: *void, size: usize) {
-    this.alloc = Allocator {
+    this.allocator = Allocator {
         .allocFn:   &LinearMalloc,
         .callocFn:  &LinearCalloc,
         .reallocFn: &LinearRealloc,
@@ -33,7 +33,9 @@ public func (this: *LinearAllocator) init(mem: *void, size: usize) {
 
 @doc("Zero out all allocated memory and reset current offset")
 public func (this: *LinearAllocator) clear() {
-    c::memset(this.mem, 0, this.size)
+    // Way too costly for performance, put the ownes on the owner
+    // of the memory to clear out if they want to
+    //c::memset(this.mem, 0, this.size)
     this.totalBytesAllocated = 0
     this.totalAllocations = 0
     this.currentOffset = 0
@@ -44,12 +46,13 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
     var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
     offset -= this.mem as (usize)
 
-    if((offset + size) > this.size) {
+    var newOffset = offset + size
+    if(newOffset > this.size) {
         c::printf("Failed to allocate: %zu, %zu + %zu will exceed limit of %zu\n", size, offset, size, this.size)
         return null
     }
 
-    this.currentOffset = (size + offset)
+    this.currentOffset = newOffset
     this.totalBytesAllocated = (size + offset)
     this.totalAllocations += 1
 //c::printf("Allocating: %zu - Allocation Count: %zu Total Bytes: %zu\n", size, this.totalAllocations, this.totalBytesAllocated)

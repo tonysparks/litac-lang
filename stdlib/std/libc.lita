@@ -78,6 +78,10 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func pow(base: f64, exponent: f64) : f64;
 @foreign public const M_PI: f64;
 
+@foreign public const RAND_MAX: i64;
+@foreign public func rand() : i32;
+@foreign public func srand(seed: u32);
+
 // Varargs
 @foreign public struct va_list;
 @foreign public func va_start(args: va_list, format: *const char);

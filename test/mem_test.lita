@@ -1,0 +1,132 @@
+import "std/mem"
+import "std/mem/bucket_allocator"
+import "std/mem/linear_allocator"
+import "std/system"
+import "std/libc"
+
+func timeAllocations(allocator: *const Allocator, size: usize, chunkSize: usize) : f64 {
+    var startTime = SystemTimeMSec()
+    for(var i:usize = 0; i < size;) {
+        var mem = allocator.alloc(chunkSize)
+        i += chunkSize
+    }
+    var endTime = SystemTimeMSec()
+    return (endTime - startTime)
+}
+
+func timeRandomAllocations(allocator: *const Allocator, chunkSizes: *usize, len: i32) : f64 {
+    var startTime = SystemTimeMSec()
+
+    var index = 0
+    for(var i = 0; i < len; i+=1) {
+        var chunkSize = chunkSizes[i]
+        var mem = allocator.alloc(chunkSize)
+    }
+    var endTime = SystemTimeMSec()
+    return (endTime - startTime)
+}
+
+//@test
+func equalAllocations() {
+    const SIZE = 1 * GiB
+    const MAX_CHUNK_SIZE = 2 * KiB
+
+    var defaultAlloc = defaultAllocator
+
+    var linear = LinearAllocator{}
+    var mem = defaultAlloc.alloc(SIZE)
+    defer defaultAlloc.free(mem)
+
+    linear.init(mem, SIZE)
+
+    printf("Equal Segments\n")
+    {
+        printf("Linear: \n")
+        for(var i = 0; i < 10; i+=1) {
+            var delta = timeAllocations(linear, SIZE, MAX_CHUNK_SIZE)
+            var startTime = SystemTimeMSec()
+            linear.clear()
+            var endTime = SystemTimeMSec()
+            printf("Total time: %.6f     Clear time: %.6f\n", delta, endTime - startTime)
+        }
+    }
+
+    var bucket = BucketAllocator{}
+    bucket.init(defaultAlloc, 500 * MiB)
+    defer bucket.free()
+
+    {
+        printf("Bucket: (Bucket Size: %zu)\n", bucket.bucketSize)
+        for(var i = 0; i < 10; i+=1) {
+            var delta = timeAllocations(bucket, SIZE, MAX_CHUNK_SIZE)
+            var startTime = SystemTimeMSec()
+            bucket.clear()
+            var endTime = SystemTimeMSec()
+            printf("Total time: %.6f     Clear time: %.6f\n", delta, endTime - startTime)
+        }
+
+
+    }
+}
+
+
+
+@test
+func randomAllocations() {
+    const SIZE = 1 * GiB
+    const MIN_CHUNK_SIZE = 2 * KiB
+    const MAX_CHUNK_SIZE = 200 * KiB
+
+    var defaultAlloc = defaultAllocator
+
+    const MAX_ARRAY_SIZE = (SIZE / MIN_CHUNK_SIZE) + (SIZE / MIN_CHUNK_SIZE)
+    const chunkSizes = defaultAllocator.alloc((sizeof(:usize) * MAX_ARRAY_SIZE)) as (*usize)
+    memset(chunkSizes, 0, MAX_ARRAY_SIZE * sizeof(:usize))
+    defer defaultAllocator.free(chunkSizes)
+
+    var linear = LinearAllocator{}
+    var mem = defaultAlloc.alloc(SIZE)
+    defer defaultAlloc.free(mem)
+    linear.init(mem, SIZE)
+
+
+    var bucket = BucketAllocator{}
+    bucket.init(defaultAlloc, 1 * GiB + 1 * MiB)
+    defer bucket.free()
+
+    printf("Random Segments\n")
+    {
+        printf("Linear: \n")
+        for(var i = 0; i < 10; i+=1) {
+
+            var index = 0
+            // we have to add some slob, because of alignments taking up memory
+            for(var size:usize = 0; size < SIZE - (1 * MiB);) {
+                var chunkSize = MIN_CHUNK_SIZE + (rand() % MAX_CHUNK_SIZE)
+
+                if((size + chunkSize) >= (SIZE - 1)) {
+                    break
+                }
+
+                chunkSizes[index] = chunkSize
+                size += chunkSize
+                index += 1
+            }
+
+            var linearDelta = timeRandomAllocations(linear, chunkSizes, index)
+            var startTime = SystemTimeMSec()
+            linear.clear()
+            var linearClearTime = SystemTimeMSec() - startTime
+
+            var bucketDelta = timeRandomAllocations(bucket, chunkSizes, index)
+            startTime = SystemTimeMSec()
+            bucket.clear()
+            var bucketClearTime = SystemTimeMSec() - startTime
+
+            var change = ((linearDelta - bucketDelta) / bucketDelta) * 100.0f
+
+            printf("Linear time: %.6f, %.6f   Bucket time: %.6f, %.6f   Change: %.2f\n",
+                linearDelta, linearClearTime, bucketDelta, bucketClearTime, change)
+        }
+    }
+}

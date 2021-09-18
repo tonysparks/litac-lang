@@ -27,6 +27,7 @@ public struct BucketAllocator {
     currentOffset: usize
     totalAllocations: u32
     totalBytesAllocated: usize
+    totalBuckets: u32
 }
 
 public func (this: *BucketAllocator) init(decorated: *const Allocator, bucketSize: usize) {
@@ -52,11 +53,13 @@ public func (this: *BucketAllocator) init(decorated: *const Allocator, bucketSiz
     this.totalBytesAllocated = 0
     this.totalAllocations = 0
     this.currentOffset = 0
+    this.totalBuckets = 1
 }
 
 public func (this: *BucketAllocator) clear() {
     assert(this.buckets != null)
 
+    var i = 0
     var n = this.head
     while(n && n != this.buckets) {
         var prev = n.prev
@@ -65,11 +68,12 @@ public func (this: *BucketAllocator) clear() {
     }
 
     this.head = this.buckets
-    c::memset(this.head.mem, 0, this.head.size)
+    //c::memset(this.head.mem, 0, this.head.size)
 
     this.totalBytesAllocated = 0
     this.totalAllocations = 0
     this.currentOffset = 0
+    this.totalBuckets = 1
 }
 
 @doc("Free all memory associated with this allocator.")
@@ -87,23 +91,25 @@ public func (this: *BucketAllocator) free() {
     this.totalBytesAllocated = 0
     this.totalAllocations = 0
     this.currentOffset = 0
+    this.totalBuckets = 0
 }
 
 public func (this: *BucketAllocator) malloc(size: usize) : *void {
-    assert(this.head != null)
+    //assert(this.head != null)
 
     var currPtr = this.head.mem as (usize) + this.currentOffset
     var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
     offset -= this.head.mem as (usize)
 
-    var allocationSize:usize = (size + offset) - this.currentOffset
+    var newOffset = offset + size
+    var allocationSize:usize = newOffset - this.currentOffset
 
    // c::printf("currentOffset: %zu newOffset: %zu, limit: %zu allocation: %zu actualAllocation: %zu\n",
    //     this.currentOffset, offset, this.head.size, size, allocationSize)
 
 
     // check to see if there is enough room in this bucket
-    if((offset + size) > this.head.size) {
+    if(newOffset > this.head.size) {
         const bucketSize = c::MAX(size, this.bucketSize)
         //c::printf(">>>>>Creating a new bucket of size: %zu\n", bucketSize)
 
@@ -117,17 +123,17 @@ public func (this: *BucketAllocator) malloc(size: usize) : *void {
         this.head = bucket
 
         this.currentOffset = 0
+        this.totalBuckets += 1
 
         currPtr = this.head.mem as (usize)
         offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
         allocationSize = size + (offset - currPtr)
 
         offset -= this.head.mem as (usize)
-
         //c::printf("AllocationSize: %zu  offset: %zu\n", allocationSize, offset)
     }
 
-    this.currentOffset = (size + offset)
+    this.currentOffset = newOffset
     this.totalBytesAllocated += allocationSize
     this.totalAllocations += 1
     var ptr = this.head.mem + offset
