@@ -21,12 +21,14 @@ public struct PhaseResult {
     allocator: *const Allocator
     errors: Array<PhaseError>
     enabled: bool
+    isReadable: bool
 }
 
 public func PhaseResultInit(allocator: *const Allocator) : PhaseResult {
     var result = PhaseResult {
         .allocator = allocator,
-        .enabled = true
+        .enabled = true,
+        .isReadable = true
     }
 
     result.errors.init(16, allocator)

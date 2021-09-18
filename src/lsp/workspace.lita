@@ -122,7 +122,10 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     this.lsp.log("Uri: '%s' has doc: %d\n", uri, doc != null)
     if(!doc) return null;
 
-    this.runDiagnostics(alloc, uri)
+    var runResults = this.runDiagnostics(alloc, uri)
+    if(!runResults.isReadable) {
+        return null
+    }
 
     var syms = &this.lsp.lita.programSymbols
     var results = CreateJsonArray(alloc)
@@ -179,7 +182,10 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
     this.lsp.log("looking up references...\n")
     if(!uri || !position) return JSON_NULL;
 
-    this.runDiagnostics(alloc, uri)
+    var runResults = this.runDiagnostics(alloc, uri)
+    if(!runResults.isReadable) {
+        return JSON_NULL
+    }
 
     var location = this.getNodeAtSourcePos(uri, position)
     if(location.kind == SourceLocationKind.NONE) {
@@ -442,7 +448,10 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
     this.lsp.log("looking up definition...\n")
     if(!uri || !position) return JSON_NULL;
 
-    this.runDiagnostics(alloc, uri)
+    var runResults = this.runDiagnostics(alloc, uri)
+    if(!runResults.isReadable) {
+        return JSON_NULL
+    }
 
     var location = this.getNodeAtSourcePos(uri, position)
     if(location.kind == SourceLocationKind.NONE) {
@@ -738,14 +747,18 @@ public func (this: *Workspace) runDiagnostics(alloc: *const Allocator, docUri: *
     var root = lita.parse()
     if(!root) {
         this.lsp.log("Failed to parse\n")
+        lita.result.isReadable = false
         goto report
     }
 
     var checked = lita.typeCheck(root)
     if(!checked) {
         this.lsp.log("Failed to type check\n")
+        lita.result.isReadable = false
         goto report
     }
+
+    lita.result.isReadable = true
 
     var totalTime = SystemTimeMSec() - startTime
     this.lsp.log("Successfully compiled in %.3f msec\n", totalTime)
