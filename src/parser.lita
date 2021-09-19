@@ -1488,10 +1488,11 @@ func (p: *Parser) compStatement() : *Stmt {
 
     }
     else if(strcmp(type, "precheck") == 0 ||
-            strcmp(type, "postparse") == 0) {
+            strcmp(type, "postparse") == 0 ||
+            strcmp(type, "run") == 0) {
 
         var pos = p.pos()
-        var script = StringBufferInit(512, p.allocator)
+        var script = StringBufferInit(1024, p.allocator)
         var stream = pos.start
         while(*stream) {
             var c = *stream

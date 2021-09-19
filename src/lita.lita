@@ -109,13 +109,11 @@ public struct LitaOptions {
 }
 
 
-public func (this: *Lita) init(options: *LitaOptions) {
+public func (this: *Lita) init(options: *LitaOptions, decoratedAllocator: *const Allocator = defaultAllocator) {
     var size: usize = options.maxMemory > 0 ? options.maxMemory : 1024 * 1024 * 1024;
-    this.linearAllocator.init(defaultAllocator.alloc(size), size)
+    this.linearAllocator.init(decoratedAllocator.alloc(size), size)
 
-    var allocator = (&this.linearAllocator) as (*const Allocator)
-
-    this.allocator = allocator
+    this.allocator = &this.linearAllocator.allocator
     this.options = options
 
     memset(this.binaryFilename, 0, MAX_PATH)
@@ -264,11 +262,12 @@ public func (this: *Lita) transpile(module: *Module) : bool {
     return true
 }
 
-func LibtccErrorFunc(data: *void, msg: *const char) : void {
+public func LibtccErrorFunc(data: *void, msg: *const char) : void {
     Error("%s\n", msg)
 }
 
-public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *const char) : bool {
+
+public func (this: *Lita) genC(module: *Module) : *const char {
     this.startCapture(MetricType.CGEN)
     var cgen = CGen{}
     cgen.init(this, null)
@@ -276,6 +275,11 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
     this.endCapture(MetricType.CGEN)
 
     var sourceCode = cgen.buf.cStr()
+    return sourceCode
+}
+
+public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *const char) : bool {
+    var sourceCode = this.genC(module)
 
     this.startCapture(MetricType.CCOMPILE)
     defer this.endCapture(MetricType.CCOMPILE)
@@ -407,7 +411,7 @@ public func FindModulePath(lita: *Lita,
     return false
 }
 
-func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
+public func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
     if(!module) {
         return false
     }

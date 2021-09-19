@@ -1,0 +1,16 @@
+#run
+    import "std/libc"
+    import "../src/lita"
+
+    func main() {
+        printf("Hello from the compiler!\n")
+    }
+#end
+
+
+import "std/libc"
+
+@test
+func testCompileTimeExecution() {
+    printf("Done.\n")
+}

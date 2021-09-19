@@ -20,8 +20,10 @@ import "module"
 import "lita"
 import "types"
 import "symbols"
+import "error_codes"
 
-import "ape/ape"
+import "tcc/libtcc"
+import "ape"
 
 /*
 ================================================
@@ -44,6 +46,7 @@ public struct Preprocessor {
     ape: *ape_t
     callContext: CallContext
     preCheckers: Array<*CompStmt>
+    runners: Array<*CompStmt>
 }
 
 struct CallContext {
@@ -68,6 +71,8 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     this.callContext.checker = null
     this.callContext.comp = null
     this.callContext.buffer.init(1024, lita.allocator)
+
+    this.runners.init(16, lita.allocator)
 
     ape_set_repl_mode(this.ape, true) // allows redefinition of symbols if true
 //    ape_set_gc_interval(this.ape, 1000000)
@@ -139,6 +144,9 @@ public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, com
     }
     else if(strcmp(comp.type, "postparse") == 0) {
         this.callContext.preprocessCall(moduleStmt, comp)
+    }
+    else if(strcmp(comp.type, "run") == 0) {
+        this.runners.add(comp)
     }
     else if(strcmp(comp.type, "if")     == 0 ||
        strcmp(comp.type, "elseif") == 0 ||
@@ -264,6 +272,12 @@ public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker) {
         var comp = this.preCheckers.get(i)
         this.callContext.comp = comp
         this.eval(comp)
+    }
+
+    for(var i = 0; i < this.runners.size(); i += 1) {
+        var comp = this.runners.get(i)
+        this.callContext.comp = comp
+        this.runCompStmt(comp)
     }
 }
 
@@ -887,4 +901,77 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
     }
 
     return results
+}
+
+
+public func (this: *Preprocessor) runCompStmt(comp: *CompStmt) : bool {
+    if(!comp) return false
+
+    return this.runCode(comp.expr)
+}
+
+public func (this: *Preprocessor) runCode(sourceCode: *const char) : bool {
+    var lita = Lita{}
+    defer lita.free()
+
+//printf("Lita code: \n%s\n", sourceCode)
+
+    var options:LitaOptions = *this.lita.options
+    options.maxMemory = 20 * MiB
+
+    lita.init(options)
+
+    //var parser = ParserInit("<compile-time>", sourceCode, lita)
+    //var ast = parser.parseModule()
+
+    var module = NewModule(lita, "<compile-time>")
+    module.text = sourceCode as (*char)
+
+    ParseModule(lita, module, SrcPos{})
+
+    if(!lita.typeCheck(module)) {
+        goto err;
+    }
+
+    var cCode = lita.genC(module)
+
+    var state = tcc_new()
+    defer if(state) tcc_delete(state)
+
+    // Bind state
+    //tcc_add_symbol(state, "symbols", this.)
+
+    tcc_set_error_func(state, this, LibtccErrorFunc)
+    tcc_set_output_type(state, TCC_OUTPUT_MEMORY)
+
+    if(tcc_compile_string(state, cCode) < 0) {
+        return false
+    }
+
+    tcc_relocate(state, TCC_RELOCATE_AUTO)
+
+    var mainFn = tcc_get_symbol(state, "main")
+    if(mainFn) {
+        var function = mainFn as (func() : void)
+        function()
+    }
+
+    return true
+
+err:
+    this.lita.result.errors.addAll(lita.result.errors)
+    printf("Errors %d...\n", lita.result.errors.size())
+    var sb = StringBufferInit(1024)
+    defer sb.free()
+
+    if(!lita.result.errors.empty()) {
+        for(var i = 0; i < lita.result.errors.size(); i += 1) {
+            PrintError(sb, lita.result.errors.get(i))
+
+            printf("%s\n", sb.cStr())
+            sb.clear()
+        }
+        printf("Total errors: %d\n", lita.result.errors.size())
+    }
+    return false
 }
