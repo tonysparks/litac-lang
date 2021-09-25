@@ -143,9 +143,26 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
 func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
 
     if(p.match(TokenType.IMPORT)) {
-        var importDecl = p.importDeclaration()
-        if(importDecl) {
-            moduleStmt.imports.add(importDecl)
+        if(p.match(TokenType.LEFT_BRACE)) {
+            do {
+                if(p.match(TokenType.RIGHT_BRACE)) {
+                    break
+                }
+
+                var importDecl = p.importDeclaration()
+                if(importDecl) {
+                    moduleStmt.imports.add(importDecl)
+                }
+
+                p.match(TokenType.SEMICOLON)
+            }
+            while(!p.atEnd());
+        }
+        else {
+            var importDecl = p.importDeclaration()
+            if(importDecl) {
+                moduleStmt.imports.add(importDecl)
+            }
         }
     }
     else if(p.match(TokenType.HASH)) {
@@ -168,35 +185,95 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
 
         var isPublic = p.match(TokenType.PUBLIC)
         if(p.match(TokenType.VAR)) {
-            var decl = p.varDeclaration()
-            moduleStmt.declarations.add(decl)
+            if(p.match(TokenType.LEFT_BRACE)) {
+                do {
+                    if(p.match(TokenType.RIGHT_BRACE)) {
+                        break
+                    }
+
+                    var decl = p.varDeclaration()
+                    decl.attributes.notes = notes
+                    decl.attributes.isPublic = isPublic
+                    decl.attributes.isGlobal = true
+                    moduleStmt.declarations.add(decl)
+
+                    p.match(TokenType.SEMICOLON)
+                }
+                while(!p.atEnd());
+            }
+            else {
+                var decl = p.varDeclaration()
+                decl.attributes.notes = notes
+                decl.attributes.isPublic = isPublic
+                decl.attributes.isGlobal = true
+                moduleStmt.declarations.add(decl)
+            }
         }
         else if(p.match(TokenType.CONST)) {
-            var decl = p.constDeclaration()
-            moduleStmt.declarations.add(decl)
+            if(p.match(TokenType.LEFT_BRACE)) {
+                do {
+                    if(p.match(TokenType.RIGHT_BRACE)) {
+                        break
+                    }
+
+                    var decl = p.constDeclaration()
+                    decl.attributes.notes = notes
+                    decl.attributes.isPublic = isPublic
+                    decl.attributes.isGlobal = true
+                    moduleStmt.declarations.add(decl)
+
+                    p.match(TokenType.SEMICOLON)
+                }
+                while(!p.atEnd());
+            }
+            else {
+                var decl = p.constDeclaration()
+                decl.attributes.notes = notes
+                decl.attributes.isPublic = isPublic
+                decl.attributes.isGlobal = true
+                moduleStmt.declarations.add(decl)
+            }
         }
         else if(p.match(TokenType.FUNC)) {
             var decl = p.funcDeclaration()
+            decl.attributes.notes = notes
+            decl.attributes.isPublic = isPublic
+            decl.attributes.isGlobal = true
             moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.STRUCT)) {
             var decl = p.structDeclaration()
+            decl.attributes.notes = notes
+            decl.attributes.isPublic = isPublic
+            decl.attributes.isGlobal = true
             moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.UNION)) {
             var decl = p.unionDeclaration()
+            decl.attributes.notes = notes
+            decl.attributes.isPublic = isPublic
+            decl.attributes.isGlobal = true
             moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.TRAIT)) {
             var decl = p.traitDeclaration()
+            decl.attributes.notes = notes
+            decl.attributes.isPublic = isPublic
+            decl.attributes.isGlobal = true
             moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.ENUM)) {
             var decl = p.enumDeclaration()
+            decl.attributes.notes = notes
+            decl.attributes.isPublic = isPublic
+            decl.attributes.isGlobal = true
             moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.TYPEDEF)) {
             var decl = p.typedefDeclaration()
+            decl.attributes.notes = notes
+            decl.attributes.isPublic = isPublic
+            decl.attributes.isGlobal = true
             moduleStmt.declarations.add(decl)
         }
         else if(p.match(TokenType.SEMICOLON)) {
@@ -209,11 +286,6 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             p.errorAtToken(p.peek(), ErrorCode.UNEXPECTED_TOKEN)
             return;
         }
-
-        var decl = moduleStmt.declarations.last()
-        decl.attributes.notes = notes
-        decl.attributes.isPublic = isPublic
-        decl.attributes.isGlobal = true
     }
 }
 

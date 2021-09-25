@@ -1,0 +1,172 @@
+{
+    "description": "Block Declarations",
+    "disabled": false,
+    "debug": true,
+    "disableLines": true,
+    "includeTypeInfos": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Block Import",
+            "definitions": `
+                import {
+                    "std/libc"
+                }
+            `,
+            "code": `
+                assert(sqrt(9_f64) == 3_f64)
+            `,
+        },
+        {
+            "name": "Block Imports",
+            "definitions": `
+                import {
+                    "std/libc"
+                    "std/array"
+                    "std/map"
+                }
+            `,
+            "code": `
+                assert(sqrt(9_f64) == 3_f64)
+                var array: Array<i32>;
+                var map: Map<*const char, *const char>;
+            `,
+        },
+        {
+            "name": "Block Import After",
+            "definitions": `
+                import {
+                    "std/libc"
+                    "std/array"
+                    "std/map"
+                }
+                import "std/string"
+            `,
+            "code": `
+                assert(sqrt(9_f64) == 3_f64)
+                var array: Array<i32>;
+                var map: Map<*const char, *const char>;
+                var string: String{}
+            `,
+        },
+        {
+            "name": "Block No End Brace",
+            "definitions": `
+                import {
+                    "std/libc"
+                    "std/array"
+                    "std/map"
+
+                import "std/string"
+            `,
+            "code": `
+                assert(sqrt(9_f64) == 3_f64)
+                var array: Array<i32>;
+                var map: Map<*const char, *const char>;
+                var string: String{}
+            `,
+            "error": "Unexpected token: 'import' - Missing identifier"
+        },
+
+        // Vars Consts
+        {
+            "name": "Block Vars",
+            "definitions": `
+                var {
+                    x = 42
+                    y: f32
+                    z: f32 = 4.0f32
+                }
+
+                var {
+                    x2 = 42;
+                    y2: f32;
+                    z2: f32 = 4.0f32;
+                }
+
+                var {
+                    x3 = 42
+                    y3: f32;
+                    z3: f32 = 4.0f32
+                }
+            `,
+            "code": `
+                assert(x == 42)
+                assert(y == 0f32)
+                assert(z == 4.0)
+
+                assert(x2 == 42)
+                assert(y2 == 0f32)
+                assert(z2 == 4.0)
+
+                assert(x3 == 42)
+                assert(y3 == 0f32)
+                assert(z3 == 4.0)
+            `,
+
+        },
+/*
+        {
+            "name": "Block Const",
+            "definitions": `
+                const {
+                    x = 42
+                    y: f32
+                    z: f32 = 4.0f32
+                }
+
+                const {
+                    x2 = 42;
+                    y2: f32;
+                    z2: f32 = 4.0f32;
+                }
+
+                const {
+                    x3 = 42
+                    y3: f32;
+                    z3: f32 = 4.0f32
+                }
+            `,
+            "code": `
+                assert(x == 42)
+                assert(y == 0f32)
+                assert(z == 4.0)
+
+                assert(x2 == 42)
+                assert(y2 == 0f32)
+                assert(z2 == 4.0)
+
+                assert(x3 == 42)
+                assert(y3 == 0f32)
+                assert(z3 == 4.0)
+            `,
+        },
+*/
+
+        {
+            "name": "Block Vars in Statement",
+            "definitions": `
+
+            `,
+            "code": `
+                const {
+                    x = 42
+                    y: f32
+                    z: f32 = 4.0f32
+                }
+                assert(x == 42)
+                assert(y == 0f32)
+                assert(z == 4.0)
+            `,
+        },
+    ]
+}

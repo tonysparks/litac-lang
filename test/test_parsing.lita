@@ -1,0 +1,43 @@
+import {
+    "std/mem"
+    "std/array"
+    "std/libc"
+}
+
+@test
+func (this: *X)  {
+    hello() {
+        printf("did this work?\n")
+    }
+
+    bye() {
+        printf("did this work again?\n")
+    }
+}
+
+struct {
+    ArrayZ<T> {
+        length: usize
+    }
+}
+
+public func (this: *ArrayZ<T>) {
+    add<T>(value: T) {
+
+    }
+
+    size<T>() : usize {
+        return this.length
+    }
+}
+
+/*
+public func {
+    (this: *ArrayZ<T>) addz<T>(value: T) {
+
+    }
+
+    (this: *ArrayZ<T>) size<T>() : usize {
+        return this.length
+    }
+}*/
