@@ -62,7 +62,6 @@ public struct TypeChecker {
     genericParamStack: Array<Array<GenericParam>>
     genericTemplates: Array<*Symbol>
 
-
     interfaceImpls: Map<Typeid, Array<Typeid>>
 
     labels: [MAX_LABELS]LabelInfo;
@@ -235,8 +234,9 @@ func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeIn
 }
 
 func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
-    assert(a != null)
-    assert(b != null)
+    if(a == null || b == null) {
+        return false
+    }
 
     if(!a.canCastTo(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
@@ -262,8 +262,9 @@ func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeIn
 
 
 func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
-    assert(a != null)
-    assert(b != null)
+    if(a == null || b == null) {
+        return false
+    }
 
     if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
@@ -304,8 +305,9 @@ func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *Type
 }
 
 func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
-    assert(a != null)
-    assert(b != null)
+    if(a == null || b == null) {
+        return false
+    }
 
     if(!a.isDeclarable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
@@ -329,8 +331,9 @@ func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *Type
 }
 
 func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
-    assert(a != null)
-    assert(b != null)
+    if(a == null || b == null) {
+        return false
+    }
 
     if(!a.isAssignable(b, this)) {
         var sb = StringBufferInit(256, this.allocator)
@@ -1378,6 +1381,10 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
 
             var count = this.errors()
             var currentFuncDecl = this.funcDeclStack.last()
+            if(!currentFuncDecl) {
+                return false
+            }
+
             if(ret.expr) {
                 if(!this.resolveExpr(ret.expr)) {
                     return false

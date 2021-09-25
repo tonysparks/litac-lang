@@ -1965,6 +1965,10 @@ public func (this: *AggregateTypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]
 }
 
 public func (this: *AggregateTypeInfo) getMethod(module: *Module, methodName: *const char) : *Symbol {
+    if(!this.sym) {
+        return null
+    }
+
     var funcName = [MAX_SYMBOL_NAME]char {0};
     this.getFunctionName(funcName, methodName)
 
@@ -1989,7 +1993,9 @@ public func (this: *AggregateTypeInfo) getMethod(module: *Module, methodName: *c
     }
 
     var base = decl.params.first().typeInfo.getBaseType()
-
+    if(this == null || base == null) {
+        return null
+    }
 
     // If this is a generic type, we need to compare against the original
     // template types for equality

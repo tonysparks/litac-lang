@@ -37,6 +37,12 @@ public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
 public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
     if(!expr) return false
 
+    defer {
+        if(expr.operand.typeInfo == null) {
+            return false
+        }
+    }
+
     switch(expr.kind) {
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             return this.resolveArrayDesignationExpr(expr as (*ArrayDesignationExpr))

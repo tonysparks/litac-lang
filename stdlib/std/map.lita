@@ -48,7 +48,7 @@ public func StringViewMap<V>(emptyValue: V,
                              alloc: *const mem::Allocator = null) : Map<StringView, V> {
 
     var m = Map<StringView, V>{};
-    m.init<StringView, V>(emptyValue, initialSize, StringView_hash, StringView_equalsStringView, alloc);
+    m.init<StringView, V>(emptyValue, initialSize, StringView_hash, StringView_equalsStringView, alloc, StringView{.buffer = 0, .length = 0});
     return m;
 }
 
