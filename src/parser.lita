@@ -1313,6 +1313,10 @@ func (p: *Parser) statement() : *Stmt {
 func (p: *Parser) tryStatement() : *Stmt {
     var pos = p.pos()
 
+    if(p.atEnd()) {
+        goto err;
+    }
+
     // check for note declarations
     if(p.check(TokenType.AT)) {
         var notes = Array<*NoteStmt>{}
