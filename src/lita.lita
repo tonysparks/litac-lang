@@ -20,7 +20,9 @@ import "ast_new"
 import "checker"
 import "cgen"
 import "common"
+
 import "lsp/references"
+import "lsp/workspace"
 
 import "tcc/libtcc"
 
@@ -49,6 +51,7 @@ public struct Lita {
 
     // Language Server support
     references: ReferenceDatabase
+    workspace: *Workspace
 }
 
 @asStr
@@ -410,6 +413,19 @@ public func FindModulePath(lita: *Lita,
 func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
     if(!module) {
         return false
+    }
+
+    // if we are processing as LSP, let's check the workspace for an open
+    // document that contains the text
+    if(lita.workspace) {
+        var output:[MAX_PATH]char
+        var uri = FilePathToUri(module.id.filename, output)
+        uri = PathNormalize(uri, uri)
+
+        var doc = lita.workspace.openedDocuments.get(uri)
+        if(doc) {
+            module.text = doc.text.cStr()
+        }
     }
 
     if(!module.text) {

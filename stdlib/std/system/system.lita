@@ -224,6 +224,28 @@ end:
 }
 
 
+public func PathNormalize(filename: *const char, out:[MAX_PATH]char) : *char {
+    if(!filename) {
+        goto end;
+    }
+
+    var len = strlen(filename)
+
+    var i = 0
+    for(; i < len; i += 1) {
+        var c = filename[i]
+        if(c == '\\') {
+           c = '/'
+        }
+        out[i] = c
+    }
+
+
+end:
+    out[i] = '\0'
+    return out
+}
+
 func strcicmp(a: *const char, b: *const char) : i32 {
     if(a==b) return 0;
     if(!a && b) return -1;
@@ -311,6 +333,7 @@ public func PathEquals(a: *const char, b: *const char) : bool {
 }
 
 const uriEscapeChars = [256]*const char {
+    [' '] = "%20",
     ['!'] = "%21",
     ['#'] = "%23",
     ['$'] = "%24",
@@ -322,7 +345,7 @@ const uriEscapeChars = [256]*const char {
     ['*'] = "%2A",
     ['+'] = "%2B",
     [','] = "%2C",
-    ['/'] = "%2F",
+    //['/'] = "%2F",
     [':'] = "%3A",
     [';'] = "%3B",
     ['='] = "%3D",
@@ -361,7 +384,10 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
         if(*uri == '%') {
             var escaped = [2]char{0};
             if(uri[1] == '2') {
-                if(uri[2] == '1') {
+                if(uri[2] == '0') {
+                    outputStr.appendChar(' ')
+                }
+                else if(uri[2] == '1') {
                     outputStr.appendChar('!')
                 }
                 else if(uri[2] == '3') {
@@ -419,7 +445,7 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
                 }
                 else {
                     // invalid escaped sequence -- what to do here?
-                    outputStr.append("%s", "%2")
+                    outputStr.append("%s", "%3")
                     uri += 2
                     continue
                 }
@@ -430,7 +456,7 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
                 }
                 else {
                     // invalid escaped sequence -- what to do here?
-                    outputStr.append("%s", "%2")
+                    outputStr.append("%s", "%4")
                     uri += 2
                     continue
                 }
@@ -444,7 +470,7 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
                 }
                 else {
                     // invalid escaped sequence -- what to do here?
-                    outputStr.append("%s", "%2")
+                    outputStr.append("%s", "%5")
                     uri += 2
                     continue
                 }

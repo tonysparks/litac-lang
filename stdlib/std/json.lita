@@ -492,6 +492,10 @@ public func (node: *JsonNode) size() : i32 {
     return 0
 }
 
+public func (node: *JsonNode) empty() : bool {
+    return node.size() == 0
+}
+
 
 public func (node: *JsonNode) equals(other: *JsonNode) : bool {
     if(node == other) {

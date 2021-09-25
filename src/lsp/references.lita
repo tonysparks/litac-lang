@@ -18,7 +18,7 @@ import "lsp/protocol"
 import "lsp/lsp"
 import "lsp/util"
 
-public func FindTokenByPosition(lsp: *LspServer, alloc: *const Allocator, doc: *TextDocument, pos: Position) : Token {
+public func FindTokenByPosition(lsp: *LspServer, alloc: *const Allocator, doc: *Document, pos: Position) : Token {
     var lex = LexerInit(doc.filename, doc.text.cStr(), alloc)
 
     var targetLine = pos.line + 1

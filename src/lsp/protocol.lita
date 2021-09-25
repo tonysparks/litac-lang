@@ -27,8 +27,24 @@ public struct Location {
     range: Range
 }
 
+public struct TextDocument {
+    uri: *const char
+    version: u32
+}
+
+public const MAX_DOCUMENT_CONTENT_CHANGES = 16
+
+public struct TextDocumentDidChange {
+    textDocument: TextDocument
+
+    contentChanges: [MAX_DOCUMENT_CONTENT_CHANGES]TextDocumentChangeEvent
+    numOfContentChanges: i32
+}
+
 public struct TextDocumentChangeEvent {
-    range: *Range
+    hasRange: bool
+    range: Range
+    rangeLength: u32
     text: *const char
 }
 
@@ -287,4 +303,52 @@ public func SrcPosToLocations(rootPath: *const char, results: *Array<SrcPos>, al
     }
 
     return locations
+}
+
+public func JsonNodeToTextDocumentChangeEvent(params: *JsonNode, alloc: *const Allocator) : *TextDocumentDidChange {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return null;
+    }
+
+    var result = new<TextDocumentDidChange>(alloc)
+
+    result.textDocument.uri = textDoc.getStr("uri", null)
+    result.textDocument.version = textDoc.getInt("version", 1)
+    result.numOfContentChanges = 0
+
+    var contentArray = params.getArray("contentChanges")
+    if(!contentArray) {
+        return result;
+    }
+
+    result.numOfContentChanges = contentArray.size()
+    for(var i = 0; i < contentArray.size(); i += 1) {
+        var content = contentArray.at(i)
+
+        var change = &result.contentChanges[i]
+        change.hasRange = false
+        change.text = content.getStr("text", null)
+        change.rangeLength = content.getInt("rangeLength", 0)
+
+        var range = content.getObject("range")
+        if(range) {
+            var r = &change.range
+            change.hasRange = true
+
+            var start = range.getObject("start")
+            if(start) {
+                r.start.line = start.getInt("line", 0)
+                r.start.character = start.getInt("character", 0)
+            }
+
+            var end = range.getObject("end")
+            if(end) {
+                r.end.line = end.getInt("line", 0)
+                r.end.character = end.getInt("character", 0)
+            }
+        }
+    }
+
+    return result
 }

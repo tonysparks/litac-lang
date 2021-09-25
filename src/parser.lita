@@ -2005,7 +2005,6 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
     return spec;
 
 err:
-    sb.free()
     return null
 }
 
