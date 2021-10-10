@@ -1445,6 +1445,10 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
 func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTypeInfo) : bool {
     assert(expr != null)
 
+    if(!aggInfo || !IsAggregate(aggInfo)) {
+        return false
+    }
+
     // If this was already processed as a method, we'll need to determine
     // if this is a generic symbol and must be re-resolved - this happens
     // during type inference for methods -- @see resolveFuncCallExpr and inferFuncCallExpr
@@ -1509,9 +1513,16 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
             var varField = field.varField
             if(varField.attributes.isUsing) {
                 var baseType = field.typeInfo.getBaseType()
+
+                // avoid inifinite recursion
+                if(baseType.strictEquals(aggInfo)) {
+                    continue
+                }
+
                 if(this.checkMethodExpr(expr, baseType as (*AggregateTypeInfo))) {
                     return true
                 }
+
             }
         }
     }

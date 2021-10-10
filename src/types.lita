@@ -1932,14 +1932,21 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
                 }
 
                 path.pop()
-
                 break;
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
-                //var aggField = field.aggregateField
-                // TODO: ?
-                assert(false)
+                var aggField = field.aggregateField
+
+                var baseType = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
+                path.add(field)
+
+                if(baseType.getFieldPathByType(type, path)) {
+                    return true
+                }
+
+                path.pop()
+                break;
             }
             default: {
                 continue;
