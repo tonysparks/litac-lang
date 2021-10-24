@@ -73,8 +73,8 @@ public func Panic(format: *const char, ...) {
 }
 
 
-public func EscapeName(name: *const char, sb: *StringBuffer) : *char {
-    sb.appendStrn(name, strlen(name))
+public func EscapeName(name: *const char, len: i32, sb: *StringBuffer) : *char {
+    sb.appendStrn(name, len)
     for(var i = 0; i < sb.length;) {
         var c = sb.buffer[i]
 

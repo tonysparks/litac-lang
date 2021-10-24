@@ -18,6 +18,7 @@ import "parser"
 import "lex"
 import "error_codes"
 import "phase_result"
+import "intern"
 
 public struct Introspect {
     lita: *Lita
@@ -149,7 +150,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
             var typeInfo = checker.resolveValueDecl(numDecl as (*VarDecl))
             assert(typeInfo != null)
 
-            var existingDecl = module.getType("numOfTypeInfos")
+            var existingDecl = module.getType(NUM_OF_TYPE_INFOS)
             assert(existingDecl != null)
 
             numDecl.sym = existingDecl
@@ -178,7 +179,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
             // END TEMP
             assert(typeInfo != null)
 
-            var existingDecl = module.getType("typeInfos")
+            var existingDecl = module.getType(TYPE_INFOS)
             assert(existingDecl != null)
 
             typesDecl.sym = existingDecl
@@ -206,11 +207,11 @@ func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym
                 var param = funcInfo.decl.params.get(i)
                 scratch.append("""
                     ParamInfo {
-                        .name = "%s",
+                        .name = "%.*s",
                         .type = %llu,
                         .modifiers = Modifiers.%s,
                     },
-                """, param.name.asString(), param.type.typeInfo.typeid, (param.attributes.isUsing) ? "Using" : "None")
+                """, param.name.str.length, param.name.str.buffer, param.type.typeInfo.typeid, (param.attributes.isUsing) ? "Using" : "None")
             }
             scratch.append("}")
 
@@ -223,7 +224,7 @@ func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym
     sb.append("""
         [%llu] = &TypeInfo {
             .kind = TypeKind.FUNC,
-            .name = "%s",
+            .name = "%.*s",
             .id = %llu,
             .funcType = funcType {
                 .isVararg = %s,
@@ -232,7 +233,7 @@ func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym
                 .numOfParams = %d
             }
         },
-    """, type.typeid, sym.name, type.typeid, isVararg ? "true": "false", returnTypeid, scratch.cStr(), numOfParams)
+    """, type.typeid, sym.name.length, sym.name.buffer, type.typeid, isVararg ? "true": "false", returnTypeid, scratch.cStr(), numOfParams)
 }
 
 func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym: *Symbol) {
@@ -262,10 +263,10 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                     }
                     scratch.append("""
                         EnumFieldInfo {
-                            .name = "%s",
+                            .name = "%.*s",
                             .value = %d,
                         },
-                    """, field.name.asString(), value)
+                    """, field.name.str.length, field.name.str.buffer, value)
 
                     value += 1
                 }
@@ -280,14 +281,14 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
             sb.append("""
                 [%llu] = &TypeInfo {
                     .kind = TypeKind.%s,
-                    .name = "%s",
+                    .name = "%.*s",
                     .id = %llu,
                     .enumType = enumType {
                         .fields = %s,
                         .numOfFields = %d
                     }
                 },
-            """, type.typeid, TypeKindAsStr(type.kind), name, type.typeid, scratch.cStr(), numOfFields)
+            """, type.typeid, TypeKindAsStr(type.kind), name.length, name.buffer, type.typeid, scratch.cStr(), numOfFields)
 
             break
         }
@@ -310,7 +311,7 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                     switch(field.kind) {
                         case StmtKind.TRAIT_FIELD_DECL: {
                             var traitField = field.traitField
-                            if(traitField.name.type != TokenType.IDENTIFIER) {
+                            if(traitField.name.token.type != TokenType.IDENTIFIER) {
                                 break
                             }
 
@@ -319,18 +320,23 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                             scratch.append("""
                                 FieldInfo {
                                     .kind = FieldInfoKind.VAR_FIELD,
-                                    .name = "%s",
+                                    .name = "%.*s",
                                     .type = %llu,
                                     .modifiers = Modifiers.%s,
-                                    .offset = offsetof(%.*s::%s, %s)
+                                    .offset = offsetof(%.*s::%.*s, %.*s)
                                 },
-                            """, traitField.name.asString(), typeid, "None", sym.declared.id.name.length, sym.declared.id.name.buffer, type.name, traitField.name.asString())
+                            """, traitField.name.str.length, traitField.name.str.buffer,
+                                 typeid,
+                                 "None",
+                                 sym.declared.id.name.length, sym.declared.id.name.buffer,
+                                 type.name.length, type.name.buffer,
+                                 traitField.name.str.length, traitField.name.str.buffer)
 
                             break;
                         }
                         case StmtKind.VAR_FIELD_DECL: {
                             var varField = field.varField
-                            if(varField.name.type != TokenType.IDENTIFIER) {
+                            if(varField.name.token.type != TokenType.IDENTIFIER) {
                                 break
                             }
 
@@ -339,29 +345,36 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                             scratch.append("""
                                 FieldInfo {
                                     .kind = FieldInfoKind.VAR_FIELD,
-                                    .name = "%s",
+                                    .name = "%.*s",
                                     .type = %llu,
                                     .modifiers = Modifiers.%s,
-                                    .offset = offsetof(%.*s::%s, %s)
+                                    .offset = offsetof(%.*s::%.*s, %.*s)
                                 },
-                            """, varField.name.asString(), typeid, (varField.attributes.isUsing) ? "Using" : "None", sym.declared.id.name.length, sym.declared.id.name.buffer, type.name, varField.name.asString())
+                            """, varField.name.str.length, varField.name.str.buffer,
+                                 typeid,
+                                 (varField.attributes.isUsing) ? "Using" : "None",
+                                 sym.declared.id.name.length, sym.declared.id.name.buffer,
+                                 type.name.length, type.name.buffer,
+                                 varField.name.str.length, varField.name.str.buffer)
 
                             break;
                         }
                         case StmtKind.ENUM_FIELD_DECL: {
                             var enumField = field.enumField
-                            if(enumField.name.type != TokenType.IDENTIFIER) {
+                            if(enumField.name.token.type != TokenType.IDENTIFIER) {
                                 break
                             }
 
                             scratch.append("""
                                 FieldInfo {
                                     .kind = FieldInfoKind.ENUM_FIELD,
-                                    .name = "%s",
+                                    .name = "%.*s",
                                     .type = %llu,
                                     .modifiers = Modifiers.%s,
                                 },
-                            """, enumField.name.asString(), enumField.sym.type.typeid, (enumField.attributes.isUsing) ? "Using" : "None")
+                            """, enumField.name.str.length, enumField.name.str.buffer,
+                                 enumField.sym.type.typeid,
+                                 (enumField.attributes.isUsing) ? "Using" : "None")
 
                             break;
                         }
@@ -369,19 +382,22 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                         case StmtKind.STRUCT_FIELD_DECL: {
                             var aggField = field.aggregateField
                             var fieldType = field.kind == StmtKind.STRUCT_FIELD_DECL ? "STRUCT_FIELD" : "UNION_FIELD"
-                            if(aggField.name.type == TokenType.IDENTIFIER) {
+                            if(aggField.name.token.type == TokenType.IDENTIFIER) {
                                 scratch.append("""
                                     FieldInfo {
                                         .kind = FieldInfoKind.%s,
-                                        .name = "%s",
+                                        .name = "%.*s",
                                         .type = %llu,
                                         .modifiers = Modifiers.%s,
                                     },
-                                """, fieldType, aggField.name.asString(), aggField.sym.type.typeid, (aggField.attributes.isUsing) ? "Using" : "None")
+                                """, fieldType,
+                                     aggField.name.str.length, aggField.name.str.buffer,
+                                     aggField.sym.type.typeid,
+                                     (aggField.attributes.isUsing) ? "Using" : "None")
 
                                 break;
                             }
-                            else if(aggField.name.type == TokenType.VOID) {
+                            else if(aggField.name.token.type == TokenType.VOID) {
                                 scratch.append("""
                                     FieldInfo {
                                         .kind = FieldInfoKind.%s,
@@ -389,7 +405,9 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
                                         .type = %llu,
                                         .modifiers = Modifiers.%s,
                                     },
-                                """, fieldType, aggField.sym.type.typeid, (aggField.attributes.isUsing) ? "Using" : "None")
+                                """, fieldType,
+                                     aggField.sym.type.typeid,
+                                     (aggField.attributes.isUsing) ? "Using" : "None")
 
                             }
                             break;
@@ -413,14 +431,19 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
             sb.append("""
                 [%llu] = &TypeInfo {
                     .kind = TypeKind.%s,
-                    .name = "%s",
+                    .name = "%.*s",
                     .id = %llu,
                     .aggType = aggType {
                         .fields = %s,
                         .numOfFields = %d
                     }
                 },
-            """, type.typeid, TypeKindAsStr(type.kind), name, type.typeid, scratch.cStr(), numOfFields)
+            """, type.typeid,
+                 TypeKindAsStr(type.kind),
+                 name.length, name.buffer,
+                 type.typeid,
+                 scratch.cStr(),
+                 numOfFields)
             break
         }
     }
@@ -450,10 +473,13 @@ func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
             sb.append("""
                 [%llu] = &TypeInfo {
                     .kind = TypeKind.%s,
-                    .name = "%s",
+                    .name = "%.*s",
                     .id = %llu
                 },
-            """, type.typeid, TypeKindAsStr(type.kind), type.name, type.typeid)
+            """, type.typeid,
+                 TypeKindAsStr(type.kind),
+                 type.name.length, type.name.buffer,
+                 type.typeid)
 
             break
         }
@@ -469,7 +495,11 @@ func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
                         .arrayOfType: %llu
                     }
                 },
-            """, type.typeid, TypeKindAsStr(type.kind), type.typeid, arrayType.length, arrayType.arrayOf.typeid)
+            """, type.typeid,
+                 TypeKindAsStr(type.kind),
+                 type.typeid,
+                 arrayType.length,
+                 arrayType.arrayOf.typeid)
 
             break
         }
@@ -484,7 +514,10 @@ func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
                         .ptrOfType: %llu
                     }
                 },
-            """, type.typeid, TypeKindAsStr(type.kind), type.typeid, ptrType.ptrOf.typeid)
+            """, type.typeid,
+                 TypeKindAsStr(type.kind),
+                 type.typeid,
+                 ptrType.ptrOf.typeid)
 
             break
         }
@@ -499,7 +532,10 @@ func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
                         .constOfType: %llu
                     }
                 },
-            """, type.typeid, TypeKindAsStr(type.kind), type.typeid, constType.constOf.typeid)
+            """, type.typeid,
+                 TypeKindAsStr(type.kind),
+                 type.typeid,
+                 constType.constOf.typeid)
 
             break
         }

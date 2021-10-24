@@ -18,6 +18,7 @@ import "parser"
 import "ast"
 import "error_codes"
 import "ast_copy"
+import "intern"
 
 public func Instrument(lita: *Lita, checker: *TypeChecker) {
 
@@ -101,7 +102,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             var tagDecl = stmts.declarations.get(0)
             assert(tagDecl.kind == StmtKind.ENUM_DECL)
 
-            var existingDecl = module.getType("ProfileTag")
+            var existingDecl = module.getType(PROFILE_TAG)
             assert(existingDecl != null)
 
             tagDecl.sym = existingDecl
@@ -113,7 +114,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             var entriesDecl = stmts.declarations.get(1)
             assert(entriesDecl.kind == StmtKind.CONST_DECL)
 
-            var existingDecl = module.getType("profileEntries")
+            var existingDecl = module.getType(PROFILE_ENTRIES)
             assert(existingDecl != null)
 
             entriesDecl.sym = existingDecl

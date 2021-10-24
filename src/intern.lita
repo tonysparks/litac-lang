@@ -1,0 +1,327 @@
+import "std/map"
+import "std/mem"
+import "std/string_view"
+import "std/libc"
+
+public var callCount = 0
+
+public union InternedString {
+    struct {
+        buffer: *const char
+        length: i32
+    };
+    struct {
+        addr: usize
+        size: i32
+    };
+    view: StringView
+}
+
+public const EMPTY_STR = InternedString {
+    .buffer = null,
+    .length = 0_i32
+}
+public const VOID = InternedString{};
+public const NULL = InternedString{};
+public const BOOL = InternedString{};
+public const CHAR = InternedString{};
+public const I8 = InternedString{};
+public const U8 = InternedString{};
+public const I16 = InternedString{};
+public const U16 = InternedString{};
+public const I32 = InternedString{};
+public const U32 = InternedString{};
+public const I64 = InternedString{};
+public const U64 = InternedString{};
+public const F32 = InternedString{};
+public const F64 = InternedString{};
+public const USIZE = InternedString{};
+public const CONST = InternedString{};
+public const STRING = InternedString{};
+public const POISON = InternedString{};
+public const BUILTIN = InternedString{};
+public const MAIN = InternedString{};
+public const NUM_OF_TYPE_INFOS = InternedString{};
+public const TYPE_INFOS = InternedString{};
+public const PROFILE_TAG = InternedString{};
+public const PROFILE_ENTRIES = InternedString{};
+// compile time statements
+public const IF = InternedString{};
+public const ELSE = InternedString{};
+public const ELSEIF = InternedString{};
+public const PRECHECK = InternedString{};
+public const POSTPARSE = InternedString{};
+public const END = InternedString{};
+
+public func InternHashFn(a: InternedString) : u32 {
+    var hash = ((a.addr as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func InternEqualFn(a: InternedString, b: InternedString) : bool {
+    return a.addr == b.addr;
+}
+
+public func InternMap<V>(emptyValue: V,
+                         initialSize: i32 = 16,
+                         allocator: *const Allocator = null) : Map<InternedString, V> {
+    var map = Map<InternedString, V>{}
+    map.init<InternedString, V>(emptyValue,
+                       initialSize,
+                       InternHashFn,
+                       InternEqualFn,
+                       allocator,
+                       EMPTY_STR)
+    return map
+}
+
+public struct Strings {
+    allocator: *const Allocator
+
+    length: i32
+    capacity: i32
+    keys: *StringView
+    values: *InternedString
+}
+
+public func (this: *Strings) init(allocator: *const Allocator) {
+    this.allocator = allocator
+
+    this.length = 0
+    this.capacity = 0
+    this.keys = null
+    this.values = null
+
+    this.grow(4096)
+
+    this.internConstant("void", 4, &VOID)
+    this.internConstant("null", 4, &NULL)
+    this.internConstant("bool", 4, &BOOL)
+    this.internConstant("char", 4, &CHAR)
+    this.internConstant("i8", 2, &I8)
+    this.internConstant("u8", 2, &U8)
+    this.internConstant("i16", 3, &I16)
+    this.internConstant("u16", 3, &U16)
+    this.internConstant("i32", 3, &I32)
+    this.internConstant("u32", 3, &U32)
+    this.internConstant("i64", 3, &I64)
+    this.internConstant("u64", 3, &U64)
+    this.internConstant("f32", 3, &F32)
+    this.internConstant("f64", 3, &F64)
+    this.internConstant("usize", 5, &USIZE)
+    this.internConstant("const", 5, &CONST)
+    this.internConstant("*const char", 11, &STRING)
+    this.internConstant("<poison>", 8, &POISON)
+    this.internConstant("builtin", 7, &BUILTIN)
+    this.internConstant("main", 4, &MAIN)
+
+    this.internConstant("numOfTypeInfos", 15, &NUM_OF_TYPE_INFOS)
+    this.internConstant("typeInfos", 9, &TYPE_INFOS)
+    this.internConstant("ProfileTag", 10, &PROFILE_TAG)
+    this.internConstant("profileEntries", 15, &PROFILE_ENTRIES)
+
+    this.internConstant("if", 2, &IF)
+    this.internConstant("else", 4, &ELSE)
+    this.internConstant("elseif", 6, &ELSEIF)
+    this.internConstant("precheck", 8, &PRECHECK)
+    this.internConstant("postparse", 9, &POSTPARSE)
+    this.internConstant("end", 3, &END)
+}
+
+func (this: *Strings) internConstant(string: *const char, length: i32, intern: *InternedString) {
+    var str = this.intern(string, length)
+    intern.buffer = str.buffer
+    intern.length = str.length
+}
+
+public func (this: *Strings) internStringView(string: *StringView) : InternedString {
+    return this.intern(string.buffer, string.length)
+}
+
+@doc("""
+    The supplied `string` must be long-lived, as in for the duration of the lifetime of this
+    `Strings`.  If you can't garauntee to the lifetime of the supplied `string`, use `Strings#internCopy`
+""")
+public func (this: *Strings) intern(string: *const char, length: i32) : InternedString {
+    callCount += 1
+
+    var view = StringView {
+        .buffer = string,
+        .length = length
+    }
+
+    var result = this.get(view)
+    if(result.length == 0) {
+        result = InternedString{.buffer = string, .length = view.length}
+        this.put(view, result)
+    }
+
+    return result
+}
+
+
+@doc("""
+    If this `string` has not been interned yet, a copy of the `string` is stored as the interned string.
+""")
+public func (this: *Strings) internCopy(string: *const char, length: i32 = -1) : InternedString {
+    callCount += 1
+
+    var view = StringView {
+        .buffer = string,
+        .length = (length < 0) ? strlen(string) : length
+    }
+
+    length = view.length
+
+    var result = this.get(view)
+    if(result.length == 0) {
+        var copy = this.allocator.alloc(sizeof(:char) * length) as (*char)
+        memcpy(copy, string, length)
+
+        result = InternedString{.buffer = copy, .length = length}
+        this.put(result.view, result)
+    }
+
+    return result
+}
+
+public func (this: *Strings) put(key: StringView, value: InternedString) {
+
+    if( (this.length + 128) >= this.capacity) {
+        this.grow(2 * this.capacity);
+    }
+
+    var i = key.hash()
+    for(;;) {
+        i &= this.capacity - 1;
+
+        var k = this.keys[i]
+        if(k.length == 0) {
+            this.length += 1
+            this.keys[i] = key;
+            this.values[i] = value;
+            return;
+        }
+        else if(k.length == key.length && strncmp(key.buffer, k.buffer, key.length) == 0) {
+            this.values[i] = value;
+            return;
+        }
+
+        i += 1;
+    }
+
+}
+
+public func (this: *Strings) size() : i32 {
+    return this.length
+}
+
+func (this: *Strings) get(key: *StringView) : InternedString {
+    if(this.length == 0) {
+        return EMPTY_STR;
+    }
+
+    var i = key.hash()
+    for(;;) {
+        i &= this.capacity - 1;
+
+        var k = this.keys[i]
+        if(k.length == key.length && strncmp(key.buffer, k.buffer, key.length) == 0) {
+            return this.values[i];
+        }
+        else if(k.length == 0) {
+            return EMPTY_STR;
+        }
+        i += 1;
+    }
+
+    return EMPTY_STR;
+}
+
+
+func (this: *Strings) grow(newlength: i32) {
+    var oldKeys = this.keys
+    var oldValues = this.values
+    var oldCapacity = this.capacity
+
+    this.keys     = this.allocator.calloc(newlength, sizeof(StringView)) as (*StringView)
+    this.values   = this.allocator.calloc(newlength, sizeof(InternedString)) as (*InternedString)
+    this.capacity = newlength
+    this.length   = 0
+
+    for(var i = 0; i < oldCapacity; i+=1) {
+        if(oldKeys[i].buffer) {
+            this.put(oldKeys[i], oldValues[i]);
+        }
+    }
+
+    this.allocator.free(oldKeys)
+    this.allocator.free(oldValues)
+}
+
+@inline
+public func (this: *InternedString) equals(other: *InternedString) : bool {
+    return this.addr == other.addr
+}
+
+@inline
+public func (this: *InternedString) empty() : bool {
+    return this.buffer == null || this.length == 0
+}
+
+
+import "std/assert"
+import "std/mem/bucket_allocator"
+
+@test
+func testInterns() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var strings: Strings{}
+    strings.init(allocator)
+    defer strings.strings.free()
+
+    var buffer = "Hello World"
+    var i = strings.internCopy(buffer)
+    var j = strings.internCopy("Hello World")
+
+    assert(j.equals(i))
+
+    var x = [64]char;
+    strcpy(x, buffer)
+    var v = strings.internCopy(x)
+    assert(j.equals(v))
+    assert(i.equals(v))
+
+
+    var symbols = InternMap<i32>(0, 2, allocator)
+
+    var n = strings.intern("Bye")
+
+    symbols.put(i, 12)
+    symbols.put(n, 31)
+
+    assert(symbols.get(i) == 12)
+    assert(symbols.get(n) == 31)
+
+    for(var ii = 0; ii < 1024; ii+=1) {
+        var b = [32]char{};
+        sprintf(b, "string%i", ii)
+
+        var p = strings.internCopy(b)
+        symbols.put(p, ii)
+
+        assert(symbols.get(p) == ii)
+    }
+
+    for(var ii = 0; ii < 1024; ii+=1) {
+        var b = [32]char{};
+        sprintf(b, "string%i", ii)
+
+        var p = strings.internCopy(b)
+        assert(symbols.get(p) == ii)
+    }
+    printf("Complete\n")
+}

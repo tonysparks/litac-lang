@@ -112,7 +112,7 @@ ape_program_t* ape_compile_file(ape_t *ape, const char *path);
 ape_object_t   ape_execute_program(ape_t *ape, const ape_program_t *program);
 void           ape_program_destroy(ape_program_t *program);
 
-ape_object_t  ape_execute(ape_t *ape, const char *code);
+ape_object_t  ape_execute(ape_t *ape, const char *code, int len);
 ape_object_t  ape_execute_file(ape_t *ape, const char *path);
 
 ape_object_t  ape_call(ape_t *ape, const char *function_name, int argc, ape_object_t *args);

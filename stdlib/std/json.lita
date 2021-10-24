@@ -309,7 +309,7 @@ public func (node: *JsonNode) putStr(key: *const char, str: *const char, len: i3
         return;
     }
 
-    var value = CreateJsonString(str, -1, node.alloc)
+    var value = CreateJsonString(str, len, node.alloc)
     node.put(key, value, len)
 }
 

@@ -14,6 +14,7 @@ import "module"
 import "checker"
 import "common"
 import "ast_print"
+import "intern"
 
 public const MAX_GENERIC_NAME = 1024;
 
@@ -45,19 +46,19 @@ func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
                 var unaliasedType = checker.getType(name)
                 if(unaliasedType) {
                     var type = unaliasedType.type
-                    if(type && type.name) {
-                        str.append(type.name)
+                    if(type && !type.name.empty()) {
+                        str.appendStrn(type.name.buffer, type.name.length)
                         nameSet = true
                     }
                 }
             }
             else {
-                str.append("%s", type.typeInfo.name)
+                str.append("%.*s", type.typeInfo.name.length, type.typeInfo.name.buffer)
                 nameSet = true
             }
 
             if(!nameSet) {
-                str.append(name.name)
+                str.appendStrn(name.name.buffer, name.name.length)
             }
 
             if(name.genericArgs.empty()) {
@@ -105,26 +106,26 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
     GetGenericName(checker, name, genericName)
 
-    var newName = genericName.cStrConst()
-    var genericSym = checker.current.genericSymbols.get(newName)
+
+    var newNameStr = checker.lita.strings.internCopy(genericName.cStrConst(), genericName.length)
+    var genericSym = checker.current.genericSymbols.get(newNameStr)
 
     if(!genericSym) {
-        var newNameStr = genericName.copy(checker.allocator).buffer
         var genericDecl: *GenericDecl = null;
 
         switch(sym.decl.kind) {
             case StmtKind.FUNC_DECL: {
-                genericDecl = CreateFuncDecl(sym.decl as (*FuncDecl), name.genericArgs, checker.allocator)
+                genericDecl = CreateFuncDecl(sym.decl as (*FuncDecl), name.genericArgs, checker.lita)
                 break;
             }
             case StmtKind.TRAIT_DECL:
             case StmtKind.UNION_DECL:
             case StmtKind.STRUCT_DECL: {
-                genericDecl = CreateAggregateDecl(sym.decl as (*AggregateDecl), name.genericArgs, checker.allocator)
+                genericDecl = CreateAggregateDecl(sym.decl as (*AggregateDecl), name.genericArgs, checker.lita)
                 break;
             }
             case StmtKind.TYPEDEF_DECL: {
-                genericDecl = CreateTypedefDecl(sym.decl as (*TypedefDecl), name.genericArgs, checker.allocator)
+                genericDecl = CreateTypedefDecl(sym.decl as (*TypedefDecl), name.genericArgs, checker.lita)
                 break;
             }
             default: {
@@ -233,8 +234,8 @@ err:
 
 func CreateAggregateDecl(aggDecl: *AggregateDecl,
                          genericArgs: *Array<*TypeSpec>,
-                         allocator: *const Allocator) : *GenericDecl {
-    var copy = CopyAggregateDecl(aggDecl, allocator)
+                         lita: *Lita) : *GenericDecl {
+    var copy = CopyAggregateDecl(aggDecl, lita)
 
     var template = Template {
         .genericParams = &aggDecl.genericParams,
@@ -249,8 +250,8 @@ func CreateAggregateDecl(aggDecl: *AggregateDecl,
 
 func CreateFuncDecl(funcDecl: *FuncDecl,
                     genericArgs: *Array<*TypeSpec>,
-                    allocator: *const Allocator) : *GenericDecl {
-    var copy = CopyFuncDecl(funcDecl, allocator)
+                    lita: *Lita) : *GenericDecl {
+    var copy = CopyFuncDecl(funcDecl, lita)
 
     var template = Template {
         .genericParams = &funcDecl.genericParams,
@@ -264,8 +265,8 @@ func CreateFuncDecl(funcDecl: *FuncDecl,
 
 func CreateTypedefDecl(typedefDecl: *TypedefDecl,
                        genericArgs: *Array<*TypeSpec>,
-                       allocator: *const Allocator) : *GenericDecl {
-    var copy = CopyTypedefDecl(typedefDecl, allocator)
+                       lita: *Lita) : *GenericDecl {
+    var copy = CopyTypedefDecl(typedefDecl, lita)
 
     var template = Template {
         .genericParams = &typedefDecl.genericParams,
@@ -319,7 +320,7 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
                 for(var j = 0; j < this.genericParams.size(); j+=1) {
                     var param = this.genericParams.get(j)
 
-                    if(param.name.str.equalsStringView(genParam.name.str)) {
+                    if(param.name.str.equals(genParam.name.str)) {
                         funcPtr.genericParams.removeAt(i)
                         isRemoved = true
                         break;

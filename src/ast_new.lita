@@ -1,5 +1,6 @@
 import "std/mem"
 import "std/array"
+import "std/string_view"
 import "std/assert"
 
 import "ast"
@@ -8,34 +9,36 @@ import "symbols"
 import "types"
 import "common"
 import "module"
+import "lita"
+import "intern"
 
-public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
-    var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, allocator) as (*NameTypeSpec)
-    voidSpec.name = "void"
+public func NewVoidTypeSpec(pos: SrcPos, lita: *Lita) : *TypeSpec {
+    var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, lita) as (*NameTypeSpec)
+    voidSpec.name = VOID
     return voidSpec as (*TypeSpec)
 }
 
-public func NewNameTypeSpec(pos: SrcPos, name: *const char, allocator: *const Allocator) : *NameTypeSpec {
-    var result = new<NameTypeSpec>(allocator)
+public func NewNameTypeSpecIntern(pos: SrcPos, name: InternedString, lita: *Lita) : *NameTypeSpec {
+    var result = new<NameTypeSpec>(lita.allocator)
     result.kind = TypeSpecKind.NAME
     result.pos = pos
     result.base = null
     result.name = name
-    result.genericArgs.init(0, allocator)
+    result.genericArgs.init(0, lita. allocator)
     return result
 }
 
-public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
+public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, lita: *Lita) : *TypeSpec {
     switch(kind) {
         case TypeSpecKind.NONE: {
-            var result = new<TypeSpec>(allocator)
+            var result = new<TypeSpec>(lita.allocator)
             result.kind = TypeSpecKind.NONE
             result.pos = pos
             result.base = null
             return result
         }
         case TypeSpecKind.ARRAY: {
-            var result = new<ArrayTypeSpec>(allocator)
+            var result = new<ArrayTypeSpec>(lita.allocator)
             result.kind = TypeSpecKind.ARRAY
             result.pos = pos
             result.base = null
@@ -43,37 +46,37 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Alloc
             return result as (*TypeSpec)
         }
         case TypeSpecKind.PTR: {
-            var result = new<PtrTypeSpec>(allocator)
+            var result = new<PtrTypeSpec>(lita.allocator)
             result.kind = TypeSpecKind.PTR
             result.pos = pos
             result.base = null
             return result as (*TypeSpec)
         }
         case TypeSpecKind.CONST: {
-            var result = new<ConstTypeSpec>(allocator)
+            var result = new<ConstTypeSpec>(lita.allocator)
             result.kind = TypeSpecKind.CONST
             result.pos = pos
             result.base = null
             return result as (*TypeSpec)
         }
         case TypeSpecKind.NAME: {
-            var result = new<NameTypeSpec>(allocator)
+            var result = new<NameTypeSpec>(lita.allocator)
             result.kind = TypeSpecKind.NAME
             result.pos = pos
             result.base = null
-            result.name = null
-            result.genericArgs.init(0, allocator)
+            result.name = EMPTY_STR
+            result.genericArgs.init(0, lita.allocator)
             return result as (*TypeSpec)
         }
         case TypeSpecKind.FUNC_PTR: {
-            var result = new<FuncPtrTypeSpec>(allocator)
+            var result = new<FuncPtrTypeSpec>(lita.allocator)
             result.kind = TypeSpecKind.FUNC_PTR
             result.pos = pos
             result.base = null
-            result.args.init(0, allocator)
+            result.args.init(0, lita.allocator)
             result.ret = null
             result.hasVarargs = false
-            result.genericParams.init(0, allocator)
+            result.genericParams.init(0, lita.allocator)
             return result as (*TypeSpec)
         }
         default: {
@@ -86,8 +89,8 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Alloc
 
 public func NewImportDecl(startPos: SrcPos,
                           endPos: SrcPos,
-                          name: Token,
-                          alias: Token,
+                          name: Identifier,
+                          alias: Identifier,
                           isUsing: bool,
                           allocator: *const Allocator) : *Decl {
     var decl = new<ImportDecl>(allocator)
@@ -103,7 +106,7 @@ public func NewImportDecl(startPos: SrcPos,
 
 public func NewVarDecl(startPos: SrcPos,
                        endPos: SrcPos,
-                       name: Token,
+                       name: Identifier,
                        type: *TypeSpec,
                        expr: *Expr,
                        allocator: *const Allocator) : *Decl {
@@ -120,7 +123,7 @@ public func NewVarDecl(startPos: SrcPos,
 
 public func NewFuncDecl(startPos: SrcPos,
                          endPos: SrcPos,
-                         name: Token,
+                         name: Identifier,
                          genericParams: Array<GenericParam>,
                          params: *ParametersStmt,
                          body: *Stmt,
@@ -144,7 +147,7 @@ public func NewFuncDecl(startPos: SrcPos,
 public func NewAggregateDecl(startPos: SrcPos,
                       endPos: SrcPos,
                       kind: StmtKind,
-                      name: Token,
+                      name: Identifier,
                       genericParams: Array<GenericParam>,
                       fields: Array<FieldStmt>,
                       flags: i32,
@@ -193,7 +196,7 @@ public func NewAggregateDecl(startPos: SrcPos,
 
 public func NewStructDecl(startPos: SrcPos,
                           endPos: SrcPos,
-                          name: Token,
+                          name: Identifier,
                           genericParams: Array<GenericParam>,
                           fields: Array<FieldStmt>,
                           flags: i32,
@@ -204,7 +207,7 @@ public func NewStructDecl(startPos: SrcPos,
 
 public func NewUnionDecl(startPos: SrcPos,
                          endPos: SrcPos,
-                         name: Token,
+                         name: Identifier,
                          genericParams: Array<GenericParam>,
                          fields: Array<FieldStmt>,
                          flags: i32,
@@ -216,7 +219,7 @@ public func NewUnionDecl(startPos: SrcPos,
 
 public func NewTraitDecl(startPos: SrcPos,
                          endPos: SrcPos,
-                         name: Token,
+                         name: Identifier,
                          genericParams: Array<GenericParam>,
                          fields: Array<FieldStmt>,
                          flags: i32,
@@ -228,7 +231,7 @@ public func NewTraitDecl(startPos: SrcPos,
 
 public func NewEnumDecl(startPos: SrcPos,
                          endPos: SrcPos,
-                         name: Token,
+                         name: Identifier,
                          fields: Array<*EnumFieldEntryDecl>,
                          allocator: *const Allocator) : *Decl {
     var decl = new<EnumDecl>(allocator)
@@ -243,7 +246,7 @@ public func NewEnumDecl(startPos: SrcPos,
 
 public func NewTypedefDecl(startPos: SrcPos,
                          endPos: SrcPos,
-                         name: Token,
+                         name: Identifier,
                          genericParams: Array<GenericParam>,
                          type: *TypeSpec,
                          allocator: *const Allocator) : *Decl {
@@ -260,7 +263,7 @@ public func NewTypedefDecl(startPos: SrcPos,
 
 public func NewParameterDecl(startPos: SrcPos,
                          endPos: SrcPos,
-                         name: Token,
+                         name: Identifier,
                          type: *TypeSpec,
                          defaultExpr: *Expr,
                          isUsing: bool,
@@ -521,7 +524,7 @@ public func NewArrayDesignationExpr(startPos: SrcPos,
 
 public func NewInitArgExpr(startPos: SrcPos,
                            endPos: SrcPos,
-                           fieldName: Token,
+                           fieldName: Identifier,
                            position: i32,
                            value: *Expr,
                            allocator: *const Allocator) : *Expr {
@@ -672,7 +675,7 @@ public func NewTypeOfExpr(startPos: SrcPos,
 public func NewOffsetOfExpr(startPos: SrcPos,
                           endPos: SrcPos,
                           type: *TypeSpec,
-                          field: Token,
+                          field: Identifier,
                           allocator: *const Allocator) : *Expr {
     var expr = new<OffsetOfExpr>(allocator)
     expr.kind = StmtKind.OFFSET_OF_EXPR
@@ -712,8 +715,8 @@ public func NewModuleStmt(startPos: SrcPos,
 
 public func NewCompStmt(startPos: SrcPos,
                         endPos: SrcPos,
-                        type: *const char,
-                        expr: *const char,
+                        type: InternedString,
+                        expr: StringView,
                         body: Array<*Stmt>,
                         end: *CompStmt,
                         allocator: *const Allocator) : *Stmt {
@@ -893,7 +896,7 @@ public func NewDeferStmt(startPos: SrcPos,
 
 public func NewGotoStmt(startPos: SrcPos,
                         endPos: SrcPos,
-                        label: Token,
+                        label: Identifier,
                         allocator: *const Allocator) : *Stmt {
     var stmt = new<GotoStmt>(allocator)
     stmt.kind = StmtKind.GOTO_STMT
@@ -905,7 +908,7 @@ public func NewGotoStmt(startPos: SrcPos,
 
 public func NewLabelStmt(startPos: SrcPos,
                          endPos: SrcPos,
-                         label: Token,
+                         label: Identifier,
                          allocator: *const Allocator) : *Stmt {
     var stmt = new<LabelStmt>(allocator)
     stmt.kind = StmtKind.LABEL_STMT
@@ -917,7 +920,7 @@ public func NewLabelStmt(startPos: SrcPos,
 
 public func NewNoteStmt(startPos: SrcPos,
                         endPos: SrcPos,
-                        name: Token,
+                        name: Identifier,
                         attributes: Array<Token>,
                         allocator: *const Allocator) : *Stmt {
     var stmt = new<NoteStmt>(allocator)
@@ -956,7 +959,7 @@ public func NewParametersStmt(startPos: SrcPos,
 
 public func NewVarFieldDecl(startPos: SrcPos,
                             endPos: SrcPos,
-                            fieldName: Token,
+                            fieldName: Identifier,
                             type: *TypeSpec,
                             attributes: Attributes,
                             defaultExpr: *Expr,
@@ -974,7 +977,7 @@ public func NewVarFieldDecl(startPos: SrcPos,
 
 public func NewTraitFieldDecl(startPos: SrcPos,
                             endPos: SrcPos,
-                            fieldName: Token,
+                            fieldName: Identifier,
                             type: *TypeSpec,
                             attributes: Attributes,
                             allocator: *const Allocator) : *Stmt {
@@ -991,7 +994,7 @@ public func NewTraitFieldDecl(startPos: SrcPos,
 
 public func NewEnumFieldEntryDecl(startPos: SrcPos,
                             endPos: SrcPos,
-                            fieldName: Token,
+                            fieldName: Identifier,
                             value: *Expr,
                             attributes: Attributes,
                             allocator: *const Allocator) : *Stmt {

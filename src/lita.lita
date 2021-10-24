@@ -1,6 +1,7 @@
 import "std/io"
 import "std/mem"
 import "std/mem/linear_allocator"
+import "std/mem/bucket_allocator"
 import "std/array"
 import "std/map"
 import "std/libc"
@@ -20,6 +21,8 @@ import "ast_new"
 import "checker"
 import "cgen"
 import "common"
+import "intern"
+import "types"
 
 import "lsp/references"
 import "lsp/workspace"
@@ -32,6 +35,7 @@ public const LITA_VERSION = "0.1.2-alpha"
 public struct Lita {
     allocator: *const Allocator
     linearAllocator: LinearAllocator
+    stringsAllocator: BucketAllocator
 
     preprocessor: Preprocessor
     result: PhaseResult
@@ -46,8 +50,9 @@ public struct Lita {
     sourceFilename: [MAX_PATH]char
 
     programSymbols: ProgramSymbols
-    genericSymbols: Map<*const char, *Symbol>
+    genericSymbols: Map<InternedString, *Symbol>
 
+    strings: Strings
 
     // Language Server support
     references: ReferenceDatabase
@@ -116,9 +121,7 @@ public func (this: *Lita) init(options: *LitaOptions) {
     var size: usize = options.maxMemory > 0 ? options.maxMemory : 1024 * 1024 * 1024;
     this.linearAllocator.init(defaultAllocator.alloc(size), size)
 
-    var allocator = (&this.linearAllocator) as (*const Allocator)
-
-    this.allocator = allocator
+    this.allocator = &this.linearAllocator.allocator
     this.options = options
 
     memset(this.binaryFilename, 0, MAX_PATH)
@@ -137,7 +140,12 @@ public func (this: *Lita) reset() {
     this.result = PhaseResultInit(this.allocator)
     this.modules = StrMap<*Module>(null, 32, this.allocator)
 
-    this.genericSymbols = StrMap<*Symbol>(null, 128, this.allocator)
+    this.genericSymbols = InternMap<*Symbol>(null, 128, this.allocator)
+
+    this.stringsAllocator.init(this.allocator, 5 * KiB)
+    this.strings.init(this.stringsAllocator)
+
+    TypesInit(this.strings)
 
     // TODO: Only initialize if this is an LSP
     this.references.init(this.allocator)
@@ -194,8 +202,11 @@ public func (this: *Lita) parse() : *Module {
 
     var builtinImport = NewImportDecl(SrcPos{},
                                       SrcPos{},
-                                      BUILTIN_IMPORT_TOKEN,
-                                      Token{.type = TokenType.VOID},
+                                      BUILTIN_IMPORT_IDENT,
+                                      Identifier {
+                                          .str = EMPTY_STR,
+                                          .token = Token{.type = TokenType.VOID}
+                                      },
                                       false,
                                       this.allocator) as (*ImportDecl)
     builtinImport.moduleId = &builtin.id
@@ -357,8 +368,8 @@ public func (this: *Lita) run() {
 
 
 public func FindModulePath(lita: *Lita,
-                    moduleName: StringView,
-                    filename: [MAX_PATH]char) : bool {
+                           moduleName: StringView,
+                           filename: [MAX_PATH]char) : bool {
 
     var path = [MAX_PATH]char{0}
     var pathStr = StringInit(path, MAX_PATH);
@@ -448,13 +459,13 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var importStmt = module.ast.imports.get(i)
-        if(importStmt.name.type == TokenType.ERROR) {
+        if(importStmt.name.token.type == TokenType.ERROR) {
             lita.result.addError(importStmt.startPos, "Could not parse import statement")
             continue
         }
 
         var filename: [MAX_PATH]char
-        if(!FindModulePath(lita, importStmt.name.str, filename)) {
+        if(!FindModulePath(lita, importStmt.name.str.view, filename)) {
             lita.result.addError(importStmt.startPos, "Could not find module '%.*s'",
                     importStmt.name.str.length, importStmt.name.str.buffer)
             continue

@@ -70,6 +70,31 @@ public func (s: *String) append(format: *const char, ...) : i32 {
     return len
 }
 
+public func (b: *String) appendStr(str: *const char) {
+    if(str == null) {
+        return;
+    }
+    var len = strlen(str)
+    b.appendStrn(str, len)
+}
+
+
+public func (b: *String) appendStrn(str: *const char, len: i32) {
+    if(str == null || len < 1) {
+        return;
+    }
+
+    if(b.length + len > b.capacity) {
+        len = b.capacity
+    }
+
+    memcpy((&b.buffer[b.length]) as (*void),
+             str as (*const void),
+             len * sizeof(:char))
+    b.length += len
+}
+
+
 public func (s: *String) setStrn(str: *const char, len: i32) {
     if(str == null || len < 1) {
         return;

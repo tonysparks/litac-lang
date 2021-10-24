@@ -20,6 +20,7 @@ import "common"
 import "ast_print"
 import "checker"
 import "checker_expr"
+import "intern"
 
 public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     assert(decl != null)
@@ -128,7 +129,7 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
     switch(field.kind) {
         case StmtKind.TRAIT_FIELD_DECL: {
             var traitField = field.traitField
-            if(traitField.name.type != TokenType.IDENTIFIER) {
+            if(traitField.name.token.type != TokenType.IDENTIFIER) {
                 break
             }
 
@@ -137,7 +138,7 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
         }
         case StmtKind.VAR_FIELD_DECL: {
             var varField = field.varField
-            if(varField.name.type != TokenType.IDENTIFIER) {
+            if(varField.name.token.type != TokenType.IDENTIFIER) {
                 break
             }
 
@@ -146,7 +147,7 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
         }
         case StmtKind.ENUM_FIELD_DECL: {
             var enumField = field.enumField
-            if(enumField.name.type != TokenType.IDENTIFIER) {
+            if(enumField.name.token.type != TokenType.IDENTIFIER) {
                 break
             }
             this.checkAggregateFieldDuplicate(aggDecl, enumField.name.str, index)
@@ -155,11 +156,11 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
         case StmtKind.UNION_FIELD_DECL:
         case StmtKind.STRUCT_FIELD_DECL: {
             var aggField = field.aggregateField
-            if(aggField.name.type == TokenType.IDENTIFIER) {
+            if(aggField.name.token.type == TokenType.IDENTIFIER) {
                 this.checkAggregateFieldDuplicate(aggDecl, aggField.name.str, index)
                 break;
             }
-            else if(aggField.name.type == TokenType.VOID) {
+            else if(aggField.name.token.type == TokenType.VOID) {
                 for(var j = 0; j < aggField.fields.size(); j+=1) {
                     var anonymousField = aggField.fields.get(j)
                     this.checkAnonAggregateFieldDuplicate(aggDecl, anonymousField, index)
@@ -178,12 +179,12 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
     return this.errors() == errors
 }
 
-func (this: *TypeChecker) errorInvalidMemberForTrait(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
+func (this: *TypeChecker) errorInvalidMemberForTrait(aggDecl: *AggregateDecl, fieldName: InternedString, pos: SrcPos) {
     this.result.addError(pos, "invalid member '%.*s', only function pointers are allowed for traits",
                          fieldName.length, fieldName.buffer)
 }
 
-func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
+func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: InternedString, pos: SrcPos) {
     if(aggDecl.name.str.length) {
         this.result.addError(pos, "invalid 'using' member '%.*s' in '%.*s', only aggregate types (or pointer to an aggregate) are allowed",
                                         fieldName.length, fieldName.buffer,
@@ -201,7 +202,7 @@ func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
 
 }
 
-func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: StringView, pos: SrcPos) {
+func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: InternedString, pos: SrcPos) {
     if(aggDecl.name.str.length) {
         this.result.addError(pos, "duplicate member '%.*s' in '%.*s'",
                                         fieldName.length, fieldName.buffer,
@@ -213,7 +214,7 @@ func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldNam
     }
 }
 
-func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, fieldName: StringView, index: i32) : bool {
+func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, fieldName: InternedString, index: i32) : bool {
     var isValid = true;
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         if(index == i) {
@@ -224,11 +225,11 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
         switch(field.kind) {
             case StmtKind.TRAIT_FIELD_DECL: {
                 var traitField = field.traitField
-                if(traitField.name.type != TokenType.IDENTIFIER) {
+                if(traitField.name.token.type != TokenType.IDENTIFIER) {
                     continue
                 }
 
-                if(traitField.name.str.equalsStringView(fieldName)) {
+                if(traitField.name.str.equals(fieldName)) {
                     this.errorDuplicateMember(aggDecl, fieldName, traitField.startPos)
                     isValid = false
                 }
@@ -237,11 +238,11 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
             }
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
-                if(varField.name.type != TokenType.IDENTIFIER) {
+                if(varField.name.token.type != TokenType.IDENTIFIER) {
                     continue
                 }
 
-                if(varField.name.str.equalsStringView(fieldName)) {
+                if(varField.name.str.equals(fieldName)) {
                     this.errorDuplicateMember(aggDecl, fieldName, varField.startPos)
                     isValid = false
                 }
@@ -250,10 +251,10 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
             }
             case StmtKind.ENUM_FIELD_DECL: {
                 var enumField = field.enumField
-                if(enumField.name.type != TokenType.IDENTIFIER) {
+                if(enumField.name.token.type != TokenType.IDENTIFIER) {
                     continue
                 }
-                if(enumField.name.str.equalsStringView(fieldName)) {
+                if(enumField.name.str.equals(fieldName)) {
                     this.errorDuplicateMember(aggDecl, fieldName, enumField.startPos)
                     isValid = false
                 }
@@ -262,13 +263,13 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 var aggField = field.aggregateField
-                if(aggField.name.type == TokenType.IDENTIFIER) {
-                    if(aggField.name.str.equalsStringView(fieldName)) {
+                if(aggField.name.token.type == TokenType.IDENTIFIER) {
+                    if(aggField.name.str.equals(fieldName)) {
                         this.errorDuplicateMember(aggDecl, fieldName, aggField.startPos)
                         isValid = false
                     }
                 }
-                else if(aggField.name.type == TokenType.VOID) {
+                else if(aggField.name.token.type == TokenType.VOID) {
                     isValid = this.checkAggregateFieldDuplicate(aggField, fieldName, -1) && isValid
                 }
                 break;
@@ -365,7 +366,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     return false
                 }
 
-                if(field.enumField.name.type == TokenType.IDENTIFIER) {
+                if(field.enumField.name.token.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.enumField.name.str, i)
                 }
 
@@ -382,13 +383,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 // any generic arguments are accounted for
                 var sym: *Symbol = field.aggregateField.sym
                 if(aggDecl.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-
-                    var name = [MAX_SYMBOL_NAME]char{}
-                    var nameStr = StringInit(name, MAX_SYMBOL_NAME)
-                    nameStr.format("%.*s", field.aggregateField.name.str.length, field.aggregateField.name.str.buffer)
+                    var nameStr = field.aggregateField.name.str
 
                     // determine if this symbol has already been created
-                    sym = this.getTypeByName(nameStr.cStr())
+                    sym = this.getTypeByName(nameStr)
                     if(!sym) {
                         // if it hasn't, create it from the template
                         sym = this.createDeclSymbol(field.aggregateField)
@@ -396,7 +394,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
                     // build up the new Declaration Name with the appropriate generic arguments supplemented in
                     // from the parent declaration
-                    var nameSpec = NewNameTypeSpec(field.aggregateField.startPos, nameStr.cStr(), this.allocator)
+                    var nameSpec = NewNameTypeSpecIntern(field.aggregateField.startPos, nameStr, this.lita)
                     nameSpec.genericArgs.init(field.aggregateField.genericParams.size(), this.allocator)
                     for(var i = 0; i < field.aggregateField.genericParams.size(); i += 1) {
                         var genericParam = field.aggregateField.genericParams.get(i)
@@ -404,8 +402,8 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                         for(var j = 0; j < aggDecl.sym.genericParams.size(); j += 1) {
                             var parentGenericParam = aggDecl.sym.genericParams.get(j)
 
-                            if(parentGenericParam.name.str.equalsStringView(genericParam.name.str)) {
-                                nameSpec.genericArgs.add(aggDecl.sym.genericArgs.get(j).asTypeSpec(this.allocator))
+                            if(parentGenericParam.name.str.equals(genericParam.name.str)) {
+                                nameSpec.genericArgs.add(aggDecl.sym.genericArgs.get(j).asTypeSpec(this.lita))
                                 break
                             }
                         }
@@ -432,7 +430,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     return false
                 }
 
-                if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
+                if(field.aggregateField.name.token.type == TokenType.IDENTIFIER) {
                     this.checkAggregateFieldDuplicate(aggDecl, field.aggregateField.name.str, i)
                 }
                 else {
@@ -494,7 +492,7 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
-                if(field.aggregateField.name.type == TokenType.IDENTIFIER) {
+                if(field.aggregateField.name.token.type == TokenType.IDENTIFIER) {
                     this.lita.references.addFieldReference(field.aggregateField.startPos, parentTypeInfo, position)
                     position += 1
                 }
@@ -521,7 +519,7 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
         if(i == index) continue
 
         var other = enumDecl.fields.get(i)
-        if(other.name.str.equalsStringView(field.name.str)) {
+        if(other.name.str.equals(field.name.str)) {
             this.result.addError(other.startPos, "duplicate member '%.*s'",
                                 field.name.str.length, field.name.str.buffer)
             hasDuplicates = true

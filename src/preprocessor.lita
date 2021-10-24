@@ -20,6 +20,7 @@ import "module"
 import "lita"
 import "types"
 import "symbols"
+import "intern"
 
 import "ape/ape"
 
@@ -102,7 +103,7 @@ public func (this: *Preprocessor) init(lita: *Lita) {
 
 @profile
 func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
-    var result = ape_execute(this.ape, comp.expr)
+    var result = ape_execute(this.ape, comp.expr.buffer, comp.expr.length)
     if(ape_has_errors(this.ape)) {
         var error = ape_get_error(this.ape, 0)
         var pos = SrcPos {
@@ -134,17 +135,17 @@ public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, com
     this.callContext.comp = comp
 
     // Preprocessor directives
-    if(strcmp(comp.type, "precheck") == 0) {
+    if(comp.type.equals(PRECHECK)) {
         this.preCheckers.add(comp)
     }
-    else if(strcmp(comp.type, "postparse") == 0) {
+    else if(comp.type.equals(POSTPARSE)) {
         this.callContext.preprocessCall(moduleStmt, comp)
     }
-    else if(strcmp(comp.type, "if")     == 0 ||
-       strcmp(comp.type, "elseif") == 0 ||
-       strcmp(comp.type, "else")   == 0) {
+    else if(comp.type.equals(IF)     ||
+            comp.type.equals(ELSEIF) ||
+            comp.type.equals(ELSE)) {
 
-        if(strcmp(comp.type, "else") == 0 || this.eval(comp)) {
+        if(comp.type.equals(ELSE) || this.eval(comp)) {
             for(var i = 0; i < comp.body.size(); i += 1) {
                 var stmt = comp.body.get(i)
                 switch(stmt.kind) {
@@ -195,11 +196,11 @@ public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, com
     this.callContext.checker = checker
     this.callContext.comp = comp
 
-    if(strcmp(comp.type, "if")     == 0 ||
-       strcmp(comp.type, "elseif") == 0 ||
-       strcmp(comp.type, "else")   == 0) {
+    if(comp.type.equals(IF)     ||
+       comp.type.equals(ELSEIF) ||
+       comp.type.equals(ELSE)) {
 
-        if(strcmp(comp.type, "else") == 0 || this.eval(comp)) {
+        if(comp.type.equals(ELSE) || this.eval(comp)) {
             comp.evaluatedStmt = NewBlockStmt(comp.startPos, comp.endPos, comp.body, this.lita.allocator)
         }
         else if(comp.end) {
@@ -228,7 +229,8 @@ func ApeGetTypeKind(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : 
         return ape_object_make_null()
     }
 
-    var symbol = context.checker.current.currentScope.lookup(element)
+    var elementIntern = context.pp.lita.strings.internCopy(element)
+    var symbol = context.checker.current.currentScope.lookup(elementIntern)
     if(!symbol) {
         context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
         return ape_object_make_null()
@@ -297,7 +299,7 @@ func (this: *Preprocessor) addNotes(obj: ape_object_t, attributes: *Attributes) 
 
 func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     var declObj = ape_object_make_map(this.ape)
-    ape_object_set_map_string(declObj, "name", sym.name)
+    ape_object_set_map_value(declObj, "name", ape_object_make_stringf(this.ape, "%.*s", sym.name.length, sym.name.buffer))
     ape_object_set_map_string(declObj, "kind", StmtKindAsStr(sym.decl.kind))
     ape_object_set_map_string(declObj, "moduleFilename", sym.declared.id.filename)
     ape_object_set_map_value(declObj, "moduleName", ape_object_make_stringf(this.ape, "%.*s", sym.declared.id.name.length, sym.declared.id.name.buffer))
@@ -657,9 +659,11 @@ func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_objec
 
             for(var i = 0; i < stmts.declarations.size(); i += 1) {
                 var decl = stmts.declarations.get(i)
-                var sym = context.checker.getTypeByName(decl.name.asString())
+
+                var sym = context.checker.getTypeByName(decl.name.str)
                 if(!sym) {
-                    context.pp.lita.result.addError(context.comp.startPos, "symbol '%s' not found for replacement", decl.name.asString())
+                    context.pp.lita.result.addError(context.comp.startPos,
+                        "symbol '%.*s' not found for replacement", decl.name.str.length, decl.name.str.buffer)
                     return ape_object_make_null()
                 }
 
@@ -736,7 +740,7 @@ func ApeAstInsert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
     var parser = ParserInit(astNode.startPos.filename, code, context.pp.lita)
     var stmt = parser.statement()
 
-    AstInsert(astNode, stmt, index, context.pp.lita.allocator)
+    AstInsert(astNode, stmt, index, context.pp.lita)
     return ape_object_make_null()
 }
 
@@ -816,7 +820,8 @@ func ApeSetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) 
         return ape_object_make_null()
     }
 
-    var sym = module.getType(symbolName)
+    var symbolNameIntern = context.pp.lita.strings.internCopy(symbolName)
+    var sym = module.getType(symbolNameIntern)
     if(!sym) {
         context.pp.lita.result.addError(context.comp.startPos, "can not find symbol '%s' in module: '%s'", symbolName, moduleName)
         return ape_object_make_null()

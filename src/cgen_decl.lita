@@ -88,7 +88,7 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
         }
 
         var param = funcInfo.decl.params.get(i)
-        buf.appendStr(this.cTypeDecl(param.sym.type, this.prefix(param.sym.name, &tmp), decayArrays))
+        buf.appendStr(this.cTypeDecl(param.sym.type, this.prefix(param.sym.name.view, &tmp), decayArrays))
         tmp.clear()
     }
 
