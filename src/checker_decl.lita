@@ -120,7 +120,12 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         }
     }
 
-    return declaredType ? declaredType : inferredType
+    var resultType = declaredType ? declaredType : inferredType
+    if(!resultType) {
+        this.result.addError(decl.startPos,
+                "invalid variable declaration, can't infer type for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
+    }
+    return resultType
 }
 
 func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {

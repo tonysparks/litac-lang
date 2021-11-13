@@ -1136,6 +1136,10 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
 
                 if(varField.attributes.isUsing) {
                     var fieldBaseType = field.typeInfo.getBaseType()
+                    if(fieldBaseType.kind == TypeKind.POISON) {
+                        break
+                    }
+
                     assert(IsAggregate(fieldBaseType))
                     this.addTypeToScope(decl, scope, baseType, fieldBaseType as (*AggregateTypeInfo))
                 }

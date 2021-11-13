@@ -612,7 +612,9 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
     var type = expr.object.operand.typeInfo
 
-    assert(IsFuncLike(type))
+    if(!IsFuncLike(type)) {
+        goto err;
+    }
 
     // if this is still a generic template, we haven't completely inferred all
     // generic parameters
@@ -2231,6 +2233,11 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
 
     expr.sym = sym
     expr.operand.typeInfo = typeInfo
+
+    if(!expr.operand.typeInfo) {
+        this.result.addError(expr.startPos, "unknown type or variable '%s'", expr.type.name)
+        return false
+    }
 
     this.lita.references.addSymbolReference(sym, expr.startPos)
 
