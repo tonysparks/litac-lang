@@ -72,7 +72,8 @@ report:
 
 // TEMP
 {
-printf("Call count: %d Size: %d\n", callCount, lita.strings.size())
+//printf("Intern count: %d Size: %d Grow Count: %d Collision Count %d Put:%d Get:%d Hash:%d Eq: %d FuncName: %d GetMethod: %d\n",
+//    internCount, lita.strings.size(), growCount, collisionCount, putCount, getCount, hashCount, equalCount, funcNameCount, getMethodCount)
 /*for(var it = lita.strings.strings.iter(); it.hasNext();) {
     var v = it.next().value
     printf("Str: %.*s\n", v.length, v.buffer)

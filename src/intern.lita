@@ -2,9 +2,14 @@ import "std/map"
 import "std/mem"
 import "std/string_view"
 import "std/libc"
-
-public var callCount = 0
-
+/*
+public var internCount = 0
+public var putCount = 0
+public var getCount = 0
+public var growCount = 0
+public var collisionCount = 0
+public var equalCount = 0
+*/
 public union InternedString {
     struct {
         buffer: *const char
@@ -143,7 +148,7 @@ public func (this: *Strings) internStringView(string: *StringView) : InternedStr
     `Strings`.  If you can't garauntee to the lifetime of the supplied `string`, use `Strings#internCopy`
 """)
 public func (this: *Strings) intern(string: *const char, length: i32) : InternedString {
-    callCount += 1
+    internCount += 1
 
     var view = StringView {
         .buffer = string,
@@ -164,7 +169,7 @@ public func (this: *Strings) intern(string: *const char, length: i32) : Interned
     If this `string` has not been interned yet, a copy of the `string` is stored as the interned string.
 """)
 public func (this: *Strings) internCopy(string: *const char, length: i32 = -1) : InternedString {
-    callCount += 1
+//    internCount += 1
 
     var view = StringView {
         .buffer = string,
@@ -186,8 +191,9 @@ public func (this: *Strings) internCopy(string: *const char, length: i32 = -1) :
 }
 
 public func (this: *Strings) put(key: StringView, value: InternedString) {
+//putCount += 1
 
-    if( (this.length + 128) >= this.capacity) {
+    if( this.length >= (this.capacity * 0.55)) {
         this.grow(2 * this.capacity);
     }
 
@@ -206,7 +212,7 @@ public func (this: *Strings) put(key: StringView, value: InternedString) {
             this.values[i] = value;
             return;
         }
-
+//collisionCount+=1
         i += 1;
     }
 
@@ -217,6 +223,7 @@ public func (this: *Strings) size() : i32 {
 }
 
 func (this: *Strings) get(key: *StringView) : InternedString {
+//getCount += 1
     if(this.length == 0) {
         return EMPTY_STR;
     }
@@ -232,6 +239,7 @@ func (this: *Strings) get(key: *StringView) : InternedString {
         else if(k.length == 0) {
             return EMPTY_STR;
         }
+//collisionCount+=1
         i += 1;
     }
 
@@ -240,6 +248,8 @@ func (this: *Strings) get(key: *StringView) : InternedString {
 
 
 func (this: *Strings) grow(newlength: i32) {
+//growCount+=1;
+
     var oldKeys = this.keys
     var oldValues = this.values
     var oldCapacity = this.capacity
@@ -261,6 +271,7 @@ func (this: *Strings) grow(newlength: i32) {
 
 @inline
 public func (this: *InternedString) equals(other: *InternedString) : bool {
+//equalCount += 1
     return this.addr == other.addr
 }
 

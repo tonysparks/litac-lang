@@ -1954,11 +1954,15 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
     return false
 }
 
+//public var funcNameCount = 0
+//public var getMethodCount = 0
+
 @doc("""
 Given a method name, this will return the function name equivalent, which is:
 AggregateName_MethodName
 """)
 public func (this: *AggregateTypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, methodName: InternedString) : *const char {
+//funcNameCount += 1
     memset(result, 0, MAX_SYMBOL_NAME)
     this.getBaseName(result);
 
@@ -1969,6 +1973,7 @@ public func (this: *AggregateTypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]
 }
 
 public func (this: *AggregateTypeInfo) getMethod(strings: *Strings, module: *Module, methodName: InternedString) : *Symbol {
+//getMethodCount += 1
     if(!this.sym) {
         return null
     }

@@ -35,3 +35,5 @@ bootstrap/*.pdb
 bootstrap/litacc
 /**/node_modules/**
 *.log
+bootstrap/output/litac_tests.exe
+bootstrap/output/litac_tests.pdb

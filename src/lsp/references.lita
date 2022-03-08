@@ -19,7 +19,7 @@ import "lsp/lsp"
 import "lsp/util"
 
 public func FindTokenByPosition(lsp: *LspServer, alloc: *const Allocator, doc: *Document, pos: Position) : Token {
-    var lex = LexerInit(doc.filename, doc.text.cStr(), alloc)
+    var lex = LexerInit(doc.filename, doc.text.cStr(), doc.text.length, alloc)
 
     var targetLine = pos.line + 1
     lsp.log("Searching for token at: %d:%d\n", pos.line, pos.character)

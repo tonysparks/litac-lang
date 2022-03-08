@@ -435,12 +435,16 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 
         var doc = lita.workspace.openedDocuments.get(uri)
         if(doc) {
-            module.text = doc.text.cStr()
+            module.text.buffer = doc.text.cStr()
+            module.text.length = doc.text.length
+            module.text.capacity = doc.text.length
         }
     }
 
-    if(!module.text) {
-        var status = ReadFile(module.id.filename, &module.text, lita.allocator)
+    if(!module.text.length) {
+        var length: i64;
+
+        var status = ReadFile(module.id.filename, &module.text.buffer, &length, lita.allocator)
         if(status == FileStatus.FileNotFoundError) {
             lita.result.addError(pos, "Could not open file '%s'\n", module.id.filename)
             return false
@@ -450,9 +454,12 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
             lita.result.addError(pos, "Could not read file '%s'\n", module.id.filename)
             return false
         }
+
+        module.text.length = length as (i32)
+        module.text.capacity = length as (i32)
     }
 
-    var parser = ParserInit(module.id.filename, module.text, lita)
+    var parser = ParserInit(module.id.filename, module.text.buffer, module.text.length, lita)
     var moduleStmt = parser.parseModule()
     module.ast = moduleStmt
     lita.totalSourceLines += parser.totalLines

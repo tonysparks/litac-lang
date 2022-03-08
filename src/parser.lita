@@ -72,6 +72,7 @@ public struct Parser {
 
 public func ParserInit(filename: *const char,
                        text: *const char,
+                       length: i64,
                        lita: *Lita) : Parser {
 
     var parser = Parser {
@@ -91,7 +92,7 @@ public func ParserInit(filename: *const char,
         .panicMode = false,
     }
 
-    var lex = LexerInit(filename, text, lita.allocator)
+    var lex = LexerInit(filename, text, length, lita.allocator)
     parser.tokens.init(1024, lita.allocator)
 
     while(!lex.eof()) {
@@ -354,7 +355,7 @@ func (p: *Parser) notes(notes: *Array<*NoteStmt>) : bool {
             do {
                 // TODO: This allows for garbage in the notes, is that OK?
                 if(p.check(TokenType.STRING)) {
-                    attributes.add(*p.advance())
+                    attributes.add(*p.advancep())
                 }
             }
             while(p.match(TokenType.COMMA));
@@ -2630,13 +2631,13 @@ func (p: *Parser) tryBitShiftRight(expr: *Expr) : *Expr {
         return null
     }
 
-    var prevToken = p.advance()
+    var prevToken = p.advancep()
     if(!p.check(TokenType.GREATER_THAN)) {
         p.rewind()
         return null
     }
 
-    var nextToken = p.advance()
+    var nextToken = p.advancep()
     if((nextToken.pos.position - prevToken.pos.position) == 1) {
         var right = p.term()
         return NewBinaryExpr(expr.startPos, p.pos(), expr, TokenType.RSHIFT, right, p.allocator)
@@ -2711,7 +2712,10 @@ func (p: *Parser) poisonDecl(pos: SrcPos) : *Decl {
     return NewPoisonDecl(pos, p.pos(), p.allocator)
 }
 
+@inline
 func (p: *Parser) pos() : SrcPos {
+    return p.tokens.elements[p.current].pos
+    /*
     if(!p.atEnd()) {
         return p.peek().pos
     }
@@ -2720,19 +2724,19 @@ func (p: *Parser) pos() : SrcPos {
         return SrcPos{}
     }
 
-    return p.tokens.last().pos
+    return p.tokens.last().pos*/
 }
 
 func (p: *Parser) prevPos() : SrcPos {
     return p.previous().pos
 }
 
-//@inline
+@inline
 func (p: *Parser) peek() : *Token {
-    assert(p.current >= 0 && p.current <= p.tokens.size())
+    /*assert(p.current >= 0 && p.current <= p.tokens.size())
     if(p.current >= p.tokens.size()) {
         return &p.tokens.elements[p.tokens.size() - 1]
-    }
+    }*/
     return &p.tokens.elements[p.current]
 }
 
@@ -2761,7 +2765,13 @@ func (p: *Parser) atEnd() : bool {
            p.peek().type == TokenType.END_OF_FILE
 }
 
-func (p: *Parser) advance() : *Token {
+func (p: *Parser) advance() {
+    if(!p.atEnd()) {
+        p.current += 1
+    }
+}
+
+func (p: *Parser) advancep() : *Token {
     if(!p.atEnd()) {
         p.current += 1
     }
@@ -2797,7 +2807,7 @@ func (p: *Parser) matches(types: *TokenType, len: i32) : bool {
 
 func (p: *Parser) consume(type: TokenType, errorCode: ErrorCode) : *Token {
     if(p.check(type)) {
-        return p.advance()
+        return p.advancep()
     }
 
     p.errorUnexpectedToken(p.peek(), errorCode)

@@ -1,0 +1,371 @@
+@raw("""
+
+#define __PRFCHWINTRIN_H
+#undef __attribute__
+#include <intrin.h>
+#include <emmintrin.h>
+#include <immintrin.h>
+//#include <immintrin.h>
+//#include <x86intrin.h>
+
+//#pragma intrinsic(__rdtsc)
+""");
+
+@foreign
+public union __m128i {
+    m128i_i8:   [16]i8;
+    m128i_i16:  [8]i16;
+    m128i_i32:  [4]i32;
+    m128i_i64:  [2]i64;
+    m128i_u8:   [16]u8;
+    m128i_u16:  [8]u16;
+    m128i_u32:  [4]u32;
+    m128i_u64:  [2]u64;
+}
+
+@foreign
+public struct __m128d {
+    m128d_f64: [2]f64;
+};
+
+
+@foreign
+public typedef u16 as __mmask16;
+
+@foreign
+func _rdtsc() : i64;
+
+@foreign
+func _mm_set1_epi8(b: char) : __m128i;
+
+@foreign
+func _mm_set1_epi16(s: i16) : __m128i;
+
+@foreign
+func _mm_loadu_si128(addr: *const __m128i) : __m128i;
+
+@foreign
+func _mm_loadu_si16(addr: *void) : __m128i;
+
+@foreign
+func _mm_cmpeq_epi8(a: __m128i, b: __m128i) : __m128i;
+@foreign
+func _mm_cmpeq_epi8_mask (a: __m128i, b: __m128i) : __mmask16;
+
+@foreign
+func _mm_or_si128(a: __m128i, b: __m128i) : __m128i;
+
+@foreign
+func _mm_movemask_epi8(a: __m128i) : i32;
+
+@foreign
+func _tzcnt_u32(a: u32) : u32;
+
+@foreign
+func _lzcnt_u32(a: u32) : u32;
+
+@foreign
+func _mm_store_si128(addr: *__m128i, a: __m128i);
+
+@foreign
+func _mm_popcnt_u32 (a: u32) : i32;
+
+@foreign
+func _mm_cmpistri (a: __m128i, b: __m128i, imm8: i32) : i32;
+@foreign
+func _mm_cmpestri (a: __m128i, la: i32, b: __m128i, lb: i32, imm8: i32) : i32;
+
+@foreign
+public const _SIDD_UBYTE_OPS:i32                // unsigned 8-bit characters
+@foreign
+public const _SIDD_UWORD_OPS:i32                // unsigned 16-bit characters
+@foreign
+public const _SIDD_SBYTE_OPS:i32                // signed 8-bit characters
+@foreign
+public const _SIDD_SWORD_OPS:i32                // signed 16-bit characters
+@foreign
+public const _SIDD_CMP_EQUAL_ANY:i32            // compare equal any
+@foreign
+public const _SIDD_CMP_RANGES:i32               // compare ranges
+@foreign
+public const _SIDD_CMP_EQUAL_EACH:i32           // compare equal each
+@foreign
+public const _SIDD_CMP_EQUAL_ORDERED:i32        // compare equal ordered
+@foreign
+public const _SIDD_NEGATIVE_POLARITY:i32        // negate results
+@foreign
+public const _SIDD_MASKED_NEGATIVE_POLARITY:i32 // negate results only before end of string
+@foreign
+public const _SIDD_LEAST_SIGNIFICANT:i32        // index only: return last significant bit
+@foreign
+public const _SIDD_MOST_SIGNIFICANT:i32         // index only: return most significant bit
+@foreign
+public const _SIDD_BIT_MASK:i32                 // mask only: return bit mask
+@foreign
+public const _SIDD_UNIT_MASK:i32                // mask only: return byte/word mask
+
+import "std/libc"
+
+
+@test
+func testCmp() {
+
+    //var str    = "hel*x/lothere!!!!xx"
+    //var str = "/* this is a comment in whichyyyy*/x"
+    //var str = "/*this is a comment in xxxyyyvx*nnnnn/want to find the end ofxx */start of new"
+
+    // test boundaries
+    //var str = "yyyyyyyyyyyyyyz*/xx/yy12345678901234567890*"
+
+    // test trailing with no ending
+    //var str = "yyyyyyyyyyyyyyz*"
+    // test trailing with ending
+    //var str = "yyyyyyyyyyyyyyz*/"
+
+    // test with carriage returns
+    var str = "\nhello\nthere*/\nthis is it"
+
+/*
+{
+    var mm = "x\ny\nzx\nxxxxx\nxxxxxxxxxxxxx"
+    var batch = _mm_loadu_si128(mm as (*__m128i))
+    var nl  = _mm_set1_epi8('\n');
+    //var mask = _mm_cmpeq_epi8_mask(batch, nl)
+    var mask = _mm_cmpeq_epi8(batch, nl)
+    var count = _mm_movemask_epi8(mask)
+    var pcount = _mm_popcnt_u32(count)
+    printf("Count: %d %d\n", count, pcount)
+}*/
+
+    var len = strlen(str)
+
+    var needle = "*/1234567890123456"
+    const match = _mm_loadu_si128(needle as (*__m128i))
+    const nl  = _mm_set1_epi8('\n');
+
+    var startTime = _rdtsc()
+
+    var data = str
+    var count = 0
+    var end = len - 16
+    var foundIndex = -1
+
+    var lineNumber = 0
+    var position = 0
+
+    while(count < end) {
+        var batch = _mm_loadu_si128(data as (*__m128i))
+
+        var mask = _mm_cmpeq_epi8(batch, nl)
+        var count = _mm_movemask_epi8(mask)
+        if(count) {
+            var pcount = _mm_popcnt_u32(count)
+            lineNumber += pcount
+            position   = _lzcnt_u32(count) as (i32) - 16
+            printf("Position: %d\n", _lzcnt_u32(count))
+        }
+
+        var result = _mm_cmpestri(match, 2, batch, 16, _SIDD_UBYTE_OPS|_SIDD_CMP_EQUAL_ORDERED|_SIDD_LEAST_SIGNIFICANT|_SIDD_BIT_MASK)
+        if(result < 15 || (result == 15 && data[16] == '/')) {
+            data = data + result + 2
+            position += result + 2
+
+            goto found;
+        }
+
+        count += 16
+        data  += 16
+        position += 16
+    }
+
+    //printf("Using slow..\n")
+    for(var i = count; i < len; i+=1) {
+        if(str[i] == '*' && str[i + 1] == '/') {
+            data = str + i + 2
+            goto found;
+        }
+    }
+    goto not_found;
+
+    found:
+    {
+        var endTime = _rdtsc()
+        printf("Found: %s => %lld at: %d:%d \n", data, endTime - startTime, lineNumber, position)
+        return;
+    }
+    not_found:
+    {
+        var endTime = _rdtsc()
+        printf("NOT Found => %lld at: %d:%d\n", endTime - startTime, lineNumber, position)
+        return;
+    }
+}
+
+//@test
+func testIntrinsics() {
+    //var str = "/* this is a comment in whichx*/want to find the end ofxx */start of new"
+    var str = "/* this is a comment in whichyyyy*/x"
+
+    var star  = _mm_set1_epi8('*');
+    var slash = _mm_set1_epi8('/');
+
+    var data = str
+    var len = strlen(str)
+    var end = len - 16
+    var count = 0
+    while(count < end) {
+        var value: [16]u8;
+        var batch = _mm_loadu_si128(data as (*__m128i))
+
+        var testSlash = _mm_cmpeq_epi8(batch, slash)
+        var slashCheck = _mm_movemask_epi8(testSlash)
+        if(slashCheck) {
+            var offset = _tzcnt_u32(slashCheck)
+
+            printf("OFFSET: %d %c  check: %d\n", offset, data[offset], slashCheck)
+            if((data + offset) != str && str[count + offset - 1] == '*') {
+                data += offset + 1 as (i32)
+                goto found;
+            }
+            else {
+                for(var i = offset + 1; i < 16; i+=1) {
+                    var c = data[i]
+                    if(c == '*' && data[i + 1] == '/') {
+                        printf("From loop\n")
+                        data += i + 2
+                        goto found;
+                    }
+                }
+            }
+
+
+        }
+/*
+        _mm_store_si128(value as (*__m128i), testSlash)
+        printf("Slash: %d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d\n",
+            value[0],value[1],value[2],value[3],value[4],value[5],value[6],value[7],
+            value[8],value[9],value[10],value[11],value[12],value[13],value[14],value[15])
+
+        var test = _mm_or_si128(testStar, testSlash)
+        var check = _mm_movemask_epi8(test)
+
+        var advance = _tzcnt_u32(check)
+        _mm_store_si128(value as (*__m128i), test)
+
+        printf("Test: %d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d.%d vs %d => %d\n",
+            value[0],value[1],value[2],value[3],value[4],value[5],value[6],value[7],
+            value[8],value[9],value[10],value[11],value[12],value[13],value[14],value[15],
+            check, advance)
+*/
+        count += 16
+        data  += 16
+    }
+
+    for(var i = count; i < len; i+=1) {
+        var c = str[i]
+        if(c == '*' && str[i + 1] == '/') {
+            data = str + i + 2
+            goto found;
+        }
+    }
+
+    goto end;
+
+    found:
+    printf("Found ending: %s\n", data)
+    end:
+
+    //var t = _rdtsc()
+    //printf("Time: %lld %s\n", _rdtsc() - t, x)
+}
+
+
+//@test
+func testSlowTimed() {
+    var str = "/* this is a comment in whichx*x/want to find the end ofxx */start of new"
+    //var str = "/* this is a comment in whichyyyy*/x"
+
+    var len = strlen(str)
+
+    var startTime = _rdtsc()
+    var data: *const char = null
+
+    for(var i = 0; i < len; i+=1) {
+        if(str[i] == '*' && str[i + 1] == '/') {
+            data = str + i + 2
+            break;
+        }
+    }
+
+    if(data) {
+        var endTime = _rdtsc()
+        printf("Found: %s => %lld\n", data, endTime - startTime)
+    }
+    else {
+        var endTime = _rdtsc()
+        printf("NOT Found => %lld\n", endTime - startTime)
+    }
+}
+
+//@test
+func testIntrinsicsTimed() {
+    var str = "/* this is a comment in whichx*x/want to find the end ofxx */start of new"
+    //var str = "/* this is a comment in whichyyyy*/x"
+
+    var len = strlen(str)
+
+    var startTime = _rdtsc()
+    var slash = _mm_set1_epi8('/');
+
+    var data = str
+    var end = len - 16
+    var count = 0
+
+    while(count < end) {
+        var batch = _mm_loadu_si128(data as (*__m128i))
+
+        var testSlash = _mm_cmpeq_epi8(batch, slash)
+        var slashCheck = _mm_movemask_epi8(testSlash)
+        if(slashCheck) {
+            var offset = _tzcnt_u32(slashCheck)
+
+            if((data + offset) != str && str[count + offset - 1] == '*') {
+                data += offset + 1 as (i32)
+                goto found;
+            }
+            else {
+                for(var i = offset + 1; i < 16; i+=1) {
+                    var c = data[i]
+                    if(c == '*' && data[i + 1] == '/') {
+                        data += i + 2
+                        goto found;
+                    }
+                }
+            }
+        }
+
+        count += 16
+        data  += 16
+    }
+
+    for(var i = count; i < len; i+=1) {
+        var c = str[i]
+        if(c == '*' && str[i + 1] == '/') {
+            data = str + i + 2
+            goto found;
+        }
+    }
+
+    goto end;
+
+    found:
+        var endTime = _rdtsc()
+        printf("Found ending: %s  => %lld\n", data, endTime - startTime)
+        return;
+
+    end:
+        var endTime2 = _rdtsc()
+        printf("Ending not found => %lld\n", endTime2 - startTime)
+
+    //printf("Time: %lld %s\n", _rdtsc() - t, x)
+}

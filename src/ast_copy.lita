@@ -737,7 +737,7 @@ public func CopyTypedefDecl(decl: *TypedefDecl, lita: *Lita) : *TypedefDecl {
 }
 
 public func AstInsertText(node: *Node, text: *const char, index: i32, lita: *Lita) {
-    var parser = ParserInit(node.startPos.filename, text, lita)
+    var parser = ParserInit(node.startPos.filename, text, strlen(text), lita)
     var stmt = parser.statement()
 
     AstInsert(node, stmt, index, lita)

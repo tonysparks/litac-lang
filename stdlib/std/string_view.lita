@@ -24,7 +24,7 @@ public func StringViewInit(str: *const char, len: i32 = -1) : StringView {
 public func (b: StringView) hash() : u32 {
     var hash = 5381_u32;
     for(var i = 0; i < b.length; i+=1) {
-        hash = ((hash << 5_u32) + hash) ^ ((b.buffer[i]) as (u32));
+        hash = ((hash << 5_u32) + hash) + ((b.buffer[i]) as (u32));
     }
     return hash;
 }
