@@ -1,0 +1,20 @@
+import "std/libc"
+
+public const MAX_I8:i32  =  (1<<7)
+public const MIN_I8:i32  = ~(1<<7)
+
+public const MAX_I16:i32 =  (1<<15)
+public const MIN_I16:i32 = ~(1<<15)
+
+public const MAX_I32:i32 =  (1<<31)
+public const MIN_I32:i32 = ~(1<<31)
+
+public const MAX_I64:i64 =  (1_i64<<63_i64)
+public const MIN_I64:i64 = ~(1_i64<<63_i64)
+
+
+public const MAX_U8:u32  =  (1<<8)  - 1
+public const MAX_U16:u32 =  (1<<16) - 1
+public const MAX_U32:u64 =  (1_i64<<32_i64) - 1_i64
+// TODO
+//public const MAX_U64:u64 =  0xFFFF_FFFF_FFFF_FFFF

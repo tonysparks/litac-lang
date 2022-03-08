@@ -41,9 +41,9 @@ public func (this: *Atomic<T>) get<T>() : T {
 }
 
 public func (this: *Atomic<T>) getAdd<T>(amount: T) : T {
-    return atomic_fetch_add<T>(&this.value)
+    return atomic_fetch_add<T>(&this.value, amount)
 }
 
 public func (this: *Atomic<T>) getSub<T>(amount: T) : T {
-    return atomic_fetch_sub<T>(&this.value)
+    return atomic_fetch_sub<T>(&this.value, amount)
 }

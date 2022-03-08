@@ -1,0 +1,179 @@
+import "std/string_buffer"
+import "std/string_view"
+import "std/libc"
+import "std/web/mongoose"
+import "std/mem"
+import "std/map"
+
+
+
+@get_request("/api/beers/*")
+func GetBeers(ctx: *WebContext) : i32 {
+    ctx.response.body.append("Here in Beers!\n")
+    return 200
+}
+
+@get_request("/api/cups/*")
+func GetCup(ctx: *WebContext) : i32{
+    ctx.response.body.append("Here in Cup!\n")
+    return 200
+}
+
+
+@doc("Callback function from a web request annotation")
+public typedef func(*WebContext): i32 as WebController;
+
+
+/**
+    This will scan all symbols for web annotations.  Functions annotated with
+    'get_request', 'delete_request', 'post_request', 'put_request' or 'web_request'
+    are automatically bound to a URI and incoming web requests are matched against
+    these annotations.  If a match is found, the corresponding WebController is
+    called.
+*/
+#precheck
+    var symbols = getSymbolsByNote("get_request")
+    emitClear()
+    
+    emit("public func GetWebController(msg: *mg_http_message) : WebController {")
+    
+    for(sym in symbols) {
+        if(sym.kind == "FUNC_DECL") {
+            //var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
+            var attr = sym.notes[0].attributes
+            if(attr) {
+                // TODO: Method
+                // TODO: output length of string
+                var value = attr[0]
+                //print(value, " ", value.name, "\n")
+                emit("\n\tif(mg_match(msg.uri, mg_strx(\"%s\"), null)) return %s;", value.name, sym.name)
+            }
+            
+
+        }
+        
+        
+    }
+    emit("\n\treturn Web404Controller;\n")
+    emit("} ")
+    
+    addDeclaration(getCurrentModuleFilename(), emitStr())
+    
+    
+    /// DELETE
+    
+#end
+
+func Web404Controller(ctx: *WebContext) : i32 {
+    return 404
+}
+
+public struct WebContext {
+    conn: *mg_connection
+    request: *WebRequest
+    response: *WebResponse
+}
+
+public const MAX_HTTP_HEADERS = MG_MAX_HTTP_HEADERS;
+
+public struct WebHeader {
+    //name: StringView
+    //value: StringBuffer
+    value: *const char
+}
+
+public struct WebRequest {
+    msg: *mg_http_message
+}
+
+public struct WebResponse {
+    status: i32
+    headers: Map<*const char, WebHeader>
+    body: StringBuffer
+}
+
+public struct WebConfig {
+    addr: *const char = "http://0.0.0.0:8080"
+    poll: i32
+}
+
+public enum WebStatus {
+    OK,
+    ERROR,
+}
+
+public struct WebServer {
+    allocator: *const Allocator
+    mg: mg_mgr
+    poll: i32
+}
+
+
+@doc("""
+    Initializes the web server
+""")
+public func (this: *WebServer) init(config: *WebConfig, 
+                                    allocator: *const Allocator = defaultAllocator) : WebStatus {
+    this.allocator = allocator
+    mg_mgr_init(&this.mg)
+    mg_http_listen(&this.mg, config.addr, WebCallbackFn, this)
+    return WebStatus.OK
+}
+
+@doc("""
+    Starts the web server, blocks indefinetly
+""")
+public func (this: *WebServer) start() {
+    for(;;) {
+        mg_mgr_poll(&this.mg, this.poll)
+    }
+    
+    mg_mgr_free(&this.mg)
+}
+
+
+/**
+    Handle a mongoose event, this will just delegate to a WebController
+    which are registered via the precheck script
+*/
+func WebCallbackFn(conn: *mg_connection, ev: i32, ev_data: *void, fn_data: *void) {
+    var server = fn_data as (*WebServer)
+    
+    if(ev == MgEvent.MG_EV_HTTP_MSG) {
+        var msg = ev_data as (*mg_http_message)
+        
+        var request = WebRequest {
+            .msg = msg
+        }
+        
+        var response = WebResponse {}
+        response.headers = StrMap<WebHeader>(WebHeader{}, 16, server.allocator)
+        response.body.init(1024, server.allocator)
+        
+        var context = WebContext {
+            .conn = conn,
+            .request = &request,
+            .response = &response
+        }
+        
+        var controller = GetWebController(msg)
+        response.status = controller(&context)
+     
+        mg_http_reply(conn, response.status, "", response.body.cStr());     
+    }
+}
+
+
+
+func main(len: i32, args: **char) : i32 {
+    var server: WebServer;
+    var config = WebConfig{}
+    printf("Starting http server: %s\n", config.addr)
+    
+    server.init(&config)
+    
+    server.start()
+    
+    printf("Terminated http server")
+    return 0
+}
