@@ -45,7 +45,7 @@
         {
             "name": "Offset of packed struct",
             "buildCmd": "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
-            "disabled": false,
+            "disabled": true,
             "definitions": `
                 import "std/io"
 
