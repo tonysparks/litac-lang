@@ -998,7 +998,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
             var sym = this.getType(nameSpec, isFunc)
             if(!sym) {
                 sym = this.currentScope().lookup(nameSpec.name)
-
+                if(!sym) {
                     this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
                     goto err;
                 }
