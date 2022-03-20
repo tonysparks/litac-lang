@@ -923,12 +923,16 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
         return defaultName
     }
 
-    if(note.attributes.empty()) {
+    if(note.arguments.empty()) {
         return defaultName
     }
 
-    var arg = note.attributes.get(0)
-    return arg.str;
+    var arg = note.arguments.get(0)
+    if(!arg.argExpr) {
+        return defaultName
+    }
+
+    return arg.argExpr.operand.val.str;
 }
 
 /**
@@ -1062,6 +1066,10 @@ func (this: using *CGen) flush() {
     }
 }
 
+func (this: using *CGen) emitNameStr(name: StringView) {
+    buf.appendStrn(name.buffer, name.length)
+}
+
 func (this: using *CGen) emitName(id: Identifier) {
     var tok = id.token
     if(tok.type != TokenType.ERROR) {
@@ -1179,68 +1187,87 @@ func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bool = tr
 }
 
 func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
-    if(strncmp(note.name.str.buffer, "include", note.name.str.length) == 0) {
-        for(var i = 0; i < note.attributes.size(); i += 1) {
-            var attr = note.attributes.get(i)
-            if(attr.str.length > 0 && attr.str.buffer[0] == '<') {
-                this.emit("#include %.*s\n", attr.str.length, attr.str.buffer)
-            }
-            else {
-                this.emit("#include \"%.*s\"\n", attr.str.length, attr.str.buffer)
+    if(note.type.name.equals(&INCLUDE)) {
+        for(var i = 0; i < note.arguments.size(); i += 1) {
+            var attr = note.arguments.get(i)
+            if(!attr.argExpr) {
+                continue
             }
 
+            var value = attr.argExpr.operand.val.str
+
+            if(value.length > 0 && value.buffer[0] == '<') {
+                this.emit("#include %.*s\n", value.length, value.buffer)
+            }
+            else {
+                this.emit("#include \"%.*s\"\n", value.length, value.buffer)
+            }
         }
     }
-    else if(strncmp(note.name.str.buffer, "raw", note.name.str.length) == 0) {
-        for(var i = 0; i < note.attributes.size(); i += 1) {
-            var attr = note.attributes.get(i)
-            buf.appendStrn(attr.str.buffer, attr.str.length)
+    else if(note.type.name.equals(&RAW)) {
+        for(var i = 0; i < note.arguments.size(); i += 1) {
+            var attr = note.arguments.get(i)
+            if(!attr.argExpr) {
+                continue
+            }
+
+            var value = attr.argExpr.operand.val.str
+            buf.appendStrn(value.buffer, value.length)
         }
     }
-    else if(strncmp(note.name.str.buffer, "inline", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&INLINE)) {
         this.emitStr("LITAC_INLINE ")
     }
-    else if(strncmp(note.name.str.buffer, "noinline", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&NOINLINE)) {
         this.emitStr("LITAC_NOINLINE ")
     }
-    else if(strncmp(note.name.str.buffer, "static", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&STATIC)) {
         this.emitStr("static ")
     }
-    else if(strncmp(note.name.str.buffer, "atomic", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&ATOMIC)) {
         this.emitStr("_Atomic ")
     }
-    else if(strncmp(note.name.str.buffer, "register", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&REGISTER)) {
         this.emitStr("register ")
     }
-    else if(strncmp(note.name.str.buffer, "threadlocal", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&THREADLOCAL)) {
         this.emitStr("LITAC_THREADLOCAL ")
     }
-    else if(strncmp(note.name.str.buffer, "export", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&EXPORT)) {
         this.emitStr("LITAC_EXPORT ")
         // TODO
     }
-    else if(strncmp(note.name.str.buffer, "packed", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&PACKED)) {
         this.emitStr("LITAC_PACKED ")
     }
-    else if(strncmp(note.name.str.buffer, "cc", note.name.str.length) == 0) {
-        if(!note.attributes.empty()) {
-            var attr = note.attributes.get(0)
-            this.emitStrn(attr.str.buffer, attr.str.length)
-            this.emitStrn(" ", 1)
+    else if(note.type.name.equals(&CC)) {
+        if(!note.arguments.empty()) {
+            var attr = note.arguments.get(0)
+            if(attr.argExpr) {
+                var value = attr.argExpr.operand.val.str
+                this.emitStrn(value.buffer, value.length)
+                this.emitStrn(" ", 1)
+            }
         }
     }
-    else if(strncmp(note.name.str.buffer, "cFile", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&CFILE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
         var filenameStr = StringInit(filename, MAX_PATH)
         var filedata = [BUFFER_SIZE]char{0};
 
-        for(var i = 0; i < note.attributes.size(); i += 1) {
-            var arg = note.attributes.get(i)
+        for(var i = 0; i < note.arguments.size(); i += 1) {
+            var arg = note.arguments.get(i)
+            if(!arg.argExpr) {
+                continue
+            }
+
+            var value = arg.argExpr.operand.val.str
+
             FilePath(note.startPos.filename, filename)
 
             filenameStr.adjust()
-            filenameStr.append("/%.*s", arg.str.length, arg.str.buffer)
+            filenameStr.append("/%.*s", value.length, value.buffer)
 
             if(!FileExists(filenameStr.cStr())) {
                 // TODO:
@@ -1248,7 +1275,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 //      check working directory
                 //      check lib directory
                 //printf("FilePath: '%s'\n", filename)
-                this.result.addError(note.startPos, "unable to locate file: '%.*s'", arg.str.length, arg.str.buffer)
+                this.result.addError(note.startPos, "unable to locate file: '%.*s'", value.length, value.buffer)
                 continue;
             }
 
@@ -1256,7 +1283,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             defer if(file) fclose(file)
 
             if(!file) {
-                this.result.addError(note.startPos, "unable to open file: '%.*s'", filename)
+                this.result.addError(note.startPos, "unable to open file: '%s'", filename)
                 continue;
             }
 
@@ -1271,18 +1298,24 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             this.emitStrn("\n", 1)
         }
     }
-    else if(strncmp(note.name.str.buffer, "cInclude", note.name.str.length) == 0) {
+    else if(note.type.name.equals(&CINCLUDE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
         var filenameStr = StringInit(filename, MAX_PATH)
         var filedata = [BUFFER_SIZE]char{0};
 
-        for(var i = 0; i < note.attributes.size(); i += 1) {
-            var arg = note.attributes.get(i)
+        for(var i = 0; i < note.arguments.size(); i += 1) {
+            var arg = note.arguments.get(i)
+            if(!arg.argExpr) {
+                continue
+            }
+
+            var value = arg.argExpr.operand.val.str
+
             FilePath(note.startPos.filename, filename)
 
             filenameStr.adjust()
-            filenameStr.append("/%.*s", arg.str.length, arg.str.buffer)
+            filenameStr.append("/%.*s", value.length, value.buffer)
 
             if(!FileExists(filenameStr.cStr())) {
                 // TODO:
@@ -1290,7 +1323,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 //      check working directory
                 //      check lib directory
                 //printf("FilePath: '%s'\n", filename)
-                this.result.addError(note.startPos, "unable to locate file: '%.*s'", arg.str.length, arg.str.buffer)
+                this.result.addError(note.startPos, "unable to locate file: '%.*s'", value.length, value.buffer)
                 continue;
             }
 
@@ -1300,7 +1333,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 }
 
 func (this: using *CGen) emitPostludeNote(note: *NoteStmt) {
-    if(strncmp(note.name.str.buffer, "packed", note.name.str.length) == 0) {
+    if(note.type.name.equals(&PACKED)) {
         this.emitStr(" LITAC_PACKED_POP ")
     }
 }
@@ -1308,14 +1341,14 @@ func (this: using *CGen) emitPostludeNote(note: *NoteStmt) {
 func (this: using *CGen) emitFieldName(field: FieldStmt) {
     assert(field.kind != StmtKind.POISON_EXPR)
     var alias = field.varField.decl.getNote("alias")
-    if(alias && alias.attributes.size()) {
-        var name = alias.attributes.get(0)
-        this.emit("%.*s", name.value.str.length, name.value.str.buffer)
+    if(alias && alias.arguments.size()) {
+        var name = alias.arguments.get(0)
+        if(name.argExpr) {
+            this.emitNameStr(name.argExpr.operand.val.str)
+            return;
+        }
     }
-    else {
-        this.emitName(field.varField.name)
-    }
-
+    this.emitName(field.varField.name)
 }
 
 func (this: using *CGen) emitSymbol(sym: *Symbol) {
@@ -1667,20 +1700,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.NOTE_STMT: {
-            var stmt = s as (*NoteStmt)
-            this.emitStrn("@", 1)
-            this.emitName(stmt.name)
-            if(!stmt.attributes.empty()) {
-                this.emitStrn("(", 1)
-                for(var i = 0; i < stmt.attributes.size(); i += 1) {
-                    if(i > 0) this.emitStrn(", ", 2)
-                    this.emitStrn("'", 1)
-                    var n = stmt.attributes.get(i)
-                    this.emit("%.*s", n.value.str.length, n.value.str.buffer)
-                    this.emitStrn("'", 1)
-                }
-                this.emitStrn(")", 1)
-            }
+            assert(false)
             return;
         }
         case StmtKind.PARAMETERS_STMT: {
@@ -1756,11 +1776,14 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")
-            if(aliasNote && !aliasNote.attributes.empty()) {
-                var aliasName = aliasNote.attributes.get(0)
+            if(aliasNote && !aliasNote.arguments.empty()) {
+                var aliasName = aliasNote.arguments.get(0)
+                if(aliasName.argExpr) {
+                    var value = aliasName.argExpr.operand.val.str
 
-                nameStr.clear()
-                nameStr.setStrn(aliasName.str.buffer, aliasName.str.length)
+                    nameStr.clear()
+                    nameStr.setStrn(value.buffer, value.length)
+                }
             }
 
             this.emitStr(this.cTypeDecl(decl.type.typeInfo, nameStr.cStrConst()))
@@ -1778,11 +1801,14 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")
-            if(aliasNote && !aliasNote.attributes.empty()) {
-                var aliasName = aliasNote.attributes.get(0)
+            if(aliasNote && !aliasNote.arguments.empty()) {
+                var aliasName = aliasNote.arguments.get(0)
+                if(aliasName.argExpr) {
+                    var value = aliasName.argExpr.operand.val.str
 
-                nameStr.clear()
-                nameStr.setStrn(aliasName.str.buffer, aliasName.str.length)
+                    nameStr.clear()
+                    nameStr.setStrn(value.buffer, value.length)
+                }
             }
 
             this.emitStr(this.cTypeDecl(decl.type.typeInfo, nameStr.cStrConst()))

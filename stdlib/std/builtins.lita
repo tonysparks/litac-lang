@@ -5,6 +5,71 @@ public struct any {
     id: typeid
 }
 
+/**
+========================================================================
+Note declarations
+========================================================================
+*/
+public struct foreign {
+    alias: *const char
+}
+
+public struct alias {
+    alias: *const char
+}
+
+public struct include {
+    value: *const char
+}
+
+public struct static {
+}
+
+public struct raw {
+    value: *const char
+}
+
+public struct cFile {
+}
+
+public struct doc {
+    value: *const char
+}
+
+public struct asStr {
+    name: *const char
+}
+
+public struct inline {
+}
+
+public struct no_profile {
+}
+
+public struct profile {
+    value: *const char
+}
+
+public struct generated {
+}
+
+public struct module_init {
+}
+
+public struct module_destroy {
+}
+
+public struct threadlocal {
+}
+
+public struct test {
+    name: *const char
+}
+
+public struct packed {
+}
+
+//=====================================================================================
 
 /*
 #if (REFLECTION)
@@ -43,8 +108,8 @@ public struct any {
             // Look to see if there is a custom name in the enums note
             if(sym.notes) {
                 for(note in sym.notes) {
-                    if(note.name == "asStr" && note.attributes) {
-                        symName = note.attributes[0].name
+                    if(note.name == "asStr" && note.arguments) {
+                        symName = note.arguments[0].value
                     }
                 }
             }
@@ -65,8 +130,8 @@ public struct any {
                 // Look to see if there is a custom name for the field
                 if(field.notes) {
                     for(note in field.notes) {
-                        if(note.name == "asStr" && note.attributes) {
-                            valueName = note.attributes[0].name
+                        if(note.name == "asStr" && note.arguments) {
+                            valueName = note.arguments[0].value
                         }
                         //else if(note.name == "alias" && note.attributes) {
                         //    fieldName = note.attributes[0].name

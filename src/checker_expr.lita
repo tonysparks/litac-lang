@@ -134,12 +134,12 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
 func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
 
-    var type = this.resolveTypeSpec(expr.type)
+    var type = this.resolveTypeSpec(expr.type, .isFunc = true)
     if(!type) {
-        this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
+        this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
-
+// TODO: must we check types for FUNC_PTR?
     var sym = type.sym
     if(type.kind == TypeKind.FUNC_PTR) {
         var funcSym = this.currentScope().lookup(expr.type.name)
@@ -613,7 +613,9 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
     var type = expr.object.operand.typeInfo
 
-    assert(IsFuncLike(type))
+    if(!IsFuncLike(type)) {
+        goto err;
+    }
 
     // if this is still a generic template, we haven't completely inferred all
     // generic parameters
@@ -1440,18 +1442,22 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
 func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTypeInfo) : bool {
     assert(expr != null)
 
+    if(!aggInfo || !IsAggregate(aggInfo)) {
+        return false
+    }
+
     // If this was already processed as a method, we'll need to determine
     // if this is a generic symbol and must be re-resolved - this happens
     // during type inference for methods -- @see resolveFuncCallExpr and inferFuncCallExpr
     if(expr.flags & GetExprFlags.IS_METHOD_CALL) {
-        var funcSym = this.getType(expr.field.type)
+        var funcSym = this.getType(expr.field.type, .isFunc = true)
         if(!funcSym) {
             // TODO: mark an error?
             return false
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
-            var typeInfo = this.resolveTypeSpec(expr.field.type)
+            var typeInfo = this.resolveTypeSpec(expr.field.type, .isFunc = true)
             if(!typeInfo) {
                 // TODO: mark an error?
                 return false;
@@ -1484,7 +1490,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
-            typeInfo = this.resolveTypeSpec(expr.field.type)
+            typeInfo = this.resolveTypeSpec(expr.field.type, .isFunc = true)
             if(!typeInfo) {
                 // TODO: mark an error?
                 return false
@@ -1504,9 +1510,16 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
             var varField = field.varField
             if(varField.attributes.isUsing) {
                 var baseType = field.typeInfo.getBaseType()
+
+                // avoid inifinite recursion
+                if(baseType.strictEquals(aggInfo)) {
+                    continue
+                }
+
                 if(this.checkMethodExpr(expr, baseType as (*AggregateTypeInfo))) {
                     return true
                 }
+
             }
         }
     }
@@ -1748,7 +1761,7 @@ func (this: *TypeChecker) resolveArrayDesignationExpr(expr: *ArrayDesignationExp
     if(expr.index.kind == StmtKind.IDENTIFIER_EXPR) {
         var idExpr = expr.index as (*IdentifierExpr)
         if(idExpr.sym != null && !(idExpr.sym.flags & SymbolFlags.IS_CONSTANT)) {
-            this.result.addError(expr.index.startPos, "'%s' must be a constant", idExpr.sym.name)
+            this.result.addError(expr.index.startPos, "'%.*s' must be a constant", idExpr.sym.name.length, idExpr.sym.name.buffer)
             return false
         }
     }
@@ -2137,7 +2150,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
         sym = idExpr.sym
 
         if(sym && (sym.flags & SymbolFlags.IS_TYPE)) {
-            this.result.addError(expr.startPos, "can't reassign type '%s'", sym.name)
+            this.result.addError(expr.startPos, "can't reassign type '%.*s'", sym.name.length, sym.name.buffer)
             return false
         }
     }
@@ -2157,7 +2170,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     }
 
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
-        this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)
+        this.result.addError(expr.startPos, "can't reassign constant variable '%.*s'", sym.name.length, sym.name.buffer)
         return false
     }
 
@@ -2194,16 +2207,18 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
 
     var sym = this.currentScope().lookup(expr.type.name)
     if(!sym) {
-        this.result.addError(expr.startPos, "unknown variable '%s'", expr.type.name)
-        return false
+        sym = this.currentScope().lookupFunc(expr.type.name)
+        if(!sym) {
+            this.result.addError(expr.startPos, "unknown variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
+            return false
+        }
     }
 
     // Account for Type Expressions such as sizeof(Array<i32>) which should
     // really be sizeof(:Array<i32>)  ...Do we still want to support the former
     // syntax?
     var typeInfo: *TypeInfo = sym.type
-    if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE &&
-       !expr.type.genericArgs.empty()) {
+    if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE && !expr.type.genericArgs.empty()) {
         typeInfo = this.resolveTypeSpec(expr.type)
         if(!typeInfo || typeInfo == &POISON_TYPE) {
             this.result.addError(expr.startPos, "unknown type '%s'", expr.type.name)
@@ -2214,6 +2229,11 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
 
     expr.sym = sym
     expr.operand.typeInfo = typeInfo
+
+    if(!expr.operand.typeInfo) {
+        this.result.addError(expr.startPos, "unknown type or variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        return false
+    }
 
     this.lita.references.addSymbolReference(sym, expr.startPos)
 

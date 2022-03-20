@@ -55,7 +55,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
         }
 
         if(profileAll || sym.decl.hasNote("profile")) {
-            sb.append("    %.*s__%s,\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+            sb.append("    %.*s__%.*s,\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
             numOfProfiled += 1
         }
     }
@@ -81,12 +81,12 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
         if(profileAll || sym.decl.hasNote("profile")) {
             sb.append("""
                 ProfileEntry {
-                    .functionName = "%.*s::%s",
+                    .functionName = "%.*s::%.*s",
                     .count = 0_u64,
                     .startTime = 0_f64,
                     .totalTime = 0_f64,
                 },
-            """,  sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+            """,  sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
         }
     }
     sb.append("\n}\n")
@@ -145,21 +145,21 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             var alias = AstAddImport(lita, checker, sym.declared, module)
             if(alias) {
                 sb.clear()
-                sb.append("defer %s::StopWatch(%s::ProfileTag.%.*s__%s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                sb.append("defer %s::StopWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
                 AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
 
                 sb.clear()
-                sb.append("%s::StartWatch(%s::ProfileTag.%.*s__%s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                sb.append("%s::StartWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
                 AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
 
             }
             else {
                 sb.clear()
-                sb.append("defer StopWatch(ProfileTag.%.*s__%s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                sb.append("defer StopWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
                 AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
 
                 sb.clear()
-                sb.append("StartWatch(ProfileTag.%.*s__%s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name)
+                sb.append("StartWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
                 AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
             }
         }

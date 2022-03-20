@@ -95,7 +95,8 @@ public struct Scope {
     allocator: *const Allocator
     result: *PhaseResult
     parent: *Scope
-    symbols: using Map<InternedString, *Symbol>
+    symbolTypes: Map<InternedString, *Symbol>
+    symbolFuncs: Map<InternedString, *Symbol>
 
     module: *Module // TEMP
 }
@@ -114,20 +115,30 @@ public func (scope: *Scope) init(kind: ScopeKind,
     scope.allocator = allocator
     scope.parent = parent
     scope.result = result
-    scope.symbols = InternMap<*Symbol>(null, 16, allocator)
-
-/* TODO: Fix Named Args bug
-    scope.symbols.init(.emptyValue: null,
-                       .initialSize: 16,
-                       .hashFn: PtrHashFn<usize>,
-                       .equalFn: PtrEqualFn<usize>,
-                       .alloc: allocator)
-*/
+    scope.symbolTypes = InternMap<*Symbol>(null, 16, allocator)
+    scope.symbolFuncs = InternMap<*Symbol>(null, 16, allocator)
 }
 
+public func (s: *Scope) lookupFunc(name: InternedString) : *Symbol {
+    var sym = s.symbolFuncs.get(name)
+    if(sym) {
+        return sym
+    }
+
+    if(!s.parent) {
+        return null
+    }
+
+    return s.parent.lookupFunc(name)
+}
 
 public func (s: *Scope) lookup(name: InternedString) : *Symbol {
-    var sym = s.symbols.get(name)
+    var sym = s.symbolFuncs.get(name)
+    if(sym) {
+        return sym
+    }
+
+    sym = s.symbolTypes.get(name)
     if(sym) {
         return sym
     }
@@ -151,15 +162,28 @@ public func (s: *Scope) lookupByToken(name: Token) : *Symbol {
 public func (this: *Scope) importSymbol(name: InternedString,
                                         symbol: *Symbol) {
 
-    if(this.symbols.contains(name) && !symbol.decl.hasNote("generated")) {
-        var existingSym = this.symbols.get(name)
-        var decl = existingSym.decl
-        this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
-            name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
-        return;
-    }
+    if(symbol.kind == SymbolKind.FUNC) {
+        if(this.symbolFuncs.contains(name) && !symbol.decl.hasNote("generated")) {
+            var existingSym = this.symbolFuncs.get(name)
+            var decl = existingSym.decl
+            this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
+                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+            return;
+        }
 
-    this.symbols.put(name, symbol)
+        this.symbolFuncs.put(name, symbol)
+    }
+    else {
+        if(this.symbolTypes.contains(name) && !symbol.decl.hasNote("generated")) {
+            var existingSym = this.symbolTypes.get(name)
+            var decl = existingSym.decl
+            this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
+                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+            return;
+        }
+
+        this.symbolTypes.put(name, symbol)
+    }
 }
 
 public func (this: *Scope) addSymbol(name: InternedString,
@@ -167,12 +191,25 @@ public func (this: *Scope) addSymbol(name: InternedString,
                                      decl: *Decl,
                                      flags: i32) : *Symbol {
 
-    if(this.symbols.contains(name) && !decl.hasNote("generated")) {
-        var existingSym = this.symbols.get(name)
-        var decl = existingSym.decl
-        this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
-            name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
-        return null;
+    var isFunc = decl.kind == StmtKind.FUNC_DECL
+
+    if(isFunc) {
+        if(this.symbolFuncs.contains(name) && !decl.hasNote("generated")) {
+            var existingSym = this.symbolFuncs.get(name)
+            var decl = existingSym.decl
+            this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
+                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+            return null;
+        }
+    }
+    else {
+        if(this.symbolTypes.contains(name) && !decl.hasNote("generated")) {
+            var existingSym = this.symbolTypes.get(name)
+            var decl = existingSym.decl
+            this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
+                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+            return null;
+        }
     }
 
     var isNewType = (decl.kind == StmtKind.FUNC_DECL   ||
@@ -251,7 +288,13 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
     decl.sym = sym
 
-    this.symbols.put(sym.name, sym)
+    if(isFunc) {
+        this.symbolFuncs.put(sym.name, sym)
+    }
+    else {
+        this.symbolTypes.put(sym.name, sym)
+    }
+
     return sym
 }
 
@@ -259,9 +302,18 @@ public func (this: *Scope) addSymbol(name: InternedString,
 // TEMP
 public func (this: *Scope) print(header: *const char) {
     printf("Scope %s {\n", header)
-    for(var i = 0; i < this.symbols.capacity; i+=1) {
-        var symName = this.symbols.keys[i]
-        var symbol = this.symbols.values[i]
+    for(var i = 0; i < this.symbolTypes.capacity; i+=1) {
+        var symName = this.symbolTypes.keys[i]
+        var symbol = this.symbolTypes.values[i]
+        if(!symName.addr || !symbol) {
+            continue
+        }
+        printf("   '%.*s'\n", symbol.name.length, symbol.name.buffer)
+    }
+
+    for(var i = 0; i < this.symbolFuncs.capacity; i+=1) {
+        var symName = this.symbolFuncs.keys[i]
+        var symbol = this.symbolFuncs.values[i]
         if(!symName.addr || !symbol) {
             continue
         }

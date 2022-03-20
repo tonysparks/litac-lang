@@ -1,0 +1,91 @@
+@cFile("./mongoose.h", "./mongoose.c");
+
+@raw("""
+typedef struct mg_connection mg_connection;
+typedef struct mg_http_message mg_http_message;
+typedef struct mg_mgr mg_mgr;
+typedef struct mg_str mg_str;
+""");
+
+
+@foreign
+public const MG_MAX_HTTP_HEADERS : i32;
+
+@foreign
+public typedef func(*mg_connection, i32, *void, *void) : void as MgConnectionCallback;
+
+@foreign
+public struct mg_connection;
+
+@foreign
+public struct mg_str;
+
+@foreign
+public struct mg_http_header {
+    name: mg_str
+    value: mg_str
+}
+
+@foreign
+public struct mg_http_message {
+    method: mg_str
+    uri: mg_str
+    query: mg_str
+    proto: mg_str
+    headers: [MG_MAX_HTTP_HEADERS]mg_http_header
+    body: mg_str
+    message: mg_str
+};
+
+@foreign
+public struct mg_mgr;
+
+@foreign
+public func mg_mgr_init(m: *mg_mgr);
+
+@foreign
+public func mg_mgr_free(m: *mg_mgr);
+
+@foreign
+public func mg_mgr_poll(m: *mg_mgr, sleep: i32);
+
+@foreign
+public func mg_http_listen(m: *mg_mgr, addr: *const char, fn: MgConnectionCallback, args: *void);
+
+@foreign
+public func mg_http_match_uri(m: *mg_http_message, uri: *const char);
+
+@foreign
+public func mg_http_reply(c: *mg_connection, status: i32, headers:*const char, body: *const char, ...);
+
+@foreign
+public enum MgEvent {
+  MG_EV_ERROR,       // Error                        char *error_message
+  MG_EV_OPEN,        // Connection created           NULL
+  MG_EV_POLL,        // mg_mgr_poll iteration        int64_t *milliseconds
+  MG_EV_RESOLVE,     // Host name is resolved        NULL
+  MG_EV_CONNECT,     // Connection established       NULL
+  MG_EV_ACCEPT,      // Connection accepted          NULL
+  MG_EV_READ,        // Data received from socket    struct mg_str *
+  MG_EV_WRITE,       // Data written to socket       long *bytes_written
+  MG_EV_CLOSE,       // Connection closed            NULL
+  MG_EV_HTTP_MSG,    // HTTP request/response        struct mg_http_message *
+  MG_EV_HTTP_CHUNK,  // HTTP chunk (partial msg)     struct mg_http_message *
+  MG_EV_WS_OPEN,     // Websocket handshake done     struct mg_http_message *
+  MG_EV_WS_MSG,      // Websocket msg, text or bin   struct mg_ws_message *
+  MG_EV_WS_CTL,      // Websocket control msg        struct mg_ws_message *
+  MG_EV_MQTT_CMD,    // MQTT low-level command       struct mg_mqtt_message *
+  MG_EV_MQTT_MSG,    // MQTT PUBLISH received        struct mg_mqtt_message *
+  MG_EV_MQTT_OPEN,   // MQTT CONNACK received        int *connack_status_code
+  MG_EV_SNTP_TIME,   // SNTP time received           int64_t *milliseconds
+  MG_EV_USER,        // Starting ID for user events
+};
+
+@foreign("mg_str")
+public func mg_strx(str: *const char) : mg_str;
+
+@foreign
+public func mg_vcmp(s1: *const mg_str, s2: *const char) : i32;
+
+@foreign
+public func mg_match(str: mg_str, pattern: mg_str, caps: *mg_str) : bool;

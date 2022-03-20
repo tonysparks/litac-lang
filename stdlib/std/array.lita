@@ -89,10 +89,22 @@ public func (a: *Array<T>) first<T>() : T {
     return a.elements[0]
 }
 
+public func (a: *Array<T>) firstPtr<T>() : *T {
+    assert(a.length != 0)
+
+    return &a.elements[0]
+}
+
 public func (a: *Array<T>) last<T>() : T {
     assert(a.length != 0)
 
     return a.elements[a.length - 1]
+}
+
+public func (a: *Array<T>) lastPtr<T>() : *T {
+    assert(a.length != 0)
+
+    return &a.elements[a.length - 1]
 }
 
 public func (a: *Array<T>) pop<T>() : T {

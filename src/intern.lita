@@ -58,6 +58,25 @@ public const PRECHECK = InternedString{};
 public const POSTPARSE = InternedString{};
 public const END = InternedString{};
 
+// notes
+public const INCLUDE = InternedString{};
+public const RAW = InternedString{};
+public const INLINE = InternedString{};
+public const NOINLINE = InternedString{};
+public const STATIC = InternedString{};
+public const ATOMIC = InternedString{};
+public const REGISTER = InternedString{};
+public const THREADLOCAL = InternedString{};
+public const EXPORT = InternedString{};
+public const PACKED = InternedString{};
+public const CC = InternedString{};
+public const CFILE = InternedString{};
+public const CINCLUDE = InternedString{};
+public const FOREIGN = InternedString{};
+public const ALIAS = InternedString{};
+public const ASSTR = InternedString{};
+public const TOSTR = InternedString{};
+
 public func InternHashFn(a: InternedString) : u32 {
     var hash = ((a.addr as (usize)) % 4294967291_u32) as (u32)
     return hash;
@@ -131,6 +150,25 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("precheck", 8, &PRECHECK)
     this.internConstant("postparse", 9, &POSTPARSE)
     this.internConstant("end", 3, &END)
+
+    // notes
+    this.internConstant("include", 7, &INCLUDE)
+    this.internConstant("raw", 3, &RAW)
+    this.internConstant("inline", 6, &INLINE)
+    this.internConstant("noinline", 8, &NOINLINE)
+    this.internConstant("static", 6, &STATIC)
+    this.internConstant("atomic", 6, &ATOMIC)
+    this.internConstant("register", 8, &REGISTER)
+    this.internConstant("threadlocal", 11, &THREADLOCAL)
+    this.internConstant("export", 6, &EXPORT)
+    this.internConstant("packed", 6, &PACKED)
+    this.internConstant("cc", 2, &CC)
+    this.internConstant("cFile", 5, &CFILE)
+    this.internConstant("cInclude", 8, &CINCLUDE)
+    this.internConstant("foreign", 7, &FOREIGN)
+    this.internConstant("alias", 5, &ALIAS)
+    this.internConstant("asStr", 5, &ASSTR)
+    this.internConstant("toStr", 5, &TOSTR)
 }
 
 func (this: *Strings) internConstant(string: *const char, length: i32, intern: *InternedString) {
@@ -267,6 +305,11 @@ func (this: *Strings) grow(newlength: i32) {
 
     this.allocator.free(oldKeys)
     this.allocator.free(oldValues)
+}
+
+@inline
+public func (this: *InternedString) equalsStr(other: *const char) : bool {
+    return strncmp(this.buffer, other, this.length)
 }
 
 @inline

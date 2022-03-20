@@ -558,13 +558,14 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         case StmtKind.NOTE_STMT: {
             var stmt = s as (*NoteStmt)
             Printf(indent, "@")
-            PrintName(stmt.name.token)
-            if(!stmt.attributes.empty()) {
+            PrintTypeSpec(stmt.type)
+            if(!stmt.arguments.empty()) {
                 printf("(")
-                for(var i = 0; i < stmt.attributes.size(); i += 1) {
+                for(var i = 0; i < stmt.arguments.size(); i += 1) {
                     if(i > 0) printf(", ")
                     printf("'")
-                    PrintName(stmt.attributes.get(i))
+                    // TODO
+                    // PrintStmt(stmt.arguments.get(i))
                     printf("'")
                 }
                 printf(")")
@@ -735,7 +736,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         case StmtKind.IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
-            Printf(indent, "%s", expr.type.name)
+            Printf(indent, "%.*s", expr.type.name.length, expr.type.name.buffer)
             return;
         }/*
         case StmtKind.INIT_ARG_EXPR: {

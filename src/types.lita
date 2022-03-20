@@ -1936,14 +1936,21 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
                 }
 
                 path.pop()
-
                 break;
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
-                //var aggField = field.aggregateField
-                // TODO: ?
-                assert(false)
+                var aggField = field.aggregateField
+
+                var baseType = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
+                path.add(field)
+
+                if(baseType.getFieldPathByType(type, path)) {
+                    return true
+                }
+
+                path.pop()
+                break;
             }
             default: {
                 continue;
@@ -1984,10 +1991,10 @@ public func (this: *AggregateTypeInfo) getMethod(strings: *Strings, module: *Mod
     var funcNameInterned = strings.internCopy(funcName)
 
     // first see if the aggregate declaration module has the method
-    var methodSym = this.sym.declared.getType(funcNameInterned)
+    var methodSym = this.sym.declared.getFuncType(funcNameInterned)
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
         // otherwise look in the current module
-        methodSym = module.getType(funcNameInterned)
+        methodSym = module.getFuncType(funcNameInterned)
     }
 
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {

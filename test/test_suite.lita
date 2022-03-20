@@ -72,9 +72,7 @@ func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
 
     var testFiles = []*const char {
-        //"../test/tests/unicode_support.json",
-        //"../test/tests/func_named_args.json",
-
+        //"../test/tests/compile_time_stmt.json",
         // "../test/tests/misc.json", json syntax error
         "../test/tests/bucket_allocator.json",
         "../test/tests/stack_allocator.json",
