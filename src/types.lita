@@ -1980,10 +1980,10 @@ public func (this: *AggregateTypeInfo) getMethod(module: *Module, methodName: *c
     this.getFunctionName(funcName, methodName)
 
     // first see if the aggregate declaration module has the method
-    var methodSym = this.sym.declared.getType(funcName)
+    var methodSym = this.sym.declared.getFuncType(funcName)
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
         // otherwise look in the current module
-        methodSym = module.getType(funcName)
+        methodSym = module.getFuncType(funcName)
     }
 
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {

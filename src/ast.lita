@@ -352,8 +352,8 @@ public struct ModuleStmt {
 
 public struct NoteStmt {
     stmt: using Stmt
-    name: Token // Identifier?
-    attributes: Array<Token> // Identifier?
+    type: *NameTypeSpec
+    arguments: Array<CallArg>
 }
 
 public struct ParametersStmt {
@@ -666,7 +666,7 @@ public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
 
     for(var i = 0; i < d.attributes.notes.size(); i += 1) {
         var note = d.attributes.notes.get(i)
-        if(note.name.nameEquals(name)) {
+        if(strcmp(note.type.name, name) == 0) {
             return note;
         }
     }

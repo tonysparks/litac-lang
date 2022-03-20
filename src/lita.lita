@@ -199,7 +199,7 @@ public func (this: *Lita) parse() : *Module {
                                       false,
                                       this.allocator) as (*ImportDecl)
     builtinImport.moduleId = &builtin.id
-    root.ast.imports.add(builtinImport)
+    root.ast.imports.insertAt(0, builtinImport)
 
     return root
 }
