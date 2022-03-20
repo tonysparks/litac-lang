@@ -366,7 +366,8 @@ func (this: using *CGen) emitTraitDecls() {
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
         var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME)
-        vtableNameStr.format("%s%.*s__%s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, this.escapeNameStr(traitSym.name))
+        var escapedName = this.escapeNameStr(traitSym.name)
+        vtableNameStr.format("%s%.*s__%.*s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, escapedName.length, escapedName.buffer)
 
         // Generate Casting functions;
         // we generate the casting functions in C code and not in lita

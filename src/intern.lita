@@ -148,7 +148,7 @@ public func (this: *Strings) internStringView(string: *StringView) : InternedStr
     `Strings`.  If you can't garauntee to the lifetime of the supplied `string`, use `Strings#internCopy`
 """)
 public func (this: *Strings) intern(string: *const char, length: i32) : InternedString {
-    internCount += 1
+    //internCount += 1
 
     var view = StringView {
         .buffer = string,

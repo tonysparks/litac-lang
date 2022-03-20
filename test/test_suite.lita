@@ -72,6 +72,9 @@ func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
 
     var testFiles = []*const char {
+        //"../test/tests/unicode_support.json",
+        //"../test/tests/func_named_args.json",
+
         // "../test/tests/misc.json", json syntax error
         "../test/tests/bucket_allocator.json",
         "../test/tests/stack_allocator.json",
@@ -117,7 +120,7 @@ func main(len: i32, args: **char) : i32 {
 
     linearAllocator.init(mem, memSize)
     testHarness.allocator = (&linearAllocator) as (*Allocator)
-    testHarness.buffer = StringBufferInit(1024, defaultAllocator)
+    testHarness.buffer = StringBufferInit(1024 * 1024, defaultAllocator)
     defer testHarness.buffer.free()
 
     testHarness.numberOfTests = 0
@@ -161,7 +164,8 @@ func main(len: i32, args: **char) : i32 {
 
 func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     var data:*char;
-    if(ReadFile(filename, &data, testHarness.allocator) != FileStatus.Ok) {
+    var length: i64;
+    if(ReadFile(filename, &data, &length, testHarness.allocator) != FileStatus.Ok) {
         goto err;
     }
 
@@ -345,12 +349,13 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
 
     FilePath(options.inputFile, options.srcPath)
 
-    lita.options = &options
-    lita.reset()
+    // TODO: Bug with reset not clearing buffers correctly, tests end up failing if running too many "invalid" type tests
+    //lita.options = &options
+    //lita.reset()
 
-    //var lita = Lita{}
-    //lita.init(&options)
-    //defer lita.free()
+    var lita = Lita{}
+    lita.init(&options)
+    defer lita.free()
 
     var root = lita.parse()
     if(!root) {
