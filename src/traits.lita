@@ -112,7 +112,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         {
             //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
            // printf("Sym: %s vs %s\n", traitName, traitDecl.name.asString())
-            sb.append("struct %s__VirtualTable", traitName)
+            sb.append("struct %.*s__VirtualTable", traitName.length, traitName.buffer)
             sb.append(" {\n")
 
             for(var j = 0; j < traitDecl.fields.size(); j += 1) {
@@ -122,7 +122,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
                   var fn = field.typeInfo as (*FuncPtrTypeInfo)
                   var traitField = field.traitField
-                  sb.append("    %s: func", traitField.name.asString())
+                  sb.append("    %.*s: func", traitField.name.str.length, traitField.name.str.buffer)
                   PrintGenerics(fn.genericParams, sb)
                   sb.append("(*void")
                   for(var p = 0; p < fn.paramDecls.size(); p += 1) {
@@ -160,7 +160,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
                     var fn = field.typeInfo as (*FuncPtrTypeInfo)
 
-                    sb.append("func __%s_%s_wrapper", implEscapedName, field.traitField.name.asString())
+                    sb.append("func __%.*s_%.*s_wrapper", implEscapedName.length, implEscapedName.buffer, field.traitField.name.str.length, field.traitField.name.str.buffer)
                     sb.append("(this: *void")
                     for(var p = 0; p < fn.paramDecls.size(); p += 1) {
                         var param = fn.paramDecls.get(p)
@@ -178,7 +178,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                     sb.append(" {\n")
                     {
                         var moduleName = implSym.declared.id.name
-                        sb.append("    var __this = this as (*%.*s::%s", moduleName.length, moduleName.buffer, implName)
+                        sb.append("    var __this = this as (*%.*s::%.*s", moduleName.length, moduleName.buffer, implName.length, implName.buffer)
                         PrintGenericArgs(implSym.genericArgs, sb)
                         sb.append(")\n")
 
@@ -189,7 +189,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                             sb.append("    ")
                         }
 
-                        sb.append("__this.%s", field.traitField.name.asString())
+                        sb.append("__this.%.*s", field.traitField.name.str.length, field.traitField.name.str.buffer)
 
                         sb.append("(")
                         for(var p = 0; p < fn.paramDecls.size(); p += 1) {
@@ -209,20 +209,24 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         // Generate Vtables implementations
         {
             //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
-            sb.append("const %s__vtables = []*%s__VirtualTable {\n", traitName, traitName)
+            sb.append("const %.*s__vtables = []*%.*s__VirtualTable {\n",
+                traitName.length, traitName.buffer, traitName.length, traitName.buffer)
+
             for(var i = 0; i < entry.value.size(); i += 1) {
                 var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
                 assert(implSym)
 
                 var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
-                sb.append("    [%d] = &%s__VirtualTable {\n", i, traitName)
+                sb.append("    [%d] = &%.*s__VirtualTable {\n", i, traitName.length, traitName.buffer)
                 {
                     for(var j = 0; j < traitDecl.fields.size(); j += 1) {
                         var field = traitDecl.fields.get(j)
                         assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
-                        var fieldName = field.traitField.name.asString()
-                        sb.append("        .%s = __%s_%s_wrapper", fieldName, implEscapedName, fieldName)
+                        sb.append("        .%.*s = __%.*s_%.*s_wrapper",
+                            field.traitField.name.str.length, field.traitField.name.str.buffer,
+                            implEscapedName.length, implEscapedName.buffer,
+                            field.traitField.name.str.length, field.traitField.name.str.buffer)
                         sb.append(",\n")
                     }
                 }
@@ -234,7 +238,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
     {
         //printf("Traits Source: \n%s\n", sb.cStr())
-        var parser = ParserInit("generated", sb.cStr(), checker.lita)
+        var parser = ParserInit("generated", sb.cStr(), sb.length, checker.lita)
         var stmts = parser.parseModule()
         decls.addAll(stmts.declarations)
     }
@@ -251,7 +255,7 @@ func PrintGenerics(genericParams: *Array<GenericParam>, sb: *StringBuffer) {
             sb.append(", ")
         }
         var name = genericParams.get(x).name
-        sb.append("%s", name.asString())
+        sb.append("%.*s", name.str.length, name.str.buffer)
     }
     if(genericParams.size() > 0) {
         sb.append(">")
@@ -287,21 +291,26 @@ func FindSymbolByTypeid(symbols: Array<*Symbol>, id: Typeid) : *Symbol {
     return null
 }
 
-func GetTraitName(traitSym: *Symbol, sb: *StringBuffer) : *const char {
+func GetTraitName(traitSym: *Symbol, sb: *StringBuffer) : StringView {
 
     // if this isn't a generic generated trait, just use the symbol name
     if(!(traitSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
-        return traitSym.name
+        return traitSym.name.view
     }
 
     sb.clear()
 
     // otherwise, we have to calculate the new name using the generic type arguments
-    return EscapeName(traitSym.name, sb)
+    EscapeName(traitSym.name.buffer, traitSym.name.length, sb)
+
+    return StringView {
+        .buffer = sb.buffer,
+        .length = sb.length
+    }
 }
 
 func Parse(sb: *StringBuffer, checker: *TypeChecker, decls: *Array<*Decl>) {
-    var parser = ParserInit("generated", sb.cStr(), checker.lita)
+    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.lita)
     var stmts = parser.parseModule()
     decls.addAll(stmts.declarations)
 }

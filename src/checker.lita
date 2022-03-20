@@ -24,7 +24,7 @@ import "common"
 import "traits"
 import "checker_decl"
 import "checker_expr"
-
+import "intern"
 /**
 ===================================================================
     Type Checker
@@ -36,7 +36,7 @@ const MAX_LABELS = 256;
 const MAX_LABEL_NAME = 32;
 
 struct LabelInfo {
-    name: StringView
+    name: InternedString
     defined: bool
     stmt: *Stmt
 }
@@ -111,7 +111,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     for(var i = 0; i < root.ast.declarations.size(); i += 1) {
         var decl = root.ast.declarations.get(i)
         if(decl.sym && decl.kind == StmtKind.FUNC_DECL &&
-            strcmp(decl.sym.name, "main") == 0) {
+           decl.sym.name.equals(MAIN)) {
             this.mainEntry = decl.sym
             this.mainEntry.flags |= SymbolFlags.IS_MAIN
             break
@@ -433,7 +433,7 @@ func (this: *TypeChecker) isGenericParamType(name: *NameTypeSpec) : bool {
 
         for(var i = 0; i < params.size(); i+=1) {
             var param = params.get(i)
-            assert(param.name.type == TokenType.IDENTIFIER)
+            assert(param.name.token.type == TokenType.IDENTIFIER)
 
             if(param.name.str.equals(name.name)) {
                 return true;
@@ -452,19 +452,22 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         return decl.sym
     }
 
-    var name:[MAX_SYMBOL_NAME]char;
-    if(decl.name.type == TokenType.IDENTIFIER) {
-        decl.name.str.copyTo(name, MAX_SYMBOL_NAME)
+    var name = EMPTY_STR
+    if(decl.name.token.type == TokenType.IDENTIFIER) {
+        name = decl.name.str
     }
     else {
-        var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+        var buffer = [MAX_SYMBOL_NAME]char;
+        var nameStr = StringInit(buffer, MAX_SYMBOL_NAME)
         nameStr.format("anon_%d", this.randomNameIndex)
+        name = this.lita.strings.internCopy(nameStr.cStr(), nameStr.length)
+
         this.randomNameIndex+=1
     }
 
     var sym: *Symbol = null
     if(decl.kind != StmtKind.FUNC_DECL) {
-        sym = this.current.symbols.addSymbol(name as (*const char), this.current, decl, SymbolFlags.IS_INCOMPLETE)
+        sym = this.current.symbols.addSymbol(name, this.current, decl, SymbolFlags.IS_INCOMPLETE)
         if(!sym) {
             goto err;
         }
@@ -499,13 +502,16 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         case StmtKind.FUNC_DECL: {
             var funcDecl = decl as (*FuncDecl)
             if(funcDecl.flags & FuncFlags.IS_METHOD) {
-                if(!funcDecl.getName(name)) {
+                var buffer = [MAX_SYMBOL_NAME]char;
+                if(!funcDecl.getName(buffer)) {
                     this.result.addError(decl.startPos, "invalid function name")
                     goto err;
                 }
+
+                name = this.lita.strings.internCopy(buffer)
             }
 
-            sym = this.current.symbols.addSymbol(name as (*const char), this.current, decl, SymbolFlags.IS_INCOMPLETE)
+            sym = this.current.symbols.addSymbol(name, this.current, decl, SymbolFlags.IS_INCOMPLETE)
             if(!sym) {
                 goto err;
             }
@@ -601,7 +607,7 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
             continue
         }
 
-        if(other.name.str.equalsStringView(imp.name.str)) {
+        if(other.name.str.equals(imp.name.str)) {
             this.result.addError(imp.startPos, "duplicate import of module '%.*s'",
                 imp.name.str.length, imp.name.str.buffer)
             goto err;
@@ -681,7 +687,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
     }
 
     if(sym.state == SymbolState.RESOLVING) {
-        this.result.addError(sym.decl.startPos, "cyclic dependency found with '%s'", sym.name)
+        this.result.addError(sym.decl.startPos, "cyclic dependency found with '%.*s'", sym.name.length, sym.name.buffer)
         goto err;
     }
 
@@ -863,8 +869,7 @@ func (this: *TypeChecker) getType(spec: *NameTypeSpec, isFunc: bool = false) : *
     return this.getTypeByName(spec.name, isFunc)
 }
 
-func (this: *TypeChecker) getTypeByName(typeName: *const char, isFunc: bool = false) : *Symbol {
-    assert(typeName != null)
+func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc: bool = false) : *Symbol {
     var type = isFunc ? this.current.getFuncType(typeName) :
                             this.current.getType(typeName)
     if(!type) {
@@ -878,7 +883,7 @@ func (this: *TypeChecker) getTypeByName(typeName: *const char, isFunc: bool = fa
     // modules without having to import them all into
     // the current module
     if(!type && this.bypassing) {
-        var name = StringViewInit(typeName)
+        var name = typeName.view
         var index = name.indexOf("::")
         if(index < 0) {
             return null
@@ -893,8 +898,9 @@ func (this: *TypeChecker) getTypeByName(typeName: *const char, isFunc: bool = fa
         assert(module != null)
         var namePart = name.substring(index + 2)
 
-        return isFunc ? module.getFuncType(namePart.buffer) :
-                            module.getType(namePart.buffer)
+        var namePartType = this.lita.strings.internCopy(namePart.buffer, namePart.length)
+        return isFunc ? module.getFuncType(namePartType) :
+                            module.getType(namePartType)
     }
 
     return type
@@ -939,12 +945,13 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
         assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
         // check to see if the method is in the found symbols
-        var functionName = field.traitField.decl.name.asString()
+        var functionName = field.traitField.decl.name.token.asString()
         var traitFn = field.typeInfo as (*FuncPtrTypeInfo)
 
         for(var index = 0; index < numOfMethods; index += 1) {
             var sym = symbols[index]
-            var str = StringViewInit(sym.name)
+            var str = sym.name.view
+
             var start = str.indexOf("_")
             if(start < 0) {
                 continue
@@ -999,7 +1006,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
             if(!sym) {
                 sym = this.currentScope().lookup(nameSpec.name)
                 if(!sym) {
-                    this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
+                    this.result.addError(spec.pos, "unknown type '%.*s'", nameSpec.name.length, nameSpec.name.buffer)
                     goto err;
                 }
                 // account for function pointers in parameter declarations
@@ -1012,7 +1019,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
             }
 
             if(!(sym.flags & SymbolFlags.IS_TYPE) && !IsFuncLike(sym.type)) {
-                this.result.addError(spec.pos, "'%s' must be a type", nameSpec.name)
+                this.result.addError(spec.pos, "'%.*s' must be a type", nameSpec.name.length, nameSpec.name.buffer)
                 goto err;
             }
 
@@ -1104,11 +1111,9 @@ err:
 }
 
 func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
-    var name:[MAX_SYMBOL_NAME]char;
-    assert(decl.name.type == TokenType.IDENTIFIER)
-    decl.name.str.copyTo(name, MAX_SYMBOL_NAME)
+    assert(decl.name.token.type == TokenType.IDENTIFIER)
 
-    var sym = this.current.currentScope.addSymbol(name as (*const char), this.current, decl, 0)
+    var sym = this.current.currentScope.addSymbol(decl.name.str, this.current, decl, 0)
     if(sym) {
         sym.type = typeInfo
         this.resolveSymbol(sym)
@@ -1126,16 +1131,13 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
         switch(field.kind) {
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
-                if(varField.name.type != TokenType.IDENTIFIER) {
+                if(varField.name.token.type != TokenType.IDENTIFIER) {
                     break
                 }
 
                 var varDecl = NewVarDecl(decl.startPos, decl.endPos, decl.name, varField.type, null, this.allocator)
 
-                var name:[MAX_SYMBOL_NAME]char;
-                varField.name.str.copyTo(name, MAX_SYMBOL_NAME)
-
-                varDecl.sym = scope.addSymbol(name as (*const char), this.current, varDecl, SymbolFlags.IS_USING)
+                varDecl.sym = scope.addSymbol(varField.name.str, this.current, varDecl, SymbolFlags.IS_USING)
                 varDecl.sym.type = field.typeInfo
                 varDecl.sym.usingParent = decl.sym
 
@@ -1313,14 +1315,14 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.GOTO_STMT: {
             var gotoStmt = stmt as (*GotoStmt)
 
-            if(gotoStmt.label.type != TokenType.IDENTIFIER) {
+            if(gotoStmt.label.token.type != TokenType.IDENTIFIER) {
                 return false
             }
 
             // check to see if the label has already been created
             for(var i = 0; i < this.numOfLabels; i+=1) {
                 var label = &this.labels[i]
-                if(gotoStmt.label.str.equalsStringView(label.name)) {
+                if(gotoStmt.label.str.equals(label.name)) {
                     label.stmt = stmt
                     return true
                 }
@@ -1363,7 +1365,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.LABEL_STMT: {
             var labelStmt = stmt as (*LabelStmt)
-            if(labelStmt.label.type != TokenType.IDENTIFIER) {
+            if(labelStmt.label.token.type != TokenType.IDENTIFIER) {
                 return false
             }
 
@@ -1374,7 +1376,7 @@ func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
 
             for(var i = 0; i < this.numOfLabels; i+=1) {
                 var label = &this.labels[i]
-                if(labelStmt.label.str.equalsStringView(label.name)) {
+                if(labelStmt.label.str.equals(label.name)) {
                     label.defined = true
                     return true
                 }

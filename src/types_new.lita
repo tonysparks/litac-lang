@@ -7,6 +7,7 @@ import "std/map"
 import "types"
 import "symbols"
 import "ast"
+import "intern"
 
 
 public struct TypeCache {
@@ -14,7 +15,7 @@ public struct TypeCache {
     constCache: Map<i64, *ConstTypeInfo>     // TODO: Fix alias generics bug - should be using Typeid
     ptrCache:   Map<i64, *PtrTypeInfo>
     arrayCache: Map<ArrayEntry, *ArrayTypeInfo>
-    genericCache: Map<*const char, *TypeInfo>
+    genericCache: Map<InternedString, *TypeInfo>
 }
 
 public struct ArrayEntry {
@@ -50,10 +51,10 @@ public func (this: *TypeCache) init(allocator: *const Allocator) {
     this.constCache.init(null, 1024, PtrHashFn<Typeid>, PtrEqualFn<Typeid>, allocator)
     this.ptrCache.init(null, 1024, PtrHashFn<Typeid>, PtrEqualFn<Typeid>, allocator)
     this.arrayCache.init(null, 512, Hash, Equals, allocator, ArrayEntry{.expr = null, .arrayOf = null, .length = 0})
-    this.genericCache.init<*const char, *TypeInfo>(null, 128, StrHashFn, StrEqualFn, allocator);
+    this.genericCache = InternMap<*TypeInfo>(null, 128, allocator)
 }
 
-public func (this: *TypeCache) newGenericParamTypeInfo(name: *const char) : *TypeInfo {
+public func (this: *TypeCache) newGenericParamTypeInfo(name: InternedString) : *TypeInfo {
     var type = this.genericCache.get(name)
     if(!type) {
         type = new<TypeInfo>(this.allocator)

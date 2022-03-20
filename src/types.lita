@@ -13,6 +13,8 @@ import "lex"
 import "types_new"
 import "common"
 import "checker"
+import "lita"
+import "intern"
 
 @asStr
 public enum TypeKind {
@@ -290,7 +292,7 @@ public func IsBooleanable(type: *TypeInfo) : bool {
     Converts the trait method into a function pointer.  This adds the first
     void pointer argument
 */
-public func AsTraitFuncPtr(type: *TypeInfo, name: *const char, typeCache: *TypeCache) : *FuncPtrTypeInfo {
+public func AsTraitFuncPtr(type: *TypeInfo, name: InternedString, typeCache: *TypeCache) : *FuncPtrTypeInfo {
     if(!type) {
         return null
     }
@@ -523,7 +525,7 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
         case TypeKind.TRAIT:
         case TypeKind.ENUM:
         case TypeKind.GENERIC_PARAM:
-            sb.appendStr(this.name)
+            sb.appendStrn(this.name.buffer, this.name.length)
             break;
         case TypeKind.STR: {
             sb.appendStr("*const char")
@@ -560,7 +562,7 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
                 for(var i = 0; i < funcPtrInfo.genericParams.size(); i += 1) {
                     if(i > 0) sb.appendStrn(",", 1)
                     var t = funcPtrInfo.genericParams.get(i).name
-                    sb.appendStrn(t.value.str.buffer, t.value.str.length)
+                    sb.appendStrn(t.str.buffer, t.str.length)
                 }
                 sb.appendStrn(">", 1)
             }
@@ -582,7 +584,7 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
                 for(var i = 0; i < funcInfo.decl.genericParams.size(); i += 1) {
                     if(i > 0) sb.appendStrn(",", 1)
                     var t = funcInfo.decl.genericParams.get(i).name
-                    sb.appendStrn(t.value.str.buffer, t.value.str.length)
+                    sb.appendStrn(t.str.buffer, t.str.length)
                 }
                 sb.appendStrn(">", 1)
             }
@@ -666,7 +668,7 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
         }
         case TypeKind.GENERIC_PARAM: {
             if(other.kind == TypeKind.GENERIC_PARAM) {
-                return strcmp(this.name, other.name) == 0
+                return this.name.addr == other.name.addr
             }
 
             return true
@@ -1344,75 +1346,76 @@ public func IsFuncImpl(traitFn: *FuncPtrTypeInfo, fn: *TypeInfo, checker: *TypeC
     return true
 }
 
-public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpec {
+public func (this: *TypeInfo) asTypeSpec(lita: *Lita) : *TypeSpec {
     var pos = (this.sym) ? this.sym.decl.startPos : SrcPos{};
+    var allocator = lita.allocator
 
     switch(this.kind) {
         case TypeKind.BOOL: {
-            return NewNameTypeSpec(pos, "bool", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, BOOL, lita) as (*TypeSpec)
         }
         case TypeKind.CHAR: {
-            return NewNameTypeSpec(pos, "char", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, CHAR, lita) as (*TypeSpec)
         }
         case TypeKind.I8: {
-            return NewNameTypeSpec(pos, "i8", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I8, lita) as (*TypeSpec)
         }
         case TypeKind.U8: {
-            return NewNameTypeSpec(pos, "u8", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U8, lita) as (*TypeSpec)
         }
         case TypeKind.I16: {
-            return NewNameTypeSpec(pos, "i16", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I16, lita) as (*TypeSpec)
         }
         case TypeKind.U16: {
-            return NewNameTypeSpec(pos, "u16", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U16, lita) as (*TypeSpec)
         }
         case TypeKind.I32: {
-            return NewNameTypeSpec(pos, "i32", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I32, lita) as (*TypeSpec)
         }
         case TypeKind.U32: {
-            return NewNameTypeSpec(pos, "u32", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U32, lita) as (*TypeSpec)
         }
         case TypeKind.I64: {
-            return NewNameTypeSpec(pos, "i64", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I64, lita) as (*TypeSpec)
         }
         case TypeKind.U64: {
-            return NewNameTypeSpec(pos, "u64", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U64, lita) as (*TypeSpec)
         }
         case TypeKind.F32: {
-            return NewNameTypeSpec(pos, "f32", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, F32, lita) as (*TypeSpec)
         }
         case TypeKind.F64: {
-            return NewNameTypeSpec(pos, "f64", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, F64, lita) as (*TypeSpec)
         }
         case TypeKind.USIZE: {
-            return NewNameTypeSpec(pos, "usize", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, USIZE, lita) as (*TypeSpec)
         }
         case TypeKind.NULL: {
-            return NewNameTypeSpec(pos, "null", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, NULL, lita) as (*TypeSpec)
         }
         case TypeKind.VOID: {
-            return NewNameTypeSpec(pos, "void", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, VOID, lita) as (*TypeSpec)
         }
         case TypeKind.STR: {
-            return NewNameTypeSpec(pos, "*const char", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, STRING, lita) as (*TypeSpec)
         }
         case TypeKind.ARRAY: {
             var arrayInfo = this as (*ArrayTypeInfo)
-            var arrayTypeSpec = NewTypeSpec(TypeSpecKind.ARRAY, pos, allocator) as (*ArrayTypeSpec)
-            arrayTypeSpec.base = arrayInfo.arrayOf.asTypeSpec(allocator)
+            var arrayTypeSpec = NewTypeSpec(TypeSpecKind.ARRAY, pos, lita) as (*ArrayTypeSpec)
+            arrayTypeSpec.base = arrayInfo.arrayOf.asTypeSpec(lita)
             arrayTypeSpec.numElements = arrayInfo.numOfElements
             return arrayTypeSpec as (*TypeSpec)
         }
         case TypeKind.PTR: {
             var ptrInfo = this as (*PtrTypeInfo)
-            var ptrTypeSpec = NewTypeSpec(TypeSpecKind.PTR, pos, allocator) as (*PtrTypeSpec)
-            ptrTypeSpec.base = ptrInfo.ptrOf.asTypeSpec(allocator)
+            var ptrTypeSpec = NewTypeSpec(TypeSpecKind.PTR, pos, lita) as (*PtrTypeSpec)
+            ptrTypeSpec.base = ptrInfo.ptrOf.asTypeSpec(lita)
             return ptrTypeSpec as (*TypeSpec)
         }
         case TypeKind.CONST: {
             var constInfo = this as (*ConstTypeInfo)
-            var constTypeSpec = NewTypeSpec(TypeSpecKind.CONST, pos, allocator) as (*ConstTypeSpec)
-            constTypeSpec.base = constInfo.constOf.asTypeSpec(allocator)
+            var constTypeSpec = NewTypeSpec(TypeSpecKind.CONST, pos, lita) as (*ConstTypeSpec)
+            constTypeSpec.base = constInfo.constOf.asTypeSpec(lita)
             return constTypeSpec as (*TypeSpec)
         }
         case TypeKind.FUNC_PTR: {
@@ -1421,11 +1424,11 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
             args.init(funcInfo.paramDecls.size(), allocator)
             for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
                 var param = funcInfo.paramDecls.get(i)
-                args.add(param.asTypeSpec(allocator))
+                args.add(param.asTypeSpec(lita))
             }
 
-            var result = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, allocator) as (*FuncPtrTypeSpec)
-            result.ret = funcInfo.returnType.asTypeSpec(allocator)
+            var result = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, lita) as (*FuncPtrTypeSpec)
+            result.ret = funcInfo.returnType.asTypeSpec(lita)
             result.args = args
             result.hasVarargs = funcInfo.hasVarargs
             result.genericParams = funcInfo.genericParams
@@ -1435,16 +1438,15 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
         case TypeKind.UNION:
         case TypeKind.STRUCT: {
             var aggInfo = this as (*AggregateTypeInfo)
-            var result = NewNameTypeSpec(pos, aggInfo.name, allocator)
+            var result = NewNameTypeSpecIntern(pos, aggInfo.name, lita)
 
             var args = Array<*TypeSpec>{}
             args.init(aggInfo.decl.genericParams.size(), allocator)
             for(var i = 0; i < aggInfo.decl.genericParams.size(); i += 1) {
                 var param = aggInfo.decl.genericParams.get(i)
-                var name = allocator.alloc((param.name.str.length+1) * sizeof(:char)) as (*char)
-                param.name.str.copyTo(name, param.name.str.length)
+                var name = param.name.str
 
-                args.add(NewNameTypeSpec(pos, name, allocator) as (*TypeSpec))
+                args.add(NewNameTypeSpecIntern(pos, name, lita) as (*TypeSpec))
             }
 
             result.genericArgs = args;
@@ -1452,14 +1454,14 @@ public func (this: *TypeInfo) asTypeSpec(allocator: *const Allocator) : *TypeSpe
         }
         case TypeKind.ENUM: {
             var info = this as (*EnumTypeInfo)
-            return NewNameTypeSpec(pos, info.name, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, info.name, lita) as (*TypeSpec)
         }
         case TypeKind.FUNC: {
             var info = this as (*FuncTypeInfo)
-            return NewNameTypeSpec(pos, info.name, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, info.name, lita) as (*TypeSpec)
         }
         case TypeKind.POISON: {
-            return NewNameTypeSpec(pos, "<poison>", allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, POISON, lita) as (*TypeSpec)
         }
         default: {
             assert(false)
@@ -1483,7 +1485,7 @@ public func (this: *FuncTypeInfo) asPtr(typeCache: *TypeCache) : *FuncPtrTypeInf
 }
 
 
-public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryDecl {
+public func (this: *EnumTypeInfo) getField(name: InternedString) : *EnumFieldEntryDecl {
     assert(this != null)
     for(var i = 0; i < this.decl.fields.size(); i+=1) {
         var field = this.decl.fields.get(i)
@@ -1495,7 +1497,7 @@ public func (this: *EnumTypeInfo) getField(name: *const char) : *EnumFieldEntryD
     return null
 }
 
-public func (this: *EnumTypeInfo) getFieldIndex(name: *const char) : i32 {
+public func (this: *EnumTypeInfo) getFieldIndex(name: InternedString) : i32 {
     assert(this != null)
     for(var i = 0; i < this.decl.fields.size(); i+=1) {
         var field = this.decl.fields.get(i)
@@ -1512,16 +1514,18 @@ public func (this: *AggregateTypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) 
     assert(this != null)
 
     var index = 0
-    var n = this.name
+    var n = this.name.buffer
+    var len = this.name.length
 
-    while(*n) {
+    while(*n && index < len) {
         var c = *n
         if(c == '<') {
             break;
         }
 
         name[index] = c
-        n+=1;
+
+        n +=1;
         index += 1;
     }
 
@@ -1543,7 +1547,7 @@ public func (this: *AggregateTypeInfo) getFieldByPosition(position: i32) : Field
     return this.decl.fields.get(position)
 }
 
-public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
+public func (this: *AggregateTypeInfo) getField(name: InternedString) : FieldStmt {
     assert(this != null)
 
     for(var i = 0; i < this.decl.fields.size(); i+=1) {
@@ -1582,7 +1586,7 @@ public func (this: *AggregateTypeInfo) getField(name: *const char) : FieldStmt {
 
                 // if this is an anonymous aggregate, the fields
                 // should be looked at for matching
-                if(aggField.name.type == TokenType.VOID) {
+                if(aggField.name.token.type == TokenType.VOID) {
                     var aggType = aggField.sym.type as (*AggregateTypeInfo)
                     var result = aggType.getField(name)
                     if(result.kind != StmtKind.POISON_EXPR) {
@@ -1608,7 +1612,7 @@ err:
 }
 
 @doc("Gets the field position in this aggregate type (including anonymous aggregates) only")
-public func (this: *AggregateTypeInfo) getFieldIndex(name: *const char) : i32 {
+public func (this: *AggregateTypeInfo) getFieldIndex(name: InternedString) : i32 {
     assert(this != null)
 
     var index = 0
@@ -1648,7 +1652,7 @@ public func (this: *AggregateTypeInfo) getFieldIndex(name: *const char) : i32 {
 
                 // if this is an anonymous aggregate, the fields
                 // should be looked at for matching
-                if(aggField.name.type == TokenType.VOID) {
+                if(aggField.name.token.type == TokenType.VOID) {
                     var aggType = aggField.sym.type as (*AggregateTypeInfo)
                     var result = aggType.getFieldIndex(name)
 
@@ -1683,7 +1687,7 @@ public struct FieldPositionResult {
 }
 
 @doc("Gets the field position in this aggregate type and any using sub aggregates")
-public func (this: *AggregateTypeInfo) getFieldPosition(name: *const char) : FieldPositionResult {
+public func (this: *AggregateTypeInfo) getFieldPosition(name: InternedString) : FieldPositionResult {
 
     // Find the aggregate type of this field -- we have
     // to do some object traversels because of the 'using'
@@ -1764,7 +1768,7 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo, 
 
                 // if this is an anonymous aggregate, the fields
                 // should be looked at for matching
-                if(aggField.name.type == TokenType.VOID) {
+                if(aggField.name.token.type == TokenType.VOID) {
                     var aggType = aggField.sym.type as (*AggregateTypeInfo)
                     var result = aggType.getFieldByType(type, false)
                     if(result.kind != StmtKind.POISON_EXPR) {
@@ -1784,7 +1788,7 @@ public func (this: *AggregateTypeInfo) getFieldByType(type: *AggregateTypeInfo, 
 }
 
 
-public func (this: *AggregateTypeInfo) getFieldWithUsing(name: *const char) : FieldStmt {
+public func (this: *AggregateTypeInfo) getFieldWithUsing(name: InternedString) : FieldStmt {
     assert(this != null)
 
     var fieldStmt = this.getField(name)
@@ -1850,7 +1854,7 @@ func (this: *FieldPath) pop() {
 }
 
 
-public func (this: *AggregateTypeInfo) getFieldPath(name: *const char, path: *FieldPath) : bool {
+public func (this: *AggregateTypeInfo) getFieldPath(name: InternedString, path: *FieldPath) : bool {
     assert(this != null)
 
     var fieldStmt = this.getField(name)
@@ -1957,21 +1961,26 @@ public func (this: *AggregateTypeInfo) getFieldPathByType(type: *AggregateTypeIn
     return false
 }
 
+//public var funcNameCount = 0
+//public var getMethodCount = 0
+
 @doc("""
 Given a method name, this will return the function name equivalent, which is:
 AggregateName_MethodName
 """)
-public func (this: *AggregateTypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, methodName: *const char) : *const char {
+public func (this: *AggregateTypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, methodName: InternedString) : *const char {
+//funcNameCount += 1
     memset(result, 0, MAX_SYMBOL_NAME)
     this.getBaseName(result);
 
-    strcat(result, "_")
-    strcat(result, methodName)
+    strncat(result, "_", 1)
+    strncat(result, methodName.buffer, methodName.length)
 
     return (result)
 }
 
-public func (this: *AggregateTypeInfo) getMethod(module: *Module, methodName: *const char) : *Symbol {
+public func (this: *AggregateTypeInfo) getMethod(strings: *Strings, module: *Module, methodName: InternedString) : *Symbol {
+//getMethodCount += 1
     if(!this.sym) {
         return null
     }
@@ -1979,11 +1988,13 @@ public func (this: *AggregateTypeInfo) getMethod(module: *Module, methodName: *c
     var funcName = [MAX_SYMBOL_NAME]char {0};
     this.getFunctionName(funcName, methodName)
 
+    var funcNameInterned = strings.internCopy(funcName)
+
     // first see if the aggregate declaration module has the method
-    var methodSym = this.sym.declared.getFuncType(funcName)
+    var methodSym = this.sym.declared.getFuncType(funcNameInterned)
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
         // otherwise look in the current module
-        methodSym = module.getFuncType(funcName)
+        methodSym = module.getFuncType(funcNameInterned)
     }
 
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
@@ -2046,10 +2057,34 @@ public func NextTypeId() : Typeid {
     return idGen;
 }
 
+@doc("""
+The supplied `Strings` must be initialized and pre-populated with interned constants
+""")
+public func TypesInit(strings: *Strings) {
+    idGen = TypeKind.MAX_TYPE_KINDS as (i64)
+    BOOL_TYPE.name  = BOOL
+    CHAR_TYPE.name  = CHAR
+    I8_TYPE.name    = I8
+    U8_TYPE.name    = U8
+    I16_TYPE.name   = I16
+    U16_TYPE.name   = U16
+    I32_TYPE.name   = I32
+    U32_TYPE.name   = U32
+    I64_TYPE.name   = I64
+    U64_TYPE.name   = U64
+    F32_TYPE.name   = F32
+    F64_TYPE.name   = F64
+    USIZE_TYPE.name = USIZE
+    NULL_TYPE.name  = NULL
+    VOID_TYPE.name  = VOID
+    STR_TYPE.name   = STRING
+    POISON_TYPE.name= POISON
+}
+
 public struct TypeInfo {
     kind: TypeKind
     typeid: Typeid
-    name: *const char
+    name: InternedString
     sym: *Symbol
 }
 
@@ -2104,118 +2139,101 @@ public struct AggregateTypeInfo {
 public const BOOL_TYPE = TypeInfo {
     .kind = TypeKind.BOOL,
     .typeid = TypeKind.BOOL as (Typeid),
-    .name = "bool",
     .sym = null
 }
 
 public const CHAR_TYPE = TypeInfo {
     .kind = TypeKind.CHAR,
     .typeid = TypeKind.CHAR as (Typeid),
-    .name = "char",
     .sym = null
 }
 
 public const I8_TYPE = TypeInfo {
     .kind = TypeKind.I8,
     .typeid = TypeKind.I8 as (Typeid),
-    .name = "i8",
     .sym = null
 }
 
 public const U8_TYPE = TypeInfo {
     .kind = TypeKind.U8,
     .typeid = TypeKind.U8 as (Typeid),
-    .name = "u8",
     .sym = null
 }
 
 public const I16_TYPE = TypeInfo {
     .kind = TypeKind.I16,
     .typeid = TypeKind.I16 as (Typeid),
-    .name = "i16",
     .sym = null
 }
 
 public const U16_TYPE = TypeInfo {
     .kind = TypeKind.U16,
     .typeid = TypeKind.U16 as (Typeid),
-    .name = "u16",
     .sym = null
 }
 
 public const I32_TYPE = TypeInfo {
     .kind = TypeKind.I32,
     .typeid = TypeKind.I32 as (Typeid),
-    .name = "i32",
     .sym = null
 }
 
 public const U32_TYPE = TypeInfo {
     .kind = TypeKind.U32,
     .typeid = TypeKind.U32 as (Typeid),
-    .name = "u32",
     .sym = null
 }
 
 public const I64_TYPE = TypeInfo {
     .kind = TypeKind.I64,
     .typeid = TypeKind.I64 as (Typeid),
-    .name = "i64",
     .sym = null
 }
 
 public const U64_TYPE = TypeInfo {
     .kind = TypeKind.U64,
     .typeid = TypeKind.U64 as (Typeid),
-    .name = "u64",
     .sym = null
 }
 
 public const F32_TYPE = TypeInfo {
     .kind = TypeKind.F32,
     .typeid = TypeKind.F32 as (Typeid),
-    .name = "f32",
     .sym = null
 }
 
 public const F64_TYPE = TypeInfo {
     .kind = TypeKind.F64,
     .typeid = TypeKind.F64 as (Typeid),
-    .name = "f64",
     .sym = null
 }
 
 public const USIZE_TYPE = TypeInfo {
     .kind = TypeKind.USIZE,
     .typeid = TypeKind.USIZE as (Typeid),
-    .name = "usize",
     .sym = null
 }
 
 public const NULL_TYPE = TypeInfo {
     .kind = TypeKind.NULL,
     .typeid = TypeKind.NULL as (Typeid),
-    .name = "null",
     .sym = null
 }
 
 public const VOID_TYPE = TypeInfo {
     .kind = TypeKind.VOID,
     .typeid = TypeKind.VOID as (Typeid),
-    .name = "void",
     .sym = null
 }
 
 public const STR_TYPE = TypeInfo {
     .kind = TypeKind.STR,
     .typeid = TypeKind.STR as (Typeid),
-    .name = "*const char",
     .sym = null
 }
 
 public const POISON_TYPE = TypeInfo {
     .kind = TypeKind.POISON,
     .typeid = TypeKind.POISON as (Typeid),
-    .name = "<poison>",
     .sym = null
 }

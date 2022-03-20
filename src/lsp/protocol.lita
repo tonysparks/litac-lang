@@ -207,7 +207,7 @@ public func SymbolToSymbolInformation(sym: *sym::Symbol, rootPath: *const char, 
     if(!sym) return null;
 
     var result = CreateJsonObject(alloc)
-    result.putStr("name", sym.name)
+    result.putStr("name", sym.name.buffer, sym.name.length)
     result.putBool("deprecated", (sym.flags & sym::SymbolFlags.IS_TYPE) && sym.decl.hasNote("deprecated"))
 
     var kind = SymbolKindFromSymbol(sym) as (i32)

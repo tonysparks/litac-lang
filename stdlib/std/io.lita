@@ -23,24 +23,31 @@ public func FileLength(fileName: *const char) : i64 {
     return len;
 }
 
-public func ReadFile(fileName: *const char, data: **char, alloc: *const Allocator = defaultAllocator) : FileStatus {
+public func ReadFile(fileName: *const char,
+                     data: **char,
+                     length: *i64,
+                     alloc: *const Allocator = defaultAllocator) : FileStatus {
 
     var fp = fopen(fileName, "r")
     if(fp == null) {
+        *length = -1;
         return FileStatus.FileNotFoundError;
     }
     defer fclose(fp)
 
     if (fseek(fp, 0, SEEK_END)) {
+        *length = -1;
         return FileStatus.IOError;
     }
 
     const len = ftell(fp)
     if(len < 0_i64) {
+        *length = -1;
         return FileStatus.IOError;
     }
 
     if (fseek(fp, 0, SEEK_SET)) {
+        *length = -1;
         return FileStatus.IOError;
     }
 
@@ -50,10 +57,13 @@ public func ReadFile(fileName: *const char, data: **char, alloc: *const Allocato
     // stupid Windows and /r/n, the newLen will be different than that of ftell
     var newLen = fread(buf, sizeof(:char), len, fp);
     if(ferror(fp)) {
+        *length = -1;
         return FileStatus.IOError;
     }
 
     buf[newLen] = '\0';
+    *length = newLen;
+
     return FileStatus.Ok;
 
 }

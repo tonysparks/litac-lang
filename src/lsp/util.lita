@@ -161,7 +161,7 @@ func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
             var funcPtr = type as (*FuncPtrTypeSpec)
             for(var i = 0; i < funcPtr.genericParams.size(); i += 1) {
                 var param = funcPtr.genericParams.getPtr(i)
-                if(this.isTokenAtPos(param.name)) {
+                if(this.isTokenAtPos(param.name.token)) {
                     return true
                 }
             }
@@ -202,10 +202,10 @@ func (this: *SourceLookup) isDeclAtPos(decl: *Decl) : bool {
         return false
     }
 
-    if(this.isTokenAtPos(decl.name)) {
+    if(this.isTokenAtPos(decl.name.token)) {
         this.result.kind = SourceLocationKind.AST
         this.result.node = &decl.stmt.node
-        PosToRange(decl.name.pos, &this.result.location.range)
+        PosToRange(decl.name.token.pos, &this.result.location.range)
         return true
     }
 
@@ -219,8 +219,8 @@ func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
         case StmtKind.IMPORT_DECL: {
             var decl = node as (*ImportDecl)
 
-            if(decl.alias.type == TokenType.IDENTIFIER) {
-                if(this.isTokenAtPos(decl.alias)) {
+            if(decl.alias.token.type == TokenType.IDENTIFIER) {
+                if(this.isTokenAtPos(decl.alias.token)) {
                     this.result.kind = SourceLocationKind.AST
                     this.result.node = &decl.stmt.node
                     return true
@@ -751,8 +751,8 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
                 return true
             }
 
-            if(expr.fieldName.type == TokenType.IDENTIFIER) {
-                if(this.isTokenAtPos(expr.fieldName)) {
+            if(expr.fieldName.token.type == TokenType.IDENTIFIER) {
+                if(this.isTokenAtPos(expr.fieldName.token)) {
                     this.result.kind = SourceLocationKind.AST
                     this.result.node = &node.stmt.node
                     return true
@@ -766,8 +766,8 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
                 return true
             }
 
-            if(expr.field.type == TokenType.IDENTIFIER) {
-                if(this.isTokenAtPos(expr.field)) {
+            if(expr.field.token.type == TokenType.IDENTIFIER) {
+                if(this.isTokenAtPos(expr.field.token)) {
                     // TODO: Field reference
                     return true
                 }

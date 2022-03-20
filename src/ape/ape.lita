@@ -102,7 +102,7 @@ public func ape_execute_program(p0: *ape_t, p1: *const ape_program_t) : ape_obje
 public func ape_program_destroy(p0: *ape_program_t) : void;
 
 @foreign
-public func ape_execute(p0: *ape_t, p1: *const char) : ape_object_t;
+public func ape_execute(p0: *ape_t, p1: *const char, len: i32) : ape_object_t;
 
 @foreign
 public func ape_execute_file(p0: *ape_t, p1: *const char) : ape_object_t;

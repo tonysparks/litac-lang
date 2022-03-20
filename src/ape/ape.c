@@ -510,7 +510,7 @@ typedef struct lexer {
     compiled_file_t *file;
 } lexer_t;
 
-APE_INTERNAL bool lexer_init(lexer_t *lex, const char *input, compiled_file_t *file); // no need to deinit
+APE_INTERNAL bool lexer_init(lexer_t *lex, const char *input, int len, compiled_file_t *file); // no need to deinit
 
 APE_INTERNAL token_t lexer_next_token(lexer_t *lex);
 
@@ -814,7 +814,7 @@ typedef struct parser {
 APE_INTERNAL parser_t* parser_make(const ape_config_t *config, ptrarray(error_t) *errors);
 APE_INTERNAL void parser_destroy(parser_t *parser);
 
-APE_INTERNAL ptrarray(statement_t)* parser_parse_all(parser_t *parser,  const char *input, compiled_file_t *file);
+APE_INTERNAL ptrarray(statement_t)* parser_parse_all(parser_t *parser,  const char *input, int len, compiled_file_t *file);
 
 #endif /* parser_h */
 //FILE_END
@@ -1051,7 +1051,7 @@ typedef struct compiler {
 
 APE_INTERNAL compiler_t *compiler_make(const ape_config_t *config, gcmem_t *mem, ptrarray(error_t) *errors);
 APE_INTERNAL void compiler_destroy(compiler_t *comp);
-APE_INTERNAL compilation_result_t* compiler_compile(compiler_t *comp, const char *code);
+APE_INTERNAL compilation_result_t* compiler_compile(compiler_t *comp, const char *code, int len);
 APE_INTERNAL compilation_result_t* compiler_compile_file(compiler_t *comp, const char *path);
 APE_INTERNAL int compiler_emit(compiler_t *comp, opcode_t op, int operands_count, uint64_t *operands);
 APE_INTERNAL compilation_scope_t* compiler_get_compilation_scope(compiler_t *comp);
@@ -3126,9 +3126,9 @@ static token_type_t lookup_identifier(const char *ident, int len);
 static void skip_whitespace(lexer_t *lex);
 static void add_line(lexer_t *lex, int offset);
 
-bool lexer_init(lexer_t *lex, const char *input, compiled_file_t *file) {
+bool lexer_init(lexer_t *lex, const char *input, int len, compiled_file_t *file) {
     lex->input = input;
-    lex->input_len = (int)strlen(input);
+    lex->input_len = len;
     lex->position = 0;
     lex->next_position = 0;
     lex->ch = '\0';
@@ -4542,10 +4542,10 @@ void parser_destroy(parser_t *parser) {
     ape_free(parser, ape_freeArg);
 }
 
-ptrarray(statement_t)* parser_parse_all(parser_t *parser,  const char *input, compiled_file_t *file) {
+ptrarray(statement_t)* parser_parse_all(parser_t *parser,  const char *input, int len, compiled_file_t *file) {
     parser->depth = 0;
 
-    lexer_init(&parser->lexer, input, file);
+    lexer_init(&parser->lexer, input, len, file);
 
     next_token(parser);
     next_token(parser);
@@ -6180,7 +6180,7 @@ void compilation_result_destroy(compilation_result_t *res) {
 #include "error.h"
 #endif
 
-static bool compile_code(compiler_t *comp, const char *code);
+static bool compile_code(compiler_t *comp, const char *code, int len);
 static bool compile_statements(compiler_t *comp, ptrarray(statement_t) *statements);
 static bool import_module(compiler_t *comp, const statement_t *import_stmt);
 static bool compile_statement(compiler_t *comp, const statement_t *stmt);
@@ -6262,7 +6262,7 @@ void compiler_destroy(compiler_t *comp) {
     ape_free(comp, ape_freeArg);
 }
 
-compilation_result_t* compiler_compile(compiler_t *comp, const char *code) {
+compilation_result_t* compiler_compile(compiler_t *comp, const char *code, int len) {
     // todo: make compiler_reset function
     array_clear(comp->src_positions_stack);
     array_clear(comp->break_ip_stack);
@@ -6274,7 +6274,7 @@ compilation_result_t* compiler_compile(compiler_t *comp, const char *code) {
 
     symbol_table_t *global_table_copy = symbol_table_copy(compiler_get_symbol_table(comp));
 
-    bool ok = compile_code(comp, code);
+    bool ok = compile_code(comp, code, len);
 
     compilation_scope = compiler_get_compilation_scope(comp);
 
@@ -6324,7 +6324,7 @@ compilation_result_t* compiler_compile_file(compiler_t *comp, const char *path) 
     compiled_file_t *prev_file = file_scope->file;
     file_scope->file = file;
 
-    compilation_result_t *res = compiler_compile(comp, code);
+    compilation_result_t *res = compiler_compile(comp, code, strlen(code));
 
     file_scope->file = prev_file;
     ape_free(code, ape_freeArg);
@@ -6401,11 +6401,11 @@ opcode_t compiler_last_opcode(compiler_t *comp) {
 }
 
 // INTERNAL
-static bool compile_code(compiler_t *comp, const char *code) {
+static bool compile_code(compiler_t *comp, const char *code, int len) {
     file_scope_t *file_scope = ptrarray_top(comp->file_scopes);
     APE_ASSERT(file_scope);
 
-    ptrarray(statement_t) *statements = parser_parse_all(file_scope->parser, code, file_scope->file);
+    ptrarray(statement_t) *statements = parser_parse_all(file_scope->parser, code, len, file_scope->file);
     if (!statements) {
         // errors are added by parser
         return false;
@@ -6496,7 +6496,7 @@ static bool import_module(compiler_t *comp, const statement_t *import_stmt) {
 
         module = module_make(module_name);
         push_file_scope(comp, filepath, module);
-        bool ok = compile_code(comp, code);
+        bool ok = compile_code(comp, code, strlen(code));
         pop_file_scope(comp);
         ape_free(code, ape_freeArg);
 
@@ -10776,7 +10776,7 @@ ape_program_t* ape_compile(ape_t *ape, const char *code) {
 
     compilation_result_t *comp_res = NULL;
 
-    comp_res = compiler_compile(ape->compiler, code);
+    comp_res = compiler_compile(ape->compiler, code, strlen(code));
     if (!comp_res || ptrarray_count(ape->errors) > 0) {
         goto err;
     }
@@ -10843,12 +10843,12 @@ void ape_program_destroy(ape_program_t *program) {
     ape_free(program, ape_freeArg);
 }
 
-ape_object_t ape_execute(ape_t *ape, const char *code) {
+ape_object_t ape_execute(ape_t *ape, const char *code, int len) {
     reset_state(ape);
 
     compilation_result_t *comp_res = NULL;
 
-    comp_res = compiler_compile(ape->compiler, code);
+    comp_res = compiler_compile(ape->compiler, code, len);
     if (!comp_res || ptrarray_count(ape->errors) > 0) {
         goto err;
     }

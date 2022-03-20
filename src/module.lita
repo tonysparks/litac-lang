@@ -14,6 +14,7 @@ import "types"
 import "ast"
 import "ast_new"
 import "lex"
+import "intern"
 
 public enum ModuleFlags {
     TYPE_CHECKED  = (1<<0),
@@ -24,27 +25,31 @@ public enum ModuleFlags {
 public struct ModuleId {
     filename: [MAX_PATH]char   // full path the file of this module
     packageName: StringView    // relative path from the main module's directory
-    name: StringView           // the name of the module
+    name: InternedString       // the name of the module
 }
 
 public struct ModuleImport {
     module: *Module
-    alias: *StringView
+    alias: *InternedString
     isUsing: bool
 }
 
 public struct Module {
     id: ModuleId        // TODO: don't make a separate allocation
-    text: *char         // text of modules file
+    text: String        // text of modules file
     ast: *ModuleStmt
     symbols: Scope
     currentScope: *Scope
-    genericSymbols: *Map<*const char, *Symbol>
+    genericSymbols: *Map<InternedString, *Symbol>
     flags: i32
 
     importedBy: Array<ModuleImport> // modules that import this module
 
     allocator: *const Allocator
+    lita: *Lita
+}
+
+public const BUILTIN_IMPORT_IDENT = Identifier {
 }
 
 public const BUILTIN_IMPORT_TOKEN = Token {
@@ -58,13 +63,17 @@ public const BUILTIN_IMPORT_TOKEN = Token {
 }
 public const builtins = Module{}
 public func BuiltinsInit(lita: *Lita) : *Module {
-    builtins.text = null
+    BUILTIN_IMPORT_IDENT.str = BUILTIN
+    BUILTIN_IMPORT_IDENT.token = BUILTIN_IMPORT_TOKEN
+
+    builtins.text = String{}
     builtins.ast = null
     builtins.flags = 0
     builtins.allocator = lita.allocator
     builtins.importedBy.init(512, lita.allocator)
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
     builtins.genericSymbols = &lita.genericSymbols
+    builtins.lita = lita
 
     var filename: [MAX_PATH]char;
     var pathStr = StringInit(filename, MAX_PATH);
@@ -105,27 +114,26 @@ public func NewModule(lita: *Lita,
                       filename: *const char) : *Module {
 
     var mod = new<Module>(lita.allocator)
-    mod.init(&lita.result, &lita.genericSymbols, lita.allocator)
+    mod.init(lita)
     mod.id.fromFile(lita, filename)
     return mod
 }
 
-public func (this: *Module) init(result: *PhaseResult,
-                                 genericSymbols: *Map<*const char, *Symbol>,
-                                 allocator: *const Allocator) {
-    this.text = null
+public func (this: *Module) init(lita: *Lita) {
+    this.text = String{}
     this.ast = null
-    this.importedBy.init(64, allocator)
-    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, result, allocator)
+    this.importedBy.init(64, lita.allocator)
+    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, lita.allocator)
     this.flags = 0
-    this.allocator = allocator
+    this.allocator = lita.allocator
     this.currentScope = &this.symbols
-    this.genericSymbols = genericSymbols
+    this.genericSymbols = &lita.genericSymbols
+    this.lita = lita
 
     this.symbols.module = this // TEMP
 }
 
-public func (this: *Module) getType(type: *const char) : *Symbol {
+public func (this: *Module) getType(type: InternedString) : *Symbol {
     var sym = this.symbols.lookup(type)
     if(sym) {
         return sym
@@ -134,7 +142,7 @@ public func (this: *Module) getType(type: *const char) : *Symbol {
     return this.genericSymbols.get(type)
 }
 
-public func (this: *Module) getFuncType(type: *const char) : *Symbol {
+public func (this: *Module) getFuncType(type: InternedString) : *Symbol {
     var sym = this.symbols.lookupFunc(type)
     if(sym) {
         return sym
@@ -220,9 +228,9 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
 }
 
 public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport: *Module) {
-    var moduleName: *StringView = null;
+    var moduleName: *InternedString = null;
 
-    if(importDecl.alias.type == TokenType.IDENTIFIER) {
+    if(importDecl.alias.token.type == TokenType.IDENTIFIER) {
         moduleName = &importDecl.alias.str;
     }
 
@@ -230,15 +238,14 @@ public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport
 }
 
 
-func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *StringView, isUsing: bool) {
+func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *InternedString, isUsing: bool) {
     moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
 
     var symbols = moduleToImport.symbols;
-
     for(var i = 0; i < symbols.symbolTypes.capacity; i += 1) {
         var symName = symbols.symbolTypes.keys[i]
         var symbol = symbols.symbolTypes.values[i]
-        if(!symName || !symbol) {
+        if(!symName.addr || !symbol) {
             continue
         }
 
@@ -248,7 +255,7 @@ func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *S
     for(var i = 0; i < symbols.symbolFuncs.capacity; i += 1) {
         var symName = symbols.symbolFuncs.keys[i]
         var symbol = symbols.symbolFuncs.values[i]
-        if(!symName || !symbol) {
+        if(!symName.addr || !symbol) {
             continue
         }
 
@@ -257,9 +264,9 @@ func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *S
 }
 
 public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
-                                               moduleName: *StringView,
+                                               moduleName: *InternedString,
                                                symbol: *Symbol,
-                                               symName: *const char,
+                                               symName: InternedString,
                                                isUsing: bool) {
 
     // only import public symbols
@@ -287,9 +294,10 @@ public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
         var name = StringBufferInit(MAX_SYMBOL_NAME, this.allocator)
         name.appendStrn(moduleName.buffer, moduleName.length)
         name.appendStrn("::", 2)
-        name.appendStr(symbol.name)
+        name.appendStrn(symbol.name.buffer, symbol.name.length)
 
-        this.symbols.importSymbol(name.cStrConst(), symbol)
+        var nameIntern = this.lita.strings.intern(name.cStrConst(), name.length)
+        this.symbols.importSymbol(nameIntern, symbol)
     }
     else {
         this.symbols.importSymbol(symName, symbol)
@@ -308,27 +316,27 @@ public func (this: *Module) equals(other: *Module) : bool {
 
 public func (this: *Module) print(header: *const char) {
     printf("Module %s %.*s {\n", header, this.id.name.length, this.id.name.buffer)
-    var symbols = this.symbols
 
+    var symbols = this.symbols
     for(var i = 0; i < symbols.symbolTypes.capacity; i+=1) {
         var symName = symbols.symbolTypes.keys[i]
         var symbol = symbols.symbolTypes.values[i]
-        if(!symName || !symbol) {
+        if(!symName.addr || !symbol) {
             printf("   %d null\n", i)
             continue
         }
-        printf("   %d '%s' %s\n", i, symName, SymbolKindAsStr(symbol.kind))
+        printf("   %d '%.*s' %s\n", i, symName.length, symName.buffer, SymbolKindAsStr(symbol.kind))
     }
 
 
     for(var i = 0; i < symbols.symbolFuncs.capacity; i+=1) {
         var symName = symbols.symbolFuncs.keys[i]
         var symbol = symbols.symbolFuncs.values[i]
-        if(!symName || !symbol) {
+        if(!symName.addr || !symbol) {
             printf("   %d null\n", i)
             continue
         }
-        printf("   %d '%s' %s\n", i, symName, SymbolKindAsStr(symbol.kind))
+        printf("   %d '%.*s' %s\n", i, symName.length, symName.buffer, SymbolKindAsStr(symbol.kind))
     }
     printf("}\n")
 }
@@ -338,7 +346,9 @@ public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {
     var pathStr = StringViewInit(moduleId.filename);
 
     moduleId.packageName = StringViewInit(moduleId.filename, 0)
-    moduleId.name = GetModuleName(pathStr)
+
+    var name = GetModuleName(pathStr)
+    moduleId.name = lita.strings.internCopy(name.buffer, name.length)
 }
 
 public func GetModuleName(pathStr: StringView) : StringView {

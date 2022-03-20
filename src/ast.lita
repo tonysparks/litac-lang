@@ -10,6 +10,7 @@ import "types"
 import "lex"
 import "common"
 import "module"
+import "intern"
 
 @asStr
 public enum StmtKind {
@@ -115,7 +116,8 @@ public struct TypeSpec {
 
 public struct NameTypeSpec {
     spec: using TypeSpec
-    name: *const char
+    //name: *const char
+    name: InternedString
     genericArgs: Array<*TypeSpec>
 }
 
@@ -140,8 +142,13 @@ public struct FuncPtrTypeSpec {
     genericParams: Array<GenericParam>
 }
 
+public struct Identifier {
+    str: InternedString
+    token: Token
+}
+
 public struct GenericParam {
-    name: Token
+    name: Identifier
 }
 
 public struct Attributes {
@@ -198,7 +205,7 @@ public func (n: *Node) becomeParentOfChildrenCallArgs(children: *Array<CallArg>)
 public struct Decl {
     stmt: using Stmt
     sym: *Symbol
-    name: Token
+    name: Identifier
     attributes: Attributes
 }
 
@@ -209,7 +216,7 @@ public struct GenericDecl {
 
 public struct ImportDecl {
     decl: using Decl
-    alias: Token // Identifier?
+    alias: Identifier
     isUsing: bool
 
     moduleId: *ModuleId
@@ -279,8 +286,8 @@ public struct BreakStmt {
 
 public struct CompStmt {
     stmt: using Stmt
-    type: *const char
-    expr: *const char
+    type: InternedString
+    expr: StringView
     end: *CompStmt
     evaluatedStmt: *Stmt
     body: Array<*Stmt>
@@ -325,7 +332,7 @@ public struct FuncBodyStmt {
 
 public struct GotoStmt {
     stmt: using Stmt
-    label: Token // Identifer?
+    label: Identifier
 }
 
 public struct IfStmt {
@@ -338,7 +345,7 @@ public struct IfStmt {
 
 public struct LabelStmt {
     stmt: using Stmt
-    label: Token // Identifier?
+    label: Identifier
 }
 
 // TODO: should ths be a declaration?
@@ -451,7 +458,7 @@ public struct CharExpr {
 
 public struct CallArg {
     argExpr: *Expr
-    argName: Token
+    argName: Identifier
     index: i32
 }
 
@@ -491,7 +498,7 @@ public struct IdentifierExpr {
 
 public struct InitArgExpr {
     expr: using Expr
-    fieldName: Token // Identifier?
+    fieldName: Identifier
     argPosition: i32
     value: *Expr
 }
@@ -515,7 +522,7 @@ public struct NumberExpr {
 public struct OffsetOfExpr {
     expr: using Expr
     type: *TypeSpec
-    field: Token // Identifier?
+    field: Identifier
 }
 
 public struct SetExpr {
@@ -666,7 +673,7 @@ public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
 
     for(var i = 0; i < d.attributes.notes.size(); i += 1) {
         var note = d.attributes.notes.get(i)
-        if(strcmp(note.type.name, name) == 0) {
+        if(strncmp(note.type.name.buffer, name, note.type.name.length) == 0) {
             return note;
         }
     }
@@ -700,7 +707,7 @@ public func (this: *TypeSpec) getBaseType() : *TypeSpec {
 
 
 public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
-    if(f.name.type != TokenType.IDENTIFIER) {
+    if(f.name.token.type != TokenType.IDENTIFIER) {
         return false
     }
 
@@ -731,13 +738,14 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
         }
 
         var type = typeSpec as (*NameTypeSpec)
-        var totalLen = f.name.str.length + strlen(type.name) + 2 // _ and \0
+        var totalLen = f.name.str.length + type.name.length + 2 // _ and \0
         if(totalLen > MAX_SYMBOL_NAME) {
             return false
         }
 
         var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
-        nameStr.format("%s_%.*s", type.name, f.name.str.length, f.name.str.buffer)
+        nameStr.format("%.*s_%.*s",
+            type.name.length, type.name.buffer, f.name.str.length, f.name.str.buffer)
         return true
     }
 

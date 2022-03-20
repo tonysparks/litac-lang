@@ -20,6 +20,7 @@ import "lex"
 import "common"
 import "dependency_graph"
 import "cgen_decl"
+import "intern"
 
 public struct CGen {
     lita: using *Lita
@@ -365,7 +366,8 @@ func (this: using *CGen) emitTraitDecls() {
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
         var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME)
-        vtableNameStr.format("%s%.*s__%s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, this.escapeNameStr(traitSym.name))
+        var escapedName = this.escapeNameStr(traitSym.name)
+        vtableNameStr.format("%s%.*s__%.*s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, escapedName.length, escapedName.buffer)
 
         // Generate Casting functions;
         // we generate the casting functions in C code and not in lita
@@ -488,12 +490,25 @@ func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]cha
     return name.cStr()
 }
 
-func (this: using *CGen) escapeNameStr(name: *const char) : *char {
+func (this: using *CGen) escapeNameStr(name: InternedString) : StringView {
     var sb = StringBufferInit(256, this.allocator)
-    return EscapeName(name, sb)
+    EscapeName(name.buffer, name.length, sb)
+    return StringView {
+        .buffer = sb.buffer,
+        .length = sb.length
+    }
 }
 
-func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
+func (this: using *CGen) escapeNameChars(name: *const char) : StringView {
+    var sb = StringBufferInit(256, this.allocator)
+    EscapeName(name, strlen(name), sb)
+    return StringView {
+        .buffer = sb.buffer,
+        .length = sb.length
+    }
+}
+
+func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
     if(IsAggregate(type)) {
         return this.escapeNameStr(type.name)
     }
@@ -507,15 +522,17 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : *const char {
                     assert(false)
                 }
 
-                return this.escapeNameStr(methodName)
+                return this.escapeNameChars(methodName)
             }
         }
         // function pointer
-        return "_"
-        //return this.escapeNameStr(type.name)
+        return StringView {
+            .buffer = "_",
+            .length = 1
+        }
     }
 
-    return type.name
+    return type.name.view
 }
 
 func (this: using *CGen) baseTypeName(name: StringView) : StringView {
@@ -924,7 +941,7 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
 func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
 
-    var declName:*const char = sym.name
+    var declName = sym.name.view
     if(IsFuncLike(sym.type)) {
         declName = this.escapeNameStr(sym.name)
     }
@@ -938,10 +955,10 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 
     if(sym.flags & SymbolFlags.IS_FOREIGN) {
         if(sym.flags & SymbolFlags.IS_BUILTIN) {
-            return this.prefix(sym.name, sb)
+            return this.prefix(sym.name.view, sb)
         }
 
-        var name = this.foreignName(sym.decl, this.baseTypeName(sym.decl.name.str))
+        var name = this.foreignName(sym.decl, this.baseTypeName(sym.decl.name.str.view))
         sb.appendStrn(name.buffer, name.length)
         return sb.cStrConst()
     }
@@ -949,7 +966,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
     sb.appendStr(this.options.cPrefix)
     sb.appendStrn(sym.declared.id.name.buffer, sym.declared.id.name.length)
     sb.appendStrn("__", 2)
-    sb.appendStr(declName)
+    sb.appendStrn(declName.buffer, declName.length)
     return sb.cStrConst()
 }
 
@@ -968,9 +985,9 @@ func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     return this.cName(type.sym)
 }
 
-func (this: using *CGen) prefix(name: *const char, sb: *StringBuffer) : *const char {
+func (this: using *CGen) prefix(name: StringView, sb: *StringBuffer) : *const char {
     sb.appendStr(this.options.cPrefix)
-    sb.appendStr(name)
+    sb.appendStrn(name.buffer, name.length)
     return sb.cStrConst()
 }
 
@@ -1005,7 +1022,7 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
         }
         case TypeSpecKind.NAME: {
             var name = spec as (*NameTypeSpec)
-            buf.appendStr(name.name)
+            buf.appendStrn(name.name.buffer, name.name.length)
             if(!name.genericArgs.empty()) {
                 buf.appendStrn("<", 1)
                 for(var i = 0; i < name.genericArgs.size(); i += 1) {
@@ -1053,7 +1070,8 @@ func (this: using *CGen) emitNameStr(name: StringView) {
     buf.appendStrn(name.buffer, name.length)
 }
 
-func (this: using *CGen) emitName(tok: Token) {
+func (this: using *CGen) emitName(id: Identifier) {
+    var tok = id.token
     if(tok.type != TokenType.ERROR) {
         buf.appendStrn(tok.value.str.buffer, tok.value.str.length)
     }
@@ -1169,7 +1187,7 @@ func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bool = tr
 }
 
 func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
-    if(strcmp(note.type.name, "include") == 0) {
+    if(note.type.name.equals(&INCLUDE)) {
         for(var i = 0; i < note.arguments.size(); i += 1) {
             var attr = note.arguments.get(i)
             if(!attr.argExpr) {
@@ -1186,7 +1204,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             }
         }
     }
-    else if(strcmp(note.type.name, "raw") == 0) {
+    else if(note.type.name.equals(&RAW)) {
         for(var i = 0; i < note.arguments.size(); i += 1) {
             var attr = note.arguments.get(i)
             if(!attr.argExpr) {
@@ -1197,32 +1215,32 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             buf.appendStrn(value.buffer, value.length)
         }
     }
-    else if(strcmp(note.type.name, "inline") == 0) {
+    else if(note.type.name.equals(&INLINE)) {
         this.emitStr("LITAC_INLINE ")
     }
-    else if(strcmp(note.type.name, "noinline") == 0) {
+    else if(note.type.name.equals(&NOINLINE)) {
         this.emitStr("LITAC_NOINLINE ")
     }
-    else if(strcmp(note.type.name, "static") == 0) {
+    else if(note.type.name.equals(&STATIC)) {
         this.emitStr("static ")
     }
-    else if(strcmp(note.type.name, "atomic") == 0) {
+    else if(note.type.name.equals(&ATOMIC)) {
         this.emitStr("_Atomic ")
     }
-    else if(strcmp(note.type.name, "register") == 0) {
+    else if(note.type.name.equals(&REGISTER)) {
         this.emitStr("register ")
     }
-    else if(strcmp(note.type.name, "threadlocal") == 0) {
+    else if(note.type.name.equals(&THREADLOCAL)) {
         this.emitStr("LITAC_THREADLOCAL ")
     }
-    else if(strcmp(note.type.name, "export") == 0) {
+    else if(note.type.name.equals(&EXPORT)) {
         this.emitStr("LITAC_EXPORT ")
         // TODO
     }
-    else if(strcmp(note.type.name, "packed") == 0) {
+    else if(note.type.name.equals(&PACKED)) {
         this.emitStr("LITAC_PACKED ")
     }
-    else if(strcmp(note.type.name, "cc") == 0) {
+    else if(note.type.name.equals(&CC)) {
         if(!note.arguments.empty()) {
             var attr = note.arguments.get(0)
             if(attr.argExpr) {
@@ -1232,7 +1250,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             }
         }
     }
-    else if(strcmp(note.type.name, "cFile") == 0) {
+    else if(note.type.name.equals(&CFILE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
         var filenameStr = StringInit(filename, MAX_PATH)
@@ -1280,7 +1298,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             this.emitStrn("\n", 1)
         }
     }
-    else if(strcmp(note.type.name, "cInclude") == 0) {
+    else if(note.type.name.equals(&CINCLUDE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
         var filenameStr = StringInit(filename, MAX_PATH)
@@ -1315,7 +1333,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 }
 
 func (this: using *CGen) emitPostludeNote(note: *NoteStmt) {
-    if(strcmp(note.type.name, "packed") == 0) {
+    if(note.type.name.equals(&PACKED)) {
         this.emitStr(" LITAC_PACKED_POP ")
     }
 }
@@ -1323,7 +1341,6 @@ func (this: using *CGen) emitPostludeNote(note: *NoteStmt) {
 func (this: using *CGen) emitFieldName(field: FieldStmt) {
     assert(field.kind != StmtKind.POISON_EXPR)
     var alias = field.varField.decl.getNote("alias")
-
     if(alias && alias.arguments.size()) {
         var name = alias.arguments.get(0)
         if(name.argExpr) {
@@ -1963,7 +1980,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             if(!sym) {
                 this.emitStr(this.options.cPrefix)
-                this.emitStr(expr.type.name)
+                this.emitStrn(expr.type.name.buffer, expr.type.name.length)
             }
             else {
                 this.emitSymbol(sym)
@@ -1985,12 +2002,12 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             if(expr.flags & GetExprFlags.IS_ENUM) {
                 // TODO: Allow for Alias field names for foreign types!
                 if(objectType.sym && objectType.sym.flags & SymbolFlags.IS_FOREIGN) {
-                    buf.appendStr(expr.field.type.name)
+                    buf.appendStrn(expr.field.type.name.buffer, expr.field.type.name.length)
                 }
                 else {
                     buf.appendStr(this.cName(objectType.sym))
                     buf.appendStrn("_", 1)
-                    buf.appendStr(expr.field.type.name)
+                    buf.appendStrn(expr.field.type.name.buffer, expr.field.type.name.length)
                 }
                 return;
             }
@@ -2060,7 +2077,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.INIT_ARG_EXPR: {
             var expr = s as (*InitArgExpr)
-            if(expr.fieldName.type == TokenType.IDENTIFIER) {
+            if(expr.fieldName.token.type == TokenType.IDENTIFIER) {
                 var parentExpr = expr.parent
                 assert(parentExpr && parentExpr.kind == StmtKind.INIT_EXPR)
 
@@ -2074,7 +2091,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
                 var aggInfo = baseInfo as (*AggregateTypeInfo)
 
-                var field = aggInfo.getField(expr.fieldName.asString())
+                var field = aggInfo.getField(expr.fieldName.str)
                 if(field.kind == StmtKind.VAR_FIELD_DECL) {
                     this.emitStrn(".", 1)
                     this.emitFieldName(field)
@@ -2265,7 +2282,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 else {
                     buf.appendStrn(".", 1)
                 }
-                buf.appendStr(expr.field.type.name)
+                buf.appendStrn(expr.field.type.name.buffer, expr.field.type.name.length)
                 buf.appendStrn(" ", 1)
                 buf.appendStr(tokenText[expr.operator])
                 buf.appendStrn(" ", 1)

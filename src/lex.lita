@@ -5,6 +5,7 @@ import "std/mem"
 import "std/string"
 import "std/unicode/utf8"
 import "std/assert"
+//import "std/intrinsics"
 
 import "types"
 
@@ -516,6 +517,7 @@ public struct Lexer {
     filename: *const char
     token: Token
     stream: *const char
+    length: i64
 
     lineStart: *const char
     lineNumber: i32
@@ -526,6 +528,7 @@ public struct Lexer {
 
 public func LexerInit(filename: *const char,
                       text: *const char,
+                      length: i64,
                       allocator: *const Allocator) : Lexer {
     return Lexer {
         .allocator = allocator,
@@ -539,6 +542,7 @@ public func LexerInit(filename: *const char,
             }
         },
         .stream = text,
+        .length = length,
         .lineStart = text,
         .lineNumber = 1,
         .position = 1,
@@ -616,6 +620,9 @@ func (l: *Lexer) skipWhitespace() {
     }
 }
 
+//func batchRead(str: *const char)
+const commentEnd = "*/1234567890123456"
+
 func (l: *Lexer) skipComments() {
     if(*l.stream == '/') {
         if(l.stream[1] == '/') {
@@ -629,6 +636,49 @@ func (l: *Lexer) skipComments() {
             while(!l.eof())
         }
         else if(l.stream[1] == '*') {
+/* TODO: Use intrinsics for faster lexing...
+            const match = _mm_loadu_si128(commentEnd as (*__m128i))
+            const carriage = _mm_set1_epi8('\n');
+
+            l.nextChar() // eat /
+            l.nextChar() // eat *
+
+            var end   = l.length - 16
+            var count = (l.stream + l.length) - (l.stream)
+
+            while(count < end) {
+                var batch = _mm_loadu_si128(l.stream as (*__m128i))
+
+                var carriageRet = _mm_cmpeq_epi8(batch, carriage)
+
+                // check for ending comment marker
+                var result = _mm_cmpestri(match, 2, batch, 16, _SIDD_UBYTE_OPS|_SIDD_CMP_EQUAL_ORDERED|_SIDD_LEAST_SIGNIFICANT|_SIDD_BIT_MASK)
+                if(result < 16) {
+                    l.stream = l.stream + result + 2
+                    goto found;
+                }
+
+                count     += 16
+                l.stream  += 16
+            }
+
+            for(; count < l.length; count +=1) {
+                var c = l.stream[count]
+                if(c == '*' && l.stream[count + 1] == '/') {
+                    l.stream = l.stream + count + 2
+                    goto found;
+                }
+            }
+
+            // end of the stream, with no closing comments...
+            {
+                return;
+            }
+
+            found:
+            // TODO: need to calculate lineNumber and position...
+
+*/
             l.nextChar() // eat /
             do {
                 l.nextChar()

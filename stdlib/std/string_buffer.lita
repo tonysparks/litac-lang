@@ -110,7 +110,7 @@ public func (b: *StringBuffer) appendChar(c: char) : i32 {
 
     b.buffer[b.length] = c
     b.length += 1
-    return b.length
+    return 1
 }
 
 public func (b: *StringBuffer) append(format: *const char, ...) : i32 {

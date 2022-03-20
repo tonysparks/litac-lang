@@ -6,7 +6,8 @@
     "includeTypeInfos": false,
 
     // Unicode escape sequences don't work with TCC :S
-    "buildCmd": "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
+    "buildCmd": "clang -std=c99 -g -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
+    //"buildCmd": "gcc -std=c99 -g -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
 
     "program": `
         @include("assert.h");
@@ -224,7 +225,7 @@
             `,
             "error": "Error token: universal character name: 'U00000000' refers to a control character.  A universal character name may not represent a character in the range 0000-009F, inclusive, with the exceptions of 0024 ('$'), 0040 ('@') and 0060 ('`')"
         },
-        {
+        /*{
             "name": "Invalid Termination String Unicode8",
             "definitions": `
                 import "std/libc"
@@ -234,7 +235,7 @@
                 assert(false)
             `,
             "error": "Error token: string literal not terminated"
-        },
+        },*/
 
 
         // Verbatim Strings

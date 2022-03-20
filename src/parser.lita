@@ -1,4 +1,5 @@
 import "std/string_buffer"
+import "std/string_view"
 import "std/string"
 import "std/mem"
 import "std/array"
@@ -17,6 +18,7 @@ import "error_codes"
 import "lita"
 import "common"
 import "module"
+import "intern"
 
 const DECL_ADJUST_TOKENS_COUNT = 11
 const DECL_ADJUST_TOKENS = [DECL_ADJUST_TOKENS_COUNT]TokenType {
@@ -51,6 +53,7 @@ public struct Parser {
     allocator: *const Allocator
     result: *PhaseResult
     lita: *Lita
+    strings: *Strings
     filename: *const char
 
     totalLines: i32
@@ -69,12 +72,14 @@ public struct Parser {
 
 public func ParserInit(filename: *const char,
                        text: *const char,
+                       length: i64,
                        lita: *Lita) : Parser {
 
     var parser = Parser {
         .allocator = lita.allocator,
         .result = &lita.result,
         .lita = lita,
+        .strings = &lita.strings,
         .filename = filename,
         .current = 0,
         .breakLevel = 0,
@@ -87,7 +92,7 @@ public func ParserInit(filename: *const char,
         .panicMode = false,
     }
 
-    var lex = LexerInit(filename, text, lita.allocator)
+    var lex = LexerInit(filename, text, length, lita.allocator)
     parser.tokens.init(1024, lita.allocator)
 
     while(!lex.eof()) {
@@ -296,10 +301,16 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
     if(!moduleNameStr) {
         goto err;
     }
-    var moduleName = *moduleNameStr
+    var moduleName = Identifier {
+        .str = p.strings.internStringView(moduleNameStr.value.str),
+        .token = *moduleNameStr
+    }
 
-    var alias = Token{
-        .type = TokenType.VOID
+    var alias = Identifier {
+        .str = EMPTY_STR,
+        .token = Token {
+            .type = TokenType.VOID
+        }
     }
 
     if(p.match(TokenType.AS)) {
@@ -308,7 +319,8 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
             goto err;
         }
 
-        alias = *identifier
+        alias.str = p.strings.internStringView(identifier.value.str)
+        alias.token = *identifier
     }
 
     return NewImportDecl(pos, p.prevPos(), moduleName, alias, isUsing, p.allocator) as (*ImportDecl)
@@ -353,7 +365,11 @@ func (p: *Parser) varDeclaration() : *Decl {
     if(!identifier) {
         goto err;
     }
-    var name = *identifier
+
+    var name = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
 
     var type: *TypeSpec = null
     var expr: *Expr = null
@@ -410,7 +426,11 @@ func (p: *Parser) funcDeclaration() : *Decl {
     if(!identifier) {
         goto err;
     }
-    var name = *identifier
+
+    var name = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
 
     var genericParams = Array<GenericParam>{}
     if(p.match(TokenType.LESS_THAN)) {
@@ -440,7 +460,7 @@ func (p: *Parser) funcDeclaration() : *Decl {
         }
     }
     else {
-        returnType = NewVoidTypeSpec(p.pos(), p.allocator)
+        returnType = NewVoidTypeSpec(p.pos(), p.lita)
     }
 
     var flags = 0;
@@ -495,12 +515,16 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
         flags |= AggregateFlags.IS_EMBEDDED;
     }
 
-    var name = Token{
-        .type = TokenType.VOID
+    var name = Identifier {
+        .str = EMPTY_STR,
+        .token = Token {
+            .type = TokenType.VOID
+        }
     }
-
     if(p.check(TokenType.IDENTIFIER)) {
-        name = p.identifier();
+        var id = p.identifier();
+        name.str = p.strings.internStringView(id.value.str)
+        name.token = id
     }
     else {
         flags |= AggregateFlags.IS_ANONYMOUS;
@@ -556,7 +580,10 @@ func (p: *Parser) enumDeclaration() : *Decl {
     if(!identifier) {
         goto err;
     }
-    var name = *identifier
+    var name = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
 
     if(!p.consume(TokenType.LEFT_BRACE, ErrorCode.MISSING_LEFT_BRACE)) {
         goto err;
@@ -602,7 +629,11 @@ func (p: *Parser) typedefDeclaration() : *Decl {
     if(!identifier) {
         goto err;
     }
-    var name = *identifier
+
+    var name = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
 
     var genericParams = Array<GenericParam>{}
     if(p.match(TokenType.LESS_THAN)) {
@@ -625,7 +656,10 @@ func (p: *Parser) paramDeclaration() : *ParameterDecl {
         goto err;
     }
 
-    var name = *identifier
+    var name = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
 
     if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
         goto err;
@@ -835,7 +869,12 @@ func (p: *Parser) offsetOf() : *Expr {
         goto err;
     }
 
-    return NewOffsetOfExpr(pos, p.pos(), type, *fieldName, p.allocator)
+    var name = Identifier {
+        .str = p.strings.internStringView(fieldName.value.str),
+        .token = *fieldName
+    }
+
+    return NewOffsetOfExpr(pos, p.pos(), type, name, p.allocator)
 
 err:
     return p.poisonExpr(pos)
@@ -1400,14 +1439,14 @@ err:
 func (p: *Parser) compStatement() : *Stmt {
     var pos = p.pos()
 
-    var type: *const char = null
-    var scriptExpr: *const char = null
+    var type: InternedString = EMPTY_STR
+    var scriptExpr = StringView{};
 
     if(p.match(TokenType.IF)) {
-        type = "if"
+        type = IF
     }
     else if(p.match(TokenType.ELSE)) {
-        type = "else"
+        type = ELSE
     }
     else {
         var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
@@ -1415,15 +1454,15 @@ func (p: *Parser) compStatement() : *Stmt {
             goto err;
         }
 
-        type = NewTokenName(*identifier, p.allocator)
+        type = NewTokenNameIntern(*identifier, p.lita.strings)
     }
 
-    if(strcmp(type, "if") == 0 ||
-       strcmp(type, "elseif") == 0) {
+    if(type.equals(IF) || type.equals(ELSEIF)) {
         // read the expression
         var pos = p.pos()
         var currentLine = pos.lineNumber
         var script = StringBufferInit(128, p.allocator)
+
         var stream = pos.start
         while(*stream) {
             var c = *stream
@@ -1437,6 +1476,7 @@ func (p: *Parser) compStatement() : *Stmt {
                     continue
                 }
             }
+
             script.appendChar(c)
             stream += 1
         }
@@ -1453,7 +1493,8 @@ func (p: *Parser) compStatement() : *Stmt {
             p.advance()
         }
 
-        scriptExpr = script.cStr()
+        scriptExpr.buffer = script.cStr()
+        scriptExpr.length = script.length
 
         var body = ArrayInit<*Stmt>(32, p.allocator)
         while(!p.atEnd()) {
@@ -1478,20 +1519,10 @@ func (p: *Parser) compStatement() : *Stmt {
         return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
 
     }
-    else if(strcmp(type, "precheck") == 0 ||
-            strcmp(type, "postparse") == 0) {
-
+    else if(type.equals(PRECHECK) || type.equals(POSTPARSE)) {
         var pos = p.pos()
-        var script = StringBufferInit(512, p.allocator)
+
         var stream = pos.start
-        while(*stream) {
-            var c = *stream
-            if(c == '#') {
-                break
-            }
-            script.appendChar(c)
-            stream += 1
-        }
 
         // read the tokens until we are caught up with the
         // eval expression
@@ -1504,7 +1535,8 @@ func (p: *Parser) compStatement() : *Stmt {
             p.advance()
         }
 
-        scriptExpr = script.cStr()
+        scriptExpr.buffer = pos.start
+        scriptExpr.length = (p.pos().start - pos.start) as (i32)
 
         if(!p.consume(TokenType.HASH, ErrorCode.MISSING_COMP_STMT_END)) {
             goto err;
@@ -1517,7 +1549,7 @@ func (p: *Parser) compStatement() : *Stmt {
         var body = Array<*Stmt>{}
         return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
     }
-    else if(strcmp(type, "else") == 0) {
+    else if(type.equals(ELSE)) {
         var body = ArrayInit<*Stmt>(32, p.allocator)
         while(!p.atEnd()) {
             if(p.check(TokenType.HASH)) {
@@ -1540,8 +1572,8 @@ func (p: *Parser) compStatement() : *Stmt {
         }
         return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
     }
-    else if(strcmp(type, "end") == 0) {
-        return NewCompStmt(pos, p.pos(), type, null, Array<*Stmt>{}, null, p.allocator)
+    else if(type.equals(END)) {
+        return NewCompStmt(pos, p.pos(), type, StringView{}, Array<*Stmt>{}, null, p.allocator)
     }
     else {
         p.errorAtToken(p.peek(), ErrorCode.INVALID_COMP_STMT)
@@ -1868,7 +1900,12 @@ func (p: *Parser) gotoStatement() : *Stmt {
         goto err;
     }
 
-    return NewGotoStmt(pos, p.pos(), label, p.allocator)
+    var name = Identifier {
+        .str = p.strings.internStringView(label.value.str),
+        .token = *label
+    }
+
+    return NewGotoStmt(pos, p.pos(), name, p.allocator)
 
 err:
     return p.poisonStatement(pos)
@@ -1889,7 +1926,12 @@ func (p: *Parser) tryLabelStatement() : *Stmt {
         goto err;
     }
 
-    return NewLabelStmt(pos, p.pos(), label, p.allocator)
+    var name = Identifier {
+        .str = p.strings.internStringView(label.value.str),
+        .token = *label
+    }
+
+    return NewLabelStmt(pos, p.pos(), name, p.allocator)
 
 err:
     return p.poisonStatement(pos)
@@ -1918,8 +1960,8 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
         case TokenType.USIZE:
         case TokenType.VOID: {
             p.advance()
-            var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.allocator) as (*NameTypeSpec)
-            spec.name = NewTokenName(token, p.allocator)
+            var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.lita) as (*NameTypeSpec)
+            spec.name = NewTokenNameIntern(token, p.lita.strings)
 
             return spec as (*TypeSpec)
         }
@@ -1928,7 +1970,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             var base = p.type(disambiguate)
             if(!base) return null;
 
-            var spec = NewTypeSpec(TypeSpecKind.PTR, token.pos, p.allocator)
+            var spec = NewTypeSpec(TypeSpecKind.PTR, token.pos, p.lita)
             spec.base = base
             return spec as (*TypeSpec)
         }
@@ -1937,7 +1979,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             var base = p.type(disambiguate)
             if(!base) return null;
 
-            var spec = NewTypeSpec(TypeSpecKind.CONST, token.pos, p.allocator)
+            var spec = NewTypeSpec(TypeSpecKind.CONST, token.pos, p.lita)
             spec.base = base
             return spec as (*TypeSpec)
         }
@@ -1986,8 +2028,8 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
         sb.appendStrn(identifier.str.buffer, identifier.str.length)
     }
 
-    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.allocator) as (*NameTypeSpec)
-    spec.name = sb.cStr()
+    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.lita) as (*NameTypeSpec)
+    spec.name = p.lita.strings.intern(sb.cStr(), sb.length)
 
     if(p.check(TokenType.LESS_THAN)) {
         spec.genericArgs = p.tryGenericArguments(disambiguate)
@@ -2000,7 +2042,7 @@ err:
 }
 
 func (p: *Parser) arrayType() : *ArrayTypeSpec {
-    var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.allocator) as (*ArrayTypeSpec)
+    var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.lita) as (*ArrayTypeSpec)
     p.advance()
 
     if(!p.check(TokenType.RIGHT_BRACKET)) {
@@ -2022,7 +2064,7 @@ err:
 
 func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {
     var pos = p.prevPos()
-    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.allocator) as (*FuncPtrTypeSpec)
+    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.lita) as (*FuncPtrTypeSpec)
 
     if(p.match(TokenType.LESS_THAN))  {
         if(!p.genericParameters(&spec.genericParams)) {
@@ -2131,13 +2173,19 @@ func (p: *Parser) structArguments(arguments: *Array<*InitArgExpr>) : bool {
         }
 
         var pos = p.pos()
-        var fieldName = Token{.type = TokenType.VOID}
+        var fieldName = Identifier {
+            .str = EMPTY_STR,
+            .token = Token{.type = TokenType.VOID}
+        }
+
         if(p.match(TokenType.DOT)) {
             var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
             if(!identifier) {
                 goto err;
             }
-            fieldName = *identifier
+
+            fieldName.str = p.strings.internStringView(identifier.value.str)
+            fieldName.token = *identifier
 
             if(p.check(TokenType.COLON)) {
                 p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
@@ -2180,7 +2228,8 @@ func (p: *Parser) arguments(arguments: *Array<CallArg>) : bool {
                     goto err;
                 }
 
-                arg.argName = *identifier
+                arg.argName.str = p.strings.internStringView(identifier.value.str)
+                arg.argName.token = *identifier
 
                 if(p.check(TokenType.COLON)) {
                     p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)
@@ -2221,8 +2270,13 @@ func (p: *Parser) genericParameters(arguments: *Array<GenericParam>) : bool {
                 goto err;
             }
 
+            var name = Identifier {
+                .str = p.strings.internStringView(typeName.value.str),
+                .token = *typeName
+            }
+
             arguments.add(GenericParam {
-                .name = *typeName
+                .name = name
             })
         }
         while(p.match(TokenType.COMMA))
@@ -2391,7 +2445,11 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
         if(!identifier) {
             goto err;
         }
-        var fieldName = *identifier
+
+        var fieldName = Identifier {
+            .str = p.strings.internStringView(identifier.value.str),
+            .token = *identifier
+        }
 
         if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
             goto err;
@@ -2425,7 +2483,11 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
                 if(!identifier) {
                     goto err;
                 }
-                var fieldName = *identifier
+
+                var fieldName = Identifier {
+                    .str = p.strings.internStringView(identifier.value.str),
+                    .token = *identifier
+                }
 
                 if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
                     goto err;
@@ -2511,7 +2573,11 @@ func (p: *Parser) enumFieldEntryDecl() : *EnumFieldEntryDecl {
     if(!identifier) {
         goto err;
     }
-    var fieldName = *identifier
+
+    var fieldName = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
 
     var value: *Expr = null
     if(p.match(TokenType.EQUALS)) {
@@ -2551,13 +2617,13 @@ func (p: *Parser) tryBitShiftRight(expr: *Expr) : *Expr {
         return null
     }
 
-    var prevToken = p.advance()
+    var prevToken = p.advancep()
     if(!p.check(TokenType.GREATER_THAN)) {
         p.rewind()
         return null
     }
 
-    var nextToken = p.advance()
+    var nextToken = p.advancep()
     if((nextToken.pos.position - prevToken.pos.position) == 1) {
         var right = p.term()
         return NewBinaryExpr(expr.startPos, p.pos(), expr, TokenType.RSHIFT, right, p.allocator)
@@ -2632,7 +2698,10 @@ func (p: *Parser) poisonDecl(pos: SrcPos) : *Decl {
     return NewPoisonDecl(pos, p.pos(), p.allocator)
 }
 
+@inline
 func (p: *Parser) pos() : SrcPos {
+    return p.tokens.elements[p.current].pos
+    /*
     if(!p.atEnd()) {
         return p.peek().pos
     }
@@ -2641,19 +2710,19 @@ func (p: *Parser) pos() : SrcPos {
         return SrcPos{}
     }
 
-    return p.tokens.last().pos
+    return p.tokens.last().pos*/
 }
 
 func (p: *Parser) prevPos() : SrcPos {
     return p.previous().pos
 }
 
-//@inline
+@inline
 func (p: *Parser) peek() : *Token {
-    assert(p.current >= 0 && p.current <= p.tokens.size())
+    /*assert(p.current >= 0 && p.current <= p.tokens.size())
     if(p.current >= p.tokens.size()) {
         return &p.tokens.elements[p.tokens.size() - 1]
-    }
+    }*/
     return &p.tokens.elements[p.current]
 }
 
@@ -2682,7 +2751,13 @@ func (p: *Parser) atEnd() : bool {
            p.peek().type == TokenType.END_OF_FILE
 }
 
-func (p: *Parser) advance() : *Token {
+func (p: *Parser) advance() {
+    if(!p.atEnd()) {
+        p.current += 1
+    }
+}
+
+func (p: *Parser) advancep() : *Token {
     if(!p.atEnd()) {
         p.current += 1
     }
@@ -2718,7 +2793,7 @@ func (p: *Parser) matches(types: *TokenType, len: i32) : bool {
 
 func (p: *Parser) consume(type: TokenType, errorCode: ErrorCode) : *Token {
     if(p.check(type)) {
-        return p.advance()
+        return p.advancep()
     }
 
     p.errorUnexpectedToken(p.peek(), errorCode)

@@ -39,7 +39,7 @@ public func PrintTypeSpec(spec: *TypeSpec) {
         }
         case TypeSpecKind.NAME: {
             var name = spec as (*NameTypeSpec)
-            printf("%s", name.name)
+            printf("%.*s", name.name.length, name.name.buffer)
             if(!name.genericArgs.empty()) {
                 printf("<")
                 for(var i = 0; i < name.genericArgs.size(); i += 1) {
@@ -59,7 +59,7 @@ public func PrintTypeSpec(spec: *TypeSpec) {
                     if(i > 0) {
                         printf(",")
                     }
-                    PrintName(fn.genericParams.get(i).name)
+                    PrintName(fn.genericParams.get(i).name.token)
                 }
                 printf(">")
             }
@@ -102,11 +102,11 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         case StmtKind.IMPORT_DECL: {
             var decl = s as (*ImportDecl)
             Printf(0, "import '")
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             printf("'")
-            if(decl.alias.type == TokenType.IDENTIFIER) {
+            if(decl.alias.token.type == TokenType.IDENTIFIER) {
                 Printf(0, " as ")
-                PrintName(decl.alias)
+                PrintName(decl.alias.token)
             }
             return;
         }
@@ -126,7 +126,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             else {
                 Printf(indent, "var ")
             }
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             if(decl.typeSpec != null) {
                 printf(": ")
                 PrintTypeSpec(decl.typeSpec)
@@ -152,13 +152,13 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 printf("public ")
             }
             printf("struct ")
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             if(!decl.genericParams.empty()) {
                 printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) Printf(indent, ",")
                     var t = decl.genericParams.get(i).name
-                    printf("%.*s", t.value.str.length, t.value.str.buffer)
+                    printf("%.*s", t.str.length, t.str.buffer)
                 }
                 printf(">")
             }
@@ -204,13 +204,13 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 printf("public ")
             }
             printf("union ")
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             if(!decl.genericParams.empty()) {
                 printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) Printf(indent, ",")
                     var t = decl.genericParams.get(i).name
-                    printf("%.*s", t.value.str.length, t.value.str.buffer)
+                    printf("%.*s", t.str.length, t.str.buffer)
                 }
                 printf(">")
             }
@@ -256,13 +256,13 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 printf("public ")
             }
             printf("trait ")
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             if(!decl.genericParams.empty()) {
                 printf("<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) Printf(indent, ",")
                     var t = decl.genericParams.get(i).name
-                    printf("%.*s", t.value.str.length, t.value.str.buffer)
+                    printf("%.*s", t.str.length, t.str.buffer)
                 }
                 printf(">")
             }
@@ -295,7 +295,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 printf("public ")
             }
             printf("enum ")
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             printf(" {\n")
             for(var i = 0; i < decl.fields.size(); i+=1) {
                 var field = decl.fields.get(i)
@@ -318,13 +318,13 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 Printf(indent, "public ")
             }
             Printf(indent, "func ")
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             if(!decl.genericParams.empty()) {
                 Printf(indent, "<")
                 for(var i = 0; i < decl.genericParams.size(); i += 1) {
                     if(i > 0) Printf(indent, ",")
                     var t = decl.genericParams.get(i).name
-                    Printf(indent, "%.*s", t.value.str.length, t.value.str.buffer)
+                    Printf(indent, "%.*s", t.str.length, t.str.buffer)
                 }
                 Printf(indent, ">")
             }
@@ -360,7 +360,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             Printf(indent, "typedef ")
             PrintTypeSpec(decl.type)
             printf(" as ")
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             return;
         }
         case StmtKind.PARAM_DECL: {
@@ -372,7 +372,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
 
-            PrintName(decl.name)
+            PrintName(decl.name.token)
             Printf(indent, ": ")
             PrintTypeSpec(decl.type)
             if(decl.defaultExpr) {
@@ -453,7 +453,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         case StmtKind.ENUM_FIELD_ENTRY_DECL: {
             var stmt = s as (*EnumFieldEntryDecl)
             Printf(indent, "")
-            PrintName(stmt.name)
+            PrintName(stmt.name.token)
             if(stmt.value) {
                 printf(" = ")
                 PrintStmt(stmt.value, 0)
@@ -506,7 +506,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         case StmtKind.GOTO_STMT: {
             var stmt = s as (*GotoStmt)
             Printf(indent, "goto ")
-            PrintName(stmt.label)
+            PrintName(stmt.label.token)
             return;
         }
         case StmtKind.IF_STMT: {
@@ -527,7 +527,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
             printf(":")
-            PrintName(stmt.label)
+            PrintName(stmt.label.token)
             return;
         }
         case StmtKind.MODULE_STMT: {
@@ -629,7 +629,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
             Printf(indent, "")
-            PrintName(stmt.name)
+            PrintName(stmt.name.token)
             printf(": ")
             PrintTypeSpec(stmt.type)
             return;
@@ -643,7 +643,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
             Printf(indent, "")
-            PrintName(stmt.name)
+            PrintName(stmt.name.token)
             printf(": ")
             PrintTypeSpec(stmt.type)
             return;
@@ -736,7 +736,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         case StmtKind.IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
-            Printf(indent, "%s", expr.type.name)
+            Printf(indent, "%.*s", expr.type.name.length, expr.type.name.buffer)
             return;
         }/*
         case StmtKind.INIT_ARG_EXPR: {

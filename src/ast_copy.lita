@@ -16,19 +16,18 @@ import "lita"
 import "module"
 import "checker"
 import "parser"
+import "intern"
 
-public func NewTokenName(token: Token, allocator: *const Allocator) : *const char {
+public func NewTokenNameIntern(token: Token, strings: *Strings) : InternedString {
     if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
-        return tokenText[token.type]
+        var text = tokenText[token.type]
+        return strings.intern(text, strlen(text))
     }
 
-    var bytes = allocator.alloc(token.value.str.length + 1) as (*char)
-    token.value.str.copyTo(bytes, token.value.str.length)
-
-    return bytes
+    return strings.intern(token.value.str.buffer, token.value.str.length)
 }
 
-public func CopyTypeSpecs(specs: Array<*TypeSpec>, allocator: *const Allocator) : Array<*TypeSpec> {
+public func CopyTypeSpecs(specs: Array<*TypeSpec>, lita: *Lita) : Array<*TypeSpec> {
     if(specs.empty()) {
         return Array<*TypeSpec>{
             0
@@ -36,23 +35,23 @@ public func CopyTypeSpecs(specs: Array<*TypeSpec>, allocator: *const Allocator) 
     }
 
     var result = Array<*TypeSpec>{}
-    result.init(specs.size(), allocator)
+    result.init(specs.size(), lita.allocator)
 
     for(var i = 0; i < specs.size(); i += 1) {
         var spec = specs.get(i)
-        result.add(CopyTypeSpec(spec, allocator))
+        result.add(CopyTypeSpec(spec, lita))
     }
 
     return result
 }
 
-public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSpec {
+public func CopyTypeSpec(spec: *TypeSpec, lita: *Lita) : *TypeSpec {
     if(spec == null) {
         return null;
     }
 
-    var copy = NewTypeSpec(spec.kind, spec.pos, allocator)
-    copy.base = CopyTypeSpec(spec.base, allocator)
+    var copy = NewTypeSpec(spec.kind, spec.pos, lita)
+    copy.base = CopyTypeSpec(spec.base, lita)
 
     switch(spec.kind) {
         case TypeSpecKind.NONE: {
@@ -62,7 +61,7 @@ public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSp
             var originalArray = spec as (*ArrayTypeSpec)
             var copyArray = copy as (*ArrayTypeSpec)
             if(originalArray.numElements) {
-                copyArray.numElements = CopyExpr(originalArray.numElements, allocator)
+                copyArray.numElements = CopyExpr(originalArray.numElements, lita)
             }
             return copyArray as (*TypeSpec)
         }
@@ -74,16 +73,16 @@ public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSp
             var originalName = spec as (*NameTypeSpec)
             var copyName = copy as (*NameTypeSpec)
             copyName.name = originalName.name
-            copyName.genericArgs = CopyTypeSpecs(originalName.genericArgs, allocator)
+            copyName.genericArgs = CopyTypeSpecs(originalName.genericArgs, lita)
             return copy
         }
         case TypeSpecKind.FUNC_PTR: {
             var original = spec as (*FuncPtrTypeSpec)
             var copyFunc = copy as (*FuncPtrTypeSpec)
-            copyFunc.args = CopyTypeSpecs(original.args, allocator)
-            copyFunc.ret = CopyTypeSpec(original.ret, allocator)
+            copyFunc.args = CopyTypeSpecs(original.args, lita)
+            copyFunc.ret = CopyTypeSpec(original.ret, lita)
             copyFunc.hasVarargs = original.hasVarargs
-            copyFunc.genericParams.init(original.genericParams.size(), allocator)
+            copyFunc.genericParams.init(original.genericParams.size(), lita.allocator)
             for(var i = 0; i < original.genericParams.size(); i+=1) {
                 var param = original.genericParams.get(i)
                 copyFunc.genericParams.add(param)
@@ -98,7 +97,7 @@ public func CopyTypeSpec(spec: *TypeSpec, allocator: *const Allocator) : *TypeSp
     return null
 }
 
-public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
+public func CopyDecl(decl: *Decl, lita: *Lita) : *Decl {
     if(!decl) return null;
 
     switch(decl.kind) {
@@ -111,9 +110,9 @@ public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
             var copy = NewVarDecl(original.startPos,
                                   original.endPos,
                                   original.name,
-                                  CopyTypeSpec(original.typeSpec, allocator),
-                                  CopyExpr(original.expr, allocator),
-                                  allocator)
+                                  CopyTypeSpec(original.typeSpec, lita),
+                                  CopyExpr(original.expr, lita),
+                                  lita.allocator)
             if(decl.kind == StmtKind.CONST_DECL) {
                 copy.kind = StmtKind.CONST_DECL
             }
@@ -122,25 +121,25 @@ public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.TRAIT_DECL: {
-            return CopyAggregateDecl(decl as (*AggregateDecl), allocator) as (*Decl)
+            return CopyAggregateDecl(decl as (*AggregateDecl), lita) as (*Decl)
         }
         case StmtKind.ENUM_DECL:
             assert(false) // not implemented yet??
         case StmtKind.FUNC_DECL: {
-            return CopyFuncDecl(decl as (*FuncDecl), allocator) as (*Decl)
+            return CopyFuncDecl(decl as (*FuncDecl), lita) as (*Decl)
         }
         case StmtKind.TYPEDEF_DECL: {
-            return CopyTypedefDecl(decl as (*TypedefDecl), allocator) as (*Decl)
+            return CopyTypedefDecl(decl as (*TypedefDecl), lita) as (*Decl)
         }
         case StmtKind.PARAM_DECL: {
             var original = decl as (*ParameterDecl)
             var copy = NewParameterDecl(original.startPos,
                                         original.endPos,
                                         original.name,
-                                        CopyTypeSpec(original.type, allocator),
-                                        CopyExpr(original.defaultExpr, allocator),
+                                        CopyTypeSpec(original.type, lita),
+                                        CopyExpr(original.defaultExpr, lita),
                                         original.attributes.isUsing,
-                                        allocator)
+                                        lita.allocator)
             return copy
         }
         case StmtKind.NATIVE_DECL: {
@@ -154,14 +153,14 @@ public func CopyDecl(decl: *Decl, allocator: *const Allocator) : *Decl {
     return null
 }
 
-public func CopyCallArgs(args: *Array<CallArg>, allocator: *const Allocator) : Array<CallArg> {
+public func CopyCallArgs(args: *Array<CallArg>, lita: *Lita) : Array<CallArg> {
     if(args.empty()) {
         return Array<CallArg>{}
     }
-    var result = ArrayInit<CallArg>(args.size(), allocator)
+    var result = ArrayInit<CallArg>(args.size(), lita.allocator)
     for(var i = 0; i < args.size(); i += 1) {
         var arg = args.get(i)
-        var argExpr = CopyExpr(arg.argExpr, allocator)
+        var argExpr = CopyExpr(arg.argExpr, lita)
         result.add(CallArg {
             .argExpr = argExpr,
             .argName = arg.argName
@@ -171,26 +170,26 @@ public func CopyCallArgs(args: *Array<CallArg>, allocator: *const Allocator) : A
     return result
 }
 
-public func CopyExprs(exprs: *Array<*Expr>, allocator: *const Allocator) : Array<*Expr> {
+public func CopyExprs(exprs: *Array<*Expr>, lita: *Lita) : Array<*Expr> {
     if(exprs.empty()) {
         return Array<*Expr>{}
     }
-    var result = ArrayInit<*Expr>(exprs.size(), allocator)
+    var result = ArrayInit<*Expr>(exprs.size(), lita.allocator)
     for(var i = 0; i < exprs.size(); i += 1) {
-        var copy = CopyExpr(exprs.get(i), allocator)
+        var copy = CopyExpr(exprs.get(i), lita)
         result.add(copy)
     }
 
     return result
 }
 
-public func CopyStmts(stmts: *Array<*Stmt>, allocator: *const Allocator) : Array<*Stmt> {
+public func CopyStmts(stmts: *Array<*Stmt>, lita: *Lita) : Array<*Stmt> {
     if(stmts.empty()) {
         return Array<*Stmt>{}
     }
-    var result = ArrayInit<*Stmt>(stmts.size(), allocator)
+    var result = ArrayInit<*Stmt>(stmts.size(), lita.allocator)
     for(var i = 0; i < stmts.size(); i += 1) {
-        var copy = CopyStmt(stmts.get(i), allocator)
+        var copy = CopyStmt(stmts.get(i), lita)
         result.add(copy)
     }
 
@@ -198,7 +197,7 @@ public func CopyStmts(stmts: *Array<*Stmt>, allocator: *const Allocator) : Array
 }
 
 
-public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
+public func CopyExpr(expr: *Expr, lita: *Lita) : *Expr {
     if(!expr) return null;
 
     switch(expr.kind) {
@@ -206,28 +205,28 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var original = expr as (*ArrayDesignationExpr)
             var copy = NewArrayDesignationExpr(original.startPos,
                                                original.endPos,
-                                               CopyExpr(original.index, allocator),
-                                               CopyExpr(original.value, allocator),
-                                               allocator)
+                                               CopyExpr(original.index, lita),
+                                               CopyExpr(original.value, lita),
+                                               lita.allocator)
             return copy
         }
         case StmtKind.ARRAY_INIT_EXPR: {
             var original = expr as (*ArrayInitExpr)
             var copy = NewArrayInitExpr(original.startPos,
                                         original.endPos,
-                                        CopyTypeSpec(original.type, allocator),
-                                        CopyExprs(original.values, allocator),
-                                        allocator)
+                                        CopyTypeSpec(original.type, lita),
+                                        CopyExprs(original.values, lita),
+                                        lita.allocator)
             return copy
         }
         case StmtKind.BINARY_EXPR: {
             var original = expr as (*BinaryExpr)
             var copy = NewBinaryExpr(original.startPos,
                                      original.endPos,
-                                     CopyExpr(original.left, allocator),
+                                     CopyExpr(original.left, lita),
                                      original.operator,
-                                     CopyExpr(original.right, allocator),
-                                     allocator)
+                                     CopyExpr(original.right, lita),
+                                     lita.allocator)
             return copy
         }
         case StmtKind.BOOLEAN_EXPR: {
@@ -237,9 +236,9 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var original = expr as (*CastExpr)
             var copy = NewCastExpr(original.startPos,
                                    original.endPos,
-                                   CopyExpr(original.exprToCast, allocator),
-                                   CopyTypeSpec(original.castTo, allocator),
-                                   allocator)
+                                   CopyExpr(original.exprToCast, lita),
+                                   CopyTypeSpec(original.castTo, lita),
+                                   lita.allocator)
             return copy
         }
         case StmtKind.CHAR_EXPR: {
@@ -249,18 +248,18 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var original = expr as (*FuncCallExpr)
             var copy = NewFuncCallExpr(original.startPos,
                                        original.endPos,
-                                       CopyExpr(original.object, allocator),
-                                       CopyCallArgs(original.arguments, allocator),
-                                       CopyTypeSpecs(original.genericArgs, allocator),
-                                       allocator)
+                                       CopyExpr(original.object, lita),
+                                       CopyCallArgs(original.arguments, lita),
+                                       CopyTypeSpecs(original.genericArgs, lita),
+                                       lita.allocator)
             return copy
         }
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
             var original = expr as (*IdentifierExpr)
             var copy = NewIdentifierExpr(original.startPos,
                                          original.endPos,
-                                         CopyTypeSpec(original.type, allocator) as (*NameTypeSpec),
-                                         allocator)
+                                         CopyTypeSpec(original.type, lita) as (*NameTypeSpec),
+                                         lita.allocator)
             copy.kind = StmtKind.FUNC_IDENTIFIER_EXPR
             return copy
         }
@@ -268,25 +267,25 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var original = expr as (*GetExpr)
             var copy = NewGetExpr(original.startPos,
                                   original.endPos,
-                                  CopyExpr(original.object, allocator),
-                                  CopyExpr(original.field, allocator) as (*IdentifierExpr),
-                                  allocator)
+                                  CopyExpr(original.object, lita),
+                                  CopyExpr(original.field, lita) as (*IdentifierExpr),
+                                  lita.allocator)
             return copy
         }
         case StmtKind.GROUP_EXPR: {
             var original = expr as (*GroupExpr)
             var copy = NewGroupExpr(original.startPos,
                                     original.endPos,
-                                    CopyExpr(original.groupedExpr, allocator),
-                                    allocator)
+                                    CopyExpr(original.groupedExpr, lita),
+                                    lita.allocator)
             return copy
         }
         case StmtKind.IDENTIFIER_EXPR: {
             var original = expr as (*IdentifierExpr)
             var copy = NewIdentifierExpr(original.startPos,
                                          original.endPos,
-                                         CopyTypeSpec(original.type, allocator) as (*NameTypeSpec),
-                                         allocator)
+                                         CopyTypeSpec(original.type, lita) as (*NameTypeSpec),
+                                         lita.allocator)
             return copy
         }
         case StmtKind.INIT_ARG_EXPR: {
@@ -295,27 +294,27 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
                                       original.endPos,
                                       original.fieldName,
                                       original.argPosition,
-                                      CopyExpr(original.value, allocator),
-                                      allocator)
+                                      CopyExpr(original.value, lita),
+                                      lita.allocator)
             return copy
         }
         case StmtKind.INIT_EXPR: {
             var original = expr as (*InitExpr)
             var arguments = Array<*InitArgExpr>{}
             if(!original.arguments.empty()) {
-                arguments.init(original.arguments.size(), allocator)
+                arguments.init(original.arguments.size(), lita.allocator)
             }
 
             for(var i = 0; i < original.arguments.size(); i += 1) {
-                var copy = CopyExpr(original.arguments.get(i), allocator) as (*InitArgExpr)
+                var copy = CopyExpr(original.arguments.get(i), lita) as (*InitArgExpr)
                 arguments.add(copy)
             }
 
             var copy = NewInitExpr(original.startPos,
                                    original.endPos,
-                                   CopyTypeSpec(original.type, allocator) as (*NameTypeSpec),
+                                   CopyTypeSpec(original.type, lita) as (*NameTypeSpec),
                                    arguments,
-                                   allocator)
+                                   lita.allocator)
             return copy
         }
         case StmtKind.NULL_EXPR: {
@@ -328,28 +327,28 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var original = expr as (*SetExpr)
             var copy = NewSetExpr(original.startPos,
                                   original.endPos,
-                                  CopyExpr(original.object, allocator),
-                                  CopyExpr(original.field, allocator) as (*IdentifierExpr),
+                                  CopyExpr(original.object, lita),
+                                  CopyExpr(original.field, lita) as (*IdentifierExpr),
                                   original.operator,
-                                  CopyExpr(original.value, allocator),
-                                  allocator)
+                                  CopyExpr(original.value, lita),
+                                  lita.allocator)
             return copy
         }
         case StmtKind.OFFSET_OF_EXPR: {
             var original = expr as (*OffsetOfExpr)
             var copy = NewOffsetOfExpr(original.startPos,
                                        original.endPos,
-                                       CopyTypeSpec(original.type, allocator),
+                                       CopyTypeSpec(original.type, lita),
                                        original.field,
-                                       allocator)
+                                       lita.allocator)
             return copy
         }
         case StmtKind.SIZE_OF_EXPR: {
             var original = expr as (*SizeOfExpr)
             var copy = NewSizeOfExpr(original.startPos,
                                      original.endPos,
-                                     CopyExpr(original.sizeOfExpr, allocator),
-                                     allocator)
+                                     CopyExpr(original.sizeOfExpr, lita),
+                                     lita.allocator)
             return copy
         }
         case StmtKind.STRING_EXPR: {
@@ -359,47 +358,47 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var original = expr as (*SubscriptGetExpr)
             var copy = NewSubscriptGetExpr(original.startPos,
                                            original.endPos,
-                                           CopyExpr(original.object, allocator),
-                                           CopyExpr(original.index, allocator),
-                                           allocator)
+                                           CopyExpr(original.object, lita),
+                                           CopyExpr(original.index, lita),
+                                           lita.allocator)
             return copy
         }
         case StmtKind.SUBSCRIPT_SET_EXPR: {
             var original = expr as (*SubscriptSetExpr)
             var copy = NewSubscriptSetExpr(original.startPos,
                                            original.endPos,
-                                           CopyExpr(original.object, allocator),
-                                           CopyExpr(original.index, allocator),
+                                           CopyExpr(original.object, lita),
+                                           CopyExpr(original.index, lita),
                                            original.operator,
-                                           CopyExpr(original.value, allocator),
-                                           allocator)
+                                           CopyExpr(original.value, lita),
+                                           lita.allocator)
             return copy
         }
         case StmtKind.TERNARY_EXPR: {
             var original = expr as (*TernaryExpr)
             var copy = NewTernaryExpr(original.startPos,
                                       original.endPos,
-                                      CopyExpr(original.cond, allocator),
-                                      CopyExpr(original.then, allocator),
-                                      CopyExpr(original.other, allocator),
-                                      allocator)
+                                      CopyExpr(original.cond, lita),
+                                      CopyExpr(original.then, lita),
+                                      CopyExpr(original.other, lita),
+                                      lita.allocator)
             return copy
         }
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
             var original = expr as (*TypeIdentifierExpr)
             var copy = NewTypeIdentifierExpr(original.startPos,
                                              original.endPos,
-                                             CopyTypeSpec(original.type, allocator),
-                                             allocator)
+                                             CopyTypeSpec(original.type, lita),
+                                             lita.allocator)
             return copy
         }
         case StmtKind.TYPE_OF_EXPR: {
             var original = expr as (*TypeOfExpr)
             var copy = NewTypeOfExpr(original.startPos,
                                      original.endPos,
-                                     CopyExpr(original.typeOfExpr, allocator),
-                                     CopyTypeSpec(original.type, allocator),
-                                     allocator)
+                                     CopyExpr(original.typeOfExpr, lita),
+                                     CopyTypeSpec(original.type, lita),
+                                     lita.allocator)
             return copy
         }
         case StmtKind.UNARY_EXPR: {
@@ -407,8 +406,8 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
             var copy = NewUnaryExpr(original.startPos,
                                     original.endPos,
                                     original.operator,
-                                    CopyExpr(original.unaryExpr, allocator),
-                                    allocator)
+                                    CopyExpr(original.unaryExpr, lita),
+                                    lita.allocator)
             return copy
         }
         case StmtKind.POISON_EXPR: {
@@ -421,7 +420,7 @@ public func CopyExpr(expr: *Expr, allocator: *const Allocator) : *Expr {
     return null
 }
 
-public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
+public func CopyStmt(stmt: *Stmt, lita: *Lita) : *Stmt {
     if(!stmt) return null;
 
     switch(stmt.kind) {
@@ -429,8 +428,8 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
             var original = stmt as (*BlockStmt)
             var copy = NewBlockStmt(original.startPos,
                                     original.endPos,
-                                    CopyStmts(original.stmts, allocator),
-                                    allocator)
+                                    CopyStmts(original.stmts, lita),
+                                    lita.allocator)
             return copy
         }
         case StmtKind.BREAK_STMT: {
@@ -447,9 +446,9 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
                                    original.endPos,
                                    original.type,
                                    original.expr,
-                                   CopyStmts(original.body, allocator),
-                                   CopyStmt(end, allocator) as (*CompStmt),
-                                   allocator)
+                                   CopyStmts(original.body, lita),
+                                   CopyStmt(end, lita) as (*CompStmt),
+                                   lita.allocator)
             return copy
         }
         case StmtKind.CONTINUE_STMT: {
@@ -459,17 +458,17 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
             var original = stmt as (*DeferStmt)
             var copy = NewDeferStmt(original.startPos,
                                     original.endPos,
-                                    CopyStmt(original.deferedStmt, allocator),
-                                    allocator)
+                                    CopyStmt(original.deferedStmt, lita),
+                                    lita.allocator)
             return copy
         }
         case StmtKind.DO_WHILE_STMT: {
             var original = stmt as (*DoWhileStmt)
             var copy = NewDoWhileStmt(original.startPos,
                                     original.endPos,
-                                    CopyExpr(original.cond, allocator),
-                                    CopyStmt(original.body, allocator),
-                                    allocator)
+                                    CopyExpr(original.cond, lita),
+                                    CopyStmt(original.body, lita),
+                                    lita.allocator)
             return copy
         }
         case StmtKind.EMPTY_STMT: {
@@ -479,19 +478,19 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
             var original = stmt as (*ForStmt)
             var copy = NewForStmt(original.startPos,
                                   original.endPos,
-                                  CopyStmt(original.init, allocator),
-                                  CopyExpr(original.cond, allocator),
-                                  CopyStmt(original.post, allocator),
-                                  CopyStmt(original.body, allocator),
-                                  allocator)
+                                  CopyStmt(original.init, lita),
+                                  CopyExpr(original.cond, lita),
+                                  CopyStmt(original.post, lita),
+                                  CopyStmt(original.body, lita),
+                                  lita.allocator)
             return copy
         }
         case StmtKind.FUNC_BODY_STMT: {
             var original = stmt as (*FuncBodyStmt)
             var copy = NewBlockStmt(original.startPos,
                                     original.endPos,
-                                    CopyStmts(original.stmts, allocator),
-                                    allocator)
+                                    CopyStmts(original.stmts, lita),
+                                    lita.allocator)
             copy.kind = StmtKind.FUNC_BODY_STMT
             return copy
         }
@@ -502,10 +501,10 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
             var original = stmt as (*IfStmt)
             var copy = NewIfStmt(original.startPos,
                                  original.endPos,
-                                 CopyExpr(original.cond, allocator),
-                                 CopyStmt(original.then, allocator),
-                                 CopyStmt(original.elseStmt, allocator),
-                                 allocator)
+                                 CopyExpr(original.cond, lita),
+                                 CopyStmt(original.then, lita),
+                                 CopyStmt(original.elseStmt, lita),
+                                 lita.allocator)
             return copy
         }
         case StmtKind.LABEL_STMT: {
@@ -521,10 +520,10 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
             var original = stmt as (*ParametersStmt)
             var params = Array<*ParameterDecl>{}
             if(!original.params.empty()) {
-                params.init(original.params.size(), allocator)
+                params.init(original.params.size(), lita.allocator)
             }
             for(var i = 0; i < original.params.size(); i += 1) {
-                var copy = CopyStmt(original.params.get(i), allocator) as (*ParameterDecl)
+                var copy = CopyStmt(original.params.get(i), lita) as (*ParameterDecl)
                 params.add(copy)
             }
 
@@ -532,43 +531,43 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
                                          original.endPos,
                                          params,
                                          original.isVararg,
-                                         allocator)
+                                         lita.allocator)
             return copy
         }
         case StmtKind.RETURN_STMT: {
             var original = stmt as (*ReturnStmt)
             var copy = NewReturnStmt(original.startPos,
                                      original.endPos,
-                                     CopyExpr(original.expr, allocator),
-                                     allocator)
+                                     CopyExpr(original.expr, lita),
+                                     lita.allocator)
             return copy
         }
         case StmtKind.SWITCH_CASE_STMT: {
             var original = stmt as (*SwitchCaseStmt)
             var copy = NewSwitchCaseStmt(original.startPos,
                                          original.endPos,
-                                        CopyExpr(original.cond, allocator),
-                                        CopyStmt(original.body, allocator),
-                                        allocator)
+                                        CopyExpr(original.cond, lita),
+                                        CopyStmt(original.body, lita),
+                                        lita.allocator)
             return copy
         }
         case StmtKind.SWITCH_STMT:{
             var original = stmt as (*SwitchStmt)
             var cases = Array<*SwitchCaseStmt>{}
             if(!original.cases.empty()) {
-                cases.init(original.cases.size(), allocator)
+                cases.init(original.cases.size(), lita.allocator)
             }
             for(var i = 0; i < original.cases.size(); i += 1) {
-                var copy = CopyStmt(original.cases.get(i), allocator) as (*SwitchCaseStmt)
+                var copy = CopyStmt(original.cases.get(i), lita) as (*SwitchCaseStmt)
                 cases.add(copy)
             }
 
             var copy = NewSwitchStmt(original.startPos,
                                      original.endPos,
-                                     CopyExpr(original.cond, allocator),
+                                     CopyExpr(original.cond, lita),
                                      cases,
-                                     CopyStmt(original.defaultStmt, allocator),
-                                     allocator)
+                                     CopyStmt(original.defaultStmt, lita),
+                                     lita.allocator)
             return copy
         }
         case StmtKind.ENUM_FIELD_DECL:
@@ -583,17 +582,17 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
             var original = stmt as (*WhileStmt)
             var copy = NewWhileStmt(original.startPos,
                                     original.endPos,
-                                    CopyExpr(original.cond, allocator),
-                                    CopyStmt(original.body, allocator),
-                                    allocator)
+                                    CopyExpr(original.cond, lita),
+                                    CopyStmt(original.body, lita),
+                                    lita.allocator)
             return copy
         }
         default: {
             if(IsExpr(stmt)) {
-                return CopyExpr(stmt as (*Expr), allocator) as (*Stmt)
+                return CopyExpr(stmt as (*Expr), lita) as (*Stmt)
             }
             if(IsDecl(stmt)) {
-                return CopyDecl(stmt as (*Decl), allocator) as (*Stmt)
+                return CopyDecl(stmt as (*Decl), lita) as (*Stmt)
             }
 
             assert(false)
@@ -603,10 +602,18 @@ public func CopyStmt(stmt: *Stmt, allocator: *const Allocator) : *Stmt {
     return null
 }
 
-public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator) : *AggregateDecl {
-    var copy = NewAggregateDecl(decl.startPos, decl.endPos, decl.kind, decl.name, decl.genericParams.copy(allocator), Array<FieldStmt>{}, decl.flags, allocator) as (*AggregateDecl)
+public func CopyAggregateDecl(decl: *AggregateDecl, lita: *Lita) : *AggregateDecl {
+    var copy = NewAggregateDecl(decl.startPos,
+                                decl.endPos,
+                                decl.kind,
+                                decl.name,
+                                decl.genericParams.copy(lita.allocator),
+                                Array<FieldStmt>{},
+                                decl.flags,
+                                lita.allocator) as (*AggregateDecl)
+
     copy.attributes = decl.attributes
-    copy.fields = ArrayInit<FieldStmt>(decl.fields.size(), allocator)
+    copy.fields = ArrayInit<FieldStmt>(decl.fields.size(), lita.allocator)
 
     for(var i = 0; i < decl.fields.size(); i+=1) {
         var field = decl.fields.get(i)
@@ -616,9 +623,9 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
                 var traitField = NewTraitFieldDecl(o.startPos,
                                                   o.endPos,
                                                   o.name,
-                                                  CopyTypeSpec(o.type, allocator),
+                                                  CopyTypeSpec(o.type, lita),
                                                   o.attributes,
-                                                  allocator) as (*TraitFieldDecl)
+                                                  lita.allocator) as (*TraitFieldDecl)
 
                 var copyField = FieldStmt {
                     .kind = StmtKind.TRAIT_FIELD_DECL,
@@ -633,10 +640,10 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
                 var varField = NewVarFieldDecl(o.startPos,
                                                o.endPos,
                                                o.name,
-                                               CopyTypeSpec(o.type, allocator),
+                                               CopyTypeSpec(o.type, lita),
                                                o.attributes,
-                                               CopyExpr(o.defaultExpr, allocator),
-                                               allocator) as (*VarFieldDecl)
+                                               CopyExpr(o.defaultExpr, lita),
+                                               lita.allocator) as (*VarFieldDecl)
 
                 var copyField = FieldStmt {
                     .kind = StmtKind.VAR_FIELD_DECL,
@@ -660,7 +667,7 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
                 var aggField = field.aggregateField
                 var copyField = FieldStmt {
                     .kind = field.kind,
-                    .aggregateField = CopyAggregateDecl(aggField, allocator)
+                    .aggregateField = CopyAggregateDecl(aggField, lita)
                 }
                 copy.fields.add(copyField)
                 copy.node.becomeParentOf(copyField.aggregateField)
@@ -678,32 +685,33 @@ public func CopyAggregateDecl(decl: *AggregateDecl, allocator: *const Allocator)
 }
 
 
-public func CopyFuncDecl(decl: *FuncDecl, allocator: *const Allocator) : *FuncDecl {
+public func CopyFuncDecl(decl: *FuncDecl, lita: *Lita) : *FuncDecl {
     var copy = NewFuncDecl(decl.startPos,
                            decl.endPos,
                            decl.name,
-                           decl.genericParams.copy(allocator),
-                           CopyParameters(decl.params, allocator),
-                           CopyStmt(decl.body, allocator),
-                           CopyTypeSpec(decl.returnType, allocator),
+                           decl.genericParams.copy(lita.allocator),
+                           CopyParameters(decl.params, lita),
+                           CopyStmt(decl.body, lita),
+                           CopyTypeSpec(decl.returnType, lita),
                            decl.flags,
-                           allocator)
+                           lita.allocator)
     copy.attributes = decl.attributes
     return copy as (*FuncDecl)
 }
 
-public func CopyParameters(params: ParametersStmt, allocator: *const Allocator) : *ParametersStmt {
+public func CopyParameters(params: ParametersStmt, lita: *Lita) : *ParametersStmt {
     var paramDecls = Array<*ParameterDecl>{}
-    paramDecls.init(params.params.size(), allocator)
+    paramDecls.init(params.params.size(), lita.allocator)
 
     for(var i = 0; i < params.params.size(); i+=1) {
         var decl = params.params.get(i)
         var copy = NewParameterDecl(decl.startPos,
                                     decl.endPos,
                                     decl.name,
-                                    CopyTypeSpec(decl.type, allocator),
-                                    CopyExpr(decl.defaultExpr, allocator),
-                                    decl.attributes.isUsing, allocator) as (*ParameterDecl)
+                                    CopyTypeSpec(decl.type, lita),
+                                    CopyExpr(decl.defaultExpr, lita),
+                                    decl.attributes.isUsing,
+                                    lita.allocator) as (*ParameterDecl)
         copy.attributes = decl.attributes
         paramDecls.add(copy)
     }
@@ -712,22 +720,27 @@ public func CopyParameters(params: ParametersStmt, allocator: *const Allocator) 
                                        params.endPos,
                                        paramDecls,
                                        params.isVararg,
-                                       allocator)
+                                       lita.allocator)
     return paramsCopy as (*ParametersStmt)
 }
 
 
-public func CopyTypedefDecl(decl: *TypedefDecl, allocator: *const Allocator) : *TypedefDecl {
-    var copy = NewTypedefDecl(decl.startPos, decl.endPos, decl.name, decl.genericParams.copy(allocator), CopyTypeSpec(decl.type, allocator), allocator)
+public func CopyTypedefDecl(decl: *TypedefDecl, lita: *Lita) : *TypedefDecl {
+    var copy = NewTypedefDecl(decl.startPos,
+                              decl.endPos,
+                              decl.name,
+                              decl.genericParams.copy(lita.allocator),
+                              CopyTypeSpec(decl.type, lita),
+                              lita.allocator)
     copy.attributes = decl.attributes
     return copy as (*TypedefDecl)
 }
 
 public func AstInsertText(node: *Node, text: *const char, index: i32, lita: *Lita) {
-    var parser = ParserInit(node.startPos.filename, text, lita)
+    var parser = ParserInit(node.startPos.filename, text, strlen(text), lita)
     var stmt = parser.statement()
 
-    AstInsert(node, stmt, index, lita.allocator)
+    AstInsert(node, stmt, index, lita)
 }
 
 
@@ -736,7 +749,7 @@ public func AstInsertText(node: *Node, text: *const char, index: i32, lita: *Lit
 
     Right now only FuncDecl is supported.
 """)
-public func AstInsert(node: *Node, stmt: *Stmt, index: i32, allocator: *const Allocator) {
+public func AstInsert(node: *Node, stmt: *Stmt, index: i32, lita: *Lita) {
 
     switch(node.kind) {
         case StmtKind.FUNC_DECL: {
@@ -751,7 +764,7 @@ public func AstInsert(node: *Node, stmt: *Stmt, index: i32, allocator: *const Al
                     body.node.becomeParentOf(stmt)
                 }
                 else {
-                    var stmts = ArrayInit<*Stmt>(8, allocator)
+                    var stmts = ArrayInit<*Stmt>(8, lita.allocator)
                     if(index) {
                         stmts.add(funcDecl.body)
                         stmts.add(stmt)
@@ -764,7 +777,7 @@ public func AstInsert(node: *Node, stmt: *Stmt, index: i32, allocator: *const Al
                     funcDecl.body = NewFuncBodyStmt(index ? funcDecl.body.startPos : stmt.startPos,
                                                     index ? stmt.endPos : funcDecl.body.endPos,
                                                     stmts,
-                                                    allocator)
+                                                    lita.allocator)
 
                 }
             }
@@ -789,8 +802,8 @@ public func AstAddImport(lita: *Lita,
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var importStmt = module.ast.imports.get(i)
         if(strncmp(importStmt.moduleId.filename, importModule.id.filename, MAX_PATH) == 0) {
-            if(importStmt.alias.type == TokenType.IDENTIFIER) {
-                return importStmt.alias.asString()
+            if(importStmt.alias.token.type == TokenType.IDENTIFIER) {
+                return importStmt.alias.token.asString()
             }
             else {
                 // this is already being imported and doesn't have an alias
@@ -799,21 +812,32 @@ public func AstAddImport(lita: *Lita,
         }
     }
 
+    var strings = lita.strings
+
     // this module isn't being imported, so we must inject an import
     // statement for it; but also give it an alias that *shouldn't*
     // collide with other imports
-    var name = Token {
-        .type = TokenType.IDENTIFIER,
-        .pos = module.ast.startPos,
-        .value = Value{.str = importModule.id.name}
+    var name = Identifier {
+        .str = importModule.id.name,
+        .token = Token {
+            .type = TokenType.IDENTIFIER,
+            .pos = module.ast.startPos,
+            .value = Value{.str = importModule.id.name.view}
+        }
     }
+//////////////////////////////////////////////////
+// TODO: String intern -- don't allocate here, instead do a internCopy
+//////////////////////////////////////////////////
     var sb = StringBufferInit(16, lita.allocator)
     sb.append("____%d", moduleNameIndex += 1)
 
-    var alias = Token {
-        .type = TokenType.IDENTIFIER,
-        .pos = module.ast.startPos,
-        .value = Value{ .str = StringViewInit(sb.cStr(), sb.length)}
+    var alias = Identifier {
+        .str = lita.strings.intern(sb.cStr(), sb.length),
+        .token = Token {
+            .type = TokenType.IDENTIFIER,
+            .pos = module.ast.startPos,
+            .value = Value{ .str = StringViewInit(sb.cStr(), sb.length)}
+        }
     }
     var importStmt = NewImportDecl(module.ast.startPos,
                                     module.ast.startPos,

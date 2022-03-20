@@ -193,7 +193,8 @@ func (this: *DependencyGraph) sortAggregates() {
         var cause = this.resolveDependency(dep)
         if(cause) {
             this.lita.result.addError(dep.sym.decl.startPos,
-                    "could not resolve dependency order for '%s' because of cyclic dependency with '%s'", dep.sym.name, cause.sym.name)
+                    "could not resolve dependency order for '%.*s' because of cyclic dependency with '%.*s'",
+                        dep.sym.name.length, dep.sym.name.buffer, cause.sym.name.length, cause.sym.name.buffer)
         }
     }
 }

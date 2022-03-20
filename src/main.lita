@@ -24,6 +24,7 @@ import "module"
 import "checker"
 import "cgen"
 import "lsp"
+import "intern"
 
 func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
@@ -68,6 +69,18 @@ func main(len: i32, args: **char) : i32 {
     var runProgram = options.run
 
 report:
+
+// TEMP
+{
+//printf("Intern count: %d Size: %d Grow Count: %d Collision Count %d Put:%d Get:%d Hash:%d Eq: %d FuncName: %d GetMethod: %d\n",
+//    internCount, lita.strings.size(), growCount, collisionCount, putCount, getCount, hashCount, equalCount, funcNameCount, getMethodCount)
+/*for(var it = lita.strings.strings.iter(); it.hasNext();) {
+    var v = it.next().value
+    printf("Str: %.*s\n", v.length, v.buffer)
+}*/
+}
+// END TEMP
+
     var totalTime = SystemTimeMSec() - startTime
 
     var sb = StringBufferInit(1024)

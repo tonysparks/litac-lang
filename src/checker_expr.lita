@@ -19,7 +19,7 @@ import "checker"
 import "common"
 import "ast_print"
 import "error_codes"
-
+import "intern"
 
 
 public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
@@ -136,7 +136,7 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
 
     var type = this.resolveTypeSpec(expr.type, .isFunc = true)
     if(!type) {
-        this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
+        this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 // TODO: must we check types for FUNC_PTR?
@@ -218,10 +218,11 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
         var field = path.fields[i]
         assert(field.kind == StmtKind.VAR_FIELD_DECL)
 
-        var name = this.allocator.alloc((field.varField.name.str.length + 1) * sizeof(:char)) as (*char)
-        field.varField.name.str.copyTo(name, field.varField.name.str.length)
+        //var name = this.allocator.alloc((field.varField.name.str.length + 1) * sizeof(:char)) as (*char)
+        //field.varField.name.str.copyTo(name, field.varField.name.str.length)
+        var name = field.varField.name.str
 
-        var nameTypeSpec = NewNameTypeSpec(expr.startPos, name, this.allocator)
+        var nameTypeSpec = NewNameTypeSpecIntern(expr.startPos, name, this.lita)
         var idExpr = NewIdentifierExpr(expr.startPos, expr.endPos, nameTypeSpec, this.allocator) as (*IdentifierExpr)
 
         var parentExpr = expr.parent
@@ -325,7 +326,7 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
 
 
 func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
-                                            funcName: *const char,
+                                            funcName: InternedString,
                                             maxNumOfArgs: i32,
                                             hasVarargs: bool,
                                             numberOfSuppliedArgs: i32,
@@ -341,7 +342,7 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
         return true
     }
     if(minNumOfArgs > numberOfSuppliedArgs) {
-        this.result.addError(expr.startPos, "'%s' called with too few arguments", funcName)
+        this.result.addError(expr.startPos, "'%.*s' called with too few arguments", funcName.length, funcName.buffer)
         return false
     }
 
@@ -350,14 +351,14 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
     }
 
     if(maxNumOfArgs < numberOfSuppliedArgs) {
-        this.result.addError(expr.startPos, "'%s' called with too many arguments", funcName)
+        this.result.addError(expr.startPos, "'%.*s' called with too many arguments", funcName.length, funcName.buffer)
         return false
     }
 
     return true
 }
 
-func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expectedType: *TypeInfo) : *TypeInfo {
+func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, expectedType: *TypeInfo) : *TypeInfo {
     assert(paramType != null)
     assert(expectedType != null)
 
@@ -427,36 +428,36 @@ func (this: *TypeChecker) inferredType(name: Token, paramType: *TypeInfo, expect
                 if(pSize) {
                     for(var i = 0; i < pSize; i += 1) {
                         var param = sym.genericParams.get(i)
-                        if(param.name.str.equalsStringView(genericName.str)) {
+                        if(param.name.str.equals(genericName.str)) {
                             return sym.genericArgs.get(i)
                         }
                     }
                 }
             }
 
-            var fieldName: [MAX_SYMBOL_NAME]char;
+            var fieldName = EMPTY_STR;
             for(var i = 0; i < aggInfo.decl.fields.size(); i += 1) {
                 var field = aggInfo.decl.fields.get(i)
                 switch(field.kind) {
                     case StmtKind.TRAIT_FIELD_DECL: {
                         var traitField = field.traitField
-                        traitField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        fieldName = traitField.name.str
                         break;
                     }
                     case StmtKind.VAR_FIELD_DECL: {
                         var varField = field.varField
-                        varField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        fieldName = varField.name.str
                         break;
                     }
                     case StmtKind.ENUM_FIELD_DECL: {
                         var enumField = field.enumField
-                        enumField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        fieldName = enumField.name.str
                         break;
                     }
                     case StmtKind.UNION_FIELD_DECL:
                     case StmtKind.STRUCT_FIELD_DECL: {
                         var aggField = field.aggregateField
-                        aggField.name.str.copyTo(fieldName, MAX_SYMBOL_NAME)
+                        fieldName = aggField.name.str
                         break;
                     }
                     default: {
@@ -561,7 +562,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
                 var inferredType = this.inferredType(genericParam.name, paramType, argType)
                 if(inferredType) {
-                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.lita))
                     break
                 }
             }
@@ -594,7 +595,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
                 var inferredType = this.inferredType(genericParam.name, paramType, argType)
                 if(inferredType) {
-                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.allocator))
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.lita))
                     break
                 }
             }
@@ -652,7 +653,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                 // For now, we don't allow function pointers to contain
                 // named arguments, only because we currently don't allow names in the
                 // parameters in the TypeInfo
-                if(callArg.argName.type == TokenType.IDENTIFIER) {
+                if(callArg.argName.token.type == TokenType.IDENTIFIER) {
                     this.errorNamedArgumentsForFuncPtr(arg)
                     success = false
                 }
@@ -677,26 +678,26 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                 var callArg = suppliedArgs.getPtr(i)
                 var paramIndex = i
 
-                if(callArg.argName.type == TokenType.IDENTIFIER) {
+                if(callArg.argName.token.type == TokenType.IDENTIFIER) {
                     hasNamedArg = true
                     paramIndex = -1
 
                     for(var index = 0; index < funcInfo.decl.params.size(); index += 1) {
                         var param = funcInfo.decl.params.get(index)
-                        if(param.name.str.equalsStringView(callArg.argName.str)) {
+                        if(param.name.str.equals(callArg.argName.str)) {
                             paramIndex = index
                             break
                         }
                     }
 
                     if(paramIndex < 0) {
-                        this.errorInvalidNamedArgument(callArg.argName.pos, callArg.argName.str, funcInfo)
+                        this.errorInvalidNamedArgument(callArg.argName.token.pos, callArg.argName.str, funcInfo)
                         success = false
                     }
                 }
                 else if(hasNamedArg) {
                     // allow for in-order names to follow fixed arguments
-                    if(!p.name.str.equalsStringView(callArg.argName.str)) {
+                    if(!p.name.str.equals(callArg.argName.str)) {
                         this.errorFixedArgumentAfterNamed(callArg.argExpr)
                         success = false
                     }
@@ -1065,10 +1066,10 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
         var hasNamedArgs = false
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
-            if(arg.fieldName.type == TokenType.IDENTIFIER) {
+            if(arg.fieldName.token.type == TokenType.IDENTIFIER) {
                 hasNamedArgs = true
 
-                if(arg.fieldName.str.equalsStringView(field.varField.name.str)) {
+                if(arg.fieldName.str.equals(field.varField.name.str)) {
                     byName = true
                     break
                 }
@@ -1100,19 +1101,17 @@ func (this: *TypeChecker) addInitArgumentsReferences(type: *TypeInfo, expr: *Ini
     assert(type != null)
 
     if(IsAggregate(type)) {
-        var fieldName:[MAX_SYMBOL_NAME]char;
-        var fieldNameStr = StringInit(fieldName, MAX_SYMBOL_NAME)
-
         var aggInfo = type as (*AggregateTypeInfo)
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
             var field: FieldStmt;
 
-            if(arg.fieldName.type == TokenType.IDENTIFIER) {
-                fieldNameStr.format("%.*s", arg.fieldName.str.length, arg.fieldName.str.buffer)
-                field = aggInfo.getField(fieldNameStr.cStr())
+            if(arg.fieldName.token.type == TokenType.IDENTIFIER) {
+                var fieldName = arg.fieldName.str
 
-                var fieldResult = aggInfo.getFieldPosition(fieldNameStr.cStr())
+                field = aggInfo.getField(fieldName)
+
+                var fieldResult = aggInfo.getFieldPosition(fieldName)
                 if(fieldResult.aggInfo) {
                     this.lita.references.addFieldReference(arg.startPos,
                                                            fieldResult.aggInfo,
@@ -1130,19 +1129,17 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
 
     var errors = this.errors()
     if(IsAggregate(type)) {
-        var fieldName:[MAX_SYMBOL_NAME]char;
-        var fieldNameStr = StringInit(fieldName, MAX_SYMBOL_NAME)
-
         var aggInfo = type as (*AggregateTypeInfo)
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
             var field: FieldStmt;
 
-            if(arg.fieldName.type == TokenType.IDENTIFIER) {
-                fieldNameStr.format("%.*s", arg.fieldName.str.length, arg.fieldName.str.buffer)
-                field = aggInfo.getField(fieldNameStr.cStr())
+            if(arg.fieldName.token.type == TokenType.IDENTIFIER) {
+                var fieldName = arg.fieldName.str
+
+                field = aggInfo.getField(fieldName)
                 if(field.kind == StmtKind.POISON_EXPR) {
-                    this.errorNoField(arg, type, fieldNameStr.cStr())
+                    this.errorNoField(arg, type, fieldName)
                     continue
                 }
             }
@@ -1211,7 +1208,7 @@ func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *AggregateType
 
             var inferredType = this.inferredType(genericParam.name, paramType, suppliedArgs.get(fieldIndex))
             if(inferredType) {
-                expr.type.genericArgs.add(inferredType.asTypeSpec(this.allocator))
+                expr.type.genericArgs.add(inferredType.asTypeSpec(this.lita))
                 break
             }
         }
@@ -1411,18 +1408,16 @@ func (this: *TypeChecker) resolveOffsetOfExpr(expr: *OffsetOfExpr) : bool {
         this.errorNonAggregateType(expr, type)
         return false
     }
-    if(expr.field.type != TokenType.IDENTIFIER) {
+    if(expr.field.token.type != TokenType.IDENTIFIER) {
         return false
     }
 
-    var fieldName:[MAX_SYMBOL_NAME]char;
-    var fieldNameStr = StringInit(fieldName, MAX_SYMBOL_NAME)
-    fieldNameStr.format("%.*s", expr.field.str.length, expr.field.str.buffer)
+    var fieldName = expr.field.str
 
     var aggInfo = type as (*AggregateTypeInfo)
-    var fieldStmt = aggInfo.getField(fieldNameStr.cStr())
+    var fieldStmt = aggInfo.getField(fieldName)
     if(fieldStmt.kind == StmtKind.POISON_EXPR) {
-        this.errorNoField(expr, type, fieldNameStr.cStr())
+        this.errorNoField(expr, type, fieldName)
         return false
     }
 
@@ -1475,7 +1470,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
         return true;
     }
 
-    var funcSym = aggInfo.getMethod(this.current, expr.field.type.name)
+    var funcSym = aggInfo.getMethod(this.lita.strings, this.current, expr.field.type.name)
     if(funcSym) {
         var decl = funcSym.decl as (*FuncDecl)
         var typeInfo = funcSym.type;
@@ -1488,10 +1483,10 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
 
             // We need to update the get expression with the method name
             var oldName = expr.field.type
-            var functionName = this.allocator.alloc(MAX_SYMBOL_NAME * sizeof(:char)) as (*char)
+            var functionName = [MAX_SYMBOL_NAME]char;
             aggInfo.getFunctionName(functionName, oldName.name)
 
-            expr.field.type.name = functionName
+            expr.field.type.name = this.lita.strings.internCopy(functionName)
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
@@ -1766,7 +1761,7 @@ func (this: *TypeChecker) resolveArrayDesignationExpr(expr: *ArrayDesignationExp
     if(expr.index.kind == StmtKind.IDENTIFIER_EXPR) {
         var idExpr = expr.index as (*IdentifierExpr)
         if(idExpr.sym != null && !(idExpr.sym.flags & SymbolFlags.IS_CONSTANT)) {
-            this.result.addError(expr.index.startPos, "'%s' must be a constant", idExpr.sym.name)
+            this.result.addError(expr.index.startPos, "'%.*s' must be a constant", idExpr.sym.name.length, idExpr.sym.name.buffer)
             return false
         }
     }
@@ -2014,19 +2009,19 @@ func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *cons
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field: *const char) {
+func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field: InternedString) {
     assert(expr != null)
     assert(type != null)
 
     var sb = StringBufferInit(256, this.allocator)
     sb.appendStr("can't reassign enum '")
     type.toString(sb)
-    sb.append("' field '%s'", field)
+    sb.append("' field '%.*s'", field.length, field.buffer)
 
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: *const char) {
+func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: InternedString) {
     assert(expr != null)
     assert(type != null)
 
@@ -2034,7 +2029,7 @@ func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: *con
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
-    sb.append(" does not have field '%s'", field)
+    sb.append(" does not have field '%.*s'", field.length, field.buffer)
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -2052,7 +2047,7 @@ func (this: *TypeChecker) errorNoFieldAt(expr: *Expr, type: *TypeInfo, position:
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field: *const char) {
+func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field: InternedString) {
     assert(expr != null)
     assert(type != null)
 
@@ -2060,7 +2055,7 @@ func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
-    sb.append(" can't be accessed with field '%s'", field)
+    sb.append(" can't be accessed with field '%.*s'", field.length, field.buffer)
 
     this.result.addErrorStr(expr.startPos, sb)
 }
@@ -2088,13 +2083,12 @@ func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Arra
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: *const char, genericParams: *Array<GenericParam>) {
+func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: InternedString, genericParams: *Array<GenericParam>) {
     assert(expr != null)
-    assert(typeName != null)
     assert(genericParams != null)
 
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("'%s' is missing generic arguments [", typeName)
+    sb.append("'%.*s' is missing generic arguments [", typeName.length, typeName.buffer)
     for(var i = 0; i < genericParams.size(); i += 1) {
         var param = genericParams.get(i)
         if(i > 0) {
@@ -2126,17 +2120,17 @@ func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Expr) {
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *StringView, funcInfo: *FuncTypeInfo) {
+func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *InternedString, funcInfo: *FuncTypeInfo) {
     var sb = StringBufferInit(256, this.allocator)
-    sb.append("Invalid named parameter: '%.*s'; no parameter with that name found in 'func %s(",
-        name.length, name.buffer, funcInfo.name)
+    sb.append("Invalid named parameter: '%.*s'; no parameter with that name found in 'func %.*s(",
+        name.length, name.buffer, funcInfo.name.length, funcInfo.name.buffer)
 
     for(var i = 0; i < funcInfo.decl.params.size(); i+=1) {
         var param = funcInfo.decl.params.get(i)
         if(i > 0) {
             sb.append(", ")
         }
-        sb.append("%s: ", param.name.asString())
+        sb.append("%.*s: ", param.name.str.length, param.name.str.buffer)
         if(param.typeInfo) {
             param.typeInfo.toString(sb)
         }
@@ -2156,7 +2150,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
         sym = idExpr.sym
 
         if(sym && (sym.flags & SymbolFlags.IS_TYPE)) {
-            this.result.addError(expr.startPos, "can't reassign type '%s'", sym.name)
+            this.result.addError(expr.startPos, "can't reassign type '%.*s'", sym.name.length, sym.name.buffer)
             return false
         }
     }
@@ -2176,7 +2170,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     }
 
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
-        this.result.addError(expr.startPos, "can't reassign constant variable '%s'", sym.name)
+        this.result.addError(expr.startPos, "can't reassign constant variable '%.*s'", sym.name.length, sym.name.buffer)
         return false
     }
 
@@ -2215,7 +2209,7 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     if(!sym) {
         sym = this.currentScope().lookupFunc(expr.type.name)
         if(!sym) {
-            this.result.addError(expr.startPos, "unknown variable '%s'", expr.type.name)
+            this.result.addError(expr.startPos, "unknown variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
             return false
         }
     }
@@ -2237,7 +2231,7 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     expr.operand.typeInfo = typeInfo
 
     if(!expr.operand.typeInfo) {
-        this.result.addError(expr.startPos, "unknown type or variable '%s'", expr.type.name)
+        this.result.addError(expr.startPos, "unknown type or variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 
