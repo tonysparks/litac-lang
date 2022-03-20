@@ -391,6 +391,8 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
         var imp = module.ast.imports.get(i)
         this.createImportSymbols(imp)
     }
+
+    this.resolveNotes(module.ast.notes)
 }
 
 func (this: *TypeChecker) enterModule(module: *Module) {
@@ -856,17 +858,19 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     }
 }
 
-func (this: *TypeChecker) getType(spec: *NameTypeSpec) : *Symbol {
+func (this: *TypeChecker) getType(spec: *NameTypeSpec, isFunc: bool = false) : *Symbol {
     assert(spec != null)
-    return this.getTypeByName(spec.name)
+    return this.getTypeByName(spec.name, isFunc)
 }
 
-func (this: *TypeChecker) getTypeByName(typeName: *const char) : *Symbol {
+func (this: *TypeChecker) getTypeByName(typeName: *const char, isFunc: bool = false) : *Symbol {
     assert(typeName != null)
-    var type = this.current.getType(typeName)
+    var type = isFunc ? this.current.getFuncType(typeName) :
+                            this.current.getType(typeName)
     if(!type) {
         if(this.genericContext.callsite) {
-            type = this.genericContext.callsite.getType(typeName)
+            type = isFunc ? this.genericContext.callsite.getFuncType(typeName) :
+                                this.genericContext.callsite.getType(typeName)
         }
     }
 
@@ -889,7 +893,8 @@ func (this: *TypeChecker) getTypeByName(typeName: *const char) : *Symbol {
         assert(module != null)
         var namePart = name.substring(index + 2)
 
-        return module.getType(namePart.buffer)
+        return isFunc ? module.getFuncType(namePart.buffer) :
+                            module.getType(namePart.buffer)
     }
 
     return type
@@ -972,12 +977,12 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
 }
 
 
-func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
+func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false) : *TypeInfo {
     if(!spec) {
         return &VOID_TYPE
     }
 
-    if(spec.typeInfo) {
+    if(spec.typeInfo && spec.typeInfo.kind != TypeKind.POISON) {
         return spec.typeInfo
     }
 
@@ -990,14 +995,16 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec) : *TypeInfo {
                 return nameSpec.typeInfo
             }
 
-            var sym = this.getType(nameSpec)
+            var sym = this.getType(nameSpec, isFunc)
             if(!sym) {
                 sym = this.currentScope().lookup(nameSpec.name)
-                if(!sym) {
+
                     this.result.addError(spec.pos, "unknown type '%s'", nameSpec.name)
                     goto err;
                 }
                 // account for function pointers in parameter declarations
+                // we escape here so that we don't attempt to build a generic
+                // type
                 else if(sym.type && IsFuncLike(sym.type)) {
                     spec.typeInfo = sym.type
                     return spec.typeInfo
@@ -1160,6 +1167,37 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
     }
 }
 
+func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
+    if(!notes || notes.empty()) return true;
+
+    var success = true
+    for(var i = 0; i < notes.size(); i += 1) {
+        var note = notes.get(i)
+
+        assert(note.type != null)
+
+        var typeInfo = this.resolveTypeSpec(note.type)
+        if(typeInfo.kind == TypeKind.POISON) {
+            success = false
+        }
+
+        for(var j = 0; j < note.arguments.size(); j += 1) {
+            var arg = note.arguments.get(j)
+
+            if(!this.resolveStmt(arg.argExpr)) {
+                success = false
+            }
+
+            // TODO: Validate:
+            // 1) field exists in note.type
+            // 2) arg.argExpr is type compatible with note.type for argName
+            // 3) arg.argExpr is a constant type
+        }
+
+    }
+
+    return success
+}
 
 func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
     if(!stmt) return true;

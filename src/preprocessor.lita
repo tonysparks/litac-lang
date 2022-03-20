@@ -269,25 +269,59 @@ public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker) {
 
 func (this: *Preprocessor) addNotes(obj: ape_object_t, attributes: *Attributes) {
     if(attributes.notes.size()) {
+
+        /*
+            HACK:
+            Terrible work around - this won't work for all
+            cases!!
+
+            We have a chicken and egg problem here with generated symbols
+            and resolving symbols.  We are generating new symbols in this
+            preprocessor stage, however, we need symbols to be partially resolved
+            (atleast their Notes).  Instead, we cheat and resolve the notes expressions
+            here if they exist.
+        */
+        this.callContext.checker.resolveNotes(attributes.notes)
+
         var notesArray = ape_object_make_array(this.ape)
         for(var i = 0; i < attributes.notes.size(); i += 1) {
             var note = attributes.notes.get(i)
             var noteObj = ape_object_make_map(this.ape)
-            var name = ape_object_make_stringf(this.ape, "%.*s", note.name.str.length, note.name.str.buffer)
+            var name = ape_object_make_stringf(this.ape, "%s", note.type.name)
             ape_object_set_map_value(noteObj, "name", name)
 
-            if(note.attributes.size()) {
-                var attributesArray = ape_object_make_array(this.ape)
-                for(var i = 0; i < note.attributes.size(); i += 1) {
-                    var attr = note.attributes.get(i)
-                    var attrObj = ape_object_make_map(this.ape)
-                    var name = ape_object_make_stringf(this.ape, "%.*s", attr.str.length, attr.str.buffer)
-                    ape_object_set_map_value(attrObj, "name", name)
-                    ape_object_add_array_value(attributesArray, attrObj)
-                }
-                ape_object_set_map_value(noteObj, "attributes", attributesArray)
-            }
+            if(note.arguments.size()) {
+                var argumentsArray = ape_object_make_array(this.ape)
+                for(var i = 0; i < note.arguments.size(); i += 1) {
+                    var attr = note.arguments.get(i)
 
+                    var attrObj = ape_object_make_map(this.ape)
+                    var name = ape_object_make_stringf(this.ape, "%.*s", attr.argName.str.length, attr.argName.str.buffer)
+
+                    ape_object_set_map_value(attrObj, "name", name)
+                    ape_object_add_array_value(argumentsArray, attrObj)
+
+                    // TODO: Make this much more comprehensible...
+                    if(attr.argExpr != null && attr.argExpr.operand.typeInfo != null) {
+                        if(attr.argExpr.operand.typeInfo.kind == TypeKind.STR)  {
+                            var value = ape_object_make_stringf(this.ape, "%.*s", attr.argExpr.operand.val.str.length, attr.argExpr.operand.val.str.buffer)
+                            ape_object_set_map_value(attrObj, "value", value)
+                        }
+                        else if(IsNumberLike(attr.argExpr.operand.typeInfo)) {
+                            if(IsInteger(attr.argExpr.operand.typeInfo)) {
+                                ape_object_set_map_number(attrObj, "value", attr.argExpr.operand.val.intValue as (f64))
+                            }
+                            else {
+                                ape_object_set_map_number(attrObj, "value", attr.argExpr.operand.val.floatValue)
+                            }
+                        }
+                        else {
+                            // TODO: other complex types...
+                        }
+                    }
+                }
+                ape_object_set_map_value(noteObj, "arguments", argumentsArray)
+            }
             ape_object_add_array_value(notesArray, noteObj)
         }
 
@@ -854,11 +888,29 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
                 }
                 else {
                     var note = sym.decl.getNote("test")
-                    for(var i = 0; i < note.attributes.size(); i += 1) {
-                        var att = note.attributes.get(i)
+                    const MAX_SIZE = 256
+                    var buffer: [MAX_SIZE]char;
+
+                    for(var i = 0; i < note.arguments.size(); i += 1) {
+                        var att = note.arguments.get(i)
                         var matchlength = 0
 
-                        if(pattern.match(att.asString(), &matchlength) > -1) {
+                        if(att.argExpr == null || att.argExpr.operand.typeInfo == null) {
+                            continue
+                        }
+
+                        if(att.argExpr.operand.typeInfo.kind != TypeKind.STR) {
+                            continue
+                        }
+
+                        var value = att.argExpr.operand.val.str
+                        if(value.length >= MAX_SIZE) {
+                            continue
+                        }
+
+                        value.copyTo(buffer, value.length)
+
+                        if(pattern.match(buffer, &matchlength) > -1) {
                             var declObj = context.pp.declToApe(sym)
                             ape_object_add_array_value(results, declObj)
                             break

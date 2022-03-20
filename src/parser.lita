@@ -326,31 +326,18 @@ func (p: *Parser) notes(notes: *Array<*NoteStmt>) : bool {
     while(p.match(TokenType.AT)) {
         var pos = p.prevPos()
 
-        var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
-        if(!identifier) {
-            goto err;
-        }
+        var type = p.identifierType(true)
 
-        var name = *identifier
-
-        var attributes = Array<Token>{}
-        attributes.init(2, p.allocator)
+        var args = Array<CallArg>{}
+        args.init(0, p.allocator)
 
         if(p.match(TokenType.LEFT_PAREN)) {
-            do {
-                // TODO: This allows for garbage in the notes, is that OK?
-                if(p.check(TokenType.STRING)) {
-                    attributes.add(*p.advance())
-                }
-            }
-            while(p.match(TokenType.COMMA));
-
-            if(!p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)) {
+            if(!p.arguments(args)) {
                 goto err;
             }
         }
 
-        var note = NewNoteStmt(pos, p.prevPos(), name, attributes, p.allocator) as (*NoteStmt)
+        var note = NewNoteStmt(pos, p.prevPos(), type, args, p.allocator) as (*NoteStmt)
         notes.add(note)
     }
 

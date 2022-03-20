@@ -259,11 +259,12 @@
                 var t2 = Test<f32> { &test2 }
                 assert(t2.y(1.4f) == 1.4f)
             `
-        }, ///
+        }, 
         {
             "name": "Generic Func Ptr in Func",
+            "buildCmd": "clang -std=c99 -g -gcodeview -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
             "definitions": `
-                func test(a:i32) : i32 {
+                func testx(a:i32) : i32 {
                     return a;
                 }
 
@@ -274,7 +275,7 @@
             `,
             "code": `
 
-                var t = gen<i32>(&test, 24)
+                var t = gen<i32>(&testx, 24)
                 assert(t == 24)
             `
         },

@@ -81,6 +81,12 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
             return null
         }
     }
+
+
+    if(!this.resolveNotes(decl.attributes.notes)) {
+        return null
+    }
+
     var declaredType: *TypeInfo = null
     var inferredType: *TypeInfo = null
 
@@ -303,6 +309,11 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
         this.genericParamStack.pop()
     }
 
+
+    if(!this.resolveNotes(aggDecl.attributes.notes)) {
+        return false
+    }
+
     var isTrait = aggDecl.sym.flags & SymbolFlags.IS_TRAIT
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
@@ -314,6 +325,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 var traitField = field.traitField
                 field.typeInfo = this.resolveTypeSpec(traitField.type)
                 assert(field.typeInfo)
+
+                if(!this.resolveNotes(traitField.attributes.notes)) {
+                    return false
+                }
 
                 if(field.typeInfo.kind != TypeKind.FUNC_PTR) {
                     this.errorInvalidMemberForTrait(aggDecl, traitField.name.str, traitField.startPos)
@@ -330,6 +345,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 var varField = field.varField
                 field.typeInfo = this.resolveTypeSpec(varField.type)
                 assert(field.typeInfo)
+
+                if(!this.resolveNotes(varField.attributes.notes)) {
+                    return false
+                }
 
                 if(isTrait) {
                     this.errorInvalidMemberForTrait(aggDecl, varField.name.str, varField.startPos)
@@ -367,6 +386,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
                 field.typeInfo = sym.type
                 if(!field.typeInfo) {
+                    return false
+                }
+
+                if(!this.resolveNotes(field.enumField.attributes.notes)) {
                     return false
                 }
 
@@ -427,6 +450,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 }
 
                 field.aggregateField.sym = sym
+
+                if(!this.resolveNotes(field.aggregateField.attributes.notes)) {
+                    return false
+                }
 
                 //sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
@@ -540,9 +567,19 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
     defer this.references.addTypeReferenceBySymbol(enumDecl.startPos, enumDecl.sym)
 
     var errors = this.errors()
+
+    if(!this.resolveNotes(enumDecl.attributes.notes)) {
+        return false
+    }
+
     var parentTypeInfo = enumDecl.sym.type
     for(var i = 0; i < enumDecl.fields.size(); i+=1) {
         var field = enumDecl.fields.get(i)
+
+        if(!this.resolveNotes(field.attributes.notes)) {
+            return false
+        }
+
         if(field.value) {
             if(!this.resolveExpr(field.value)) {
                 return false
@@ -593,6 +630,11 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         this.genericParamStack.pop()
     }
 
+
+    if(!this.resolveNotes(funcDecl.attributes.notes)) {
+        return false
+    }
+
     if(!this.resolveStmt(funcDecl.params)) {
         return false
     }
@@ -615,6 +657,10 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
     defer this.references.addTypeReferenceBySymbol(paramDecl.startPos, paramDecl.sym)
 
     var errors = this.errors()
+
+    if(!this.resolveNotes(paramDecl.attributes.notes)) {
+        return false
+    }
 
     if(paramDecl.defaultExpr) {
         if(!this.resolveExpr(paramDecl.defaultExpr)) {
@@ -646,6 +692,10 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
 
 public func (this: *TypeChecker) resolveTypedefDecl(typedefDecl: *TypedefDecl) : bool {
     defer this.references.addTypeReferenceBySymbol(typedefDecl.startPos, typedefDecl.sym)
+
+    if(!this.resolveNotes(typedefDecl.attributes.notes)) {
+        return false
+    }
 
     // nothing to type check
     return true

@@ -134,6 +134,15 @@ public func (this: *Module) getType(type: *const char) : *Symbol {
     return this.genericSymbols.get(type)
 }
 
+public func (this: *Module) getFuncType(type: *const char) : *Symbol {
+    var sym = this.symbols.lookupFunc(type)
+    if(sym) {
+        return sym
+    }
+
+    return this.genericSymbols.get(type) // TODO: Separate out Func in generic symbols
+}
+
 public const MAX_METHODS_FOR_TYPE = 2048; // TODO: this should be big enough??
 
 func (this: *Module) isMethodForType(type: *TypeInfo, sym: *Symbol) : bool {
@@ -179,7 +188,7 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
 
     var currentSyms: *Scope = &this.symbols
     while(currentSyms) {
-        for(var it = currentSyms.symbols.iter(); it.hasNext();) {
+        for(var it = currentSyms.symbolFuncs.iter(); it.hasNext();) {
             var n = it.next()
             var sym = n.value
 
@@ -224,9 +233,21 @@ public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport
 func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *StringView, isUsing: bool) {
     moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
 
-    for(var i = 0; i < moduleToImport.symbols.capacity; i += 1) {
-        var symName = moduleToImport.symbols.keys[i]
-        var symbol = moduleToImport.symbols.values[i]
+    var symbols = moduleToImport.symbols;
+
+    for(var i = 0; i < symbols.symbolTypes.capacity; i += 1) {
+        var symName = symbols.symbolTypes.keys[i]
+        var symbol = symbols.symbolTypes.values[i]
+        if(!symName || !symbol) {
+            continue
+        }
+
+        this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
+    }
+
+    for(var i = 0; i < symbols.symbolFuncs.capacity; i += 1) {
+        var symName = symbols.symbolFuncs.keys[i]
+        var symbol = symbols.symbolFuncs.values[i]
         if(!symName || !symbol) {
             continue
         }
@@ -287,9 +308,22 @@ public func (this: *Module) equals(other: *Module) : bool {
 
 public func (this: *Module) print(header: *const char) {
     printf("Module %s %.*s {\n", header, this.id.name.length, this.id.name.buffer)
-    for(var i = 0; i < this.symbols.capacity; i+=1) {
-        var symName = this.symbols.keys[i]
-        var symbol = this.symbols.values[i]
+    var symbols = this.symbols
+
+    for(var i = 0; i < symbols.symbolTypes.capacity; i+=1) {
+        var symName = symbols.symbolTypes.keys[i]
+        var symbol = symbols.symbolTypes.values[i]
+        if(!symName || !symbol) {
+            printf("   %d null\n", i)
+            continue
+        }
+        printf("   %d '%s' %s\n", i, symName, SymbolKindAsStr(symbol.kind))
+    }
+
+
+    for(var i = 0; i < symbols.symbolFuncs.capacity; i+=1) {
+        var symName = symbols.symbolFuncs.keys[i]
+        var symbol = symbols.symbolFuncs.values[i]
         if(!symName || !symbol) {
             printf("   %d null\n", i)
             continue

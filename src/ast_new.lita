@@ -917,15 +917,15 @@ public func NewLabelStmt(startPos: SrcPos,
 
 public func NewNoteStmt(startPos: SrcPos,
                         endPos: SrcPos,
-                        name: Token,
-                        attributes: Array<Token>,
+                        type: *NameTypeSpec,
+                        arguments: Array<CallArg>,
                         allocator: *const Allocator) : *Stmt {
     var stmt = new<NoteStmt>(allocator)
     stmt.kind = StmtKind.NOTE_STMT
     stmt.startPos = startPos
     stmt.endPos = endPos
-    stmt.name = name
-    stmt.attributes = attributes
+    stmt.type = type
+    stmt.arguments = arguments
     return stmt as (*Stmt)
 }
 

@@ -108,6 +108,23 @@ public struct WebServer {
     poll: i32
 }
 
+/*
+@get_request(
+    .uri = "blah",
+    .method = ["GET","PUT"])
+    
+@GetRequest{
+    .uri = "blah",
+    .method = ["GET","PUT"]}
+    
+@note GetRequest {
+    uri: *const char
+    method: [5]*const char = [5]*const char {
+        "GET",
+        null
+    }
+}*/    
+    
 
 @doc("""
     Initializes the web server
