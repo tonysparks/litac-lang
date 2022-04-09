@@ -6,22 +6,13 @@ import "std/mem"
 import "std/map"
 
 
-
-@get_request("/api/beers/*")
-func GetBeers(ctx: *WebContext) : i32 {
-    ctx.response.body.append("Here in Beers!\n")
-    return 200
-}
-
-@get_request("/api/cups/*")
-func GetCup(ctx: *WebContext) : i32{
-    ctx.response.body.append("Here in Cup!\n")
-    return 200
-}
-
-
 @doc("Callback function from a web request annotation")
 public typedef func(*WebContext): i32 as WebController;
+
+@doc("Get Request note")
+public struct get_request {
+    uri: *const char
+}
 
 
 /**
@@ -34,10 +25,11 @@ public typedef func(*WebContext): i32 as WebController;
 #precheck
     var symbols = getSymbolsByNote("get_request")
     emitClear()
-    
+
     emit("public func GetWebController(msg: *mg_http_message) : WebController {")
-    
+
     for(sym in symbols) {
+        print("Sym: ", sym.name, "\n")
         if(sym.kind == "FUNC_DECL") {
             //var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
             var attr = sym.notes[0].attributes
@@ -48,20 +40,20 @@ public typedef func(*WebContext): i32 as WebController;
                 //print(value, " ", value.name, "\n")
                 emit("\n\tif(mg_match(msg.uri, mg_strx(\"%s\"), null)) return %s;", value.name, sym.name)
             }
-            
+
 
         }
-        
-        
+
+
     }
     emit("\n\treturn Web404Controller;\n")
     emit("} ")
-    
+
     addDeclaration(getCurrentModuleFilename(), emitStr())
-    
-    
+
+
     /// DELETE
-    
+
 #end
 
 func Web404Controller(ctx: *WebContext) : i32 {
@@ -112,24 +104,24 @@ public struct WebServer {
 @get_request(
     .uri = "blah",
     .method = ["GET","PUT"])
-    
+
 @GetRequest{
     .uri = "blah",
     .method = ["GET","PUT"]}
-    
+
 @note GetRequest {
     uri: *const char
     method: [5]*const char = [5]*const char {
         "GET",
         null
     }
-}*/    
-    
+}*/
+
 
 @doc("""
     Initializes the web server
 """)
-public func (this: *WebServer) init(config: *WebConfig, 
+public func (this: *WebServer) init(config: *WebConfig,
                                     allocator: *const Allocator = defaultAllocator) : WebStatus {
     this.allocator = allocator
     mg_mgr_init(&this.mg)
@@ -144,7 +136,7 @@ public func (this: *WebServer) start() {
     for(;;) {
         mg_mgr_poll(&this.mg, this.poll)
     }
-    
+
     mg_mgr_free(&this.mg)
 }
 
@@ -155,28 +147,28 @@ public func (this: *WebServer) start() {
 */
 func WebCallbackFn(conn: *mg_connection, ev: i32, ev_data: *void, fn_data: *void) {
     var server = fn_data as (*WebServer)
-    
+
     if(ev == MgEvent.MG_EV_HTTP_MSG) {
         var msg = ev_data as (*mg_http_message)
-        
+
         var request = WebRequest {
             .msg = msg
         }
-        
+
         var response = WebResponse {}
         response.headers = StrMap<WebHeader>(WebHeader{}, 16, server.allocator)
         response.body.init(1024, server.allocator)
-        
+
         var context = WebContext {
             .conn = conn,
             .request = &request,
             .response = &response
         }
-        
+
         var controller = GetWebController(msg)
         response.status = controller(&context)
-     
-        mg_http_reply(conn, response.status, "", response.body.cStr());     
+
+        mg_http_reply(conn, response.status, "", response.body.cStr());
     }
 }
 
@@ -186,11 +178,11 @@ func main(len: i32, args: **char) : i32 {
     var server: WebServer;
     var config = WebConfig{}
     printf("Starting http server: %s\n", config.addr)
-    
+
     server.init(&config)
-    
+
     server.start()
-    
+
     printf("Terminated http server")
     return 0
 }

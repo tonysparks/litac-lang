@@ -24,5 +24,113 @@
 
             `,
         },
+
+        {
+            "name": "Complex note",
+            "definitions": `
+                public struct get_request {
+                    uri: *const char
+                    count: i32
+                }
+
+                @get_request(.uri = "/test", .count = 10)
+                func Test() {
+                }
+
+                #precheck
+                    var symbols = getSymbolsByNote("get_request")
+                    for(sym in symbols) {
+                        assert(sym.notes != null)
+                        assert(len(sym.notes) == 1)
+
+                        var note = sym.notes[0]
+                        assert(note != null)
+                        assert(note.name == "get_request")
+                        assert(note.arguments != null)
+                        assert(len(note.arguments) == 2)
+                        assert(note.arguments[0].name == "uri")
+                        assert(note.arguments[0].value == "/test")
+                        assert(note.arguments[1].name == "count")
+                        assert(note.arguments[1].value == 10)
+                    }
+                #end
+            `,
+            "code": `
+
+            `,
+        },
+        {
+            "name": "Complex note in other module",
+            "definitions": `
+                import "web"
+
+                @get_request(.uri = "/test", .count = 10)
+                func Test() {
+                }
+
+            `,
+            "modules": [
+                {
+                    "name": "web",
+                    "program": `
+                        public struct get_request {
+                            uri: *const char
+                            count: i32
+                        }
+
+
+                        #precheck
+                            var symbols = getSymbolsByNote("get_request")
+                            for(sym in symbols) {
+                                assert(sym.notes != null)
+                                assert(len(sym.notes) == 1)
+
+                                var note = sym.notes[0]
+                                assert(note != null)
+                                assert(note.name == "get_request")
+                                assert(note.arguments != null)
+                                assert(len(note.arguments) == 2)
+                                assert(note.arguments[0].name == "uri")
+                                assert(note.arguments[0].value == "/test")
+                                assert(note.arguments[1].name == "count")
+                                assert(note.arguments[1].value == 10)
+                            }
+                        #end
+                    `
+                }
+            ],
+            "code": `
+
+            `,
+        },
+        {
+            "name": "Invalid note",
+            "definitions": `
+                @get_request(.uri = "/test", .count = 10)
+                func Test() {
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "unknown type 'get_request'"
+        },
+        {
+            "name": "Invalid note argument",
+            "definitions": `
+                public struct get_request {
+                    uri: *const char
+                    count: i32
+                }
+
+                @get_request(.uri = "/test", .count = 10, .headers = "blah")
+                func Test() {
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "unknown type 'get_request'"
+        },
     ]
 }

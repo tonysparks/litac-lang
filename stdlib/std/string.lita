@@ -199,12 +199,16 @@ public func (s: String) size() : i32 {
 }
 
 public func (s: String) cStr() : *char {
-    s.buffer[s.length] = '\0'
+    if(s.length > 0) {
+        s.buffer[s.length] = '\0'
+    }
     return s.buffer
 }
 
 public func (s: String) cStrConst() : *const char {
-    s.buffer[s.length] = '\0'
+    if(s.length > 0) {
+        s.buffer[s.length] = '\0'
+    }
     return s.buffer as (*const char)
 }
 
@@ -213,9 +217,13 @@ public func StringCopy(original: *const char, len: i32 = -1, allocator: *const m
         len = strlen(original)
     }
 
-    var copiedStr = allocator.alloc((len + 1) * sizeof(:char)) as (*char)
-    memcpy(copiedStr, original, len)
+    var copiedStr: *char = null
 
-    copiedStr[len] = '\0'
+    if(len > 0) {
+        copiedStr = allocator.alloc((len + 1) * sizeof(:char)) as (*char)
+        memcpy(copiedStr, original, len)
+
+        copiedStr[len] = '\0'
+    }
     return copiedStr
 }

@@ -1,6 +1,7 @@
 import "std/mem" as mem;
 import "std/assert";
 import "std/string_buffer";
+import "std/string";
 import "std/map";
 import "std/array";
 import "std/libc";
@@ -267,18 +268,12 @@ public func CreateJsonObject(alloc: *const mem::Allocator = mem::defaultAllocato
     return node
 }
 
-public func (node: *JsonNode) put(key: *const char, n: *JsonNode, len: i32 = -1) {
+public func (node: *JsonNode) put(key: *const char, n: *JsonNode) {
     if(node.type != JsonType.OBJECT) {
         return;
     }
 
-    if(len < 0) {
-        len = strlen(key);
-    }
-
-    var copy = mem::memduplicate(key as (*const void), len + 1, node.alloc) as (*char)
-    copy[len] = '\0'
-
+    var copy = StringCopy(key, strlen(key), node.alloc)
     var entry = Entry {
         .key = copy,
         .value = n
@@ -287,13 +282,9 @@ public func (node: *JsonNode) put(key: *const char, n: *JsonNode, len: i32 = -1)
     node.objValue.indexes.put(copy, node.objValue.values.size() - 1)
 }
 
-public func (node: *JsonNode) putNoDup(key: *const char, n: *JsonNode, len: i32 = -1) {
+public func (node: *JsonNode) putNoDup(key: *const char, n: *JsonNode) {
     if(node.type != JsonType.OBJECT) {
         return;
-    }
-
-    if(len < 0) {
-        len = strlen(key);
     }
 
     var entry = Entry {
@@ -310,43 +301,43 @@ public func (node: *JsonNode) putStr(key: *const char, str: *const char, len: i3
     }
 
     var value = CreateJsonString(str, len, node.alloc)
-    node.put(key, value, len)
+    node.put(key, value)
 }
 
 
-public func (node: *JsonNode) putNumber(key: *const char, number: f64, len: i32 = -1) {
+public func (node: *JsonNode) putNumber(key: *const char, number: f64) {
     if(node.type != JsonType.OBJECT) {
         return;
     }
 
     var value = CreateJsonFloatNumber(number, node.alloc)
-    node.put(key, value, len)
+    node.put(key, value)
 }
 
-public func (node: *JsonNode) putIntNumber(key: *const char, number: i64, len: i32 = -1) {
+public func (node: *JsonNode) putIntNumber(key: *const char, number: i64) {
     if(node.type != JsonType.OBJECT) {
         return;
     }
 
     var value = CreateJsonIntNumber(number, node.alloc)
-    node.put(key, value, len)
+    node.put(key, value)
 }
 
-public func (node: *JsonNode) putFloatNumber(key: *const char, number: f64, len: i32 = -1) {
+public func (node: *JsonNode) putFloatNumber(key: *const char, number: f64) {
     if(node.type != JsonType.OBJECT) {
         return;
     }
 
     var value = CreateJsonFloatNumber(number, node.alloc)
-    node.put(key, value, len)
+    node.put(key, value)
 }
 
-public func (node: *JsonNode) putBool(key: *const char, b: bool, len: i32 = -1) {
+public func (node: *JsonNode) putBool(key: *const char, b: bool) {
     if(node.type != JsonType.OBJECT) {
         return;
     }
 
-    node.put(key, b ? JSON_TRUE : JSON_FALSE, len)
+    node.put(key, b ? JSON_TRUE : JSON_FALSE)
 }
 
 

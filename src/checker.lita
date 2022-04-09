@@ -355,6 +355,24 @@ func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *
     return true
 }
 
+func (this: *TypeChecker) checkNote(src: SrcPos, a: *TypeInfo) : bool {
+    if(a == null) {
+        return false
+    }
+
+    if(!IsFieldAccessible(a)) {
+        var sb = StringBufferInit(256, this.allocator)
+        sb.appendStrn("'", 1)
+        a.toString(sb)
+        sb.appendStr("' must be either a struct, union or enum")
+
+        this.result.addErrorStr(src, sb)
+        return false
+    }
+
+    return true
+}
+
 func (this: *TypeChecker) createModuleSymbols(module: *Module) {
     if(!module.ast) {
         return;
@@ -1190,10 +1208,42 @@ func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
                 success = false
             }
 
+            // TODO:
+            // not type checking on no-named arguments
+            // Is this a good thing???
+            /*if(arg.argName.length == 0) {
+                continue;
+            }*/
+
             // TODO: Validate:
             // 1) field exists in note.type
             // 2) arg.argExpr is type compatible with note.type for argName
             // 3) arg.argExpr is a constant type
+            if(success) {
+                if(!this.checkNote(note.startPos, typeInfo)) {
+                    success = false
+                }
+                else {
+                    if(IsAggregate(typeInfo)) {
+                        var aggInfo = typeInfo as (*AggregateTypeInfo)
+                    }
+                    else {
+                        /*
+                        var enumInfo = typeInfo as (*EnumTypeInfo)
+                        if(arg.argName.length >= 0) {
+                            var field = enumInfo.getField(arg.argName)
+                        }
+                        else {
+                            if(j >= enumInfo.decl.fields.size()) {
+                                success = false
+                            }
+                            else {
+
+                            }
+                        }*/
+                    }
+                }
+            }
         }
 
     }

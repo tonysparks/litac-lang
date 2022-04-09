@@ -91,6 +91,7 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     ape_set_native_function(this.ape, "replaceDeclaration", ApeReplaceDeclaration, &this.callContext)
     ape_set_native_function(this.ape, "addImport", ApeAddImport, &this.callContext)
 
+    ape_set_native_function(this.ape, "assert", ApeAssert, &this.callContext)
     ape_set_native_function(this.ape, "getMainSymbol", ApeGetMainSymbol, &this.callContext)
     ape_set_native_function(this.ape, "setMainSymbol", ApeSetMainSymbol, &this.callContext)
     ape_set_native_function(this.ape, "getInputModuleFilename", ApeGetInputModuleFilename, &this.callContext)
@@ -294,8 +295,8 @@ func (this: *Preprocessor) addNotes(obj: ape_object_t, attributes: *Attributes) 
 
             if(note.arguments.size()) {
                 var argumentsArray = ape_object_make_array(this.ape)
-                for(var i = 0; i < note.arguments.size(); i += 1) {
-                    var attr = note.arguments.get(i)
+                for(var j = 0; j < note.arguments.size(); j += 1) {
+                    var attr = note.arguments.get(j)
 
                     var attrObj = ape_object_make_map(this.ape)
                     var name = ape_object_make_stringf(this.ape, "%.*s", attr.argName.str.length, attr.argName.str.buffer)
@@ -944,4 +945,16 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
     }
 
     return results
+}
+
+func ApeAssert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var stmt = ape_object_get_bool(args[0])
+    if(!stmt) {
+        // TODO: Get the position of the function call...
+        context.pp.lita.result.addError(context.comp.startPos, "preprocessor assertion failure")
+    }
+
+    return ape_object_make_null()
 }
