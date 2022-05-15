@@ -1,6 +1,9 @@
-![LitaC](/extras/assets/litac_logo_64x64.png)
 
-# LitaC
+<p align="center">
+<img src="./extras/assets/litac_logo.png" width="256" height="256">
+</p>
+
+
 LitaC (pronounced Lee-ta-see) is a C like language.  In fact, its main goal is to be C with some minor syntax sugar.  It compiles to ISO-C99 (C11 for some features) which has the benefits of being fairly easy to use existing C libraries and code, and can target any platform with a C99 compiler.
 
 This is the self-hosted compiler implementation -- the original bootstrap implementation can be found [here.](https://github.com/tonysparks/litac).  This implementation is currently heavily in development and the bootstrap version is no longer supported and lacks current features.
