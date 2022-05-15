@@ -14,6 +14,26 @@
     `,
     "tests": [
         {
+            "name": "Note Declaration",
+            "definitions": `
+                public @note Something {
+                    str: *const char = "Hello"
+                    fnum: f32 = 4.0
+                    inum: i32 = 18
+                }
+
+                @Something(.str = "yes", .fnum = 44, .inum = 22)
+                struct UseNote {
+
+                }
+
+
+            `,
+            "code": `
+
+            `,
+        },
+        /*{
             "name": "Typecast",
             "definitions": `
                 @threadlocal
@@ -23,12 +43,12 @@
             "code": `
 
             `,
-        },
+        },*/
 
         {
             "name": "Complex note",
             "definitions": `
-                public struct get_request {
+                public @note get_request {
                     uri: *const char
                     count: i32
                 }
@@ -58,7 +78,7 @@
             "code": `
 
             `,
-        },
+        },/*
         {
             "name": "Complex note in other module",
             "definitions": `
@@ -131,6 +151,6 @@
 
             `,
             "error": "unknown type 'get_request'"
-        },
+        },*/
     ]
 }

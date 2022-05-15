@@ -48,6 +48,7 @@ public enum SymbolFlags {
     IS_TRAIT_METHOD         = (1<<18),
     IS_TRAIT_GENERATED      = (1<<19),
     IS_GENERATED            = (1<<20),
+    IS_NOTE                 = (1<<21),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -217,6 +218,7 @@ public func (this: *Scope) addSymbol(name: InternedString,
                      decl.kind == StmtKind.UNION_DECL  ||
                      decl.kind == StmtKind.TRAIT_DECL  ||
                      decl.kind == StmtKind.TYPEDEF_DECL||
+                     decl.kind == StmtKind.NOTE_DECL   ||
                      decl.kind == StmtKind.ENUM_DECL)
 
     if(this.kind == ScopeKind.FUNC) {
@@ -243,6 +245,7 @@ public func (this: *Scope) addSymbol(name: InternedString,
             flags |= SymbolFlags.IS_ALIAS
             // fallthru
         }
+        case StmtKind.NOTE_DECL:
         case StmtKind.ENUM_DECL:
         case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
@@ -251,6 +254,11 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
             if(decl.kind == StmtKind.TRAIT_DECL) {
                 flags |= SymbolFlags.IS_TRAIT
+            }
+
+            if(decl.kind == StmtKind.NOTE_DECL) {
+                flags |= SymbolFlags.IS_NOTE
+                flags &= ~SymbolFlags.IS_TYPE
             }
             break;
         }

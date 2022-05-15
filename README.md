@@ -1,3 +1,5 @@
+![LitaC](/extras/assets/litac_logo_64x64.png)
+
 # LitaC
 LitaC (pronounced Lee-ta-see) is a C like language.  In fact, its main goal is to be C with some minor syntax sugar.  It compiles to ISO-C99 (C11 for some features) which has the benefits of being fairly easy to use existing C libraries and code, and can target any platform with a C99 compiler.
 

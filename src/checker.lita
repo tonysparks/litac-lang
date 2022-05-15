@@ -58,6 +58,8 @@ public struct TypeChecker {
     symbolFuncs: Array<*Symbol>
     mainEntry: *Symbol // main entry point to the program
 
+    symbolNotes: Array<*Symbol>
+
     genericContext: GenericContext
     genericParamStack: Array<Array<GenericParam>>
     genericTemplates: Array<*Symbol>
@@ -130,6 +132,9 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     }
 
     this.resolveSymbols()
+
+    // allow for creating more symbols after initial resolving of symbols
+    this.lita.preprocessor.postResolveSymbols(this)
 
     this.enterModule(root)
     {
@@ -547,6 +552,12 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             this.symbolTypes.add(sym)
             break;
         }
+        case StmtKind.NOTE_DECL: {
+            var noteDecl = decl as (*AggregateDecl)
+            this.resolveSymbol(sym)
+            this.finishResolveSymbol(sym)
+            break;
+        }
         case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
@@ -745,6 +756,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     sym.type = aliasedType
                     break;
                 }
+                case StmtKind.NOTE_DECL:
                 case StmtKind.TRAIT_DECL:
                 case StmtKind.STRUCT_DECL:
                 case StmtKind.UNION_DECL: {
@@ -835,6 +847,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     sym.flags &= ~SymbolFlags.IS_INCOMPLETE
 
     switch(sym.decl.kind) {
+        case StmtKind.NOTE_DECL:
         case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
@@ -1001,6 +1014,45 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
     return isImpl
 }
 
+
+func (this: *TypeChecker) resolveNoteTypeSpec(spec: *NameTypeSpec) : *TypeInfo {
+    if(!spec) {
+        return &VOID_TYPE
+    }
+
+    if(spec.typeInfo && spec.typeInfo.kind != TypeKind.POISON) {
+        return spec.typeInfo
+    }
+
+    if(this.isGenericParamType(spec)) {
+        spec.typeInfo = this.typeCache.newGenericParamTypeInfo(spec.name)
+        return spec.typeInfo
+    }
+
+    var sym = this.getType(spec, false)
+    if(!sym || !sym.type) {
+        this.result.addError(spec.pos, "unknown note type '%.*s'", spec.name.length, spec.name.buffer)
+        goto err;
+    }
+
+/* TODO: Silence until bootstrap is completed */
+    if(!(sym.flags & SymbolFlags.IS_NOTE)) {
+        this.result.addError(spec.pos, "'%.*s' is not a note type", spec.name.length, spec.name.buffer)
+        goto err;
+    }
+
+    spec.typeInfo = sym.type
+    this.lita.references.addTypeReference(spec)
+
+    return spec.typeInfo
+
+err:
+    if(!spec.typeInfo) {
+        spec.typeInfo = &POISON_TYPE
+    }
+
+    return &POISON_TYPE
+}
 
 func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false) : *TypeInfo {
     if(!spec) {
@@ -1196,9 +1248,10 @@ func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
 
         assert(note.type != null)
 
-        var typeInfo = this.resolveTypeSpec(note.type)
+        var typeInfo = this.resolveNoteTypeSpec(note.type)
+        //var typeInfo = this.resolveTypeSpec(note.type)
         if(typeInfo.kind == TypeKind.POISON) {
-            success = false
+            return false
         }
 
         for(var j = 0; j < note.arguments.size(); j += 1) {

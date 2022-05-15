@@ -23,6 +23,7 @@ public enum StmtKind {
     ENUM_DECL,
     FUNC_DECL,
     TYPEDEF_DECL,
+    NOTE_DECL,
     PARAM_DECL,
     NATIVE_DECL,
     NOTES_DECL,
@@ -270,6 +271,12 @@ public struct NotesDecl {
     decl: using Decl
     notes: Array<*NoteStmt>
 }
+
+/*
+public struct NoteDecl {
+    decl: using Decl
+    fields: Array<FieldStmt>
+}*/
 
 public struct PoisonDecl {
     decl: using Decl

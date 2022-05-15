@@ -10,63 +10,65 @@ public struct any {
 Note declarations
 ========================================================================
 */
-public struct foreign {
+
+public @note foreign {
     alias: *const char
 }
 
-public struct alias {
+
+public @note alias {
     alias: *const char
 }
 
-public struct include {
+public @note include {
     value: *const char
 }
 
-public struct static {
+public @note static {
 }
 
-public struct raw {
+public @note raw {
     value: *const char
 }
 
-public struct cFile {
+public @note cFile {
 }
 
-public struct doc {
+public @note doc {
     value: *const char
 }
 
-public struct asStr {
+public @note asStr {
     name: *const char
 }
 
-public struct inline {
+public @note inline {
 }
 
-public struct no_profile {
+public @note no_profile {
 }
 
-public struct profile {
+public @note profile {
     value: *const char
 }
 
-public struct generated {
+public @note generated {
 }
 
-public struct module_init {
+public @note module_init {
 }
 
-public struct module_destroy {
+public @note module_destroy {
 }
 
-public struct threadlocal {
+public @note threadlocal {
 }
 
-public struct test {
+public @note test {
     name: *const char
 }
 
-public struct packed {
+public @note packed {
 }
 
 //=====================================================================================

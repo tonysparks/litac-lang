@@ -261,6 +261,17 @@ public func NewTypedefDecl(startPos: SrcPos,
     return decl as (*Decl)
 }
 
+
+public func NewNoteDecl(startPos: SrcPos,
+                        endPos: SrcPos,
+                        name: Identifier,
+                        fields: Array<FieldStmt>,
+                        allocator: *const Allocator) : *Decl {
+    return NewAggregateDecl(startPos, endPos, StmtKind.NOTE_DECL,
+                                name, Array<GenericParam>{}, fields, 0, allocator)
+}
+
+
 public func NewParameterDecl(startPos: SrcPos,
                          endPos: SrcPos,
                          name: Identifier,

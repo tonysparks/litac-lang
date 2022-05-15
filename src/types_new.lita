@@ -120,10 +120,10 @@ public func (this: *TypeCache) newFuncPtrTypeInfo(genericParams: Array<GenericPa
 }
 
 public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
-                                                    aggregateDecl: *AggregateDecl) : *AggregateTypeInfo {
+                                                    decl: *AggregateDecl) : *AggregateTypeInfo {
 
     var type = new<AggregateTypeInfo>(this.allocator)
-    switch(aggregateDecl.kind) {
+    switch(decl.kind) {
         case StmtKind.TRAIT_DECL: {
             type.kind = TypeKind.TRAIT
             break;
@@ -132,6 +132,7 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
             type.kind = TypeKind.UNION
             break;
         }
+        case StmtKind.NOTE_DECL:
         case StmtKind.STRUCT_DECL: {
             type.kind = TypeKind.STRUCT
             break;
@@ -143,7 +144,7 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
     }
     type.typeid = NextTypeId()
     type.name = sym.name
-    type.decl = aggregateDecl
+    type.decl = decl
     type.sym = sym
     return type
 }
