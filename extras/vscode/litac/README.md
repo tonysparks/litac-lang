@@ -1,6 +1,6 @@
 # litac README
 
-VSCode extension for the [LitaC](https://github.com/tonysparks/litac) Programming Language.
+VSCode extension for the [LitaC](https://github.com/tonysparks/litac-lang) Programming Language.
 
 Extreme Work In Progress!
 
@@ -13,7 +13,7 @@ Extreme Work In Progress!
 
 ## Requirements
 
-You need [LitaC](https://github.com/tonysparks/litac) installed
+You need [LitaC](https://github.com/tonysparks/litac-lang) installed
 
 ## Extension Settings
 

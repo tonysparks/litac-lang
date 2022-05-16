@@ -1,7 +1,14 @@
 {
 	"name": "litac",
-	"displayName": "litac",
+	"displayName": "LitaC",
 	"description": "LitaC Programming Language",
+    "icon" : "images/litac_logo_128x128.png",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/tonysparks/litac-lang"
+    },
+    "homepage" : "https://github.com/tonysparks/litac-lang/README.md",
+    "keywords" : ["litac"],    
 	"version": "0.0.3",
 	"publisher": "tonysparks",
 	"engines": {
