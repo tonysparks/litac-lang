@@ -272,12 +272,6 @@ public struct NotesDecl {
     notes: Array<*NoteStmt>
 }
 
-/*
-public struct NoteDecl {
-    decl: using Decl
-    fields: Array<FieldStmt>
-}*/
-
 public struct PoisonDecl {
     decl: using Decl
 }
