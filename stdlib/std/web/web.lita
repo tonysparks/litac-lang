@@ -10,7 +10,7 @@ import "std/map"
 public typedef func(*WebContext): i32 as WebController;
 
 @doc("Get Request note")
-public struct get_request {
+public @note get_request {
     uri: *const char
 }
 
@@ -29,16 +29,27 @@ public struct get_request {
     emit("public func GetWebController(msg: *mg_http_message) : WebController {")
 
     for(sym in symbols) {
-        print("Sym: ", sym.name, "\n")
-        if(sym.kind == "FUNC_DECL") {
-            //var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
-            var attr = sym.notes[0].attributes
-            if(attr) {
-                // TODO: Method
-                // TODO: output length of string
-                var value = attr[0]
-                //print(value, " ", value.name, "\n")
-                emit("\n\tif(mg_match(msg.uri, mg_strx(\"%s\"), null)) return %s;", value.name, sym.name)
+        //print("Sym: ", sym.name, "\n")
+        if(sym.kind == "FUNC_DECL" && sym.isPublic) {
+
+            var args = sym.notes[0].arguments
+            if(args) {
+                var alias = addImport(getCurrentModuleFilename(), sym.moduleFilename)
+
+                for(arg in args) {
+                    var name = arg["name"]
+                    if(name == "uri") {
+                        var uri = arg["value"]
+                        if(uri != "") {
+                            if(alias != null) {
+                                emit("\n\tif(mg_match(msg.uri, mg_strx(\"%s\"), null)) return %s::%s;", uri, alias, sym.name)
+                            }
+                            else {
+                                emit("\n\tif(mg_match(msg.uri, mg_strx(\"%s\"), null)) return %s;", uri, sym.name)
+                            }
+                        }
+                    }
+                }
             }
 
 

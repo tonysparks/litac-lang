@@ -204,6 +204,10 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             var decl = p.typedefDeclaration()
             moduleStmt.declarations.add(decl)
         }
+        else if(p.match(TokenType.NOTE)) {
+            var decl = p.noteDeclaration()
+            moduleStmt.declarations.add(decl)
+        }
         else if(p.match(TokenType.SEMICOLON)) {
             if(!notes.empty()) {
                 moduleStmt.notes.addAll(notes)
@@ -266,6 +270,9 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
         }
         else if(p.match(TokenType.TYPEDEF)) {
             decl = p.typedefDeclaration()
+        }
+        else if(p.match(TokenType.NOTE)) {
+            decl = p.noteDeclaration()
         }
         else if(p.match(TokenType.SEMICOLON)) {
             if(!notes.empty()) {
@@ -647,6 +654,55 @@ func (p: *Parser) typedefDeclaration() : *Decl {
 err:
     return p.poisonDecl(pos)
 }
+
+
+func (p: *Parser) noteDeclaration() : *Decl {
+    var pos = p.prevPos()
+
+    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(!identifier) {
+        goto err;
+    }
+
+    var name = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
+
+    var fields = Array<FieldStmt>{}
+    if(!p.match(TokenType.SEMICOLON)) {
+        if(!p.consume(TokenType.LEFT_BRACE, ErrorCode.MISSING_LEFT_BRACE)) {
+            goto err;
+        }
+
+        fields.init(8, p.allocator)
+        do {
+            if(p.check(TokenType.RIGHT_BRACE)) {
+                break;
+            }
+
+            var field = p.noteFieldStatement();
+            if(field.kind == StmtKind.POISON_EXPR) {
+                goto err;
+            }
+
+            fields.add(field);
+
+            p.eatSemicolon();
+        }
+        while(!p.atEnd());
+
+        if(!p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE)) {
+            goto err;
+        }
+    }
+
+    return NewNoteDecl(pos, p.prevPos(), name, fields, p.allocator)
+
+err:
+    return p.poisonDecl(pos)
+}
+
 
 func (p: *Parser) paramDeclaration() : *ParameterDecl {
     var pos = p.pos()
@@ -1519,9 +1575,11 @@ func (p: *Parser) compStatement() : *Stmt {
         return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
 
     }
-    else if(type.equals(PRECHECK) || type.equals(POSTPARSE)) {
-        var pos = p.pos()
+    else if(type.equals(PRECHECK)  ||
+            type.equals(POSTCHECK) ||
+            type.equals(POSTPARSE)) {
 
+        var pos = p.pos()
         var stream = pos.start
 
         // read the tokens until we are caught up with the
@@ -2561,6 +2619,49 @@ err:
         .kind = StmtKind.POISON_EXPR
     }
 }
+
+func (p: *Parser) noteFieldStatement() : FieldStmt {
+    var pos = p.pos()
+
+    var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(!identifier) {
+        goto err;
+    }
+
+    var fieldName = Identifier {
+        .str = p.strings.internStringView(identifier.value.str),
+        .token = *identifier
+    }
+
+    if(!p.consume(TokenType.COLON, ErrorCode.MISSING_COLON)) {
+        goto err;
+    }
+
+    var attributes = Attributes{}
+    var defaultExpr: *Expr = null
+
+    var type = p.type()
+    if(!type) {
+        goto err;
+    }
+
+    if(p.match(TokenType.EQUALS)) {
+        defaultExpr = p.constExpression()
+    }
+
+    var varField = NewVarFieldDecl(pos, p.pos(), fieldName, type, attributes, defaultExpr, p.allocator);
+    return FieldStmt {
+        .kind = StmtKind.VAR_FIELD_DECL,
+        .varField = varField as (*VarFieldDecl)
+    }
+
+err:
+    return FieldStmt {
+        .kind = StmtKind.POISON_EXPR
+    }
+}
+
+
 
 func (p: *Parser) enumFieldEntryDecl() : *EnumFieldEntryDecl {
     var pos = p.pos()

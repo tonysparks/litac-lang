@@ -13,8 +13,29 @@
         }
     `,
     "tests": [
+
         {
-            "name": "Typecast",
+            "name": "Note Declaration",
+            "definitions": `
+                public @note Something {
+                    str: *const char = "Hello"
+                    fnum: f32 = 4.0
+                    inum: i32 = 18
+                }
+
+                @Something(.str = "yes", .fnum = 44, .inum = 22)
+                struct UseNote {
+
+                }
+
+
+            `,
+            "code": `
+
+            `,
+        },
+        {
+            "name": "BuiltIn",
             "definitions": `
                 @threadlocal
                 var x: i32 = 4
@@ -28,7 +49,7 @@
         {
             "name": "Complex note",
             "definitions": `
-                public struct get_request {
+                public @note get_request {
                     uri: *const char
                     count: i32
                 }
@@ -73,7 +94,7 @@
                 {
                     "name": "web",
                     "program": `
-                        public struct get_request {
+                        public @note get_request {
                             uri: *const char
                             count: i32
                         }
@@ -113,10 +134,10 @@
             "code": `
 
             `,
-            "error": "unknown type 'get_request'"
+            "error": "unknown note type 'get_request'"
         },
         {
-            "name": "Invalid note argument",
+            "name": "Invalid note type",
             "definitions": `
                 public struct get_request {
                     uri: *const char
@@ -130,7 +151,72 @@
             "code": `
 
             `,
-            "error": "unknown type 'get_request'"
+            "error": "'get_request' is not a note type"
+        },
+        {
+            "name": "Invalid note argument no field",
+            "definitions": `
+                public @note get_request {
+                    uri: *const char
+                    count: i32
+                }
+
+                @get_request(.uri = "/test", .count = 10, .headers = "blah")
+                func Test() {
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "'get_request' does not have field 'headers'"
+        },
+        {
+            "name": "Invalid note argument invalid field type",
+            "definitions": `
+                public @note get_request {
+                    uri: *const char
+                    count: i32
+                }
+
+                @get_request(.uri = null, .count = "Hello")
+                func Test() {
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "'*const char' is not of type 'i32'"
+        },
+        {
+            "name": "Invalid note argument invalid field type and invalid arg",
+            "definitions": `
+                public @note get_request {
+                    uri: *const char
+                    count: i32
+                }
+
+                @get_request(.urix = null, .count = "Hello")
+                func Test() {
+                }
+            `,
+            "code": `
+
+            `,
+            "error": "'*const char' is not of type 'i32'"
+        },
+        {
+            "name": "Empty fields",
+            "definitions": `
+                public @note get_request {
+                }
+
+                @get_request(1, "unnamed argument", "another unamed arg")
+                func Test() {
+                }
+            `,
+            "code": `
+
+            `,
         },
     ]
 }

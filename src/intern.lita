@@ -55,6 +55,7 @@ public const IF = InternedString{};
 public const ELSE = InternedString{};
 public const ELSEIF = InternedString{};
 public const PRECHECK = InternedString{};
+public const POSTCHECK = InternedString{};
 public const POSTPARSE = InternedString{};
 public const END = InternedString{};
 
@@ -148,6 +149,7 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("else", 4, &ELSE)
     this.internConstant("elseif", 6, &ELSEIF)
     this.internConstant("precheck", 8, &PRECHECK)
+    this.internConstant("postcheck", 9, &POSTCHECK)
     this.internConstant("postparse", 9, &POSTPARSE)
     this.internConstant("end", 3, &END)
 

@@ -213,7 +213,7 @@ func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
 
 }
 
-func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: InternedString, pos: SrcPos) {
+func (this: *TypeChecker) errorDuplicateMember(aggDecl: *Decl, fieldName: InternedString, pos: SrcPos) {
     if(aggDecl.name.str.length) {
         this.result.addError(pos, "duplicate member '%.*s' in '%.*s'",
                                         fieldName.length, fieldName.buffer,
@@ -295,6 +295,90 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
     }
     return isValid
 }
+
+/*
+func (this: *TypeChecker) checkNoteFieldDuplicate(noteDecl: *NoteDecl, fieldName: InternedString, index: i32) : bool {
+    var isValid = true;
+    for(var i = 0; i < noteDecl.fields.size(); i+=1) {
+        if(index == i) {
+            continue
+        }
+
+        var field = noteDecl.fields.get(i)
+        switch(field.kind) {
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                if(varField.name.token.type != TokenType.IDENTIFIER) {
+                    continue
+                }
+
+                if(varField.name.str.equals(fieldName)) {
+                    this.errorDuplicateMember(noteDecl, fieldName, varField.startPos)
+                    isValid = false
+                }
+
+                break;
+            }
+            case StmtKind.ENUM_FIELD_DECL:
+            case StmtKind.UNION_FIELD_DECL:
+            case StmtKind.STRUCT_FIELD_DECL:
+            case StmtKind.POISON_EXPR: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+    return isValid
+}
+*/
+
+public func (this: *TypeChecker) resolveNoteDecl(noteDecl: *AggregateDecl) : bool {
+    defer this.references.addTypeReferenceBySymbol(noteDecl.startPos, noteDecl.sym)
+
+    var errors = this.errors()
+
+    for(var i = 0; i < noteDecl.fields.size(); i+=1) {
+        var field = &noteDecl.fields.elements[i]
+
+        switch(field.kind) {
+            case StmtKind.TRAIT_FIELD_DECL:
+            case StmtKind.ENUM_FIELD_DECL:
+            case StmtKind.UNION_FIELD_DECL:
+            case StmtKind.STRUCT_FIELD_DECL: {
+                // TODO: Error
+                return false
+            }
+            case StmtKind.VAR_FIELD_DECL: {
+                var varField = field.varField
+                field.typeInfo = this.resolveTypeSpec(varField.type)
+                assert(field.typeInfo)
+
+                if(varField.defaultExpr) {
+                    if(!this.resolveExpr(varField.defaultExpr)) {
+                        return false
+                    }
+                    this.checkDeclarability(varField.defaultExpr.startPos, varField.defaultExpr.operand.typeInfo, field.typeInfo)
+                }
+
+                this.checkAggregateFieldDuplicate(noteDecl, varField.name.str, i)
+                break;
+            }
+            case StmtKind.POISON_EXPR: {
+                break;
+            }
+            default: {
+                assert(false)
+            }
+        }
+    }
+
+    this.addFieldReferences(noteDecl, noteDecl.sym.type, 0)
+
+    return this.errors() == errors
+}
+
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
     defer this.references.addTypeReferenceBySymbol(aggDecl.startPos, aggDecl.sym)

@@ -199,14 +199,14 @@ public func (s: String) size() : i32 {
 }
 
 public func (s: String) cStr() : *char {
-    if(s.length > 0) {
+    if(s.length < s.capacity && s.length > 0) {
         s.buffer[s.length] = '\0'
     }
     return s.buffer
 }
 
 public func (s: String) cStrConst() : *const char {
-    if(s.length > 0) {
+    if(s.length < s.capacity && s.length > 0) {
         s.buffer[s.length] = '\0'
     }
     return s.buffer as (*const char)
