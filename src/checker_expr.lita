@@ -2021,7 +2021,7 @@ func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field:
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: InternedString) {
+public func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: InternedString) {
     assert(expr != null)
     assert(type != null)
 

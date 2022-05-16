@@ -1249,53 +1249,50 @@ func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
         assert(note.type != null)
 
         var typeInfo = this.resolveNoteTypeSpec(note.type)
-        //var typeInfo = this.resolveTypeSpec(note.type)
         if(typeInfo.kind == TypeKind.POISON) {
-            return false
+            success = false
+            continue
         }
+
+        if(!this.checkNote(note.startPos, typeInfo)) {
+            success = false
+            continue
+        }
+
+        assert(IsAggregate(typeInfo))
+
+        var aggInfo = typeInfo as (*AggregateTypeInfo)
 
         for(var j = 0; j < note.arguments.size(); j += 1) {
             var arg = note.arguments.get(j)
 
             if(!this.resolveStmt(arg.argExpr)) {
                 success = false
+                continue
             }
 
-            // TODO:
-            // not type checking on no-named arguments
+            // no type checking on no-named arguments
             // Is this a good thing???
-            /*if(arg.argName.length == 0) {
+            if(arg.argName.str.length == 0) {
                 continue;
-            }*/
+            }
 
             // TODO: Validate:
             // 1) field exists in note.type
             // 2) arg.argExpr is type compatible with note.type for argName
             // 3) arg.argExpr is a constant type
-            if(success) {
-                if(!this.checkNote(note.startPos, typeInfo)) {
-                    success = false
-                }
-                else {
-                    if(IsAggregate(typeInfo)) {
-                        var aggInfo = typeInfo as (*AggregateTypeInfo)
-                    }
-                    else {
-                        /*
-                        var enumInfo = typeInfo as (*EnumTypeInfo)
-                        if(arg.argName.length >= 0) {
-                            var field = enumInfo.getField(arg.argName)
-                        }
-                        else {
-                            if(j >= enumInfo.decl.fields.size()) {
-                                success = false
-                            }
-                            else {
+            var field = aggInfo.getField(arg.argName.str)
+            if(field.kind == StmtKind.POISON_EXPR) {
+                this.errorNoField(arg.argExpr, typeInfo, arg.argName.str)
+                success = false
+                continue
+            }
 
-                            }
-                        }*/
-                    }
-                }
+            if(!this.checkTypeCompatibility(arg.argName.token.pos,
+                                            field.typeInfo,
+                                            arg.argExpr.operand.typeInfo)) {
+                success = false
+                continue
             }
         }
 
