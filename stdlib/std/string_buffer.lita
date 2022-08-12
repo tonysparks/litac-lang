@@ -114,43 +114,19 @@ public func (b: *StringBuffer) appendChar(c: char) : i32 {
 }
 
 public func (b: *StringBuffer) append(format: *const char, ...) : i32 {
-
-    // ensure we have enough of a buffer initially
-    /*if(b.length + MAX_BUFFER_SIZE >= b.capacity) {
-        BufferGrow(b, MAX_BUFFER_SIZE)
-    }*/
-
     // get the variable args
     var args1:va_list;
     va_start(args1, format);
 
     var len = _vscprintf(format, args1)
     if(b.length + len >= b.capacity) {
-        BufferGrow(b, (len + 1) - b.capacity);
+        var growBy = (b.length + len + 1) - b.capacity;
+        BufferGrow(b, growBy);
     }
 
     len = vsnprintf(&b.buffer[b.length], len + 1, format, args1);
     va_end(args1);
-/*
-    // need to copy the args even though we won't know if we
-    // need them until after we use the first set
-    var args2: va_list;
-    va_copy(args2, args1);
 
-    // have to call vsnprintf at least once - might as well use a small
-    // fixed-size buffer just in case the final string fits in it
-    var len = vsnprintf(&b.buffer[b.length], b.capacity - b.length, format, args1);
-    va_end(args1);
-
-
-    // if it didn't fit, expand the buffer for the necessary length
-    if (b.length + len >= b.capacity) {
-        BufferGrow(b, (len + 1) - b.capacity);
-
-        len = vsnprintf(&b.buffer[b.length], len + 1, format, args2);
-        va_end(args2);
-    }
-*/
     if(len < 0) {
         return len
     }

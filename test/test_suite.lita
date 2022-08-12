@@ -74,9 +74,9 @@ func main(len: i32, args: **char) : i32 {
     var testFiles = []*const char {
         //"../test/tests/notes.json",
         // "../test/tests/misc.json", json syntax error
+        "../test/tests/single.json",
         "../test/tests/bucket_allocator.json",
         "../test/tests/stack_allocator.json",
-        "../test/tests/single.json",
         "../test/tests/unicode_support.json",
         "../test/tests/func_named_args.json",
         "../test/tests/traits.json",
@@ -162,7 +162,7 @@ func main(len: i32, args: **char) : i32 {
 
 func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     var data:*char;
-    var length: i64;
+    var length: usize;
     if(ReadFile(filename, &data, &length, testHarness.allocator) != FileStatus.Ok) {
         goto err;
     }
@@ -176,7 +176,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
 
     if(!node) {
         if(parser.hasError()) {
-            printf("Test Json Syntax error: %s at %s\n", parser.errorMsg, filename)
+            printf("Test Json Syntax error: '%s' in file '%s'\n", parser.errorMsg, filename)
         }
         goto err;
     }
@@ -324,8 +324,8 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
             options.compileCmd = suite.buildCmd
         }
         else {
-            //options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
-            options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+            options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+            //options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
         }
     }
 

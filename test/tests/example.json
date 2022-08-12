@@ -1,0 +1,24 @@
+{
+    "name": "Body If MultiLine",
+    "definitions": `
+        func test<T>(i: T) : T {
+            #if getTypeKind("i") == "BOOL" ||\
+                getTypeKind("i") == "I32"
+                return i
+            #elseif getTypeKind("i") == "F32"
+                return i + 4.4f
+            #else
+                return i + 6
+            #end
+        }
+    `,
+    "code": `
+        var x : i32 = test<i32>(1)
+        var y : f32 = test<f32>(3.0f)
+        var z : bool = test<bool>(true)
+
+        assert(x == 1)
+        assert(y == 7.4f)
+        assert(z == true)
+    `
+}

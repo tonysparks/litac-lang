@@ -149,7 +149,7 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
     }
 
     if(!sym) {
-        this.result.addError(expr.startPos, "unknown function '%s'", expr.type.name)
+        this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 

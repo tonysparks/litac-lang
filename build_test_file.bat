@@ -9,10 +9,10 @@ REM set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I
 
 
 echo Running %1 tests...
-REM cd bin
+cd bin
 REM litac.exe  -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
-cd bootstrap
-litacc.exe -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
+REM cd bootstrap
+litac.exe -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
 if errorlevel 1 (
     goto error_compiling
 )

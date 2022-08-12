@@ -254,15 +254,12 @@ func (this: *CallContext) logErrors() : bool {
         return false;
     }
 
-    var sb = StringBufferInit(1024, this.pp.lita.allocator)
     var pos = SrcPos{}
-
     for (var i = 0; i < ape_errors_count(this.pp.ape); i+=1) {
         var err = ape_get_error(this.pp.ape, i);
         var errStr = ape_error_serialize(err);
-        defer if(errStr) free(errStr)
 
-        this.pp.lita.result.addErrorStr(pos, sb)
+        this.pp.lita.result.addError(pos, "%s", errStr)
     }
 
     return true
@@ -629,7 +626,7 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
         return ape_object_make_null()
     }
 
-    var module = context.pp.lita.modules.get(moduleName)
+    var module = context.pp.lita.getModule(moduleName)
     if(!module) {
         context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
         return ape_object_make_null()
@@ -699,7 +696,7 @@ func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_objec
         return ape_object_make_null()
     }
 
-    var module = context.pp.lita.modules.get(moduleName)
+    var module = context.pp.lita.getModule(moduleName)
     if(!module) {
         context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
         return ape_object_make_null()
@@ -744,7 +741,8 @@ func ApeGetInputModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape_o
     var context = data as (*CallContext)
 
     var moduleFilename = context.pp.lita.options.inputFile
-    var mainModule = context.pp.lita.modules.get(moduleFilename)
+
+    var mainModule = context.pp.lita.getModule(moduleFilename)
     if(!mainModule) {
         return ape_object_make_null()
     }
@@ -756,7 +754,7 @@ func ApeGetCurrentModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape
     var context = data as (*CallContext)
 
     var moduleFilename = context.comp.startPos.filename
-    var mainModule = context.pp.lita.modules.get(moduleFilename)
+    var mainModule = context.pp.lita.getModule(moduleFilename)
     if(!mainModule) {
         return ape_object_make_null()
     }
@@ -824,7 +822,7 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
         return ape_object_make_null()
     }
 
-    var module = context.pp.lita.modules.get(moduleName)
+    var module = context.pp.lita.getModule(moduleName)
     if(!module) {
         context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
         return ape_object_make_null()
@@ -841,7 +839,7 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
         return ape_object_make_null()
     }
 
-    var importModule = context.pp.lita.modules.get(moduleToImport)
+    var importModule = context.pp.lita.getModule(moduleToImport)
     if(!importModule) {
         context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleToImport)
         return ape_object_make_null()
@@ -871,7 +869,7 @@ func ApeSetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) 
         return ape_object_make_null()
     }
 
-    var module = context.pp.lita.modules.get(moduleName)
+    var module = context.pp.lita.getModule(moduleName)
     if(!module) {
         context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
         return ape_object_make_null()
@@ -957,7 +955,7 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
     // otherwise we are just testing the input file's tests
     else {
         var moduleName = context.pp.lita.options.inputFile
-        var mainModule = context.pp.lita.modules.get(moduleName)
+        var mainModule = context.pp.lita.getModule(moduleName)
         if(!mainModule) {
             return results;
         }

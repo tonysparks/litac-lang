@@ -38,7 +38,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
     }
 
     // if the type module is never used -- don't bother generating it
-    var module = this.lita.modules.get(filename)
+    var module = this.lita.getModule(filename)
     if(!module) {
         return;
     }

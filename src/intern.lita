@@ -311,7 +311,7 @@ func (this: *Strings) grow(newlength: i32) {
 
 @inline
 public func (this: *InternedString) equalsStr(other: *const char) : bool {
-    return strncmp(this.buffer, other, this.length)
+    return strncmp(this.buffer, other, this.length) == 0
 }
 
 @inline

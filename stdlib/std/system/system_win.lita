@@ -49,6 +49,10 @@ func CreateDirectoryA(pathname: *const char, attr: *void) : bool;
 func GetCurrentDirectory(len: i32, buffer: *char): i32;
 
 @foreign
+func GetFullPathNameA(fileName: *const char, bufferLen: i32, buffer: *char, filePart: *char): i32;
+
+
+@foreign
 func QueryPerformanceFrequency(freq: *LARGE_INTEGER) : bool;
 
 @foreign
@@ -88,6 +92,12 @@ public func _CurrentWorkingPath() : *const char {
 
     return pwd;
 
+}
+
+@inline
+public func _GetFullPathName(fileName: *const char, output: [MAX_PATH]char) : *char {
+    GetFullPathNameA(fileName, MAX_PATH, output, null);
+    return output
 }
 
 @inline

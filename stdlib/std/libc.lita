@@ -156,7 +156,7 @@ public const __LINE__: u64;
 /**
     Because vsnprintf does not return consistent behavior
 */
-#if OS == "WINDOWS"
+#if (OS == "WINDOWS")
     @foreign public func _vscprintf(format: *const char, args: va_list) : i32;
 #else
     public func _vscprintf(format: *const char, args: va_list) : i32 {

@@ -1526,11 +1526,20 @@ func (p: *Parser) compStatement() : *Stmt {
                 break
             }
             if(c == '\\') {
-                if(stream[1] == '\n') {
+                if(stream[1] == '\r' && stream[2] == '\n') {
+                    stream += 3
+                    currentLine += 1
+                    continue
+                }
+                else if(stream[1] == '\n') {
                     stream += 2
                     currentLine += 1
                     continue
                 }
+            }
+            if(c == '\r') {
+                stream += 1
+                continue
             }
 
             script.appendChar(c)

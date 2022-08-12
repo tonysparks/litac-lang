@@ -1,0 +1,120 @@
+import "std/mem"
+import "std/libc"
+
+
+#if (OS == "WINDOWS")
+    import "std/io/io_win"
+#end
+
+@asStr
+public enum FileStatus {
+    Ok = 0,
+    FileNotFoundError,
+    IOError,
+}
+
+public func FileLength(fileName: *const char) : i64 {
+    var fp = fopen(fileName, "r")
+    if(fp == null) {
+        return -1;
+    }
+    defer fclose(fp)
+
+    if (fseek(fp, 0, SEEK_END)) {
+        return -1;
+    }
+
+    const len = ftell(fp)
+    return len;
+}
+
+public func ReadFile(fileName: *const char,
+                     data: **char,
+                     length: *usize,
+                     alloc: *const Allocator = defaultAllocator) : FileStatus {
+#if (OS == "WINDOWS")
+    return WinReadFile(fileName, data, length, alloc)
+#else
+    var fp = fopen(fileName, "r")
+    if(fp == null) {
+        *length = -1;
+        return FileStatus.FileNotFoundError;
+    }
+    defer fclose(fp)
+
+    if (fseek(fp, 0, SEEK_END)) {
+        *length = -1;
+        return FileStatus.IOError;
+    }
+
+    const len = ftell(fp)
+    if(len < 0_i64) {
+        *length = -1;
+        return FileStatus.IOError;
+    }
+
+    if (fseek(fp, 0, SEEK_SET)) {
+        *length = -1;
+        return FileStatus.IOError;
+    }
+
+    var buf = alloc.alloc(sizeof(:char) * (len as(u64) + 1_u64)) as (*char);
+    (*data) = buf;
+
+    // stupid Windows and /r/n, the newLen will be different than that of ftell
+    var newLen = fread(buf, sizeof(:char), len, fp);
+    if(ferror(fp)) {
+        *length = -1;
+        return FileStatus.IOError;
+    }
+
+    buf[newLen] = '\0';
+    *length = newLen;
+
+    return FileStatus.Ok;
+#end
+}
+
+public func WriteFile(fileName: *const char, buffer: *const char, len: usize) : FileStatus {
+#if (OS == "WINDOWS")
+    return WinWriteFile(fileName, buffer, len)
+#else
+    var fp = fopen(fileName, "w")
+    if(fp == null) {
+        return FileStatus.FileNotFoundError;
+    }
+    defer fclose(fp)
+
+    return WriteBytes(fp, buffer, len)
+#end
+}
+
+public func WriteBytes(fp: *FILE, buffer: *const char, len: usize) : FileStatus {
+    var bytesWritten = fwrite(buffer as (*const void), sizeof(:char), len, fp)
+    if(bytesWritten != len) {
+        return FileStatus.IOError;
+    }
+
+    return FileStatus.Ok
+}
+
+
+@test
+func TestReadFile() {
+    var data: *char = null
+    var length: usize = 0
+
+    var data2: *char = null
+    var length2: usize = 0
+
+    var status = WinReadFile("C:/Users/antho/git/litac-lang/test/tests/bucket_allocator.json", &data, &length)
+    var status2 = ReadFile("C:/Users/antho/git/litac-lang/test/tests/bucket_allocator.json", &data2, &length2)
+    //var status = WinReadFile("C:/Users/antho/Desktop/test.txt", &data, &length)
+    printf("Status: %s\n%.*s\n", FileStatusAsStr(status), length as (i32), data)
+    printf("Status: %s\n%.*s\n", FileStatusAsStr(status2), length2 as (i32), data2)
+
+    printf("%zu vs %zu\n", length, length2)
+
+    defaultAllocator.free(data)
+    defaultAllocator.free(data2)
+}

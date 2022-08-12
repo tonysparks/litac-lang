@@ -24,6 +24,10 @@ public enum ModuleFlags {
 
 public struct ModuleId {
     filename: [MAX_PATH]char   // full path the file of this module
+
+    filenameKey: [MAX_PATH]char   // full path the file of this module, normalized to a 'key', not
+                                  // to be used for file retrieval operations
+
     packageName: StringView    // relative path from the main module's directory
     name: InternedString       // the name of the module
 }
@@ -304,6 +308,24 @@ public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
     }
 }
 
+/**
+    Returns the filename as a normalized 'key' which can be
+    used to identify a module without relying on Windows case insensitivity.
+
+TODO:
+    Ideally we'd use something more reliable such as a FileDescriptor or
+    Windows FileInformation.
+*/
+public func GetFilenameKey(filename: *const char, output: [MAX_PATH]char) : *char {
+    GetAbsolutePath(CurrentWorkingPath(), filename, output)
+    var c = output
+    while(*c) {
+        *c = toupper(*c)
+        c+=1;
+    }
+    return output
+}
+
 @inline
 public func (this: *Module) equals(other: *Module) : bool {
     return this == other
@@ -343,10 +365,11 @@ public func (this: *Module) print(header: *const char) {
 
 public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {
     GetAbsolutePath(CurrentWorkingPath(), filename, moduleId.filename)
-    var pathStr = StringViewInit(moduleId.filename);
+    GetFilenameKey(filename, moduleId.filenameKey)
 
     moduleId.packageName = StringViewInit(moduleId.filename, 0)
 
+    var pathStr = StringViewInit(moduleId.filename);
     var name = GetModuleName(pathStr)
     moduleId.name = lita.strings.internCopy(name.buffer, name.length)
 }

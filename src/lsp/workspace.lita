@@ -449,7 +449,7 @@ func (this: *Workspace) getNodeAtSourcePos(uri: *const char, position: *JsonNode
         }
     }
 
-    var module = this.lsp.lita.modules.get(doc.filename)
+    var module = this.lsp.lita.getModule(doc.filename)
     if(!module) {
         this.lsp.log("No module found for: '%s'\n", doc.filename)
         return SourceLocation {

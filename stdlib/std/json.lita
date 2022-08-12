@@ -7,6 +7,8 @@ import "std/array";
 import "std/libc";
 import "std/unicode/utf8"
 
+import "std/io"
+
 @asStr
 public enum JsonType {
     NULL,
@@ -160,6 +162,10 @@ public func CreateJsonFloatNumber(value: f64, alloc: *const mem::Allocator = mem
 */
 public func CreateJsonString(str: *const char, len: i32 = -1,
                              alloc: *const mem::Allocator = mem::defaultAllocator) : *JsonNode {
+    if(str == null) {
+        return JSON_NULL
+    }
+
     if(len < 0) {
         len = strlen(str);
     }
@@ -1158,6 +1164,14 @@ func (p: using *JsonParser) scanMultiStr() {
                 stream += 1;
             }
 
+            // don't include CR characters, because
+            // this will mess up string equals, always do things
+            // as only \n.  If this must include the \r, it can be
+            // included as an escape character.
+            if(val == '\r') {
+                continue;
+            }
+
             buffer.append("%c", val)
         }
     }
@@ -1212,6 +1226,7 @@ repeat:
     p.skipComments()
 
     token.start = stream
+
     switch(*stream) {
         case ' ':
         case '\n':
@@ -1317,13 +1332,14 @@ repeat:
             token.kind = TokenKind.COLON
             stream += 1;
             break;
-        default:
-            p.error("Invalid '%c' token", *stream);
+        default: {
+            p.error("Invalid '%c' ('%u') token", *stream, *stream);
             stream += 1;
             token.kind = TokenKind.ERROR
             break;
         }
-        token.end = stream;
+    }
+    token.end = stream;
 }
 
 func (p: *JsonParser) check(kind: TokenKind) : bool {
@@ -1354,3 +1370,33 @@ func (p: *JsonParser) expect(kind: TokenKind) : bool {
 }
 
 
+@test
+public func testParser() {
+    #if true ||\
+        false
+        printf("Hello!\n")
+    #end
+    var data:*char;
+    var length: usize;
+    if(ReadFile("C:/Users/antho/git/litac-lang/test/tests/example.json", &data, &length) != FileStatus.Ok) {
+        goto err;
+    }
+
+    var parser = JsonParser{}
+    parser.init()
+    defer parser.free()
+
+    var node = parser.parseJson(data)
+    defer if(node) node.free()
+
+    if(!node) {
+        if(parser.hasError()) {
+            printf("Test Json Syntax error: \"%s\"\n", parser.errorMsg)
+        }
+    }
+    else {
+        var def = node.getStr("definitions")
+        printf("%s\n", def)
+    }
+err:
+}

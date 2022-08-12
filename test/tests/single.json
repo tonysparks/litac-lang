@@ -14,57 +14,18 @@
     `,
     "tests": [
         {
-            "name": "Offset of packed struct",
-            "buildCmd": "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
-            "disabled": true,
+            "name": "Verbatim String with inline escape chars",
             "definitions": `
-                import "std/libc"
-
-                @packed
-                struct Sprite {
-                    a: i32
-                    b: i64
-                    c: i8
-                    d: i8
-                }
-
+            @include("<string.h>");
+            @foreign func strncmp(a:*const char, b:*const char, len: i32) : i32;
+            @foreign func strcmp(a:*const char, b:*const char) : i32;
+            @foreign func sprintf(b: *char, format: *const char, ...) : i32;
             `,
             "code": `
-                printf("Sizeof(i32) == %zu\n", sizeof(:i32))
-                var A = offsetof(Sprite, a);
-                printf("A = %zu\n", A)
-                var B = offsetof(Sprite, b);
-                printf("B = %zu\n", B)
-                var C = offsetof(Sprite, c);
-                printf("C = %zu\n", C)
-                var D = offsetof(Sprite, d);
-                printf("D = %zu\n", D)
-
-                assert(A == 0)
-                assert(B == 4)
-                assert(C == 12)
-                assert(D == 13)
+                var str = """this
+is"""
+                assert(strcmp("this\nis", str) == 0)
             `,
-            "output":
-`Sizeof(i32) == 4
-A = 0
-B = 4
-C = 12
-D = 13
-`
-        },
-        {
-            "name" : "Invalid Func Param Syntax Error",
-            "definitions": `
-                //func something(array: [NOT_VALID]char)
-                func hello(x: *const char) {
-
-                }
-            `,
-            "code": `
-                hello("hi"\n)
-            `,
-            "error": "Unexpected token: '\\' - Missing )"
         },
     ]
 }

@@ -158,7 +158,14 @@ public func (lita: *Lita) free() {
 }
 
 public func (lita: *Lita) addModule(module: *Module) {
-    lita.modules.put(module.id.filename, module)
+    lita.modules.put(module.id.filenameKey, module)
+}
+
+public func (lita: *Lita) getModule(filename: *const char) : *Module {
+    @static var filenameKey = [MAX_PATH]char{0}
+    GetFilenameKey(filename, filenameKey)
+
+    return lita.modules.get(filenameKey)
 }
 
 public func (lita: *Lita) startCapture(type: MetricType) {
@@ -442,7 +449,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
     }
 
     if(!module.text.length) {
-        var length: i64;
+        var length: usize;
 
         var status = ReadFile(module.id.filename, &module.text.buffer, &length, lita.allocator)
         if(status == FileStatus.FileNotFoundError) {
@@ -478,7 +485,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
             continue
         }
 
-        var importModule = lita.modules.get(filename)
+        var importModule = lita.getModule(filename)
         if(importModule) {
             importStmt.moduleId = &importModule.id
             continue;

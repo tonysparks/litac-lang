@@ -647,7 +647,7 @@ func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
         goto err;
     }
 
-    var module = this.lita.modules.get(imp.moduleId.filename)
+    var module = this.lita.getModule(imp.moduleId.filename)
     if(!module) {
         this.result.addError(imp.startPos, "could not find module '%s'",
                 imp.moduleId.filename)
@@ -925,7 +925,7 @@ func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc: bool =
             return null
         }
 
-        var module = this.lita.modules.get(filename)
+        var module = this.lita.getModule(filename)
         assert(module != null)
         var namePart = name.substring(index + 2)
 

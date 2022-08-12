@@ -2313,6 +2313,11 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                         var n = str.buffer[i+1] as (u32)
                         var isSeq = (n == 'u' || n == 'U' || n != 'x')
 
+                        if(c == '\r') {
+                            i += 1
+                            continue
+                        }
+
                         var escaped = escapeStrings[c as (u32)]
                         if(escaped && !(c == '\\' && isSeq)) {
                             buf.appendStr(escaped)
