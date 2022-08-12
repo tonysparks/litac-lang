@@ -1,0 +1,177 @@
+import "std/system"
+import "std/mem"
+import "std/io"
+
+/*
+    The hopes and dreams of bypassing the c library for performance gains
+    on Windows is met with disaster.
+
+    On Linux, these IO operations are at least 10x faster -- wtf are you doing
+    Windows????
+*/
+
+@foreign
+const GENERIC_READ: i32;
+
+@foreign
+const GENERIC_WRITE: i32;
+
+@foreign
+const FILE_SHARE_READ: i32;
+
+@foreign
+const OPEN_EXISTING: i32;
+
+@foreign
+const CREATE_NEW: i32;
+
+@foreign
+const TRUNCATE_EXISTING: i32;
+
+@foreign
+const FILE_ATTRIBUTE_NORMAL: i32;
+
+@foreign
+const FILE_FLAG_SEQUENTIAL_SCAN: i32;
+
+@foreign
+const FILE_FLAG_WRITE_THROUGH: i32;
+
+@foreign
+typedef *void as HANDLE;
+
+@foreign
+const INVALID_HANDLE_VALUE: HANDLE;
+
+
+@foreign
+typedef void as DWORD;
+
+@foreign
+typedef *void as LPSECURITY_ATTRIBUTES;
+
+@foreign
+struct OVERLAPPED;
+
+@foreign
+union LARGE_INTEGER {
+    QuadPart: i64;
+}
+
+@foreign("CreateFileA")
+func Win32_CreateFile(filename: *const char,
+                 access: DWORD,
+                 shareMode: DWORD,
+                 security: LPSECURITY_ATTRIBUTES,
+                 creationDisposition: DWORD,
+                 flags: DWORD,
+                 template: *HANDLE) : HANDLE;
+
+@foreign("ReadFile")
+func Win32_ReadFile(file: HANDLE,
+              buffer: *void,
+              numOfBytesToRead: DWORD,
+              numOfBytesRead: *DWORD,
+              overlapped: *OVERLAPPED) : bool;
+
+@foreign("WriteFile")
+func Win32_WriteFile(file: HANDLE,
+              buffer: *void,
+              numOfBytesToWrite: DWORD,
+              numOfBytesWrite: *DWORD,
+              overlapped: *OVERLAPPED) : bool;
+
+@foreign("GetFileSizeEx")
+func Win32_GetFileSizeEx(
+              hFile: HANDLE,
+              lpFileSize: *LARGE_INTEGER) : bool;
+
+@foreign("CloseHandle")
+func Win32_CloseHandle(handle: HANDLE);
+
+
+@inline
+public func WinReadFile(fileName: *const char,
+                 data: **char,
+                 length: *usize,
+                 allocator: *const Allocator = defaultAllocator) : FileStatus {
+    var handle = Win32_CreateFile(fileName,
+                                  GENERIC_READ,
+                                  FILE_SHARE_READ,
+                                  null,
+                                  OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL|FILE_FLAG_SEQUENTIAL_SCAN,
+                                  null)
+
+    // TODO: Much more robust error handling
+    if (handle == INVALID_HANDLE_VALUE) {
+        return FileStatus.FileNotFoundError;
+    }
+
+    defer Win32_CloseHandle(handle);
+
+    var bigint: LARGE_INTEGER;
+    if(Win32_GetFileSizeEx(handle, &bigint) == 0) {
+        return FileStatus.IOError;
+    }
+
+    *length = bigint.QuadPart
+
+    if(*length < 0) {
+        return FileStatus.IOError;
+    }
+
+    if(*length == 0) {
+        return FileStatus.Ok;
+    }
+
+    *data = allocator.alloc(sizeof(:char) * ((*length) + 1)) as (*char)
+
+    var bytesRead: DWORD;
+    if(Win32_ReadFile(handle, *data, (*length) as (DWORD), &bytesRead, null) == 0) {
+        return FileStatus.IOError;
+    }
+
+    (*data)[bytesRead] = '\0';
+    (*length) = bytesRead;
+
+    return FileStatus.Ok
+}
+
+
+@inline
+public func WinWriteFile(fileName: *const char,
+                  buffer: *const char,
+                  len: usize) : FileStatus {
+
+
+    if((len <= 0) || (buffer == null)) {
+        return FileStatus.Ok
+    }
+
+    var handle = Win32_CreateFile(fileName,
+                                  GENERIC_WRITE,
+                                  0,
+                                  null,
+                                  CREATE_NEW|TRUNCATE_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL|FILE_FLAG_WRITE_THROUGH,
+                                  null)
+
+    // TODO: Much more robust error handling
+    if (handle == INVALID_HANDLE_VALUE) {
+        return FileStatus.FileNotFoundError;
+    }
+
+    defer Win32_CloseHandle(handle);
+
+    var bytesWritten: DWORD;
+    if(Win32_WriteFile(handle, buffer as (*void), len as (DWORD), &bytesWritten, null) == 0) {
+        return FileStatus.IOError;
+    }
+
+    if(bytesWritten != len) {
+        return FileStatus.IOError
+    }
+
+    return FileStatus.Ok
+}
