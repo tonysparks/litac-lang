@@ -1,8 +1,9 @@
 
 <p align="center">
 <img src="./extras/assets/litac_logo.png" width="256" height="256">
-![Build](https://github.com/tonysparks/litac-lang/actions/workflows/main.yml/badge.svg)
 </p>
+
+![Build CI](https://github.com/tonysparks/litac-lang/actions/workflows/main.yml/badge.svg)
 
 
 LitaC (pronounced Lee-ta-see) is a C like language.  In fact, its main goal is to be C with some minor syntax sugar.  It compiles to ISO-C99 (C11 for some features) which has the benefits of being fairly easy to use existing C libraries and code, and can target any platform with a C99 compiler.
