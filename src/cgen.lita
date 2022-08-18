@@ -41,7 +41,7 @@ public struct CGen {
     currentFunc: *FuncTypeInfo
     currentScope: *CGenScope
 
-    output: *FILE
+    output: *File
 }
 
 struct CGenScope {
@@ -84,7 +84,7 @@ const escapeChars = [256]*const char {
 }
 
 
-public func (this: *CGen) init(lita: *Lita, output: *FILE) {
+public func (this: *CGen) init(lita: *Lita, output: *File) {
     this.lita = lita
     this.buf.init(1024 * 2, lita.allocator)
     this.line.init(1024 * 2, lita.allocator)
@@ -1061,7 +1061,7 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
 
 func (this: using *CGen) flush() {
     if(this.output) {
-        WriteBytes(this.output, buf.buffer, buf.length)
+        this.output.writeBytes(buf.buffer, buf.length)
         buf.length = 0
     }
 }
@@ -1292,7 +1292,9 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             var bytesRead = 0_i64;
             do {
                 bytesRead = fread(filedata, 1, BUFFER_SIZE, file)
-                fwrite(filedata as (*const void), sizeof(:char), bytesRead, this.output)
+                if(this.output) {
+                    this.output.writeBytes(filedata, bytesRead)
+                }
             }
             while(bytesRead > 0);
             this.emitStrn("\n", 1)

@@ -317,14 +317,15 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
 
 public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool {
     this.startCapture(MetricType.CGEN)
-    var fp = fopen(cFilename, "w")
-    if(fp == null) {
-        return false;
+
+    var file: File{}
+    if(file.open(cFilename, FileOpenOp.WRITE_BINARY) != FileStatus.Ok) {
+        return false
     }
-    defer fclose(fp)
+    defer file.close()
 
     var cgen = CGen{}
-    cgen.init(this, fp)
+    cgen.init(this, file)
     cgen.emitProgram(module)
     this.endCapture(MetricType.CGEN)
 

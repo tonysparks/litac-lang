@@ -211,9 +211,12 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
             else {
                 testHarness.numberOfTests += 1
 
+                var startTime = SystemTimeMSec()
                 var result = RunTest(suite, test)
+                var deltaTime = SystemTimeMSec() - startTime
+
                 var passed = result == TestResult.SUCCESS;
-                printf("    %-85s ......%s\n", test.name, passed ? "SUCCESS" : "***FAILED***")
+                printf("    %-85s (%.2f msec)......%s\n", test.name, deltaTime, passed ? "SUCCESS" : "***FAILED***")
                 if(!passed) {
                     testHarness.numberOfFailures += 1
                     switch(result) {

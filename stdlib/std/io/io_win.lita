@@ -26,6 +26,9 @@ const OPEN_EXISTING: i32;
 const CREATE_NEW: i32;
 
 @foreign
+const CREATE_ALWAYS: i32;
+
+@foreign
 const TRUNCATE_EXISTING: i32;
 
 @foreign
@@ -38,7 +41,7 @@ const FILE_FLAG_SEQUENTIAL_SCAN: i32;
 const FILE_FLAG_WRITE_THROUGH: i32;
 
 @foreign
-typedef *void as HANDLE;
+public typedef *void as HANDLE; // public so that File struct can see this type
 
 @foreign
 const INVALID_HANDLE_VALUE: HANDLE;
@@ -174,4 +177,80 @@ public func WinWriteFile(fileName: *const char,
     }
 
     return FileStatus.Ok
+}
+
+
+@inline
+public func WinWriteBytes(file: *File, buffer: *const char, len: usize) : FileStatus {
+    var bytesWritten: DWORD;
+    if(Win32_WriteFile(file.handle, buffer as (*void), len as (DWORD), &bytesWritten, null) == 0) {
+        return FileStatus.IOError;
+    }
+
+    if(bytesWritten != len) {
+        return FileStatus.IOError
+    }
+
+    return FileStatus.Ok
+}
+
+@inline
+public func WinFileLength(file: *File) : i64 {
+    var bigint: LARGE_INTEGER;
+    if(Win32_GetFileSizeEx(file.handle, &bigint) == 0) {
+        return -1;
+    }
+
+    return bigint.QuadPart
+}
+
+@inline
+public func WinFileOpen(file: *File, filename: *const char, op: FileOpenOp) : FileStatus {
+
+    var access = GENERIC_READ
+    var shareMode = 0
+    var creationDis =  OPEN_EXISTING
+    var flags = FILE_ATTRIBUTE_NORMAL
+
+    switch(op) {
+        case FileOpenOp.READ_ONLY_BINARY:
+        case FileOpenOp.READ_ONLY:
+            break;
+        case FileOpenOp.WRITE_BINARY:
+        case FileOpenOp.WRITE: {
+            access = GENERIC_READ|GENERIC_WRITE
+            creationDis =  CREATE_ALWAYS
+            flags = FILE_ATTRIBUTE_NORMAL
+            break
+        }
+        case FileOpenOp.WRITE_APPEND_BINARY:
+        case FileOpenOp.WRITE_APPEND: {
+            access = GENERIC_READ|GENERIC_WRITE
+            creationDis =  OPEN_EXISTING
+            flags = FILE_ATTRIBUTE_NORMAL
+            break;
+        }
+    }
+
+    file.handle = Win32_CreateFile(filename,
+                                  access,
+                                  0,
+                                  null,
+                                  creationDis,
+                                  flags,
+                                  null)
+
+    // TODO: Much more robust error handling
+    if (file.handle == INVALID_HANDLE_VALUE) {
+        return FileStatus.FileNotFoundError;
+    }
+
+    return FileStatus.Ok
+}
+
+@inline
+public func WinFileClose(file: *File) {
+    if(file) {
+        Win32_CloseHandle(file.handle)
+    }
 }

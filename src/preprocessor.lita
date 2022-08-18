@@ -149,7 +149,7 @@ public func (this: *Preprocessor) evaluateForModule(moduleStmt: *ModuleStmt, com
         this.postCheckers.add(comp)
     }
     else if(comp.type.equals(POSTPARSE)) {
-        this.callContext.preprocessCall(moduleStmt, comp)
+        this.callContext.postParse(moduleStmt, comp)
     }
     else if(comp.type.equals(IF)     ||
             comp.type.equals(ELSEIF) ||
@@ -469,14 +469,21 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
 
 }
 
+
+// TODO: Rethink this, is this necessary, why is this different from pre/postCheckers??
+// can't we just rely on the AddDecl API??
 @doc("""
-Parses out the #preprocess compile time statement which will attempt to
+Parses out the #postparse compile time statement which will attempt to
 generate or alter existing source.
 """)
-func (this: *CallContext) preprocessCall(moduleStmt: *ModuleStmt, comp: *CompStmt) {
+func (this: *CallContext) postParse(moduleStmt: *ModuleStmt, comp: *CompStmt) {
     this.pp.eval(comp)
 
     var original = StringViewInit(this.buffer.buffer, this.buffer.length)
+    if(original.empty()) {
+        return;
+    }
+
     var emitCode = original.copy(this.pp.lita.allocator)
 
     var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, this.pp.lita)
