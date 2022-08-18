@@ -73,42 +73,6 @@
             }
         },
         {
-            "label": "BuildLspTest",
-            "type": "shell",
-            "command": "sh",
-            "args": [
-                "build_test.sh",
-                "${file}"
-            ],
-            "windows": {
-                "options": {
-                    "shell": {
-                        "executable": "cmd.exe",
-                        "args": [
-                            "/d", "/c"
-                        ]
-                    }
-                },
-                "command": "build_lsp_test.bat",
-                "args": ["${file}"]
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        },
-        {
             "label": "BuildTestFile",
             "type": "shell",
             "command": "sh",
@@ -172,41 +136,6 @@
                 "isDefault": true
             }
         },*/
-        {
-            "label": "BuildRelease",
-            "type": "shell",
-            "command": "sh",
-            "args": [
-                "build_release.sh"
-            ],
-            "windows": {
-                "options": {
-                    "shell": {
-                        "executable": "cmd.exe",
-                        "args": [
-                            "/d", "/c"
-                        ]
-                    }
-                },
-                "command": "build_release.bat",
-                "args": []
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        },
         {
             "label": "BuildBootstrap",
             "type": "shell",
