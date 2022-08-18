@@ -1,6 +1,7 @@
 
 <p align="center">
 <img src="./extras/assets/litac_logo.png" width="256" height="256">
+![Build](https://github.com/tonysparks/litac-lang/actions/workflows/main.yml/badge.svg)
 </p>
 
 
