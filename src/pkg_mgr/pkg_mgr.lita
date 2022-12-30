@@ -1,0 +1,98 @@
+/**
+    The LitaC Package Manager
+
+    This aims to be the simplest solution to address using third party packages.
+
+    Goals:
+    1) Make it 'easy' to use 3rd party authored packages within a LitaC project
+    2) Make it 'easy' to author a package
+    3) Make it as secure as possible knowing this system is about sharing code from
+       3rd parties
+
+
+    Approach:
+    * What is a Package?
+        A package is a set of litac modules (.lita source files) and associated files that form a logical
+        and physical grouping of code that can be re-used by other LitaC packages and
+        applications.
+
+        Example project folder structure
+
+        .packages/    // stores packages this project depends on
+        bin/          // stores the binary output of compilation
+        lib/          // stores static libraries
+        src/          // stores LitaC code
+        package.json  // defines this projects package and dependencies
+
+        A package is uniquely defined by these properties:
+            * Package Repo - the repository in which the package is hosted.  Example github.com/tonysparks/my-package
+            * Package Name - the name of the package
+            * Package Version - the version of the package
+
+    * Allow package authors to define their package and any packages they may depend on
+        This will just be a simply JSON file and no CLI for creating said JSON file will be
+        available.  These are programmers, they can edit/create it themselves.
+
+        Proposed format:
+
+        package.json
+        {
+            // We have two options here:
+            // 1) specify the repository in which this resides in
+            // 2) give it a group name (akin to Maven group/artifact)
+            // With #1, you are essentially hardcoding "where" to retrieve this
+            // package.  Although, we could proxy the repos
+            // With #2, it decouples the 'where' with the actual package itself.
+            // For simplicity, we'll go with #1 for now...
+            "repo": "github.com/tonysparks",
+            "name": "c2litac",
+            "version": "0.2.1",
+            "dependencies": [
+                {
+                    "repo": "github.com/tonysparks",
+                    "name": "example",
+                    "version": "0.1.9", // for now, always require a specific version
+                                        // I don't want to play the SemVer game and rely
+                                        // on developers adhering to it.  Sometimes nice,
+                                        // I'm not the biggest fan of allowing the 'latest'
+                                        // of a particular major.minor dependency.  I want
+                                        // to be specfic in the version I'm using.
+                }
+            ]
+        }
+    * Packages may be downloaded from an HTTPS endpoint (other protocols may be supported)
+        We'll need the package manager to be able to construct a valid URL to download the
+        specific version.
+
+        For instance, github is:
+            https://github.com/USERNAME/REPOSITORY/archive/TAGNAME.zip
+
+        We should (eventually) allow for a templated repository configuration to allow arbitrary
+        repositories.
+
+        Something like:
+
+        https://{PACKAGE_REPO}/{PACKAGE_NAME}/archive/{PACKAGE_VERSION}.zip
+
+        Downloading packages should be done as an opt-in CLI option, such as:
+
+        litac --pkg-sync
+
+        Which would download packages defined in the 'dependencies' section
+        into a .package hidden folder.
+
+
+    Considerations:
+    * Adding include (-I) and library paths (-L) for packages, this perhaps could be in the package.json??
+    * Adding static libraries (-l) -- ditto
+    * Specifying library type (static/dynamic) of Package
+*/
+import "std/http"
+import "std/mem"
+
+import "pkg_mgr/pkg"
+
+public struct PackageManager {
+    allocator: *const Allocator
+    pkg: *PackageDef   // this projects package definition
+}

@@ -1,0 +1,113 @@
+import "pkg_mgr/pkg_mgr"
+import "pkg_mgr/pkg"
+
+import "std/assert"
+import "std/io"
+import "std/http"
+import "std/system"
+import "std/libc"
+import "std/string"
+
+/*
+import "std/atomic"
+import "std/thread"
+import "std/thread/thread_pool"
+*/
+
+const DOWNLOAD_COMPLETED_FILE = ".litac_pkg"
+
+public struct PackageSyncOptions {
+    pkgDir: *const char         // the .pkgs directory
+    fullSync: bool              // force a full download of all packages
+    httpOptions: *HttpOptions   // http options
+    useThreadPool: bool         // use the thread-pool
+
+}
+
+public enum SyncCode {
+    OK = 0,
+    ERROR_UNABLE_TO_CREATE_FILE,
+    INVALID_DIRECTORY
+}
+
+public func PackageSync(pm: *PackageManager, options: *PackageSyncOptions) : SyncCode {
+    if(!pm.pkg) {
+        return SyncCode.OK
+    }
+
+    if(!FileExists(pm.pkgDir)) {
+        if(!Mkdir(pm.pkgDir)) {
+            return SyncCode.ERROR_UNABLE_TO_CREATE_FILE
+        }
+    }
+
+    assert(FileExists(pm.pkgDir))
+
+
+    var numOfPkgs = pm.pkg.dependencies.size()
+    if(numOfPkgs < 1) {
+        return SyncCode.OK
+    }
+
+    var numOfDownloadedPkgs = Atomic<u32>{}
+    numOfDownloadedPkgs.init(0)
+
+    var pkgsToDownload = ArrayInit<*PackageId>(numOfPkgs, pm.allocator)
+
+    var findCode = findPackagesToDownload(pm, &pkgsToDownload)
+    if(findCode != SyncCode.OK) {
+        return findCode
+    }
+
+    if(options.useThreadPool) {
+        /* TODO: Must implement threading for POSIX systems..
+        var pool: ThreadPool
+        pool.init(.minThreads = 1, .maxThreads = 10)
+        pool.start()
+        */
+        assert(false)
+    }
+    else {
+
+    }
+}
+
+func findPackagesToDownload(pm: *PackageManager, pkgsToDownload: *Array<*PackageId>) : SyncCode {
+    // TODO:
+    // using the pkg.dependencies, scan the .pkg directory to ensure all packages
+    // are download (we can do this by verifying the .litac_pkg file exists in the directory of the
+    // package, we create this empty file to denote a package has been fully downloaded)
+}
+
+func downloadPackage(pm: *PackageManager, http: *Http, pkgId: *PackageId) : SyncCode {
+    var temp: [MAX_PATH]char;
+
+    var pkgDirectory = StringInit(temp, MAX_PATH);
+
+    sanitizeFilename(pkgId.id, pkgDirectory)
+    Mkdir(pkgDirectory)
+}
+
+// TODO: Should we support Unicode names???
+func sanitizeFilename(filename: *const char, output: [MAX_PATH]char) : *char {
+    if(!filename) {
+        goto end;
+    }
+
+    var len = strlen(filename)
+    len = min(len, MAX_PATH)
+
+    var i = 0
+    for(; i < len; i += 1) {
+        var c = filename[i]
+        if(!isalnum(c)) {
+            c = '_'
+        }
+        out[i] = c
+    }
+
+
+end:
+    out[i] = '\0'
+    return out
+}

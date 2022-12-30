@@ -1,0 +1,188 @@
+import "std/string_view"
+import "std/string_buffer"
+import "std/array"
+import "std/mem"
+import "std/json"
+import "std/map"
+import "std/libc"
+
+public enum PackageType {
+    EXECUTABLE,
+    STATIC_LIBRARY,
+    DYNAMIC_LIBRARY,
+    SOURCE_LIBRARY,
+}
+
+public enum PackageParseCode {
+    OK = 0,
+    ERROR_MISC,
+    ERROR_MISSING_REPO,
+    ERROR_MISSING_NAME,
+    ERROR_MISSING_VERSION,
+}
+
+public struct PackageDef {
+    id: using PackageId
+
+    type: PackageType
+    dependencies: Array<PackageId>
+}
+
+public struct PackageId {
+    id: *const char
+
+    repo: StringView
+    name: StringView
+    version: StringView
+}
+
+public struct PackageRegistry {
+    packages: Map<*const char, *PackageDef>
+}
+
+public func (this: *PackageRegistry) init(allocator: *const Allocator = defaultAllocator) {
+    this.packages = StrMap<*PackageDef>(null, 32, allocator)
+}
+
+public func (this: *PackageRegistry) free() {
+    this.packages.free()
+}
+
+public func ParsePackage(
+        registry: *PackageRegistry,
+        json: *JsonNode,
+        result: **PackageDef,
+        allocator: *const Allocator = defaultAllocator) : PackageParseCode {
+
+    if(!json) {
+        return PackageParseCode.ERROR_MISC
+    }
+
+    var pkgId = PackageId{};
+    var code = ParsePackageId(json, &pkgId, allocator)
+    if(code != PackageParseCode.OK) {
+        return code
+    }
+
+    // if this is already in the registry, no need to further process
+    if(registry.packages.contains(pkgId.id)) {
+        *result = registry.packages.get(pkgId.id)
+        return PackageParseCode.OK
+    }
+
+    var pkg = new<PackageDef>(allocator)
+    pkg.id = pkgId
+
+    var type = json.getStr("type", "source")
+    /* TODO parse type */
+
+    var deps = json.getArray("dependencies")
+    if(deps && deps.size() > 0) {
+        pkg.dependencies.init(deps.size(), allocator)
+
+        for(var i = 0; i < deps.size(); i+=1) {
+            var depNode = deps.at(i)
+
+            pkg.dependencies.add(PackageId{})
+            var pkgId = pkg.dependencies.getPtr(i)
+
+            var code = ParsePackageId(json, pkgId, allocator)
+            if(code != PackageParseCode.OK) {
+                return code
+            }
+        }
+    }
+
+    *result = pkg
+
+    return PackageParseCode.OK
+}
+
+
+public func ParsePackageId(
+        json: *JsonNode,
+        pkg: *PackageId,
+        allocator: *const Allocator = defaultAllocator) : PackageParseCode {
+
+    if(!json) {
+        return PackageParseCode.ERROR_MISC
+    }
+
+    var repo = json.getStr("repo")
+    if(!repo) return PackageParseCode.ERROR_MISSING_REPO
+
+    var name = json.getStr("name")
+    if(!name) return PackageParseCode.ERROR_MISSING_NAME
+
+    var version = json.getStr("version")
+    if(!version) return PackageParseCode.ERROR_MISSING_VERSION
+
+    var repoLen = strlen(repo)
+    var nameLen = strlen(name)
+    var versionLen = strlen(version)
+
+    var sb = StringBufferInit(repoLen + nameLen + versionLen + 1, allocator)
+    sb.append("%s:%s:%s", repo, name, version)
+
+    var id = sb.cStr();
+
+    pkg.id = id;
+    pkg.repo = StringViewInit(id, repoLen);
+    pkg.name = StringViewInit(id + repoLen + 1, nameLen);
+    pkg.version = StringViewInit(id + repoLen + 1 + nameLen + 1, versionLen);
+
+    return PackageParseCode.OK
+}
+
+
+public func (this: *PackageDef) equals(other: *PackageDef) : bool {
+    return
+        this.repo.equalsStringView(other.repo) &&
+        this.name.equalsStringView(other.name) &&
+        this.version.equalsStringView(other.version)
+}
+
+@test
+func testParsePackage() {
+    var parser = JsonParser{}
+    parser.init()
+    defer parser.free()
+
+    var data =
+    """
+    {
+        "repo" : "https://github.com/tonysparks",
+        "name" : "litac-lang",
+        "version" : "0.1.2-alpha",
+        "type": "executable",
+        "dependencies": [
+        ]
+    }
+    """;
+
+    //"
+
+    var node = parser.parseJson(data)
+    defer if(node) node.free()
+
+    if(parser.hasError()) {
+        printf("Error parsing JSON\n")
+        return;
+    }
+
+    var registry = PackageRegistry{}
+    registry.init()
+    printf("Len: %d\n", registry.packages.size())
+    defer registry.free()
+
+    var pkg: *PackageDef;
+    if(ParsePackage(&registry, node, &pkg) != PackageParseCode.OK) {
+        printf("Error parsing Package\n")
+        return;
+    }
+
+    printf("Id: %s\n", pkg.id.id)
+    printf("Repo: %.*s\n", pkg.repo.length, pkg.repo.buffer)
+    printf("Name: %.*s\n", pkg.name.length, pkg.name.buffer)
+    printf("Version: %.*s\n", pkg.version.length, pkg.version.buffer)
+}

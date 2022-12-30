@@ -1,0 +1,8 @@
+{
+    "repo" : "https://github.com/tonysparks",
+    "name" : "litac-lang",
+    "version" : "0.1.2-alpha",
+    "type": "executable",
+    "dependencies": [
+    ]
+}

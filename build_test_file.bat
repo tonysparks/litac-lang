@@ -4,7 +4,7 @@ if [%LITAC_HOME%] == [] goto error_exit
 del ".\bin\litacc.*" /q
 del ".\bin\litac_tests.*" /q
 
-set BUILD_CMD="clang.exe -march=native -msse2 -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -mtune=znver1 -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
+set BUILD_CMD="clang.exe -march=native -msse2 -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -mtune=znver1 -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc -llibcurl.dll.lib"
 REM set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
 
 
@@ -12,7 +12,8 @@ echo Running %1 tests...
 cd bin
 REM litac.exe  -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
 REM cd bootstrap
-litac.exe -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
+REM -disableLine
+litac.exe -cFormat -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
 if errorlevel 1 (
     goto error_compiling
 )
