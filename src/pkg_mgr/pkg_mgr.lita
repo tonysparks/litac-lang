@@ -89,10 +89,114 @@
 */
 import "std/http"
 import "std/mem"
+import "std/map"
+import "std/array"
+import "std/libc"
+import "std/io"
+import "std/system"
+import "std/string"
+import "std/assert"
 
 import "pkg_mgr/pkg"
+import "pkg_mgr/pkg_sync"
+
+import "build"
 
 public struct PackageManager {
+    options: PackageSyncOptions
     allocator: *const Allocator
+
+    packages: Map<*const char, *PackageDef>
     pkg: *PackageDef   // this projects package definition
+}
+
+public func (this: *PackageManager) init(
+    options: PackageSyncOptions,
+    allocator: *const Allocator = defaultAllocator) {
+
+    this.options = options
+    this.allocator = allocator
+    this.packages = StrMap<*PackageDef>(null, 32, allocator)
+}
+
+
+public func (this: *PackageManager) free() {
+    for(var it = this.packages.iter(); it.hasNext();) {
+        var n = it.next()
+        if(n.value) {
+            // NOTE: This doesn't free PackageId.id, but
+            // this is OK because we're using an Arena
+            // for PM.sync
+            this.allocator.free(n.value)
+        }
+    }
+
+    this.packages.free()
+    this.pkg = null
+}
+
+@doc("""
+    Synchronizes the pkg.json with the file system.  This will
+    download any dependent packages if necessary.
+""")
+public func (this: *PackageManager) sync() : SyncStatus {
+    var temp:[MAX_PATH]char;
+
+    var pkgDef = StringInit(temp, MAX_PATH)
+    pkgDef.format("%s/pkg.json", CurrentWorkingPath())
+
+    if(!FileExists(pkgDef.cStr())) {
+        printf("ERROR: Could not find '%s' to synchronize dependencies!\n", pkgDef.cStr())
+        return SyncStatus.ERROR_UNABLE_TO_OPEN_FILE
+    }
+
+    printf("Found '%s', synchronizing dependencies...\n", pkgDef.cStr())
+
+    if(ParsePackageFile(this, pkgDef.cStr(), &this.pkg) != SyncStatus.OK) {
+        return SyncStatus.ERROR_PARSING_PKG_JSON;
+    }
+
+    var pkgPath = StringInit(this.pkg.path, MAX_PATH, 0)
+    pkgPath.format("%s/src", CurrentWorkingPath())
+
+    if(!this.pkg.dependencies.empty()) {
+        for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
+            printf("Synchronizing '%s'\n", this.pkg.dependencies.get(i).id)
+        }
+    }
+
+    return PackageSync(this)
+}
+
+@doc("""
+    Updates the build.json file with any dependent package information.  This
+    should be called after a sync is made.
+""")
+public func (this: *PackageManager) updateBuildFile(buildFile: *BuildFile) : SyncStatus {
+    for(var it = this.packages.iter(); it.hasNext();) {
+        var entry = it.next()
+
+        printf("Pkg Dir: %s %s\n", entry.key, entry.value.path)
+        buildFile.
+    }
+    return SyncStatus.OK
+}
+
+@test
+func testPackageManagerSync() {
+    var pm: PackageManager{}
+    pm.init(PackageSyncOptions{})
+    defer pm.free()
+
+    var status = pm.sync()
+    assert(status == SyncStatus.OK)
+    // printf("Status: %s\n", SyncStatusAsStr(status))
+
+    var buildFile: BuildFile{}
+    defer buildFile.free()
+
+    buildFile.init(pm.allocator)
+
+    status = pm.updateBuildFile(&buildFile)
+    assert(status == SyncStatus.OK)
 }
