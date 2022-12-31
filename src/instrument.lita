@@ -146,21 +146,21 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             if(alias) {
                 sb.clear()
                 sb.append("defer %s::StopWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
 
                 sb.clear()
                 sb.append("%s::StartWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
 
             }
             else {
                 sb.clear()
                 sb.append("defer StopWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
 
                 sb.clear()
                 sb.append("StartWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringCopy(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
             }
         }
     }

@@ -52,6 +52,7 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func fseek(stream: *FILE, offset : i64, whence : i32) : i32;
 @foreign public func ftell(stream: *FILE) : i64;
 @foreign public func ferror(stream: *FILE) : i32;
+@foreign public func remove(filename: *const char) : i32;
 @foreign public func scanf(format: *const char, ...) : i32;
 @foreign public func fscanf(stream: *FILE, format: *const char, ...) : i32;
 @foreign public func getchar() : i32;

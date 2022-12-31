@@ -88,6 +88,8 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
 
     curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_URL, req.url);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_NOPROGRESS, 1_i64);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_FOLLOWLOCATION, 1_i64);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_MAXREDIRS, 8_i64);
     // WARNING: What a damn mess, for now don't validate certificates -- yikes!
     // TODO: include CA in litac and allow for overriding location
     curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, false);
@@ -108,7 +110,9 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
 
     var curlRes = curl_easy_perform(curl)
     if(curlRes) {
-        resp.body.append("%s", curl_easy_strerror(curlRes))
+        var body = curl_easy_strerror(curlRes)
+        HttpWriteCallback(body as (*void), strlen(body), 1, resp)
+
         resp.statusCode = -1;
         return false;
     }

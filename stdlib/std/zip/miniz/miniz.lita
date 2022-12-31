@@ -1,0 +1,42 @@
+@cFile("miniz.h");
+@cFile("miniz.c");
+
+@foreign
+public const MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE: i32;
+
+@foreign
+public const MZ_ZIP_MAX_IO_BUF_SIZE: i32;
+
+@foreign
+public struct mz_zip_archive {
+    m_pAlloc: func(*void, usize, usize) : *void;
+    m_pFree: func(*void, *void) : void;
+    m_pRealloc: func(*void, *void, usize, usize) : *void;
+    m_pAlloc_opaque: *void
+}
+
+@foreign
+public struct mz_zip_archive_file_stat {
+    m_filename: *char
+}
+
+@foreign
+public func mz_zip_reader_init_file(archive: *mz_zip_archive, filename: *const char, flags: i32) : bool;
+
+@foreign
+public func mz_zip_extract_archive_file_to_path(archive: *mz_zip_archive, path: *const char) : bool;
+
+@foreign
+public func mz_zip_reader_get_num_files(archive: *mz_zip_archive) : i32;
+
+@foreign
+public func mz_zip_reader_file_stat(archive: *mz_zip_archive, fileIndex: i32, fileStat: *mz_zip_archive_file_stat) : bool;
+
+@foreign
+public func mz_zip_reader_is_file_a_directory(archive: *mz_zip_archive, fileIndex: i32) : bool;
+
+@foreign
+public func mz_zip_reader_extract_to_file(archive: *mz_zip_archive, fileIndex: i32, destFilename: *const char, flags: u32) : bool;
+
+@foreign
+public func mz_zip_reader_end(archive: *mz_zip_archive) : bool;

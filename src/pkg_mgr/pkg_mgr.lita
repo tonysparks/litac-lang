@@ -177,7 +177,7 @@ public func (this: *PackageManager) updateBuildFile(buildFile: *BuildFile) : Syn
         var entry = it.next()
 
         printf("Pkg Dir: %s %s\n", entry.key, entry.value.path)
-        buildFile.
+        //buildFile.
     }
     return SyncStatus.OK
 }

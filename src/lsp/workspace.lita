@@ -87,7 +87,7 @@ public func (this: *Workspace) isDocumentOpen(uri: *const char) : bool {
 public func (this: *Workspace) openDocument(uri: *const char, text: *const char) {
     if(!uri) return;
 
-    var moduleUri = StringCopy(uri, -1, this.allocator)
+    var moduleUri = StringClone(uri, -1, this.allocator)
 
     var doc = new<Document>(this.allocator)
     doc.lineMap.init(256, this.allocator)

@@ -186,10 +186,16 @@ public func GetEnv(varName: *const char) : *char {
     return getenv(varName)
 }
 
+/** TODO: Move these to IO packages... */
+
 public func CurrentWorkingPath() : *const char {
     return _CurrentWorkingPath()
-
 }
+
+public func FileDelete(filename: *const char) : bool {
+    return remove(filename) == 0
+}
+
 public func FileExists(filename: *const char) : bool {
     var s: FileStat;
     return stat(filename, &s) == 0

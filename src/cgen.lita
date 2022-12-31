@@ -1289,6 +1289,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
             this.flush()
             this.emitStrn("\n", 1)
+            this.emit("#line %d \"%s\"\n", 0, filename)
             var bytesRead = 0_i64;
             do {
                 bytesRead = fread(filedata, 1, BUFFER_SIZE, file)
@@ -1328,7 +1329,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 this.result.addError(note.startPos, "unable to locate file: '%.*s'", value.length, value.buffer)
                 continue;
             }
-
+            this.emit("#line %d \"%s\"\n", 0, filename)
             this.emit("#include \"%s\"\n", filename)
         }
     }

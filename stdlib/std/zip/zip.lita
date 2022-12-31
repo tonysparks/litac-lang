@@ -1,0 +1,161 @@
+import "std/zip/miniz"
+import "std/mem"
+import "std/libc"
+import "std/assert"
+import "std/io"
+import "std/system"
+import "std/string"
+import "std/array"
+
+@doc("""
+    Open for either writing or reading
+""")
+public enum ZipOpen {
+    READ,
+    WRITE,
+}
+
+public enum ZipFlags {
+    INCLUDE_ZIPFILE_NAME_ON_UNZIP = (1<<0),
+}
+
+public enum ZipStatus {
+    OK = 0,
+    ERROR_UNABLE_TO_OPEN_FILE,
+    ERROR_UNABLE_TO_STAT,
+    ERROR_UNABLE_CREATE_DIR,
+    ERROR_UNABLE_WRITE_FILE,
+}
+
+public struct ZipFile {
+    archive: mz_zip_archive
+}
+
+/*
+typedef void *(*mz_alloc_func)(void *opaque, size_t items, size_t size);
+typedef void (*mz_free_func)(void *opaque, void *address);
+typedef void *(*mz_realloc_func)(void *opaque, void *address, size_t items, size_t size);
+*/
+func ZipFileAlloc(opaque: *void, items: usize, size: usize) : *void {
+    var allocator = opaque as (*const Allocator);
+    if(!allocator) {
+        return null
+    }
+
+    return allocator.alloc(items * size)
+}
+
+func ZipFileReAlloc(opaque: *void, address: *void, items: usize, size: usize) : *void {
+    var allocator = opaque as (*const Allocator);
+    if(!allocator) {
+        return null
+    }
+
+    return allocator.realloc(address, 0, items * size)
+}
+
+func ZipFileFree(opaque: *void, address: *void) {
+    var allocator = opaque as (*const Allocator);
+    if(!allocator) {
+        return;
+    }
+
+    allocator.free(address)
+}
+
+public func (this: *ZipFile) open(
+    filename: *const char,
+    type: ZipOpen,
+    allocator: *const Allocator = defaultAllocator) : ZipStatus {
+
+    memset(&this.archive, 0, sizeof(this.archive));
+
+    this.archive.m_pAlloc = ZipFileAlloc;
+    this.archive.m_pFree = ZipFileFree;
+    this.archive.m_pRealloc = ZipFileReAlloc;
+    this.archive.m_pAlloc_opaque = allocator as (*void);
+
+    if(type == ZipOpen.READ) {
+        var status = mz_zip_reader_init_file(&this.archive, filename, .flags = 0);
+        if(!status) {
+            return ZipStatus.ERROR_UNABLE_TO_OPEN_FILE
+        }
+    }
+    else {
+        // TODO: Implement Write support
+        assert(false)
+    }
+
+    return ZipStatus.OK
+}
+
+public func (this: *ZipFile) close() {
+    mz_zip_reader_end(&this.archive);
+}
+
+@doc("""
+    dest - the destination folder to write the zipped files to
+    extractedFiles - optional parameter to store the unzipped file names
+    flags - optional parameter, @see ZipFlags
+""")
+public func (this: *ZipFile) unzip(
+    dest: *const char,
+    extractedFiles: *Array<*const char> = null,
+    flags: i32 = 0) : ZipStatus {
+
+    var fileCount = mz_zip_reader_get_num_files(&this.archive)
+    if(fileCount == 0) {
+        return ZipStatus.OK
+    }
+
+    // Get the base filename, so that we can remove
+    // it from the output path if requested
+    var fileStat: mz_zip_archive_file_stat;
+    if(!mz_zip_reader_file_stat(&this.archive, 0, &fileStat)) {
+        return ZipStatus.ERROR_UNABLE_TO_STAT
+    }
+
+    var temp:[MAX_PATH]char;
+    var path = StringInit(temp, MAX_PATH)
+
+    var baseLen = strlen(fileStat.m_filename);
+    if( (flags | ZipFlags.INCLUDE_ZIPFILE_NAME_ON_UNZIP) > 0) {
+        baseLen = 0
+    }
+
+    for(var i = 0; i < fileCount; i+=1) {
+        if(!mz_zip_reader_file_stat(&this.archive, i, &fileStat)) {
+            continue
+        }
+
+        var filename = StringInit(fileStat.m_filename + baseLen, MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE)
+        path.format("%s/%.*s", dest, filename.length, filename.buffer)
+
+        var cPath = path.cStr()
+
+        if(mz_zip_reader_is_file_a_directory(&this.archive, i)) {
+            Mkdir(cPath)
+            if(!FileExists(cPath)) {
+                return ZipStatus.ERROR_UNABLE_CREATE_DIR
+            }
+        }
+        else if(!mz_zip_reader_extract_to_file(&this.archive, i, cPath, 0)) {
+            return ZipStatus.ERROR_UNABLE_WRITE_FILE
+        }
+
+        if(extractedFiles) {
+            extractedFiles.add(cPath)
+        }
+    }
+
+    return ZipStatus.OK
+}
+
+@test
+func testUnzip() {
+    var zip: ZipFile{}
+    defer zip.close()
+
+    assert(zip.open("C:/Users/antho/Downloads/seventh-0.4.1-beta.zip", ZipOpen.READ) == ZipStatus.OK)
+    assert(zip.unzip("C:/Users/antho/Desktop/temp") == ZipStatus.OK)
+}

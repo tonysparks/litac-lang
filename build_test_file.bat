@@ -7,13 +7,14 @@ del ".\bin\litac_tests.*" /q
 set BUILD_CMD="clang.exe -march=native -msse2 -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -mtune=znver1 -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc -llibcurl.dll.lib"
 REM set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
 
+set SRC_PATH=%cd%\src
 
-echo Running %1 tests...
+echo Running %1 tests with source path %SRC_PATH%...
 cd bin
 REM litac.exe  -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
 REM cd bootstrap
 REM -disableLine
-litac.exe -cFormat -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
+litac.exe -cFormat -debug -testFile -run -profile -srcDir %SRC_PATH% -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
 if errorlevel 1 (
     goto error_compiling
 )
