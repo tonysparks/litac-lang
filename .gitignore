@@ -38,3 +38,5 @@ bootstrap/litacc
 bootstrap/output/litac_tests.exe
 bootstrap/output/litac_tests.pdb
 bootstrap/output/**
+/.pkgs
+.build.json

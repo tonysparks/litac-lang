@@ -1,5 +1,6 @@
 import "std/string_view"
 import "std/string_buffer"
+import "std/string"
 import "std/array"
 import "std/mem"
 import "std/json"
@@ -10,7 +11,7 @@ import "std/io"
 import "std/system"
 
 import "pkg_mgr/pkg_mgr"
-import "pkg_mgr/pkg_sync"
+import "pkg_mgr/pkg_install"
 
 public const SEPARATOR = "|"
 public const SEPARATOR_LENGTH = 1  /* we need better const support! */
@@ -33,15 +34,36 @@ public struct PackageDef {
     dependencies: Array<PackageId>
 }
 
-public struct PackageId {
-    id: *const char
-
-    repo: StringView
-    name: StringView
-    version: StringView
+public func (this: *PackageDef) free() {
+    this.dependencies.free()
 }
 
-public func PackageIdFromString(id: *const char) : PackageId {
+public struct PackageId {
+    id: [MAX_PATH]char
+
+    repoOffset: i32
+    repoLength: i32
+
+    nameOffset: i32
+    nameLength: i32
+
+    versionOffset: i32
+    versionLength: i32
+}
+
+public func (this: *PackageId) repo() : StringView {
+    return StringViewInit(this.id + this.repoOffset, this.repoLength)
+}
+
+public func (this: *PackageId) name() : StringView {
+    return StringViewInit(this.id + this.nameOffset, this.nameLength)
+}
+
+public func (this: *PackageId) version() : StringView {
+    return StringViewInit(this.id + this.versionOffset, this.versionLength)
+}
+
+public func PackageIdFromString(id: *const char, pkgId: *PackageId) : bool {
     var view = StringViewInit(id)
     var nameIndex = view.indexOfAt(SEPARATOR, .len = SEPARATOR_LENGTH, .fromIndex = 0)
     if(nameIndex < 0) {
@@ -52,32 +74,26 @@ public func PackageIdFromString(id: *const char) : PackageId {
         goto invalid
     }
 
-    return PackageId {
-        .id = id,
-        .repo = StringView {
-            .buffer = id,
-            .length = nameIndex
-        },
-        .name = StringView {
-            .buffer = id + nameIndex + 1,
-            .length = versionIndex - nameIndex - 1
-        },
-        .version = StringView {
-            .buffer = id + versionIndex + 1,
-            .length = view.length - versionIndex - 1
-        },
-    }
+    StringCopy(.src = id, .dest = pkgId.id, .size = MAX_PATH)
+    pkgId.repoOffset = 0
+    pkgId.repoLength = nameIndex
+
+    pkgId.nameOffset = nameIndex + 1
+    pkgId.nameLength = versionIndex - nameIndex - 1
+
+    pkgId.versionOffset = versionIndex + 1
+    pkgId.versionLength = view.length - versionIndex - 1
+
+    return true
 
 invalid:
-    return PackageId {
-        .id = id
-    }
+    return false
 }
 
 public func ParsePackageFile(
         pm: *PackageManager,
         pkgFile: *const char,
-        result: **PackageDef) : SyncStatus {
+        result: **PackageDef) : InstallStatus {
 
     var parser = JsonParser{}
     parser.init(pm.allocator)
@@ -86,15 +102,17 @@ public func ParsePackageFile(
     var data: *char;
     var length: usize;
 
+    defer pm.allocator.free(data)
+
     if(ReadFile(pkgFile, &data, &length, pm.allocator) != FileStatus.Ok) {
-        return SyncStatus.ERROR_READING_PKG_FILE
+        return InstallStatus.ERROR_READING_PKG_FILE
     }
 
     var node = parser.parseJson(data)
     defer if(node) node.free()
 
     if(parser.hasError()) {
-        return SyncStatus.ERROR_PARSING_PKG_JSON;
+        return InstallStatus.ERROR_PARSING_PKG_JSON;
     }
 
     return ParsePackage(pm, node, result)
@@ -103,22 +121,22 @@ public func ParsePackageFile(
 public func ParsePackage(
         pm: *PackageManager,
         json: *JsonNode,
-        result: **PackageDef) : SyncStatus {
+        result: **PackageDef) : InstallStatus {
 
     if(!json) {
-        return SyncStatus.ERROR_READING_PKG_FILE
+        return InstallStatus.ERROR_READING_PKG_FILE
     }
 
     var pkgId = PackageId{};
     var code = ParsePackageId(json, &pkgId, pm.allocator)
-    if(code != SyncStatus.OK) {
+    if(code != InstallStatus.OK) {
         return code
     }
 
     // if this is already in the registry, no need to further process
     if(pm.packages.contains(pkgId.id)) {
         *result = pm.packages.get(pkgId.id)
-        return SyncStatus.OK
+        return InstallStatus.OK
     }
 
     var pkg = new<PackageDef>(pm.allocator)
@@ -140,7 +158,7 @@ public func ParsePackage(
             var pkgId = pkg.dependencies.getPtr(i)
 
             var code = ParsePackageId(depNode, pkgId, pm.allocator)
-            if(code != SyncStatus.OK) {
+            if(code != InstallStatus.OK) {
                 return code
             }
         }
@@ -148,54 +166,47 @@ public func ParsePackage(
 
     (*result) = pkg
 
-    return SyncStatus.OK
+    return InstallStatus.OK
 }
 
 
 public func ParsePackageId(
         json: *JsonNode,
-        pkg: *PackageId,
-        allocator: *const Allocator = defaultAllocator) : SyncStatus {
+        pkgId: *PackageId,
+        allocator: *const Allocator = defaultAllocator) : InstallStatus {
 
     if(!json) {
-        return SyncStatus.ERROR_PARSING_PKG_JSON
+        return InstallStatus.ERROR_PARSING_PKG_JSON
     }
 
     var repo = json.getStr("repo")
-    if(!repo) return SyncStatus.ERROR_PARSING_PKG_JSON
+    if(!repo) return InstallStatus.ERROR_PARSING_PKG_JSON
 
     var name = json.getStr("name")
-    if(!name) return SyncStatus.ERROR_PARSING_PKG_JSON
+    if(!name) return InstallStatus.ERROR_PARSING_PKG_JSON
 
     var version = json.getStr("version")
-    if(!version) return SyncStatus.ERROR_PARSING_PKG_JSON
+    if(!version) return InstallStatus.ERROR_PARSING_PKG_JSON
 
     var repoLen = strlen(repo)
     var nameLen = strlen(name)
     var versionLen = strlen(version)
 
-    var sb = StringBufferInit(repoLen + nameLen + versionLen + 1, allocator)
+    var sb = StringBufferInit(repoLen + nameLen + versionLen + (SEPARATOR_LENGTH*2)+1, allocator)
+    defer sb.free()
+
     sb.append("%s%s%s%s%s", repo, SEPARATOR, name, SEPARATOR, version)
 
     var id = sb.cStr();
+    PackageIdFromString(sb.cStr(), pkgId)
 
-    pkg.id = id;
-    pkg.repo = StringViewInit(id, repoLen);
-    pkg.name = StringViewInit(id + repoLen + SEPARATOR_LENGTH, nameLen);
-    pkg.version = StringViewInit(
-        id + repoLen + SEPARATOR_LENGTH + nameLen + SEPARATOR_LENGTH,
-        versionLen);
-
-    return SyncStatus.OK
+    return InstallStatus.OK
 }
 
 
-public func (this: *PackageDef) equals(other: *PackageDef) : bool {
-    return
-        this.repo.equalsStringView(other.repo) &&
-        this.name.equalsStringView(other.name) &&
-        this.version.equalsStringView(other.version)
-}
+/* ------------------------------------------------------
+    Tests
+---------------------------------------------------------*/
 
 @test
 func testParsePackage() {
@@ -230,24 +241,43 @@ func testParsePackage() {
     defer pm.free()
 
     var pkg: *PackageDef;
-    if(ParsePackage(&pm, node, &pkg) != SyncStatus.OK) {
+    if(ParsePackage(&pm, node, &pkg) != InstallStatus.OK) {
         printf("Error parsing Package\n")
         return;
     }
 
+    var repo = pkg.id.repo()
+    var name = pkg.id.name()
+    var version = pkg.id.version()
+
+/*
     printf("Id: %s\n", pkg.id.id)
-    printf("Repo: %.*s\n", pkg.repo.length, pkg.repo.buffer)
-    printf("Name: %.*s\n", pkg.name.length, pkg.name.buffer)
-    printf("Version: %.*s\n", pkg.version.length, pkg.version.buffer)
+    printf("Repo: %.*s\n", repo.length, repo.buffer)
+    printf("Name: %.*s\n", name.length, name.buffer)
+    printf("Version: %.*s\n", version.length, version.buffer)
+*/
+
+    assert(strcmp(pkg.id.id, "https://github.com/tonysparks|litac-lang|0.1.2-alpha") == 0)
+    assert(repo.equals("https://github.com/tonysparks"))
+    assert(name.equals("litac-lang"))
+    assert(version.equals("0.1.2-alpha"))
 }
+
 
 @test
 func testPackageFromString() {
-    var pkg = PackageIdFromString("repo|name|version")
-    printf("%.*s\n", pkg.repo.length, pkg.repo.buffer)
-    printf("%.*s\n", pkg.name.length, pkg.name.buffer)
-    printf("%.*s\n", pkg.version.length, pkg.version.buffer)
-    assert(pkg.repo.equals("repo"))
-    assert(pkg.name.equals("name"))
-    assert(pkg.version.equals("version"))
+    var pkgId = PackageId{}
+    PackageIdFromString("repo|name|version", &pkgId)
+
+    var repo = pkgId.repo()
+    var name = pkgId.name()
+    var version = pkgId.version()
+    /*
+    printf("%.*s\n", repo.length, repo.buffer)
+    printf("%.*s\n", name.length, name.buffer)
+    printf("%.*s\n", version.length, version.buffer)
+    */
+    assert(repo.equals("repo"))
+    assert(name.equals("name"))
+    assert(version.equals("version"))
 }

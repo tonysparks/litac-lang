@@ -229,6 +229,33 @@ end:
     return out
 }
 
+public func FileParent(filename: *const char, out:[MAX_PATH]char) : *char {
+    var index = 0
+
+    if(!filename) {
+        goto end;
+    }
+
+    var len = strlen(filename)
+    if(len > 0) {
+        index = len - 1
+        if(filename[len-1] == '/') {
+            index -= 1
+        }
+        for(; index >= 0; index -= 1) {
+            var c = filename[index]
+            if(c == '/' || c == '\\') {
+                memcpy(out, filename, index)
+                goto end;
+            }
+        }
+        index = 0
+    }
+
+end:
+    out[index] = '\0'
+    return out
+}
 
 public func PathNormalize(filename: *const char, out:[MAX_PATH]char) : *char {
     if(!filename) {

@@ -213,6 +213,10 @@ public func (s: String) cStrConst() : *const char {
 }
 
 public func StringClone(original: *const char, len: i32 = -1, allocator: *const mem::Allocator = mem::defaultAllocator) : *char {
+    if(!original) {
+        return null
+    }
+
     if(len < 0) {
         len = strlen(original)
     }
@@ -229,6 +233,10 @@ public func StringClone(original: *const char, len: i32 = -1, allocator: *const 
 }
 
 public func StringCopy(src: *const char, dest: *char, size: usize) : *char {
+    if(!src) {
+        return null
+    }
+
     if (size > 0) {
         var i:usize;
         for (i = 0; i < size - 1 && src[i]; i+=1) {

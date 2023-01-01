@@ -4,5 +4,10 @@
     "version" : "0.1.2-alpha",
     "type": "executable",
     "dependencies": [
+        {
+            "repo" : "https://github.com/tonysparks",
+            "name" : "test-pkg",
+            "version" : "1.0",
+        }
     ]
 }

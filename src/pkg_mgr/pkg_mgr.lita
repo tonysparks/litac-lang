@@ -96,11 +96,34 @@ import "std/io"
 import "std/system"
 import "std/string"
 import "std/assert"
+import "std/string_buffer"
+import "std/string_view"
 
 import "pkg_mgr/pkg"
-import "pkg_mgr/pkg_sync"
+import "pkg_mgr/pkg_install"
 
 import "build"
+
+public struct PackageSyncOptions {
+    projectPath: *const char
+    pkgDir: *const char = ".pkgs"      // the .pkgs directory
+    fullSync: bool = false              // force a full download of all packages
+    httpOptions: HttpOptions            // http options
+}
+
+@asStr
+public enum InstallStatus {
+    OK = 0,
+    ERROR_CREATING_PKG_DIR,
+    ERROR_UNABLE_TO_OPEN_FILE,
+    ERROR_UNABLE_TO_OPEN_PKG_FILE,
+    ERROR_UNABLE_TO_EXTRACT_PKG_FILE,
+    ERROR_PARSING_PKG_JSON,
+    ERROR_READING_PKG_FILE,
+    ERROR_HTTP_STATUS,
+    ERROR_INVALID_DIRECTORY,
+    ERROR_INVALID_REPO,
+}
 
 public struct PackageManager {
     options: PackageSyncOptions
@@ -108,6 +131,8 @@ public struct PackageManager {
 
     packages: Map<*const char, *PackageDef>
     pkg: *PackageDef   // this projects package definition
+
+    errors: StringBuffer
 }
 
 public func (this: *PackageManager) init(
@@ -117,6 +142,7 @@ public func (this: *PackageManager) init(
     this.options = options
     this.allocator = allocator
     this.packages = StrMap<*PackageDef>(null, 32, allocator)
+    this.errors = StringBufferInit(128, allocator)
 }
 
 
@@ -124,44 +150,45 @@ public func (this: *PackageManager) free() {
     for(var it = this.packages.iter(); it.hasNext();) {
         var n = it.next()
         if(n.value) {
-            // NOTE: This doesn't free PackageId.id, but
-            // this is OK because we're using an Arena
-            // for PM.sync
+            n.value.free()
             this.allocator.free(n.value)
         }
     }
 
     this.packages.free()
+    this.errors.free()
     this.pkg = null
 }
 
 @doc("""
-    Synchronizes the pkg.json with the file system.  This will
-    download any dependent packages if necessary.
+    Installs all packages defined the pkg.json to the file system.
 """)
-public func (this: *PackageManager) sync() : SyncStatus {
+public func (this: *PackageManager) install() : InstallStatus {
     var temp:[MAX_PATH]char;
 
     var pkgDef = StringInit(temp, MAX_PATH)
     pkgDef.format("%s/pkg.json", CurrentWorkingPath())
 
     if(!FileExists(pkgDef.cStr())) {
-        printf("ERROR: Could not find '%s' to synchronize dependencies!\n", pkgDef.cStr())
-        return SyncStatus.ERROR_UNABLE_TO_OPEN_FILE
+        this.errors.append("could not find '%s' to install dependencies!\n", pkgDef.cStr())
+        return InstallStatus.ERROR_UNABLE_TO_OPEN_FILE
     }
 
-    printf("Found '%s', synchronizing dependencies...\n", pkgDef.cStr())
-
-    if(ParsePackageFile(this, pkgDef.cStr(), &this.pkg) != SyncStatus.OK) {
-        return SyncStatus.ERROR_PARSING_PKG_JSON;
+    if(ParsePackageFile(this, pkgDef.cStr(), &this.pkg) != InstallStatus.OK) {
+        this.errors.append("could not parse pkg.json\n")
+        return InstallStatus.ERROR_PARSING_PKG_JSON;
     }
 
+    printf("Found '%s' with %d package dependencies.\n", pkgDef.cStr(), this.pkg.dependencies.size())
+
+    // TODO: Get the actual /src directory -- this can be taken off of
+    // LitaOptions..
     var pkgPath = StringInit(this.pkg.path, MAX_PATH, 0)
     pkgPath.format("%s/src", CurrentWorkingPath())
 
     if(!this.pkg.dependencies.empty()) {
         for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
-            printf("Synchronizing '%s'\n", this.pkg.dependencies.get(i).id)
+            printf("Installing '%s'\n", this.pkg.dependencies.get(i).id)
         }
     }
 
@@ -172,14 +199,24 @@ public func (this: *PackageManager) sync() : SyncStatus {
     Updates the build.json file with any dependent package information.  This
     should be called after a sync is made.
 """)
-public func (this: *PackageManager) updateBuildFile(buildFile: *BuildFile) : SyncStatus {
+public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : InstallStatus {
+    buildFile.init(this.allocator)
+
+    var temp:[MAX_PATH]char;
+    var len = this.options.projectPath != null ? strlen(this.options.projectPath) : 0;
+
     for(var it = this.packages.iter(); it.hasNext();) {
         var entry = it.next()
 
-        printf("Pkg Dir: %s %s\n", entry.key, entry.value.path)
-        //buildFile.
+        // TODO: Update all of the other's, include,library,staticLibs, etc.
+        var fullPkgPath = StringViewInit(entry.value.path)
+        if(fullPkgPath.startsWith(this.options.projectPath, len)) {
+            fullPkgPath = fullPkgPath.substring(.start = len, .end = -1)
+        }
+
+        buildFile.pkgPaths.add(StringClone(fullPkgPath.buffer, fullPkgPath.length, this.allocator))
     }
-    return SyncStatus.OK
+    return InstallStatus.OK
 }
 
 @test
@@ -188,15 +225,18 @@ func testPackageManagerSync() {
     pm.init(PackageSyncOptions{})
     defer pm.free()
 
-    var status = pm.sync()
-    assert(status == SyncStatus.OK)
-    // printf("Status: %s\n", SyncStatusAsStr(status))
+    var status = pm.install()
+    assert(status == InstallStatus.OK)
+    // printf("Status: %s\n", InstallStatusAsStr(status))
 
     var buildFile: BuildFile{}
     defer buildFile.free()
 
-    buildFile.init(pm.allocator)
+    status = pm.createBuildFile(&buildFile)
+    assert(status == InstallStatus.OK)
 
-    status = pm.updateBuildFile(&buildFile)
-    assert(status == SyncStatus.OK)
+    assert(buildFile.pkgPaths.size() == 2)
+    assert(strcmp(buildFile.pkgPaths.get(0), "C:/Users/antho/git/litac-lang/bin/output/src") == 0)
+    assert(strcmp(buildFile.pkgPaths.get(1), "C:/Users/antho/git/litac-lang/bin/output/.pkgs/test-pkg/1.0/test-pkg-1.0/src") == 0)
+
 }

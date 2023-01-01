@@ -23,6 +23,7 @@ import "cgen"
 import "common"
 import "intern"
 import "types"
+import "build"
 
 import "lsp/references"
 import "lsp/workspace"
@@ -49,6 +50,7 @@ public struct Lita {
     binaryFilename: [MAX_PATH]char
     sourceFilename: [MAX_PATH]char
 
+    buildFile: BuildFile
     programSymbols: ProgramSymbols
     genericSymbols: Map<InternedString, *Symbol>
 
@@ -85,6 +87,7 @@ public enum TypeInfoOption {
 }
 
 public struct LitaOptions {
+    projectPath: [MAX_PATH]char    // the directory of where the main source module is
     srcPath: [MAX_PATH]char        // the directory of where the main source module is
     libPath: [MAX_PATH]char        // optional configurable path to modules for libraries
     litaPath: [MAX_PATH]char       // the LITAC_HOME environment variable for standard lita modules
@@ -114,6 +117,9 @@ public struct LitaOptions {
     disableLineSync: bool          // disables C #line directives sync with Lita source code
 
     maxMemory: usize               // max amount of memory that can be allocated
+
+    proxy: *const char             // the proxy server to use
+    runPkgInstall: bool            // if we should run pkg install
 }
 
 
@@ -149,6 +155,20 @@ public func (this: *Lita) reset() {
 
     // TODO: Only initialize if this is an LSP
     this.references.init(this.allocator)
+
+    // see if there is a .build.json file
+    {
+        var temp: [MAX_PATH]char;
+        var build = StringInit(temp, MAX_PATH)
+        build.format("%s/.build.json", this.options.projectPath)
+
+        memset((&this.buildFile) as (*void), 0, sizeof(:BuildFile))
+
+        if(FileExists(build.cStr())) {
+            BuildFileFromFile(build.cStr(), &this.buildFile, this.allocator)
+        }
+
+    }
 }
 
 public func (lita: *Lita) free() {
@@ -422,6 +442,25 @@ public func FindModulePath(lita: *Lita,
         pathStr.format("%s/stdlib/%.*s/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
         if(FileExists(pathStr.cStrConst())) {
             return true
+        }
+    }
+
+    // Finally check and see if there is an imported package
+    {
+        for(var i = 0; i < lita.buildFile.pkgPaths.size(); i+=1) {
+            var pkgPath = lita.buildFile.pkgPaths.get(i)
+            pathStr.format("%s%s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer)
+            if(FileExists(pathStr.cStrConst())) {
+                return true
+            }
+
+            var index = moduleName.lastIndexOfAt("/", 1)
+            var name = index < 0 ? moduleName : moduleName.substring(index + 1)
+
+            pathStr.format("%s%s/%.*s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
+            if(FileExists(pathStr.cStrConst())) {
+                return true
+            }
         }
     }
 
