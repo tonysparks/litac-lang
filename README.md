@@ -724,7 +724,9 @@ Ex.
 LITAC_HOME=/home/tony/projects/litac
 ```
 
-# Using the LitaC Package Manager
+# LitaC Package Manager
+
+A LitaC `package` is a bundle of LitaC modules and any other dependencies (such as DLL's, static libraries or C header files).
 
 The `litac` executable contains a command (`-pkg-install`) for downloading third party packages.  As of right now, only packages hosted on `github.com` are supported.  Packages are defined and can be referenced by creating a `pkg.json` file in your project folder.
 
