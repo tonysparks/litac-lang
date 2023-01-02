@@ -502,21 +502,38 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             var varDecl = decl as (*VarDecl)
 
             var isValid = false
+            var hasNotes = varDecl.hasNotes()
             if(varDecl.expr.isConstExpr() || varDecl.hasNote("foreign")) {
                 this.result.enabled = false
-                isValid = this.resolveValueDecl(varDecl) != null
+                var type = this.resolveValueDecl(varDecl)
+                isValid = type != null
                 this.result.enabled = true
 
                 // if this is resolvable, this means it
                 // is a valid constant expression and we don't need
                 // to resolve it later
                 if(isValid) {
-                    this.resolveSymbol(sym)
-                    this.finishResolveSymbol(sym)
+                    // The one exception to this rule are
+                    // constant definitions with note declarations,
+                    // given that notes may not be resolved yet, we
+                    // need to cheat here, by assigning the type
+                    // of the const declaration, but ensuring it
+                    // gets properly resolve later.
+                    // If we don't do this, and this constant is
+                    // used in say a struct field definition (via an array)
+                    // we'll get an error 'unknown type or variable' for
+                    // this const.
+                    if(!hasNotes) {
+                        this.resolveSymbol(sym)
+                        this.finishResolveSymbol(sym)
+                    }
+                    else {
+                        sym.type = type
+                    }
                 }
             }
 
-            if(!isValid) {
+            if(!isValid || hasNotes) {
                 this.pendingValues.add(sym)
             }
 

@@ -13,6 +13,7 @@
         }
     `,
     "tests": [
+        /*
         {
             "name": "Verbatim String with inline escape chars",
             "definitions": `
@@ -25,6 +26,20 @@
                 var str = """this
 is"""
                 assert(strcmp("this\nis", str) == 0)
+            `,
+        },*/
+        {
+            "name": "Test Foreign Array Bug",
+            "definitions": `
+            @raw("#define MTEST 12");
+            @foreign
+            public const MTEST:i32;
+            struct X {
+                x:[MTEST]i32
+            }
+            `,
+            "code": `
+                assert(MTEST == 12)
             `,
         },
     ]

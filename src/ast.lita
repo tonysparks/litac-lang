@@ -660,6 +660,11 @@ public func IsDecl(node: *Node) : bool {
     }
 }
 
+public func (d: *Decl) hasNotes() : bool {
+    if(!d) return false
+    return !d.attributes.notes.empty()
+}
+
 public func (d: *Decl) hasNote(name: *const char) : bool {
     return d.getNote(name) != null
 }

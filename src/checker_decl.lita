@@ -83,8 +83,7 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         }
     }
 
-
-    if(!this.resolveNotes(decl.attributes.notes)) {
+    if(this.result.enabled && !this.resolveNotes(decl.attributes.notes)) {
         return null
     }
 
