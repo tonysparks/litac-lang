@@ -173,6 +173,13 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("toStr", 5, &TOSTR)
 }
 
+public func (this: *Strings) free() {
+    this.allocator.free(this.keys)
+    this.allocator.free(this.values)
+    this.length = 0
+    this.capacity = 0
+}
+
 func (this: *Strings) internConstant(string: *const char, length: i32, intern: *InternedString) {
     var str = this.intern(string, length)
     intern.buffer = str.buffer
@@ -337,7 +344,7 @@ func testInterns() {
 
     var strings: Strings{}
     strings.init(allocator)
-    defer strings.strings.free()
+    defer strings.free()
 
     var buffer = "Hello World"
     var i = strings.internCopy(buffer)
@@ -354,7 +361,7 @@ func testInterns() {
 
     var symbols = InternMap<i32>(0, 2, allocator)
 
-    var n = strings.intern("Bye")
+    var n = strings.intern("Bye", 3)
 
     symbols.put(i, 12)
     symbols.put(n, 31)
@@ -380,4 +387,11 @@ func testInterns() {
         assert(symbols.get(p) == ii)
     }
     printf("Complete\n")
+}
+
+//@foreign
+public const MAX_SOMETHING: i32 = 0;
+
+public struct X {
+    v: [MAX_SOMETHING]i32
 }
