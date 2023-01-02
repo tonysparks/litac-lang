@@ -87,7 +87,7 @@ typedef struct tm tm;
 
 @foreign("Lita_OSType")
 //@asStr TODO, this isn't working, function not in scope??
-enum OS {
+public enum OS {
     @alias("Lita_OSType_WINDOWS")
     @asStr("WINDOWS")
     Lita_OSType_WINDOWS,
@@ -129,6 +129,38 @@ public func OSAsStr(type: OS) : *const char {
         case OS.Lita_OSType_OTHER: return "OTHER";
         default: return null;
     }
+}
+
+public func OSFromStr(str: *const char, len: usize) : OS {
+    if(!str) {
+        return OS.Lita_OSType_OTHER
+    }
+
+    if(strcicmp(str, "WINDOWS", len) == 0) {
+        return OS.Lita_OSType_WINDOWS
+    }
+
+    if(strcicmp(str, "ANDROID", len) == 0) {
+        return OS.Lita_OSType_ANDROID
+    }
+
+    if(strcicmp(str, "LINUX", len) == 0) {
+        return OS.Lita_OSType_LINUX
+    }
+
+    if(strcicmp(str, "BSD", len) == 0) {
+        return OS.Lita_OSType_BSD
+    }
+
+    if(strcicmp(str, "IOS", len) == 0) {
+        return OS.Lita_OSType_IOS
+    }
+
+    if(strcicmp(str, "MAC", len) == 0) {
+        return OS.Lita_OSType_MAC
+    }
+
+    return OS.Lita_OSType_OTHER
 }
 
 @foreign("litaOS")
@@ -186,10 +218,16 @@ public func GetEnv(varName: *const char) : *char {
     return getenv(varName)
 }
 
+/** TODO: Move these to IO packages... */
+
 public func CurrentWorkingPath() : *const char {
     return _CurrentWorkingPath()
-
 }
+
+public func FileDelete(filename: *const char) : bool {
+    return remove(filename) == 0
+}
+
 public func FileExists(filename: *const char) : bool {
     var s: FileStat;
     return stat(filename, &s) == 0
@@ -223,6 +261,33 @@ end:
     return out
 }
 
+public func FileParent(filename: *const char, out:[MAX_PATH]char) : *char {
+    var index = 0
+
+    if(!filename) {
+        goto end;
+    }
+
+    var len = strlen(filename)
+    if(len > 0) {
+        index = len - 1
+        if(filename[len-1] == '/') {
+            index -= 1
+        }
+        for(; index >= 0; index -= 1) {
+            var c = filename[index]
+            if(c == '/' || c == '\\') {
+                memcpy(out, filename, index)
+                goto end;
+            }
+        }
+        index = 0
+    }
+
+end:
+    out[index] = '\0'
+    return out
+}
 
 public func PathNormalize(filename: *const char, out:[MAX_PATH]char) : *char {
     if(!filename) {
@@ -246,12 +311,12 @@ end:
     return out
 }
 
-func strcicmp(a: *const char, b: *const char) : i32 {
+func strcicmp(a: *const char, b: *const char, size: usize) : i32 {
     if(a==b) return 0;
     if(!a && b) return -1;
     if(a && !b) return 1;
 
-    for (;;) {
+    for (var i = 0; i < size; i += 1) {
         var ac = *a
         var bc = *b
 
@@ -333,7 +398,7 @@ public func GetAbsolutePath(pwd: *const char, path: *const char, output: [MAX_PA
 
 public func PathEquals(a: *const char, b: *const char) : bool {
     // TODO: Total BS implementation... this is downright wrong
-    return strcicmp(a, b) == 0
+    return strcicmp(a, b, MAX_PATH) == 0
 }
 
 const uriEscapeChars = [256]*const char {

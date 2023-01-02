@@ -77,6 +77,7 @@ public const FOREIGN = InternedString{};
 public const ALIAS = InternedString{};
 public const ASSTR = InternedString{};
 public const TOSTR = InternedString{};
+public const COMPILER_OPTION = InternedString{};
 
 public func InternHashFn(a: InternedString) : u32 {
     var hash = ((a.addr as (usize)) % 4294967291_u32) as (u32)
@@ -171,6 +172,8 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("alias", 5, &ALIAS)
     this.internConstant("asStr", 5, &ASSTR)
     this.internConstant("toStr", 5, &TOSTR)
+    this.internConstant("compiler_option", 15, &COMPILER_OPTION)
+
 }
 
 public func (this: *Strings) free() {
@@ -332,6 +335,12 @@ public func (this: *InternedString) empty() : bool {
     return this.buffer == null || this.length == 0
 }
 
+public func (this: *InternedString) asStringView() : StringView {
+    return StringView {
+        .buffer = this.buffer,
+        .length = this.length,
+    }
+}
 
 import "std/assert"
 import "std/mem/bucket_allocator"

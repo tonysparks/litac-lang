@@ -10,6 +10,7 @@ import "std/string"
 import "std/string_view"
 import "std/string_buffer"
 import "std/profile"
+import "std/http"
 
 import "lex"
 import "lita"
@@ -25,18 +26,27 @@ import "checker"
 import "cgen"
 import "lsp"
 import "intern"
+import "build"
+
+import "pkg_mgr"
 
 func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
 
-    var options = LitaOptions{}
-    var status = ParseArgs(len, args, &options)
+    var options = new<LitaOptions>()
+    defer defaultAllocator.free(options)
+
+    var status = ParseArgs(len, args, options)
     if(status != ParseStatus.OK) {
         return ParseStatus.TERMINATE == status ? 0 : -1;
     }
 
+    if(options.runPkgInstall) {
+        return RunPkgInstall(options)
+    }
+
     var lita = Lita{}
-    lita.init(&options)
+    lita.init(options)
     defer lita.free()
 
     if(options.languageServer) {
@@ -69,18 +79,6 @@ func main(len: i32, args: **char) : i32 {
     var runProgram = options.run
 
 report:
-
-// TEMP
-{
-//printf("Intern count: %d Size: %d Grow Count: %d Collision Count %d Put:%d Get:%d Hash:%d Eq: %d FuncName: %d GetMethod: %d\n",
-//    internCount, lita.strings.size(), growCount, collisionCount, putCount, getCount, hashCount, equalCount, funcNameCount, getMethodCount)
-/*for(var it = lita.strings.strings.iter(); it.hasNext();) {
-    var v = it.next().value
-    printf("Str: %.*s\n", v.length, v.buffer)
-}*/
-}
-// END TEMP
-
     var totalTime = SystemTimeMSec() - startTime
 
     var sb = StringBufferInit(1024)
@@ -161,6 +159,8 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     parser.addOption("types",          't', "Includes TypeInfo for reflection\n<arg> can be:\nall       Means all types will have reflection values\ntagged    Means only basic types and types annotated with @typeinfo will have reflection values", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("test",           '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
+    parser.addOption("pkg-install",    '\0', "Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.\nIf successful, creates a build.json which is used for building this LitaC project.", 0, null);
+    parser.addOption("proxy",          '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("buildCmd",       'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("maxMemory",      '\0', "The max amount of memory allowed for allocation. NOTE: This is a temporary option", OptionFlag.HAS_ARGUMENT, null);
 
@@ -186,8 +186,12 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
         goto terminate;
     }
 
+    if(parser.hasOption("pkg-install")) {
+        options.runPkgInstall = true
+    }
+
     options.languageServer = parser.hasOption("languageServer")
-    if(!options.languageServer) {
+    if(!options.languageServer && !options.runPkgInstall) {
         if(parser.args.size() < 2) {
             printf("Missing input file\n")
             goto err;
@@ -213,8 +217,6 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     if(parser.hasOption("maxMemory")) {
         var memoryStr = parser.getOption("maxMemory").value
         var view = StringViewInit(memoryStr)
-
-
 
         options.maxMemory = strtol(memoryStr, null, 10)
         if(view.indexOf("GB") > -1 || view.indexOf("GiB") > -1 ||
@@ -255,6 +257,10 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
         options.testsOnly = true
     }
 
+    if(parser.hasOption("proxy")) {
+        options.proxy = parser.getOption("proxy").value
+    }
+
     if(parser.hasOption("buildCmd")) {
         options.compileCmd = parser.getOption("buildCmd").value
     }
@@ -263,13 +269,13 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     }
 
     var cPrefix = parser.hasOption("cPrefix") ? parser.getOption("cPrefix").value : "litaC_"
-    strncpy(options.cPrefix, cPrefix, MAX_PREFIX_SIZE)
+    StringCopy(.src = cPrefix, .dest = options.cPrefix, .size = MAX_PREFIX_SIZE)
 
     var outputFile = parser.hasOption("output") ? parser.getOption("output").value : "a"
-    strncpy(options.outputFile, outputFile, MAX_PATH)
+    StringCopy(.src = outputFile, .dest = options.outputFile, .size = MAX_PATH)
 
     var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "./output"
-    strncpy(options.outputPath, outputPath, MAX_PATH)
+    StringCopy(.src = outputPath, .dest = options.outputPath, .size = MAX_PATH)
 
     var len = strlen(options.outputPath)
     if(len > 0) {
@@ -279,15 +285,23 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
 
         var output = [MAX_PATH]char{0}
         GetAbsolutePath(CurrentWorkingPath(), options.outputPath, output)
-        strncpy(options.outputPath, output, MAX_PATH)
+        StringCopy(.src = output, .dest = options.outputPath, .size = MAX_PATH)
     }
 
     if(parser.hasOption("srcDir")) {
-        strncpy(options.srcPath, parser.getOption("srcDir").value, MAX_PATH)
+        StringCopy(.src = parser.getOption("srcDir").value, .dest = options.srcPath, .size = MAX_PATH)
     }
 
     if(strnlen(options.srcPath, MAX_PATH) == 0) {
         FilePath(options.inputFile, options.srcPath)
+    }
+
+    // if there is no source path
+    if(strnlen(options.srcPath, MAX_PATH) > 0) {
+        FileParent(options.srcPath, options.projectPath)
+    }
+    else {
+        StringCopy(.src = CurrentWorkingPath(), .dest = options.projectPath, .size = MAX_PATH)
     }
 
     return ParseStatus.OK
@@ -305,4 +319,58 @@ err_print:
     }
 err:
     return ParseStatus.ERROR
+}
+
+
+func RunPkgInstall(options: *LitaOptions) : i32 {
+    var size: usize = options.maxMemory > 0
+        ? options.maxMemory
+        : 1024 * 1024 * 1024;
+
+    var linearAllocator = LinearAllocator{}
+    linearAllocator.init(defaultAllocator.alloc(size), size)
+    defer defaultAllocator.free(linearAllocator.mem)
+
+    var pm = PackageManager{};
+    pm.init(PackageSyncOptions{
+        .projectPath = options.projectPath,
+        .fullSync = false,
+        .httpOptions = HttpOptions {
+            .proxy = options.proxy,
+        }
+    }, linearAllocator.allocator)
+    defer pm.free()
+
+    var status = pm.install()
+    if(status != InstallStatus.OK) {
+        printf("Error installing packages:\nErrorCode: %s - %s\n",
+            InstallStatusAsStr(status), pm.errors.cStr())
+        return 1;
+    }
+
+    var buildFile = BuildFile{}
+    defer buildFile.free()
+
+    status = pm.createBuildFile(&buildFile)
+    if(status != InstallStatus.OK) {
+        printf("Error creating build.json:\nErrorCode: %s - %s\n",
+            InstallStatusAsStr(status), pm.errors.cStr())
+        return 1;
+    }
+
+    var temp: [MAX_PATH]char;
+    var build = StringInit(temp, MAX_PATH, 0)
+    build.format("%s/.build.json", options.projectPath)
+
+    var file = File{}
+    file.open(build.cStr(), FileOpenOp.WRITE)
+
+    printf("Writing '%s'.\n", build.cStr())
+    if(!buildFile.writeTo(&file)) {
+        printf("Error writing out build.json\n")
+        return 1;
+    }
+
+    printf("Success.\n")
+    return 0;
 }

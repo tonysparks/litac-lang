@@ -686,6 +686,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                         var param = funcInfo.decl.params.get(index)
                         if(param.name.str.equals(callArg.argName.str)) {
                             paramIndex = index
+                            p = param
                             break
                         }
                     }

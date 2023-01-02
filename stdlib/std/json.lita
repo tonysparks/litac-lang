@@ -279,7 +279,7 @@ public func (node: *JsonNode) put(key: *const char, n: *JsonNode) {
         return;
     }
 
-    var copy = StringCopy(key, strlen(key), node.alloc)
+    var copy = StringClone(key, strlen(key), node.alloc)
     var entry = Entry {
         .key = copy,
         .value = n

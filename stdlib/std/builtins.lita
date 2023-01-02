@@ -11,6 +11,12 @@ Note declarations
 ========================================================================
 */
 
+public @note compiler_option {
+    cc: *const char = "default"
+    os: *const char = "default"
+    options: *const char
+}
+
 public @note foreign {
     alias: *const char
 }

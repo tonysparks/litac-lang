@@ -1,0 +1,156 @@
+import "std/http/libcurl"
+import "std/string_buffer"
+import "std/mem"
+import "std/map"
+import "std/libc"
+
+public enum HttpRequestType {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+}
+
+public typedef func(/*data:*/ *void, /*size: */ usize, /*n: */ usize, /*userdata: */ *void) : usize as HttpResponseCallback;
+
+public struct HttpRequest {
+    url: *const char
+    headers: Map<*const char, *const char>
+    type: HttpRequestType
+    body: *char
+}
+
+public struct HttpResponse {
+    statusCode: i32
+    headers: Map<*const char, *const char>
+
+    body: StringBuffer
+
+    userdata: *void
+    bodyFn : HttpResponseCallback
+}
+
+public struct HttpOptions {
+    proxy: *const char
+}
+
+public struct Http {
+    options: HttpOptions
+    alloc: *const Allocator
+}
+
+public func (this: *Http) init(
+    options: *HttpOptions,
+    allocator: *const Allocator = defaultAllocator) : bool {
+
+    this.options = *options
+    if(curl_global_init(CURLflags.CURL_GLOBAL_ALL) != CURLcode.CURLE_OK) {
+        // TODO: Expose error states... via curl_easy_strerror
+        return false
+    }
+
+    return true
+}
+
+public func (this: *Http) free() {
+    curl_global_cleanup()
+}
+
+/*
+public func (this: *HttpResponse) free() {
+    this.body.free()
+}*/
+
+public func (this: *Http) setProxy(proxy: *const char) {
+    this.options.proxy = proxy
+}
+
+/**
+    Make an HTTP GET request
+*/
+public func (this: *Http) get(url: *const char, resp: *HttpResponse) : bool {
+    var req = HttpRequest {
+        .url = url,
+        .type = HttpRequestType.GET,
+        .body = null,
+    }
+    return this.makeRequest(&req, resp)
+}
+
+public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : bool {
+    var curl = curl_easy_init()
+    if(!curl) {
+        resp.statusCode = -1;
+        return false;
+    }
+
+    defer curl_easy_cleanup(curl)
+
+    curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_URL, req.url);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_NOPROGRESS, 1_i64);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_FOLLOWLOCATION, 1_i64);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_MAXREDIRS, 8_i64);
+    // WARNING: What a damn mess, for now don't validate certificates -- yikes!
+    // TODO: include CA in litac and allow for overriding location
+    curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, false);
+    // curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_CAINFO, "%windir%\\system32\\curl-ca-bundle.crt");
+
+    if(this.options.proxy) {
+        curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_PROXY, this.options.proxy);
+    }
+
+    curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_WRITEFUNCTION, (&HttpWriteCallback) as (*void));
+    curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_WRITEDATA, resp);
+
+    if(req.type == HttpRequestType.POST) {
+        // TODO: https://curl.se/libcurl/c/CURLOPT_POST.html
+        // curl_easy_setopt(curl, CURLoption.CURLOPT_POST, 1_i64);
+        // curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+    }
+
+    var curlRes = curl_easy_perform(curl)
+    if(curlRes) {
+        var body = curl_easy_strerror(curlRes)
+        HttpWriteCallback(body as (*void), strlen(body), 1, resp)
+
+        resp.statusCode = -1;
+        return false;
+    }
+
+    var code = 0
+    curl_easy_getinfo(curl, CURLinfo.CURLINFO_RESPONSE_CODE, &code)
+    resp.statusCode = code
+
+    return true
+}
+
+func HttpWriteCallback(data: *void, size: usize, n: usize, userdata: *void) : usize {
+    var totalSize = size * n
+    var resp = userdata as (*HttpResponse)
+    if(resp.bodyFn) {
+        return resp.bodyFn(data, size, n, resp.userdata)
+    }
+
+    resp.body.append("%.*s", totalSize, data)
+    return totalSize
+}
+
+
+@test
+func testFileDownload() {
+    var http = Http{}
+    http.init(HttpOptions{})
+    defer http.free()
+
+    var body = StringBuffer{}
+    body.init(256)
+    // defer body.free() TODO: causes double free??!?!
+
+    var resp = HttpResponse {
+        .body = body
+    }
+    http.get("https://curl.se/libcurl/c/CURLOPT_POST.html", &resp)
+
+    printf("Status: %d\n%s\n", resp.statusCode, resp.body.cStr())
+
+}

@@ -1,0 +1,223 @@
+/**
+    Reads the build.json file to be used for LitaC source
+    compilation.
+
+    The build.json defines the following:
+    * C compiler options
+        * Include directories
+        * Library directories
+        * static libraries
+    * Package paths to include for scanning LitaC modules
+    * Project source code directory
+
+*/
+import "std/array"
+import "std/json"
+import "std/io"
+import "std/mem"
+import "std/string_buffer"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+public struct BuildFile {
+    allocator: *const Allocator
+
+    compileCmdTemplate: *const char
+    projectSrcDir: *const char
+
+    pkgPaths: Array<*const char>
+    includePaths: Array<*const char>
+    libraryPaths: Array<*const char>
+    staticLibs: Array<*const char>
+}
+
+public func (this: *BuildFile) init(allocator: *const Allocator = defaultAllocator) {
+    this.allocator = allocator
+
+    this.compileCmdTemplate = null
+    this.projectSrcDir = null
+
+    this.pkgPaths.init(32, allocator)
+    this.includePaths.init(32, allocator)
+    this.libraryPaths.init(32, allocator)
+    this.staticLibs.init(32, allocator)
+}
+
+public func (this: *BuildFile) free() {
+    if(this.compileCmdTemplate) {
+        this.allocator.free(this.compileCmdTemplate as (*void))
+    }
+
+    if(this.projectSrcDir) {
+        this.allocator.free(this.projectSrcDir as (*void))
+    }
+
+    FreeArray(this.pkgPaths, this.allocator)
+    FreeArray(this.includePaths, this.allocator)
+    FreeArray(this.libraryPaths, this.allocator)
+    FreeArray(this.staticLibs, this.allocator)
+}
+
+func FreeArray(array: *Array<*const char>, allocator: *const Allocator) {
+    for(var i = 0; i < array.size(); i+=1) {
+        var v = array.get(i)
+        allocator.free(v as (*void))
+    }
+
+    array.free()
+}
+
+public func (this: *BuildFile) writeTo(file: *File) : bool {
+    var root = CreateJsonObject(this.allocator)
+    root.putStr("compile_template", this.compileCmdTemplate)
+    root.putStr("source_directory", this.projectSrcDir)
+    root.put("package_paths", CreateArray(&this.pkgPaths, this.allocator))
+    root.put("include_paths", CreateArray(&this.includePaths, this.allocator))
+    root.put("library_paths", CreateArray(&this.libraryPaths, this.allocator))
+    root.put("static_libs", CreateArray(&this.staticLibs, this.allocator))
+
+    var sb = StringBufferInit(1024, this.allocator)
+    defer sb.free()
+
+    root.print(sb)
+
+    if(file.writeBytes(sb.cStr(), sb.length) != FileStatus.Ok) {
+        return false
+    }
+
+    return true
+}
+
+public func BuildFileFromFile(
+    filename: *const char,
+    buildFile: *BuildFile,
+    allocator: *const Allocator = defaultAllocator) : bool {
+
+    var parser = JsonParser{}
+    parser.init(allocator)
+    defer parser.free()
+
+    var data: *char;
+    var length: usize;
+
+    if(ReadFile(filename, &data, &length, allocator) != FileStatus.Ok) {
+        return false
+    }
+
+    var node = parser.parseJson(data)
+    defer if(node) node.free()
+
+    if(parser.hasError()) {
+        return false
+    }
+
+    return BuildFileFromJson(node, buildFile, allocator)
+}
+
+public func BuildFileFromJson(
+    json: *JsonNode,
+    buildFile: *BuildFile,
+    allocator: *const Allocator = defaultAllocator) : bool {
+
+    if(!json) {
+        return false;
+    }
+
+    // buildFile.init(allocator)
+    buildFile.allocator = allocator
+
+    buildFile.compileCmdTemplate = StringClone(json.getStr("compile_template"), -1, allocator)
+    buildFile.projectSrcDir = StringClone(json.getStr("source_directory"), -1, allocator)
+
+    AddStrings(json, "package_paths", &buildFile.pkgPaths, allocator)
+    AddStrings(json, "include_paths", &buildFile.includePaths, allocator)
+    AddStrings(json, "library_paths", &buildFile.libraryPaths, allocator)
+    AddStrings(json, "static_libs", &buildFile.staticLibs, allocator)
+
+    return true
+}
+
+func AddStrings(json: *JsonNode, key: *const char, array: *Array<*const char>, allocator: *const Allocator) {
+    var nodes = json.getArray(key)
+    if(nodes) {
+        if(array.alloc == null) {
+            array.init(nodes.size(), allocator)
+        }
+
+        for(var i = 0; i < nodes.size(); i+=1) {
+            var node = nodes.at(i)
+            if(!node.isString()) {
+                continue;
+            }
+
+            array.add(StringClone(node.asString(), -1, allocator))
+        }
+    }
+}
+
+func CreateArray(array: *Array<*const char>, allocator: *const Allocator) : *JsonNode {
+    if(array.empty()) {
+        return JSON_NULL
+    }
+
+    var node = CreateJsonArray(allocator)
+    for(var i = 0; i < array.size(); i+=1) {
+        var value = array.get(i)
+        node.add(CreateJsonStringNoDup(value, allocator))
+    }
+
+    return node
+}
+
+@test
+func testBuildFileFromJson() {
+    var data = """
+    {
+        "compile_template" : "compile template",
+        "source_directory" : "source directory",
+        "package_paths" : ["p1", "p2", "p3"],
+        "include_paths" : ["i1", "i2", "i3"],
+        "library_paths" : ["L1", "L2", "L3"],
+        "static_libs" : ["s1", "s2", "s3"],
+    }
+    """;
+
+    var parser = JsonParser{}
+    parser.init()
+    defer parser.free()
+
+    var node = parser.parseJson(data)
+    defer if(node) node.free()
+
+    assert(!parser.hasError());
+
+    var buildFile = BuildFile{}
+    defer buildFile.free()
+
+    var status = BuildFileFromJson(node, buildFile, defaultAllocator)
+    assert(status == true)
+
+    assert(strcmp(buildFile.compileCmdTemplate, "compile template") == 0)
+    assert(strcmp(buildFile.projectSrcDir, "source directory") == 0)
+
+    assert(buildFile.pkgPaths.size() == 3)
+    assert(strcmp(buildFile.pkgPaths.get(0), "p1") == 0)
+    assert(strcmp(buildFile.pkgPaths.get(1), "p2") == 0)
+    assert(strcmp(buildFile.pkgPaths.get(2), "p3") == 0)
+
+    assert(buildFile.includePaths.size() == 3)
+    assert(strcmp(buildFile.includePaths.get(0), "i1") == 0)
+    assert(strcmp(buildFile.includePaths.get(1), "i2") == 0)
+    assert(strcmp(buildFile.includePaths.get(2), "i3") == 0)
+
+    assert(buildFile.libraryPaths.size() == 3)
+    assert(strcmp(buildFile.libraryPaths.get(0), "L1") == 0)
+    assert(strcmp(buildFile.libraryPaths.get(1), "L2") == 0)
+    assert(strcmp(buildFile.libraryPaths.get(2), "L3") == 0)
+
+    assert(buildFile.staticLibs.size() == 3)
+    assert(strcmp(buildFile.staticLibs.get(0), "s1") == 0)
+    assert(strcmp(buildFile.staticLibs.get(1), "s2") == 0)
+    assert(strcmp(buildFile.staticLibs.get(2), "s3") == 0)
+}
