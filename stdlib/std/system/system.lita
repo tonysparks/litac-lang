@@ -87,7 +87,7 @@ typedef struct tm tm;
 
 @foreign("Lita_OSType")
 //@asStr TODO, this isn't working, function not in scope??
-enum OS {
+public enum OS {
     @alias("Lita_OSType_WINDOWS")
     @asStr("WINDOWS")
     Lita_OSType_WINDOWS,
@@ -129,6 +129,38 @@ public func OSAsStr(type: OS) : *const char {
         case OS.Lita_OSType_OTHER: return "OTHER";
         default: return null;
     }
+}
+
+public func OSFromStr(str: *const char, len: usize) : OS {
+    if(!str) {
+        return OS.Lita_OSType_OTHER
+    }
+
+    if(strcicmp(str, "WINDOWS", len) == 0) {
+        return OS.Lita_OSType_WINDOWS
+    }
+
+    if(strcicmp(str, "ANDROID", len) == 0) {
+        return OS.Lita_OSType_ANDROID
+    }
+
+    if(strcicmp(str, "LINUX", len) == 0) {
+        return OS.Lita_OSType_LINUX
+    }
+
+    if(strcicmp(str, "BSD", len) == 0) {
+        return OS.Lita_OSType_BSD
+    }
+
+    if(strcicmp(str, "IOS", len) == 0) {
+        return OS.Lita_OSType_IOS
+    }
+
+    if(strcicmp(str, "MAC", len) == 0) {
+        return OS.Lita_OSType_MAC
+    }
+
+    return OS.Lita_OSType_OTHER
 }
 
 @foreign("litaOS")
@@ -279,12 +311,12 @@ end:
     return out
 }
 
-func strcicmp(a: *const char, b: *const char) : i32 {
+func strcicmp(a: *const char, b: *const char, size: usize) : i32 {
     if(a==b) return 0;
     if(!a && b) return -1;
     if(a && !b) return 1;
 
-    for (;;) {
+    for (var i = 0; i < size; i += 1) {
         var ac = *a
         var bc = *b
 
@@ -366,7 +398,7 @@ public func GetAbsolutePath(pwd: *const char, path: *const char, output: [MAX_PA
 
 public func PathEquals(a: *const char, b: *const char) : bool {
     // TODO: Total BS implementation... this is downright wrong
-    return strcicmp(a, b) == 0
+    return strcicmp(a, b, MAX_PATH) == 0
 }
 
 const uriEscapeChars = [256]*const char {

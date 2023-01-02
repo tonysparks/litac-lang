@@ -166,7 +166,7 @@ public func (this: *PackageManager) free() {
 public func (this: *PackageManager) install() : InstallStatus {
     var temp:[MAX_PATH]char;
 
-    var pkgDef = StringInit(temp, MAX_PATH)
+    var pkgDef = StringInit(temp, MAX_PATH, 0)
     pkgDef.format("%s/pkg.json", CurrentWorkingPath())
 
     if(!FileExists(pkgDef.cStr())) {

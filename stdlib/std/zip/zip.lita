@@ -116,7 +116,7 @@ public func (this: *ZipFile) unzip(
     }
 
     var temp:[MAX_PATH]char;
-    var path = StringInit(temp, MAX_PATH)
+    var path = StringInit(temp, MAX_PATH, 0)
 
     var baseLen = strlen(fileStat.m_filename);
     if( (flags | ZipFlags.INCLUDE_ZIPFILE_NAME_ON_UNZIP) > 0) {
@@ -128,7 +128,7 @@ public func (this: *ZipFile) unzip(
             continue
         }
 
-        var filename = StringInit(fileStat.m_filename + baseLen, MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE)
+        var filename = StringInit(fileStat.m_filename + baseLen, MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE - baseLen, 0)
         path.format("%s/%.*s", dest, filename.length, filename.buffer)
 
         var cPath = path.cStr()

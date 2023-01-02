@@ -24,13 +24,20 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-      
+
       # Install tcc
       - name: Install tcc
         run: |
           echo Install tcc compiler
           sudo apt-get install -y tcc
-      
+
+      # Install libcurl
+      - name: Install libcurl
+        run: |
+          echo Install libcurl
+          sudo apt-get install -y curl
+          curl --version
+
       # Print compiler information
       - name: Compiler Info
         run: |

@@ -324,7 +324,7 @@ func readPackage(
     var name = pkgId.name()
     var version = pkgId.version()
 
-    var pkgDef = StringInit(temp, MAX_PATH)
+    var pkgDef = StringInit(temp, MAX_PATH, 0)
     pkgDef.format("%s/%.*s-%.*s/pkg.json",
         pkgPath,
         name.length, name.buffer,

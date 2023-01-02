@@ -365,7 +365,7 @@ func (this: using *CGen) emitTraitDecls() {
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
-        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME)
+        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
         var escapedName = this.escapeNameStr(traitSym.name)
         vtableNameStr.format("%s%.*s__%.*s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, escapedName.length, escapedName.buffer)
 
@@ -480,7 +480,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
 }
 
 func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]char) : *const char {
-    var name = StringInit(buffer, MAX_SYMBOL_NAME)
+    var name = StringInit(buffer, MAX_SYMBOL_NAME, 0)
     name.format("__tmp%d", this.tmpVar)
     this.tmpVar += 1
 
@@ -1215,6 +1215,40 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             buf.appendStrn(value.buffer, value.length)
         }
     }
+    else if(note.type.name.equals(&COMPILER_OPTION)) {
+        var ccOption = CCompilerOption{
+            .os = OS.Lita_OSType_OTHER,
+            .options = StringView{},
+        }
+
+        for(var i = 0; i < note.arguments.size(); i += 1) {
+            var attr = note.arguments.get(i)
+            if(!attr.argExpr) {
+                continue
+            }
+
+            var value = attr.argExpr.operand.val.str
+
+            if(attr.argName.token.type == TokenType.IDENTIFIER) {
+                if(attr.argName.str.equalsStr("os")) {
+                    ccOption.os = OSFromStr(value.buffer, value.length)
+                }
+                else if(attr.argName.str.equalsStr("options")) {
+                    ccOption.options = value
+                }
+            }
+            else {
+                if(i == 0) {
+                    ccOption.os = OSFromStr(value.buffer, value.length)
+                }
+                else if(i == 1) {
+                    ccOption.options = value
+                }
+            }
+        }
+
+        this.lita.compilerOptions.add(ccOption)
+    }
     else if(note.type.name.equals(&INLINE)) {
         this.emitStr("LITAC_INLINE ")
     }
@@ -1253,7 +1287,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(note.type.name.equals(&CFILE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
-        var filenameStr = StringInit(filename, MAX_PATH)
+        var filenameStr = StringInit(filename, MAX_PATH, 0)
         var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
@@ -1304,7 +1338,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(note.type.name.equals(&CINCLUDE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
-        var filenameStr = StringInit(filename, MAX_PATH)
+        var filenameStr = StringInit(filename, MAX_PATH, 0)
         var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
@@ -1775,7 +1809,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitNotes(&decl.attributes)
 
             var name: [MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+            var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")
@@ -1800,7 +1834,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitNotes(&decl.attributes)
 
             var name: [MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(name, MAX_SYMBOL_NAME)
+            var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")

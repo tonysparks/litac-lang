@@ -48,7 +48,7 @@ public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char
     var lita = this.lsp.lita
 
     var filepath = [MAX_PATH]char{0};
-    var pathStr = StringInit(filepath, MAX_PATH);
+    var pathStr = StringInit(filepath, MAX_PATH, 0);
 
     pathStr.format("%s/src/main.lita", rootPath)
     this.lsp.log("Checking for main at: '%s'...", pathStr.cStr())

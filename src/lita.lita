@@ -51,6 +51,8 @@ public struct Lita {
     sourceFilename: [MAX_PATH]char
 
     buildFile: BuildFile
+    compilerOptions: Array<CCompilerOption>
+
     programSymbols: ProgramSymbols
     genericSymbols: Map<InternedString, *Symbol>
 
@@ -84,6 +86,11 @@ public enum TypeInfoOption {
     NONE,        // no type information should be generated
     TAGGED,      // only types tagged with @typeinfo shall be generated
     ALL,         // all types will be generated
+}
+
+public struct CCompilerOption {
+    os: OS
+    options: StringView
 }
 
 public struct LitaOptions {
@@ -156,10 +163,12 @@ public func (this: *Lita) reset() {
     // TODO: Only initialize if this is an LSP
     this.references.init(this.allocator)
 
+    this.compilerOptions.init(16, this.allocator)
+
     // see if there is a .build.json file
     {
         var temp: [MAX_PATH]char;
-        var build = StringInit(temp, MAX_PATH)
+        var build = StringInit(temp, MAX_PATH, 0)
         build.format("%s/.build.json", this.options.projectPath)
 
         memset((&this.buildFile) as (*void), 0, sizeof(:BuildFile))
@@ -371,7 +380,20 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
         commandStr.replace(index, index+strlen("%input%"), sourceFilename)
     }
 
-    //printf("Running command: '%s'\n", commandStr.cStr())
+    var os = GetOS()
+    for(var i = 0; i < this.compilerOptions.size(); i+= 1) {
+        var option = this.compilerOptions.getPtr(i)
+
+        // skip this option, if the OS doesn't match
+        if(option.os != OS.Lita_OSType_OTHER && option.os != os) {
+            continue
+        }
+
+        commandStr.appendStrn(" ", 1)
+        commandStr.appendStrn(option.options.buffer, option.options.length)
+    }
+
+    // printf("Running command: '%s'\n", commandStr.cStr())
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }
@@ -400,7 +422,7 @@ public func FindModulePath(lita: *Lita,
                            filename: [MAX_PATH]char) : bool {
 
     var path = [MAX_PATH]char{0}
-    var pathStr = StringInit(path, MAX_PATH);
+    var pathStr = StringInit(path, MAX_PATH, 0);
     defer {
         GetAbsolutePath(CurrentWorkingPath(), pathStr.cStr(), filename)
     }

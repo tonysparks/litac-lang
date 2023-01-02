@@ -1,6 +1,17 @@
 
 @include("<curl/curl.h>");
 
+@compiler_option(
+    .os = "windows",
+    .options = "-llibcurl.dll.lib"
+);
+
+@compiler_option(
+    .os = "linux",
+    .options = "-llibcurl"
+);
+
+
 /*
 @raw("""
 #if defined(_WIN32)

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -ltcc -lm -lrt -lpthread -ldl"
+BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -lm -lrt -lpthread -ldl"
 #set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
 
 

@@ -359,7 +359,7 @@ func RunPkgInstall(options: *LitaOptions) : i32 {
     }
 
     var temp: [MAX_PATH]char;
-    var build = StringInit(temp, MAX_PATH)
+    var build = StringInit(temp, MAX_PATH, 0)
     build.format("%s/.build.json", options.projectPath)
 
     var file = File{}

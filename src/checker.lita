@@ -481,7 +481,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     }
     else {
         var buffer = [MAX_SYMBOL_NAME]char;
-        var nameStr = StringInit(buffer, MAX_SYMBOL_NAME)
+        var nameStr = StringInit(buffer, MAX_SYMBOL_NAME, 0)
         nameStr.format("anon_%d", this.randomNameIndex)
         name = this.lita.strings.internCopy(nameStr.cStr(), nameStr.length)
 
