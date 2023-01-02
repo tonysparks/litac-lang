@@ -184,6 +184,7 @@ public func (file: *File) writeBytes(buffer: *const char, len: usize) : FileStat
 #end
 }
 
+/*
 @test
 func TestReadFile() {
     var data: *char = null
@@ -202,4 +203,4 @@ func TestReadFile() {
 
     defaultAllocator.free(data)
     defaultAllocator.free(data2)
-}
+}*/

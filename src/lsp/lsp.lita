@@ -415,7 +415,7 @@ public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
             var diagnostic = CreateJsonObject(this.requestAlloc())
             diagnostic.putStr("message", error.message)
             diagnostic.putIntNumber("severity", 1)
-            var sourceLine = StringCopy(error.pos.start, (error.pos.end - error.pos.start) as (i32), this.requestAlloc())
+            var sourceLine = StringClone(error.pos.start, (error.pos.end - error.pos.start) as (i32), this.requestAlloc())
             diagnostic.putStr("source", sourceLine)
             diagnostic.put("range", SrcPosToRange(error.pos, this.requestAlloc()))
 

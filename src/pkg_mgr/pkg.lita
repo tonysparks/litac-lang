@@ -1,0 +1,283 @@
+import "std/string_view"
+import "std/string_buffer"
+import "std/string"
+import "std/array"
+import "std/mem"
+import "std/json"
+import "std/map"
+import "std/libc"
+import "std/assert"
+import "std/io"
+import "std/system"
+
+import "pkg_mgr/pkg_mgr"
+import "pkg_mgr/pkg_install"
+
+public const SEPARATOR = "|"
+public const SEPARATOR_LENGTH = 1  /* we need better const support! */
+
+public enum PackageType {
+    EXECUTABLE,
+    STATIC_LIBRARY,
+    DYNAMIC_LIBRARY,
+    SOURCE_LIBRARY,
+}
+
+public struct PackageDef {
+    id: using PackageId
+
+    // the physical path to this package when
+    // it is installed
+    path: [MAX_PATH]char
+
+    type: PackageType
+    dependencies: Array<PackageId>
+}
+
+public func (this: *PackageDef) free() {
+    this.dependencies.free()
+}
+
+public struct PackageId {
+    id: [MAX_PATH]char
+
+    repoOffset: i32
+    repoLength: i32
+
+    nameOffset: i32
+    nameLength: i32
+
+    versionOffset: i32
+    versionLength: i32
+}
+
+public func (this: *PackageId) repo() : StringView {
+    return StringViewInit(this.id + this.repoOffset, this.repoLength)
+}
+
+public func (this: *PackageId) name() : StringView {
+    return StringViewInit(this.id + this.nameOffset, this.nameLength)
+}
+
+public func (this: *PackageId) version() : StringView {
+    return StringViewInit(this.id + this.versionOffset, this.versionLength)
+}
+
+public func PackageIdFromString(id: *const char, pkgId: *PackageId) : bool {
+    var view = StringViewInit(id)
+    var nameIndex = view.indexOfAt(SEPARATOR, .len = SEPARATOR_LENGTH, .fromIndex = 0)
+    if(nameIndex < 0) {
+        goto invalid
+    }
+    var versionIndex = view.indexOfAt(SEPARATOR, .len = SEPARATOR_LENGTH, .fromIndex = nameIndex + 1)
+    if(versionIndex < 0) {
+        goto invalid
+    }
+
+    StringCopy(.src = id, .dest = pkgId.id, .size = MAX_PATH)
+    pkgId.repoOffset = 0
+    pkgId.repoLength = nameIndex
+
+    pkgId.nameOffset = nameIndex + 1
+    pkgId.nameLength = versionIndex - nameIndex - 1
+
+    pkgId.versionOffset = versionIndex + 1
+    pkgId.versionLength = view.length - versionIndex - 1
+
+    return true
+
+invalid:
+    return false
+}
+
+public func ParsePackageFile(
+        pm: *PackageManager,
+        pkgFile: *const char,
+        result: **PackageDef) : InstallStatus {
+
+    var parser = JsonParser{}
+    parser.init(pm.allocator)
+    defer parser.free()
+
+    var data: *char;
+    var length: usize;
+
+    defer pm.allocator.free(data)
+
+    if(ReadFile(pkgFile, &data, &length, pm.allocator) != FileStatus.Ok) {
+        return InstallStatus.ERROR_READING_PKG_FILE
+    }
+
+    var node = parser.parseJson(data)
+    defer if(node) node.free()
+
+    if(parser.hasError()) {
+        return InstallStatus.ERROR_PARSING_PKG_JSON;
+    }
+
+    return ParsePackage(pm, node, result)
+}
+
+public func ParsePackage(
+        pm: *PackageManager,
+        json: *JsonNode,
+        result: **PackageDef) : InstallStatus {
+
+    if(!json) {
+        return InstallStatus.ERROR_READING_PKG_FILE
+    }
+
+    var pkgId = PackageId{};
+    var code = ParsePackageId(json, &pkgId, pm.allocator)
+    if(code != InstallStatus.OK) {
+        return code
+    }
+
+    // if this is already in the registry, no need to further process
+    if(pm.packages.contains(pkgId.id)) {
+        *result = pm.packages.get(pkgId.id)
+        return InstallStatus.OK
+    }
+
+    var pkg = new<PackageDef>(pm.allocator)
+    pkg.id = pkgId
+
+    pm.packages.put(pkgId.id, pkg)
+
+    var type = json.getStr("type", "source")
+    /* TODO parse type */
+
+    var deps = json.getArray("dependencies")
+    if(deps && deps.size() > 0) {
+        pkg.dependencies.init(deps.size(), pm.allocator)
+
+        for(var i = 0; i < deps.size(); i+=1) {
+            var depNode = deps.at(i)
+
+            pkg.dependencies.add(PackageId{})
+            var pkgId = pkg.dependencies.getPtr(i)
+
+            var code = ParsePackageId(depNode, pkgId, pm.allocator)
+            if(code != InstallStatus.OK) {
+                return code
+            }
+        }
+    }
+
+    (*result) = pkg
+
+    return InstallStatus.OK
+}
+
+
+public func ParsePackageId(
+        json: *JsonNode,
+        pkgId: *PackageId,
+        allocator: *const Allocator = defaultAllocator) : InstallStatus {
+
+    if(!json) {
+        return InstallStatus.ERROR_PARSING_PKG_JSON
+    }
+
+    var repo = json.getStr("repo")
+    if(!repo) return InstallStatus.ERROR_PARSING_PKG_JSON
+
+    var name = json.getStr("name")
+    if(!name) return InstallStatus.ERROR_PARSING_PKG_JSON
+
+    var version = json.getStr("version")
+    if(!version) return InstallStatus.ERROR_PARSING_PKG_JSON
+
+    var repoLen = strlen(repo)
+    var nameLen = strlen(name)
+    var versionLen = strlen(version)
+
+    var sb = StringBufferInit(repoLen + nameLen + versionLen + (SEPARATOR_LENGTH*2)+1, allocator)
+    defer sb.free()
+
+    sb.append("%s%s%s%s%s", repo, SEPARATOR, name, SEPARATOR, version)
+
+    var id = sb.cStr();
+    PackageIdFromString(sb.cStr(), pkgId)
+
+    return InstallStatus.OK
+}
+
+
+/* ------------------------------------------------------
+    Tests
+---------------------------------------------------------*/
+
+@test
+func testParsePackage() {
+    var parser = JsonParser{}
+    parser.init()
+    defer parser.free()
+
+    var data =
+    """
+    {
+        "repo" : "https://github.com/tonysparks",
+        "name" : "litac-lang",
+        "version" : "0.1.2-alpha",
+        "type": "executable",
+        "dependencies": [
+        ]
+    }
+    """;
+
+    //"
+
+    var node = parser.parseJson(data)
+    defer if(node) node.free()
+
+    if(parser.hasError()) {
+        printf("Error parsing JSON\n")
+        return;
+    }
+
+    var pm = PackageManager {}
+    pm.init(PackageSyncOptions{})
+    defer pm.free()
+
+    var pkg: *PackageDef;
+    if(ParsePackage(&pm, node, &pkg) != InstallStatus.OK) {
+        printf("Error parsing Package\n")
+        return;
+    }
+
+    var repo = pkg.id.repo()
+    var name = pkg.id.name()
+    var version = pkg.id.version()
+
+/*
+    printf("Id: %s\n", pkg.id.id)
+    printf("Repo: %.*s\n", repo.length, repo.buffer)
+    printf("Name: %.*s\n", name.length, name.buffer)
+    printf("Version: %.*s\n", version.length, version.buffer)
+*/
+
+    assert(strcmp(pkg.id.id, "https://github.com/tonysparks|litac-lang|0.1.2-alpha") == 0)
+    assert(repo.equals("https://github.com/tonysparks"))
+    assert(name.equals("litac-lang"))
+    assert(version.equals("0.1.2-alpha"))
+}
+
+
+@test
+func testPackageFromString() {
+    var pkgId = PackageId{}
+    PackageIdFromString("repo|name|version", &pkgId)
+
+    var repo = pkgId.repo()
+    var name = pkgId.name()
+    var version = pkgId.version()
+    /*
+    printf("%.*s\n", repo.length, repo.buffer)
+    printf("%.*s\n", name.length, name.buffer)
+    printf("%.*s\n", version.length, version.buffer)
+    */
+    assert(repo.equals("repo"))
+    assert(name.equals("name"))
+    assert(version.equals("version"))
+}

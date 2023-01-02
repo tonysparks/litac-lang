@@ -1,0 +1,403 @@
+import "pkg_mgr/pkg_mgr"
+import "pkg_mgr/pkg"
+
+import "std/assert"
+import "std/io"
+import "std/http"
+import "std/system"
+import "std/libc"
+import "std/array"
+import "std/mem"
+import "std/string"
+import "std/string_buffer"
+import "std/zip"
+import "std/json"
+
+import "std/atomic"
+/*
+import "std/thread"
+import "std/thread/thread_pool"
+*/
+
+const INSTALL_COMPLETED_FILE = ".litac_pkg"
+
+public func PackageSync(pm: *PackageManager) : InstallStatus {
+    if(!pm.pkg) {
+        return InstallStatus.OK
+    }
+
+    var options = pm.options
+
+    Mkdir(options.pkgDir)
+    if(!FileExists(options.pkgDir)) {
+        return InstallStatus.ERROR_CREATING_PKG_DIR
+    }
+
+    var numOfPkgs = pm.pkg.dependencies.size()
+    if(numOfPkgs < 1) {
+        return InstallStatus.OK
+    }
+
+    var pkgsToDownload = ArrayInit<PackageId>(numOfPkgs, pm.allocator)
+    defer pkgsToDownload.free()
+
+    var findCode = findPackagesToDownload(pm, &pkgsToDownload)
+    if(findCode != InstallStatus.OK) {
+        return findCode
+    }
+
+    var http = Http{}
+    http.init(pm.options.httpOptions)
+    defer http.free()
+
+    var pkgPath:[MAX_PATH]char;
+
+    for(var i = 0; i < pkgsToDownload.size(); i+=1) {
+        var pkgId = pkgsToDownload.get(i)
+
+        var status = makePackageDirectory(pm, pkgId, pkgPath)
+        if(status != InstallStatus.OK) {
+            return status
+        }
+
+        if(!pm.options.fullSync && isPackageInstalled(pm, pkgId, pkgPath)) {
+            var status = readPackage(pm, pkgId, pkgPath, pkgsToDownload)
+            if(status != InstallStatus.OK) {
+                return status
+            }
+
+            continue;
+        }
+
+        status = cleanPackageDirectory(pm, pkgPath)
+        if(status != InstallStatus.OK) {
+            return status
+        }
+
+        var pkgFile = StringInit(pkgPath, MAX_PATH)
+        pkgFile.appendStr("/pkg.zip")
+
+        status = downloadPackage(pm, &http, pkgId, pkgFile.cStr())
+        if(status != InstallStatus.OK) {
+            return status
+        }
+
+        status = installPackage(pm, pkgId, pkgFile.cStr(), pkgsToDownload)
+        if(status != InstallStatus.OK) {
+            return status
+        }
+    }
+    return InstallStatus.OK
+}
+
+func isPackageInstalled(pm: *PackageManager, pkgId: *PackageId, pkgDir: *const char) : bool {
+    var temp:[MAX_PATH]char;
+    var lockFile = StringInit(temp, MAX_PATH, 0);
+    lockFile.format("%s/%s", pkgDir, INSTALL_COMPLETED_FILE)
+
+    if(FileExists(lockFile.cStr())) {
+        return true
+    }
+
+    return false
+}
+
+func cleanPackageDirectory(pm: *PackageManager, pkgPath: *const char) : InstallStatus {
+    // TODO:
+    return InstallStatus.OK
+}
+
+func findPackagesToDownload(pm: *PackageManager, pkgsToDownload: *Array<PackageId>) : InstallStatus {
+    // TODO:
+    // using the pkg.dependencies, scan the .pkg directory to ensure all packages
+    // are download (we can do this by verifying the .litac_pkg file exists in the directory of the
+    // package, we create this empty file to denote a package has been fully downloaded)
+    if(pm.pkg) {
+        pkgsToDownload.addAll(pm.pkg.dependencies)
+    }
+    return InstallStatus.OK
+}
+
+func makePackageDirectory(
+    pm: *PackageManager,
+    pkgId: *PackageId,
+    output: [MAX_PATH]char) : InstallStatus {
+
+    var pkgDirectory = StringInit(output, MAX_PATH, 0);
+
+    // the ${PWD}/.pkgs directory
+    {
+        pkgDirectory.format("%s/%s/",
+            CurrentWorkingPath(),
+            pm.options.pkgDir)
+
+        Mkdir(pkgDirectory.cStr())
+    }
+
+    // the ${PWD}/.pkgs/{name}
+    {
+        var name = pkgId.name()
+        var len = pkgDirectory.length
+        pkgDirectory.append("%.*s/",
+            name.length, name.buffer)
+
+        var sanitizedPath: *char = pkgDirectory.cStr() + len
+        sanitizeFilename(sanitizedPath, sanitizedPath)
+        Mkdir(pkgDirectory.cStr())
+    }
+
+    // the ${PWD}/.pkgs/{name}/{version}
+    {
+        var version = pkgId.version()
+        var len = pkgDirectory.length
+        pkgDirectory.append("%.*s",
+            version.length, version.buffer)
+
+        var sanitizedPath: *char = pkgDirectory.cStr() + len
+        sanitizeFilename(sanitizedPath, sanitizedPath)
+        Mkdir(pkgDirectory.cStr())
+    }
+
+    var path = pkgDirectory.cStr()
+    Mkdir(path)
+
+    if(!FileExists(path)) {
+        return InstallStatus.ERROR_CREATING_PKG_DIR
+    }
+
+    return InstallStatus.OK
+}
+
+func downloadPackage(
+    pm: *PackageManager,
+    http: *Http,
+    pkgId: *PackageId,
+    pkgFile: *const char) : InstallStatus {
+
+    const uriTemplate = getRepoTemplate(pkgId)
+    if(!uriTemplate) {
+        return InstallStatus.ERROR_INVALID_REPO
+    }
+
+    var temp:[MAX_PATH]char;
+    var uri = StringInit(temp, MAX_PATH, 0)
+
+    var repo = pkgId.repo()
+    var name = pkgId.name()
+    var version = pkgId.version()
+
+    uri.format(uriTemplate,
+            repo.length, repo.buffer,
+            name.length, name.buffer,
+            version.length, version.buffer)
+
+    var file: File;
+    if(file.open(pkgFile, FileOpenOp.WRITE_BINARY) != FileStatus.Ok) {
+        return InstallStatus.ERROR_UNABLE_TO_OPEN_FILE
+    }
+    defer file.close()
+
+    var resp = HttpResponse {
+        .userdata = &file,
+        .bodyFn = httpCallback,
+    }
+
+    http.get(uri.cStr(), &resp)
+
+    if(resp.statusCode < 200) {
+        return InstallStatus.ERROR_HTTP_STATUS
+    }
+
+    return InstallStatus.OK
+}
+
+func httpCallback(data: *void, size: usize, n: usize, userdata: *void) : usize {
+    var file = userdata as (*File)
+    if(!file) {
+        return 0
+    }
+
+    if(file.writeBytes(data as (*const char), size * n) != FileStatus.Ok) {
+        return 0
+    }
+
+    return size * n
+}
+
+func getRepoTemplate(pkgId: *PackageId) : *const char {
+    if(!pkgId) {
+        return null
+    }
+
+    var repo = pkgId.repo()
+
+    if(repo.startsWith("https://github.com")) {
+        // Example: https://github.com/tonysparks/seventh/archive/refs/tags/v0.4.1-beta.zip
+        return "%.*s/%.*s/archive/refs/tags/%.*s.zip"
+    }
+
+    return null
+}
+
+// TODO: Should we support Unicode names???
+func sanitizeFilename(filename: *const char, out: [MAX_PATH]char) : *char {
+    if(!filename) {
+        goto end;
+    }
+
+    var len = strlen(filename)
+    len = MIN(len, MAX_PATH)
+
+    var i = 0
+    for(; i < len; i += 1) {
+        var c = filename[i]
+        if(!isalnum(c) &&
+            c != '/' &&
+            c != '.' &&
+            c != '-') {
+            c = '_'
+        }
+        out[i] = c
+    }
+
+
+end:
+    out[i] = '\0'
+    return out
+}
+
+func installPackage(
+    pm: *PackageManager,
+    pkgId: *PackageId,
+    pkgFile: *const char,
+    pkgsToDownload: *Array<PackageId>) : InstallStatus {
+
+    var pkgPath:[MAX_PATH]char;
+    FilePath(pkgFile, pkgPath)
+
+    // unzip the pkg
+    {
+        var zip: ZipFile{}
+        defer {
+            zip.close()
+            FileDelete(pkgFile)
+        }
+
+        if(zip.open(pkgFile, ZipOpen.READ, pm.allocator) != ZipStatus.OK) {
+            return InstallStatus.ERROR_UNABLE_TO_OPEN_PKG_FILE
+        }
+
+        if(zip.unzip(pkgPath) != ZipStatus.OK) {
+            return InstallStatus.ERROR_UNABLE_TO_EXTRACT_PKG_FILE
+        }
+    }
+
+    var status = readPackage(pm, pkgId, pkgPath, pkgsToDownload)
+    if(status != InstallStatus.OK) {
+        return status
+    }
+
+    // if at this point, everything went ok, we can mark this
+    // package as installed..
+    // TODO: should we invert this, create a lock file upon start, and
+    // remove it once it's done?
+    {
+        var pkgLck = StringInit(pkgPath, MAX_PATH)
+        pkgLck.append("/%s", INSTALL_COMPLETED_FILE)
+
+        var lockFile = File{}
+        lockFile.open(pkgLck.cStr(), FileOpenOp.WRITE)
+        lockFile.close()
+    }
+
+    return InstallStatus.OK
+}
+
+func readPackage(
+    pm: *PackageManager,
+    pkgId: *PackageId,
+    pkgPath: *const char,
+    pkgsToDownload: *Array<PackageId>) : InstallStatus {
+
+    var temp:[MAX_PATH]char;
+
+    var name = pkgId.name()
+    var version = pkgId.version()
+
+    var pkgDef = StringInit(temp, MAX_PATH, 0)
+    pkgDef.format("%s/%.*s-%.*s/pkg.json",
+        pkgPath,
+        name.length, name.buffer,
+        version.length, version.buffer)
+
+    if(!FileExists(pkgDef.cStr())) {
+        return InstallStatus.ERROR_UNABLE_TO_OPEN_PKG_FILE
+    }
+
+    // read the pkg.json and add the dependencies...
+    var pkg: *PackageDef;
+    if(ParsePackageFile(pm, pkgDef.cStr(), &pkg) != InstallStatus.OK) {
+        return InstallStatus.ERROR_PARSING_PKG_JSON;
+    }
+
+    var srcPath = StringInit(pkg.path, MAX_PATH, 0)
+
+    // TODO: Do we want packages to allow to define an alternative
+    // folder for src/bin/lib directories, or should this be
+    // standard's by conventions...
+    srcPath.format("%s/%.*s-%.*s/src",
+        pkgPath,
+        name.length, name.buffer,
+        version.length, version.buffer)
+
+    srcPath.cStr()
+
+    // Add this installed packages dependencies...
+    if(!pkg.dependencies.empty()) {
+        // TODO: Create a Set type in LitaC, for now
+        // this will contain duplicates, which will be
+        // caught in the "isPackageInstalled" function
+        pkgsToDownload.addAll(pkg.dependencies)
+    }
+
+    return InstallStatus.OK
+}
+
+@test
+func testSanitizeFilename() {
+    var temp: [MAX_PATH]char;
+    var pkgDirectory = StringInit(temp, MAX_PATH, 0);
+    pkgDirectory.format("%s/%s/%s", "http://root", "name-complex", "1.0.3")
+
+    sanitizeFilename(pkgDirectory.cStr(), pkgDirectory.cStr())
+
+    // printf("Path: '%s'\n", pkgDirectory.cStr())
+    assert(strncmp(pkgDirectory.cStr(), "http_//root/name-complex/1.0.3", MAX_PATH) == 0)
+}
+
+/*
+@test
+func testDownloadPackage() {
+    var pkg = PackageDef {}
+    PackageIdFromString("https://github.com/tonysparks|seventh|v0.4.1-beta", &pkg.id)
+
+    var pm = PackageManager {
+        .options = PackageSyncOptions {
+            .pkgDir = "./.pkgs",
+            .httpOptions = HttpOptions {
+            }
+        },
+        .allocator = defaultAllocator,
+        .pkg = &pkg,
+    }
+
+    var http = Http{}
+    http.init(pm.options.httpOptions)
+    defer http.free()
+
+    var outputDir = "./__temp__/test/output.zip"
+
+    var resultCode = downloadPackage(&pm, &http, &pkg.id, outputDir)
+    printf("Result: %s\n", InstallStatusAsStr(resultCode))
+}
+*/

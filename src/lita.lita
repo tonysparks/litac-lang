@@ -23,6 +23,7 @@ import "cgen"
 import "common"
 import "intern"
 import "types"
+import "build"
 
 import "lsp/references"
 import "lsp/workspace"
@@ -48,6 +49,9 @@ public struct Lita {
     options: *LitaOptions
     binaryFilename: [MAX_PATH]char
     sourceFilename: [MAX_PATH]char
+
+    buildFile: BuildFile
+    compilerOptions: Array<CCompilerOption>
 
     programSymbols: ProgramSymbols
     genericSymbols: Map<InternedString, *Symbol>
@@ -84,7 +88,13 @@ public enum TypeInfoOption {
     ALL,         // all types will be generated
 }
 
+public struct CCompilerOption {
+    os: OS
+    options: StringView
+}
+
 public struct LitaOptions {
+    projectPath: [MAX_PATH]char    // the directory of where the main source module is
     srcPath: [MAX_PATH]char        // the directory of where the main source module is
     libPath: [MAX_PATH]char        // optional configurable path to modules for libraries
     litaPath: [MAX_PATH]char       // the LITAC_HOME environment variable for standard lita modules
@@ -114,6 +124,9 @@ public struct LitaOptions {
     disableLineSync: bool          // disables C #line directives sync with Lita source code
 
     maxMemory: usize               // max amount of memory that can be allocated
+
+    proxy: *const char             // the proxy server to use
+    runPkgInstall: bool            // if we should run pkg install
 }
 
 
@@ -149,6 +162,22 @@ public func (this: *Lita) reset() {
 
     // TODO: Only initialize if this is an LSP
     this.references.init(this.allocator)
+
+    this.compilerOptions.init(16, this.allocator)
+
+    // see if there is a .build.json file
+    {
+        var temp: [MAX_PATH]char;
+        var build = StringInit(temp, MAX_PATH, 0)
+        build.format("%s/.build.json", this.options.projectPath)
+
+        memset((&this.buildFile) as (*void), 0, sizeof(:BuildFile))
+
+        if(FileExists(build.cStr())) {
+            BuildFileFromFile(build.cStr(), &this.buildFile, this.allocator)
+        }
+
+    }
 }
 
 public func (lita: *Lita) free() {
@@ -351,7 +380,20 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
         commandStr.replace(index, index+strlen("%input%"), sourceFilename)
     }
 
-    //printf("Running command: '%s'\n", commandStr.cStr())
+    var os = GetOS()
+    for(var i = 0; i < this.compilerOptions.size(); i+= 1) {
+        var option = this.compilerOptions.getPtr(i)
+
+        // skip this option, if the OS doesn't match
+        if(option.os != OS.Lita_OSType_OTHER && option.os != os) {
+            continue
+        }
+
+        commandStr.appendStrn(" ", 1)
+        commandStr.appendStrn(option.options.buffer, option.options.length)
+    }
+
+    // printf("Running command: '%s'\n", commandStr.cStr())
     if(system(commandStr.cStrConst()) == 0) {
         return true
     }
@@ -380,7 +422,7 @@ public func FindModulePath(lita: *Lita,
                            filename: [MAX_PATH]char) : bool {
 
     var path = [MAX_PATH]char{0}
-    var pathStr = StringInit(path, MAX_PATH);
+    var pathStr = StringInit(path, MAX_PATH, 0);
     defer {
         GetAbsolutePath(CurrentWorkingPath(), pathStr.cStr(), filename)
     }
@@ -422,6 +464,25 @@ public func FindModulePath(lita: *Lita,
         pathStr.format("%s/stdlib/%.*s/%.*s.lita", lita.options.litaPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
         if(FileExists(pathStr.cStrConst())) {
             return true
+        }
+    }
+
+    // Finally check and see if there is an imported package
+    {
+        for(var i = 0; i < lita.buildFile.pkgPaths.size(); i+=1) {
+            var pkgPath = lita.buildFile.pkgPaths.get(i)
+            pathStr.format("%s%s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer)
+            if(FileExists(pathStr.cStrConst())) {
+                return true
+            }
+
+            var index = moduleName.lastIndexOfAt("/", 1)
+            var name = index < 0 ? moduleName : moduleName.substring(index + 1)
+
+            pathStr.format("%s%s/%.*s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
+            if(FileExists(pathStr.cStrConst())) {
+                return true
+            }
         }
     }
 

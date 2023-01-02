@@ -1,5 +1,9 @@
 @include("<stdatomic.h>");
 
+public @note atomic {
+}
+
+
 @foreign
 func atomic_init<T>(obj: *T, desired: T);
 

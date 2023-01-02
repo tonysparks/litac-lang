@@ -1,5 +1,15 @@
 @include("<libtcc.h>");
 
+@compiler_option(
+    .os = "windows",
+    .options = "-llibtcc"
+);
+
+@compiler_option(
+    .os = "linux",
+    .options = "-ltcc"
+);
+
 @foreign
 public struct TCCState;
 

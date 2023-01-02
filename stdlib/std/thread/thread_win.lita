@@ -266,7 +266,13 @@ public enum MutexType {
 */
 
 @foreign
+typedef void as WORD;
+
+@foreign
 typedef void as DWORD;
+
+@foreign
+typedef void as DWORD_PTR;
 
 @foreign
 typedef void as LPDWORD;
@@ -284,6 +290,26 @@ typedef void as HANDLE;
 struct _timeb {
     time: time_t
     millitm: i64
+}
+
+@foreign
+struct SYSTEM_INFO {
+    union DUMMYUNIONNAME {
+        dwOemId: DWORD
+        struct DUMMYSTRUCTNAME {
+            wProcessorArchitecture: WORD;
+            wReserved: WORD;
+        }
+    }
+    dwPageSize: DWORD;
+    lpMinimumApplicationAddress: LPVOID;
+    lpMaximumApplicationAddress: LPVOID;
+    dwActiveProcessorMask: DWORD_PTR;
+    dwNumberOfProcessors: DWORD;
+    dwProcessorType: DWORD;
+    dwAllocationGranularity: DWORD;
+    wProcessorLevel: WORD;
+    wProcessorRevision: WORD;
 }
 
 @foreign
@@ -397,6 +423,9 @@ func GetThreadId(h: HANDLE) : i32;
 
 @foreign
 func ExitThread(res: DWORD);
+
+@foreign
+func GetSystemInfo(info: *SYSTEM_INFO): i32;
 
 /*==============================================================
     Public APIs
@@ -864,4 +893,10 @@ public func (thr: Thread) sleep(duration: *TimeSpec, remaining: *TimeSpec = null
 
 public func (thr: Thread) yield() {
     Sleep(0)
+}
+
+public func GetNumberOfSystemThreads() : u32 {
+    sysinfo: SYSTEM_INFO;
+    GetSystemInfo(&sysinfo);
+    return sysinfo.dwNumberOfProcessors;
 }

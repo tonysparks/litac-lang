@@ -301,7 +301,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     }
 
     var moduleFilename = [260]char {};
-    var moduleFilenameStr = StringInit(moduleFilename, 260)
+    var moduleFilenameStr = StringInit(moduleFilename, 260, 0)
     for(var i = 0; i < test.modules.size(); i += 1) {
         var m = test.modules.get(i)
         moduleFilenameStr.clear()
@@ -311,7 +311,9 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
         }
     }
 
-    var options = LitaOptions{}
+    var options = new<LitaOptions>()
+    defer defaultAllocator.free(options)
+
     options.checkerOnly = false
     options.cOutputOnly = false
     options.showProfileInfo = false
@@ -355,7 +357,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     //lita.reset()
 
     var lita = Lita{}
-    lita.init(&options)
+    lita.init(options)
     defer lita.free()
 
     var root = lita.parse()

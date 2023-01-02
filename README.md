@@ -694,6 +694,9 @@ OPTIONS:
                          tagged      Means only basic types and types annoted with @typeinfo will have reflection values
   -test <arg>          Runs functions annotated with @test.  <arg> is a regex of which tests should be run
   -testFile            Runs functions annotated with @test in the supplied source file only
+  -pkg-install         Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.
+                       If successful, creates a build.json which is used for building this LitaC project.
+  -proxy               Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443
   -buildCmd            The underlying C compiler build and compile command.  Variables will
                        be substituted if found:
                           %output%         The executable name
@@ -719,4 +722,61 @@ Ex.
 
 ```
 LITAC_HOME=/home/tony/projects/litac
+```
+
+# LitaC Package Manager
+
+A LitaC `package` is a bundle of LitaC modules and any other dependencies (such as DLL's, static libraries or C header files).
+
+The `litac` executable contains a command (`-pkg-install`) for downloading third party packages.  As of right now, only packages hosted on `github.com` are supported.  Packages are defined and can be referenced by creating a `pkg.json` file in your project folder.
+
+Example project structure:
+
+```
+bin/
+lib/
+src/
+pkg.json
+```
+
+Here is an example `pkg.json` for using a third-party [test-pkg](https://github.com/tonysparks/test-pkg) package:
+
+```
+{
+    "repo" : "https://github.com/tonysparks",
+    "name" : "litac-lang",
+    "version" : "0.1.2-alpha",
+    "type": "executable",
+
+    // here is where you define any packages you want to be used
+    "dependencies": [
+        {
+            "repo" : "https://github.com/tonysparks",
+            "name" : "test-pkg",
+            "version" : "1.0",
+        }
+    ]
+}
+```
+
+If you execute the command `litac -pkg-install` this will download any defined packages in the `dependencies` section of your `pkg.json` and extract them to the `.pkgs/` directory.  It will also create a `.build.json` file which will be used by the `litac` compiler to resolve package module files.
+
+After executing `litac -pkg-install`:
+```
+.pkgs/
+bin/
+lib/
+src/
+pkg.json
+.build.json
+```
+
+From your code, you can just `import` the package modules as if they were local.
+
+```C
+import "test"  // the 'test' module is defined in the 'test-pkg:1.0' third-party package
+
+func doStuff() {
+    Test(4)  // call functions/types defined the 'test' module
+}
 ```

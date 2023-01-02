@@ -1,0 +1,242 @@
+/**
+    The LitaC Package Manager
+
+    This aims to be the simplest solution to address using third party packages.
+
+    Goals:
+    1) Make it 'easy' to use 3rd party authored packages within a LitaC project
+    2) Make it 'easy' to author a package
+    3) Make it as secure as possible knowing this system is about sharing code from
+       3rd parties
+
+
+    Approach:
+    * What is a Package?
+        A package is a set of litac modules (.lita source files) and associated files that form a logical
+        and physical grouping of code that can be re-used by other LitaC packages and
+        applications.
+
+        Example project folder structure
+
+        .packages/    // stores packages this project depends on
+        bin/          // stores the binary output of compilation
+        lib/          // stores static libraries
+        src/          // stores LitaC code
+        package.json  // defines this projects package and dependencies
+
+        A package is uniquely defined by these properties:
+            * Package Repo - the repository in which the package is hosted.  Example github.com/tonysparks/my-package
+            * Package Name - the name of the package
+            * Package Version - the version of the package
+
+    * Allow package authors to define their package and any packages they may depend on
+        This will just be a simply JSON file and no CLI for creating said JSON file will be
+        available.  These are programmers, they can edit/create it themselves.
+
+        Proposed format:
+
+        package.json
+        {
+            // We have two options here:
+            // 1) specify the repository in which this resides in
+            // 2) give it a group name (akin to Maven group/artifact)
+            // With #1, you are essentially hardcoding "where" to retrieve this
+            // package.  Although, we could proxy the repos
+            // With #2, it decouples the 'where' with the actual package itself.
+            // For simplicity, we'll go with #1 for now...
+            "repo": "github.com/tonysparks",
+            "name": "c2litac",
+            "version": "0.2.1",
+            "dependencies": [
+                {
+                    "repo": "github.com/tonysparks",
+                    "name": "example",
+                    "version": "0.1.9", // for now, always require a specific version
+                                        // I don't want to play the SemVer game and rely
+                                        // on developers adhering to it.  Sometimes nice,
+                                        // I'm not the biggest fan of allowing the 'latest'
+                                        // of a particular major.minor dependency.  I want
+                                        // to be specfic in the version I'm using.
+                }
+            ]
+        }
+    * Packages may be downloaded from an HTTPS endpoint (other protocols may be supported)
+        We'll need the package manager to be able to construct a valid URL to download the
+        specific version.
+
+        For instance, github is:
+            https://github.com/USERNAME/REPOSITORY/archive/TAGNAME.zip
+
+        We should (eventually) allow for a templated repository configuration to allow arbitrary
+        repositories.
+
+        Something like:
+
+        https://{PACKAGE_REPO}/{PACKAGE_NAME}/archive/{PACKAGE_VERSION}.zip
+
+        Downloading packages should be done as an opt-in CLI option, such as:
+
+        litac --pkg-sync
+
+        Which would download packages defined in the 'dependencies' section
+        into a .package hidden folder.
+
+
+    Considerations:
+    * Adding include (-I) and library paths (-L) for packages, this perhaps could be in the package.json??
+    * Adding static libraries (-l) -- ditto
+    * Specifying library type (static/dynamic) of Package
+*/
+import "std/http"
+import "std/mem"
+import "std/map"
+import "std/array"
+import "std/libc"
+import "std/io"
+import "std/system"
+import "std/string"
+import "std/assert"
+import "std/string_buffer"
+import "std/string_view"
+
+import "pkg_mgr/pkg"
+import "pkg_mgr/pkg_install"
+
+import "build"
+
+public struct PackageSyncOptions {
+    projectPath: *const char
+    pkgDir: *const char = ".pkgs"      // the .pkgs directory
+    fullSync: bool = false              // force a full download of all packages
+    httpOptions: HttpOptions            // http options
+}
+
+@asStr
+public enum InstallStatus {
+    OK = 0,
+    ERROR_CREATING_PKG_DIR,
+    ERROR_UNABLE_TO_OPEN_FILE,
+    ERROR_UNABLE_TO_OPEN_PKG_FILE,
+    ERROR_UNABLE_TO_EXTRACT_PKG_FILE,
+    ERROR_PARSING_PKG_JSON,
+    ERROR_READING_PKG_FILE,
+    ERROR_HTTP_STATUS,
+    ERROR_INVALID_DIRECTORY,
+    ERROR_INVALID_REPO,
+}
+
+public struct PackageManager {
+    options: PackageSyncOptions
+    allocator: *const Allocator
+
+    packages: Map<*const char, *PackageDef>
+    pkg: *PackageDef   // this projects package definition
+
+    errors: StringBuffer
+}
+
+public func (this: *PackageManager) init(
+    options: PackageSyncOptions,
+    allocator: *const Allocator = defaultAllocator) {
+
+    this.options = options
+    this.allocator = allocator
+    this.packages = StrMap<*PackageDef>(null, 32, allocator)
+    this.errors = StringBufferInit(128, allocator)
+}
+
+
+public func (this: *PackageManager) free() {
+    for(var it = this.packages.iter(); it.hasNext();) {
+        var n = it.next()
+        if(n.value) {
+            n.value.free()
+            this.allocator.free(n.value)
+        }
+    }
+
+    this.packages.free()
+    this.errors.free()
+    this.pkg = null
+}
+
+@doc("""
+    Installs all packages defined the pkg.json to the file system.
+""")
+public func (this: *PackageManager) install() : InstallStatus {
+    var temp:[MAX_PATH]char;
+
+    var pkgDef = StringInit(temp, MAX_PATH, 0)
+    pkgDef.format("%s/pkg.json", CurrentWorkingPath())
+
+    if(!FileExists(pkgDef.cStr())) {
+        this.errors.append("could not find '%s' to install dependencies!\n", pkgDef.cStr())
+        return InstallStatus.ERROR_UNABLE_TO_OPEN_FILE
+    }
+
+    if(ParsePackageFile(this, pkgDef.cStr(), &this.pkg) != InstallStatus.OK) {
+        this.errors.append("could not parse pkg.json\n")
+        return InstallStatus.ERROR_PARSING_PKG_JSON;
+    }
+
+    printf("Found '%s' with %d package dependencies.\n", pkgDef.cStr(), this.pkg.dependencies.size())
+
+    // TODO: Get the actual /src directory -- this can be taken off of
+    // LitaOptions..
+    var pkgPath = StringInit(this.pkg.path, MAX_PATH, 0)
+    pkgPath.format("%s/src", CurrentWorkingPath())
+
+    if(!this.pkg.dependencies.empty()) {
+        for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
+            printf("Installing '%s'\n", this.pkg.dependencies.get(i).id)
+        }
+    }
+
+    return PackageSync(this)
+}
+
+@doc("""
+    Updates the build.json file with any dependent package information.  This
+    should be called after a sync is made.
+""")
+public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : InstallStatus {
+    buildFile.init(this.allocator)
+
+    var temp:[MAX_PATH]char;
+    var len = this.options.projectPath != null ? strlen(this.options.projectPath) : 0;
+
+    for(var it = this.packages.iter(); it.hasNext();) {
+        var entry = it.next()
+
+        // TODO: Update all of the other's, include,library,staticLibs, etc.
+        var fullPkgPath = StringViewInit(entry.value.path)
+        if(fullPkgPath.startsWith(this.options.projectPath, len)) {
+            fullPkgPath = fullPkgPath.substring(.start = len, .end = -1)
+        }
+
+        buildFile.pkgPaths.add(StringClone(fullPkgPath.buffer, fullPkgPath.length, this.allocator))
+    }
+    return InstallStatus.OK
+}
+
+@test
+func testPackageManagerSync() {
+    var pm: PackageManager{}
+    pm.init(PackageSyncOptions{})
+    defer pm.free()
+
+    var status = pm.install()
+    assert(status == InstallStatus.OK)
+    // printf("Status: %s\n", InstallStatusAsStr(status))
+
+    var buildFile: BuildFile{}
+    defer buildFile.free()
+
+    status = pm.createBuildFile(&buildFile)
+    assert(status == InstallStatus.OK)
+
+    assert(buildFile.pkgPaths.size() == 2)
+    assert(strcmp(buildFile.pkgPaths.get(0), "C:/Users/antho/git/litac-lang/bin/output/src") == 0)
+    assert(strcmp(buildFile.pkgPaths.get(1), "C:/Users/antho/git/litac-lang/bin/output/.pkgs/test-pkg/1.0/test-pkg-1.0/src") == 0)
+
+}
