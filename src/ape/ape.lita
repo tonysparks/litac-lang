@@ -1,5 +1,5 @@
-@include("<ape.h>");
-@cFile("./ape.c");
+@cFile("ape.h");
+@cFile("ape.c");
 
 @foreign
 public struct ape {

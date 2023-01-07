@@ -1,0 +1,101 @@
+import "std/fs/tinydir"
+import "std/system" // TODO: move the FS stuff into here!!
+import "std/string"
+import "std/libc"
+
+public struct FileHandle {
+    dir: tinydir_dir
+    file: tinydir_file
+}
+
+public func (this: *FileHandle) openEx(path: *const char, len: i32) : bool {
+    if(len > MAX_PATH) {
+        return false;
+    }
+
+    var temp:[MAX_PATH]char;
+    var str = StringInit(temp, MAX_PATH, 0)
+    str.format("%.*s", len, path)
+    return this.open(str.cStr())
+}
+
+public func (this: *FileHandle) open(path: *const char) : bool {
+    if(tinydir_open(&this.dir, path) == -1) {
+        return false
+    }
+
+    /*
+    if(this.dir.has_next) {
+        if(tinydir_readfile(&this.dir, &this.file) == -1) {
+            return false
+        }
+    }
+    return true*/
+
+    return this.next()
+}
+
+
+public func (this: *FileHandle) isFile() : bool {
+    return this.file.is_reg
+}
+
+public func (this: *FileHandle) isDirectory() : bool {
+    return this.file.is_dir
+}
+
+public func (this: *FileHandle) name() : *const char {
+    return this.file.name
+}
+
+public func (this: *FileHandle) hasNext() : bool {
+    return this.dir.has_next
+}
+
+public func (this: *FileHandle) next() : bool {
+    while(this.dir.has_next) {
+        if(tinydir_next(&this.dir) == -1) {
+            printf("Error in next\n")
+            return false
+        }
+
+        if(tinydir_readfile(&this.dir, &this.file) == -1) {
+            printf("Error in read\n")
+            return false
+        }
+
+        if(strncmp(this.file.name, "..", MAX_PATH) == 0) {
+            continue;
+        }
+
+        // if(strncmp(this.file.name, ".", MAX_PATH) == 0) {
+        //     continue;
+        // }
+        break;
+    }
+    return true
+}
+
+public func (this: *FileHandle) close() : bool {
+    tinydir_close(&this.dir)
+    return true
+}
+
+
+
+@test
+func testFileHandle() {
+
+    var handle: FileHandle{}
+    handle.open("C:/Users/antho/git/litac-lang/bin")
+
+    while(handle.hasNext()) {
+        printf("%s", handle.name())
+
+        if(handle.isDirectory()) {
+            printf("/")
+        }
+        printf("\n")
+        handle.next()
+    }
+}

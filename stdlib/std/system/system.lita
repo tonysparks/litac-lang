@@ -167,7 +167,10 @@ public func OSFromStr(str: *const char, len: usize) : OS {
 const os: OS;
 
 @foreign
-struct FileStat;
+struct FileStat {
+    st_mode: i32;
+};
+
 
 #if OS == "WINDOWS"
     const OPEN_MODE = "rt";
@@ -224,6 +227,14 @@ public func CurrentWorkingPath() : *const char {
     return _CurrentWorkingPath()
 }
 
+public func FileTruncate(filename: *const char, newLength: usize) : bool {
+    return _FileTruncate(filename, newLength)
+}
+
+public func FileTruncateFile(file: *FILE, newLength: usize) : bool {
+    return _FileTruncateFile(file, newLength)
+}
+
 public func FileDelete(filename: *const char) : bool {
     return remove(filename) == 0
 }
@@ -233,8 +244,51 @@ public func FileExists(filename: *const char) : bool {
     return stat(filename, &s) == 0
 }
 
+public func FileMove(srcFilename: *const char, destFilename: *const char) : bool {
+    return rename(srcFilename, destFilename) == 0
+}
+
+public func FileIsDir(filename: *const char) : bool {
+    return _FileIsDir(filename)
+}
+
 public func Mkdir(dir: *const char) : bool {
     return _Mkdir(dir)
+}
+
+public func Mkdirs(dir: *const char) : bool {
+    var temp: [MAX_PATH]char;
+    var path = StringInit(temp, MAX_PATH, 0)
+
+    var workingPath = StringViewInit(dir)
+    var index = 0
+
+    // check Windows C:/ style path
+    if(workingPath.length > 2) {
+        if(workingPath.buffer[2] == ':') {
+            path.append("%.*s", 2, workingPath.buffer)
+            index = 3
+        }
+    }
+
+    while(index >= 0) {
+        index = workingPath.indexOfAt("/", 1, .fromIndex = index)
+        if(index > -1) {
+            path.format("%.*s", index, workingPath.buffer)
+            _Mkdir(path.cStr())
+            index += 1
+        }
+        else {
+            break
+        }
+    }
+
+    return _Mkdir(dir)
+}
+
+@test
+func testMkdirs() {
+    Mkdirs("C:/tony/this/test")
 }
 
 public func FilePath(filename: *const char, out:[MAX_PATH]char) : *char {
@@ -261,7 +315,7 @@ end:
     return out
 }
 
-public func FileParent(filename: *const char, out:[MAX_PATH]char) : *char {
+public func FileParent(filename: *const char, out:[MAX_PATH]char, length: *i32 = null) : *char {
     var index = 0
 
     if(!filename) {
@@ -285,6 +339,9 @@ public func FileParent(filename: *const char, out:[MAX_PATH]char) : *char {
     }
 
 end:
+    if(length) {
+        (*length) = index
+    }
     out[index] = '\0'
     return out
 }

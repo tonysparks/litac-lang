@@ -1,4 +1,4 @@
-@include("<libtcc.h>");
+@cFile("libtcc.h");
 
 @compiler_option(
     .os = "windows",

@@ -10,8 +10,10 @@ import "std/array"
 import "std/mem"
 import "std/string"
 import "std/string_buffer"
+import "std/string_view"
 import "std/zip"
 import "std/json"
+import "std/fs"
 
 import "std/atomic"
 /*
@@ -38,10 +40,10 @@ public func PackageSync(pm: *PackageManager) : InstallStatus {
         return InstallStatus.OK
     }
 
-    var pkgsToDownload = ArrayInit<PackageId>(numOfPkgs, pm.allocator)
-    defer pkgsToDownload.free()
+    var pkgsToInstall = ArrayInit<PackageId>(numOfPkgs, pm.allocator)
+    defer pkgsToInstall.free()
 
-    var findCode = findPackagesToDownload(pm, &pkgsToDownload)
+    var findCode = findPackagesToInstall(pm, &pkgsToInstall)
     if(findCode != InstallStatus.OK) {
         return findCode
     }
@@ -52,8 +54,8 @@ public func PackageSync(pm: *PackageManager) : InstallStatus {
 
     var pkgPath:[MAX_PATH]char;
 
-    for(var i = 0; i < pkgsToDownload.size(); i+=1) {
-        var pkgId = pkgsToDownload.get(i)
+    for(var i = 0; i < pkgsToInstall.size(); i+=1) {
+        var pkgId = pkgsToInstall.get(i)
 
         var status = makePackageDirectory(pm, pkgId, pkgPath)
         if(status != InstallStatus.OK) {
@@ -61,7 +63,8 @@ public func PackageSync(pm: *PackageManager) : InstallStatus {
         }
 
         if(!pm.options.fullSync && isPackageInstalled(pm, pkgId, pkgPath)) {
-            var status = readPackage(pm, pkgId, pkgPath, pkgsToDownload)
+            var pkg: *PackageDef = null
+            var status = readPackage(pm, pkgId, pkgPath, &pkg, pkgsToInstall)
             if(status != InstallStatus.OK) {
                 return status
             }
@@ -77,12 +80,18 @@ public func PackageSync(pm: *PackageManager) : InstallStatus {
         var pkgFile = StringInit(pkgPath, MAX_PATH)
         pkgFile.appendStr("/pkg.zip")
 
-        status = downloadPackage(pm, &http, pkgId, pkgFile.cStr())
+        if(pkgId.repo().startsWith("file://")) {
+            status = zipLocalPackage(pm, pkgId, pkgFile.cStr())
+        }
+        else {
+            status = downloadPackage(pm, &http, pkgId, pkgFile.cStr())
+        }
+
         if(status != InstallStatus.OK) {
             return status
         }
 
-        status = installPackage(pm, pkgId, pkgFile.cStr(), pkgsToDownload)
+        status = installPackage(pm, pkgId, pkgFile.cStr(), pkgsToInstall)
         if(status != InstallStatus.OK) {
             return status
         }
@@ -107,13 +116,13 @@ func cleanPackageDirectory(pm: *PackageManager, pkgPath: *const char) : InstallS
     return InstallStatus.OK
 }
 
-func findPackagesToDownload(pm: *PackageManager, pkgsToDownload: *Array<PackageId>) : InstallStatus {
+func findPackagesToInstall(pm: *PackageManager, pkgsToInstall: *Array<PackageId>) : InstallStatus {
     // TODO:
     // using the pkg.dependencies, scan the .pkg directory to ensure all packages
     // are download (we can do this by verifying the .litac_pkg file exists in the directory of the
     // package, we create this empty file to denote a package has been fully downloaded)
     if(pm.pkg) {
-        pkgsToDownload.addAll(pm.pkg.dependencies)
+        pkgsToInstall.addAll(pm.pkg.dependencies)
     }
     return InstallStatus.OK
 }
@@ -270,7 +279,7 @@ func installPackage(
     pm: *PackageManager,
     pkgId: *PackageId,
     pkgFile: *const char,
-    pkgsToDownload: *Array<PackageId>) : InstallStatus {
+    pkgsToInstall: *Array<PackageId>) : InstallStatus {
 
     var pkgPath:[MAX_PATH]char;
     FilePath(pkgFile, pkgPath)
@@ -287,15 +296,58 @@ func installPackage(
             return InstallStatus.ERROR_UNABLE_TO_OPEN_PKG_FILE
         }
 
-        if(zip.unzip(pkgPath) != ZipStatus.OK) {
+        var extractedFiles = ArrayInit<*const char>(64, pm.allocator)
+        defer {
+            for(var i = 0; i < extractedFiles.size(); i+=1) {
+                var file = extractedFiles.get(i)
+                pm.allocator.free(file as (*void))
+            }
+            extractedFiles.free()
+        }
+
+        if(zip.unzip(pkgPath, &extractedFiles) != ZipStatus.OK) {
+            return InstallStatus.ERROR_UNABLE_TO_EXTRACT_PKG_FILE
+        }
+
+        if(dealWithGithubBS(pkgPath, &extractedFiles) != InstallStatus.OK) {
             return InstallStatus.ERROR_UNABLE_TO_EXTRACT_PKG_FILE
         }
     }
 
-    var status = readPackage(pm, pkgId, pkgPath, pkgsToDownload)
+    var pkg: *PackageDef;
+    var status = readPackage(pm, pkgId, pkgPath, &pkg, pkgsToInstall)
     if(status != InstallStatus.OK) {
         return status
     }
+
+    // Move any dynamic libraries if necessary to this
+    // project bin directory
+    {
+        var temp1:[MAX_PATH]char;
+        var libPath = StringInit(temp1, MAX_PATH, 0)
+
+        var temp2:[MAX_PATH]char;
+        var destPath = StringInit(temp2, MAX_PATH, 0)
+
+        for(var i = 0; i < pkg.dynamicLibraries.size(); i+=1) {
+            var lib = pkg.dynamicLibraries.get(i)
+            libPath.format("%s/pkg/bin/%s", pkgPath, lib)
+
+            if(!FileExists(libPath.cStr())) {
+                // TODO: log warning..
+                printf("missing dynamic library: '%s'\n", libPath.cStr())
+                continue;
+            }
+
+            destPath.format("%s/bin/%s", pm.options.projectPath, lib)
+            if(!FileMove(libPath.cStr(), destPath.cStr())) {
+                // TODO: log warning??
+                printf("unable to move dynamic library '%s' to '%s'\n",
+                    libPath.cStr(), destPath.cStr())
+            }
+        }
+    }
+
 
     // if at this point, everything went ok, we can mark this
     // package as installed..
@@ -317,39 +369,33 @@ func readPackage(
     pm: *PackageManager,
     pkgId: *PackageId,
     pkgPath: *const char,
-    pkgsToDownload: *Array<PackageId>) : InstallStatus {
-
-    var temp:[MAX_PATH]char;
+    resultPkg: **PackageDef,
+    pkgsToInstall: *Array<PackageId>) : InstallStatus {
 
     var name = pkgId.name()
     var version = pkgId.version()
 
+    var temp:[MAX_PATH]char;
     var pkgDef = StringInit(temp, MAX_PATH, 0)
-    pkgDef.format("%s/%.*s-%.*s/pkg.json",
-        pkgPath,
-        name.length, name.buffer,
-        version.length, version.buffer)
+    pkgDef.format("%s/pkg/pkg.json", pkgPath)
 
     if(!FileExists(pkgDef.cStr())) {
         return InstallStatus.ERROR_UNABLE_TO_OPEN_PKG_FILE
     }
 
     // read the pkg.json and add the dependencies...
-    var pkg: *PackageDef;
-    if(ParsePackageFile(pm, pkgDef.cStr(), &pkg) != InstallStatus.OK) {
+
+    if(ParsePackageFile(pm, pkgDef.cStr(), resultPkg) != InstallStatus.OK) {
         return InstallStatus.ERROR_PARSING_PKG_JSON;
     }
 
+    var pkg: *PackageDef = (*resultPkg);
     var srcPath = StringInit(pkg.path, MAX_PATH, 0)
 
     // TODO: Do we want packages to allow to define an alternative
     // folder for src/bin/lib directories, or should this be
     // standard's by conventions...
-    srcPath.format("%s/%.*s-%.*s/src",
-        pkgPath,
-        name.length, name.buffer,
-        version.length, version.buffer)
-
+    srcPath.format("%s/pkg/src", pkgPath)
     srcPath.cStr()
 
     // Add this installed packages dependencies...
@@ -357,11 +403,89 @@ func readPackage(
         // TODO: Create a Set type in LitaC, for now
         // this will contain duplicates, which will be
         // caught in the "isPackageInstalled" function
-        pkgsToDownload.addAll(pkg.dependencies)
+        pkgsToInstall.addAll(pkg.dependencies)
     }
 
     return InstallStatus.OK
 }
+
+/**
+    Github is inconsistent in how it packages
+    releases in ther zip/gzip archives.  The containing
+    folder name is not consistent from what I can tell.  So
+    we need to do this BS --
+
+    This will just move the contents of the parent zip folder
+    to the supplied pkgPath.
+*/
+func dealWithGithubBS(
+    pkgPath: *const char,
+    extractedFiles: *Array<*const char>) : InstallStatus {
+
+    // nothing was extracted...
+    if(extractedFiles.size() < 1) {
+        return InstallStatus.OK
+    }
+
+
+    var temp1:[MAX_PATH]char;
+    var srcPath = StringInit(temp1, MAX_PATH, 0)
+
+    var temp2:[MAX_PATH]char;
+    var destPath = StringInit(temp2, MAX_PATH, 0)
+
+    var root = extractedFiles.get(0)
+    var rootLength = strlen(root)
+
+
+    srcPath.format("%s/%s", pkgPath, root)
+    destPath.format("%s/pkg", pkgPath)
+
+    // should only happen for local packages...
+    if(FileExists(destPath.cStr())) {
+        return InstallStatus.OK
+    }
+
+    if(!FileMove(srcPath.cStr(), destPath.cStr())) {
+        return InstallStatus.ERROR_UNABLE_TO_PROCESS_PKG_FILE
+    }
+
+    return InstallStatus.OK
+}
+
+/**
+    TODO:
+    This is pretty terrible, we shouldn't waste precious resources
+    zipping up a local directory just to move it to the .pkgs directory.
+
+    Clean this up!!!
+*/
+func zipLocalPackage(
+    pm: *PackageManager,
+    pkgId: *PackageId,
+    pkgFile: *const char) : InstallStatus {
+
+    var zip: ZipFile{}
+    defer zip.close()
+
+    if(zip.open(pkgFile, ZipOpen.WRITE, pm.allocator) != ZipStatus.OK) {
+        return InstallStatus.ERROR_OPENING_LOCAL_FILE_PKG
+    }
+
+    const len = 7 // "file://"
+    var basePath = pkgId.repo().substring(7)
+
+    if(zip.zipDir(basePath.buffer, basePath.length, "pkg") != ZipStatus.OK) {
+        return InstallStatus.ERROR_WRITING_LOCAL_FILE_PKG
+    }
+
+    if(zip.finalize() != ZipStatus.OK) {
+        return InstallStatus.ERROR_FINALIZING_LOCAL_FILE_PKG
+    }
+
+    return InstallStatus.OK
+}
+
 
 @test
 func testSanitizeFilename() {

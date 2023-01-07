@@ -21,6 +21,13 @@ import "std/string"
 import "std/string_view"
 import "std/system"
 
+@foreign
+func fileno(file: *FILE) : i32;
+
+@foreign
+func ftruncate(fd: i32, size: usize) : bool;
+
+
 @foreign("PATH_MAX")
 public const MAX_PATH: i32; /* NAME_MAX=255, PATH_MAX=4096 */
 
@@ -74,6 +81,33 @@ public func _Mkdir(dir: *const char) : bool {
         return FileExists(normalized.cStr())
     }
     return FileExists(dir)
+}
+
+@foreign("S_ISDIR")
+func S_ISDIR(mode: i32) : bool;
+
+public func _FileIsDir(filename: *const char) : bool {
+    var s: FileStat;
+    if (stat(filename, &s) != 0) {
+        return false
+    }
+    return S_ISDIR(s.st_mode)
+}
+
+@inline
+public func _FileTruncate(filename: *const char, newLength: usize) : bool {
+    var file = fopen(filename, "rw");
+    return _FileTruncateFile(file, newLength)
+}
+
+@inline
+public func _FileTruncateFile(file: *FILE, newLength: usize) : bool {
+    if(!file) {
+        return false;
+    }
+
+    var fd = fileno(file)
+    return ftruncate(fd, newLength);
 }
 
 @foreign

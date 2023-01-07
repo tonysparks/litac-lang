@@ -801,7 +801,12 @@ public func AstAddImport(lita: *Lita,
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var importStmt = module.ast.imports.get(i)
-        if(strncmp(importStmt.moduleId.filename, importModule.id.filename, MAX_PATH) == 0) {
+        if(!importStmt.moduleId) {
+            continue
+        }
+
+        if(strncmp(importStmt.moduleId.filename,
+                   importModule.id.filename, MAX_PATH) == 0) {
             if(importStmt.alias.token.type == TokenType.IDENTIFIER) {
                 return importStmt.alias.token.asString()
             }

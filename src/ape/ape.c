@@ -26,7 +26,7 @@ THE SOFTWARE.
 
 #define APE_AMALGAMATED
 
-#include "ape.h"
+// #include "ape.h"
 
 //-----------------------------------------------------------------------------
 // Headers
@@ -10621,7 +10621,7 @@ static bool try_overload_operator(vm_t *vm, object_t left, object_t right, opcod
 
 //FILE_END
 //FILE_START:ape.c
-#include "ape.h"
+//#include "ape.h"
 
 #include <stdlib.h>
 #include <string.h>

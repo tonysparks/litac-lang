@@ -1221,6 +1221,10 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             .options = StringView{},
         }
 
+        var temp:[MAX_PATH]char;
+        // this constant is strlen("{relativePath}")
+        const len = 14
+
         for(var i = 0; i < note.arguments.size(); i += 1) {
             var attr = note.arguments.get(i)
             if(!attr.argExpr) {
@@ -1228,6 +1232,22 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             }
 
             var value = attr.argExpr.operand.val.str
+
+            // determine if the compiler_option has a template
+            // substitution within it.  We have this to allow for
+            // include/library path's to be relative to where they
+            // are used -- either locally or referenced from the .pkgs
+            // directory.
+            {
+                var index = value.indexOf("{relativePath}", len)
+                if(index > -1 && note.startPos.filename != null) {
+                    var buffer = StringBufferInit(MAX_PATH, this.lita.allocator)
+                    buffer.append("%.*s", value.length, value.buffer)
+
+                    buffer.replace(index, index + len, FileParent(note.startPos.filename, temp))
+                    value = buffer.asStringView()
+                }
+            }
 
             if(attr.argName.token.type == TokenType.IDENTIFIER) {
                 if(attr.argName.str.equalsStr("os")) {

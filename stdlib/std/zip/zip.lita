@@ -6,6 +6,9 @@ import "std/io"
 import "std/system"
 import "std/string"
 import "std/array"
+import "std/string_view"
+import "std/fs"
+
 
 @doc("""
     Open for either writing or reading
@@ -25,10 +28,15 @@ public enum ZipStatus {
     ERROR_UNABLE_TO_STAT,
     ERROR_UNABLE_CREATE_DIR,
     ERROR_UNABLE_WRITE_FILE,
+    ERROR_ADDING_FILE,
+    ERROR_CLOSING,
+    ERROR_FINALIZING,
 }
 
 public struct ZipFile {
     archive: mz_zip_archive
+    type: ZipOpen
+    allocator: *const Allocator
 }
 
 /*
@@ -45,13 +53,13 @@ func ZipFileAlloc(opaque: *void, items: usize, size: usize) : *void {
     return allocator.alloc(items * size)
 }
 
-func ZipFileReAlloc(opaque: *void, address: *void, items: usize, size: usize) : *void {
+func ZipFileReAlloc(opaque: *void, address: *void, old_items: usize, old_size: usize, items: usize, size: usize) : *void {
     var allocator = opaque as (*const Allocator);
     if(!allocator) {
         return null
     }
 
-    return allocator.realloc(address, 0, items * size)
+    return allocator.realloc(address, old_items * old_size, items * size)
 }
 
 func ZipFileFree(opaque: *void, address: *void) {
@@ -68,7 +76,10 @@ public func (this: *ZipFile) open(
     type: ZipOpen,
     allocator: *const Allocator = defaultAllocator) : ZipStatus {
 
-    memset(&this.archive, 0, sizeof(this.archive));
+    memset(&this.archive, 0, sizeof(:mz_zip_archive));
+
+    this.type = type
+    this.allocator = allocator
 
     this.archive.m_pAlloc = ZipFileAlloc;
     this.archive.m_pFree = ZipFileFree;
@@ -82,20 +93,135 @@ public func (this: *ZipFile) open(
         }
     }
     else {
-        // TODO: Implement Write support
-        assert(false)
+        var status = mz_zip_writer_init_file(&this.archive, filename, 0)
+        if(!status) {
+            return ZipStatus.ERROR_UNABLE_TO_OPEN_FILE
+        }
     }
 
     return ZipStatus.OK
 }
 
-public func (this: *ZipFile) close() {
-    mz_zip_reader_end(&this.archive);
+public func (this: *ZipFile) close() : ZipStatus {
+    if(this.type == ZipOpen.WRITE) {
+        if(!mz_zip_writer_end(&this.archive)) {
+            return ZipStatus.ERROR_CLOSING
+        }
+        return ZipStatus.OK
+    }
+
+    if(!mz_zip_end(&this.archive)) {
+        return ZipStatus.ERROR_CLOSING
+    }
+    return ZipStatus.OK
+}
+
+public func (this: *ZipFile) finalize() : ZipStatus {
+    if(!mz_zip_writer_finalize_archive(&this.archive)) {
+        return ZipStatus.ERROR_FINALIZING
+    }
+    /*
+    if(this.archive.m_pState && this.archive.m_pState.m_pFile) {
+        if(!FileTruncateFile(this.archive.m_pState.m_pFile, this.archive.m_archive_size)) {
+            // return ZipStatus.ERROR_FINALIZING
+        }
+    }*/
+    return ZipStatus.OK
+}
+
+public func (this: *ZipFile) isValid() : bool {
+    return mz_zip_validate_archive(&this.archive, 0)
+}
+
+public func (this: *ZipFile) getLastError() : *const char {
+    return mz_zip_get_error_string(this.archive.m_last_error)
+}
+
+public func (this: *ZipFile) zipDir(
+    pathToZip: *const char,
+    len: i32,
+    baseName: *const char) : ZipStatus {
+
+    var basePath = StringViewInit(pathToZip, len)
+
+    var tempArch:[MAX_PATH]char;
+    var tempPath:[MAX_PATH]char;
+
+    var archiveName = StringInit(tempArch, MAX_PATH, 0)
+    var path = StringInit(tempPath, MAX_PATH, 0)
+    path.format("%.*s", basePath.length, basePath.buffer)
+
+    return this.zipFolder(baseName, &basePath, &archiveName, &path)
+}
+
+func (this: *ZipFile) zipFolder(
+    baseName: *const char,
+    basePath: *StringView,
+    archiveName: *String,
+    path: *String) : ZipStatus {
+
+    var handle: FileHandle{}
+    if(!handle.openEx(path.buffer, path.length)) {
+        return ZipStatus.ERROR_UNABLE_TO_OPEN_FILE
+    }
+    defer handle.close()
+
+    while(handle.hasNext()) {
+        if(handle.isDirectory()) {
+            var len = path.length
+            path.append("/%s", handle.name())
+
+            var status = this.zipFolder(baseName, basePath, archiveName, path)
+            path.length = len
+
+            if(status != ZipStatus.OK) {
+                return status
+            }
+        }
+        else {
+            archiveName.format("%s%.*s/%s",
+                baseName,
+                path.length - basePath.length,
+                path.buffer + basePath.length,
+                handle.name())
+
+            var len = path.length
+            path.append("/%s", handle.name())
+
+            if(this.addFile(archiveName.cStr(), path.cStr()) != ZipStatus.OK) {
+                return ZipStatus.ERROR_ADDING_FILE
+            }
+            path.length = len
+        }
+        handle.next()
+    }
+
+    return ZipStatus.OK
+}
+
+
+// TODO: Expose compression levels
+public func (this: *ZipFile) addFile(
+    archiveName: *const char,
+    filename: *const char) : ZipStatus {
+
+    if(!mz_zip_writer_add_file(
+            &this.archive,
+            archiveName,
+            filename,
+            "",
+            0_u16)) {
+        return ZipStatus.ERROR_ADDING_FILE
+    }
+
+    return ZipStatus.OK
 }
 
 @doc("""
     dest - the destination folder to write the zipped files to
-    extractedFiles - optional parameter to store the unzipped file names
+    extractedFiles - optional parameter to store the unzipped file names, if this is supplied
+        than a copy of the string is stored in this Array.  It is up to the caller of this function
+        to manage the memory.  The allocation uses the allocator used in ZipFile.open.
     flags - optional parameter, @see ZipFlags
 """)
 public func (this: *ZipFile) unzip(
@@ -116,6 +242,7 @@ public func (this: *ZipFile) unzip(
     }
 
     var temp:[MAX_PATH]char;
+    var temp2:[MAX_PATH]char;
     var path = StringInit(temp, MAX_PATH, 0)
 
     var baseLen = strlen(fileStat.m_filename);
@@ -128,10 +255,11 @@ public func (this: *ZipFile) unzip(
             continue
         }
 
-        var filename = StringInit(fileStat.m_filename + baseLen, MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE - baseLen, 0)
+        var filename = StringInit(fileStat.m_filename + baseLen, MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE - baseLen, -1)
         path.format("%s/%.*s", dest, filename.length, filename.buffer)
-
         var cPath = path.cStr()
+
+        Mkdirs(FileParent(cPath, temp2))
 
         if(mz_zip_reader_is_file_a_directory(&this.archive, i)) {
             Mkdir(cPath)
@@ -144,13 +272,14 @@ public func (this: *ZipFile) unzip(
         }
 
         if(extractedFiles) {
-            extractedFiles.add(cPath)
+            extractedFiles.add(StringClone(filename.buffer, filename.length, this.allocator))
         }
     }
 
     return ZipStatus.OK
 }
 
+/*
 @test
 func testUnzip() {
     var zip: ZipFile{}
@@ -158,4 +287,34 @@ func testUnzip() {
 
     assert(zip.open("C:/Users/antho/Downloads/seventh-0.4.1-beta.zip", ZipOpen.READ) == ZipStatus.OK)
     assert(zip.unzip("C:/Users/antho/Desktop/temp") == ZipStatus.OK)
+}*/
+
+
+import "std/mem/linear_allocator"
+@test
+func testZipDir() {
+    var zip: ZipFile{}
+    defer zip.close()
+
+    const size = 128*MiB
+    var mem = defaultAllocator.alloc(size)
+    var alloc = LinearAllocator{}
+    alloc.init(mem, size)
+
+    assert(zip.open("test.zip", ZipOpen.WRITE, alloc.allocator) == ZipStatus.OK)
+    assert(zip.zipDir("C:/Users/antho/git/c2litac", strlen("C:/Users/antho/git/c2litac"), "pkg") == ZipStatus.OK)
+    assert(zip.finalize() == ZipStatus.OK)
 }
+
+/*
+@test
+func testZipDir() {
+    var zip: ZipFile{}
+    defer zip.close()
+
+    assert(zip.open("test.zip", ZipOpen.WRITE) == ZipStatus.OK)
+    assert(zip.addFile("pkg/pkg.json", "C:/Users/antho/git/c2litacx/pkg.json") == ZipStatus.OK)
+    assert(zip.addFile("pkg/src/test.txt", "C:/Users/antho/git/c2litacx/src/test.txt") == ZipStatus.OK)
+    //assert(zip.zipDir("C:/Users/antho/git/c2litacx", strlen("C:/Users/antho/git/c2litacx")) == ZipStatus.OK)
+    assert(zip.finalize() == ZipStatus.OK)
+}*/

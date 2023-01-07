@@ -31,11 +31,17 @@ public struct PackageDef {
     path: [MAX_PATH]char
 
     type: PackageType
+    dynamicLibraries: Array<*const char>
     dependencies: Array<PackageId>
 }
 
 public func (this: *PackageDef) free() {
     this.dependencies.free()
+    for(var i = 0; i < this.dynamicLibraries.size(); i+=1) {
+        var lib = this.dynamicLibraries.get(i)
+        this.dynamicLibraries.alloc.free(lib as (*void))
+    }
+    this.dynamicLibraries.free()
 }
 
 public struct PackageId {
@@ -140,7 +146,10 @@ public func ParsePackage(
     }
 
     var pkg = new<PackageDef>(pm.allocator)
+    memset(pkg, 0, sizeof(:PackageDef))
+
     pkg.id = pkgId
+
 
     pm.packages.put(pkgId.id, pkg)
 
@@ -160,6 +169,20 @@ public func ParsePackage(
             var code = ParsePackageId(depNode, pkgId, pm.allocator)
             if(code != InstallStatus.OK) {
                 return code
+            }
+        }
+    }
+
+    var dyLibs = json.getArray("dynamic_libraries")
+    if(dyLibs && dyLibs.size() > 0) {
+        pkg.dynamicLibraries.init(dyLibs.size(), pm.allocator)
+
+        for(var i = 0; i < dyLibs.size(); i+=1) {
+            var dyLibNode = dyLibs.at(i)
+            if(dyLibNode && dyLibNode.isString()) {
+                var path = StringBufferInit(MAX_PATH, pm.allocator)
+                path.append("%s", dyLibNode.asString())
+                pkg.dynamicLibraries.add(path.cStr())
             }
         }
     }
@@ -222,6 +245,10 @@ func testParsePackage() {
         "version" : "0.1.2-alpha",
         "type": "executable",
         "dependencies": [
+        ],
+        "dynamic_libraries": [
+            "a",
+            "b"
         ]
     }
     """;
@@ -261,6 +288,10 @@ func testParsePackage() {
     assert(repo.equals("https://github.com/tonysparks"))
     assert(name.equals("litac-lang"))
     assert(version.equals("0.1.2-alpha"))
+    assert(pkg.dependencies.size() == 0)
+    assert(pkg.dynamicLibraries.size() == 2)
+    assert(strcmp(pkg.dynamicLibraries.get(0), "a") == 0)
+    assert(strcmp(pkg.dynamicLibraries.get(1), "b") == 0)
 }
 
 

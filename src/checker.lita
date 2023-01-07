@@ -1046,13 +1046,14 @@ func (this: *TypeChecker) resolveNoteTypeSpec(spec: *NameTypeSpec) : *TypeInfo {
         return spec.typeInfo
     }
 
+    // TODO: This creates conflicts if notes name collide with functions
     var sym = this.getType(spec, false)
     if(!sym || !sym.type) {
         this.result.addError(spec.pos, "unknown note type '%.*s'", spec.name.length, spec.name.buffer)
         goto err;
     }
 
-/* TODO: Silence until bootstrap is completed */
+    /* TODO: Silence until bootstrap is completed */
     if(!(sym.flags & SymbolFlags.IS_NOTE)) {
         this.result.addError(spec.pos, "'%.*s' is not a note type", spec.name.length, spec.name.buffer)
         goto err;

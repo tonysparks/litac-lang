@@ -14,10 +14,20 @@
         "./include"
     ],
     "dependencies": [
-        {
+        /*{
             "repo" : "https://github.com/tonysparks",
             "name" : "test-pkg",
             "version" : "1.0"
-        }
+        },
+        {
+            "repo" : "https://github.com/tonysparks",
+            "name" : "raylib-litac",
+            "version" : "v1.0"
+        },
+        {
+            "repo" : "file://C:/Users/antho/git/c2litac",
+            "name" : "c2litac",
+            "version" : "0.1.2-alpha"
+        }*/
     ]
 }

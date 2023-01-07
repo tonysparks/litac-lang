@@ -174,9 +174,9 @@ MINIZ_EXPORT void miniz_def_free_func(void *opaque, void *address)
     (void)opaque, (void)address;
     MZ_FREE(address);
 }
-MINIZ_EXPORT void *miniz_def_realloc_func(void *opaque, void *address, size_t items, size_t size)
+MINIZ_EXPORT void *miniz_def_realloc_func(void *opaque, void *address, size_t old_items, size_t old_size, size_t items, size_t size)
 {
-    (void)opaque, (void)address, (void)items, (void)size;
+    (void)opaque, (void)address,  (void)old_items, (void)old_size, (void)items, (void)size;
     return MZ_REALLOC(address, items * size);
 }
 
@@ -3366,7 +3366,7 @@ static mz_bool mz_zip_array_ensure_capacity(mz_zip_archive *pZip, mz_zip_array *
         while (new_capacity < min_new_capacity)
             new_capacity *= 2;
     }
-    if (NULL == (pNew_p = pZip->m_pRealloc(pZip->m_pAlloc_opaque, pArray->m_p, pArray->m_element_size, new_capacity)))
+    if (NULL == (pNew_p = pZip->m_pRealloc(pZip->m_pAlloc_opaque, pArray->m_p, pArray->m_element_size, pArray->m_capacity, pArray->m_element_size, new_capacity)))
         return MZ_FALSE;
     pArray->m_p = pNew_p;
     pArray->m_capacity = new_capacity;
@@ -5686,7 +5686,7 @@ static size_t mz_zip_heap_write_func(void *pOpaque, mz_uint64 file_ofs, const vo
         while (new_capacity < new_size)
             new_capacity *= 2;
 
-        if (NULL == (pNew_block = pZip->m_pRealloc(pZip->m_pAlloc_opaque, pState->m_pMem, 1, new_capacity)))
+        if (NULL == (pNew_block = pZip->m_pRealloc(pZip->m_pAlloc_opaque, pState->m_pMem, 1, pState->m_mem_capacity, 1, new_capacity)))
         {
             mz_zip_set_error(pZip, MZ_ZIP_ALLOC_FAILED);
             return 0;
@@ -5750,20 +5750,41 @@ mz_bool mz_zip_writer_init_v2(mz_zip_archive *pZip, mz_uint64 existing_size, mz_
 {
     mz_bool zip64 = (flags & MZ_ZIP_FLAG_WRITE_ZIP64) != 0;
 
-    if ((!pZip) || (pZip->m_pState) || (!pZip->m_pWrite) || (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID))
+    if (!pZip) {
+        printf("No zip\n");
+    }
+
+    if (pZip->m_pState) {
+        printf("State Prsent\n");
+    }
+
+    if(!pZip->m_pWrite) {
+        printf("No Write\n");
+    }
+    if (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID) {
+        printf("Invalid Mode\n");
+    }
+
+    if ((!pZip) || (pZip->m_pState) || (!pZip->m_pWrite) || (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID)) {
+        printf("State\n");
         return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
+    }
 
     if (flags & MZ_ZIP_FLAG_WRITE_ALLOW_READING)
     {
-        if (!pZip->m_pRead)
+        if (!pZip->m_pRead) {
+            printf("READ\n");
             return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
+        }
     }
 
     if (pZip->m_file_offset_alignment)
     {
         /* Ensure user specified file offset alignment is a power of 2. */
-        if (pZip->m_file_offset_alignment & (pZip->m_file_offset_alignment - 1))
+        if (pZip->m_file_offset_alignment & (pZip->m_file_offset_alignment - 1)) {
+            printf("Alignment\n");
             return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
+        }
     }
 
     if (!pZip->m_pAlloc)
