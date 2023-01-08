@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -lm -lrt -lpthread -ldl"
+BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -lm -lrt -lpthread %options% -ldl"
 #set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
 
 
@@ -26,7 +26,7 @@ run_tests() {
     echo "Compiling litaC tests..."
 
     cd ./bin
-    ./litac_linux -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
+    ./litac_linux -verbose -strict -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
     result=$?
     if [ $result -gt 0 ]; then
         error_compiling

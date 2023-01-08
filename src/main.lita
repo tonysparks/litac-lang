@@ -161,8 +161,8 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
     parser.addOption("pkg-install",    '\0', "Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.\nIf successful, creates a build.json which is used for building this LitaC project.", 0, null);
     parser.addOption("proxy",          '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("buildCmd",       'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\nThis will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("strictBuildCmd", 'b', "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\nAny @compiler_option flags\nUnlike buildCmd, this will not append or modify the supplied argument.", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null);
+    parser.addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null);
     parser.addOption("tcc",            '\0', "Use tcc to compile.  This ignores buildCmd/strictBuildCmd", 0, null);
     parser.addOption("maxMemory",      '\0', "The max amount of memory allowed for allocation. NOTE: This is a temporary option", OptionFlag.HAS_ARGUMENT, null);
 
@@ -217,6 +217,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     options.disableLineSync = parser.hasOption("disableLine")
     options.isVerbose = parser.hasOption("verbose")
     options.isTcc = parser.hasOption("tcc")
+    options.isStrict = parser.hasOption("strict")
 
     if(parser.hasOption("maxMemory")) {
         var memoryStr = parser.getOption("maxMemory").value
@@ -300,7 +301,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
         var path = StringViewInit(options.inputFile, MAX_PATH)
         var index = path.lastIndexOfAt("/src/", .len = 5)
         if(index > -1) {
-            StringCopy(.src = options.inputFile, .dest = options.srcPath, .size = index + 4)
+            StringCopy(.src = options.inputFile, .dest = options.srcPath, .size = index + 5)
         }
         else {
             FileParent(options.inputFile, options.srcPath)
