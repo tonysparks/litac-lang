@@ -3,21 +3,28 @@
     "name" : "litac-lang",
     "version" : "0.1.2-alpha",
     "type": "executable",
-    "static_libraries": [
-        "libtcc",
-        "libcurl.dll"
+
+    "dynamic_libraries": [
+        "libcrypto-1_1-x64.dll",
+        "libcurl-x64.dll",
+        "libssl-1_1-x64.dll",
     ],
-    "library_directories": [
-        "./lib"
-    ],
-    "include_directories": [
-        "./include"
-    ],
+
     "dependencies": [
-        {
-            "repo" : "https://github.com/tonysparks",
-            "name" : "test-pkg",
-            "version" : "1.0"
-        }
-    ]
+    ],
+
+    "commands": {
+        "windows": {
+            "build": "build.bat",
+            "test": "build_test.bat",
+            "bootstrap": "build_bootstrap.bat",
+            "full": "build_bootstrap_full.bat"
+        },
+        "linux": {
+            "build": "build.sh",
+            "test": "build_test.sh",
+            "bootstrap": "build_bootstrap.sh",
+            "full": "build_bootstrap_full.sh"
+        },
+    }
 }

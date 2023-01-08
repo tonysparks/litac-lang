@@ -133,10 +133,14 @@ public func (s: *Scope) lookupFunc(name: InternedString) : *Symbol {
     return s.parent.lookupFunc(name)
 }
 
-public func (s: *Scope) lookup(name: InternedString) : *Symbol {
-    var sym = s.symbolFuncs.get(name)
-    if(sym) {
-        return sym
+public func (s: *Scope) lookup(name: InternedString, includeFuncs: bool = true) : *Symbol {
+    var sym: *Symbol = null;
+
+    if(includeFuncs) {
+        sym = s.symbolFuncs.get(name)
+        if(sym) {
+            return sym
+        }
     }
 
     sym = s.symbolTypes.get(name)
@@ -148,7 +152,7 @@ public func (s: *Scope) lookup(name: InternedString) : *Symbol {
         return null
     }
 
-    return s.parent.lookup(name)
+    return s.parent.lookup(name, includeFuncs)
 }
 
 /*

@@ -31,11 +31,22 @@ public struct PackageDef {
     path: [MAX_PATH]char
 
     type: PackageType
+    dynamicLibraries: Array<*const char>
     dependencies: Array<PackageId>
+
+    // The json representation
+    // of this package.
+    json: *JsonNode
 }
 
 public func (this: *PackageDef) free() {
     this.dependencies.free()
+    for(var i = 0; i < this.dynamicLibraries.size(); i+=1) {
+        var lib = this.dynamicLibraries.get(i)
+        this.dynamicLibraries.alloc.free(lib as (*void))
+    }
+    this.dynamicLibraries.free()
+    this.json.free()
 }
 
 public struct PackageId {
@@ -93,7 +104,7 @@ invalid:
 public func ParsePackageFile(
         pm: *PackageManager,
         pkgFile: *const char,
-        result: **PackageDef) : InstallStatus {
+        result: **PackageDef) : PkgStatus {
 
     var parser = JsonParser{}
     parser.init(pm.allocator)
@@ -105,42 +116,58 @@ public func ParsePackageFile(
     defer pm.allocator.free(data)
 
     if(ReadFile(pkgFile, &data, &length, pm.allocator) != FileStatus.Ok) {
-        return InstallStatus.ERROR_READING_PKG_FILE
+        return PkgStatus.ERROR_READING_PKG_FILE
     }
 
     var node = parser.parseJson(data)
-    defer if(node) node.free()
+    // We actually keep a reference of the json node on the PackageDef,
+    // for easy data retrieval
+    // defer if(node) node.free();
 
     if(parser.hasError()) {
-        return InstallStatus.ERROR_PARSING_PKG_JSON;
+        if(node) {
+            node.free();
+        }
+
+        return PkgStatus.ERROR_PARSING_PKG_JSON;
     }
 
-    return ParsePackage(pm, node, result)
+    var status = ParsePackage(pm, node, result)
+    if(status != PkgStatus.OK) {
+        if(node) {
+            node.free();
+        }
+    }
+
+    return status
 }
 
 public func ParsePackage(
         pm: *PackageManager,
         json: *JsonNode,
-        result: **PackageDef) : InstallStatus {
+        result: **PackageDef) : PkgStatus {
 
     if(!json) {
-        return InstallStatus.ERROR_READING_PKG_FILE
+        return PkgStatus.ERROR_READING_PKG_FILE
     }
 
     var pkgId = PackageId{};
     var code = ParsePackageId(json, &pkgId, pm.allocator)
-    if(code != InstallStatus.OK) {
+    if(code != PkgStatus.OK) {
         return code
     }
 
     // if this is already in the registry, no need to further process
     if(pm.packages.contains(pkgId.id)) {
         *result = pm.packages.get(pkgId.id)
-        return InstallStatus.OK
+        return PkgStatus.OK
     }
 
     var pkg = new<PackageDef>(pm.allocator)
+    memset(pkg, 0, sizeof(:PackageDef))
+
     pkg.id = pkgId
+    pkg.json = json
 
     pm.packages.put(pkgId.id, pkg)
 
@@ -158,35 +185,49 @@ public func ParsePackage(
             var pkgId = pkg.dependencies.getPtr(i)
 
             var code = ParsePackageId(depNode, pkgId, pm.allocator)
-            if(code != InstallStatus.OK) {
+            if(code != PkgStatus.OK) {
                 return code
+            }
+        }
+    }
+
+    var dyLibs = json.getArray("dynamic_libraries")
+    if(dyLibs && dyLibs.size() > 0) {
+        pkg.dynamicLibraries.init(dyLibs.size(), pm.allocator)
+
+        for(var i = 0; i < dyLibs.size(); i+=1) {
+            var dyLibNode = dyLibs.at(i)
+            if(dyLibNode && dyLibNode.isString()) {
+                var path = StringBufferInit(MAX_PATH, pm.allocator)
+                path.append("%s", dyLibNode.asString())
+                pkg.dynamicLibraries.add(path.cStr())
             }
         }
     }
 
     (*result) = pkg
 
-    return InstallStatus.OK
+    return PkgStatus.OK
 }
 
 
 public func ParsePackageId(
         json: *JsonNode,
         pkgId: *PackageId,
-        allocator: *const Allocator = defaultAllocator) : InstallStatus {
+        allocator: *const Allocator = defaultAllocator) : PkgStatus {
 
     if(!json) {
-        return InstallStatus.ERROR_PARSING_PKG_JSON
+        return PkgStatus.ERROR_PARSING_PKG_JSON
     }
 
     var repo = json.getStr("repo")
-    if(!repo) return InstallStatus.ERROR_PARSING_PKG_JSON
+    if(!repo) return PkgStatus.ERROR_PARSING_PKG_JSON
 
     var name = json.getStr("name")
-    if(!name) return InstallStatus.ERROR_PARSING_PKG_JSON
+    if(!name) return PkgStatus.ERROR_PARSING_PKG_JSON
 
     var version = json.getStr("version")
-    if(!version) return InstallStatus.ERROR_PARSING_PKG_JSON
+    if(!version) return PkgStatus.ERROR_PARSING_PKG_JSON
 
     var repoLen = strlen(repo)
     var nameLen = strlen(name)
@@ -200,7 +241,7 @@ public func ParsePackageId(
     var id = sb.cStr();
     PackageIdFromString(sb.cStr(), pkgId)
 
-    return InstallStatus.OK
+    return PkgStatus.OK
 }
 
 
@@ -222,6 +263,10 @@ func testParsePackage() {
         "version" : "0.1.2-alpha",
         "type": "executable",
         "dependencies": [
+        ],
+        "dynamic_libraries": [
+            "a",
+            "b"
         ]
     }
     """;
@@ -241,7 +286,7 @@ func testParsePackage() {
     defer pm.free()
 
     var pkg: *PackageDef;
-    if(ParsePackage(&pm, node, &pkg) != InstallStatus.OK) {
+    if(ParsePackage(&pm, node, &pkg) != PkgStatus.OK) {
         printf("Error parsing Package\n")
         return;
     }
@@ -261,6 +306,10 @@ func testParsePackage() {
     assert(repo.equals("https://github.com/tonysparks"))
     assert(name.equals("litac-lang"))
     assert(version.equals("0.1.2-alpha"))
+    assert(pkg.dependencies.size() == 0)
+    assert(pkg.dynamicLibraries.size() == 2)
+    assert(strcmp(pkg.dynamicLibraries.get(0), "a") == 0)
+    assert(strcmp(pkg.dynamicLibraries.get(1), "b") == 0)
 }
 
 

@@ -1,0 +1,25 @@
+@cFile("tinydir.h");
+
+@foreign
+public struct tinydir_dir {
+    has_next: bool
+}
+
+@foreign
+public struct tinydir_file {
+    is_dir: bool
+    is_reg: bool
+    name: *const char
+}
+
+@foreign
+public func tinydir_open(dir: *tinydir_dir, path: *const char) : i32;
+
+@foreign
+public func tinydir_readfile(dir: *tinydir_dir, file: *tinydir_file) : i32;
+
+@foreign
+public func tinydir_next(dir: *tinydir_dir) : i32;
+
+@foreign
+public func tinydir_close(dir: *tinydir_dir) : i32;

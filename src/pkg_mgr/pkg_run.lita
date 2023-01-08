@@ -1,0 +1,56 @@
+import "pkg_mgr"
+import "std/system"
+import "std/string"
+import "std/string_buffer"
+import "std/array"
+import "std/json"
+import "std/libc"
+
+public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
+    if(!pm.pkg) {
+        return PkgStatus.OK
+    }
+
+    if(!pm.pkg.json) {
+        return PkgStatus.OK
+    }
+
+    var commands = pm.pkg.json.get("commands")
+    if(!commands) {
+        return PkgStatus.ERROR_COMMAND_NOT_DEFINED
+    }
+
+    const BUFFER_SIZE = 64
+    var buffer = [BUFFER_SIZE]char{0};
+    var bufferStr = StringInit(buffer, BUFFER_SIZE, 0)
+    bufferStr.format("%s", OSAsStr(GetOS()))
+    bufferStr.toLower()
+
+    var cmdScript: *const char = null
+
+    if(commands.contains(cmd)) {
+        cmdScript = commands.getStr(cmd)
+    }
+
+    var osCommands = commands.get(bufferStr.cStr())
+    if(osCommands && osCommands.contains(cmd)) {
+        cmdScript = osCommands.getStr(cmd)
+    }
+
+    if(!cmdScript) {
+        return PkgStatus.ERROR_COMMAND_NOT_DEFINED
+    }
+
+    var process = SystemExec(cmdScript)
+    if(!process.pipe) {
+        return PkgStatus.ERROR_RUNNING_COMMAND
+    }
+    defer process.close()
+
+    var bytesRead = -1_i64
+    while((bytesRead = process.readOutput(buffer, BUFFER_SIZE)) > 0) {
+        printf("%.*s", bytesRead as (i32), buffer)
+    }
+
+    return PkgStatus.OK
+}

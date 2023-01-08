@@ -365,7 +365,24 @@ public func (d: *DebugAllocator) report() {
 public func (d: *DebugAllocator) malloc(size: usize,
                                         file: *const char,
                                         line: u64) : *void {
-    var mem = d.decorated.alloc(size)
+
+    var allocationSize = sizeof(:Allocation) + size;
+    var mem = d.decorated.alloc(allocationSize);
+    if(!mem) {
+        return null;
+    }
+
+    var allocation = mem as (*Allocation)
+    allocation.addr = mem + sizeof(:Allocation)
+    allocation.size = size
+    allocation.line = line
+    c::strncpy(allocation.filename, file, MAX_PATH)
+
+    d.allocations.add(allocation)
+    d.totalBytesAllocated += size
+    d.totalAllocations += 1
+
+    /*var mem = d.decorated.alloc(size)
     if(mem) {
         var allocation = new<Allocation>(d.decorated);
         allocation.addr = mem
@@ -376,9 +393,9 @@ public func (d: *DebugAllocator) malloc(size: usize,
         d.allocations.add(allocation)
         d.totalBytesAllocated += size
         d.totalAllocations += 1
-    }
+    }*/
 
-    return mem;
+    return allocation.addr;
 }
 
 #if (DEBUG)
@@ -418,7 +435,9 @@ public func (d: *DebugAllocator) malloc(size: usize,
 
         var result = debug.malloc(size, file, line);
         if(result) {
-            var len = c::MIN(oldSize, size)
+            var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+            var len = c::MIN(allocation.size, size)
+
             c::memcpy(result, ptr, len)
 
             DebugFree(alloc, ptr)
@@ -453,7 +472,9 @@ public func (d: *DebugAllocator) malloc(size: usize,
 
         var result = debug.malloc(size, "", 0);
         if(result) {
-            var len = c::MIN(oldSize, size)
+            var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+            var len = c::MIN(allocation.size, size)
+
             c::memcpy(result, ptr, len)
 
             DebugFree(alloc, ptr)
@@ -470,6 +491,8 @@ func DebugFree(alloc: *const Allocator, ptr: *void) {
     }
 
     var debug = alloc as (*DebugAllocator);
+    var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+
     var addr = ptr;
 
     var found = false
@@ -489,9 +512,9 @@ func DebugFree(alloc: *const Allocator, ptr: *void) {
 
     if(!found) {
         c::printf("Allocation not found: %p\n", ptr)
+        debug.decorated.free(ptr)
     }
 
-    debug.decorated.free(ptr)
 }
 
 

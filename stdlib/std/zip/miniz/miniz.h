@@ -264,7 +264,7 @@ enum
 Note that mz_alloc_func parameter types purposely differ from zlib's: items/size is size_t, not unsigned long. */
 typedef void *(*mz_alloc_func)(void *opaque, size_t items, size_t size);
 typedef void (*mz_free_func)(void *opaque, void *address);
-typedef void *(*mz_realloc_func)(void *opaque, void *address, size_t items, size_t size);
+typedef void *(*mz_realloc_func)(void *opaque, void *address, size_t old_items, size_t old_size, size_t items, size_t size);
 
 /* Compression levels: 0-9 are the standard zlib-style levels, 10 is best possible compression (not zlib compatible, and may be very slow), MZ_DEFAULT_COMPRESSION=MZ_DEFAULT_LEVEL. */
 enum
@@ -623,7 +623,7 @@ extern "C" {
 
 extern MINIZ_EXPORT void *miniz_def_alloc_func(void *opaque, size_t items, size_t size);
 extern MINIZ_EXPORT void miniz_def_free_func(void *opaque, void *address);
-extern MINIZ_EXPORT void *miniz_def_realloc_func(void *opaque, void *address, size_t items, size_t size);
+extern MINIZ_EXPORT void *miniz_def_realloc_func(void *opaque, void *address, size_t old_items, size_t old_size, size_t items, size_t size);
 
 #define MZ_UINT16_MAX (0xFFFFU)
 #define MZ_UINT32_MAX (0xFFFFFFFFU)

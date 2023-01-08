@@ -2,6 +2,10 @@
 @include("<curl/curl.h>");
 
 @compiler_option(
+    .options = "-I{relativePath}/include"
+);
+
+@compiler_option(
     .os = "windows",
     .options = "-llibcurl.dll.lib"
 );

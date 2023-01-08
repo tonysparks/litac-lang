@@ -1,6 +1,8 @@
 @cFile("miniz.h");
 @cFile("miniz.c");
 
+import "std/libc"
+
 @foreign
 public const MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE: i32;
 
@@ -8,17 +10,79 @@ public const MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE: i32;
 public const MZ_ZIP_MAX_IO_BUF_SIZE: i32;
 
 @foreign
+public enum mz_zip_flags {
+    MZ_ZIP_FLAG_CASE_SENSITIVE = 0x0100,
+    MZ_ZIP_FLAG_IGNORE_PATH = 0x0200,
+    MZ_ZIP_FLAG_COMPRESSED_DATA = 0x0400,
+    MZ_ZIP_FLAG_DO_NOT_SORT_CENTRAL_DIRECTORY = 0x0800,
+    MZ_ZIP_FLAG_VALIDATE_LOCATE_FILE_FLAG = 0x1000, /* if enabled, mz_zip_reader_locate_file() will be called on each file as its validated to ensure the func finds the file in the central dir (intended for testing) */
+    MZ_ZIP_FLAG_VALIDATE_HEADERS_ONLY = 0x2000,     /* validate the local headers, but don't decompress the entire file and check the crc32 */
+    MZ_ZIP_FLAG_WRITE_ZIP64 = 0x4000,               /* always use the zip64 file format, instead of the original zip file format with automatic switch to zip64. Use as flags parameter with mz_zip_writer_init*_v2 */
+    MZ_ZIP_FLAG_WRITE_ALLOW_READING = 0x8000,
+    MZ_ZIP_FLAG_ASCII_FILENAME = 0x10000,
+    /*After adding a compressed file, seek back
+    to local file header and set the correct sizes*/
+    MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE = 0x20000
+}
+
+/* Compression strategies. */
+@foreign
+public enum CompressionStrategy
+{
+    MZ_DEFAULT_STRATEGY = 0,
+    MZ_FILTERED = 1,
+    MZ_HUFFMAN_ONLY = 2,
+    MZ_RLE = 3,
+    MZ_FIXED = 4
+};
+
+/* Compression levels: 0-9 are the standard zlib-style levels, 10 is best possible compression (not zlib compatible, and may be very slow), MZ_DEFAULT_COMPRESSION=MZ_DEFAULT_LEVEL. */
+@foreign
+public enum CompressionLevel
+{
+    MZ_NO_COMPRESSION = 0,
+    MZ_BEST_SPEED = 1,
+    MZ_BEST_COMPRESSION = 9,
+    MZ_UBER_COMPRESSION = 10,
+    MZ_DEFAULT_LEVEL = 6,
+    MZ_DEFAULT_COMPRESSION = -1
+};
+
+@foreign
 public struct mz_zip_archive {
     m_pAlloc: func(*void, usize, usize) : *void;
     m_pFree: func(*void, *void) : void;
-    m_pRealloc: func(*void, *void, usize, usize) : *void;
+    m_pRealloc: func(*void, *void, usize, usize, usize, usize) : *void;
     m_pAlloc_opaque: *void
+    m_last_error: i32
+    m_pState: *mz_zip_internal_state_tag
+    m_archive_size: u64
+}
+
+@foreign
+public struct mz_zip_internal_state_tag {
+    m_pFile: *FILE
 }
 
 @foreign
 public struct mz_zip_archive_file_stat {
     m_filename: *char
 }
+
+@foreign
+public func mz_zip_get_last_error(archive: *mz_zip_archive) : i32;
+
+@foreign
+public func mz_zip_get_error_string(error: i32) : *const char;
+
+@foreign
+public func mz_zip_end(archive: *mz_zip_archive) : bool;
+
+@foreign
+public func mz_zip_validate_archive(archive: *mz_zip_archive, flags: u32) : bool;
+
+/* Read
+====================================================*/
 
 @foreign
 public func mz_zip_reader_init_file(archive: *mz_zip_archive, filename: *const char, flags: i32) : bool;
@@ -38,5 +102,71 @@ public func mz_zip_reader_is_file_a_directory(archive: *mz_zip_archive, fileInde
 @foreign
 public func mz_zip_reader_extract_to_file(archive: *mz_zip_archive, fileIndex: i32, destFilename: *const char, flags: u32) : bool;
 
+
+/* Write
+====================================================*/
+
 @foreign
-public func mz_zip_reader_end(archive: *mz_zip_archive) : bool;
+public func mz_zip_writer_init_file(
+    archive: *mz_zip_archive,
+    filename: *const char,
+    size_to_reserve_at_beginning: i32) : bool;
+
+@foreign
+public func mz_zip_writer_add_file(
+    archive: *mz_zip_archive,
+    archiveName: *const char,
+    filename: *const char,
+    comment: *const void,
+    commentSize: u16,
+    levelAndFlags: u32 = CompressionLevel.MZ_DEFAULT_COMPRESSION//,
+    //ext_attributes: i32 = 0)
+    ) : bool;
+
+
+@foreign
+public func mz_zip_writer_finalize_archive(archive: *mz_zip_archive) : bool;
+
+@foreign
+public func mz_zip_writer_end(archive: *mz_zip_archive) : bool;
+
+import "std/assert"
+
+@test
+func testArchiving() {
+    var archive: mz_zip_archive;
+    memset(&archive, 0, sizeof(:mz_zip_archive));
+
+    if(!mz_zip_writer_init_file(&archive, "test.zip", 0)) {
+        // assert(0)
+        goto fail;
+    }
+
+    if(!mz_zip_writer_add_file(
+        &archive,
+        "pkg/a.c",
+        "C:/Users/antho/git/litac-lang/bin/output/a.c", "", 0_u16)) {
+        assert(0)
+    }
+
+    if(!mz_zip_writer_add_file(
+        &archive,
+        "pkg/bin/a.c",
+        "C:/Users/antho/git/litac-lang/bin/output/a.c", "", 0_u16)) {
+        assert(0)
+    }
+
+    if(!mz_zip_writer_finalize_archive(&archive)) {
+        assert(0)
+    }
+    if(!mz_zip_writer_end(&archive)) {
+        assert(0)
+    }
+
+    return;
+
+fail:
+    var error = mz_zip_get_last_error(&archive)
+    printf("Error %s\n", mz_zip_get_error_string(error))
+    assert(0)
+}

@@ -93,6 +93,17 @@ public struct CCompilerOption {
     options: StringView
 }
 
+public enum PkgCommand {
+    PKG_NONE = 0,
+    PKG_INSTALL,
+    PKG_RUN,
+}
+
+public struct PkgOptions {
+    pkgCmd: PkgCommand             // the Package Manager command we're running (if any)
+    pkgRunCmdArg: *const char      // the pkg-run {arg} argument
+}
+
 public struct LitaOptions {
     projectPath: [MAX_PATH]char    // the directory of where the main source module is
     srcPath: [MAX_PATH]char        // the directory of where the main source module is
@@ -104,6 +115,9 @@ public struct LitaOptions {
     outputPath: [MAX_PATH]char     // the C output directory
 
     compileCmd: *const char        // the C compile system command
+    isStrict: bool                 // if the compileCmd should be strict and not allow modifications
+                                   // from compiler_options
+    isTcc: bool                    // if we should run the internal tcc compiler
 
     checkerOnly: bool              // only do the checker
     cOutputOnly: bool              // generates C file only, does not compile it
@@ -112,6 +126,7 @@ public struct LitaOptions {
     languageServer: bool           // if this should launch the language server
     isDebug: bool                  // if we are in debug mode
     instrument: bool               // if we have profiling instrumentation enabled
+    isVerbose: bool                // if we are in verbose mode, output logging detail information
 
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include
@@ -126,7 +141,7 @@ public struct LitaOptions {
     maxMemory: usize               // max amount of memory that can be allocated
 
     proxy: *const char             // the proxy server to use
-    runPkgInstall: bool            // if we should run pkg install
+    pkgOptions: PkgOptions         // Package Manager options
 }
 
 
@@ -291,7 +306,7 @@ public func (this: *Lita) transpile(module: *Module) : bool {
     }
 
     // if there is no build cmd, attempt to compile using libtcc
-    if(!this.options.compileCmd) {
+    if(!this.options.compileCmd || this.options.isTcc) {
 
         if(!this.compileWithLibtcc(module, this.binaryFilename)) {
             return false
@@ -337,6 +352,48 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
     tcc_set_output_type(state, TCC_OUTPUT_EXE)
     tcc_output_file(state, binaryFilename)
 
+
+    var temp:[256]char;
+    var buf = StringInit(temp, 256, 0)
+
+    buf.format("%s/lib", this.options.projectPath)
+    if(FileExists(buf.cStr())) {
+        tcc_add_library_path(state, buf.cStr())
+        // ccOptions.append("\"-L%s\" ", buf.cStr())
+    }
+
+    buf.format("%s/include", this.options.projectPath)
+    if(FileExists(buf.cStr())) {
+        tcc_add_include_path(state, buf.cStr())
+        // ccOptions.append("\"-I%s\" ", buf.cStr())
+    }
+
+    if(!this.compilerOptions.empty()) {
+        var os = GetOS()
+
+        var ccOptions = StringBufferInit(256)
+        defer ccOptions.free()
+        for(var i = 0; i < this.compilerOptions.size(); i+= 1) {
+            var option = this.compilerOptions.getPtr(i)
+
+            // skip this option, if the OS doesn't match
+            if(option.os != OS.Lita_OSType_OTHER && option.os != os) {
+                continue
+            }
+
+            ccOptions.appendStrn(" ", 1)
+            ccOptions.appendStrn(option.options.buffer, option.options.length)
+        }
+        if(!ccOptions.empty()) {
+            tcc_set_options(state, ccOptions.cStr())
+
+            if(this.options.isVerbose) {
+                printf("Options: '%s'\n", ccOptions.cStr())
+            }
+        }
+    }
+
+
     if(tcc_compile_string(state, sourceCode) < 0) {
         return false
     }
@@ -380,6 +437,43 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
         commandStr.replace(index, index+strlen("%input%"), sourceFilename)
     }
 
+    this.applyCompilerOptions(commandStr)
+
+    if(this.options.isVerbose) {
+        printf("Running command: '%s'\n", commandStr.cStr())
+    }
+
+    if(system(commandStr.cStrConst()) == 0) {
+        return true
+    }
+    return false
+}
+
+func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
+    var buffer: *StringBuffer = commandStr;
+
+    var replaceBuffer: StringBuffer;
+    if(this.options.isStrict) {
+        replaceBuffer.init(256)
+        buffer = &replaceBuffer;
+    }
+
+    // Add in this projects lib and include folder if they exist
+    {
+        var temp:[256]char;
+        var path = StringInit(temp, 256, 0)
+        path.format("%s/lib", this.options.projectPath)
+        if(FileExists(path.cStr())) {
+            buffer.append(" -L%s", path.cStr())
+        }
+
+        path.format("%s/include", this.options.projectPath)
+        if(FileExists(path.cStr())) {
+            buffer.append(" -I%s", path.cStr())
+        }
+    }
+
+    // Add in any @compiler_option's defined in modules
     var os = GetOS()
     for(var i = 0; i < this.compilerOptions.size(); i+= 1) {
         var option = this.compilerOptions.getPtr(i)
@@ -389,15 +483,16 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
             continue
         }
 
-        commandStr.appendStrn(" ", 1)
-        commandStr.appendStrn(option.options.buffer, option.options.length)
+        buffer.appendStrn(" ", 1)
+        buffer.appendStrn(option.options.buffer, option.options.length)
     }
 
-    // printf("Running command: '%s'\n", commandStr.cStr())
-    if(system(commandStr.cStrConst()) == 0) {
-        return true
+    if(this.options.isStrict) {
+        var index = commandStr.indexOf("%options%")
+        commandStr.replace(index, index+strlen("%options%"), buffer.cStr())
+
+        buffer.free()
     }
-    return false
 }
 
 public func (this: *Lita) run() {

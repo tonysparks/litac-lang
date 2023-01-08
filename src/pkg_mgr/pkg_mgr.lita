@@ -101,6 +101,7 @@ import "std/string_view"
 
 import "pkg_mgr/pkg"
 import "pkg_mgr/pkg_install"
+import "pkg_mgr/pkg_run"
 
 import "build"
 
@@ -112,12 +113,20 @@ public struct PackageSyncOptions {
 }
 
 @asStr
-public enum InstallStatus {
+public enum PkgStatus {
     OK = 0,
+    ERROR_NO_PROJECT_PKG_FOUND,
+    ERROR_COMMAND_NOT_DEFINED,
+    ERROR_RUNNING_COMMAND,
     ERROR_CREATING_PKG_DIR,
     ERROR_UNABLE_TO_OPEN_FILE,
     ERROR_UNABLE_TO_OPEN_PKG_FILE,
     ERROR_UNABLE_TO_EXTRACT_PKG_FILE,
+    ERROR_UNABLE_TO_PROCESS_PKG_FILE,
+    ERROR_OPENING_LOCAL_FILE_PKG,
+    ERROR_READING_LOCAL_FILE_PKG,
+    ERROR_WRITING_LOCAL_FILE_PKG,
+    ERROR_FINALIZING_LOCAL_FILE_PKG,
     ERROR_PARSING_PKG_JSON,
     ERROR_READING_PKG_FILE,
     ERROR_HTTP_STATUS,
@@ -163,28 +172,19 @@ public func (this: *PackageManager) free() {
 @doc("""
     Installs all packages defined the pkg.json to the file system.
 """)
-public func (this: *PackageManager) install() : InstallStatus {
-    var temp:[MAX_PATH]char;
-
-    var pkgDef = StringInit(temp, MAX_PATH, 0)
-    pkgDef.format("%s/pkg.json", CurrentWorkingPath())
-
-    if(!FileExists(pkgDef.cStr())) {
-        this.errors.append("could not find '%s' to install dependencies!\n", pkgDef.cStr())
-        return InstallStatus.ERROR_UNABLE_TO_OPEN_FILE
+public func (this: *PackageManager) install() : PkgStatus {
+    defer {
+        printf("Error: %s\n", this.errors.cStr())
     }
 
-    if(ParsePackageFile(this, pkgDef.cStr(), &this.pkg) != InstallStatus.OK) {
-        this.errors.append("could not parse pkg.json\n")
-        return InstallStatus.ERROR_PARSING_PKG_JSON;
+    var status = this.readProjectPkg()
+    if(status != PkgStatus.OK) {
+        return status;
     }
 
-    printf("Found '%s' with %d package dependencies.\n", pkgDef.cStr(), this.pkg.dependencies.size())
-
-    // TODO: Get the actual /src directory -- this can be taken off of
-    // LitaOptions..
-    var pkgPath = StringInit(this.pkg.path, MAX_PATH, 0)
-    pkgPath.format("%s/src", CurrentWorkingPath())
+    printf("Found '%s/pkg.json' with %d package dependencies.\n",
+        CurrentWorkingPath(),
+        this.pkg.dependencies.size())
 
     if(!this.pkg.dependencies.empty()) {
         for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
@@ -199,7 +199,7 @@ public func (this: *PackageManager) install() : InstallStatus {
     Updates the build.json file with any dependent package information.  This
     should be called after a sync is made.
 """)
-public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : InstallStatus {
+public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : PkgStatus {
     buildFile.init(this.allocator)
 
     var temp:[MAX_PATH]char;
@@ -216,7 +216,45 @@ public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : Ins
 
         buildFile.pkgPaths.add(StringClone(fullPkgPath.buffer, fullPkgPath.length, this.allocator))
     }
-    return InstallStatus.OK
+    return PkgStatus.OK
+}
+
+@doc("""
+    Run a command from the pkg.json:commands[{argument}]
+""")
+public func (this: *PackageManager) runCommand(cmd: *const char) : PkgStatus {
+    var status = this.readProjectPkg()
+    if(status != PkgStatus.OK) {
+        return status;
+    }
+
+    return PackageRun(this, cmd)
+}
+
+
+func (this: *PackageManager) readProjectPkg() : PkgStatus {
+    var temp:[MAX_PATH]char;
+
+    var pkgDef = StringInit(temp, MAX_PATH, 0)
+    pkgDef.format("%s/pkg.json", CurrentWorkingPath())
+
+    if(!FileExists(pkgDef.cStr())) {
+        this.errors.append("could not find '%s'\n", pkgDef.cStr())
+        return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
+    }
+
+    if(ParsePackageFile(this, pkgDef.cStr(), &this.pkg) != PkgStatus.OK) {
+        this.errors.append("could not parse pkg.json\n")
+        return PkgStatus.ERROR_PARSING_PKG_JSON;
+    }
+
+    // TODO: Get the actual /src directory -- this can be taken off of
+    // LitaOptions..
+    var pkgPath = StringInit(this.pkg.path, MAX_PATH, 0)
+    pkgPath.format("%s/src", CurrentWorkingPath())
+    pkgPath.cStr()
+
+    return PkgStatus.OK
 }
 
 @test
@@ -226,14 +264,14 @@ func testPackageManagerSync() {
     defer pm.free()
 
     var status = pm.install()
-    assert(status == InstallStatus.OK)
-    // printf("Status: %s\n", InstallStatusAsStr(status))
+    assert(status == PkgStatus.OK)
+    // printf("Status: %s\n", PkgStatusAsStr(status))
 
     var buildFile: BuildFile{}
     defer buildFile.free()
 
     status = pm.createBuildFile(&buildFile)
-    assert(status == InstallStatus.OK)
+    assert(status == PkgStatus.OK)
 
     assert(buildFile.pkgPaths.size() == 2)
     assert(strcmp(buildFile.pkgPaths.get(0), "C:/Users/antho/git/litac-lang/bin/output/src") == 0)
