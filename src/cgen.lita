@@ -583,7 +583,7 @@ func (this: using *CGen) popLoopScope(checkSwitch: bool = false) {
     }
 }
 
-func (this: using *CGen) leaveScope(scope: *CGenScope) {
+func (this: using *CGen) leaveScope(scope: *CGenScope, includeConst: bool = true) {
     if(!scope) {
         return;
     }
@@ -596,9 +596,11 @@ func (this: using *CGen) leaveScope(scope: *CGenScope) {
     }
     this.deferStack -= 1
 
-    for(var i = 0; i < scope.constDefs.size(); i+=1) {
-        var name = scope.constDefs.get(i)
-        this.emit("#undef %s\n", name)
+    if(includeConst) {
+        for(var i = 0; i < scope.constDefs.size(); i+=1) {
+            var name = scope.constDefs.get(i)
+            this.emit("#undef %s\n", name)
+        }
     }
 }
 
@@ -621,7 +623,7 @@ func (this: using *CGen) emitDefers() {
     }
     var scope = this.currentScope
     while(scope) {
-        this.leaveScope(scope)
+        this.leaveScope(scope, .includeConst = false)
         scope = scope.parent
     }
 }

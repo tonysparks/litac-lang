@@ -34,6 +34,7 @@ func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
 
     var options = new<LitaOptions>()
+    memset(options, 0, sizeof(:LitaOptions))
     defer defaultAllocator.free(options)
 
     var status = ParseArgs(len, args, options)
@@ -41,8 +42,8 @@ func main(len: i32, args: **char) : i32 {
         return ParseStatus.TERMINATE == status ? 0 : -1;
     }
 
-    if(options.runPkgInstall) {
-        return RunPkgInstall(options)
+    if(options.pkgOptions.pkgCmd != PkgCommand.PKG_NONE) {
+        return HandlePkgCommand(options)
     }
 
     var lita = Lita{}
@@ -160,6 +161,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     parser.addOption("test",           '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
     parser.addOption("pkg-install",    '\0', "Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.\nIf successful, creates a build.json which is used for building this LitaC project.", 0, null);
+    parser.addOption("pkg-run",        '\0', "Runs a script defined in the `commands` section in this projects `pkg.json`.  The argument passed of this option is used to run the `commands.{option}` command", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("proxy",          '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null);
@@ -188,12 +190,18 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
         goto terminate;
     }
 
+    options.pkgOptions.pkgCmd = PkgCommand.PKG_NONE
     if(parser.hasOption("pkg-install")) {
-        options.runPkgInstall = true
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_INSTALL
+    }
+
+    if(parser.hasOption("pkg-run")) {
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_RUN
+        options.pkgOptions.pkgRunCmdArg = parser.getOption("pkg-run").value
     }
 
     options.languageServer = parser.hasOption("languageServer")
-    if(!options.languageServer && !options.runPkgInstall) {
+    if(!options.languageServer && options.pkgOptions.pkgCmd == PkgCommand.PKG_NONE) {
         if(parser.args.size() < 2) {
             printf("Missing input file\n")
             goto err;
@@ -334,7 +342,7 @@ err:
 }
 
 
-func RunPkgInstall(options: *LitaOptions) : i32 {
+func HandlePkgCommand(options: *LitaOptions) : i32 {
     var size: usize = options.maxMemory > 0
         ? options.maxMemory
         : 1024 * 1024 * 1024;
@@ -353,10 +361,25 @@ func RunPkgInstall(options: *LitaOptions) : i32 {
     }, linearAllocator.allocator)
     defer pm.free()
 
+    switch(options.pkgOptions.pkgCmd) {
+        case PkgCommand.PKG_INSTALL: {
+            return RunPkgInstall(options, &pm)
+        }
+        case PkgCommand.PKG_RUN: {
+            return RunPkgCommand(options, &pm)
+        }
+        default:
+            return 0;
+    }
+
+    return 0;
+}
+
+func RunPkgInstall(options: *LitaOptions, pm: *PackageManager) : i32 {
     var status = pm.install()
-    if(status != InstallStatus.OK) {
+    if(status != PkgStatus.OK) {
         printf("Error installing packages:\nErrorCode: %s - %s\n",
-            InstallStatusAsStr(status), pm.errors.cStr())
+            PkgStatusAsStr(status), pm.errors.cStr())
         return 1;
     }
 
@@ -364,9 +387,9 @@ func RunPkgInstall(options: *LitaOptions) : i32 {
     defer buildFile.free()
 
     status = pm.createBuildFile(&buildFile)
-    if(status != InstallStatus.OK) {
+    if(status != PkgStatus.OK) {
         printf("Error creating build.json:\nErrorCode: %s - %s\n",
-            InstallStatusAsStr(status), pm.errors.cStr())
+            PkgStatusAsStr(status), pm.errors.cStr())
         return 1;
     }
 
@@ -384,5 +407,15 @@ func RunPkgInstall(options: *LitaOptions) : i32 {
     }
 
     printf("Success.\n")
+    return 0;
+}
+
+func RunPkgCommand(options: *LitaOptions, pm: *PackageManager) : i32 {
+    var status = pm.runCommand(options.pkgOptions.pkgRunCmdArg)
+    if(status != PkgStatus.OK) {
+        printf("Error running pkg command:\nErrorCode: %s - %s\n",
+            PkgStatusAsStr(status), pm.errors.cStr())
+        return 1;
+    }
     return 0;
 }

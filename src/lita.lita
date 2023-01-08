@@ -93,6 +93,17 @@ public struct CCompilerOption {
     options: StringView
 }
 
+public enum PkgCommand {
+    PKG_NONE = 0,
+    PKG_INSTALL,
+    PKG_RUN,
+}
+
+public struct PkgOptions {
+    pkgCmd: PkgCommand             // the Package Manager command we're running (if any)
+    pkgRunCmdArg: *const char      // the pkg-run {arg} argument
+}
+
 public struct LitaOptions {
     projectPath: [MAX_PATH]char    // the directory of where the main source module is
     srcPath: [MAX_PATH]char        // the directory of where the main source module is
@@ -130,7 +141,7 @@ public struct LitaOptions {
     maxMemory: usize               // max amount of memory that can be allocated
 
     proxy: *const char             // the proxy server to use
-    runPkgInstall: bool            // if we should run pkg install
+    pkgOptions: PkgOptions         // Package Manager options
 }
 
 
