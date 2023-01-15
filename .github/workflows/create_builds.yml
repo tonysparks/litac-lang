@@ -3,15 +3,12 @@
 name: CI
 
 # Controls when the workflow will run
-on:
+on: workflow_dispatch
   # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+  # push:
+  #   branches: [ master ]
+  # pull_request:
+  #   branches: [ master ]
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -77,6 +74,7 @@ jobs:
           git commit -m "update to latest bootstrap source"
           git push
 
+  # Currently broken, bootstraped exe doesn't not run????
   full-build-windows:
     # The type of runner that the job will run on
     runs-on: windows-latest
