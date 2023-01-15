@@ -14,7 +14,7 @@ goto end
 :error_compiling
 echo.
 echo ==========================================
-echo ERROR: Compiling litac compiler
+echo ERROR: Compiling bootstrap litac compiler
 echo ==========================================
 echo.
 goto end
