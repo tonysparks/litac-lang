@@ -2,7 +2,7 @@
 if [%LITAC_HOME%] == [] goto error_exit
 
 cd bootstrap
-clang -std=c99 -g -gcodeview -fsanitize=undefined,address -o litacc.exe litacc.c -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -I../stdlib/std/http/libcurl/include -llibtcc -llibcurl.dll.lib
+clang -std=c99 -g -gcodeview -fsanitize=undefined,address -o litacc.exe litac_windows.c -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -I../stdlib/std/http/libcurl/include -llibtcc -llibcurl.dll.lib
 
 if errorlevel 1 (
     goto error_compiling
