@@ -16,10 +16,11 @@ litacc.exe -cFormat -profile -buildCmd %BUILD_CMD% "../src/main.lita" -outputDir
 if errorlevel 1 (
     goto error_compiling
 )
-
+dir
 
 echo Running litaC inception!...
 cd ../bin
+dir
 litac.exe -verbose -profile -cFormat -buildCmd %BUILD_CMD% "../src/main.lita" -maxMemory 1GiB
 if errorlevel 1 (
     goto error_compiling
