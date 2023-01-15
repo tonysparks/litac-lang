@@ -107,7 +107,7 @@ import "build"
 
 public struct PackageSyncOptions {
     projectPath: *const char
-    pkgDir: *const char = ".pkgs"      // the .pkgs directory
+    pkgDir: *const char = ".pkgs"       // the .pkgs directory
     fullSync: bool = false              // force a full download of all packages
     httpOptions: HttpOptions            // http options
 }
@@ -119,6 +119,7 @@ public enum PkgStatus {
     ERROR_COMMAND_NOT_DEFINED,
     ERROR_RUNNING_COMMAND,
     ERROR_CREATING_PKG_DIR,
+    ERROR_CLEANING_PKG,
     ERROR_UNABLE_TO_OPEN_FILE,
     ERROR_UNABLE_TO_OPEN_PKG_FILE,
     ERROR_UNABLE_TO_EXTRACT_PKG_FILE,
@@ -174,7 +175,9 @@ public func (this: *PackageManager) free() {
 """)
 public func (this: *PackageManager) install() : PkgStatus {
     defer {
-        printf("Error: %s\n", this.errors.cStr())
+        if(this.errors.length > 0) {
+            printf("Error: %s\n", this.errors.cStr())
+        }
     }
 
     var status = this.readProjectPkg()

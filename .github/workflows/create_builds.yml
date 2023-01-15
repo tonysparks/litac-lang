@@ -1,0 +1,124 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  full-build-ubuntu:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # apt-get update
+      - name: Update apt-get registry
+        run: |
+          echo Update apt-get
+          sudo apt-get update
+
+      # Install tcc
+      - name: Install tcc
+        run: |
+          echo Install tcc compiler
+          sudo apt-get install -y tcc
+
+      # Install libcurl
+      - name: Install libcurl
+        run: |
+          echo Install libcurl
+          sudo apt-get install -y curl
+          sudo apt-get install -y libcurl4-openssl-dev
+          curl --version
+
+      # Print compiler information
+      - name: Compiler Info
+        run: |
+          echo Installed compilers
+          clang --version
+          gcc --version
+          tcc -version
+      # Full Build
+      - name: Full Build
+        run: |
+          echo Full Build
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_bootstrap_full.sh
+
+      # Test LitaC Compiler
+      - name: Test LitaC Compiler
+        run: |
+          echo Testing LitaC Compiler
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_test.sh
+
+      # Commit the litac_linux.c generated file
+      - name: Commit litac_linux.c
+        run: |
+          echo Commit Changes
+          git config --global user.name "tonysparks"
+          git config --global user.email "anthony.sparks31@gmail.com"
+
+          git add -A
+          git commit -m "update to latest bootstrap source"
+          git push
+
+full-build-windows:
+    # The type of runner that the job will run on
+    runs-on: windows-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Set up Clang
+        uses: egor-tensin/setup-clang@v1
+        with:
+          version: latest
+          platform: x64
+
+      # Print compiler information
+      - name: Compiler Info
+        run: |
+          echo Installed compilers
+          clang --version
+
+      # Full Build
+      - name: Full Build
+        run: |
+          echo Full Build
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_bootstrap_full.bat
+
+      # Test LitaC Compiler
+      - name: Test LitaC Compiler
+        run: |
+          echo Testing LitaC Compiler
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_test.bat
+
+      # Commit the litac_linux.c generated file
+      - name: Commit litac_linux.c
+        run: |
+          echo Commit Changes
+          git config --global user.name "tonysparks"
+          git config --global user.email "anthony.sparks31@gmail.com"
+
+          git add -A
+          git commit -m "update to latest bootstrap source"
+          git push

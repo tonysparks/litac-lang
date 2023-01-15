@@ -102,6 +102,7 @@ public enum PkgCommand {
 public struct PkgOptions {
     pkgCmd: PkgCommand             // the Package Manager command we're running (if any)
     pkgRunCmdArg: *const char      // the pkg-run {arg} argument
+    forceClean: bool               // force cleaning of package directories
 }
 
 public struct LitaOptions {

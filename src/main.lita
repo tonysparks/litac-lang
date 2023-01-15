@@ -161,6 +161,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     parser.addOption("test",           '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the suppplied source file only", 0, null);
     parser.addOption("pkg-install",    '\0', "Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.\nIf successful, creates a build.json which is used for building this LitaC project.", 0, null);
+    parser.addOption("force",          '\0', "Forces a full clean install of all packages.  Must be ran with `pkg-install` option, otherwise will be ignored.", 0, null);
     parser.addOption("pkg-run",        '\0', "Runs a script defined in the `commands` section in this projects `pkg.json`.  The argument passed of this option is used to run the `commands.{option}` command", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("proxy",          '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null);
@@ -193,6 +194,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     options.pkgOptions.pkgCmd = PkgCommand.PKG_NONE
     if(parser.hasOption("pkg-install")) {
         options.pkgOptions.pkgCmd = PkgCommand.PKG_INSTALL
+        options.pkgOptions.forceClean = parser.hasOption("force")
     }
 
     if(parser.hasOption("pkg-run")) {
@@ -354,7 +356,7 @@ func HandlePkgCommand(options: *LitaOptions) : i32 {
     var pm = PackageManager{};
     pm.init(PackageSyncOptions{
         .projectPath = options.projectPath,
-        .fullSync = false,
+        .fullSync = options.pkgOptions.forceClean,
         .httpOptions = HttpOptions {
             .proxy = options.proxy,
         }

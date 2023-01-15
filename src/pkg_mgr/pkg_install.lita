@@ -40,6 +40,17 @@ public func PackageSync(pm: *PackageManager) : PkgStatus {
         return PkgStatus.OK
     }
 
+    if(pm.options.fullSync) {
+        var temp:[MAX_PATH]char;
+        var pkgPath = StringInit(temp, MAX_PATH, 0)
+        pkgPath.format("%s/%s", CurrentWorkingPath(), options.pkgDir)
+
+        var status = cleanPackageDirectory(pm, pkgPath.cStr())
+        if(status != PkgStatus.OK) {
+            return status
+        }
+    }
+
     var pkgsToInstall = ArrayInit<PackageId>(numOfPkgs, pm.allocator)
     defer pkgsToInstall.free()
 
@@ -62,7 +73,7 @@ public func PackageSync(pm: *PackageManager) : PkgStatus {
             return status
         }
 
-        if(!pm.options.fullSync && isPackageInstalled(pm, pkgId, pkgPath)) {
+        if(isPackageInstalled(pm, pkgId, pkgPath)) {
             var pkg: *PackageDef = null
             var status = readPackage(pm, pkgId, pkgPath, &pkg, pkgsToInstall)
             if(status != PkgStatus.OK) {
@@ -112,7 +123,42 @@ func isPackageInstalled(pm: *PackageManager, pkgId: *PackageId, pkgDir: *const c
 }
 
 func cleanPackageDirectory(pm: *PackageManager, pkgPath: *const char) : PkgStatus {
-    // TODO:
+    var temp:[MAX_PATH]char;
+    var path = StringInit(temp, MAX_PATH, 0)
+    path.append("%s", pkgPath)
+
+    return deleteDir(path)
+}
+
+func deleteDir(path: *String) : PkgStatus {
+    if(!FileExists(path.cStr())) {
+        return PkgStatus.OK
+    }
+
+    var file: FileHandle;
+    if(!file.open(path.cStr())) {
+        return PkgStatus.ERROR_CLEANING_PKG
+    }
+
+    while(file.hasNext()) {
+        var len = path.length
+        path.append("/%s", file.name())
+        defer path.length = len
+
+        if(file.isDirectory()) {
+            if(deleteDir(path) != PkgStatus.OK) {
+                return PkgStatus.ERROR_CLEANING_PKG
+            }
+        }
+
+        printf("Deleting: '%s'\n", path.cStr())
+        if(!FileDelete(path.cStr())) {
+            printf("Failed to delete: '%s'\n", path.cStr())
+            return PkgStatus.ERROR_CLEANING_PKG
+        }
+
+        file.next();
+    }
     return PkgStatus.OK
 }
 
@@ -213,7 +259,7 @@ func downloadPackage(
 
     http.get(uri.cStr(), &resp)
 
-    if(resp.statusCode < 200) {
+    if(resp.statusCode < 200 || resp.statusCode > 299) {
         return PkgStatus.ERROR_HTTP_STATUS
     }
 

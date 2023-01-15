@@ -695,3 +695,11 @@ func testAbsolutePath() {
     assert(strcmp(GetAbsolutePath("C:/litac", "./..\\src/main.lita", path), "C:/src/main.lita") == 0)
     assert(strcmp(GetAbsolutePath("C:/litac", "../../src/main.lita", path), "src/main.lita") == 0)
 }
+
+@test
+func testMkdirDelete() {
+    Mkdir("rodgers")
+    assert(FileExists("rodgers"))
+    FileDelete("rodgers")
+    assert(!FileExists("rodgers"))
+}
