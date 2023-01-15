@@ -77,7 +77,6 @@ jobs:
           git commit -m "update to latest bootstrap source"
           git push
 
-  # Currently broken, bootstraped exe doesn't not run????
   full-build-windows:
     # The type of runner that the job will run on
     runs-on: windows-latest
