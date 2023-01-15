@@ -1,6 +1,8 @@
-# This is a basic workflow to help you get started with Actions
+#
+# Generates litac_{OS}.c C bootstrap files for OS specific targets.
+#
 
-name: CI
+name: Generate Bootstrap Source
 
 # Controls when the workflow will run
 on: workflow_dispatch
