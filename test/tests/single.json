@@ -13,33 +13,39 @@
         }
     `,
     "tests": [
-        /*
         {
-            "name": "Verbatim String with inline escape chars",
+            "name": "struct default values",
             "definitions": `
-            @include("<string.h>");
-            @foreign func strncmp(a:*const char, b:*const char, len: i32) : i32;
-            @foreign func strcmp(a:*const char, b:*const char) : i32;
-            @foreign func sprintf(b: *char, format: *const char, ...) : i32;
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    x: [2]const char = "H"
+                    y: *const char = "Hello"
+                    z: [2]const char = [2]const char {'Z', '\0'}
+                }
             `,
             "code": `
-                var str = """this
-is"""
-                assert(strcmp("this\nis", str) == 0)
+                var t = Test {}
+                assert(strcmp(t.x, "H") == 0)
+                assert(strcmp(t.y, "Hello") == 0)
+                assert(strcmp(t.z, "Z") == 0)
             `,
-        },*/
+        },
         {
-            "name": "Test Foreign Array Bug",
+            "name": "note default values",
             "definitions": `
-            @raw("#define MTEST 12");
-            @foreign
-            public const MTEST:i32;
-            struct X {
-                x:[MTEST]i32
-            }
+                @note Test {
+                    x: [2]const char = "H"
+                    y: *const char = "Hello"
+                    z: [2]const char = [2]const char {'Z', '\0'}
+                }
+
+                @Test(
+                )
             `,
             "code": `
-                assert(MTEST == 12)
+
             `,
         },
     ]

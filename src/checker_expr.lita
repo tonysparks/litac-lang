@@ -1123,6 +1123,18 @@ func (this: *TypeChecker) addInitArgumentsReferences(type: *TypeInfo, expr: *Ini
     }
 }
 
+func IsDecayable(arg: *InitArgExpr) : bool {
+    if(!arg.value) {
+        return false
+    }
+
+    if(arg.value.kind == StmtKind.ARRAY_INIT_EXPR ||
+       arg.value.kind == StmtKind.STRING_EXPR) {
+        return true
+    }
+
+    return false
+}
 
 func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) : bool {
     assert(expr != null)
@@ -1152,7 +1164,7 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
                 }
             }
 
-            this.checkTypeCompatibility(arg.startPos, field.typeInfo, arg.operand.typeInfo)
+            this.checkAssignability(arg.startPos, field.typeInfo, arg.operand.typeInfo, IsDecayable(arg))
             arg.expectedType = field.typeInfo
             arg.value.expectedType = field.typeInfo
         }
@@ -1161,7 +1173,8 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
         var arrayInfo = type as (*ArrayTypeInfo)
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
-            this.checkTypeCompatibility(arg.startPos, arrayInfo.arrayOf, arg.operand.typeInfo)
+
+            this.checkAssignability(arg.startPos, arrayInfo.arrayOf, arg.operand.typeInfo, IsDecayable(arg))
             arg.expectedType = arrayInfo.arrayOf
             arg.value.expectedType = arrayInfo.arrayOf
         }

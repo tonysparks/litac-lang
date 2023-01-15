@@ -49,7 +49,7 @@
             "code": `
 
             `,
-            "error": "'*X' can't be assigned to '*const char'"
+            "error": "'*const char' can't be assigned to '*X'"
         },
         {
             "name": "Embedded Struct default values",
@@ -109,7 +109,7 @@
             "code": `
 
             `,
-            "error": "'i32' can't be assigned to 'f64'"
+            "error": "'f64' can't be assigned to 'i32'"
         },
         {
             "name": "Embedded Struct default values by position",

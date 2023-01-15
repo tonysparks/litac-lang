@@ -266,47 +266,47 @@ func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: *TypeIn
 
 
 
-func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
+func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *TypeInfo, allowDecay: bool = false) : bool {
     if(a == null || b == null) {
         return false
     }
 
-    if(!a.isAssignable(b, this)) {
-        var sb = StringBufferInit(256, this.allocator)
-        // get more descriptive information if this is trait
-        // comparisons, as they are not as intuitive as other types
-        if(IsTraitLike(a)) {
-            var aTrait = a.getBaseType()
-            if(!IsPtr(b) && IsAggregate(b)) {
-                var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
-                if(aggInfo.implementsTrait(aTrait, this)) {
-                    sb.appendStrn("'", 1)
-                    b.toString(sb)
-                    sb.appendStr("' can't be assigned to '")
-                    a.toString(sb)
-                    sb.appendStrn("'", 1)
-
-                    sb.appendStr("; assigned trait implementations must be pointers: e.g. '*")
-                    b.toString(sb)
-                    sb.appendStrn("'", 1)
-
-                    this.result.addErrorStr(src, sb)
-                    return false
-                }
-            }
-        }
-
-        sb.appendStrn("'", 1)
-        b.toString(sb)
-        sb.appendStr("' can't be assigned to '")
-        a.toString(sb)
-        sb.appendStrn("'", 1)
-
-        this.result.addErrorStr(src, sb)
-        return false
+    if(a.isAssignable(b, this, allowDecay)) {
+        return true
     }
 
-    return true
+    var sb = StringBufferInit(256, this.allocator)
+    // get more descriptive information if this is trait
+    // comparisons, as they are not as intuitive as other types
+    if(IsTraitLike(a)) {
+        var aTrait = a.getBaseType()
+        if(!IsPtr(b) && IsAggregate(b)) {
+            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            if(aggInfo.implementsTrait(aTrait, this)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr("' can't be assigned to '")
+                a.toString(sb)
+                sb.appendStrn("'", 1)
+
+                sb.appendStr("; assigned trait implementations must be pointers: e.g. '*")
+                b.toString(sb)
+                sb.appendStrn("'", 1)
+
+                this.result.addErrorStr(src, sb)
+                return false
+            }
+        }
+    }
+
+    sb.appendStrn("'", 1)
+    b.toString(sb)
+    sb.appendStr("' can't be assigned to '")
+    a.toString(sb)
+    sb.appendStrn("'", 1)
+
+    this.result.addErrorStr(src, sb)
+    return false
 }
 
 func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {

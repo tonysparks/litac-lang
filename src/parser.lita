@@ -2776,6 +2776,16 @@ func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
         case StmtKind.GET_EXPR: {
             return true
         }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            var arrayInitExpr = expr as (*ArrayInitExpr)
+            for(var i = 0; i < arrayInitExpr.values.size(); i+=1) {
+                var arg = arrayInitExpr.values.get(i)
+                if(!p.checkConstExpr(arg)) {
+                    return false
+                }
+            }
+            return true
+        }
         case StmtKind.GROUP_EXPR: {
             var groupExpr = expr as (*GroupExpr)
             return p.checkConstExpr(groupExpr.groupedExpr)

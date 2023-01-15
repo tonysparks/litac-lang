@@ -19,7 +19,7 @@
             "definitions": `
                 public @note Something {
                     str: *const char = "Hello"
-                    fnum: f32 = 4.0
+                    fnum: f32 = 4.0f
                     inum: i32 = 18
                 }
 

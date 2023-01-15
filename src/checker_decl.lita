@@ -320,7 +320,7 @@ public func (this: *TypeChecker) resolveNoteDecl(noteDecl: *AggregateDecl) : boo
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
                     }
-                    this.checkDeclarability(varField.defaultExpr.startPos, varField.defaultExpr.operand.typeInfo, field.typeInfo)
+                    this.checkDeclarability(varField.defaultExpr.startPos, field.typeInfo, varField.defaultExpr.operand.typeInfo)
                 }
 
                 this.checkAggregateFieldDuplicate(noteDecl, varField.name.str, i)
@@ -405,7 +405,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
                     }
-                    this.checkDeclarability(varField.defaultExpr.startPos, varField.defaultExpr.operand.typeInfo, field.typeInfo)
+                    this.checkDeclarability(varField.defaultExpr.startPos, field.typeInfo, varField.defaultExpr.operand.typeInfo)
                 }
                 if(varField.attributes.isUsing) {
                     if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {

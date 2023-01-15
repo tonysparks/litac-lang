@@ -32,7 +32,96 @@
             `,
         },
         {
+            "name": "array invalid assignment with string literal",
+            "definitions": `
+            `,
+            "code": `
+
+                var x: [32]char;
+                x = "Brett";
+            `,
+            "error": "'*const char' can't be assigned to '[32]char'"
+        },
+        {
+            "name": "array invalid assignment with array initializer",
+            "definitions": `
+            `,
+            "code": `
+
+                var x: [32]char;
+                x = [32]char{'c', '\0'};
+            `,
+            "error": "'[32]char' can't be assigned to '[32]char'"
+        },
+        {
+            "name": "array initializer",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    x: [32]char
+                    y: [32]char
+                }
+            `,
+            "code": `
+
+                var a = [2][2]char {
+                    [2]char { 'c', '\0' },
+                    "H"
+                }
+
+                assert(strcmp(a[0], "c") == 0)
+                assert(strcmp(a[1], "H") == 0)
+            `,
+        },
+        {
+            "name": "struct array initializer",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    x: [32]char
+                    y: [32]char
+                }
+            `,
+            "code": `
+
+                var t = Test {
+                    .x = [32]char{'c', '\0'},
+                    .y = "Brett"
+
+                }
+
+                var x: [32]char;
+                var y: [32]char;
+                assert(strcmp(t.x, "c") == 0)
+                assert(strcmp(t.y, "Brett") == 0)
+            `,
+        },
+        {
             "name": "array assigned to str",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    name: *char
+                    x: [32]char
+                }
+
+                struct X {
+                    x: [32]char
+                }
+            `,
+            "code": `
+                var m : [32]char = "Brett"
+                assert(strcmp(m, "Brett") == 0)
+            `,
+        },
+        {
+            "name": "array assigned to array",
             "definitions": `
                 @include("<string.h>");
                 @foreign func strcmp(a:*const char, b:*const char) : i32;
@@ -54,8 +143,59 @@
                     .x = x.x
 
                 }
+            `,
+            "error": "'[32]char' can't be assigned to '[32]char'"
+        },
+        {
+            "name": "array passed to function",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
 
-                assert(strcmp(t.name, "Brett") == 0)
+                func testPass(a: [32]char) : *char {
+                    return a;
+                }
+            `,
+            "code": `
+                var m : [32]char = "Brett"
+
+                var x = testPass(m)
+                assert(strcmp(x, "Brett") == 0)
+            `,
+        },
+        {
+            "name": "struct default values",
+            "definitions": `
+                @include("<string.h>");
+                @foreign func strcmp(a:*const char, b:*const char) : i32;
+
+                struct Test {
+                    x: [2]const char = "H"
+                    y: *const char = "Hello"
+                    z: [2]const char = [2]const char {'Z', '\0'}
+                }
+            `,
+            "code": `
+                var t = Test {}
+                assert(strcmp(t.x, "H") == 0)
+                assert(strcmp(t.y, "Hello") == 0)
+                assert(strcmp(t.z, "Z") == 0)
+            `,
+        },
+        {
+            "name": "note default values",
+            "definitions": `
+                @note Test {
+                    x: [2]const char = "H"
+                    y: *const char = "Hello"
+                    z: [2]const char = [2]const char {'Z', '\0'}
+                }
+
+                @Test(
+                )
+            `,
+            "code": `
+
             `,
         },
         {

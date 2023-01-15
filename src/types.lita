@@ -686,7 +686,7 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
     return false
 }
 
-public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeChecker) : bool {
+public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeChecker, allowDecay: bool = true) : bool {
     assert(this != null)
     assert(other != null)
 
@@ -767,7 +767,13 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeCheck
             if(IsInteger(other)) {
                 return true
             }
-            return this.isDeclarable(other, checker)
+
+            if(allowDecay) {
+                return this.isDeclarable(other, checker)
+            }
+
+            // Arrays can not be lvalue's...
+            return false
         }
         case TypeKind.PTR: {
             // Allow for pointer arithmetic
