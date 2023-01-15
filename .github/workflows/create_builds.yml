@@ -102,14 +102,14 @@ jobs:
       - name: Full Build
         run: |
           echo Full Build
-          export set LITAC_HOME=$GITHUB_WORKSPACE
+          set LITAC_HOME=$GITHUB_WORKSPACE
           sh $GITHUB_WORKSPACE/build_bootstrap_full.bat
 
       # Test LitaC Compiler
       - name: Test LitaC Compiler
         run: |
           echo Testing LitaC Compiler
-          export set LITAC_HOME=$GITHUB_WORKSPACE
+          set LITAC_HOME=$GITHUB_WORKSPACE
           sh $GITHUB_WORKSPACE/build_test.bat
 
       # Commit the litac_linux.c generated file

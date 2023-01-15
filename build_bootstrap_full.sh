@@ -1,8 +1,9 @@
 #!/bin/bash
-wd=$(pwd)
-echo Current working directory '$wd'
 
-sh ./build.sh
+wd=$(pwd)
+echo Current working directory ${wd}
+
+sh ${wd}/build.sh
 
 cp -f "${wd}/bin/output/a.c" "${wd}/bootstrap/litac_linux.c"
 
