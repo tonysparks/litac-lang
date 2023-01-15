@@ -11,19 +11,18 @@ REM set BUILD_CMD="clang.exe -march=native -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -
 set BUILD_CMD="clang.exe -march=native -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -mtune=znver1 -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS"
 
 echo Running bootstrapped litaC...
-cd bootstrap
-.\litacc.exe -version
-.\litacc -version
-litacc.exe -cFormat -profile -buildCmd %BUILD_CMD% "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
-echo after
+cp "bootstrap\litacc.exe" "bin\litacc.exe"
+cd bin
+dir
+
+litacc.exe -version
+litacc.exe -cFormat -profile -buildCmd %BUILD_CMD% "../src/main.lita" -output "litac" -maxMemory 1GiB
 if errorlevel 1 (
     goto error_compiling
 )
-dir
+
 
 echo Running litaC inception!...
-cd ../bin
-dir
 litac.exe -verbose -profile -cFormat -buildCmd %BUILD_CMD% "../src/main.lita" -maxMemory 1GiB
 if errorlevel 1 (
     goto error_compiling
