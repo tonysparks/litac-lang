@@ -120,7 +120,7 @@ report:
 
 
     if(runProgram) {
-        lita.run()
+        return lita.run()
     }
 
     return 0

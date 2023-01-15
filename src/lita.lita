@@ -496,7 +496,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
     }
 }
 
-public func (this: *Lita) run() {
+public func (this: *Lita) run() : i32 {
     var sb = StringBufferInit(256, this.allocator)
     defer sb.free()
 
@@ -509,7 +509,7 @@ public func (this: *Lita) run() {
     sb.append(" && .%s", PATH_SEPARATOR)
     sb.appendStr(&this.binaryFilename[len + 1])
 
-    system(sb.cStr())
+    return system(sb.cStr())
 }
 
 
