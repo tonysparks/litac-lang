@@ -12,7 +12,8 @@ set BUILD_CMD="clang.exe -march=native -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -mtun
 
 echo Running bootstrapped litaC...
 cd bootstrap
-litacc.exe -version
+.\litacc.exe -version
+.\litacc -version
 litacc.exe -cFormat -profile -buildCmd %BUILD_CMD% "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
 echo after
 if errorlevel 1 (
