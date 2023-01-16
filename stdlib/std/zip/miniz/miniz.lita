@@ -26,7 +26,6 @@ public enum mz_zip_flags {
 }
 
 /* Compression strategies. */
-@foreign
 public enum CompressionStrategy
 {
     MZ_DEFAULT_STRATEGY = 0,

@@ -33,17 +33,20 @@ public enum ZipStatus {
     ERROR_FINALIZING,
 }
 
+public enum ZipCompressionLevel {
+    NO_COMPRESSION = 0,
+    BEST_SPEED = 1,
+    BEST_COMPRESSION = 9,
+    UBER_COMPRESSION = 10,
+    DEFAULT_LEVEL = 6,
+}
+
 public struct ZipFile {
     archive: mz_zip_archive
     type: ZipOpen
     allocator: *const Allocator
 }
 
-/*
-typedef void *(*mz_alloc_func)(void *opaque, size_t items, size_t size);
-typedef void (*mz_free_func)(void *opaque, void *address);
-typedef void *(*mz_realloc_func)(void *opaque, void *address, size_t items, size_t size);
-*/
 func ZipFileAlloc(opaque: *void, items: usize, size: usize) : *void {
     var allocator = opaque as (*const Allocator);
     if(!allocator) {
@@ -116,16 +119,15 @@ public func (this: *ZipFile) close() : ZipStatus {
     return ZipStatus.OK
 }
 
+
+@doc("
+    When writing to the zip file, finalize must be called to mark
+    the completion of writing.
+")
 public func (this: *ZipFile) finalize() : ZipStatus {
     if(!mz_zip_writer_finalize_archive(&this.archive)) {
         return ZipStatus.ERROR_FINALIZING
     }
-    /*
-    if(this.archive.m_pState && this.archive.m_pState.m_pFile) {
-        if(!FileTruncateFile(this.archive.m_pState.m_pFile, this.archive.m_archive_size)) {
-            // return ZipStatus.ERROR_FINALIZING
-        }
-    }*/
     return ZipStatus.OK
 }
 
@@ -140,7 +142,8 @@ public func (this: *ZipFile) getLastError() : *const char {
 public func (this: *ZipFile) zipDir(
     pathToZip: *const char,
     len: i32,
-    baseName: *const char) : ZipStatus {
+    baseName: *const char,
+    level: ZipCompressionLevel = ZipCompressionLevel.DEFAULT_LEVEL) : ZipStatus {
 
     var basePath = StringViewInit(pathToZip, len)
 
@@ -151,14 +154,15 @@ public func (this: *ZipFile) zipDir(
     var path = StringInit(tempPath, MAX_PATH, 0)
     path.format("%.*s", basePath.length, basePath.buffer)
 
-    return this.zipFolder(baseName, &basePath, &archiveName, &path)
+    return this.zipFolder(baseName, &basePath, &archiveName, &path, level)
 }
 
 func (this: *ZipFile) zipFolder(
     baseName: *const char,
     basePath: *StringView,
     archiveName: *String,
-    path: *String) : ZipStatus {
+    path: *String,
+    level: ZipCompressionLevel) : ZipStatus {
 
     var handle: FileHandle{}
     if(!handle.openEx(path.buffer, path.length)) {
@@ -171,7 +175,7 @@ func (this: *ZipFile) zipFolder(
             var len = path.length
             path.append("/%s", handle.name())
 
-            var status = this.zipFolder(baseName, basePath, archiveName, path)
+            var status = this.zipFolder(baseName, basePath, archiveName, path, level)
             path.length = len
 
             if(status != ZipStatus.OK) {
@@ -188,7 +192,7 @@ func (this: *ZipFile) zipFolder(
             var len = path.length
             path.append("/%s", handle.name())
 
-            if(this.addFile(archiveName.cStr(), path.cStr()) != ZipStatus.OK) {
+            if(this.addFile(archiveName.cStr(), path.cStr(), level) != ZipStatus.OK) {
                 return ZipStatus.ERROR_ADDING_FILE
             }
             path.length = len
@@ -203,14 +207,16 @@ func (this: *ZipFile) zipFolder(
 // TODO: Expose compression levels
 public func (this: *ZipFile) addFile(
     archiveName: *const char,
-    filename: *const char) : ZipStatus {
+    filename: *const char,
+    level: ZipCompressionLevel = ZipCompressionLevel.DEFAULT_LEVEL) : ZipStatus {
 
     if(!mz_zip_writer_add_file(
             &this.archive,
             archiveName,
             filename,
             "",
-            0_u16)) {
+            0_u16,
+            level as (CompressionStrategy))) {
         return ZipStatus.ERROR_ADDING_FILE
     }
 

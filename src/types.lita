@@ -1286,6 +1286,9 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo, checker: *TypeChecker
             return this.isDeclarable(castTo, checker)
         }
         case TypeKind.ENUM: {
+            if(IsInteger(castTo)) {
+                return true
+            }
             return this.isDeclarable(castTo, checker)
         }
         case TypeKind.FUNC: {

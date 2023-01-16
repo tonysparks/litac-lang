@@ -346,6 +346,9 @@ func (p: *Parser) notes(notes: *Array<*NoteStmt>) : bool {
         var pos = p.prevPos()
 
         var type = p.identifierType(true)
+        if(!type) {
+            goto err;
+        }
 
         var args = Array<CallArg>{}
         args.init(0, p.allocator)
