@@ -337,11 +337,11 @@ public func (this: *LspServer) handleTextDocumentSaveMessage(msg: *JsonNode, par
 }
 
 public func (this: *LspServer) handleTextDocumentChangeMessage(msg: *JsonNode, params: *JsonNode) {
-    var changeEvent = JsonNodeToTextDocumentChangeEvent(params, this.requestAlloc())
+    /*var changeEvent = JsonNodeToTextDocumentChangeEvent(params, this.requestAlloc())
     if(changeEvent) {
         this.workspace.changeDocument(changeEvent)
         this.writeDiagnostic(changeEvent.textDocument.uri)
-    }
+    }*/
 }
 
 public func (this: *LspServer) handleTextDocumentReferencesMessage(msg: *JsonNode, params: *JsonNode) {

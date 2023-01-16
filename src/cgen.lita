@@ -2003,14 +2003,38 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emitStrn("(", 1)
             }
 
+
+            // capture the last line position, because
+            // default parameters use lineInfo from where
+            // they are initially defined -- which is no good,
+            // especially for capturing __LINE__ and __FILE__ macros...
+            var startPos = expr.startPos
+
             var i = 0;
             for(; i < expr.arguments.size(); i+=1) {
                 if(i > 0) {
                     this.emitStrn(", ", 2)
                 }
-                var arg = expr.arguments.get(i).argExpr
-                if(!this.emitTraitCast(arg)) {
-                    this.emitStmt(arg)
+
+                var arg = expr.arguments.get(i)
+                if(!arg.argExpr) {
+                    continue;
+                }
+
+                if(!this.emitTraitCast(arg.argExpr)) {
+                    if(arg.isDefault) {
+                        var oldPos = arg.argExpr.startPos
+                        defer arg.argExpr.startPos = oldPos
+
+                        arg.argExpr.startPos.filename = startPos.filename
+                        arg.argExpr.startPos.lineNumber = startPos.lineNumber
+
+                        this.emitStmt(arg.argExpr)
+                    }
+                    else {
+                        this.emitStmt(arg.argExpr)
+                        startPos = arg.argExpr.startPos
+                    }
                 }
             }
 

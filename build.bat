@@ -22,7 +22,7 @@ if errorlevel 1 (
 
 
 echo Running litaC inception!...
-litac.exe -verbose -profile -cFormat -buildCmd %BUILD_CMD% "../src/main.lita" -maxMemory 1GiB
+litac.exe -verbose -profile -cFormat -debug -buildCmd %BUILD_CMD% "../src/main.lita" -maxMemory 1GiB
 if errorlevel 1 (
     goto error_compiling
 )

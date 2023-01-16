@@ -727,7 +727,8 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                 if(!hasValue) {
                     suppliedArgs.add(CallArg {
                         .argExpr = param.defaultExpr,
-                        .index = index
+                        .index = index,
+                        .isDefault = true,
                     })
                 }
             }

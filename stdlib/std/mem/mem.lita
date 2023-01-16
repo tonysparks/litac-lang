@@ -214,14 +214,6 @@ public const cAllocator : *const Allocator = (&Allocator {
 #end
 
 
-
-
-
-
-
-
-
-
 #if (DEBUG)
     public func GenericMalloc<T>(alloc: *const Allocator,
                         size: usize,
@@ -312,12 +304,20 @@ public const cAllocator : *const Allocator = (&Allocator {
 =========================================================
 */
 const MAX_PATH = 256
+
+#if (DEBUG)
 public struct Allocation {
     addr: *void
     size: usize
     line: u64
     filename: [MAX_PATH]char
 }
+#else
+public struct Allocation {
+    addr: *void
+    size: usize
+}
+#end
 
 public struct DebugAllocator {
     alloc: Allocator
@@ -348,44 +348,33 @@ public func (d: *DebugAllocator) free() {
     d.allocations.free()
 }
 
-public func (d: *DebugAllocator) report() {
-    c::printf("Leaked Allocations: {\n")
-    for(var i = 0; i < d.allocations.size(); i += 1) {
-        var a = d.allocations.get(i)
-        if(a.line > 0) {
-            c::printf("   Leak at %p (%zu bytes) allocated in '%s' at line: %ju\n", a.addr, a.size, a.filename, a.line)
+#if (DEBUG)
+    public func (d: *DebugAllocator) report() {
+        c::printf("Leaked Allocations: {\n")
+        for(var i = 0; i < d.allocations.size(); i += 1) {
+            var a = d.allocations.get(i)
+            if(a.line > 0) {
+                c::printf("   Leak at %p (%zu bytes) allocated in '%s' at line: %ju\n", a.addr, a.size, a.filename, a.line)
+            }
+            else {
+                c::printf("   Leak at %p (%zu bytes)\n", a.addr, a.size)
+            }
         }
-        else {
-            c::printf("   Leak at %p (%zu bytes)\n", a.addr, a.size)
-        }
-    }
-    c::printf("}\n")
-}
-
-public func (d: *DebugAllocator) malloc(size: usize,
-                                        file: *const char,
-                                        line: u64) : *void {
-
-    var allocationSize = sizeof(:Allocation) + size;
-    var mem = d.decorated.alloc(allocationSize);
-    if(!mem) {
-        return null;
+        c::printf("}\n")
     }
 
-    var allocation = mem as (*Allocation)
-    allocation.addr = mem + sizeof(:Allocation)
-    allocation.size = size
-    allocation.line = line
-    c::strncpy(allocation.filename, file, MAX_PATH)
+    public func (d: *DebugAllocator) malloc(size: usize,
+                                            file: *const char,
+                                            line: u64) : *void {
 
-    d.allocations.add(allocation)
-    d.totalBytesAllocated += size
-    d.totalAllocations += 1
+        var allocationSize = sizeof(:Allocation) + size;
+        var mem = d.decorated.alloc(allocationSize, file, line);
+        if(!mem) {
+            return null;
+        }
 
-    /*var mem = d.decorated.alloc(size)
-    if(mem) {
-        var allocation = new<Allocation>(d.decorated);
-        allocation.addr = mem
+        var allocation = mem as (*Allocation)
+        allocation.addr = mem + sizeof(:Allocation)
         allocation.size = size
         allocation.line = line
         c::strncpy(allocation.filename, file, MAX_PATH)
@@ -393,12 +382,24 @@ public func (d: *DebugAllocator) malloc(size: usize,
         d.allocations.add(allocation)
         d.totalBytesAllocated += size
         d.totalAllocations += 1
-    }*/
 
-    return allocation.addr;
-}
+        /*var mem = d.decorated.alloc(size)
+        if(mem) {
+            var allocation = new<Allocation>(d.decorated);
+            allocation.addr = mem
+            allocation.size = size
+            allocation.line = line
+            c::strncpy(allocation.filename, file, MAX_PATH)
 
-#if (DEBUG)
+            d.allocations.add(allocation)
+            d.totalBytesAllocated += size
+            d.totalAllocations += 1
+        }*/
+
+        return allocation.addr;
+    }
+
+
     func DebugMalloc(alloc: *const Allocator,
                      size: usize,
                      file: *const char = c::__FILE__,
@@ -428,7 +429,7 @@ public func (d: *DebugAllocator) malloc(size: usize,
                       file: *const char = c::__FILE__,
                       line: u64 = c::__LINE__) : *void {
         if(ptr == null) {
-            return DebugMalloc(alloc, size)
+            return DebugMalloc(alloc, size, file, line)
         }
 
         var debug = alloc as (*DebugAllocator);
@@ -447,15 +448,41 @@ public func (d: *DebugAllocator) malloc(size: usize,
     }
 
 #else
+    public func (d: *DebugAllocator) report() {
+        c::printf("Leaked Allocations: {\n")
+        for(var i = 0; i < d.allocations.size(); i += 1) {
+            var a = d.allocations.get(i)
+            c::printf("   Leak at %p (%zu bytes)\n", a.addr, a.size)
+        }
+        c::printf("}\n")
+    }
+
+    public func (d: *DebugAllocator) malloc(size: usize) : *void {
+        var allocationSize = sizeof(:Allocation) + size;
+        var mem = d.decorated.alloc(allocationSize);
+        if(!mem) {
+            return null;
+        }
+
+        var allocation = mem as (*Allocation)
+        allocation.addr = mem + sizeof(:Allocation)
+        allocation.size = size
+
+        d.allocations.add(allocation)
+        d.totalBytesAllocated += size
+        d.totalAllocations += 1
+
+        return allocation.addr;
+    }
 
     func DebugMalloc(alloc: *const Allocator, size: usize) : *void {
         var debug = alloc as (*DebugAllocator);
-        return debug.malloc(size, "", 0);
+        return debug.malloc(size);
     }
 
     func DebugCalloc(alloc: *const Allocator, num: usize, size: usize) : *void {
         var debug = alloc as (*DebugAllocator);
-        var result = debug.malloc(size * num, "", 0);
+        var result = debug.malloc(size * num);
         if(result) {
             c::memset(result, 0, size * num)
         }
@@ -470,7 +497,7 @@ public func (d: *DebugAllocator) malloc(size: usize,
 
         var debug = alloc as (*DebugAllocator);
 
-        var result = debug.malloc(size, "", 0);
+        var result = debug.malloc(size);
         if(result) {
             var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
             var len = c::MIN(allocation.size, size)
@@ -535,7 +562,6 @@ func DebugFree(alloc: *const Allocator, ptr: *void) {
     public func ModuleInit() {
         var debugAllocator = defaultAllocator as (*DebugAllocator)
         debugAllocator.init(cAllocator);
-        //c::printf("Module Init!\n")
     }
 
     @module_destroy
@@ -543,7 +569,6 @@ func DebugFree(alloc: *const Allocator, ptr: *void) {
         var debugAllocator = defaultAllocator as (*DebugAllocator)
         debugAllocator.report();
         debugAllocator.free();
-        //c::printf("Module Destroy!\n")
     }
 
 #else
@@ -557,3 +582,8 @@ func DebugFree(alloc: *const Allocator, ptr: *void) {
         }) as (*const Allocator);
 
 #end
+
+@test
+func testLineNumber() {
+    var mem = defaultAllocator.alloc(1024)
+}

@@ -461,6 +461,7 @@ public struct CallArg {
     argExpr: *Expr
     argName: Identifier
     index: i32
+    isDefault: bool = false
 }
 
 public struct FuncCallExpr {
