@@ -72,6 +72,12 @@ struct LARGE_INTEGER {
 }
 
 @foreign
+func RemoveDirectoryA(pathname: *const char) : bool;
+
+@foreign
+func DeleteFile(pathname: *const char) : bool;
+
+@foreign
 func CreateDirectoryA(pathname: *const char, attr: *void) : bool;
 
 @foreign
@@ -168,6 +174,14 @@ public func _FileTruncateFile(file: *FILE, newLength: usize) : bool {
 
     var fd = fileno(file)
     return ftruncate(fd, newLength);
+}
+
+@inline
+public func _FileDelete(filename: *const char) : bool {
+    if(_FileIsDir(filename)) {
+        return RemoveDirectoryA(filename)
+    }
+    return DeleteFile(filename)
 }
 
 @inline

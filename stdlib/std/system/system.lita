@@ -236,7 +236,7 @@ public func FileTruncateFile(file: *FILE, newLength: usize) : bool {
 }
 
 public func FileDelete(filename: *const char) : bool {
-    return remove(filename) == 0
+    return _FileDelete(filename)
 }
 
 public func FileExists(filename: *const char) : bool {
@@ -284,11 +284,6 @@ public func Mkdirs(dir: *const char) : bool {
     }
 
     return _Mkdir(dir)
-}
-
-@test
-func testMkdirs() {
-    Mkdirs("C:/tony/this/test")
 }
 
 public func FilePath(filename: *const char, out:[MAX_PATH]char) : *char {
@@ -703,3 +698,9 @@ func testMkdirDelete() {
     FileDelete("rodgers")
     assert(!FileExists("rodgers"))
 }
+
+
+// @test
+// func testMkdirs() {
+//     Mkdirs("C:/tony/this/test")
+// }

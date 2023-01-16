@@ -127,10 +127,10 @@ func cleanPackageDirectory(pm: *PackageManager, pkgPath: *const char) : PkgStatu
     var path = StringInit(temp, MAX_PATH, 0)
     path.append("%s", pkgPath)
 
-    return deleteDir(path)
+    return deleteDir(pm, path)
 }
 
-func deleteDir(path: *String) : PkgStatus {
+func deleteDir(pm: *PackageManager, path: *String) : PkgStatus {
     if(!FileExists(path.cStr())) {
         return PkgStatus.OK
     }
@@ -146,14 +146,13 @@ func deleteDir(path: *String) : PkgStatus {
         defer path.length = len
 
         if(file.isDirectory()) {
-            if(deleteDir(path) != PkgStatus.OK) {
+            if(deleteDir(pm, path) != PkgStatus.OK) {
                 return PkgStatus.ERROR_CLEANING_PKG
             }
         }
 
-        printf("Deleting: '%s'\n", path.cStr())
         if(!FileDelete(path.cStr())) {
-            printf("Failed to delete: '%s'\n", path.cStr())
+            pm.errors.append("Failed to delete: '%s'\n", path.cStr())
             return PkgStatus.ERROR_CLEANING_PKG
         }
 
@@ -380,15 +379,13 @@ func installPackage(
             libPath.format("%s/pkg/bin/%s", pkgPath, lib)
 
             if(!FileExists(libPath.cStr())) {
-                // TODO: log warning..
-                printf("missing dynamic library: '%s'\n", libPath.cStr())
+                pm.warnings.append("missing dynamic library: '%s'\n", libPath.cStr())
                 continue;
             }
 
             destPath.format("%s/bin/%s", pm.options.projectPath, lib)
             if(!FileMove(libPath.cStr(), destPath.cStr())) {
-                // TODO: log warning??
-                printf("unable to move dynamic library '%s' to '%s'\n",
+                pm.warnings.append("unable to move dynamic library '%s' to '%s'\n",
                     libPath.cStr(), destPath.cStr())
             }
         }

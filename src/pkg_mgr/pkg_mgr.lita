@@ -143,6 +143,7 @@ public struct PackageManager {
     pkg: *PackageDef   // this projects package definition
 
     errors: StringBuffer
+    warnings: StringBuffer
 }
 
 public func (this: *PackageManager) init(
@@ -153,6 +154,7 @@ public func (this: *PackageManager) init(
     this.allocator = allocator
     this.packages = StrMap<*PackageDef>(null, 32, allocator)
     this.errors = StringBufferInit(128, allocator)
+    this.warnings = StringBufferInit(128, allocator)
 }
 
 
@@ -167,18 +169,26 @@ public func (this: *PackageManager) free() {
 
     this.packages.free()
     this.errors.free()
+    this.warnings.free()
     this.pkg = null
+}
+
+
+func (this: *PackageManager) printMessages() {
+    if(this.warnings.length > 0) {
+        printf("Warning: %s\n", this.warnings.cStr())
+    }
+
+    if(this.errors.length > 0) {
+        printf("Error: %s\n", this.errors.cStr())
+    }
 }
 
 @doc("""
     Installs all packages defined the pkg.json to the file system.
 """)
 public func (this: *PackageManager) install() : PkgStatus {
-    defer {
-        if(this.errors.length > 0) {
-            printf("Error: %s\n", this.errors.cStr())
-        }
-    }
+    defer this.printMessages()
 
     var status = this.readProjectPkg()
     if(status != PkgStatus.OK) {
@@ -226,6 +236,8 @@ public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : Pkg
     Run a command from the pkg.json:commands[{argument}]
 """)
 public func (this: *PackageManager) runCommand(cmd: *const char) : PkgStatus {
+    defer this.printMessages()
+
     var status = this.readProjectPkg()
     if(status != PkgStatus.OK) {
         return status;
