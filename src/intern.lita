@@ -43,6 +43,7 @@ public const F64 = InternedString{};
 public const USIZE = InternedString{};
 public const CONST = InternedString{};
 public const STRING = InternedString{};
+public const GENERIC_PARAM = InternedString{};
 public const POISON = InternedString{};
 public const BUILTIN = InternedString{};
 public const MAIN = InternedString{};
@@ -137,6 +138,7 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("usize", 5, &USIZE)
     this.internConstant("const", 5, &CONST)
     this.internConstant("*const char", 11, &STRING)
+    this.internConstant("generic_param", 13, &GENERIC_PARAM)
     this.internConstant("<poison>", 8, &POISON)
     this.internConstant("builtin", 7, &BUILTIN)
     this.internConstant("main", 4, &MAIN)

@@ -472,6 +472,8 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     for(var i = 0; i < field.aggregateField.genericParams.size(); i += 1) {
                         var genericParam = field.aggregateField.genericParams.get(i)
 
+                        assert(aggDecl.sym.genericParams.size() == aggDecl.sym.genericArgs.size())
+
                         for(var j = 0; j < aggDecl.sym.genericParams.size(); j += 1) {
                             var parentGenericParam = aggDecl.sym.genericParams.get(j)
 

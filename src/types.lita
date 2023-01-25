@@ -869,6 +869,9 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeCheck
         case TypeKind.POISON: {
             return false;
         }
+        case TypeKind.GENERIC_PARAM: {
+            return true;
+        }
         default: {
             printf("Type: %s\n", typeKindText[this.kind])
             assert(false)
@@ -1409,6 +1412,10 @@ public func (this: *TypeInfo) asTypeSpec(lita: *Lita) : *TypeSpec {
         case TypeKind.STR: {
             return NewNameTypeSpecIntern(pos, STRING, lita) as (*TypeSpec)
         }
+        case TypeKind.GENERIC_PARAM: {
+            var genericParamInfo = this as (*TypeInfo)
+            return NewNameTypeSpecIntern(pos, genericParamInfo.name, lita) as (*TypeSpec)
+        }
         case TypeKind.ARRAY: {
             var arrayInfo = this as (*ArrayTypeInfo)
             var arrayTypeSpec = NewTypeSpec(TypeSpecKind.ARRAY, pos, lita) as (*ArrayTypeSpec)
@@ -1474,6 +1481,12 @@ public func (this: *TypeInfo) asTypeSpec(lita: *Lita) : *TypeSpec {
             return NewNameTypeSpecIntern(pos, POISON, lita) as (*TypeSpec)
         }
         default: {
+            /*printf("TypeId: '%d'\n", this.kind)
+            printf("Type: '%s'\n", TypeKindAsStr(this.kind))
+            // force crash report
+            var x: *char = null
+            x[0] = 2
+            */
             assert(false)
         }
     }
