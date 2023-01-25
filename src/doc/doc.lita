@@ -1,0 +1,116 @@
+import "std/mem"
+import "std/system"
+import "std/array"
+import "std/map"
+import "std/libc"
+import "std/string_buffer"
+
+import "ast"
+import "symbols"
+import "lita"
+import "lex"
+import "module"
+
+public enum DocStatus {
+    OK = 0,
+    ERROR_CREATING_DOC_DIR,
+}
+
+public struct DocOptions {
+    docDir: *const char    // directory where generated documents are output
+    docAll: bool           // include all members including package private
+}
+
+public struct DocGen {
+    options: DocOptions
+    allocator: *const Allocator
+}
+
+public func (this: *DocGen) init(
+    options: DocOptions,
+    allocator: *const Allocator = defaultAllocator) {
+
+    this.options = options
+    this.allocator = allocator
+}
+
+public func (this: *DocGen) generate(lita: *Lita) : DocStatus {
+    Mkdirs(this.options.docDir)
+
+    if(!FileExists(this.options.docDir)) {
+        return DocStatus.ERROR_CREATING_DOC_DIR
+    }
+
+    var buffer = StringBufferInit(256, this.allocator)
+    defer buffer.free()
+
+    for(var it = lita.modules.iter(); it.hasNext();) {
+        var entry = it.next()
+        this.generateModuleDocs(entry.value, buffer)
+    }
+
+    return DocStatus.OK
+}
+
+func (this: *DocGen) generateModuleDocs(module: *Module, buffer: *StringBuffer) : DocStatus {
+    printf("\n************ Module: %.*s ********************\n", module.id.name.length, module.id.name.buffer)
+
+    var symbols = module.symbols
+
+    for(var i = 0; i < symbols.symbolTypes.capacity; i+=1) {
+        var symName = symbols.symbolTypes.keys[i]
+        var sym = symbols.symbolTypes.values[i]
+        if(!symName.addr || !sym) {
+            continue
+        }
+
+        this.generateSymbol(sym, buffer)
+        buffer.clear()
+    }
+
+    for(var i = 0; i < symbols.symbolFuncs.capacity; i+=1) {
+        var symName = symbols.symbolFuncs.keys[i]
+        var sym = symbols.symbolFuncs.values[i]
+        if(!symName.addr || !sym) {
+            continue
+        }
+
+        this.generateSymbol(sym, buffer)
+        buffer.clear()
+    }
+
+    return DocStatus.OK
+}
+
+func (this: *DocGen) generateSymbol(sym: *Symbol, buffer: *StringBuffer) : DocStatus {
+    if(!sym) {
+        return DocStatus.OK
+    }
+    GetTypeName(buffer, sym)
+    printf("%.*s : %.*s\n", sym.name.length, sym.name.buffer, buffer.length, buffer.buffer)
+
+    var docNote = sym.decl.getNote("doc")
+    if(docNote && docNote.arguments.size()) {
+        var arg = docNote.arguments.get(0)
+        if(arg.argExpr && arg.argExpr.kind == StmtKind.STRING_EXPR) {
+            var strExpr = arg.argExpr as (*StringExpr)
+            printf("Doc: %.*s\n", strExpr.string.str.length, strExpr.string.str.buffer)
+        }
+    }
+
+    return DocStatus.OK
+}
+
+func GetTypeName(buffer: *StringBuffer, sym: *Symbol) {
+    var type = sym.type
+    if(!type) {
+        return;
+    }
+
+    switch(type.kind) {
+        default: {
+            type.toString(buffer)
+            break;
+        }
+    }
+}

@@ -141,6 +141,10 @@ public struct LitaOptions {
 
     maxMemory: usize               // max amount of memory that can be allocated
 
+    runDoc: bool                   // if document generator should be ran
+    docPath: [MAX_PATH]char        // the directory to store generated documentation
+    docAll: bool                   // if all members should be documented, including module private
+
     proxy: *const char             // the proxy server to use
     pkgOptions: PkgOptions         // Package Manager options
 }
