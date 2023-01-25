@@ -1,2 +1,62 @@
 @include("assert.h");
 @foreign public func assert(e:bool):void;
+
+/*
+import "std/libc"
+
+public enum ResultType {
+    RESULT = 0,
+    ERROR = 1,
+}
+
+public struct Result<T, E> {
+    type: ResultType
+    union <T, E> {
+        result: T
+        error: E
+    }
+}
+
+public func (this: *Result<T,E>) isError<T,E>() : bool {
+    return this.type == ResultType.ERROR
+}
+
+public func (this: *Result<T,E>) isResult<T,E>() : bool {
+    return this.type == ResultType.RESULT
+}
+
+public func NewResult<T, E>(result: T, error: E) : Result<T, E> {
+    if(error) {
+        return Result<T, E> {
+            .type = ResultType.ERROR,
+            .error = error,
+        }
+    }
+    return Result<T, E> {
+        .type = ResultType.RESULT,
+        .result = result,
+    }
+}
+
+
+public func Error<T, E>(error: E) : Result<T, E> {
+    return Result<T, E> {
+        .type = ResultType.ERROR,
+        .error = error
+    }
+}
+public func Ok<T, E>(result: T) : Result<T, E> {
+    return Result<T, E> {
+        .type = ResultType.RESULT,
+        .result = result,
+    }
+}
+
+@test
+func testResult() {
+    var result = NewResult(.result = 4, .error = 0)
+    assert(result.result == 4)
+    printf("Result: %d IsError: %d IsResult: %d\n", result.result, result.isError(), result.isResult())
+
+    var r = Error<i32, i32>(1)
+}*/

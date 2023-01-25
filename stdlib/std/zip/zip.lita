@@ -215,8 +215,8 @@ public func (this: *ZipFile) addFile(
             archiveName,
             filename,
             "",
-            0_u16,
-            level as (CompressionStrategy))) {
+            0_u16/*,
+            level as (CompressionStrategy)*/)) {
         return ZipStatus.ERROR_ADDING_FILE
     }
 
