@@ -2904,9 +2904,10 @@ func (p: *Parser) match(type: TokenType) : bool {
 }
 
 func (p: *Parser) matches(types: *TokenType, len: i32) : bool {
+    var token = p.peek()
     for(var i = 0; i < len; i += 1) {
         var type = types[i]
-        if(p.check(type)) {
+        if(token.type == type) {
             p.advance()
             return true
         }

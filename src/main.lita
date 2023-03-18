@@ -28,6 +28,7 @@ import "lsp"
 import "intern"
 import "build"
 
+import "doc"
 import "pkg_mgr"
 
 func main(len: i32, args: **char) : i32 {
@@ -116,6 +117,12 @@ report:
         printf("Total allocations:  %u\n", allocator.totalAllocations)
         printf("Total source lines: %u\n", lita.totalSourceLines)
         printf("\n")
+    }
+
+    if(options.runDoc) {
+        if(DocGenerate(options, &lita) != DocStatus.OK) {
+            return 2;
+        }
     }
 
 
@@ -211,6 +218,12 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
 
         GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
     }
+
+    options.docAll = parser.hasOption("docAll")
+    options.runDoc = options.docAll || parser.hasOption("doc")
+
+    var docPath = parser.hasOption("docDir") ? parser.getOption("docDir").value : "./docs"
+    StringCopy(.src = docPath, .dest = options.docPath, .size = MAX_PATH)
 
     var lib:*const char = GetEnv("LITAC_HOME")
     if(!lib) lib = "";
@@ -420,4 +433,15 @@ func RunPkgCommand(options: *LitaOptions, pm: *PackageManager) : i32 {
         return 1;
     }
     return 0;
+}
+
+func DocGenerate(options: *LitaOptions, lita: *Lita) : DocStatus {
+    var docOptions = DocOptions {
+        .docDir = options.docPath,
+        .docAll = options.docAll,
+    }
+    var gen: DocGen{}
+    gen.init(docOptions, lita.allocator)
+
+    return gen.generate(lita)
 }

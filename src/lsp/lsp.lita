@@ -114,9 +114,9 @@ public func (this: *LspServer) readMessage() {
     }
 
     var startTime = SystemTimeMSec()
-    defer this.log(">>> Request Handling Time: %.4fms\n\n", SystemTimeMSec() - startTime)
+    defer this.log(">>> Request Handling Time: %10.4fms\n\n", SystemTimeMSec() - startTime)
     // free memory
-    defer this.requestAllocator.currentOffset = 0
+    defer this.requestAllocator.clear()
 
     this.log("Received message size: %d\n", size)
     this.message.reserve(size)
@@ -146,6 +146,15 @@ public func (this: *LspServer) readMessage() {
     }
 
     this.handleMessage(json)
+
+    // Memory usage capturing
+    {
+        this.log("Memory Usage: \n\tReq: %lluKiB\n\tApp: %lluKiB\n\tLita: %lluKiB\n",
+            this.requestAllocator.totalBytesAllocated / KiB,
+            this.applicationAllocator.totalBytesAllocated / KiB,
+            this.lita.linearAllocator.totalBytesAllocated / KiB
+        )
+    }
 }
 
 func (this: *LspServer) readHeader() : i32 {
@@ -153,7 +162,6 @@ func (this: *LspServer) readHeader() : i32 {
     var sizeIndex = 0
     var index = 0
 
-    this.log("Reading header:\n'")
     while(true) {
         var r = getchar()
         if(r == EOF) {
@@ -161,8 +169,6 @@ func (this: *LspServer) readHeader() : i32 {
         }
 
         var c = r as (char)
-        this.log("%c", c)
-
         if(c == ' ') {
             sizeIndex = index + 1
         }
@@ -178,7 +184,7 @@ func (this: *LspServer) readHeader() : i32 {
         index += 1
     }
 
-    this.log("'\nRead header: '%s'\n", header)
+    this.log("Parsed header: '%s'\n", header)
 
     if(strncmp(header, "Content-Length: ", sizeIndex) != 0) {
         this.log("Invalid header: '%s'\n", header)
