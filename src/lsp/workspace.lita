@@ -781,7 +781,7 @@ public func (this: *Workspace) runDiagnostics(alloc: *const Allocator, docUri: *
     lita.result.isReadable = true
 
     var totalTime = SystemTimeMSec() - startTime
-    this.lsp.log("Successfully compiled in %.3f msec\n", totalTime)
+    this.lsp.log("Successfully compiled in %10.3f msec\n", totalTime)
 
 report:
     return &lita.result
