@@ -49,6 +49,9 @@ public enum SymbolFlags {
     IS_TRAIT_GENERATED      = (1<<19),
     IS_GENERATED            = (1<<20),
     IS_NOTE                 = (1<<21),
+
+    // Marked for reset for incremental compliation
+    IS_MARKED_RESET         = (1<<22),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -99,25 +102,43 @@ public struct Scope {
     symbolTypes: Map<InternedString, *Symbol>
     symbolFuncs: Map<InternedString, *Symbol>
 
-    module: *Module // TEMP
+    module: *Module
 }
 
-public func NewScope(kind: ScopeKind, parent: *Scope, result: *PhaseResult, allocator: *const Allocator) : *Scope {
+public func NewScope(
+    kind: ScopeKind,
+    parent: *Scope,
+    result: *PhaseResult,
+    module: *Module,
+    allocator: *const Allocator) : *Scope {
+
     var scope = new<Scope>(allocator)
-    scope.init(kind, parent, result, allocator)
+    scope.init(kind, parent, result, module, allocator)
     return scope
 }
 
 public func (scope: *Scope) init(kind: ScopeKind,
                                  parent: *Scope,
                                  result: *PhaseResult,
+                                 module: *Module,
                                  allocator: *const Allocator) {
     scope.kind = kind
     scope.allocator = allocator
     scope.parent = parent
     scope.result = result
+    scope.module = module
     scope.symbolTypes = InternMap<*Symbol>(null, 16, allocator)
     scope.symbolFuncs = InternMap<*Symbol>(null, 16, allocator)
+}
+
+public func (scope: *Scope) initIncrementalBuild() {
+    scope.markReset(scope.symbolTypes)
+    scope.markReset(scope.symbolFuncs)
+}
+
+public func (scope: *Scope) postIncrementalBuild() {
+    scope.cleanMarked(scope.symbolTypes)
+    scope.cleanMarked(scope.symbolFuncs)
 }
 
 public func (s: *Scope) lookupFunc(name: InternedString) : *Symbol {
@@ -167,28 +188,28 @@ public func (s: *Scope) lookupByToken(name: Token) : *Symbol {
 public func (this: *Scope) importSymbol(name: InternedString,
                                         symbol: *Symbol) {
 
-    if(symbol.kind == SymbolKind.FUNC) {
-        if(this.symbolFuncs.contains(name) && !symbol.decl.hasNote("generated")) {
-            var existingSym = this.symbolFuncs.get(name)
-            var decl = existingSym.decl
-            this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
-                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
-            return;
-        }
+    var symbolStorage = &this.symbolFuncs
 
-        this.symbolFuncs.put(name, symbol)
+    if(symbol.kind != SymbolKind.FUNC) {
+        symbolStorage = &this.symbolTypes
     }
-    else {
-        if(this.symbolTypes.contains(name) && !symbol.decl.hasNote("generated")) {
-            var existingSym = this.symbolTypes.get(name)
-            var decl = existingSym.decl
-            this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
-                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
-            return;
-        }
 
-        this.symbolTypes.put(name, symbol)
+    // if we are in the process of an incremental build, go ahead and
+    // ignore duplicate checks..
+    // if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
+    //     symbol.flags |= ~SymbolFlags.IS_MARKED_RESET
+    // }
+    // else
+
+    if(symbolStorage.contains(name) && !symbol.decl.hasNote("generated")) {
+        var existingSym = symbolStorage.get(name)
+        var decl = existingSym.decl
+        this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
+            name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+        return;
     }
+
+    symbolStorage.put(name, symbol)
 }
 
 public func (this: *Scope) addSymbol(name: InternedString,
@@ -197,19 +218,33 @@ public func (this: *Scope) addSymbol(name: InternedString,
                                      flags: i32) : *Symbol {
 
     var isFunc = decl.kind == StmtKind.FUNC_DECL
+    var symbolStorage = &this.symbolTypes
 
     if(isFunc) {
-        if(this.symbolFuncs.contains(name) && !decl.hasNote("generated")) {
-            var existingSym = this.symbolFuncs.get(name)
-            var decl = existingSym.decl
-            this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
-                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
-            return null;
-        }
+        symbolStorage = &this.symbolFuncs
     }
-    else {
-        if(this.symbolTypes.contains(name) && !decl.hasNote("generated")) {
-            var existingSym = this.symbolTypes.get(name)
+
+    var sym: *Symbol = null;
+    var isRebuild = this.module.flags & ModuleFlags.INCREMENTAL_COMPILATION;
+
+    if(symbolStorage.contains(name)) {
+        var isError = true
+
+        // if we are incrementally rebuilding this module,
+        // we will allow for recreating this existing symbol
+        // if it's marked
+        if(isRebuild) {
+            sym = symbolStorage.get(name)
+            if(sym.flags & SymbolFlags.IS_MARKED_RESET) {
+                sym.flags &= ~SymbolFlags.IS_MARKED_RESET
+                isError = false
+            }
+        }
+
+        isError = isError && !decl.hasNote("generated")
+
+        if(isError) {
+            var existingSym = symbolStorage.get(name)
             var decl = existingSym.decl
             this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
                 name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
@@ -289,7 +324,10 @@ public func (this: *Scope) addSymbol(name: InternedString,
         }
     }
 
-    var sym = new<Symbol>(this.allocator)
+    if(!sym) {
+        sym = new<Symbol>(this.allocator);
+    }
+
     sym.kind = kind
     sym.name = name
     sym.state = SymbolState.UNRESOLVED
@@ -300,13 +338,7 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
     decl.sym = sym
 
-    if(isFunc) {
-        this.symbolFuncs.put(sym.name, sym)
-    }
-    else {
-        this.symbolTypes.put(sym.name, sym)
-    }
-
+    symbolStorage.put(sym.name, sym)
     return sym
 }
 
@@ -332,4 +364,64 @@ public func (this: *Scope) print(header: *const char) {
         printf("   '%.*s'\n", symbol.name.length, symbol.name.buffer)
     }
     printf("}\n")
+}
+
+func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
+    for(var i = 0; i < symbols.capacity; i+=1) {
+        var symName = symbols.keys[i]
+        var symbol = symbols.values[i]
+        if(!symName.addr || !symbol) {
+            continue
+        }
+
+        // remove entries not declared in this module
+        // so that they can be reimported if necessary
+        if(!symbol.declared.equals(this.module)) {
+            //printf("Not defined in module: %.*s\n", symName.length ,symName.buffer)
+            symbols.keys[i] = EMPTY_STR
+            symbols.values[i] = null
+            symbols.length -= 1
+            continue
+        }
+
+        symbol.flags |= SymbolFlags.IS_MARKED_RESET
+    }
+}
+
+func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
+    for(var i = 0; i < symbols.capacity; i+=1) {
+        var symName = symbols.keys[i]
+        var symbol = symbols.values[i]
+        if(!symName.addr || !symbol) {
+            continue
+        }
+
+        if(!symbol.declared.equals(this.module)) {
+            continue
+        }
+
+        // Remove any entries that haven't been stored again
+        // this means they were deleted
+        if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
+            symbols.keys[i] = EMPTY_STR
+            symbols.values[i] = null
+            symbols.length -= 1
+
+
+            var isFunc = symbol.kind == SymbolKind.FUNC
+
+            // TODO: Reach out to all other modules who reference
+            // this symbol and delete it...
+            // TODO: performance...
+            for(var i = 0; i < this.module.importedBy.size(); i+=1) {
+                var m = this.module.importedBy.get(i).module
+                if(isFunc) {
+                    m.symbols.symbolFuncs.remove(symName)
+                }
+                else {
+                    m.symbols.symbolTypes.remove(symName)
+                }
+            }
+        }
+    }
 }

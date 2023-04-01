@@ -238,7 +238,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
     {
         //printf("Traits Source: \n%s\n", sb.cStr())
-        var parser = ParserInit("generated", sb.cStr(), sb.length, checker.lita)
+        var parser = ParserInit("generated", sb.cStr(), sb.length, checker.allocator, checker.lita)
         var stmts = parser.parseModule()
         decls.addAll(stmts.declarations)
     }
@@ -310,7 +310,7 @@ func GetTraitName(traitSym: *Symbol, sb: *StringBuffer) : StringView {
 }
 
 func Parse(sb: *StringBuffer, checker: *TypeChecker, decls: *Array<*Decl>) {
-    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.lita)
+    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.allocator, checker.lita)
     var stmts = parser.parseModule()
     decls.addAll(stmts.declarations)
 }

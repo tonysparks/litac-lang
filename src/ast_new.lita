@@ -12,33 +12,65 @@ import "module"
 import "lita"
 import "intern"
 
-public func NewVoidTypeSpec(pos: SrcPos, lita: *Lita) : *TypeSpec {
-    var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, lita) as (*NameTypeSpec)
+
+public struct TypeSpecAllocator {
+    typeSpecs: Array<TypeSpec>
+}
+
+public func (this: *TypeSpecAllocator) init(allocator: *const Allocator) {
+    this.typeSpecs.init(1024, allocator)
+}
+
+public func (this: *TypeSpecAllocator) free(){
+    this.typeSpecs.free()
+}
+
+public func (this: *TypeSpecAllocator) clear(){
+    this.typeSpecs.clear()
+}
+
+public func (this: *TypeSpecAllocator) alloc() : *TypeSpec {
+    this.typeSpecs.add(TypeSpec{})
+    return this.typeSpecs.getPtr(this.typeSpecs.size() - 1)
+}
+
+@test
+func typeSpecAllocator() {
+    var specs = TypeSpecAllocator{}
+    specs.init(defaultAllocator)
+
+    var x = specs.alloc()
+    x.name = InternedString{}
+    specs.free()
+}
+
+public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
+    var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, allocator) as (*NameTypeSpec)
     voidSpec.name = VOID
     return voidSpec as (*TypeSpec)
 }
 
-public func NewNameTypeSpecIntern(pos: SrcPos, name: InternedString, lita: *Lita) : *NameTypeSpec {
-    var result = new<NameTypeSpec>(lita.allocator)
+public func NewNameTypeSpecIntern(pos: SrcPos, name: InternedString, allocator: *const Allocator) : *NameTypeSpec {
+    var result = new<NameTypeSpec>(allocator)
     result.kind = TypeSpecKind.NAME
     result.pos = pos
     result.base = null
     result.name = name
-    result.genericArgs.init(0, lita. allocator)
+    result.genericArgs.init(0, allocator)
     return result
 }
 
-public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, lita: *Lita) : *TypeSpec {
+public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
     switch(kind) {
         case TypeSpecKind.NONE: {
-            var result = new<TypeSpec>(lita.allocator)
+            var result = new<TypeSpec>(allocator)
             result.kind = TypeSpecKind.NONE
             result.pos = pos
             result.base = null
             return result
         }
         case TypeSpecKind.ARRAY: {
-            var result = new<ArrayTypeSpec>(lita.allocator)
+            var result = new<ArrayTypeSpec>(allocator)
             result.kind = TypeSpecKind.ARRAY
             result.pos = pos
             result.base = null
@@ -46,37 +78,37 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, lita: *Lita) : *TypeSpe
             return result as (*TypeSpec)
         }
         case TypeSpecKind.PTR: {
-            var result = new<PtrTypeSpec>(lita.allocator)
+            var result = new<PtrTypeSpec>(allocator)
             result.kind = TypeSpecKind.PTR
             result.pos = pos
             result.base = null
             return result as (*TypeSpec)
         }
         case TypeSpecKind.CONST: {
-            var result = new<ConstTypeSpec>(lita.allocator)
+            var result = new<ConstTypeSpec>(allocator)
             result.kind = TypeSpecKind.CONST
             result.pos = pos
             result.base = null
             return result as (*TypeSpec)
         }
         case TypeSpecKind.NAME: {
-            var result = new<NameTypeSpec>(lita.allocator)
+            var result = new<NameTypeSpec>(allocator)
             result.kind = TypeSpecKind.NAME
             result.pos = pos
             result.base = null
             result.name = EMPTY_STR
-            result.genericArgs.init(0, lita.allocator)
+            result.genericArgs.init(0, allocator)
             return result as (*TypeSpec)
         }
         case TypeSpecKind.FUNC_PTR: {
-            var result = new<FuncPtrTypeSpec>(lita.allocator)
+            var result = new<FuncPtrTypeSpec>(allocator)
             result.kind = TypeSpecKind.FUNC_PTR
             result.pos = pos
             result.base = null
-            result.args.init(0, lita.allocator)
+            result.args.init(0, allocator)
             result.ret = null
             result.hasVarargs = false
-            result.genericParams.init(0, lita.allocator)
+            result.genericParams.init(0, allocator)
             return result as (*TypeSpec)
         }
         default: {

@@ -171,6 +171,7 @@ exit:
     };
 }
 
+
 @inline
 func (this: *TypeChecker) errors() : i32 {
     return this.result.errors.size()
@@ -439,8 +440,7 @@ public func (this: *TypeChecker) currentScope() : *Scope {
 }
 
 func (this: *TypeChecker) pushScope(scope: *Scope) {
-    scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.allocator);
-    scope.module = this.current
+    scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.current, this.allocator);
     this.current.currentScope = scope
 }
 

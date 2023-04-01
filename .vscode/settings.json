@@ -3,5 +3,6 @@
         "stat.h": "c",
         "emmintrin.h": "c",
         "intrin.h": "c"
-    }
+    },
+    "cmake.configureOnOpen": false
 }

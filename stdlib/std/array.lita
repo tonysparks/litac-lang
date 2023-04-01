@@ -116,6 +116,15 @@ public func (a: *Array<T>) pop<T>() : T {
     return r
 }
 
+public func (a: *Array<T>) swap<T>(aIndex: i32, bIndex: i32) {
+    assert(aIndex > -1 && aIndex < a.length && bIndex > -1 && bIndex < a.length)
+
+    var aValue = a.elements[aIndex]
+    a.elements[aIndex] = a.elements[bIndex]
+    a.elements[bIndex] = aValue
+}
+
+
 public func (a: *Array<T>) removeAt<T>(index: i32) : T {
     assert(index >= 0 && index < a.length)
 

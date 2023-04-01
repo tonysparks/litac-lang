@@ -136,7 +136,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
     }
     sb.append("\n};")
 
-    var parser = ParserInit(module.id.filename, sb.cStr(), sb.length, this.lita)
+    var parser = ParserInit(module.id.filename, sb.cStr(), sb.length, module.allocator, this.lita)
     var stmts = parser.parseModule()
     if(stmts) {
         checker.enterModule(module)

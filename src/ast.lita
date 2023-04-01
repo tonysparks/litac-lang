@@ -108,16 +108,35 @@ public enum AggregateFlags {
     IS_ANONYMOUS = (1<<1),
 }
 
+
 public struct TypeSpec {
     kind: TypeSpecKind
     pos: SrcPos
-    base: *TypeSpec
+    base: *TypeSpec        // Ptr/Const
     typeInfo: *TypeInfo    // resolved from the type checker
+
+    union {
+        // NamedTypeSpec
+        struct {
+            name: InternedString
+            genericArgs: Array<*TypeSpec>
+        }
+        // ArrayTypeSpec
+        struct {
+            numElements: *Expr
+        }
+        // FuncPtrTypeSpec
+        struct {
+            args: Array<*TypeSpec>
+            ret: *TypeSpec
+            hasVarargs: bool
+            genericParams: Array<GenericParam>
+        }
+    }
 }
 
 public struct NameTypeSpec {
     spec: using TypeSpec
-    //name: *const char
     name: InternedString
     genericArgs: Array<*TypeSpec>
 }

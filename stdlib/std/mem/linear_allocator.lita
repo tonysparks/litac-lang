@@ -12,12 +12,13 @@ public struct LinearAllocator {
     mem: *void
     size: usize
     currentOffset: usize
+    alignment: usize
 
     totalAllocations: u32
     totalBytesAllocated: usize
 }
 
-public func (this: *LinearAllocator) init(mem: *void, size: usize) {
+public func (this: *LinearAllocator) init(mem: *void, size: usize, align: usize = LITAC_DEFAULT_ALIGNMENT) {
     this.allocator = Allocator {
         .allocFn:   &LinearMalloc,
         .callocFn:  &LinearCalloc,
@@ -29,6 +30,7 @@ public func (this: *LinearAllocator) init(mem: *void, size: usize) {
     this.totalBytesAllocated = 0
     this.totalAllocations = 0
     this.currentOffset = 0
+    this.alignment = align
 }
 
 @doc("Zero out all allocated memory and reset current offset")
@@ -43,7 +45,7 @@ public func (this: *LinearAllocator) clear() {
 
 public func (this: *LinearAllocator) malloc(size: usize) : *void {
     var currPtr = this.mem as (usize) + this.currentOffset
-    var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
+    var offset = alignForward(currPtr, this.alignment)
     offset -= this.mem as (usize)
 
     var newOffset = offset + size

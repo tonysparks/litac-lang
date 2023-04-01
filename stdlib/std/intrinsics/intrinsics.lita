@@ -33,7 +33,7 @@ public struct __m128d {
 public typedef u16 as __mmask16;
 
 @foreign
-func _rdtsc() : i64;
+public func _rdtsc() : i64;
 
 @foreign
 func _mm_set1_epi8(b: char) : __m128i;

@@ -171,21 +171,21 @@ public func CreateJsonString(str: *const char, len: i32 = -1,
     }
 
     var sb = StringBufferInit(len + 1, alloc)
-    sb.appendStrn(str, len)
-//    EscapeString(sb, str, len)
+    //sb.appendStrn(str, len)
+    EscapeString(sb, str, len)
 
     return CreateJsonStringNoDup(sb.cStr(), alloc)
 }
 
 const escapeStrings = [256]*const char {
+    ['"']  = "\\\"",
     ['\b'] = "\\b",
     ['\f'] = "\\f",
     ['\n'] = "\\n",
     ['\r'] = "\\r",
     ['\t'] = "\\t",
     ['\\'] = "\\\\",
-    ['\''] = "\\'",
-    //['"'] = "\\\"",
+    //['\''] = "\\'",
     ['\0'] = "\\0",
 }
 
@@ -209,7 +209,11 @@ func EscapeString(buf: *StringBuffer, string: *const char, length: i32) {
             buf.appendStr(escaped)
             continue
         }
+        else {
+            buf.appendChar(c)
+        }
 
+/*
         if(c == '\\') {
             var n = string[i+1] as (u32)
             var escapedChar = escapeChars[n]
@@ -228,6 +232,7 @@ func EscapeString(buf: *StringBuffer, string: *const char, length: i32) {
             buf.appendStrn("\\", 1)
         }
         buf.appendChar(c)
+*/
     }
 }
 

@@ -285,6 +285,7 @@ public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *
     resp.put("error", JSON_NULL)
 
     this.writeResponse(resp)
+    // this.writeDiagnostic(.docUri = rootUri, .fullBuild = true)
 }
 
 
@@ -337,11 +338,11 @@ public func (this: *LspServer) handleTextDocumentSaveMessage(msg: *JsonNode, par
 }
 
 public func (this: *LspServer) handleTextDocumentChangeMessage(msg: *JsonNode, params: *JsonNode) {
-    /*var changeEvent = JsonNodeToTextDocumentChangeEvent(params, this.requestAlloc())
+    var changeEvent = JsonNodeToTextDocumentChangeEvent(params, this.requestAlloc())
     if(changeEvent) {
         this.workspace.changeDocument(changeEvent)
         this.writeDiagnostic(changeEvent.textDocument.uri)
-    }*/
+    }
 }
 
 public func (this: *LspServer) handleTextDocumentReferencesMessage(msg: *JsonNode, params: *JsonNode) {
@@ -379,8 +380,8 @@ public func (this: *LspServer) handleTextDocumentDefinitionMessage(msg: *JsonNod
     this.writeResponse(resp)
 }
 
-public func (this: *LspServer) writeDiagnostic(docUri: *const char) {
-    var result = this.workspace.runDiagnostics(this.requestAlloc(), docUri)
+public func (this: *LspServer) writeDiagnostic(docUri: *const char, fullBuild: bool = false) {
+    var result = this.workspace.runDiagnostics(docUri, .isFullBuild = fullBuild)
 
     var params = CreateJsonObject(this.requestAlloc())
     params.putStr("uri", docUri)

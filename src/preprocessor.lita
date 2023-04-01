@@ -486,7 +486,8 @@ func (this: *CallContext) postParse(moduleStmt: *ModuleStmt, comp: *CompStmt) {
 
     var emitCode = original.copy(this.pp.lita.allocator)
 
-    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, this.pp.lita)
+    // TODO: Memory leak with incremental compilation
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, this.pp.lita.allocator, this.pp.lita)
     var stmts = parser.parseModule()
 
     if(stmts) {
@@ -644,7 +645,7 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
     var original = StringViewInit(code)
     var emitCode = original.copy(context.pp.lita.allocator)
 
-    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, context.pp.lita)
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, module.allocator, context.pp.lita)
     var stmts = parser.parseModule()
 
     if(stmts) {
@@ -714,7 +715,7 @@ func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_objec
     var original = StringViewInit(code)
     var emitCode = original.copy(context.pp.lita.allocator)
 
-    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, context.pp.lita)
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, module.allocator, context.pp.lita)
     var stmts = parser.parseModule()
 
     if(stmts) {
@@ -805,7 +806,8 @@ func ApeAstInsert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
     var astNode = astPtr as (*Node)
 
-    var parser = ParserInit(astNode.startPos.filename, code, strlen(code), context.pp.lita)
+    // TODO: Memory leak with incremental compilation...
+    var parser = ParserInit(astNode.startPos.filename, code, strlen(code), context.pp.lita.allocator, context.pp.lita)
     var stmt = parser.statement()
 
     AstInsert(astNode, stmt, index, context.pp.lita)

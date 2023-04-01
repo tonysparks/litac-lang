@@ -73,10 +73,11 @@ public struct Parser {
 public func ParserInit(filename: *const char,
                        text: *const char,
                        length: i64,
+                       allocator: *const Allocator,
                        lita: *Lita) : Parser {
 
     var parser = Parser {
-        .allocator = lita.allocator,
+        .allocator = allocator,
         .result = &lita.result,
         .lita = lita,
         .strings = &lita.strings,
@@ -92,8 +93,8 @@ public func ParserInit(filename: *const char,
         .panicMode = false,
     }
 
-    var lex = LexerInit(filename, text, length, lita.allocator)
-    parser.tokens.init(1024, lita.allocator)
+    var lex = LexerInit(filename, text, length, allocator)
+    parser.tokens.init(1024, allocator)
 
     while(!lex.eof()) {
         var token = lex.nextToken()
@@ -470,7 +471,7 @@ func (p: *Parser) funcDeclaration() : *Decl {
         }
     }
     else {
-        returnType = NewVoidTypeSpec(p.pos(), p.lita)
+        returnType = NewVoidTypeSpec(p.pos(), p.allocator)
     }
 
     var flags = 0;
@@ -2030,7 +2031,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
         case TokenType.USIZE:
         case TokenType.VOID: {
             p.advance()
-            var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.lita) as (*NameTypeSpec)
+            var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.allocator) as (*NameTypeSpec)
             spec.name = NewTokenNameIntern(token, p.lita.strings)
 
             return spec as (*TypeSpec)
@@ -2040,7 +2041,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             var base = p.type(disambiguate)
             if(!base) return null;
 
-            var spec = NewTypeSpec(TypeSpecKind.PTR, token.pos, p.lita)
+            var spec = NewTypeSpec(TypeSpecKind.PTR, token.pos, p.allocator)
             spec.base = base
             return spec as (*TypeSpec)
         }
@@ -2049,7 +2050,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             var base = p.type(disambiguate)
             if(!base) return null;
 
-            var spec = NewTypeSpec(TypeSpecKind.CONST, token.pos, p.lita)
+            var spec = NewTypeSpec(TypeSpecKind.CONST, token.pos, p.allocator)
             spec.base = base
             return spec as (*TypeSpec)
         }
@@ -2098,7 +2099,7 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
         sb.appendStrn(identifier.str.buffer, identifier.str.length)
     }
 
-    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.lita) as (*NameTypeSpec)
+    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.allocator) as (*NameTypeSpec)
     spec.name = p.lita.strings.intern(sb.cStr(), sb.length)
 
     if(p.check(TokenType.LESS_THAN)) {
@@ -2112,7 +2113,7 @@ err:
 }
 
 func (p: *Parser) arrayType() : *ArrayTypeSpec {
-    var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.lita) as (*ArrayTypeSpec)
+    var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.allocator) as (*ArrayTypeSpec)
     p.advance()
 
     if(!p.check(TokenType.RIGHT_BRACKET)) {
@@ -2134,7 +2135,7 @@ err:
 
 func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {
     var pos = p.prevPos()
-    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.lita) as (*FuncPtrTypeSpec)
+    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.allocator) as (*FuncPtrTypeSpec)
 
     if(p.match(TokenType.LESS_THAN))  {
         if(!p.genericParameters(&spec.genericParams)) {
@@ -2904,9 +2905,10 @@ func (p: *Parser) match(type: TokenType) : bool {
 }
 
 func (p: *Parser) matches(types: *TokenType, len: i32) : bool {
+    var tokenType = p.peek().type
     for(var i = 0; i < len; i += 1) {
         var type = types[i]
-        if(p.check(type)) {
+        if(tokenType == type) {
             p.advance()
             return true
         }

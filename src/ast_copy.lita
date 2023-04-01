@@ -50,7 +50,8 @@ public func CopyTypeSpec(spec: *TypeSpec, lita: *Lita) : *TypeSpec {
         return null;
     }
 
-    var copy = NewTypeSpec(spec.kind, spec.pos, lita)
+    // TODO: Support incremental compilation
+    var copy = NewTypeSpec(spec.kind, spec.pos, lita.allocator)
     copy.base = CopyTypeSpec(spec.base, lita)
 
     switch(spec.kind) {
@@ -737,7 +738,8 @@ public func CopyTypedefDecl(decl: *TypedefDecl, lita: *Lita) : *TypedefDecl {
 }
 
 public func AstInsertText(node: *Node, text: *const char, index: i32, lita: *Lita) {
-    var parser = ParserInit(node.startPos.filename, text, strlen(text), lita)
+    // TODO: Support incremental compilation
+    var parser = ParserInit(node.startPos.filename, text, strlen(text), lita.allocator, lita)
     var stmt = parser.statement()
 
     AstInsert(node, stmt, index, lita)

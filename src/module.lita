@@ -6,6 +6,7 @@ import "std/string_buffer"
 import "std/system"
 import "std/libc"
 import "std/mem"
+import "std/mem/arena_allocator"
 
 import "phase_result"
 import "symbols"
@@ -20,6 +21,8 @@ public enum ModuleFlags {
     TYPE_CHECKED  = (1<<0),
     TYPE_RESOLVED = (1<<1),
     TYPE_IMPORTED = (1<<2),
+
+    INCREMENTAL_COMPILATION = (1<<3),
 }
 
 public struct ModuleId {
@@ -49,6 +52,8 @@ public struct Module {
 
     importedBy: Array<ModuleImport> // modules that import this module
 
+    typeSpecs: TypeSpecAllocator
+    arena: ArenaAllocator
     allocator: *const Allocator
     lita: *Lita
 }
@@ -75,7 +80,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.flags = 0
     builtins.allocator = lita.allocator
     builtins.importedBy.init(512, lita.allocator)
-    builtins.symbols.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
+    builtins.symbols.init(ScopeKind.MODULE, null, lita.result, &builtins, lita.allocator)
     builtins.genericSymbols = &lita.genericSymbols
     builtins.lita = lita
 
@@ -126,15 +131,38 @@ public func NewModule(lita: *Lita,
 public func (this: *Module) init(lita: *Lita) {
     this.text = String{}
     this.ast = null
+
+    // TODO: Figure out optimal arena size and allocator to pass in
+    // TODO: Move to Array of Ast, Symbols
+    this.arena.init(1024 * KiB, lita.allocator)
+    this.allocator = &this.arena.allocator
+    //this.allocator = lita.allocator
+
+    // We want these to be owned by the global allocator
     this.importedBy.init(64, lita.allocator)
-    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, lita.allocator)
+    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, this, lita.allocator)
+
     this.flags = 0
-    this.allocator = lita.allocator
     this.currentScope = &this.symbols
     this.genericSymbols = &lita.genericSymbols
     this.lita = lita
+}
 
-    this.symbols.module = this // TEMP
+public func (this: *Module) initIncrementalBuild() {
+    // TODO: How do we free the memory, so that we don't
+    // leak forever on incremental builds??
+    this.text = String{}
+    this.ast = null
+    this.flags = 0
+    this.flags |= ModuleFlags.INCREMENTAL_COMPILATION
+    this.symbols.initIncrementalBuild()
+}
+
+public func (this: *Module) postIncrementalBuild() {
+    this.flags &= ~ModuleFlags.INCREMENTAL_COMPILATION;
+    this.symbols.postIncrementalBuild()
+    // TODO: clean out symbols still marked?
+    // what else??
 }
 
 public func (this: *Module) getType(type: InternedString) : *Symbol {
@@ -243,6 +271,7 @@ public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport
 
 
 func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *InternedString, isUsing: bool) {
+    // TODO: Make sure to not add a duplicate importedBy module (happens with incrementalBuilds)
     moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
 
     var symbols = moduleToImport.symbols;
@@ -295,12 +324,14 @@ public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
     }
 
     if(moduleName) {
-        var name = StringBufferInit(MAX_SYMBOL_NAME, this.allocator)
+        var buffer = [MAX_SYMBOL_NAME]char{};
+
+        var name = StringInit(buffer, MAX_SYMBOL_NAME, 0)
         name.appendStrn(moduleName.buffer, moduleName.length)
         name.appendStrn("::", 2)
         name.appendStrn(symbol.name.buffer, symbol.name.length)
 
-        var nameIntern = this.lita.strings.intern(name.cStrConst(), name.length)
+        var nameIntern = this.lita.strings.internCopy(name.cStrConst(), name.length)
         this.symbols.importSymbol(nameIntern, symbol)
     }
     else {

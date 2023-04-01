@@ -467,7 +467,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
                     // build up the new Declaration Name with the appropriate generic arguments supplemented in
                     // from the parent declaration
-                    var nameSpec = NewNameTypeSpecIntern(field.aggregateField.startPos, nameStr, this.lita)
+                    var nameSpec = NewNameTypeSpecIntern(field.aggregateField.startPos, nameStr, this.allocator)
                     nameSpec.genericArgs.init(field.aggregateField.genericParams.size(), this.allocator)
                     for(var i = 0; i < field.aggregateField.genericParams.size(); i += 1) {
                         var genericParam = field.aggregateField.genericParams.get(i)

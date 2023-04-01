@@ -222,7 +222,7 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
         //field.varField.name.str.copyTo(name, field.varField.name.str.length)
         var name = field.varField.name.str
 
-        var nameTypeSpec = NewNameTypeSpecIntern(expr.startPos, name, this.lita)
+        var nameTypeSpec = NewNameTypeSpecIntern(expr.startPos, name, this.allocator)
         var idExpr = NewIdentifierExpr(expr.startPos, expr.endPos, nameTypeSpec, this.allocator) as (*IdentifierExpr)
 
         var parentExpr = expr.parent
