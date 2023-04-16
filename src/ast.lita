@@ -135,32 +135,6 @@ public struct TypeSpec {
     }
 }
 
-public struct NameTypeSpec {
-    spec: using TypeSpec
-    name: InternedString
-    genericArgs: Array<*TypeSpec>
-}
-
-public struct ArrayTypeSpec {
-    spec: using TypeSpec
-    numElements: *Expr
-}
-
-public struct PtrTypeSpec {
-    spec: using TypeSpec
-}
-
-public struct ConstTypeSpec {
-    spec: using TypeSpec
-}
-
-public struct FuncPtrTypeSpec {
-    spec: using TypeSpec
-    args: Array<*TypeSpec>
-    ret: *TypeSpec
-    hasVarargs: bool
-    genericParams: Array<GenericParam>
-}
 
 public struct Identifier {
     str: InternedString
@@ -379,7 +353,7 @@ public struct ModuleStmt {
 
 public struct NoteStmt {
     stmt: using Stmt
-    type: *NameTypeSpec
+    type: *TypeSpec
     arguments: Array<CallArg>
 }
 
@@ -513,7 +487,7 @@ public struct GroupExpr {
 public struct IdentifierExpr {
     expr: using Expr
     //genericArgs: Array<*TypeSpec>
-    type: *NameTypeSpec
+    type: *TypeSpec
     sym: *Symbol
 }
 
@@ -527,7 +501,7 @@ public struct InitArgExpr {
 public struct InitExpr {
     expr: using Expr
     genericArgs: Array<*TypeSpec>
-    type: *NameTypeSpec
+    type: *TypeSpec
     arguments: Array<*InitArgExpr>
 }
 
@@ -751,27 +725,26 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
         retry:
         if(typeSpec.kind != TypeSpecKind.NAME) {
             if(typeSpec.kind == TypeSpecKind.PTR) {
-                var ptrSpec = typeSpec as (*PtrTypeSpec)
+                var ptrSpec = typeSpec
                 typeSpec = ptrSpec.base
                 goto retry;
             }
             else if(typeSpec.kind == TypeSpecKind.CONST) {
-                var constSpec = typeSpec as (*ConstTypeSpec)
+                var constSpec = typeSpec
                 typeSpec = constSpec.base
                 goto retry;
             }
             return false
         }
 
-        var type = typeSpec as (*NameTypeSpec)
-        var totalLen = f.name.str.length + type.name.length + 2 // _ and \0
+        var totalLen = f.name.str.length + typeSpec.name.length + 2 // _ and \0
         if(totalLen > MAX_SYMBOL_NAME) {
             return false
         }
 
         var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
         nameStr.format("%.*s_%.*s",
-            type.name.length, type.name.buffer, f.name.str.length, f.name.str.buffer)
+            typeSpec.name.length, typeSpec.name.buffer, f.name.str.length, f.name.str.buffer)
         return true
     }
 

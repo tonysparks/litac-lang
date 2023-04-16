@@ -277,7 +277,7 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
 
         // TODO: Clean up memory leak!!
         // TODO: Sync values/main/generics
-        var program = checker.typeCheck(module)
+        var program = checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
 
         // Reconcile any changed symbols
         this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs)
@@ -342,14 +342,14 @@ public func (this: *Lita) parse() : *Module {
     return root
 }
 
-public func (this: *Lita) typeCheck(module: *Module) : bool {
+public func (this: *Lita) typeCheck(module: *Module, flags: i32 = 0) : bool {
     this.startCapture(MetricType.TYPE_CHECKING)
     defer this.endCapture(MetricType.TYPE_CHECKING)
 
     var checker = TypeChecker{}
     checker.init(this)
 
-    this.programSymbols = checker.typeCheck(module)
+    this.programSymbols = checker.typeCheck(module, flags)
 
     return this.result.errors.empty()
 }
@@ -699,7 +699,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         module.text.capacity = length as (i32)
     }
 
-    var parser = ParserInit(module.id.filename, module.text.buffer, module.text.length, module.allocator, lita)
+    var parser = ParserInit(module.id.filename, module.text.buffer, module.text.length, module, lita)
     var moduleStmt = parser.parseModule()
     module.ast = moduleStmt
     lita.totalSourceLines += parser.totalLines

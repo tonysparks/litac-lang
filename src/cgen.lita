@@ -1001,7 +1001,7 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.ARRAY: {
-            var array = spec as (*ArrayTypeSpec)
+            var array = spec
             buf.appendStrn("[", 1);
             if(array.numElements) {
                 this.emitStmt(array.numElements)
@@ -1011,19 +1011,19 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.PTR: {
-            var ptr = spec as (*PtrTypeSpec)
+            var ptr = spec
             buf.appendStrn("*", 1);
             this.emitTypeSpec(ptr.base)
             return;
         }
         case TypeSpecKind.CONST: {
-            var c = spec as (*ConstTypeSpec)
+            var c = spec
             buf.appendStrn("const ", 6);
             this.emitTypeSpec(c.base)
             return;
         }
         case TypeSpecKind.NAME: {
-            var name = spec as (*NameTypeSpec)
+            var name = spec
             buf.appendStrn(name.name.buffer, name.name.length)
             if(!name.genericArgs.empty()) {
                 buf.appendStrn("<", 1)
@@ -1036,7 +1036,7 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
-            var fn = spec as (*FuncPtrTypeSpec)
+            var fn = spec
             buf.appendStrn("func", 4)
             if(!fn.genericParams.empty()) {
                 buf.appendStrn("<", 1)

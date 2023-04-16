@@ -1,5 +1,6 @@
 import "std/mem"
 import "std/array"
+import "std/bucket_list"
 import "std/string_view"
 import "std/assert"
 
@@ -14,63 +15,56 @@ import "intern"
 
 
 public struct TypeSpecAllocator {
-    typeSpecs: Array<TypeSpec>
+    allocator: *const Allocator
+    typeSpecs: BucketList<TypeSpec>
 }
 
 public func (this: *TypeSpecAllocator) init(allocator: *const Allocator) {
+    this.allocator = allocator
     this.typeSpecs.init(1024, allocator)
 }
 
-public func (this: *TypeSpecAllocator) free(){
+public func (this: *TypeSpecAllocator) free() {
     this.typeSpecs.free()
 }
 
-public func (this: *TypeSpecAllocator) clear(){
+public func (this: *TypeSpecAllocator) clear() {
     this.typeSpecs.clear()
 }
 
 public func (this: *TypeSpecAllocator) alloc() : *TypeSpec {
     this.typeSpecs.add(TypeSpec{})
-    return this.typeSpecs.getPtr(this.typeSpecs.size() - 1)
+    return this.typeSpecs.lastPtr()
 }
 
-@test
-func typeSpecAllocator() {
-    var specs = TypeSpecAllocator{}
-    specs.init(defaultAllocator)
 
-    var x = specs.alloc()
-    x.name = InternedString{}
-    specs.free()
-}
-
-public func NewVoidTypeSpec(pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
-    var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, allocator) as (*NameTypeSpec)
+public func NewVoidTypeSpec(pos: SrcPos, typeAllocator: *TypeSpecAllocator) : *TypeSpec {
+    var voidSpec = NewTypeSpec(TypeSpecKind.NAME, pos, typeAllocator)
     voidSpec.name = VOID
     return voidSpec as (*TypeSpec)
 }
 
-public func NewNameTypeSpecIntern(pos: SrcPos, name: InternedString, allocator: *const Allocator) : *NameTypeSpec {
-    var result = new<NameTypeSpec>(allocator)
+public func NewNameTypeSpecIntern(pos: SrcPos, name: InternedString, typeAllocator: *TypeSpecAllocator) : *TypeSpec {
+    var result = typeAllocator.alloc()
     result.kind = TypeSpecKind.NAME
     result.pos = pos
     result.base = null
     result.name = name
-    result.genericArgs.init(0, allocator)
+    result.genericArgs.init(0, typeAllocator.allocator)
     return result
 }
 
-public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Allocator) : *TypeSpec {
+public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, typeAllocator: *TypeSpecAllocator) : *TypeSpec {
     switch(kind) {
         case TypeSpecKind.NONE: {
-            var result = new<TypeSpec>(allocator)
+            var result = typeAllocator.alloc()
             result.kind = TypeSpecKind.NONE
             result.pos = pos
             result.base = null
             return result
         }
         case TypeSpecKind.ARRAY: {
-            var result = new<ArrayTypeSpec>(allocator)
+            var result = typeAllocator.alloc()
             result.kind = TypeSpecKind.ARRAY
             result.pos = pos
             result.base = null
@@ -78,37 +72,37 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, allocator: *const Alloc
             return result as (*TypeSpec)
         }
         case TypeSpecKind.PTR: {
-            var result = new<PtrTypeSpec>(allocator)
+            var result = typeAllocator.alloc()
             result.kind = TypeSpecKind.PTR
             result.pos = pos
             result.base = null
             return result as (*TypeSpec)
         }
         case TypeSpecKind.CONST: {
-            var result = new<ConstTypeSpec>(allocator)
+            var result = typeAllocator.alloc()
             result.kind = TypeSpecKind.CONST
             result.pos = pos
             result.base = null
             return result as (*TypeSpec)
         }
         case TypeSpecKind.NAME: {
-            var result = new<NameTypeSpec>(allocator)
+            var result = typeAllocator.alloc()
             result.kind = TypeSpecKind.NAME
             result.pos = pos
             result.base = null
             result.name = EMPTY_STR
-            result.genericArgs.init(0, allocator)
+            result.genericArgs.init(0, typeAllocator.allocator)
             return result as (*TypeSpec)
         }
         case TypeSpecKind.FUNC_PTR: {
-            var result = new<FuncPtrTypeSpec>(allocator)
+            var result = typeAllocator.alloc()
             result.kind = TypeSpecKind.FUNC_PTR
             result.pos = pos
             result.base = null
-            result.args.init(0, allocator)
+            result.args.init(0, typeAllocator.allocator)
             result.ret = null
             result.hasVarargs = false
-            result.genericParams.init(0, allocator)
+            result.genericParams.init(0, typeAllocator.allocator)
             return result as (*TypeSpec)
         }
         default: {
@@ -408,7 +402,7 @@ public func NewUnaryExpr(startPos: SrcPos,
 
 public func NewInitExpr(startPos: SrcPos,
                         endPos: SrcPos,
-                        type: *NameTypeSpec,
+                        type: *TypeSpec,
                         arguments: Array<*InitArgExpr>,
                         allocator: *const Allocator) : *Expr {
     var initExpr = new<InitExpr>(allocator)
@@ -511,7 +505,7 @@ public func NewSetExpr(startPos: SrcPos,
 
 public func NewIdentifierExpr(startPos: SrcPos,
                               endPos: SrcPos,
-                              type: *NameTypeSpec,
+                              type: *TypeSpec,
                               allocator: *const Allocator) : *Expr {
     var expr = new<IdentifierExpr>(allocator)
     expr.kind = StmtKind.IDENTIFIER_EXPR
@@ -670,7 +664,7 @@ public func NewArrayInitExpr(startPos: SrcPos,
 
     // if we are relying on the values to determine the
     // size, create the AST number
-    var arrayType = expr.type as (*ArrayTypeSpec)
+    var arrayType = expr.type
     if(!arrayType.numElements && !expr.values.empty()) {
         var token = Token {
             .type = TokenType.USIZE,
@@ -963,7 +957,7 @@ public func NewLabelStmt(startPos: SrcPos,
 
 public func NewNoteStmt(startPos: SrcPos,
                         endPos: SrcPos,
-                        type: *NameTypeSpec,
+                        type: *TypeSpec,
                         arguments: Array<CallArg>,
                         allocator: *const Allocator) : *Stmt {
     var stmt = new<NoteStmt>(allocator)
@@ -1049,4 +1043,15 @@ public func NewEnumFieldEntryDecl(startPos: SrcPos,
     stmt.attributes = attributes
     stmt.value = stmt.node.becomeParentOf(value)
     return stmt as (*Stmt)
+}
+
+
+@test
+func typeSpecAllocator() {
+    var specs = TypeSpecAllocator{}
+    specs.init(defaultAllocator)
+
+    var x = specs.alloc()
+    x.name = InternedString{}
+    specs.free()
 }

@@ -214,6 +214,8 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
     }
 
     var originalExpr = expr;
+    const module = this.current
+
     for(var i = 0; i < path.numOfFields; i+=1) {
         var field = path.fields[i]
         assert(field.kind == StmtKind.VAR_FIELD_DECL)
@@ -222,11 +224,11 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
         //field.varField.name.str.copyTo(name, field.varField.name.str.length)
         var name = field.varField.name.str
 
-        var nameTypeSpec = NewNameTypeSpecIntern(expr.startPos, name, this.allocator)
-        var idExpr = NewIdentifierExpr(expr.startPos, expr.endPos, nameTypeSpec, this.allocator) as (*IdentifierExpr)
+        var nameTypeSpec = NewNameTypeSpecIntern(expr.startPos, name, &module.typeSpecAllocator)
+        var idExpr = NewIdentifierExpr(expr.startPos, expr.endPos, nameTypeSpec, module.allocator) as (*IdentifierExpr)
 
         var parentExpr = expr.parent
-        expr = NewGetExpr(expr.startPos, expr.endPos, expr, idExpr, this.allocator)
+        expr = NewGetExpr(expr.startPos, expr.endPos, expr, idExpr, module.allocator)
         if(parentExpr) {
             parentExpr.becomeParentOf(expr)
         }
@@ -562,7 +564,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
                 var inferredType = this.inferredType(genericParam.name, paramType, argType)
                 if(inferredType) {
-                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.lita))
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current))
                     break
                 }
             }
@@ -595,7 +597,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
                 var inferredType = this.inferredType(genericParam.name, paramType, argType)
                 if(inferredType) {
-                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.lita))
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current))
                     break
                 }
             }
@@ -1223,7 +1225,7 @@ func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *AggregateType
 
             var inferredType = this.inferredType(genericParam.name, paramType, suppliedArgs.get(fieldIndex))
             if(inferredType) {
-                expr.type.genericArgs.add(inferredType.asTypeSpec(this.lita))
+                expr.type.genericArgs.add(inferredType.asTypeSpec(this.current))
                 break
             }
         }

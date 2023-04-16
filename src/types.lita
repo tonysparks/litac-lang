@@ -1359,97 +1359,97 @@ public func IsFuncImpl(traitFn: *FuncPtrTypeInfo, fn: *TypeInfo, checker: *TypeC
     return true
 }
 
-public func (this: *TypeInfo) asTypeSpec(lita: *Lita) : *TypeSpec {
+public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
     var pos = (this.sym) ? this.sym.decl.startPos : SrcPos{};
-    var allocator = lita.allocator
+    var allocator = &module.typeSpecAllocator
 
     switch(this.kind) {
         case TypeKind.BOOL: {
-            return NewNameTypeSpecIntern(pos, BOOL, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, BOOL, allocator)
         }
         case TypeKind.CHAR: {
-            return NewNameTypeSpecIntern(pos, CHAR, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, CHAR, allocator)
         }
         case TypeKind.I8: {
-            return NewNameTypeSpecIntern(pos, I8, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I8, allocator)
         }
         case TypeKind.U8: {
-            return NewNameTypeSpecIntern(pos, U8, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U8, allocator)
         }
         case TypeKind.I16: {
-            return NewNameTypeSpecIntern(pos, I16, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I16, allocator)
         }
         case TypeKind.U16: {
-            return NewNameTypeSpecIntern(pos, U16, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U16, allocator)
         }
         case TypeKind.I32: {
-            return NewNameTypeSpecIntern(pos, I32, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I32, allocator)
         }
         case TypeKind.U32: {
-            return NewNameTypeSpecIntern(pos, U32, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U32, allocator)
         }
         case TypeKind.I64: {
-            return NewNameTypeSpecIntern(pos, I64, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, I64, allocator)
         }
         case TypeKind.U64: {
-            return NewNameTypeSpecIntern(pos, U64, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, U64, allocator)
         }
         case TypeKind.F32: {
-            return NewNameTypeSpecIntern(pos, F32, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, F32, allocator)
         }
         case TypeKind.F64: {
-            return NewNameTypeSpecIntern(pos, F64, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, F64, allocator)
         }
         case TypeKind.USIZE: {
-            return NewNameTypeSpecIntern(pos, USIZE, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, USIZE, allocator)
         }
         case TypeKind.NULL: {
-            return NewNameTypeSpecIntern(pos, NULL, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, NULL, allocator)
         }
         case TypeKind.VOID: {
-            return NewNameTypeSpecIntern(pos, VOID, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, VOID, allocator)
         }
         case TypeKind.STR: {
-            return NewNameTypeSpecIntern(pos, STRING, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, STRING, allocator)
         }
         case TypeKind.GENERIC_PARAM: {
             var genericParamInfo = this as (*TypeInfo)
-            return NewNameTypeSpecIntern(pos, genericParamInfo.name, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, genericParamInfo.name, allocator)
         }
         case TypeKind.ARRAY: {
             var arrayInfo = this as (*ArrayTypeInfo)
-            var arrayTypeSpec = NewTypeSpec(TypeSpecKind.ARRAY, pos, allocator) as (*ArrayTypeSpec)
-            arrayTypeSpec.base = arrayInfo.arrayOf.asTypeSpec(lita)
+            var arrayTypeSpec = NewTypeSpec(TypeSpecKind.ARRAY, pos, allocator)
+            arrayTypeSpec.base = arrayInfo.arrayOf.asTypeSpec(module)
             arrayTypeSpec.numElements = arrayInfo.numOfElements
-            return arrayTypeSpec as (*TypeSpec)
+            return arrayTypeSpec
         }
         case TypeKind.PTR: {
             var ptrInfo = this as (*PtrTypeInfo)
-            var ptrTypeSpec = NewTypeSpec(TypeSpecKind.PTR, pos, allocator) as (*PtrTypeSpec)
-            ptrTypeSpec.base = ptrInfo.ptrOf.asTypeSpec(lita)
-            return ptrTypeSpec as (*TypeSpec)
+            var ptrTypeSpec = NewTypeSpec(TypeSpecKind.PTR, pos, allocator)
+            ptrTypeSpec.base = ptrInfo.ptrOf.asTypeSpec(module)
+            return ptrTypeSpec
         }
         case TypeKind.CONST: {
             var constInfo = this as (*ConstTypeInfo)
-            var constTypeSpec = NewTypeSpec(TypeSpecKind.CONST, pos, allocator) as (*ConstTypeSpec)
-            constTypeSpec.base = constInfo.constOf.asTypeSpec(lita)
-            return constTypeSpec as (*TypeSpec)
+            var constTypeSpec = NewTypeSpec(TypeSpecKind.CONST, pos, allocator)
+            constTypeSpec.base = constInfo.constOf.asTypeSpec(module)
+            return constTypeSpec
         }
         case TypeKind.FUNC_PTR: {
             var funcInfo = this as (*FuncPtrTypeInfo)
             var args = Array<*TypeSpec>{}
-            args.init(funcInfo.paramDecls.size(), allocator)
+            args.init(funcInfo.paramDecls.size(), module.allocator)
             for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
                 var param = funcInfo.paramDecls.get(i)
-                args.add(param.asTypeSpec(lita))
+                args.add(param.asTypeSpec(module))
             }
 
-            var result = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, allocator) as (*FuncPtrTypeSpec)
-            result.ret = funcInfo.returnType.asTypeSpec(lita)
+            var result = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, allocator)
+            result.ret = funcInfo.returnType.asTypeSpec(module)
             result.args = args
             result.hasVarargs = funcInfo.hasVarargs
             result.genericParams = funcInfo.genericParams
-            return result as (*TypeSpec)
+            return result
         }
         case TypeKind.TRAIT:
         case TypeKind.UNION:
@@ -1458,27 +1458,27 @@ public func (this: *TypeInfo) asTypeSpec(lita: *Lita) : *TypeSpec {
             var result = NewNameTypeSpecIntern(pos, aggInfo.name, allocator)
 
             var args = Array<*TypeSpec>{}
-            args.init(aggInfo.decl.genericParams.size(), allocator)
+            args.init(aggInfo.decl.genericParams.size(), module.allocator)
             for(var i = 0; i < aggInfo.decl.genericParams.size(); i += 1) {
                 var param = aggInfo.decl.genericParams.get(i)
                 var name = param.name.str
 
-                args.add(NewNameTypeSpecIntern(pos, name, allocator) as (*TypeSpec))
+                args.add(NewNameTypeSpecIntern(pos, name, allocator))
             }
 
             result.genericArgs = args;
-            return result as (*TypeSpec)
+            return result
         }
         case TypeKind.ENUM: {
             var info = this as (*EnumTypeInfo)
-            return NewNameTypeSpecIntern(pos, info.name, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, info.name, allocator)
         }
         case TypeKind.FUNC: {
             var info = this as (*FuncTypeInfo)
-            return NewNameTypeSpecIntern(pos, info.name, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, info.name, allocator)
         }
         case TypeKind.POISON: {
-            return NewNameTypeSpecIntern(pos, POISON, allocator) as (*TypeSpec)
+            return NewNameTypeSpecIntern(pos, POISON, allocator)
         }
         default: {
             /*printf("TypeId: '%d'\n", this.kind)

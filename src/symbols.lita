@@ -52,6 +52,7 @@ public enum SymbolFlags {
 
     // Marked for reset for incremental compliation
     IS_MARKED_RESET         = (1<<22),
+    IS_HIDDEN               = (1<<23),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -268,6 +269,10 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
     if(decl.hasNote("foreign")) {
         flags |= SymbolFlags.IS_FOREIGN
+    }
+
+    if(decl.hasNote("hidden")) {
+        flags |= SymbolFlags.IS_HIDDEN
     }
 
     if(decl.attributes.isPublic) {

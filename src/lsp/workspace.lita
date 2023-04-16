@@ -173,6 +173,9 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     // Values
     for(var i = 0; i < syms.values.size(); i += 1) {
         var sym = syms.values.get(i)
+        if(sym.flags & SymbolFlags.IS_HIDDEN) {
+            continue
+        }
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
     }
 
@@ -180,6 +183,9 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     for(var i = 0; i < syms.symbolTypes.size(); i += 1) {
         var sym = syms.symbolTypes.get(i)
         if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+            continue
+        }
+        if(sym.flags & SymbolFlags.IS_HIDDEN) {
             continue
         }
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
@@ -191,7 +197,9 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
         if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
             continue
         }
-
+        if(sym.flags & SymbolFlags.IS_HIDDEN) {
+            continue
+        }
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
     }
 
@@ -742,7 +750,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
         // we must manually check for aliased types, because the typechecker
         // completely replaces these typInfos with the real type
         if(location.type.kind == TypeSpecKind.NAME && location.module) {
-            var name = location.type as (*NameTypeSpec)
+            var name = location.type
             sym = location.module.getType(name.name)
         }
 
@@ -791,7 +799,7 @@ public func (this: *Workspace) runDiagnostics(
             goto report
         }
 
-        var checked = lita.typeCheck(root)
+        var checked = lita.typeCheck(root, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
         if(!checked) {
             this.lsp.log("Failed to type check\n")
             lita.result.isReadable = false

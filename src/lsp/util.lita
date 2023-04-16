@@ -124,7 +124,7 @@ func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
 
     switch(type.kind) {
         case TypeSpecKind.ARRAY: {
-            var arraySpec = type as (*ArrayTypeSpec)
+            var arraySpec = type
             if(arraySpec.numElements) {
                 if(this.visitExpr(arraySpec.numElements)) {
                     return true
@@ -148,7 +148,7 @@ func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
             break
         }
         case TypeSpecKind.NAME: {
-            var name = type as (*NameTypeSpec)
+            var name = type
             for(var i = 0; i < name.genericArgs.size(); i += 1) {
                 var param = name.genericArgs.get(i)
                 if(this.isTypeAtPos(param)) {
@@ -158,7 +158,7 @@ func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
             break
         }
         case TypeSpecKind.FUNC_PTR: {
-            var funcPtr = type as (*FuncPtrTypeSpec)
+            var funcPtr = type
             for(var i = 0; i < funcPtr.genericParams.size(); i += 1) {
                 var param = funcPtr.genericParams.getPtr(i)
                 if(this.isTokenAtPos(param.name.token)) {

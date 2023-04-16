@@ -45,6 +45,10 @@ struct GenericContext {
     callsite: *Module
 }
 
+public enum TypeCheckerFlags {
+    DISABLE_TRAIT_WRAPPERS = (1<<0),
+}
+
 public struct TypeChecker {
     lita: using *Lita
 
@@ -101,7 +105,7 @@ public func (this: *TypeChecker) init(lita: *Lita) {
 }
 
 @profile
-public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
+public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : ProgramSymbols {
     if(root.flags & ModuleFlags.TYPE_CHECKED) {
         goto exit;
     }
@@ -136,24 +140,27 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     // allow for creating more symbols after initial resolving of symbols
     this.lita.preprocessor.postResolveSymbols(this)
 
-    this.enterModule(root)
-    {
-        var traitDecls = CreateTraitWrappers(this)
-        this.bypassing = true
-        for(var i = 0; i < traitDecls.size(); i += 1) {
-            var decl = traitDecls.get(i)
+    // Generate trait wrappers
+    if(!(flags & TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)) {
+        this.enterModule(root)
+        {
+            var traitDecls = CreateTraitWrappers(this)
+            this.bypassing = true
+            for(var i = 0; i < traitDecls.size(); i += 1) {
+                var decl = traitDecls.get(i)
 
-            var sym = this.createDeclSymbol(decl)
-            if(sym == null) {
-                continue
+                var sym = this.createDeclSymbol(decl)
+                if(sym == null) {
+                    continue
+                }
+
+                this.resolveSymbol(sym)
+                this.finishResolveSymbol(sym)
             }
-
-            this.resolveSymbol(sym)
-            this.finishResolveSymbol(sym)
+            this.bypassing = false
         }
-        this.bypassing = false
+        this.leaveModule()
     }
-    this.leaveModule()
 
     if(!this.lita.result.hasErrors()) {
         var introspect = Introspect{.lita = this.lita}
@@ -450,7 +457,7 @@ func (this: *TypeChecker) popScope() {
     }
 }
 
-func (this: *TypeChecker) isGenericParamType(name: *NameTypeSpec) : bool {
+func (this: *TypeChecker) isGenericParamType(name: *TypeSpec) : bool {
     for(var k = 0; k < this.genericParamStack.size(); k += 1) {
         var params = &this.genericParamStack.elements[k]
 
@@ -912,7 +919,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     }
 }
 
-func (this: *TypeChecker) getType(spec: *NameTypeSpec, isFunc: bool = false) : *Symbol {
+func (this: *TypeChecker) getType(spec: *TypeSpec, isFunc: bool = false) : *Symbol {
     assert(spec != null)
     return this.getTypeByName(spec.name, isFunc)
 }
@@ -1032,7 +1039,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
 }
 
 
-func (this: *TypeChecker) resolveNoteTypeSpec(spec: *NameTypeSpec) : *TypeInfo {
+func (this: *TypeChecker) resolveNoteTypeSpec(spec: *TypeSpec) : *TypeInfo {
     if(!spec) {
         return &VOID_TYPE
     }
@@ -1083,7 +1090,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
 
     switch(spec.kind) {
         case TypeSpecKind.NAME: {
-            var nameSpec = spec as (*NameTypeSpec)
+            var nameSpec = spec
 
             if(this.isGenericParamType(nameSpec)) {
                 nameSpec.typeInfo = this.typeCache.newGenericParamTypeInfo(nameSpec.name)
@@ -1125,19 +1132,19 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
             return spec.typeInfo
         }
         case TypeSpecKind.CONST: {
-            var constSpec = spec as (*ConstTypeSpec)
+            var constSpec = spec
             var constOf = this.resolveTypeSpec(constSpec.base)
             spec.typeInfo = this.typeCache.newConstTypeInfo(constOf) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.PTR: {
-            var ptrSpec = spec as (*PtrTypeSpec)
+            var ptrSpec = spec
             var ptrOf = this.resolveTypeSpec(ptrSpec.base)
             spec.typeInfo = this.typeCache.newPtrTypeInfo(ptrOf) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.ARRAY: {
-            var arraySpec = spec as (*ArrayTypeSpec)
+            var arraySpec = spec
             var arrayOf = this.resolveTypeSpec(arraySpec.base)
             var length: usize = 0
             var isLengthDefined = false
@@ -1171,7 +1178,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
             return spec.typeInfo
         }
         case TypeSpecKind.FUNC_PTR: {
-            var funcPtrSpec = spec as (*FuncPtrTypeSpec)
+            var funcPtrSpec = spec
             var paramDecls = Array<*TypeInfo>{}
             if(!funcPtrSpec.args.empty()) {
                 paramDecls.init(funcPtrSpec.args.size(), this.allocator)

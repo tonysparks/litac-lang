@@ -52,7 +52,7 @@ public struct Module {
 
     importedBy: Array<ModuleImport> // modules that import this module
 
-    typeSpecs: TypeSpecAllocator
+    typeSpecAllocator: TypeSpecAllocator
     arena: ArenaAllocator
     allocator: *const Allocator
     lita: *Lita
@@ -83,6 +83,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, &builtins, lita.allocator)
     builtins.genericSymbols = &lita.genericSymbols
     builtins.lita = lita
+    builtins.typeSpecAllocator.init(lita.allocator)
 
     var filename: [MAX_PATH]char;
     var pathStr = StringInit(filename, MAX_PATH, 0);
@@ -137,6 +138,7 @@ public func (this: *Module) init(lita: *Lita) {
     this.arena.init(1024 * KiB, lita.allocator)
     this.allocator = &this.arena.allocator
     //this.allocator = lita.allocator
+    this.typeSpecAllocator.init(this.allocator)
 
     // We want these to be owned by the global allocator
     this.importedBy.init(64, lita.allocator)

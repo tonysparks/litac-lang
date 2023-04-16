@@ -89,13 +89,14 @@ C:
 */
 
 public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
+    var allocator = checker.current.allocator
 
-    var decls = ArrayInit<*Decl>(512, checker.lita.allocator)
-    var sb = StringBufferInit(2048, checker.lita.allocator)
+    var decls = ArrayInit<*Decl>(512, allocator)
+    var sb = StringBufferInit(2048, allocator)
 
     //var traitNameBuffer: [MAX_SYMBOL_NAME]char;
-    var traitBuffer      = StringBufferInit(MAX_SYMBOL_NAME, checker.lita.allocator)
-    var traitFieldBuffer = StringBufferInit(MAX_SYMBOL_NAME, checker.lita.allocator)
+    var traitBuffer      = StringBufferInit(MAX_SYMBOL_NAME, allocator)
+    var traitFieldBuffer = StringBufferInit(MAX_SYMBOL_NAME, allocator)
 
     sb.append("// %d number of traits found.\n", checker.interfaceImpls.size())
     for(var it = checker.interfaceImpls.iter(); it.hasNext();) {
@@ -112,7 +113,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         {
             //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
            // printf("Sym: %s vs %s\n", traitName, traitDecl.name.asString())
-            sb.append("struct %.*s__VirtualTable", traitName.length, traitName.buffer)
+            sb.append("@hidden struct %.*s__VirtualTable", traitName.length, traitName.buffer)
             sb.append(" {\n")
 
             for(var j = 0; j < traitDecl.fields.size(); j += 1) {
@@ -141,7 +142,10 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         {
             for(var i = 0; i < entry.value.size(); i += 1) {
                 var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
-                assert(implSym)
+
+                if(!implSym) {
+                    continue;
+                }
 
                 var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
 
@@ -160,7 +164,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
                     var fn = field.typeInfo as (*FuncPtrTypeInfo)
 
-                    sb.append("func __%.*s_%.*s_wrapper", implEscapedName.length, implEscapedName.buffer, field.traitField.name.str.length, field.traitField.name.str.buffer)
+                    sb.append("@hidden func __%.*s_%.*s_wrapper", implEscapedName.length, implEscapedName.buffer, field.traitField.name.str.length, field.traitField.name.str.buffer)
                     sb.append("(this: *void")
                     for(var p = 0; p < fn.paramDecls.size(); p += 1) {
                         var param = fn.paramDecls.get(p)
@@ -209,7 +213,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         // Generate Vtables implementations
         {
             //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
-            sb.append("const %.*s__vtables = []*%.*s__VirtualTable {\n",
+            sb.append("@hidden const %.*s__vtables = []*%.*s__VirtualTable {\n",
                 traitName.length, traitName.buffer, traitName.length, traitName.buffer)
 
             for(var i = 0; i < entry.value.size(); i += 1) {
@@ -238,7 +242,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
     {
         //printf("Traits Source: \n%s\n", sb.cStr())
-        var parser = ParserInit("generated", sb.cStr(), sb.length, checker.allocator, checker.lita)
+        var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
         var stmts = parser.parseModule()
         decls.addAll(stmts.declarations)
     }
@@ -310,7 +314,7 @@ func GetTraitName(traitSym: *Symbol, sb: *StringBuffer) : StringView {
 }
 
 func Parse(sb: *StringBuffer, checker: *TypeChecker, decls: *Array<*Decl>) {
-    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.allocator, checker.lita)
+    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
     var stmts = parser.parseModule()
     decls.addAll(stmts.declarations)
 }

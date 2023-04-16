@@ -91,7 +91,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
     }
     sb.append("\n}\n")
 
-    var parser = ParserInit(module.id.filename, sb.cStr(), sb.length, module.allocator, lita)
+    var parser = ParserInit(module.id.filename, sb.cStr(), sb.length, module, lita)
     var stmts = parser.parseModule()
     if(stmts) {
         checker.enterModule(module)
@@ -146,21 +146,21 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             if(alias) {
                 sb.clear()
                 sb.append("defer %s::StopWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
 
                 sb.clear()
                 sb.append("%s::StartWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
 
             }
             else {
                 sb.clear()
                 sb.append("defer StopWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
 
                 sb.clear()
                 sb.append("StartWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, lita.allocator), 0, lita)
+                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
             }
         }
     }
