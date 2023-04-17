@@ -55,7 +55,7 @@ public struct TypeChecker {
     current: *Module
     moduleStack: Array<*Module>
 
-    funcDeclStack: Array<*FuncTypeInfo>
+    funcDeclStack: Array<*TypeInfo>
 
     pendingValues: Array<*Symbol>
     symbolTypes: Array<*Symbol>     // all types from all modules
@@ -203,7 +203,7 @@ func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeIn
         }
 
         if(!IsPtr(b) && IsAggregate(b)) {
-            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            var aggInfo = b.getBaseType()
             if(aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
                 b.toString(sb)
@@ -218,7 +218,7 @@ func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeIn
             }
         }
         else if(IsPtrAggregate(b)) {
-            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            var aggInfo = b.getBaseType()
             if(!aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
                 b.toString(sb)
@@ -289,7 +289,7 @@ func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *Type
     if(IsTraitLike(a)) {
         var aTrait = a.getBaseType()
         if(!IsPtr(b) && IsAggregate(b)) {
-            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            var aggInfo = b.getBaseType()
             if(aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
                 b.toString(sb)
@@ -813,7 +813,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         case SymbolKind.FUNC: {
             var funcDecl = sym.decl as (*FuncDecl)
             var funcInfo = sym.type != null ?
-                                sym.type as (*FuncTypeInfo) :
+                                sym.type :
                                 this.typeCache.newFuncTypeInfo(sym, funcDecl)
 
             var hasGenerics = !funcDecl.genericParams.empty() //sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
@@ -961,7 +961,7 @@ func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc: bool =
     return type
 }
 
-func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *AggregateTypeInfo) : bool {
+func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInfo) : bool {
     assert(agg != null)
     assert(iface != null)
 
@@ -984,7 +984,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
     var symbols = [MAX_METHODS_FOR_TYPE]*Symbol{}
     var numOfMethods = this.current.getMethodsForType(agg, symbols)
 
-    var numOfTraitFns = iface.decl.fields.size()
+    var numOfTraitFns = iface.aggDecl.fields.size()
 
     if(numOfMethods < numOfTraitFns) {
         return false
@@ -993,7 +993,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
     var matchedCount = 0
 
     for(var i = 0; i < numOfTraitFns; i += 1) {
-        var field = iface.decl.fields.get(i)
+        var field = iface.aggDecl.fields.get(i)
 
         assert(field.typeInfo)
         assert(field.typeInfo.kind == TypeKind.FUNC_PTR)
@@ -1001,7 +1001,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
 
         // check to see if the method is in the found symbols
         var functionName = field.traitField.decl.name.token.asString()
-        var traitFn = field.typeInfo as (*FuncPtrTypeInfo)
+        var traitFn = field.typeInfo
 
         for(var index = 0; index < numOfMethods; index += 1) {
             var sym = symbols[index]
@@ -1219,9 +1219,9 @@ func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol 
     return sym
 }
 
-func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *AggregateTypeInfo) {
-    for(var i = 0; i < currentType.decl.fields.size(); i += 1) {
-        var field = currentType.decl.fields.get(i)
+func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {
+    for(var i = 0; i < currentType.aggDecl.fields.size(); i += 1) {
+        var field = currentType.aggDecl.fields.get(i)
 
         switch(field.kind) {
             case StmtKind.VAR_FIELD_DECL: {
@@ -1245,7 +1245,7 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
                     }
 
                     assert(IsAggregate(fieldBaseType))
-                    this.addTypeToScope(decl, scope, baseType, fieldBaseType as (*AggregateTypeInfo))
+                    this.addTypeToScope(decl, scope, baseType, fieldBaseType)
                 }
                 break;
             }
@@ -1286,7 +1286,7 @@ func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
 
         assert(IsAggregate(typeInfo))
 
-        var aggInfo = typeInfo as (*AggregateTypeInfo)
+        var aggInfo = typeInfo
 
         for(var j = 0; j < note.arguments.size(); j += 1) {
             var arg = note.arguments.get(j)

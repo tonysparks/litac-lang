@@ -121,7 +121,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                   assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
                   assert(field.typeInfo != null && field.typeInfo.kind == TypeKind.FUNC_PTR)
 
-                  var fn = field.typeInfo as (*FuncPtrTypeInfo)
+                  var fn = field.typeInfo
                   var traitField = field.traitField
                   sb.append("    %.*s: func", traitField.name.str.length, traitField.name.str.buffer)
                   PrintGenerics(fn.genericParams, sb)
@@ -152,7 +152,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                 var implName = implSym.name
 
                 if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-                    var genericTypeid = (implSym.type as (*GenericTypeInfo)).genericTypeid
+                    var genericTypeid = implSym.type.genericTypeid
                     var genSym = FindSymbolByTypeid(checker.symbolTypes, genericTypeid)
                     implName = genSym.name
                 }
@@ -162,7 +162,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
                     assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
                     assert(field.typeInfo && field.typeInfo.kind == TypeKind.FUNC_PTR)
 
-                    var fn = field.typeInfo as (*FuncPtrTypeInfo)
+                    var fn = field.typeInfo
 
                     sb.append("@hidden func __%.*s_%.*s_wrapper", implEscapedName.length, implEscapedName.buffer, field.traitField.name.str.length, field.traitField.name.str.buffer)
                     sb.append("(this: *void")

@@ -3,6 +3,7 @@ import "std/libc"
 import "std/assert"
 import "std/array"
 import "std/map"
+import "std/bucket_list"
 
 import "types"
 import "symbols"
@@ -12,9 +13,10 @@ import "intern"
 
 public struct TypeCache {
     allocator: *const Allocator
-    constCache: Map<i64, *ConstTypeInfo>     // TODO: Fix alias generics bug - should be using Typeid
-    ptrCache:   Map<i64, *PtrTypeInfo>
-    arrayCache: Map<ArrayEntry, *ArrayTypeInfo>
+    typeInfos: BucketList<TypeInfo>
+    constCache: Map<i64, *TypeInfo>     // TODO: Fix alias generics bug - should be using Typeid
+    ptrCache:   Map<i64, *TypeInfo>
+    arrayCache: Map<ArrayEntry, *TypeInfo>
     genericCache: Map<InternedString, *TypeInfo>
 }
 
@@ -47,6 +49,9 @@ func Equals(a: ArrayEntry, b: ArrayEntry) : bool {
 
 public func (this: *TypeCache) init(allocator: *const Allocator) {
     this.allocator = allocator
+
+    this.typeInfos.init(1024*2, this.allocator)
+
     // TODO: should we create our own local allocator?
     this.constCache.init(null, 1024, PtrHashFn<Typeid>, PtrEqualFn<Typeid>, allocator)
     this.ptrCache.init(null, 1024, PtrHashFn<Typeid>, PtrEqualFn<Typeid>, allocator)
@@ -54,10 +59,15 @@ public func (this: *TypeCache) init(allocator: *const Allocator) {
     this.genericCache = InternMap<*TypeInfo>(null, 128, allocator)
 }
 
+func (this: *TypeCache) newTypeInfo() : *TypeInfo {
+    this.typeInfos.add(TypeInfo{})
+    return this.typeInfos.lastPtr()
+}
+
 public func (this: *TypeCache) newGenericParamTypeInfo(name: InternedString) : *TypeInfo {
     var type = this.genericCache.get(name)
     if(!type) {
-        type = new<TypeInfo>(this.allocator)
+        type = this.newTypeInfo()
         type.kind = TypeKind.GENERIC_PARAM
         type.typeid = NextTypeId()
         type.name = name
@@ -69,14 +79,14 @@ public func (this: *TypeCache) newGenericParamTypeInfo(name: InternedString) : *
 }
 
 public func (this: *TypeCache) newFuncTypeInfo(sym: *Symbol,
-                                               funcDecl: *FuncDecl) : *FuncTypeInfo {
+                                               funcDecl: *FuncDecl) : *TypeInfo {
 
-    var type = new<FuncTypeInfo>(this.allocator)
+    var type = this.newTypeInfo()
     type.kind = TypeKind.FUNC
     type.typeid = NextTypeId()
     type.name = sym.name
     type.sym = sym
-    type.decl = funcDecl
+    type.funcDecl = funcDecl
     type.returnType = null
     return type;
 }
@@ -84,13 +94,13 @@ public func (this: *TypeCache) newFuncTypeInfo(sym: *Symbol,
 public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
                                                 length: usize,
                                                 numOfElements: *Expr,
-                                                isLengthDefined: bool) : *ArrayTypeInfo {
+                                                isLengthDefined: bool) : *TypeInfo {
 
     var entry = ArrayEntry{.arrayOf = arrayOf, .expr = numOfElements, .length = length}
     var type = this.arrayCache.get(entry)
     if(!type || type.length != length || type.isLengthDefined != isLengthDefined
       || type.numOfElements != numOfElements /* this was commented out! */) {
-        type = new<ArrayTypeInfo>(this.allocator)
+        type = this.newTypeInfo()
         type.kind = TypeKind.ARRAY
         type.typeid = NextTypeId()
         type.arrayOf = arrayOf
@@ -107,9 +117,9 @@ public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
 public func (this: *TypeCache) newFuncPtrTypeInfo(genericParams: Array<GenericParam>,
                                                   returnType: *TypeInfo,
                                                   paramDecls: Array<*TypeInfo>,
-                                                  hasVarargs: bool) : *FuncPtrTypeInfo {
+                                                  hasVarargs: bool) : *TypeInfo {
 // TODO: implement cache
-    var type = new<FuncPtrTypeInfo>(this.allocator)
+    var type = this.newTypeInfo()
     type.kind = TypeKind.FUNC_PTR
     type.typeid = NextTypeId()
     type.genericParams = genericParams
@@ -120,9 +130,9 @@ public func (this: *TypeCache) newFuncPtrTypeInfo(genericParams: Array<GenericPa
 }
 
 public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
-                                                    decl: *AggregateDecl) : *AggregateTypeInfo {
+                                                    decl: *AggregateDecl) : *TypeInfo {
 
-    var type = new<AggregateTypeInfo>(this.allocator)
+    var type = this.newTypeInfo()
     switch(decl.kind) {
         case StmtKind.TRAIT_DECL: {
             type.kind = TypeKind.TRAIT
@@ -144,26 +154,26 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
     }
     type.typeid = NextTypeId()
     type.name = sym.name
-    type.decl = decl
+    type.aggDecl = decl
     type.sym = sym
     return type
 }
 
 public func (this: *TypeCache) newEnumTypeInfo(sym: *Symbol,
-                                               enumDecl: *EnumDecl) : *EnumTypeInfo {
+                                               enumDecl: *EnumDecl) : *TypeInfo {
 
-    var type = new<EnumTypeInfo>(this.allocator)
+    var type = this.newTypeInfo()
     type.kind = TypeKind.ENUM
     type.typeid = NextTypeId()
     type.name = sym.name
-    type.decl = enumDecl
+    type.enumDecl = enumDecl
     type.sym = sym
     return type
 }
 
 public func (this: *TypeCache) newForeignTypeInfo(sym: *Symbol) : *TypeInfo {
 
-    var type = new<TypeInfo>(this.allocator)
+    var type = this.newTypeInfo()
     type.kind = TypeKind.I64 // TODO: Create a foreign primitive type?
     type.typeid = NextTypeId()
     type.name = sym.name
@@ -171,15 +181,15 @@ public func (this: *TypeCache) newForeignTypeInfo(sym: *Symbol) : *TypeInfo {
     return type
 }
 
-public func (this: *TypeCache) newConstTypeInfo(base: *TypeInfo) : *ConstTypeInfo {
+public func (this: *TypeCache) newConstTypeInfo(base: *TypeInfo) : *TypeInfo {
     // can't have const const
     if(base.kind == TypeKind.CONST) {
-        return base as (*ConstTypeInfo)
+        return base
     }
 
     var type = this.constCache.get(base.typeid)
     if(!type) {
-        type = new<ConstTypeInfo>(this.allocator)
+        type = this.newTypeInfo()
         type.kind = TypeKind.CONST
         type.typeid = NextTypeId()
         type.constOf = base
@@ -190,10 +200,10 @@ public func (this: *TypeCache) newConstTypeInfo(base: *TypeInfo) : *ConstTypeInf
     return type
 }
 
-public func (this: *TypeCache) newPtrTypeInfo(base: *TypeInfo) : *PtrTypeInfo {
+public func (this: *TypeCache) newPtrTypeInfo(base: *TypeInfo) : *TypeInfo {
     var type = this.ptrCache.get(base.typeid)
     if(!type) {
-        type = new<PtrTypeInfo>(this.allocator)
+        type = this.newTypeInfo()
         type.kind = TypeKind.PTR
         type.typeid = NextTypeId()
         type.ptrOf = base
@@ -209,12 +219,12 @@ public func (this: *TypeCache) typeDecay(type: *TypeInfo) : *TypeInfo {
 
     switch(type.kind) {
         case TypeKind.ARRAY: {
-            var arrayInfo = type as (*ArrayTypeInfo)
-            return this.newPtrTypeInfo(this.typeDecay(arrayInfo.arrayOf)) as (*TypeInfo)
+            var arrayInfo = type
+            return this.newPtrTypeInfo(this.typeDecay(arrayInfo.arrayOf))
         }
         case TypeKind.FUNC: {
-            var funcInfo = type as (*FuncTypeInfo)
-            return funcInfo.asPtr(this) as (*TypeInfo)
+            var funcInfo = type
+            return funcInfo.asPtr(this)
         }
         default: {
             return type

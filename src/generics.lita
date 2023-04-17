@@ -223,7 +223,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
 
     name.typeInfo = genericSym.type
     if(IsGenericCapable(genericSym.type) && sym.type) {
-        var genericType = genericSym.type as (*GenericTypeInfo)
+        var genericType = genericSym.type
         genericType.genericTypeid = sym.type.typeid
     }
 

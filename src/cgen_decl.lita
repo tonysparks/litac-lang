@@ -70,9 +70,9 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
 
-    var funcInfo = decl.sym.type as (*FuncTypeInfo)
+    var funcInfo = decl.sym.type
     if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
-        var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+        var funcPtrInfo = funcInfo.returnType
         buf.append("%s (*%s(", this.cType(funcPtrInfo.returnType), name)
     }
     else {
@@ -82,17 +82,17 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     var decayArrays = true
     var i = 0
     var tmp = StringBufferInit(256, this.allocator)
-    for(; i < funcInfo.decl.params.size(); i += 1) {
+    for(; i < funcInfo.funcDecl.params.size(); i += 1) {
         if(i > 0) {
             buf.appendStrn(",", 1)
         }
 
-        var param = funcInfo.decl.params.get(i)
+        var param = funcInfo.funcDecl.params.get(i)
         buf.appendStr(this.cTypeDecl(param.sym.type, this.prefix(param.sym.name.view, &tmp), decayArrays))
         tmp.clear()
     }
 
-    if(funcInfo.decl.flags & FuncFlags.HAS_VARARGS) {
+    if(funcInfo.funcDecl.flags & FuncFlags.HAS_VARARGS) {
         if(i > 0) {
             buf.appendStrn(",", 1)
         }
@@ -102,7 +102,7 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     buf.appendStrn(")", 1)
 
     if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
-        var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+        var funcPtrInfo = funcInfo.returnType
         buf.appendStrn(")  (", 4)
 
         var j = 0
@@ -140,7 +140,7 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     this.funcIndex = this.buf.length
 
     if(decl.body) {
-        this.currentFunc = decl.sym.type as (*FuncTypeInfo)
+        this.currentFunc = decl.sym.type
         this.emitStmt(decl.body)
         this.currentFunc = null
     }

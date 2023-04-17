@@ -112,7 +112,7 @@ public func (this: *ReferenceDatabase) addTypeReferenceByTypeInfo(srcPos: SrcPos
     // to look up references
     if(IsGenericCapable(typeInfo)) {
         if(typeInfo.sym && typeInfo.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-            var genInfo = typeInfo as (*GenericTypeInfo)
+            var genInfo = typeInfo
             this.typeReferences.add(Reference {
                 .type = genInfo.genericTypeid,
                 .pos = srcPos

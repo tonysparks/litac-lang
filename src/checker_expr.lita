@@ -194,8 +194,8 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
     }
 
 
-    var source = sourceType.getBaseType() as (*AggregateTypeInfo)
-    var target = targetType.getBaseType() as (*AggregateTypeInfo)
+    var source = sourceType.getBaseType()
+    var target = targetType.getBaseType()
 
     // if this is a generic template, see if their generic types match
     if(targetType.sym && targetType.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
@@ -249,7 +249,7 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
     assert(IsFuncLike(funcType))
 
     if(funcType.kind == TypeKind.FUNC_PTR) {
-        var funcPtr = funcType as (*FuncPtrTypeInfo)
+        var funcPtr = funcType
         for(var i = 0; i < funcPtr.paramDecls.size() && i < suppliedArgs.size(); i += 1) {
             var argExpr = suppliedArgs.get(i).argExpr
             var paramInfo = funcPtr.paramDecls.get(i)
@@ -260,10 +260,10 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
         }
     }
     else {
-        var funcInfo  = funcType as (*FuncTypeInfo)
-        for(var i = 0; i < funcInfo.decl.params.size() && i < suppliedArgs.size(); i += 1) {
+        var funcInfo  = funcType
+        for(var i = 0; i < funcInfo.funcDecl.params.size() && i < suppliedArgs.size(); i += 1) {
             var argExpr = suppliedArgs.get(i).argExpr
-            var paramInfo = funcInfo.decl.params.get(i).typeInfo
+            var paramInfo = funcInfo.funcDecl.params.get(i).typeInfo
 
             if(!this.coerceFuncArg(expr, i, argExpr, paramInfo, suppliedArgs)) {
                 return false
@@ -391,32 +391,32 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
 
     switch(paramType.kind) {
         case TypeKind.ARRAY: {
-            var arrayInfo = paramType as (*ArrayTypeInfo)
-            var expectedArrayInfo = expectedType as (*ArrayTypeInfo)
+            var arrayInfo = paramType
+            var expectedArrayInfo = expectedType
             return this.inferredType(name, arrayInfo.arrayOf, expectedArrayInfo.arrayOf)
         }
         case TypeKind.CONST: {
-            var constInfo = paramType as (*ConstTypeInfo)
-            var expectedConstInfo = expectedType as (*ConstTypeInfo)
+            var constInfo = paramType
+            var expectedConstInfo = expectedType
             return this.inferredType(name, constInfo.constOf, expectedConstInfo.constOf)
         }
         case TypeKind.PTR: {
-            var ptrInfo = paramType as (*PtrTypeInfo)
-            var expectedPtrInfo = expectedType as (*PtrTypeInfo)
+            var ptrInfo = paramType
+            var expectedPtrInfo = expectedType
             return this.inferredType(name, ptrInfo.ptrOf, expectedPtrInfo.ptrOf)
         }
         case TypeKind.TRAIT:
         case TypeKind.UNION:
         case TypeKind.STRUCT: {
-            var aggInfo = paramType as (*AggregateTypeInfo)
+            var aggInfo = paramType
 
-            var size = aggInfo.decl.genericParams.size()
+            var size = aggInfo.aggDecl.genericParams.size()
             if(size == 0 || size <= index) {
                 break;
             }
 
-            var genericName = aggInfo.decl.genericParams.get(index).name
-            var expectedAggInfo = expectedType as (*AggregateTypeInfo)
+            var genericName = aggInfo.aggDecl.genericParams.get(index).name
+            var expectedAggInfo = expectedType
 
             var aggBaseName: [MAX_SYMBOL_NAME]char;
             var expectedBaseName: [MAX_SYMBOL_NAME]char;
@@ -438,8 +438,8 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
             }
 
             var fieldName = EMPTY_STR;
-            for(var i = 0; i < aggInfo.decl.fields.size(); i += 1) {
-                var field = aggInfo.decl.fields.get(i)
+            for(var i = 0; i < aggInfo.aggDecl.fields.size(); i += 1) {
+                var field = aggInfo.aggDecl.fields.get(i)
                 switch(field.kind) {
                     case StmtKind.TRAIT_FIELD_DECL: {
                         var traitField = field.traitField
@@ -481,12 +481,12 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
             break;
         }
         case TypeKind.FUNC_PTR: {
-            var funcInfo = paramType as (*FuncPtrTypeInfo)
+            var funcInfo = paramType
             if(funcInfo.genericParams.empty() || funcInfo.genericParams.size() <= index) {
                 break;
             }
             var genericName = funcInfo.genericParams.get(index).name
-            var argumentFuncInfo = expectedType as (*FuncPtrTypeInfo)
+            var argumentFuncInfo = expectedType
 
             var retType = this.inferredType(genericName, funcInfo.returnType, argumentFuncInfo.returnType)
             if(retType) {
@@ -540,7 +540,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
     // TODO: Clean this up, too much duplicate code...
     var genericParams: Array<GenericParam>;
     if(funcType.kind == TypeKind.FUNC_PTR) {
-        var funcPtr = funcType as (*FuncPtrTypeInfo)
+        var funcPtr = funcType
         genericParams = funcPtr.genericParams;
         var size = genericParams.size()
 
@@ -572,8 +572,8 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
     }
     else {
-        var funcInfo = funcType as (*FuncTypeInfo)
-        genericParams = funcInfo.decl.genericParams;
+        var funcInfo = funcType
+        genericParams = funcInfo.funcDecl.genericParams;
 
         var size = genericParams.size()
 
@@ -584,8 +584,8 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         for(var i = 0; i < size; i+=1) {
             var genericParam = genericParams.get(i)
 
-            for(var j = 0; j < funcInfo.decl.params.size(); j+=1) {
-                var paramType = funcInfo.decl.params.get(j).typeInfo
+            for(var j = 0; j < funcInfo.funcDecl.params.size(); j+=1) {
+                var paramType = funcInfo.funcDecl.params.get(j).typeInfo
 
                 if(j >= suppliedArgsSize) {
                     break
@@ -643,7 +643,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
     var i = 0;
 
     if(funcType.kind == TypeKind.FUNC_PTR) {
-        var funcPtr = funcType as (*FuncPtrTypeInfo)
+        var funcPtr = funcType
         hasVarargs = funcPtr.hasVarargs
 
         for(; i < funcPtr.paramDecls.size(); i+=1) {
@@ -670,12 +670,12 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
     }
     else {
-        var funcInfo = funcType as (*FuncTypeInfo)
+        var funcInfo = funcType
         var hasNamedArg = false
-        hasVarargs = funcInfo.decl.params.isVararg
+        hasVarargs = funcInfo.funcDecl.params.isVararg
 
-        for(; i < funcInfo.decl.params.size(); i+=1) {
-            var p = funcInfo.decl.params.get(i)
+        for(; i < funcInfo.funcDecl.params.size(); i+=1) {
+            var p = funcInfo.funcDecl.params.get(i)
             if(i < numberOfSuppliedArgs) {
                 var callArg = suppliedArgs.getPtr(i)
                 var paramIndex = i
@@ -684,8 +684,8 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                     hasNamedArg = true
                     paramIndex = -1
 
-                    for(var index = 0; index < funcInfo.decl.params.size(); index += 1) {
-                        var param = funcInfo.decl.params.get(index)
+                    for(var index = 0; index < funcInfo.funcDecl.params.size(); index += 1) {
+                        var param = funcInfo.funcDecl.params.get(index)
                         if(param.name.str.equals(callArg.argName.str)) {
                             paramIndex = index
                             p = param
@@ -714,8 +714,8 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
         }
 
         // now populate the any default arguments
-        for(var index = 0; index < funcInfo.decl.params.size(); index+=1) {
-            var param = funcInfo.decl.params.get(index)
+        for(var index = 0; index < funcInfo.funcDecl.params.size(); index+=1) {
+            var param = funcInfo.funcDecl.params.get(index)
             if(param.defaultExpr) {
                 var hasValue = false
                 for(var j = 0; j < suppliedArgs.size(); j += 1) {
@@ -778,22 +778,22 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     // TODO: there is a lot of duplicate code here, should we
     // represent FUNC and FUNC_PTR's in the same structure??
     if(objectType.kind == TypeKind.FUNC) {
-        var funcInfo = objectType as (*FuncTypeInfo)
-        isMethod = (funcInfo.decl.flags & FuncFlags.IS_METHOD)
-        maxNumOfArgs = funcInfo.decl.params.size()
-        hasVarargs = funcInfo.decl.params.isVararg
+        var funcInfo = objectType
+        isMethod = (funcInfo.funcDecl.flags & FuncFlags.IS_METHOD)
+        maxNumOfArgs = funcInfo.funcDecl.params.size()
+        hasVarargs = funcInfo.funcDecl.params.isVararg
         returnType = funcInfo.returnType
-        genericParams = funcInfo.decl.genericParams
+        genericParams = funcInfo.funcDecl.genericParams
 
-        for(var i = 0; i < funcInfo.decl.params.size(); i += 1) {
-            var p = funcInfo.decl.params.get(i)
+        for(var i = 0; i < funcInfo.funcDecl.params.size(); i += 1) {
+            var p = funcInfo.funcDecl.params.get(i)
             if(p.defaultExpr) {
                 numberOfDefaultArgs += 1
             }
         }
     }
     else {
-        var funcPtr = objectType as (*FuncPtrTypeInfo)
+        var funcPtr = objectType
         maxNumOfArgs = funcPtr.paramDecls.size()
         hasVarargs = funcPtr.hasVarargs
         returnType = funcPtr.returnType
@@ -837,11 +837,11 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
             assert(IsFuncLike(objectType))
 
             if(objectType.kind == TypeKind.FUNC) {
-                var funcInfo = objectType as (*FuncTypeInfo)
+                var funcInfo = objectType
                 returnType = funcInfo.returnType
             }
             else {
-                var funcPtr = objectType as (*FuncPtrTypeInfo)
+                var funcPtr = objectType
                 returnType = funcPtr.returnType
             }
         }
@@ -944,12 +944,12 @@ func (this: *TypeChecker) resolveSubscriptSetExpr(expr: *SubscriptSetExpr) : boo
             return false
         }
         case TypeKind.PTR: {
-            var ptrInfo = objectType as (*PtrTypeInfo)
+            var ptrInfo = objectType
             baseObj = ptrInfo.ptrOf
             break;
         }
         case TypeKind.ARRAY: {
-            var arrayInfo = objectType as (*ArrayTypeInfo)
+            var arrayInfo = objectType
             baseObj = arrayInfo.arrayOf
             break;
         }
@@ -999,19 +999,19 @@ func (this: *TypeChecker) resolveSubscriptGetExpr(expr: *SubscriptGetExpr) : boo
             break;
         }
         case TypeKind.PTR: {
-            var ptrInfo = objectType as (*PtrTypeInfo)
+            var ptrInfo = objectType
             baseObj = ptrInfo.ptrOf
             if(baseObj.kind == TypeKind.CONST) {
-                var constInfo = baseObj as (*ConstTypeInfo)
+                var constInfo = baseObj
                 baseObj = constInfo.constOf
             }
             break;
         }
         case TypeKind.ARRAY: {
-            var arrayInfo = objectType as (*ArrayTypeInfo)
+            var arrayInfo = objectType
             baseObj = arrayInfo.arrayOf
             if(baseObj.kind == TypeKind.CONST) {
-                var constInfo = baseObj as (*ConstTypeInfo)
+                var constInfo = baseObj
                 baseObj = constInfo.constOf
             }
             break;
@@ -1050,13 +1050,13 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
     assert(type != null)
     assert(IsAggregate(type))
 
-    var aggInfo = type as (*AggregateTypeInfo)
+    var aggInfo = type
 
     var defaultArgs = Array<*InitArgExpr>{}
-    defaultArgs.init(aggInfo.decl.fields.size(), this.allocator)
+    defaultArgs.init(aggInfo.aggDecl.fields.size(), this.allocator)
 
-    for(var position = 0; position < aggInfo.decl.fields.size(); position += 1) {
-        var field = aggInfo.decl.fields.get(position)
+    for(var position = 0; position < aggInfo.aggDecl.fields.size(); position += 1) {
+        var field = aggInfo.aggDecl.fields.get(position)
         if(field.kind != StmtKind.VAR_FIELD_DECL) {
             continue
         }
@@ -1105,7 +1105,7 @@ func (this: *TypeChecker) addInitArgumentsReferences(type: *TypeInfo, expr: *Ini
     assert(type != null)
 
     if(IsAggregate(type)) {
-        var aggInfo = type as (*AggregateTypeInfo)
+        var aggInfo = type
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
             var field: FieldStmt;
@@ -1145,7 +1145,7 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
 
     var errors = this.errors()
     if(IsAggregate(type)) {
-        var aggInfo = type as (*AggregateTypeInfo)
+        var aggInfo = type
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
             var field: FieldStmt;
@@ -1173,7 +1173,7 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
         }
     }
     else if(type.kind == TypeKind.ARRAY) {
-        var arrayInfo = type as (*ArrayTypeInfo)
+        var arrayInfo = type
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
 
@@ -1187,15 +1187,15 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
     return this.errors() == errors
 }
 
-func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *AggregateTypeInfo) : *TypeInfo {
-    var size = aggInfo.decl.genericParams.size()
+func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *TypeInfo) : *TypeInfo {
+    var size = aggInfo.aggDecl.genericParams.size()
     expr.genericArgs.init(size, this.allocator)
     var suppliedArgs = ArrayInit<*TypeInfo>(expr.arguments.size(), this.allocator)
     for(var i = 0; i < expr.arguments.size(); i += 1) {
         var arg = expr.arguments.get(i)
         var type = arg.operand.typeInfo
         if(!type) {
-            this.errorInferGenericParameters(expr, aggInfo.decl.genericParams)
+            this.errorInferGenericParameters(expr, aggInfo.aggDecl.genericParams)
             goto err
         }
 
@@ -1210,10 +1210,10 @@ func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *AggregateType
     expr.type.typeInfo = null // clear out the cached value, so it can be created with the generic types
 
     for(var genericIndex = 0; genericIndex < size; genericIndex += 1) {
-        var genericParam = aggInfo.decl.genericParams.get(genericIndex)
+        var genericParam = aggInfo.aggDecl.genericParams.get(genericIndex)
 
-        for(var fieldIndex = 0; fieldIndex < aggInfo.decl.fields.size(); fieldIndex += 1) {
-            var paramType = aggInfo.decl.fields.get(fieldIndex).typeInfo
+        for(var fieldIndex = 0; fieldIndex < aggInfo.aggDecl.fields.size(); fieldIndex += 1) {
+            var paramType = aggInfo.aggDecl.fields.get(fieldIndex).typeInfo
             if(!paramType) {
                 this.errorInferGenericParameter(expr, genericParam)
                 goto err
@@ -1276,9 +1276,9 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
     // If this aggregate type has generics and there are no generic arguments supplied,
     // we attempt to infer the generic arguments
     if(IsAggregate(type)) {
-        var aggInfo = type as (*AggregateTypeInfo)
+        var aggInfo = type
 
-        if(!aggInfo.decl.genericParams.empty() && expr.genericArgs.empty()) {
+        if(!aggInfo.aggDecl.genericParams.empty() && expr.genericArgs.empty()) {
             type = this.inferInitExpr(expr, aggInfo)
             if(type.kind == TypeKind.POISON) {
                 return false
@@ -1325,7 +1325,7 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
     assert(info != null)
     assert(info.kind == TypeKind.STRUCT || info.kind == TypeKind.UNION)
 
-    var aggInfo = info as (*AggregateTypeInfo)
+    var aggInfo = info
     var field = aggInfo.getField(expr.field.type.name)
     if(field.kind == StmtKind.POISON_EXPR) {
         field = aggInfo.getFieldWithUsing(expr.field.type.name)
@@ -1431,7 +1431,7 @@ func (this: *TypeChecker) resolveOffsetOfExpr(expr: *OffsetOfExpr) : bool {
 
     var fieldName = expr.field.str
 
-    var aggInfo = type as (*AggregateTypeInfo)
+    var aggInfo = type
     var fieldStmt = aggInfo.getField(fieldName)
     if(fieldStmt.kind == StmtKind.POISON_EXPR) {
         this.errorNoField(expr, type, fieldName)
@@ -1456,7 +1456,7 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
     return true
 }
 
-func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTypeInfo) : bool {
+func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *TypeInfo) : bool {
     assert(expr != null)
 
     if(!aggInfo || !IsAggregate(aggInfo)) {
@@ -1521,8 +1521,8 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
         return true
     }
 
-    for(var i = 0; i < aggInfo.decl.fields.size(); i += 1) {
-        var field = aggInfo.decl.fields.get(i)
+    for(var i = 0; i < aggInfo.aggDecl.fields.size(); i += 1) {
+        var field = aggInfo.aggDecl.fields.get(i)
         if(field.kind == StmtKind.VAR_FIELD_DECL) {
             var varField = field.varField
             if(varField.attributes.isUsing) {
@@ -1533,7 +1533,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *AggregateTyp
                     continue
                 }
 
-                if(this.checkMethodExpr(expr, baseType as (*AggregateTypeInfo))) {
+                if(this.checkMethodExpr(expr, baseType)) {
                     return true
                 }
 
@@ -1563,14 +1563,14 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
     }
 
     if(objectTypeInfo.kind == TypeKind.ENUM) {
-        var enumInfo = objectTypeInfo as (*EnumTypeInfo)
-        var field = enumInfo.getField(expr.field.type.name)
+        var enumInfo = objectTypeInfo
+        var field = enumInfo.getEnumField(expr.field.type.name)
         if(!field) {
             this.errorNoField(expr.field, objectTypeInfo, expr.field.type.name)
             return false
         }
 
-        this.lita.references.addFieldReference(expr.field.type.pos, enumInfo, enumInfo.getFieldIndex(expr.field.type.name))
+        this.lita.references.addFieldReference(expr.field.type.pos, enumInfo, enumInfo.getEnumFieldIndex(expr.field.type.name))
 
         expr.flags |= GetExprFlags.IS_ENUM
         expr.operand.typeInfo = &I32_TYPE
@@ -1583,7 +1583,7 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         assert(info != null)
         assert(IsAggregate(info))
 
-        var aggInfo = info as (*AggregateTypeInfo)
+        var aggInfo = info
 
         // is this a vanilla field access?
         var field = aggInfo.getField(expr.field.type.name)
@@ -1662,9 +1662,9 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
         case TokenType.STAR: {
             switch(type.kind) {
                 case TypeKind.PTR: {
-                    var info = type as (*PtrTypeInfo)
+                    var info = type
                     if(info.ptrOf.kind == TypeKind.CONST) {
-                        var constInfo = info.ptrOf as (*ConstTypeInfo)
+                        var constInfo = info.ptrOf
                         expr.operand.typeInfo = constInfo.constOf
                     }
                     else {
@@ -1677,9 +1677,9 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                     break
                 }
                 case TypeKind.ARRAY: {
-                    var info = type as (*ArrayTypeInfo)
+                    var info = type
                     if(info.arrayOf.kind == TypeKind.CONST) {
-                        var constInfo = info.arrayOf as (*ConstTypeInfo)
+                        var constInfo = info.arrayOf
                         expr.operand.typeInfo = constInfo.constOf
                     }
                     else {
@@ -1688,7 +1688,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                     break
                 }
                 case TypeKind.CONST: {
-                    var constInfo = type as (*ConstTypeInfo)
+                    var constInfo = type
                     if(IsPtrLike(constInfo.constOf)) {
                         expr.operand.typeInfo = constInfo.constOf
                     }
@@ -1709,7 +1709,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
         }
         case TokenType.BAND: {
             if(type.kind == TypeKind.FUNC) {
-                expr.operand.typeInfo = (type as (*FuncTypeInfo)).asPtr(this.typeCache) as (*TypeInfo)
+                expr.operand.typeInfo = type.asPtr(this.typeCache)
                 expr.operand.isRightValue = true
             }
             else if(expr.unaryExpr.operand.isRightValue) {
@@ -1717,7 +1717,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                 return false
             }
             else {
-                expr.operand.typeInfo = this.typeCache.newPtrTypeInfo(type) as (*TypeInfo)
+                expr.operand.typeInfo = this.typeCache.newPtrTypeInfo(type)
             }
             break;
         }
@@ -1804,7 +1804,7 @@ func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
 
     assert(typeInfo.kind == TypeKind.ARRAY)
 
-    var arrayInfo = typeInfo as (*ArrayTypeInfo)
+    var arrayInfo = typeInfo
     var arrayOf = arrayInfo.arrayOf
 
     if(!expr.values.empty()) {
@@ -2137,13 +2137,13 @@ func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Expr) {
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *InternedString, funcInfo: *FuncTypeInfo) {
+func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *InternedString, funcInfo: *TypeInfo) {
     var sb = StringBufferInit(256, this.allocator)
     sb.append("Invalid named parameter: '%.*s'; no parameter with that name found in 'func %.*s(",
         name.length, name.buffer, funcInfo.name.length, funcInfo.name.buffer)
 
-    for(var i = 0; i < funcInfo.decl.params.size(); i+=1) {
-        var param = funcInfo.decl.params.get(i)
+    for(var i = 0; i < funcInfo.funcDecl.params.size(); i+=1) {
+        var param = funcInfo.funcDecl.params.get(i)
         if(i > 0) {
             sb.append(", ")
         }

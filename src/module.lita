@@ -192,22 +192,22 @@ func (this: *Module) isMethodForType(type: *TypeInfo, sym: *Symbol) : bool {
         return false
     }
 
-    var fn = sym.type as (*FuncTypeInfo)
-    if(fn.decl.params.size() == 0) {
+    var fn = sym.type
+    if(fn.funcDecl.params.size() == 0) {
         return false
     }
 
-    var firstArg = fn.decl.params.get(0)
+    var firstArg = fn.funcDecl.params.get(0)
     if(!firstArg.typeInfo) {
         return false
     }
 
     var base = firstArg.typeInfo.getBaseType()
     if(IsGenericCapable(type)) {
-        var gen = type as (*GenericTypeInfo)
+        var gen = type
 
         if(IsGenericCapable(base)) {
-            var param = base as (*GenericTypeInfo)
+            var param = base
             if(gen.genericTypeid == param.genericTypeid) {
                 return true
             }
