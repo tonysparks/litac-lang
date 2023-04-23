@@ -286,6 +286,8 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
 }
 
 func (this: *Lita) syncSymbols(module: *Module, moduleSymbols: *Map<InternedString, *Symbol>, symbols: *Array<*Symbol>) {
+
+    // first delete the (old) module symbols out of the programSymbols
     var deletedIndex = symbols.size() - 1
     for(var i = 0; i <= deletedIndex; i+=1) {
         var sym = symbols.get(i)
@@ -298,6 +300,8 @@ func (this: *Lita) syncSymbols(module: *Module, moduleSymbols: *Map<InternedStri
     }
     symbols.length = deletedIndex < 0 ? 0 : deletedIndex;
 
+    // now add them back, this time the module will have the
+    // the most up to date symbols
     for(var i = 0; i < moduleSymbols.capacity; i+=1) {
         var symbol = moduleSymbols.values[i]
         if(!symbol) {

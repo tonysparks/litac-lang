@@ -151,13 +151,33 @@ public func (this: *Module) init(lita: *Lita) {
 }
 
 public func (this: *Module) initIncrementalBuild() {
-    // TODO: How do we free the memory, so that we don't
-    // leak forever on incremental builds??
     this.text = String{}
     this.ast = null
     this.flags = 0
     this.flags |= ModuleFlags.INCREMENTAL_COMPILATION
+
+    this.arena.clear()
+    this.typeSpecAllocator.init(this.allocator)
+
     this.symbols.initIncrementalBuild()
+
+    // clear out any generic symbols from this module
+    for(var it = this.genericSymbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
+
+        if(symbol.declared.equals(this)) {
+            it.remove()
+            continue
+        }
+
+        if(symbol.genericCallsiteModule != null &&
+           symbol.genericCallsiteModule.equals(this)) {
+            it.remove()
+            continue
+        }
+    }
 }
 
 public func (this: *Module) postIncrementalBuild() {
@@ -277,23 +297,17 @@ func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *I
     moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
 
     var symbols = moduleToImport.symbols;
-    for(var i = 0; i < symbols.symbolTypes.capacity; i += 1) {
-        var symName = symbols.symbolTypes.keys[i]
-        var symbol = symbols.symbolTypes.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
-
+    for(var it = symbols.symbolTypes.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
         this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
     }
 
-    for(var i = 0; i < symbols.symbolFuncs.capacity; i += 1) {
-        var symName = symbols.symbolFuncs.keys[i]
-        var symbol = symbols.symbolFuncs.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
-
+    for(var it = symbols.symbolFuncs.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
         this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
     }
 }
@@ -373,25 +387,22 @@ public func (this: *Module) print(header: *const char) {
     printf("Module %s %.*s {\n", header, this.id.name.length, this.id.name.buffer)
 
     var symbols = this.symbols
-    for(var i = 0; i < symbols.symbolTypes.capacity; i+=1) {
-        var symName = symbols.symbolTypes.keys[i]
-        var symbol = symbols.symbolTypes.values[i]
-        if(!symName.addr || !symbol) {
-            printf("   %d null\n", i)
-            continue
-        }
+    var i = 0
+    for(var it = symbols.symbolTypes.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
         printf("   %d '%.*s' %s\n", i, symName.length, symName.buffer, SymbolKindAsStr(symbol.kind))
+        i += 1
     }
 
-
-    for(var i = 0; i < symbols.symbolFuncs.capacity; i+=1) {
-        var symName = symbols.symbolFuncs.keys[i]
-        var symbol = symbols.symbolFuncs.values[i]
-        if(!symName.addr || !symbol) {
-            printf("   %d null\n", i)
-            continue
-        }
+    i = 0
+    for(var it = symbols.symbolFuncs.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
         printf("   %d '%.*s' %s\n", i, symName.length, symName.buffer, SymbolKindAsStr(symbol.kind))
+        i += 1
     }
     printf("}\n")
 }

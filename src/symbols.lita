@@ -133,13 +133,13 @@ public func (scope: *Scope) init(kind: ScopeKind,
 }
 
 public func (scope: *Scope) initIncrementalBuild() {
-    scope.markReset(scope.symbolTypes)
-    scope.markReset(scope.symbolFuncs)
+    scope.markReset(&scope.symbolTypes)
+    scope.markReset(&scope.symbolFuncs)
 }
 
 public func (scope: *Scope) postIncrementalBuild() {
-    scope.cleanMarked(scope.symbolTypes)
-    scope.cleanMarked(scope.symbolFuncs)
+    scope.cleanMarked(&scope.symbolTypes)
+    scope.cleanMarked(&scope.symbolFuncs)
 }
 
 public func (s: *Scope) lookupFunc(name: InternedString) : *Symbol {
@@ -351,55 +351,40 @@ public func (this: *Scope) addSymbol(name: InternedString,
 // TEMP
 public func (this: *Scope) print(header: *const char) {
     printf("Scope %s {\n", header)
-    for(var i = 0; i < this.symbolTypes.capacity; i+=1) {
-        var symName = this.symbolTypes.keys[i]
-        var symbol = this.symbolTypes.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
+    for(var it = this.symbolTypes.iter(); it.hasNext();) {
+        var symbol = it.next().value;
         printf("   '%.*s'\n", symbol.name.length, symbol.name.buffer)
     }
 
-    for(var i = 0; i < this.symbolFuncs.capacity; i+=1) {
-        var symName = this.symbolFuncs.keys[i]
-        var symbol = this.symbolFuncs.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
+    for(var it = this.symbolFuncs.iter(); it.hasNext();) {
+        var symbol = it.next().value;
         printf("   '%.*s'\n", symbol.name.length, symbol.name.buffer)
     }
     printf("}\n")
 }
 
 func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
-    for(var i = 0; i < symbols.capacity; i+=1) {
-        var symName = symbols.keys[i]
-        var symbol = symbols.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
-
+    for(var it = symbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
         // remove entries not declared in this module
         // so that they can be reimported if necessary
         if(!symbol.declared.equals(this.module)) {
-            //printf("Not defined in module: %.*s\n", symName.length ,symName.buffer)
-            symbols.keys[i] = EMPTY_STR
-            symbols.values[i] = null
-            symbols.length -= 1
+            it.remove()
             continue
         }
 
         symbol.flags |= SymbolFlags.IS_MARKED_RESET
+        symbol.state = SymbolState.UNRESOLVED
+        symbol.type = null
     }
 }
 
 func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
-    for(var i = 0; i < symbols.capacity; i+=1) {
-        var symName = symbols.keys[i]
-        var symbol = symbols.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
+    for(var it = symbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symbol = entry.value;
 
         if(!symbol.declared.equals(this.module)) {
             continue
@@ -408,12 +393,11 @@ func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
         // Remove any entries that haven't been stored again
         // this means they were deleted
         if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
-            symbols.keys[i] = EMPTY_STR
-            symbols.values[i] = null
-            symbols.length -= 1
+            it.remove()
 
 
             var isFunc = symbol.kind == SymbolKind.FUNC
+            var symName = entry.key
 
             // TODO: Reach out to all other modules who reference
             // this symbol and delete it...
