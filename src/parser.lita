@@ -2094,7 +2094,8 @@ func (p: *Parser) identifierType(disambiguate: bool) : *TypeSpec {
         goto err;
     }
 
-    var sb = StringBufferInit(MAX_SYMBOL_NAME, p.allocator)
+    var buffer:[MAX_SYMBOL_NAME]char;
+    var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
     sb.appendStrn(name.str.buffer, name.str.length)
 
     if(p.match(TokenType.COLON_COLON)) {
@@ -2107,7 +2108,7 @@ func (p: *Parser) identifierType(disambiguate: bool) : *TypeSpec {
     }
 
     var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.typeAllocator)
-    spec.name = p.lita.strings.intern(sb.cStr(), sb.length)
+    spec.name = p.lita.strings.internCopy(sb.cStr(), sb.length)
 
     if(p.check(TokenType.LESS_THAN)) {
         spec.genericArgs = p.tryGenericArguments(disambiguate)
@@ -2322,6 +2323,10 @@ func (p: *Parser) arguments(arguments: *Array<CallArg>) : bool {
             }
 
             arg.argExpr = p.expression()
+            if(arg.argExpr.kind == StmtKind.POISON_EXPR) {
+                goto err
+            }
+
             arguments.add(arg)
         }
         while(p.match(TokenType.COMMA))

@@ -21,10 +21,10 @@ import "intern"
 public func NewTokenNameIntern(token: Token, strings: *Strings) : InternedString {
     if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
         var text = tokenText[token.type]
-        return strings.intern(text, strlen(text))
+        return strings.internCopy(text, strlen(text))
     }
 
-    return strings.intern(token.value.str.buffer, token.value.str.length)
+    return strings.internCopy(token.value.str.buffer, token.value.str.length)
 }
 
 public func CopyTypeSpecs(specs: Array<*TypeSpec>, module: *Module) : Array<*TypeSpec> {
@@ -839,7 +839,7 @@ public func AstAddImport(lita: *Lita,
     sb.append("____%d", moduleNameIndex += 1)
 
     var alias = Identifier {
-        .str = lita.strings.intern(sb.cStr(), sb.length),
+        .str = lita.strings.internCopy(sb.cStr(), sb.length),
         .token = Token {
             .type = TokenType.IDENTIFIER,
             .pos = module.ast.startPos,

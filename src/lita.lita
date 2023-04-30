@@ -23,6 +23,7 @@ import "cgen"
 import "common"
 import "intern"
 import "types"
+import "types_new"
 import "build"
 
 import "lsp/references"
@@ -56,6 +57,7 @@ public struct Lita {
     programSymbols: ProgramSymbols
     genericSymbols: Map<InternedString, *Symbol>
 
+    typeCache: TypeCache
     strings: Strings
 
     // Language Server support
@@ -174,6 +176,7 @@ public func (this: *Lita) reset() {
     this.stringsAllocator.init(this.allocator, 5 * KiB)
     this.strings.init(this.stringsAllocator)
 
+    this.typeCache.init(this.allocator)
     TypesInit(this.strings)
 
     // TODO: clear module allocators

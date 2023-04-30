@@ -16,6 +16,7 @@ import "ast"
 import "ast_new"
 import "lex"
 import "intern"
+import "common"
 
 public enum ModuleFlags {
     TYPE_CHECKED  = (1<<0),
@@ -183,8 +184,6 @@ public func (this: *Module) initIncrementalBuild() {
 public func (this: *Module) postIncrementalBuild() {
     this.flags &= ~ModuleFlags.INCREMENTAL_COMPILATION;
     this.symbols.postIncrementalBuild()
-    // TODO: clean out symbols still marked?
-    // what else??
 }
 
 public func (this: *Module) getType(type: InternedString) : *Symbol {

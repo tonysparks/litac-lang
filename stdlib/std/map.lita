@@ -144,7 +144,7 @@ public func (m: *Map<K, V>) put<K, V>(key: K, value: V) {
         i &= m.capacity - 1;
         var k = m.keys[i]
 
-        if(k.state == KeyState.EMPTY && m.equalFn<K>(k.key, m.emptyKey)) {
+        if(m.equalFn<K>(k.key, m.emptyKey)) {
             m.length += 1
             m.keys[i].key = key;
             m.values[i] = value;
@@ -364,4 +364,51 @@ func nextPowerOf2(n: u32) : u32 {
     }
 
     return 1 << count;
+}
+
+func BlahHash(a: i32) : u32 {
+    return 3;
+}
+
+func BlahEq(a: i32, b: i32) : bool {
+    return a == b;
+}
+
+func Print(m: *Map<i32,i32>) {
+    printf("\n")
+    for(var i = 0; i < m.capacity; i+=1) {
+        var key = m.keys[i]
+        var value = m.values[i]
+
+        printf("Key: %d/%d Value: %d @ %d\n", key.key, key.state, value, i)
+    }
+}
+
+@test
+func testRemove() {
+    var map = Map<i32, i32>{}
+    map.init(
+        .emptyValue = 0,
+        .initialSize = 4,
+        .hashFn = BlahHash,
+        .equalFn = BlahEq
+        //.alloc = mem::defaultAllocator,
+        //.emptyKey = 0
+    )
+    defer map.free()
+
+    map.put(1, 4)
+    map.put(2, 8)
+    map.put(3, 16)
+    Print(&map)
+
+
+    map.remove(2)
+    Print(&map)
+    assert(map.get(1) == 4)
+    assert(map.get(2) == 0)
+    assert(map.get(3) == 16)
+
+    //map.put(2, 8)
+    //Print(&map)
 }

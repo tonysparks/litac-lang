@@ -73,7 +73,7 @@ public struct TypeChecker {
     labels: [MAX_LABELS]LabelInfo;
     numOfLabels: i32
 
-    typeCache: TypeCache
+    typeCache: *TypeCache
 
     randomNameIndex: u32
 
@@ -96,7 +96,7 @@ public func (this: *TypeChecker) init(lita: *Lita) {
 
     this.bypassing = false
 
-    this.typeCache.init(lita.allocator)
+    this.typeCache = &lita.typeCache
 
     this.mainEntry = null
 
@@ -426,55 +426,6 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
     this.resolveNotes(module.ast.notes)
 }
 
-func (this: *TypeChecker) enterModule(module: *Module) {
-    this.moduleStack.push(module)
-    this.current = module
-}
-
-func (this: *TypeChecker) leaveModule() {
-    var oldScope = this.current;
-
-    if(this.moduleStack.size()) {
-        this.moduleStack.pop()
-        if(this.moduleStack.size()) {
-            this.current = this.moduleStack.last()
-        }
-    }
-}
-
-public func (this: *TypeChecker) currentScope() : *Scope {
-    return this.current.currentScope
-}
-
-func (this: *TypeChecker) pushScope(scope: *Scope) {
-    scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.current, this.allocator);
-    this.current.currentScope = scope
-}
-
-func (this: *TypeChecker) popScope() {
-    if(this.currentScope()) {
-        this.current.currentScope = this.current.currentScope.parent
-    }
-}
-
-func (this: *TypeChecker) isGenericParamType(name: *TypeSpec) : bool {
-    for(var k = 0; k < this.genericParamStack.size(); k += 1) {
-        var params = &this.genericParamStack.elements[k]
-
-        for(var i = 0; i < params.size(); i+=1) {
-            var param = params.get(i)
-            assert(param.name.token.type == TokenType.IDENTIFIER)
-
-            if(param.name.str.equals(name.name)) {
-                return true;
-            }
-        }
-    }
-
-    return false
-}
-
-
 func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     assert(decl != null)
 
@@ -653,6 +604,57 @@ err:
     return null
 }
 
+
+func (this: *TypeChecker) enterModule(module: *Module) {
+    this.moduleStack.push(module)
+    this.current = module
+}
+
+func (this: *TypeChecker) leaveModule() {
+    var oldScope = this.current;
+
+    if(this.moduleStack.size()) {
+        this.moduleStack.pop()
+        if(this.moduleStack.size()) {
+            this.current = this.moduleStack.last()
+        }
+    }
+}
+
+public func (this: *TypeChecker) currentScope() : *Scope {
+    return this.current.currentScope
+}
+
+func (this: *TypeChecker) pushScope(scope: *Scope) {
+    scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.current, this.current.allocator)
+    this.current.currentScope = scope
+}
+
+func (this: *TypeChecker) popScope() {
+    if(this.currentScope()) {
+        this.current.currentScope = this.current.currentScope.parent
+    }
+}
+
+func (this: *TypeChecker) isGenericParamType(name: *TypeSpec) : bool {
+    for(var k = 0; k < this.genericParamStack.size(); k += 1) {
+        var params = &this.genericParamStack.elements[k]
+
+        for(var i = 0; i < params.size(); i+=1) {
+            var param = params.get(i)
+            assert(param.name.token.type == TokenType.IDENTIFIER)
+
+            if(param.name.str.equals(name.name)) {
+                return true;
+            }
+        }
+    }
+
+    return false
+}
+
+
+
 func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
     for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
         var other = this.current.ast.imports.get(i)
@@ -788,7 +790,11 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     sym.type = this.typeCache.newAggregateTypeInfo(sym, aggregateDecl) as (*TypeInfo)
                     break;
                 }
+                case StmtKind.POISON_DECL: {
+                    goto err;
+                }
                 default: {
+                    Info("StmtKind %.*s %d %s\n", sym.name.length, sym.name.buffer, sym.decl.kind, StmtKindAsStr(sym.decl.kind))
                     assert(false)
                 }
             }

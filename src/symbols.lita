@@ -10,6 +10,7 @@ import "module"
 import "lita"
 import "phase_result"
 import "intern"
+import "common"
 
 @asStr
 public enum SymbolKind {
@@ -144,7 +145,7 @@ public func (scope: *Scope) postIncrementalBuild() {
 
 public func (s: *Scope) lookupFunc(name: InternedString) : *Symbol {
     var sym = s.symbolFuncs.get(name)
-    if(sym) {
+    if(sym && !(sym.flags & SymbolFlags.IS_MARKED_RESET)) {
         return sym
     }
 
@@ -160,13 +161,13 @@ public func (s: *Scope) lookup(name: InternedString, includeFuncs: bool = true) 
 
     if(includeFuncs) {
         sym = s.symbolFuncs.get(name)
-        if(sym) {
+        if(sym && !(sym.flags & SymbolFlags.IS_MARKED_RESET)) {
             return sym
         }
     }
 
     sym = s.symbolTypes.get(name)
-    if(sym) {
+    if(sym && !(sym.flags & SymbolFlags.IS_MARKED_RESET)) {
         return sym
     }
 
@@ -177,15 +178,6 @@ public func (s: *Scope) lookup(name: InternedString, includeFuncs: bool = true) 
     return s.parent.lookup(name, includeFuncs)
 }
 
-/*
-public func (s: *Scope) lookupByToken(name: Token) : *Symbol {
-    if(name.type != TokenType.IDENTIFIER) {
-        return null
-    }
-
-    return s.lookup(name.str)
-}*/
-
 public func (this: *Scope) importSymbol(name: InternedString,
                                         symbol: *Symbol) {
 
@@ -194,13 +186,6 @@ public func (this: *Scope) importSymbol(name: InternedString,
     if(symbol.kind != SymbolKind.FUNC) {
         symbolStorage = &this.symbolTypes
     }
-
-    // if we are in the process of an incremental build, go ahead and
-    // ignore duplicate checks..
-    // if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
-    //     symbol.flags |= ~SymbolFlags.IS_MARKED_RESET
-    // }
-    // else
 
     if(symbolStorage.contains(name) && !symbol.decl.hasNote("generated")) {
         var existingSym = symbolStorage.get(name)
@@ -218,9 +203,9 @@ public func (this: *Scope) addSymbol(name: InternedString,
                                      decl: *Decl,
                                      flags: i32) : *Symbol {
 
-    var isFunc = decl.kind == StmtKind.FUNC_DECL
     var symbolStorage = &this.symbolTypes
 
+    var isFunc = decl.kind == StmtKind.FUNC_DECL
     if(isFunc) {
         symbolStorage = &this.symbolFuncs
     }
@@ -378,6 +363,7 @@ func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
         symbol.flags |= SymbolFlags.IS_MARKED_RESET
         symbol.state = SymbolState.UNRESOLVED
         symbol.type = null
+        symbol.decl = null
     }
 }
 
@@ -395,12 +381,9 @@ func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
         if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
             it.remove()
 
-
             var isFunc = symbol.kind == SymbolKind.FUNC
             var symName = entry.key
 
-            // TODO: Reach out to all other modules who reference
-            // this symbol and delete it...
             // TODO: performance...
             for(var i = 0; i < this.module.importedBy.size(); i+=1) {
                 var m = this.module.importedBy.get(i).module
