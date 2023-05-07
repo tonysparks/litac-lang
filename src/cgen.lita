@@ -361,13 +361,19 @@ func (this: using *CGen) emitTraitDecls() {
 
         var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = this.cTypeName(traitSym.type)
+        var module = root
 
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
         var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
         var escapedName = this.escapeNameStr(traitSym.name)
-        vtableNameStr.format("%s%.*s__%.*s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, escapedName.length, escapedName.buffer)
+        vtableNameStr.format("%s%.*s__%.*s",
+            this.options.cPrefix,
+            module.id.name.length,
+            module.id.name.buffer,
+            escapedName.length,
+            escapedName.buffer)
 
         // Generate Casting functions;
         // we generate the casting functions in C code and not in lita

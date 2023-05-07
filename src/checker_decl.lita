@@ -363,6 +363,13 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
     const isTrait = aggDecl.sym.flags & SymbolFlags.IS_TRAIT
     const module = this.current
 
+    // Always make sure trait interfaces are
+    // populated so that base vtable types are generated
+    if(isTrait && aggDecl.sym.type) {
+        var impls = ArrayInit<Typeid>(32, this.allocator)
+        this.interfaceImpls.put(aggDecl.sym.type.typeid, impls)
+    }
+
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 

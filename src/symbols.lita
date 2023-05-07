@@ -189,10 +189,21 @@ public func (this: *Scope) importSymbol(name: InternedString,
 
     if(symbolStorage.contains(name) && !symbol.decl.hasNote("generated")) {
         var existingSym = symbolStorage.get(name)
-        var decl = existingSym.decl
-        this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
-            name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
-        return;
+
+        // if this symbol was previously defined and we're doing
+        // an incremental build, go ahead with the import -- if/when
+        // the symbol gets a declaration in this module, it will error
+        // there
+        if(existingSym.flags & SymbolFlags.IS_MARKED_RESET) {
+            // do nothing...
+        }
+        else {
+            //Info("Importing: %.*s is Marked: %d\n", name.length, name.buffer, existingSym.flags & SymbolFlags.IS_MARKED_RESET)
+            var decl = existingSym.decl
+            this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
+                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+            return;
+        }
     }
 
     symbolStorage.put(name, symbol)

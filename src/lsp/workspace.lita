@@ -208,7 +208,6 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
 
 func (this: *Workspace) addDocumentSymbol(results: *JsonNode, sym: *Symbol, docFilename: *const char, alloc: *const Allocator) {
     var absPath = [MAX_PATH]char{0}
-    this.lsp.log("Symbol: %.*s\n", sym.name.length, sym.name.buffer)
     var path = GetAbsolutePath(this.rootPath, sym.declared.id.filename, absPath)
 
     if(PathEquals(path, docFilename)) {

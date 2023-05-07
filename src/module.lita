@@ -212,6 +212,10 @@ func (this: *Module) isMethodForType(type: *TypeInfo, sym: *Symbol) : bool {
     }
 
     var fn = sym.type
+    if(fn == null) {
+        return false
+    }
+
     if(fn.funcDecl.params.size() == 0) {
         return false
     }
