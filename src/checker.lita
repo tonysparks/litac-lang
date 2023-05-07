@@ -502,7 +502,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             if(funcDecl.flags & FuncFlags.IS_METHOD) {
                 var buffer = [MAX_SYMBOL_NAME]char;
                 if(!funcDecl.getName(buffer)) {
-                    this.result.addError(decl.startPos, "invalid function name")
+                    this.result.addError(decl.startPos, "invalid function name or invalid method caller type")
                     goto err;
                 }
 

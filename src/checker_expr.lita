@@ -1459,7 +1459,7 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
 func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : bool {
     assert(expr != null)
 
-    if(!type) {
+    if(!type || type.kind == TypeKind.FUNC_PTR) {
         return false
     }
 
