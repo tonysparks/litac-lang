@@ -351,40 +351,14 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
             case StmtKind.GET_EXPR: {
                 var expr = location.node as (*GetExpr)
                 var base = expr.object.operand.typeInfo.getBaseType()
+
+                // if aggregate, check aggregate fields
                 if(IsAggregate(base)) {
                     var aggInfo = base
                     var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
                     this.lsp.log("Getting field position: %d\n", fieldResult.position)
                     if(fieldResult.aggInfo) {
                         return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
-                    }
-
-                    // This might be a method call, we must check all functions in the entire program
-                    // for the method declaration
-                    else {
-                        // use the field operand vs. the field.sym because it's the one that always
-                        // gets resolved in the type checker phase
-                        if(!expr.field.operand.typeInfo) {
-                            break
-                        }
-
-                        var fieldType = expr.field.operand.typeInfo.typeid
-
-                        for(var i = 0; i < this.lsp.lita.programSymbols.symbolFuncs.size(); i += 1) {
-                            var fn = this.lsp.lita.programSymbols.symbolFuncs.get(i)
-                            if(!(fn.flags & SymbolFlags.IS_METHOD)) {
-                                continue
-                            }
-
-                            if(fn.type.typeid == fieldType) {
-                                /*this.lsp.log("Found reference symbol: %s %llu vs. %llu\n", fn.name, fn.type.typeid, fieldType)
-                                for(var i = 0; i < this.lsp.lita.references.typeReferences.size(); i+= 1) {
-                                    var ref = this.lsp.lita.references.typeReferences.get(i)
-                                    this.lsp.log("TypeId: %llu\n", ref.type)
-                                }*/
-                                return this.findTypeReferences(fn.type.typeid, alloc)
-                            }
-                        }
                     }
                 }
                 else if (base.kind == TypeKind.ENUM) {
@@ -393,6 +367,28 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     this.lsp.log("Getting enum position: %d\n", index)
                     return this.findFieldReferences(enumInfo.typeid, index, alloc)
                 }
+
+                // This might be a method call, we must check all functions in the entire program
+                // for the method declaration
+                // use the field operand vs. the field.sym because it's the one that always
+                // gets resolved in the type checker phase
+                if(!expr.field.operand.typeInfo) {
+                    break
+                }
+
+                var fieldType = expr.field.operand.typeInfo.typeid
+
+                for(var i = 0; i < this.lsp.lita.programSymbols.symbolFuncs.size(); i += 1) {
+                    var fn = this.lsp.lita.programSymbols.symbolFuncs.get(i)
+                    if(!(fn.flags & SymbolFlags.IS_METHOD)) {
+                        continue
+                    }
+
+                    if(fn.type.typeid == fieldType) {
+                        return this.findTypeReferences(fn.type.typeid, alloc)
+                    }
+                }
+
                 break
             }
             case StmtKind.SET_EXPR: {
@@ -671,30 +667,6 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                             }
                         }
                     }
-                    // This might be a method call, we must check all functions in the entire program
-                    // for the method declaration
-                    else {
-
-                        // use the field operand vs. the field.sym because it's the one that always
-                        // gets resolved in the type checker phase
-                        if(!expr.field.operand.typeInfo) {
-                            break
-                        }
-
-                        var fieldType = expr.field.operand.typeInfo.typeid
-
-                        for(var i = 0; i < this.lsp.lita.programSymbols.symbolFuncs.size(); i += 1) {
-                            var fn = this.lsp.lita.programSymbols.symbolFuncs.get(i)
-                            if(!(fn.flags & SymbolFlags.IS_METHOD)) {
-                                continue
-                            }
-
-                            if(fn.type.typeid == fieldType) {
-                                var decl = fn.decl
-                                return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
-                            }
-                        }
-                    }
                 }
                 else if (base.kind == TypeKind.ENUM) {
                     var enumInfo = base
@@ -702,6 +674,28 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                     if(index >= 0) {
                         var entryDecl = enumInfo.enumDecl.fields.get(index)
                         return SrcPosWithEndToLocation(entryDecl.startPos, entryDecl.endPos, this.rootPath, alloc)
+                    }
+                }
+
+                // This might be a method call, we must check all functions in the entire program
+                // for the method declaration
+                // use the field operand vs. the field.sym because it's the one that always
+                // gets resolved in the type checker phase
+                if(!expr.field.operand.typeInfo) {
+                    break
+                }
+
+                var fieldType = expr.field.operand.typeInfo.typeid
+
+                for(var i = 0; i < this.lsp.lita.programSymbols.symbolFuncs.size(); i += 1) {
+                    var fn = this.lsp.lita.programSymbols.symbolFuncs.get(i)
+                    if(!(fn.flags & SymbolFlags.IS_METHOD)) {
+                        continue
+                    }
+
+                    if(fn.type.typeid == fieldType) {
+                        var decl = fn.decl
+                        return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
                     }
                 }
                 break

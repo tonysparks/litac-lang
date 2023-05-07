@@ -721,17 +721,17 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
         }
 
         var typeSpec = first.type
+        var prefix = ""
 
         retry:
         if(typeSpec.kind != TypeSpecKind.NAME) {
-            if(typeSpec.kind == TypeSpecKind.PTR) {
-                var ptrSpec = typeSpec
-                typeSpec = ptrSpec.base
-                goto retry;
-            }
-            else if(typeSpec.kind == TypeSpecKind.CONST) {
-                var constSpec = typeSpec
-                typeSpec = constSpec.base
+            if(typeSpec.kind == TypeSpecKind.PTR ||
+               typeSpec.kind == TypeSpecKind.CONST ||
+               typeSpec.kind == TypeSpecKind.ARRAY) {
+                typeSpec = typeSpec.base
+                if(typeSpec.kind == TypeSpecKind.ARRAY) {
+                    prefix = "array_"
+                }
                 goto retry;
             }
             return false
@@ -743,8 +743,11 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
         }
 
         var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
-        nameStr.format("%.*s_%.*s",
-            typeSpec.name.length, typeSpec.name.buffer, f.name.str.length, f.name.str.buffer)
+        nameStr.format("%s%.*s_%.*s",
+            prefix,
+            typeSpec.name.length, typeSpec.name.buffer,
+            f.name.str.length, f.name.str.buffer)
+
         return true
     }
 

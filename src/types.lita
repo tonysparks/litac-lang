@@ -2058,15 +2058,12 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
 }
 
 public func (this: *TypeInfo) implementsTrait(iface : *TypeInfo, checker: *TypeChecker) : bool {
-    //printf("Here for this: %s iface: %s\n", this.toStringDebug(), iface.toStringDebug())
     if(!IsAggregateLike(iface)) {
-       // printf("iface %s not an aggregate\n", iface.toStringDebug())
         return false
     }
 
     var aggIface = AsAggregate(iface)
     if(!aggIface.sym || !(aggIface.sym.flags & SymbolFlags.IS_TRAIT)) {
-       // printf("iface %s not an interface\n", iface.toStringDebug())
         return false
     }
 

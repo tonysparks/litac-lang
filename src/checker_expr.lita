@@ -1456,10 +1456,10 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
     return true
 }
 
-func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *TypeInfo) : bool {
+func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : bool {
     assert(expr != null)
 
-    if(!aggInfo || !IsAggregate(aggInfo)) {
+    if(!type) {
         return false
     }
 
@@ -1487,7 +1487,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *TypeInfo) : 
         return true;
     }
 
-    var funcSym = aggInfo.getMethod(this.lita.strings, this.current, expr.field.type.name)
+    var funcSym = type.getMethod(this.lita.strings, this.current, expr.field.type.name)
     if(funcSym) {
         var decl = funcSym.decl as (*FuncDecl)
         var typeInfo = funcSym.type;
@@ -1501,7 +1501,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *TypeInfo) : 
             // We need to update the get expression with the method name
             var oldName = expr.field.type
             var functionName = [MAX_SYMBOL_NAME]char;
-            aggInfo.getFunctionName(functionName, oldName.name)
+            type.getFunctionName(functionName, oldName.name)
 
             expr.field.type.name = this.lita.strings.internCopy(functionName)
         }
@@ -1521,22 +1521,25 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, aggInfo: *TypeInfo) : 
         return true
     }
 
-    for(var i = 0; i < aggInfo.aggDecl.fields.size(); i += 1) {
-        var field = aggInfo.aggDecl.fields.get(i)
-        if(field.kind == StmtKind.VAR_FIELD_DECL) {
-            var varField = field.varField
-            if(varField.attributes.isUsing) {
-                var baseType = field.typeInfo.getBaseType()
+    if(IsAggregate(type)) {
+        var aggInfo = type
+        for(var i = 0; i < aggInfo.aggDecl.fields.size(); i += 1) {
+            var field = aggInfo.aggDecl.fields.get(i)
+            if(field.kind == StmtKind.VAR_FIELD_DECL) {
+                var varField = field.varField
+                if(varField.attributes.isUsing) {
+                    var baseType = field.typeInfo.getBaseType()
 
-                // avoid inifinite recursion
-                if(baseType.strictEquals(aggInfo)) {
-                    continue
+                    // avoid inifinite recursion
+                    if(baseType.strictEquals(aggInfo)) {
+                        continue
+                    }
+
+                    if(this.checkMethodExpr(expr, baseType)) {
+                        return true
+                    }
+
                 }
-
-                if(this.checkMethodExpr(expr, baseType)) {
-                    return true
-                }
-
             }
         }
     }
@@ -1558,8 +1561,15 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
 
     var objectTypeInfo = expr.object.operand.typeInfo
     if(!IsFieldAccessible(objectTypeInfo)) {
-        this.errorNoFieldAccess(expr.object, objectTypeInfo, expr.field.type.name)
-        return false
+
+        // for primitive types, only check and see if there is
+        // a method defined for field access
+        var info = objectTypeInfo.getBaseType()
+        if(!this.checkMethodExpr(expr, info)) {
+            this.errorNoFieldAccess(expr.object, objectTypeInfo, expr.field.type.name)
+            return false
+        }
+        return true
     }
 
     if(objectTypeInfo.kind == TypeKind.ENUM) {
