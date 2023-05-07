@@ -51,6 +51,8 @@ const STMT_ADJUST_TOKENS = []TokenType {
 
 public struct Parser {
     allocator: *const Allocator
+    typeAllocator: *TypeSpecAllocator
+    module: *Module
     result: *PhaseResult
     lita: *Lita
     strings: *Strings
@@ -73,10 +75,14 @@ public struct Parser {
 public func ParserInit(filename: *const char,
                        text: *const char,
                        length: i64,
+                       module: *Module,
                        lita: *Lita) : Parser {
 
     var parser = Parser {
-        .allocator = lita.allocator,
+        .allocator = module.allocator,
+        .typeAllocator = &module.typeSpecAllocator,
+        .module = module,
+
         .result = &lita.result,
         .lita = lita,
         .strings = &lita.strings,
@@ -92,8 +98,10 @@ public func ParserInit(filename: *const char,
         .panicMode = false,
     }
 
-    var lex = LexerInit(filename, text, length, lita.allocator)
-    parser.tokens.init(1024, lita.allocator)
+    var allocator = module.allocator;
+
+    var lex = LexerInit(filename, text, length, allocator)
+    parser.tokens.init(1024, allocator)
 
     while(!lex.eof()) {
         var token = lex.nextToken()
@@ -163,7 +171,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             return;
         }
 
-        p.lita.preprocessor.evaluateForModule(moduleStmt, compStmt as (*CompStmt))
+        p.lita.preprocessor.evaluateForModule(p.module, moduleStmt, compStmt as (*CompStmt))
     }
     else {
         var notes = Array<*NoteStmt>{}
@@ -470,7 +478,7 @@ func (p: *Parser) funcDeclaration() : *Decl {
         }
     }
     else {
-        returnType = NewVoidTypeSpec(p.pos(), p.lita)
+        returnType = NewVoidTypeSpec(p.pos(), p.typeAllocator)
     }
 
     var flags = 0;
@@ -2030,7 +2038,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
         case TokenType.USIZE:
         case TokenType.VOID: {
             p.advance()
-            var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.lita) as (*NameTypeSpec)
+            var spec = NewTypeSpec(TypeSpecKind.NAME, token.pos, p.typeAllocator)
             spec.name = NewTokenNameIntern(token, p.lita.strings)
 
             return spec as (*TypeSpec)
@@ -2040,7 +2048,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             var base = p.type(disambiguate)
             if(!base) return null;
 
-            var spec = NewTypeSpec(TypeSpecKind.PTR, token.pos, p.lita)
+            var spec = NewTypeSpec(TypeSpecKind.PTR, token.pos, p.typeAllocator)
             spec.base = base
             return spec as (*TypeSpec)
         }
@@ -2049,7 +2057,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             var base = p.type(disambiguate)
             if(!base) return null;
 
-            var spec = NewTypeSpec(TypeSpecKind.CONST, token.pos, p.lita)
+            var spec = NewTypeSpec(TypeSpecKind.CONST, token.pos, p.typeAllocator)
             spec.base = base
             return spec as (*TypeSpec)
         }
@@ -2078,7 +2086,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
     return null
 }
 
-func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
+func (p: *Parser) identifierType(disambiguate: bool) : *TypeSpec {
     var pos = p.pos()
 
     var name = p.identifier()
@@ -2086,7 +2094,8 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
         goto err;
     }
 
-    var sb = StringBufferInit(MAX_SYMBOL_NAME, p.allocator)
+    var buffer:[MAX_SYMBOL_NAME]char;
+    var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
     sb.appendStrn(name.str.buffer, name.str.length)
 
     if(p.match(TokenType.COLON_COLON)) {
@@ -2098,8 +2107,8 @@ func (p: *Parser) identifierType(disambiguate: bool) : *NameTypeSpec {
         sb.appendStrn(identifier.str.buffer, identifier.str.length)
     }
 
-    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.lita) as (*NameTypeSpec)
-    spec.name = p.lita.strings.intern(sb.cStr(), sb.length)
+    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.typeAllocator)
+    spec.name = p.lita.strings.internCopy(sb.cStr(), sb.length)
 
     if(p.check(TokenType.LESS_THAN)) {
         spec.genericArgs = p.tryGenericArguments(disambiguate)
@@ -2111,8 +2120,8 @@ err:
     return null
 }
 
-func (p: *Parser) arrayType() : *ArrayTypeSpec {
-    var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.lita) as (*ArrayTypeSpec)
+func (p: *Parser) arrayType() : *TypeSpec {
+    var spec = NewTypeSpec(TypeSpecKind.ARRAY, p.pos(), p.typeAllocator)
     p.advance()
 
     if(!p.check(TokenType.RIGHT_BRACKET)) {
@@ -2132,9 +2141,9 @@ err:
     return null
 }
 
-func (p: *Parser) funcPtrType() : *FuncPtrTypeSpec {
+func (p: *Parser) funcPtrType() : *TypeSpec {
     var pos = p.prevPos()
-    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.lita) as (*FuncPtrTypeSpec)
+    var spec = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, p.typeAllocator)
 
     if(p.match(TokenType.LESS_THAN))  {
         if(!p.genericParameters(&spec.genericParams)) {
@@ -2314,6 +2323,10 @@ func (p: *Parser) arguments(arguments: *Array<CallArg>) : bool {
             }
 
             arg.argExpr = p.expression()
+            if(arg.argExpr.kind == StmtKind.POISON_EXPR) {
+                goto err
+            }
+
             arguments.add(arg)
         }
         while(p.match(TokenType.COMMA))
@@ -2904,9 +2917,10 @@ func (p: *Parser) match(type: TokenType) : bool {
 }
 
 func (p: *Parser) matches(types: *TokenType, len: i32) : bool {
+    var tokenType = p.peek().type
     for(var i = 0; i < len; i += 1) {
         var type = types[i]
-        if(p.check(type)) {
+        if(tokenType == type) {
             p.advance()
             return true
         }

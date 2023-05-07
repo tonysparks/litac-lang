@@ -60,3 +60,7 @@ public func (r: *PhaseResult) addErrorStr(pos: SrcPos, sb: *StringBuffer) {
 public func (r: *PhaseResult) hasErrors() : bool {
     return !r.errors.empty()
 }
+
+public func (r: *PhaseResult) clear() {
+    r.errors.clear()
+}

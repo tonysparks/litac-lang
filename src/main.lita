@@ -120,6 +120,20 @@ report:
 
 
     if(runProgram) {
+        /*
+        var m = lita.getModule("src/main.lita")
+        lita.incrementalBuild(m)
+        lita.incrementalBuild(m)
+
+        if(!lita.result.errors.empty()) {
+            for(var i = 0; i < lita.result.errors.size(); i += 1) {
+                PrintError(sb, lita.result.errors.get(i))
+
+                printf("%s\n", sb.cStr())
+                sb.clear()
+            }
+            printf("Total errors: %d\n", lita.result.errors.size())
+        }*/
         return lita.run()
     }
 

@@ -360,7 +360,9 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
         return false
     }
 
-    var isTrait = aggDecl.sym.flags & SymbolFlags.IS_TRAIT
+    const isTrait = aggDecl.sym.flags & SymbolFlags.IS_TRAIT
+    const module = this.current
+
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 
@@ -381,7 +383,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     return false
                 }
 
-                var traitFn = field.typeInfo as (*FuncPtrTypeInfo)
+                var traitFn = field.typeInfo
                 traitFn.isTrait = true
 
                 this.checkAggregateFieldDuplicate(aggDecl, traitField.name.str, i)
@@ -467,8 +469,9 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
                     // build up the new Declaration Name with the appropriate generic arguments supplemented in
                     // from the parent declaration
-                    var nameSpec = NewNameTypeSpecIntern(field.aggregateField.startPos, nameStr, this.lita)
-                    nameSpec.genericArgs.init(field.aggregateField.genericParams.size(), this.allocator)
+                    var nameSpec = NewNameTypeSpecIntern(field.aggregateField.startPos, nameStr, &module.typeSpecAllocator)
+                    nameSpec.genericArgs.init(field.aggregateField.genericParams.size(), module.allocator)
+
                     for(var i = 0; i < field.aggregateField.genericParams.size(); i += 1) {
                         var genericParam = field.aggregateField.genericParams.get(i)
 
@@ -478,7 +481,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                             var parentGenericParam = aggDecl.sym.genericParams.get(j)
 
                             if(parentGenericParam.name.str.equals(genericParam.name.str)) {
-                                nameSpec.genericArgs.add(aggDecl.sym.genericArgs.get(j).asTypeSpec(this.lita))
+                                nameSpec.genericArgs.add(aggDecl.sym.genericArgs.get(j).asTypeSpec(module))
                                 break
                             }
                         }
@@ -555,8 +558,8 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
 
                 if(varField.attributes.isUsing) {
                     if(IsAggregate(field.typeInfo) || IsPtrAggregate(field.typeInfo)) {
-                        var aggInfo = field.typeInfo.getBaseType() as (*AggregateTypeInfo)
-                        position += aggInfo.decl.fields.size()
+                        var aggInfo = field.typeInfo.getBaseType()
+                        position += aggInfo.aggDecl.fields.size()
                     }
                 }
                 else {
@@ -663,7 +666,7 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     defer this.popScope()
 
     // keep track of which function we are currently parsing
-    this.funcDeclStack.add(funcDecl.sym.type as (*FuncTypeInfo))
+    this.funcDeclStack.add(funcDecl.sym.type)
     defer this.funcDeclStack.pop()
 
     var hasGenerics = funcDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
@@ -726,7 +729,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
         }
         else {
             var baseType = typeInfo.getBaseType()
-            var aggType = baseType as (*AggregateTypeInfo)
+            var aggType = baseType
 
             this.addTypeToScope(paramDecl, this.current.currentScope, aggType, aggType)
         }

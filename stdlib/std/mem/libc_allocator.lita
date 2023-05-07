@@ -1,0 +1,65 @@
+import "std/mem"
+import "std/libc" as c
+
+/**
+=========================================================
+// C Library allocator
+=========================================================
+*/
+public const cAllocator : *const Allocator = (&Allocator {
+    .allocFn:   &cMalloc,
+    .callocFn:  &cCalloc,
+    .reallocFn: &cRealloc,
+    .freeFn:    &cFree
+}) as (*const Allocator);
+
+#if (DEBUG)
+
+    public func cMalloc(a: *const Allocator,
+                 size: usize,
+                 file: *const char = c::__FILE__,
+                 line: u64 = c::__LINE__) : *void {
+        return c::malloc(size);
+    }
+
+    public func cCalloc(a: *const Allocator,
+                 num: usize,
+                 size: usize,
+                 file: *const char = c::__FILE__,
+                 line: u64 = c::__LINE__) : *void {
+        return c::calloc(num, size);
+    }
+
+    public func cRealloc(a: *const Allocator,
+                  ptr: *void,
+                  oldSize: usize,
+                  size: usize,
+                  file: *const char = c::__FILE__,
+                  line: u64 = c::__LINE__) : *void {
+        return c::realloc(ptr, size);
+    }
+
+    public func cFree(a: *const Allocator, ptr: *void) {
+        return c::free(ptr)
+    }
+
+
+#else
+
+    public func cMalloc(a: *const Allocator, size: usize) : *void {
+        return c::malloc(size);
+    }
+
+    public func cCalloc(a: *const Allocator, num: usize, size: usize) : *void {
+        return c::calloc(num, size);
+    }
+
+    public func cRealloc(a: *const Allocator, ptr: *void, oldSize: usize, size: usize) : *void {
+        return c::realloc(ptr, size);
+    }
+
+    public func cFree(a: *const Allocator, ptr: *void) {
+        return c::free(ptr)
+    }
+
+#end

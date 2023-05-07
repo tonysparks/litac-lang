@@ -50,32 +50,40 @@ public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char
     var filepath = [MAX_PATH]char{0};
     var pathStr = StringInit(filepath, MAX_PATH, 0);
 
+    // TODO:
+    // Defer full build compilation if no main is found
+    // set what we can, but wait for user to open first file
+    // and do full compilation based off of first file...
+
     pathStr.format("%s/src/main.lita", rootPath)
     this.lsp.log("Checking for main at: '%s'...", pathStr.cStr())
 
-    if(FileExists(pathStr.cStrConst())) {
-        this.lsp.log("found!\n")
-
-        GetAbsolutePath("", pathStr.cStr(), lita.options.inputFile)
-        FilePath(lita.options.inputFile, lita.options.srcPath)
-
-        var lib:*const char = GetEnv("LITAC_HOME")
-        if(!lib) lib = "";
-
-        GetAbsolutePath("", lib, lita.options.litaPath)
-
-        this.lsp.log("Lita.inputFile = '%s'\nLita.srcPath = '%s'\nLita.libPath = '%s'\nLita.litaPath = '%s'\n",
-            lita.options.inputFile,
-            lita.options.srcPath,
-            lita.options.libPath,
-            lita.options.litaPath)
-
-        lita.options.checkerOnly = true
+    if(!FileExists(pathStr.cStrConst())) {
+        // TODO: Inspect the URI
+        this.lsp.log("unable to find main.lita from '%s'\n", rootPath)
         return;
     }
 
-    // TODO: Inspect the URI
-    this.lsp.log("unable to find main.lita from '%s'\n", rootPath)
+
+    this.lsp.log("found!\n")
+
+    GetAbsolutePath("", pathStr.cStr(), lita.options.inputFile)
+    FilePath(lita.options.inputFile, lita.options.srcPath)
+
+    var lib:*const char = GetEnv("LITAC_HOME")
+    if(!lib) lib = "";
+
+    GetAbsolutePath("", lib, lita.options.litaPath)
+
+    this.lsp.log("Lita.inputFile = '%s'\nLita.srcPath = '%s'\nLita.libPath = '%s'\nLita.litaPath = '%s'\n",
+        lita.options.inputFile,
+        lita.options.srcPath,
+        lita.options.libPath,
+        lita.options.litaPath)
+
+    lita.options.checkerOnly = true
+
+    this.runDiagnostics(.docUri = null, .isFullBuild = true)
 }
 
 public func (this: *Workspace) isDocumentOpen(uri: *const char) : bool {
@@ -133,6 +141,7 @@ public func (this: *Workspace) changeDocument(change: *TextDocumentDidChange) {
     }
 
     //this.lsp.log("Changed document: '%s'\n", doc.filename)
+    this.runDiagnostics(change.textDocument.uri)
 
 }
 
@@ -143,13 +152,15 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     this.lsp.log("Uri: '%s' has doc: %d\n", uri, doc != null)
     if(!doc) return null;
 
-    var runResults = this.runDiagnostics(alloc, uri)
+    /*var runResults = this.runDiagnostics(uri)
     if(!runResults.isReadable) {
         return null
-    }
+    }*/
 
     var syms = &this.lsp.lita.programSymbols
     var results = CreateJsonArray(alloc)
+
+    //this.lsp.log("Number of Symbols: %d\n", syms.values.size() + syms.symbolTypes.size() + syms.symbolFuncs.size())
 
     // Generics
     /*for(var it = this.lsp.lita.genericSymbols.iter(); it.hasNext();) {
@@ -162,6 +173,9 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     // Values
     for(var i = 0; i < syms.values.size(); i += 1) {
         var sym = syms.values.get(i)
+        if(sym.flags & SymbolFlags.IS_HIDDEN) {
+            continue
+        }
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
     }
 
@@ -169,6 +183,9 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     for(var i = 0; i < syms.symbolTypes.size(); i += 1) {
         var sym = syms.symbolTypes.get(i)
         if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+            continue
+        }
+        if(sym.flags & SymbolFlags.IS_HIDDEN) {
             continue
         }
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
@@ -180,7 +197,9 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
         if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
             continue
         }
-
+        if(sym.flags & SymbolFlags.IS_HIDDEN) {
+            continue
+        }
         this.addDocumentSymbol(results, sym, doc.filename, alloc)
     }
 
@@ -190,6 +209,7 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
 func (this: *Workspace) addDocumentSymbol(results: *JsonNode, sym: *Symbol, docFilename: *const char, alloc: *const Allocator) {
     var absPath = [MAX_PATH]char{0}
     var path = GetAbsolutePath(this.rootPath, sym.declared.id.filename, absPath)
+
     if(PathEquals(path, docFilename)) {
         var info = SymbolToSymbolInformation(sym, this.rootPath, alloc)
         if(info) {
@@ -202,10 +222,10 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
     this.lsp.log("looking up references...\n")
     if(!uri || !position) return JSON_NULL;
 
-    var runResults = this.runDiagnostics(alloc, uri)
+    /*var runResults = this.runDiagnostics(uri)
     if(!runResults.isReadable) {
         return JSON_NULL
-    }
+    }*/
 
     var location = this.getNodeAtSourcePos(uri, position)
     if(location.kind == SourceLocationKind.NONE) {
@@ -244,7 +264,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     else {
                         var parentType = decl.sym.type
                         if(parentType) {
-                            var aggInfo = parentType as (*AggregateTypeInfo)
+                            var aggInfo = parentType
                             var fieldResult = aggInfo.getFieldPosition(varField.name.str)
                             this.lsp.log("Getting field position: %d\n", fieldResult.position)
                             if(fieldResult.aggInfo) {
@@ -267,7 +287,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     else {
                         var parentType = decl.sym.type
                         if(parentType) {
-                            var aggInfo = parentType as (*AggregateTypeInfo)
+                            var aggInfo = parentType
                             var fieldResult = aggInfo.getFieldPosition(varField.name.str)
                             this.lsp.log("Getting field position: %d\n", fieldResult.position)
                             if(fieldResult.aggInfo) {
@@ -293,7 +313,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     var init = parentNode as (*InitExpr)
                     var parentType = init.operand.typeInfo
                     if(IsAggregate(parentType)) {
-                        var aggInfo = parentType as (*AggregateTypeInfo)
+                        var aggInfo = parentType
                         var fieldResult = aggInfo.getFieldPosition(arg.fieldName.str)
                         if(fieldResult.aggInfo) {
                             this.lsp.log("Getting field position: %llu %d\n", fieldResult.aggInfo.typeid, fieldResult.position)
@@ -332,7 +352,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                 var expr = location.node as (*GetExpr)
                 var base = expr.object.operand.typeInfo.getBaseType()
                 if(IsAggregate(base)) {
-                    var aggInfo = base as (*AggregateTypeInfo)
+                    var aggInfo = base
                     var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
                     this.lsp.log("Getting field position: %d\n", fieldResult.position)
                     if(fieldResult.aggInfo) {
@@ -368,8 +388,8 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                     }
                 }
                 else if (base.kind == TypeKind.ENUM) {
-                    var enumInfo = base as (*EnumTypeInfo)
-                    var index = enumInfo.getFieldIndex(expr.field.type.name)
+                    var enumInfo = base
+                    var index = enumInfo.getEnumFieldIndex(expr.field.type.name)
                     this.lsp.log("Getting enum position: %d\n", index)
                     return this.findFieldReferences(enumInfo.typeid, index, alloc)
                 }
@@ -379,15 +399,15 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
                 var expr = location.node as (*SetExpr)
                 var base = expr.object.operand.typeInfo.getBaseType()
                 if(IsAggregate(base)) {
-                    var aggInfo = base as (*AggregateTypeInfo)
+                    var aggInfo = base
                     var fieldResult = aggInfo.getFieldPosition(expr.field.type.name)
                     if(fieldResult.aggInfo) {
                         return this.findFieldReferences(fieldResult.aggInfo.typeid, fieldResult.position, alloc)
                     }
                 }
                 else if (base.kind == TypeKind.ENUM) {
-                    var enumInfo = base as (*EnumTypeInfo)
-                    var index = enumInfo.getFieldIndex(expr.field.type.name)
+                    var enumInfo = base
+                    var index = enumInfo.getEnumFieldIndex(expr.field.type.name)
                     this.lsp.log("Getting enum position: %d\n", index)
                     return this.findFieldReferences(enumInfo.typeid, index, alloc)
                 }
@@ -468,10 +488,10 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
     this.lsp.log("looking up definition...\n")
     if(!uri || !position) return JSON_NULL;
 
-    var runResults = this.runDiagnostics(alloc, uri)
+    /*var runResults = this.runDiagnostics(uri)
     if(!runResults.isReadable) {
         return JSON_NULL
-    }
+    }*/
 
     var location = this.getNodeAtSourcePos(uri, position)
     if(location.kind == SourceLocationKind.NONE) {
@@ -530,7 +550,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                     else */{
                         var parentType = decl.sym.type
                         if(parentType) {
-                            var aggInfo = parentType as (*AggregateTypeInfo)
+                            var aggInfo = parentType
                             var fieldResult = aggInfo.getFieldPosition(varField.name.str)
                             this.lsp.log("Getting field position: %d\n", fieldResult.position)
                             if(fieldResult.aggInfo && fieldResult.aggInfo.sym) {
@@ -555,7 +575,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                     else */{
                         var parentType = decl.sym.type
                         if(parentType) {
-                            var aggInfo = parentType as (*AggregateTypeInfo)
+                            var aggInfo = parentType
                             var fieldResult = aggInfo.getFieldPosition(varField.name.str)
                             this.lsp.log("Getting field position: %d\n", fieldResult.position)
                             if(fieldResult.aggInfo && fieldResult.aggInfo.sym) {
@@ -582,7 +602,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                     var init = parentNode as (*InitExpr)
                     var parentType = init.operand.typeInfo
                     if(IsAggregate(parentType)) {
-                        var aggInfo = parentType as (*AggregateTypeInfo)
+                        var aggInfo = parentType
 
                         var field = aggInfo.getField(arg.fieldName.str)
                         if(field.kind != StmtKind.POISON_EXPR) {
@@ -626,7 +646,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                 }
 
                 if(IsAggregate(base)) {
-                    var aggInfo = base as (*AggregateTypeInfo)
+                    var aggInfo = base
                     var field = aggInfo.getField(expr.field.type.name)
                     if(field.kind != StmtKind.POISON_EXPR) {
                         switch(field.kind) {
@@ -677,10 +697,10 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                     }
                 }
                 else if (base.kind == TypeKind.ENUM) {
-                    var enumInfo = base as (*EnumTypeInfo)
-                    var index = enumInfo.getFieldIndex(expr.field.type.name)
+                    var enumInfo = base
+                    var index = enumInfo.getEnumFieldIndex(expr.field.type.name)
                     if(index >= 0) {
-                        var entryDecl = enumInfo.decl.fields.get(index)
+                        var entryDecl = enumInfo.enumDecl.fields.get(index)
                         return SrcPosWithEndToLocation(entryDecl.startPos, entryDecl.endPos, this.rootPath, alloc)
                     }
                 }
@@ -690,7 +710,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
                 var expr = location.node as (*SetExpr)
                 var base = expr.object.operand.typeInfo.getBaseType()
                 if(IsAggregate(base)) {
-                    var aggInfo = base as (*AggregateTypeInfo)
+                    var aggInfo = base
                     var field = aggInfo.getField(expr.field.type.name)
                     if(field.kind != StmtKind.POISON_EXPR) {
                         switch(field.kind) {
@@ -730,7 +750,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
         // we must manually check for aliased types, because the typechecker
         // completely replaces these typInfos with the real type
         if(location.type.kind == TypeSpecKind.NAME && location.module) {
-            var name = location.type as (*NameTypeSpec)
+            var name = location.type
             sym = location.module.getType(name.name)
         }
 
@@ -750,35 +770,59 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
 }
 
 
-public func (this: *Workspace) runDiagnostics(alloc: *const Allocator, docUri: *const char) : *PhaseResult {
+public func (this: *Workspace) runDiagnostics(
+    docUri: *const char,
+    isFullBuild: bool = false) : *PhaseResult {
+
     var startTime = SystemTimeMSec()
     var lita = this.lsp.lita
 
+    if(isFullBuild) {
+        this.lsp.log("Running diagnostics for full rebuild\n")
+    }
+
     // run this diagnostics from a particular module
-    if(docUri) {
-        this.lsp.log("Running diagnostics for: '%s'...\n", docUri)
+    if(docUri && !isFullBuild) {
+        this.lsp.log("Running %s diagnostics for: '%s'...\n", isFullBuild ? "full" : "incremental", docUri)
         UriToFilePath(docUri, lita.options.inputFile)
 
         this.lsp.log("Source file: '%s', source path: '%s'...\n", lita.options.inputFile, lita.options.srcPath)
     }
 
-    lita.reset()
+    if(isFullBuild) {
+        lita.reset()
 
-    var root = lita.parse()
-    if(!root) {
-        this.lsp.log("Failed to parse\n")
-        lita.result.isReadable = false
-        goto report
+        var root = lita.parse()
+        if(!root) {
+            this.lsp.log("Failed to parse\n")
+            lita.result.isReadable = false
+            goto report
+        }
+
+        var checked = lita.typeCheck(root, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
+        if(!checked) {
+            this.lsp.log("Failed to type check\n")
+            lita.result.isReadable = false
+            goto report
+        }
+
+        lita.result.isReadable = true
     }
+    else {
+        var doc = this.openedDocuments.get(docUri)
+        if(!doc) {
+            this.lsp.log("Failed to find open document: '%s'\n", docUri)
+            goto report
+        }
 
-    var checked = lita.typeCheck(root)
-    if(!checked) {
-        this.lsp.log("Failed to type check\n")
-        lita.result.isReadable = false
-        goto report
+        var module = lita.getModule(doc.filename)
+        if(!module) {
+            this.lsp.log("Failed to find module: '%s' from URI: '%s'\n", doc.filename, docUri)
+            goto report
+        }
+
+        lita.incrementalBuild(module)
     }
-
-    lita.result.isReadable = true
 
     var totalTime = SystemTimeMSec() - startTime
     this.lsp.log("Successfully compiled in %.3f msec\n", totalTime)

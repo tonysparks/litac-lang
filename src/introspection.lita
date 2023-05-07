@@ -136,7 +136,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
     }
     sb.append("\n};")
 
-    var parser = ParserInit(module.id.filename, sb.cStr(), sb.length, this.lita)
+    var parser = ParserInit(module.id.filename, sb.cStr(), sb.length, module, this.lita)
     var stmts = parser.parseModule()
     if(stmts) {
         checker.enterModule(module)
@@ -194,17 +194,17 @@ func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym
     var type = sym.type
     assert(type.kind ==  TypeKind.FUNC)
 
-    var funcInfo = type as (*FuncTypeInfo)
-    var isVararg = funcInfo.decl.params.isVararg
+    var funcInfo = type
+    var isVararg = funcInfo.funcDecl.params.isVararg
     var returnTypeid = funcInfo.returnType.typeid
-    var numOfParams = funcInfo.decl.params.size()
+    var numOfParams = funcInfo.funcDecl.params.size()
 
     {
         scratch.clear()
         if(numOfParams) {
             scratch.append("[]ParamInfo {")
             for(var i = 0; i < numOfParams; i += 1) {
-                var param = funcInfo.decl.params.get(i)
+                var param = funcInfo.funcDecl.params.get(i)
                 scratch.append("""
                     ParamInfo {
                         .name = "%.*s",
@@ -244,8 +244,8 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
     switch(type.kind) {
         default: {}
         case TypeKind.ENUM: {
-            var enumInfo = type as (*EnumTypeInfo)
-            var decl = enumInfo.decl
+            var enumInfo = type
+            var decl = enumInfo.enumDecl
             var numOfFields = decl.fields.size()
 
             if(numOfFields) {
@@ -295,8 +295,8 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
         case TypeKind.TRAIT:
         case TypeKind.UNION:
         case TypeKind.STRUCT: {
-            var aggInfo = type as (*AggregateTypeInfo)
-            var decl = aggInfo.decl
+            var aggInfo = type
+            var decl = aggInfo.aggDecl
             var numOfFields = decl.fields.size()
 
             if(decl.flags & AggregateFlags.IS_ANONYMOUS) {
@@ -484,7 +484,7 @@ func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
             break
         }
         case TypeKind.ARRAY: {
-            var arrayType = type as (*ArrayTypeInfo)
+            var arrayType = type
             sb.append("""
                 [%llu] = &TypeInfo {
                     .kind = TypeKind.%s,
@@ -504,7 +504,7 @@ func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
             break
         }
         case TypeKind.PTR: {
-            var ptrType = type as (*PtrTypeInfo)
+            var ptrType = type
             sb.append("""
                 [%llu] = &TypeInfo {
                     .kind = TypeKind.%s,
@@ -522,7 +522,7 @@ func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
             break
         }
         case TypeKind.CONST: {
-            var constType = type as (*ConstTypeInfo)
+            var constType = type
             sb.append("""
                 [%llu] = &TypeInfo {
                     .kind = TypeKind.%s,

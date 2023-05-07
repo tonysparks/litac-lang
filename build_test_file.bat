@@ -10,11 +10,11 @@ REM set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I
 set SRC_PATH=%cd%\src
 
 echo Running %1 tests with source path %SRC_PATH%...
-cd bin
+REM cd bin
 REM litac.exe  -debug -testFile -run -profile -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
-REM cd bootstrap
+cd bootstrap
 REM -disableLine
-litac.exe -cFormat -debug -testFile -run -profile -srcDir %SRC_PATH% -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
+litacc.exe -cFormat -debug -testFile -run -profile -srcDir %SRC_PATH% -buildCmd %BUILD_CMD% -output "litac_tests" "%1"
 if errorlevel 1 (
     goto error_compiling
 )

@@ -3,6 +3,7 @@ import "std/string_buffer"
 import "std/string"
 import "std/libc"
 import "std/array"
+import "std/map"
 
 import "ast"
 import "types"
@@ -70,9 +71,9 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     this.emitNotes(decl.attributes)
     this.emitLineInfo(decl.stmt)
 
-    var funcInfo = decl.sym.type as (*FuncTypeInfo)
+    var funcInfo = decl.sym.type
     if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
-        var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+        var funcPtrInfo = funcInfo.returnType
         buf.append("%s (*%s(", this.cType(funcPtrInfo.returnType), name)
     }
     else {
@@ -82,17 +83,17 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     var decayArrays = true
     var i = 0
     var tmp = StringBufferInit(256, this.allocator)
-    for(; i < funcInfo.decl.params.size(); i += 1) {
+    for(; i < funcInfo.funcDecl.params.size(); i += 1) {
         if(i > 0) {
             buf.appendStrn(",", 1)
         }
 
-        var param = funcInfo.decl.params.get(i)
+        var param = funcInfo.funcDecl.params.get(i)
         buf.appendStr(this.cTypeDecl(param.sym.type, this.prefix(param.sym.name.view, &tmp), decayArrays))
         tmp.clear()
     }
 
-    if(funcInfo.decl.flags & FuncFlags.HAS_VARARGS) {
+    if(funcInfo.funcDecl.flags & FuncFlags.HAS_VARARGS) {
         if(i > 0) {
             buf.appendStrn(",", 1)
         }
@@ -102,7 +103,7 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     buf.appendStrn(")", 1)
 
     if(funcInfo.returnType.kind == TypeKind.FUNC_PTR) {
-        var funcPtrInfo = funcInfo.returnType as (*FuncPtrTypeInfo)
+        var funcPtrInfo = funcInfo.returnType
         buf.appendStrn(")  (", 4)
 
         var j = 0
@@ -140,7 +141,7 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     this.funcIndex = this.buf.length
 
     if(decl.body) {
-        this.currentFunc = decl.sym.type as (*FuncTypeInfo)
+        this.currentFunc = decl.sym.type
         this.emitStmt(decl.body)
         this.currentFunc = null
     }
@@ -179,7 +180,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         var field = decl.fields.get(i)
         switch(field.kind) {
             case StmtKind.TRAIT_FIELD_DECL: {
-                //this.emitStmt(field.traitField)
+                /* delegated to the virtual table */
                 break;
             }
             case StmtKind.VAR_FIELD_DECL: {
@@ -203,17 +204,28 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
 
     // for traits, we add the virtual table and this pointers
     if(decl.sym.flags & SymbolFlags.IS_TRAIT) {
-        var root = this.lita.programSymbols.root
-        assert(root != null)
+        // we only need the virtual table if there are actual implementors of
+        // this trait
+        if(this.lita.programSymbols.interfaceImpls.contains(decl.sym.type.typeid)) {
+            var root = this.lita.programSymbols.root
+            assert(root != null)
 
-        // we put all generated trait tables in the root module, so therefore we have to manually
-        // name mangle the vtable name
-        var vtableName = [MAX_SYMBOL_NAME]char;
-        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
-        var escapedName = this.escapeNameStr(decl.sym.name)
-        var len = vtableNameStr.format("%s%.*s__%.*s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, escapedName.length, escapedName.buffer)
+            // we put all generated trait tables in the root module, so therefore we have to manually
+            // name mangle the vtable name
+            var vtableName = [MAX_SYMBOL_NAME]char;
+            var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
+            var escapedName = this.escapeNameStr(decl.sym.name)
+            var module = root
 
-        this.emit("%s__VirtualTable* __vtable;\n", vtableNameStr.cStr())
+            var len = vtableNameStr.format("%s%.*s__%.*s",
+                this.options.cPrefix,
+                module.id.name.length,
+                module.id.name.buffer,
+                escapedName.length,
+                escapedName.buffer)
+
+            this.emit("%s__VirtualTable* __vtable;\n", vtableNameStr.cStr())
+        }
         this.emitStrn("void* __this;", 13)
     }
     // address bugs that don't allow empty structs/unions

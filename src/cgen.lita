@@ -38,7 +38,7 @@ public struct CGen {
     tmpVar: i32
     deferStack: i32
 
-    currentFunc: *FuncTypeInfo
+    currentFunc: *TypeInfo
     currentScope: *CGenScope
 
     output: *File
@@ -176,7 +176,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 func (this: using *CGen) emitMain(sym: *Symbol) {
     var decl = sym.decl as (*FuncDecl)
     this.emitFuncDeclSignature(decl, "main");
-    this.currentFunc = sym.type as (*FuncTypeInfo)
+    this.currentFunc = sym.type
     defer this.currentFunc = null
 
     this.emitStrn(" {", 2)
@@ -361,13 +361,19 @@ func (this: using *CGen) emitTraitDecls() {
 
         var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = this.cTypeName(traitSym.type)
+        var module = root
 
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
         var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
         var escapedName = this.escapeNameStr(traitSym.name)
-        vtableNameStr.format("%s%.*s__%.*s", this.options.cPrefix, root.id.name.length, root.id.name.buffer, escapedName.length, escapedName.buffer)
+        vtableNameStr.format("%s%.*s__%.*s",
+            this.options.cPrefix,
+            module.id.name.length,
+            module.id.name.buffer,
+            escapedName.length,
+            escapedName.buffer)
 
         // Generate Casting functions;
         // we generate the casting functions in C code and not in lita
@@ -515,10 +521,10 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
 
     if(IsFuncLike(type)) {
         if(type.kind == TypeKind.FUNC) {
-            var funcInfo = type as (*FuncTypeInfo)
-            if(funcInfo.decl.flags & FuncFlags.IS_METHOD) {
+            var funcInfo = type
+            if(funcInfo.funcDecl.flags & FuncFlags.IS_METHOD) {
                 var methodName:[MAX_SYMBOL_NAME]char;
-                if(!funcInfo.decl.getName(methodName)) {
+                if(!funcInfo.funcDecl.getName(methodName)) {
                     assert(false)
                 }
 
@@ -673,10 +679,10 @@ func (this: using *CGen) cType(type: *TypeInfo,
     var sb = StringBufferInit(256, this.allocator)
     switch(type.kind) {
         case TypeKind.PTR: {
-            var ptrInfo = type as (*PtrTypeInfo)
+            var ptrInfo = type
             var ptrOf = ptrInfo.ptrOf
             if(ptrOf.kind == TypeKind.ARRAY && !decay) {
-                var arrayInfo = ptrOf as (*ArrayTypeInfo)
+                var arrayInfo = ptrOf
                 if(arrayInfo.isLengthDefined) {
                     var baseInfo = arrayInfo.getBaseType()
                     var cType = this.cType(baseInfo, isCast, false)
@@ -691,7 +697,7 @@ func (this: using *CGen) cType(type: *TypeInfo,
 
         }
         case TypeKind.CONST: {
-            var constInfo = type as (*ConstTypeInfo)
+            var constInfo = type
             if(IsPtrLike(constInfo.constOf)) {
                 var cType = this.cType(constInfo.constOf, isCast, decay)
                 sb.appendStr(cType)
@@ -704,10 +710,10 @@ func (this: using *CGen) cType(type: *TypeInfo,
             return sb.cStrConst()
         }
         case TypeKind.ARRAY: {
-            var arrayInfo = type as (*ArrayTypeInfo)
+            var arrayInfo = type
             if(decay) {
-                var ptrInfo = PtrTypeInfo {
-                    .info = TypeInfo {. kind = TypeKind.PTR},
+                var ptrInfo = TypeInfo {
+                    .kind = TypeKind.PTR,
                     .ptrOf = arrayInfo.arrayOf
                 }
                 // array's only decay once
@@ -743,7 +749,7 @@ func (this: using *CGen) cType(type: *TypeInfo,
                 }
 
                 if(arrayInfo.arrayOf && arrayInfo.arrayOf.kind == TypeKind.ARRAY) {
-                    arrayInfo = arrayInfo.arrayOf as (*ArrayTypeInfo)
+                    arrayInfo = arrayInfo.arrayOf
                 }
                 else {
                     arrayInfo = null
@@ -756,7 +762,7 @@ func (this: using *CGen) cType(type: *TypeInfo,
             return sb.cStrConst()
         }
         case TypeKind.FUNC_PTR: {
-            var funcInfo = type as (*FuncPtrTypeInfo)
+            var funcInfo = type
             var params = StringBufferInit(512, this.allocator)
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
@@ -790,10 +796,10 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     var sb = StringBufferInit(256, this.allocator)
     switch(type.kind) {
         case TypeKind.PTR: {
-            var ptrInfo = type as (*PtrTypeInfo)
+            var ptrInfo = type
             var ptrOf = ptrInfo.ptrOf
             if(ptrOf.kind == TypeKind.ARRAY && !decay) {
-                var arrayInfo = ptrOf as (*ArrayTypeInfo)
+                var arrayInfo = ptrOf
                 if(arrayInfo.isLengthDefined) {
                     var baseInfo = arrayInfo.getBaseType()
                     var cType = this.cType(baseInfo)
@@ -808,7 +814,7 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             return sb.cStrConst()
         }
         case TypeKind.CONST: {
-            var constInfo = type as (*ConstTypeInfo)
+            var constInfo = type
             if(IsPtrLike(constInfo.constOf)) {
                 var cType = this.cType(constInfo.constOf, false, decay)
                 sb.appendStr(cType)
@@ -822,10 +828,10 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             return sb.cStrConst()
         }
         case TypeKind.ARRAY: {
-            var arrayInfo = type as (*ArrayTypeInfo)
+            var arrayInfo = type
             if(decay) {
-                var ptrInfo = PtrTypeInfo {
-                    .info = TypeInfo {.kind = TypeKind.PTR},
+                var ptrInfo = TypeInfo {
+                    .kind = TypeKind.PTR,
                     .ptrOf = arrayInfo.arrayOf
                 }
                 // arrays only decay once
@@ -864,7 +870,7 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                 }
 
                 if(arrayInfo.arrayOf && arrayInfo.arrayOf.kind == TypeKind.ARRAY) {
-                    arrayInfo = arrayInfo.arrayOf as (*ArrayTypeInfo)
+                    arrayInfo = arrayInfo.arrayOf
                 }
                 else {
                     arrayInfo = null
@@ -888,7 +894,7 @@ func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             return sb.cStrConst()
         }
         case TypeKind.FUNC_PTR: {
-            var funcInfo = type as (*FuncPtrTypeInfo)
+            var funcInfo = type
             var params = StringBufferInit(512, this.allocator)
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
@@ -1001,7 +1007,7 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.ARRAY: {
-            var array = spec as (*ArrayTypeSpec)
+            var array = spec
             buf.appendStrn("[", 1);
             if(array.numElements) {
                 this.emitStmt(array.numElements)
@@ -1011,19 +1017,19 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.PTR: {
-            var ptr = spec as (*PtrTypeSpec)
+            var ptr = spec
             buf.appendStrn("*", 1);
             this.emitTypeSpec(ptr.base)
             return;
         }
         case TypeSpecKind.CONST: {
-            var c = spec as (*ConstTypeSpec)
+            var c = spec
             buf.appendStrn("const ", 6);
             this.emitTypeSpec(c.base)
             return;
         }
         case TypeSpecKind.NAME: {
-            var name = spec as (*NameTypeSpec)
+            var name = spec
             buf.appendStrn(name.name.buffer, name.name.length)
             if(!name.genericArgs.empty()) {
                 buf.appendStrn("<", 1)
@@ -1036,7 +1042,7 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
-            var fn = spec as (*FuncPtrTypeSpec)
+            var fn = spec
             buf.appendStrn("func", 4)
             if(!fn.genericParams.empty()) {
                 buf.appendStrn("<", 1)
@@ -1423,7 +1429,7 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
     var paramInfo = sym.usingParent
     assert(paramInfo != null)
 
-    var aggType = paramInfo.type.getBaseType() as (*AggregateTypeInfo)
+    var aggType = paramInfo.type.getBaseType()
     this.emitStr(this.cName(paramInfo))
 
     var path = FieldPath{}
@@ -1990,7 +1996,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             // are only done once
             var isTrait = false
             if(objectType.kind == TypeKind.FUNC_PTR) {
-                var funcPtr = objectType as (*FuncPtrTypeInfo)
+                var funcPtr = objectType
                 if(funcPtr.isTrait) {
                     isTrait = true
 
@@ -2040,9 +2046,9 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
 
             // fill out default parameters
             if(objectType.kind == TypeKind.FUNC) {
-                var funcType = objectType as (*FuncTypeInfo)
-                for(; i < funcType.decl.params.size(); i+=1) {
-                    var param = funcType.decl.params.get(i)
+                var funcType = objectType
+                for(; i < funcType.funcDecl.params.size(); i+=1) {
+                    var param = funcType.funcDecl.params.get(i)
                     if(param.defaultExpr) {
                         if(i > 0) {
                             this.emitStrn(", ", 2)
@@ -2112,7 +2118,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
             assert(baseInfo != null)
             assert(IsAggregate(baseInfo)) //.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
 
-            var aggInfo = baseInfo as (*AggregateTypeInfo)
+            var aggInfo = baseInfo
 
             if(expr.flags & GetExprFlags.IS_USING) {
                 var path = FieldPath{}
@@ -2172,7 +2178,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 assert(baseInfo != null)
                 assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
 
-                var aggInfo = baseInfo as (*AggregateTypeInfo)
+                var aggInfo = baseInfo
 
                 var field = aggInfo.getField(expr.fieldName.str)
                 if(field.kind == StmtKind.VAR_FIELD_DECL) {
@@ -2337,7 +2343,7 @@ func (this: using *CGen) emitStmt(s: *Stmt) {
                 assert(baseInfo != null)
                 assert(baseInfo.kind == TypeKind.STRUCT || baseInfo.kind == TypeKind.UNION)
 
-                var aggInfo = baseInfo as (*AggregateTypeInfo)
+                var aggInfo = baseInfo
 
                 var path = FieldPath{}
                 var isFound = aggInfo.getFieldPath(expr.field.type.name, &path)

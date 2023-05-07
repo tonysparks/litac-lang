@@ -23,6 +23,7 @@ import "cgen"
 import "common"
 import "intern"
 import "types"
+import "types_new"
 import "build"
 
 import "lsp/references"
@@ -56,6 +57,7 @@ public struct Lita {
     programSymbols: ProgramSymbols
     genericSymbols: Map<InternedString, *Symbol>
 
+    typeCache: TypeCache
     strings: Strings
 
     // Language Server support
@@ -174,7 +176,11 @@ public func (this: *Lita) reset() {
     this.stringsAllocator.init(this.allocator, 5 * KiB)
     this.strings.init(this.stringsAllocator)
 
+    this.typeCache.init(this.allocator)
     TypesInit(this.strings)
+
+    // TODO: clear module allocators
+
 
     // TODO: Only initialize if this is an LSP
     this.references.init(this.allocator)
@@ -200,6 +206,7 @@ public func (lita: *Lita) free() {
     if(lita.linearAllocator.mem) {
         defaultAllocator.free(lita.linearAllocator.mem)
     }
+    // TODO: clear module allocators
 }
 
 public func (lita: *Lita) addModule(module: *Module) {
@@ -232,6 +239,84 @@ public func (lita: *Lita) endCapture(type: MetricType) {
 }
 
 
+public func (this: *Lita) incrementalBuild(module: *Module) : void {
+    if(!module) {
+        return;
+    }
+
+    // TODO:
+    // 1) Move allocators to the module level instead of the Lita context level
+    // 2) Clear symbols that are no longer valid (an edit may have removed a symbol)
+    // 3) Validate imported symbols are cleared of "RESET" -- should we only mark symbols
+    //    in the declared module??
+    // 4) Add any new symbols from the edit to programSymbols
+    this.result.clear()
+
+    // reset the contents of this module
+    module.initIncrementalBuild()
+    defer module.postIncrementalBuild()
+
+    // Re-parse the module source code
+    {
+        if(!ParseModule(this, module, SrcPos{})) {
+            return;
+        }
+
+        var builtinImport = NewImportDecl(SrcPos{},
+                                        SrcPos{},
+                                        BUILTIN_IMPORT_IDENT,
+                                        Identifier {
+                                            .str = EMPTY_STR,
+                                            .token = Token{.type = TokenType.VOID}
+                                        },
+                                        false,
+                                        this.allocator) as (*ImportDecl)
+        builtinImport.moduleId = &builtins.id
+        module.ast.imports.insertAt(0, builtinImport)
+    }
+
+    // Re-type check the module
+    {
+        // printf("Running checker..\n")
+        var checker = TypeChecker{}
+        checker.init(this)
+
+        // TODO: Clean up memory leak!!
+        // TODO: Sync values/main/generics
+        var program = checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
+
+        // Reconcile any changed symbols
+        this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs)
+        this.syncSymbols(module, &module.symbols.symbolTypes, &this.programSymbols.symbolTypes)
+    }
+}
+
+func (this: *Lita) syncSymbols(module: *Module, moduleSymbols: *Map<InternedString, *Symbol>, symbols: *Array<*Symbol>) {
+
+    // first delete the (old) module symbols out of the programSymbols
+    var deletedIndex = symbols.size() - 1
+    for(var i = 0; i <= deletedIndex; i+=1) {
+        var sym = symbols.get(i)
+        if(!sym.declared.equals(module)) {
+            continue;
+        }
+
+        symbols.swap(i, deletedIndex)
+        deletedIndex -= 1
+    }
+    symbols.length = deletedIndex < 0 ? 0 : deletedIndex;
+
+    // now add them back, this time the module will have the
+    // the most up to date symbols
+    for(var i = 0; i < moduleSymbols.capacity; i+=1) {
+        var symbol = moduleSymbols.values[i]
+        if(!symbol) {
+            continue
+        }
+
+        symbols.add(symbol)
+    }
+}
 
 public func (this: *Lita) parse() : *Module {
     this.startCapture(MetricType.PARSING)
@@ -267,14 +352,14 @@ public func (this: *Lita) parse() : *Module {
     return root
 }
 
-public func (this: *Lita) typeCheck(module: *Module) : bool {
+public func (this: *Lita) typeCheck(module: *Module, flags: i32 = 0) : bool {
     this.startCapture(MetricType.TYPE_CHECKING)
     defer this.endCapture(MetricType.TYPE_CHECKING)
 
     var checker = TypeChecker{}
     checker.init(this)
 
-    this.programSymbols = checker.typeCheck(module)
+    this.programSymbols = checker.typeCheck(module, flags)
 
     return this.result.errors.empty()
 }
@@ -624,7 +709,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         module.text.capacity = length as (i32)
     }
 
-    var parser = ParserInit(module.id.filename, module.text.buffer, module.text.length, lita)
+    var parser = ParserInit(module.id.filename, module.text.buffer, module.text.length, module, lita)
     var moduleStmt = parser.parseModule()
     module.ast = moduleStmt
     lita.totalSourceLines += parser.totalLines

@@ -86,9 +86,9 @@ func (this: *DependencyGraph) markDependencies(dependency: *Dependency) {
         return;
     }
 
-    var aggInfo = sym.type as (*AggregateTypeInfo)
-    for(var i = 0; i < aggInfo.decl.fields.size(); i+=1) {
-        var field = aggInfo.decl.fields.get(i);
+    var aggInfo = sym.type
+    for(var i = 0; i < aggInfo.aggDecl.fields.size(); i+=1) {
+        var field = aggInfo.aggDecl.fields.get(i);
         assert(field.typeInfo != null)
 
         var dependentSym: *Symbol = null;
@@ -96,7 +96,7 @@ func (this: *DependencyGraph) markDependencies(dependency: *Dependency) {
             dependentSym = field.typeInfo.sym
         }
         else if(field.typeInfo.kind == TypeKind.ARRAY) {
-            var arrayInfo = field.typeInfo as (*ArrayTypeInfo)
+            var arrayInfo = field.typeInfo
             var baseInfo = arrayInfo.getBaseType()
             if(IsAggregate(baseInfo)) {
                 dependentSym = baseInfo.sym

@@ -192,7 +192,7 @@ func (this: *Strings) internConstant(string: *const char, length: i32, intern: *
 }
 
 public func (this: *Strings) internStringView(string: *StringView) : InternedString {
-    return this.intern(string.buffer, string.length)
+    return this.internCopy(string.buffer, string.length)
 }
 
 @doc("""

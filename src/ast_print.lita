@@ -16,7 +16,7 @@ public func PrintTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.ARRAY: {
-            var array = spec as (*ArrayTypeSpec)
+            var array = spec
             printf("[");
             if(array.numElements) {
                 PrintStmt(array.numElements)
@@ -26,19 +26,19 @@ public func PrintTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.PTR: {
-            var ptr = spec as (*PtrTypeSpec)
+            var ptr = spec
             printf("*");
             PrintTypeSpec(ptr.base)
             return;
         }
         case TypeSpecKind.CONST: {
-            var c = spec as (*ConstTypeSpec)
+            var c = spec
             printf("const ");
             PrintTypeSpec(c.base)
             return;
         }
         case TypeSpecKind.NAME: {
-            var name = spec as (*NameTypeSpec)
+            var name = spec
             printf("%.*s", name.name.length, name.name.buffer)
             if(!name.genericArgs.empty()) {
                 printf("<")
@@ -51,7 +51,7 @@ public func PrintTypeSpec(spec: *TypeSpec) {
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
-            var fn = spec as (*FuncPtrTypeSpec)
+            var fn = spec
             printf("func")
             if(!fn.genericParams.empty()) {
                 printf("<")

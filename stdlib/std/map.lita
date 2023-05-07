@@ -52,13 +52,23 @@ public func StringViewMap<V>(emptyValue: V,
     return m;
 }
 
+enum KeyState {
+    EMPTY = 0,
+    TOMBSTONE,
+}
+
+struct Key<K> {
+    key: K
+    state: KeyState
+}
+
 public struct Map<K, V> {
     length: i32
     capacity: i32
     hashFn: HashFn<K>
     equalFn: EqualFn<K>
     alloc: *const mem::Allocator
-    keys: *K
+    keys: *Key<K>
     values: *V
     emptyValue: V
     emptyKey: K
@@ -67,6 +77,7 @@ public struct Map<K, V> {
 public struct MapIterator<K, V> {
     m: *Map<K, V>
     it: i32
+    prevIt: i32
     count: i32
 }
 
@@ -131,14 +142,15 @@ public func (m: *Map<K, V>) put<K, V>(key: K, value: V) {
     var i = m.hashFn<K>(key);
     for(;;) {
         i &= m.capacity - 1;
-        if(m.equalFn<K>(m.keys[i], m.emptyKey)) {
-        //if(!m.keys[i]) {
+        var k = m.keys[i]
+
+        if(m.equalFn<K>(k.key, m.emptyKey)) {
             m.length += 1
-            m.keys[i] = key;
+            m.keys[i].key = key;
             m.values[i] = value;
             return;
         }
-        else if(m.equalFn<K>(m.keys[i], key)) {
+        else if(m.equalFn<K>(k.key, key)) {
             m.values[i] = value;
             return;
         }
@@ -156,11 +168,13 @@ public func (m: *Map<K, V>) get<K, V>(key: K) : V {
     var i = m.hashFn<K>(key);
     for(;;) {
         i &= m.capacity - 1;
-        if(m.equalFn<K>(m.keys[i], key)) {
+        var k = m.keys[i];
+
+        if(m.equalFn<K>(k.key, key)) {
             return m.values[i];
         }
-        else if(m.equalFn<K>(m.keys[i], m.emptyKey)) {
-        //else if(!m.keys[i]) {
+        else if(k.state != KeyState.TOMBSTONE &&
+                m.equalFn<K>(k.key, m.emptyKey)) {
             return m.emptyValue;
         }
         i += 1;
@@ -177,11 +191,12 @@ public func (m: *Map<K, V>) getPtr<K, V>(key: K) : *V {
     var i = m.hashFn<K>(key);
     for(;;) {
         i &= m.capacity - 1;
-        if(m.equalFn<K>(m.keys[i], key)) {
+        var k = m.keys[i];
+
+        if(m.equalFn<K>(k.key, key)) {
             return &m.values[i];
         }
-        //else if(m.equalFn<K>(m.keys[i], m.emptyKey)) {
-        else if(!m.keys[i]) {
+        else if(k.state != KeyState.TOMBSTONE && !k.key) {
             return null;
         }
 
@@ -194,7 +209,8 @@ public func (m: *Map<K, V>) getPtr<K, V>(key: K) : *V {
 public func (m: *Map<K, V>) clear<K, V>() {
     m.length = 0
     for(var i = 0; i < m.capacity; i += 1) {
-        m.keys[i] = m.emptyKey
+        m.keys[i].state = KeyState.EMPTY
+        m.keys[i].key = m.emptyKey
         m.values[i] = m.emptyValue
     }
 }
@@ -208,14 +224,18 @@ public func (m: *Map<K, V>) remove<K, V>(key: K) : V {
     var i = m.hashFn<K>(key);
     for(;;) {
         i &= m.capacity - 1;
-        if(m.equalFn<K>(m.keys[i], key)) {
+        var k = m.keys[i];
+
+        if(m.equalFn<K>(k.key, key)) {
             var v = m.values[i];
-            m.keys[i] = m.emptyKey
+            m.keys[i].key = m.emptyKey
+            m.keys[i].state = KeyState.TOMBSTONE
+
             m.length -= 1
             return v
         }
-        else if(m.equalFn<K>(m.keys[i], m.emptyKey)) {
-        //else if(!m.keys[i]) {
+        else if(k.state != KeyState.TOMBSTONE &&
+                m.equalFn<K>(k.key, m.emptyKey)) {
             return m.emptyValue;
         }
 
@@ -233,11 +253,13 @@ public func (m: *Map<K, V>) contains<K, V>(key: K) : bool {
     var i = m.hashFn<K>(key);
     for(;;) {
         i &= m.capacity - 1;
-        if(m.equalFn<K>(m.keys[i], key)) {
+        var k = m.keys[i];
+
+        if(m.equalFn<K>(k.key, key)) {
             return true
         }
-        else if(m.equalFn<K>(m.keys[i], m.emptyKey)) {
-        //else if(!m.keys[i]) {
+        else if(k.state != KeyState.TOMBSTONE &&
+                m.equalFn<K>(k.key, m.emptyKey)) {
             return false;
         }
 
@@ -255,7 +277,7 @@ func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) {
     var newMap = Map<K, V> {
         .length: 0,
         .capacity: newlength,
-        .keys: m.alloc.calloc(newlength, sizeof(:K)) as (*K),
+        .keys: m.alloc.calloc(newlength, sizeof(:Key<K>)) as (*Key<K>),
         .values: m.alloc.alloc(newlength * sizeof(:V)) as (*V),
         .hashFn: m.hashFn,
         .equalFn: m.equalFn,
@@ -265,9 +287,8 @@ func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) {
     }
 
     for(var i = 0; i < m.capacity; i+=1) {
-        if(!m.equalFn<K>(m.keys[i], m.emptyKey)) {
-        //if(m.keys[i]) {
-            newMap.put<K, V>(m.keys[i], m.values[i]);
+        if(!m.equalFn<K>(m.keys[i].key, m.emptyKey)) {
+            newMap.put<K, V>(m.keys[i].key, m.values[i]);
         }
     }
 
@@ -283,6 +304,7 @@ public func (m: *Map<K, V>) iter<K, V>() : MapIterator<K, V> {
     return MapIterator<K, V> {
         .m: m,
         .it: 0,
+        .prevIt: 0,
         .count: 0
     }
 }
@@ -298,11 +320,13 @@ public func (iter: *MapIterator<K, V>) next<K, V>() : MapEntry<K, V> {
     defer iter.it = i + 1
 
     for(; i < iter.m.capacity; i += 1) {
-        var hasValue = !iter.m.equalFn(iter.m.keys[i], iter.m.emptyKey)
+        var hasValue = !iter.m.equalFn(iter.m.keys[i].key, iter.m.emptyKey)
         if(hasValue) {
             iter.count += 1
+            iter.prevIt = i
+
             return MapEntry<K, V> {
-                .key: iter.m.keys[i],
+                .key: iter.m.keys[i].key,
                 .value: iter.m.values[i],
                 .valuePtr: &iter.m.values[i],
             }
@@ -310,6 +334,18 @@ public func (iter: *MapIterator<K, V>) next<K, V>() : MapEntry<K, V> {
     }
 
     return MapEntry<K, V>{}
+}
+
+public func (iter: *MapIterator<K, V>) remove<K, V>() {
+    var i = iter.prevIt;
+    assert(i > -1 && i < iter.m.capacity);
+
+    iter.m.keys[i].state = KeyState.TOMBSTONE
+    iter.m.keys[i].key = iter.m.emptyKey
+    iter.m.values[i] = iter.m.emptyValue
+
+    iter.m.length -= 1
+    iter.count -= 1
 }
 
 
@@ -328,4 +364,51 @@ func nextPowerOf2(n: u32) : u32 {
     }
 
     return 1 << count;
+}
+
+func BlahHash(a: i32) : u32 {
+    return 3;
+}
+
+func BlahEq(a: i32, b: i32) : bool {
+    return a == b;
+}
+
+func Print(m: *Map<i32,i32>) {
+    printf("\n")
+    for(var i = 0; i < m.capacity; i+=1) {
+        var key = m.keys[i]
+        var value = m.values[i]
+
+        printf("Key: %d/%d Value: %d @ %d\n", key.key, key.state, value, i)
+    }
+}
+
+@test
+func testRemove() {
+    var map = Map<i32, i32>{}
+    map.init(
+        .emptyValue = 0,
+        .initialSize = 4,
+        .hashFn = BlahHash,
+        .equalFn = BlahEq
+        //.alloc = mem::defaultAllocator,
+        //.emptyKey = 0
+    )
+    defer map.free()
+
+    map.put(1, 4)
+    map.put(2, 8)
+    map.put(3, 16)
+    Print(&map)
+
+
+    map.remove(2)
+    Print(&map)
+    assert(map.get(1) == 4)
+    assert(map.get(2) == 0)
+    assert(map.get(3) == 16)
+
+    //map.put(2, 8)
+    //Print(&map)
 }

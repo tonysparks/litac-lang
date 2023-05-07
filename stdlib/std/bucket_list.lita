@@ -1,0 +1,336 @@
+import "std/mem";
+import "std/assert"
+import "std/libc"
+
+/*
+    A resizable bucket of memory segments.  If a growth in size
+    is required, a new segment is added and linked to the previous.
+
+    This is essentially a linked list of array lists.  This allows
+    for "long-lived" pointers to be retained without invaliding them
+    with realloc.
+*/
+public struct BucketList<T> {
+    allocator: *const Allocator
+    bucketSize: i32
+    length: usize
+    buckets: *Bucket<T>
+
+    top: *Bucket<T>
+}
+
+struct Bucket<T> {
+    length: i32
+    next: *Bucket<T>
+    elements: *T
+}
+
+
+public func BucketListInit<T>(bucketSize: i32 = 16,
+                              alloc: *const Allocator = defaultAllocator) : BucketList<T> {
+    var list = BucketList<T>{}
+    list.init<T>(bucketSize, alloc)
+    return list;
+}
+
+public func (this: *BucketList<T>) init<T>(bucketSize: i32 = 16,
+                                           alloc: *const Allocator = defaultAllocator) {
+    this.allocator = alloc;
+    this.length = 0;
+    this.bucketSize = bucketSize;
+
+    this.buckets = this.allocBucket<T>();
+    this.top = this.buckets
+}
+
+func (this: *BucketList<T>) allocBucket<T>() : *Bucket<T> {
+    var mem: *void = this.allocator.alloc(sizeof(:Bucket<T>) + (sizeof(:T) * this.bucketSize));
+
+    var bucket = mem as (*Bucket<T>)
+    bucket.length = 0
+    bucket.next = null
+    bucket.elements = (mem + sizeof(:Bucket<T>)) as (*T)
+
+    return bucket;
+}
+
+public func (this: *BucketList<T>) free<T>() {
+    var current = this.buckets
+    var next: *Bucket<T> = null;
+
+    while(current != null) {
+        var bucket = current
+        current = current.next
+
+        bucket.next = null
+        this.allocator.free(bucket)
+    }
+}
+
+public func (this: *BucketList<T>) clear<T>() {
+    var current = this.buckets
+    var next: *Bucket<T> = null;
+
+    while(current != null) {
+        var bucket = current
+        current = current.next
+
+        bucket.length = 0
+    }
+
+    this.length = 0
+    this.top = this.buckets
+}
+
+public func (this: *BucketList<T>) add<T>(element: T) {
+
+    if(this.top.length + 1 > this.bucketSize) {
+        if(!this.top.next) {
+            var next = this.allocBucket<T>()
+            this.top.next = next
+            this.top = next
+        }
+        else {
+            this.top = this.top.next
+        }
+    }
+
+    #if (getTypeKind("element") == "ARRAY")
+        memcpy(&this.top.elements[this.top.length], element as (*void), sizeof(:T));
+    #else
+        this.top.elements[this.top.length] = element;
+    #end
+
+    this.top.length += 1
+    this.length += 1
+}
+
+func (this: *BucketList<T>) getBucketAt<T>(index: usize, iterations: *i32) : *Bucket<T> {
+    if(index < this.bucketSize) {
+        *iterations = 0;
+
+        return this.buckets
+    }
+
+    var bucketIndex = 0
+
+    var current = this.buckets
+    var next: *Bucket<T> = null;
+
+    while(current != null) {
+        var bucket = current
+        current = current.next
+
+        if((bucketIndex + bucket.length) > index) {
+            return bucket
+        }
+
+        *iterations += 1
+        bucketIndex += bucket.length
+    }
+
+    return this.top
+}
+
+public func (this: *BucketList<T>) push<T>(element: T) {
+    this.add<T>(element)
+}
+
+public func (this: *BucketList<T>) get<T>(index: usize) : T {
+    assert(index >= 0 && index < this.length)
+
+    var iterations = 0
+    var bucket = this.getBucketAt<T>(index, &iterations)
+    index -= (iterations * this.bucketSize)
+
+    return bucket.elements[index]
+}
+
+public func (this: *BucketList<T>) getPtr<T>(index: i32) : *T {
+    assert(index >= 0 && index < a.length)
+
+    var iterations = 0
+    var bucket = this.getBucketAt<T>(index, &iterations)
+    index -= (iterations * this.bucketSize)
+
+    return &bucket.elements[index]
+}
+
+public func (this: *BucketList<T>) set<T>(index: i32, element: T) {
+    assert(index >= 0 && index < a.length);
+
+    var iterations = 0
+    var bucket = this.getBucketAt<T>(index, &iterations)
+    index -= (iterations * this.bucketSize)
+
+    #if (getTypeKind("element") == "ARRAY")
+        memcpy(&bucket.elements[index], element as (*void), sizeof(:T));
+    #else
+        bucket.elements[index] = element;
+    #end
+}
+
+public func (this: *BucketList<T>) first<T>() : T {
+    assert(this.length != 0)
+
+    return this.buckets.elements[0]
+}
+
+public func (this: *BucketList<T>) firstPtr<T>() : *T {
+    assert(this.length != 0)
+
+    return &this.buckets.elements[0]
+}
+
+public func (this: *BucketList<T>) last<T>() : T {
+    assert(this.length != 0)
+
+    var bucket = this.top
+    if(this.top.length == 0) {
+        var iterations = 0
+        bucket = this.getBucketAt<T>(this.length - 1, &iterations)
+        this.top = bucket
+    }
+
+    return bucket.elements[bucket.length - 1]
+}
+
+public func (this: *BucketList<T>) lastPtr<T>() : *T {
+    assert(this.length != 0)
+
+    var bucket = this.top
+    if(this.top.length == 0) {
+        var iterations = 0
+        bucket = this.getBucketAt<T>(this.length - 1, &iterations)
+        this.top = bucket
+    }
+
+    return &bucket.elements[bucket.length - 1]
+}
+
+public func (this: *BucketList<T>) pop<T>() : T {
+    assert(this.length != 0)
+
+    var bucket = this.top
+    if(this.top.length == 0) {
+        var iterations = 0
+        bucket = this.getBucketAt<T>(this.length - 1, &iterations)
+        this.top = bucket
+    }
+
+    var result = bucket.elements[bucket.length - 1]
+    bucket.length -= 1
+    this.length -= 1
+
+    return result
+}
+
+public func (this: *BucketList<T>) popPtr<T>() : *T {
+    assert(this.length != 0)
+
+    var bucket = this.top
+    if(this.top.length == 0) {
+        var iterations = 0
+        bucket = this.getBucketAt<T>(this.length - 1, &iterations)
+        this.top = bucket
+    }
+
+    var result = &bucket.elements[bucket.length - 1]
+    bucket.length -= 1
+    this.length -= 1
+
+    return result
+}
+
+public func (this: *BucketList<T>) swap<T>(aIndex: usize, bIndex: usize) {
+    assert(aIndex < this.length && bIndex < this.length)
+
+    var iterations = 0
+    var aBucket = this.getBucketAt<T>(aIndex, &iterations)
+    aIndex -= (iterations * this.bucketSize)
+
+
+    iterations = 0
+    var bBucket = this.getBucketAt<T>(bIndex, &iterations)
+    bIndex -= (iterations * this.bucketSize)
+
+    var aValue = aBucket.elements[aIndex]
+    aBucket.elements[aIndex] = bBucket.elements[bIndex]
+    bBucket.elements[bIndex] = aValue
+}
+
+
+@inline
+public func (this: *BucketList<T>) empty<T>() : bool {
+    return this.length == 0
+}
+
+@inline
+public func (this: *BucketList<T>) size<T>() : usize {
+    return this.length
+}
+
+
+@test
+func testBucket() {
+    var list = BucketListInit<i32>(3)
+    printf("Is Empty: %d\n", list.empty())
+
+    for(var i = 0; i < 31; i+=1) {
+        list.add(1<<i)
+    }
+    printf("Count: %zu\n", list.size())
+    for(var i = 0; i < list.size(); i+=1) {
+        printf("Index: %d value: %d\n", i, list.get(i))
+    }
+    printf("Swap\n")
+    list.swap(0, 15)
+    for(var i = 0; i < list.size(); i+=1) {
+        printf("Index: %d value: %d\n", i, list.get(i))
+    }
+    printf("Clear\n")
+    list.clear()
+    for(var i = 0; i < list.size(); i+=1) {
+        printf("Index: %d value: %d\n", i, list.get(i))
+    }
+
+    printf("Manual add\n")
+    list.add(33)
+    list.add(65)
+    list.add(66)
+    for(var i = 0; i < list.size(); i+=1) {
+        printf("Index: %d value: %d\n", i, list.get(i))
+    }
+
+
+    // Test pop
+    {
+        printf("Test Pop\n")
+        list.clear()
+
+        list.add(33)
+        list.add(65)
+        list.add(66)
+        printf("Pop: %d\n", list.pop())
+        printf("Top: %d\n", list.last())
+        list.add(89)
+        list.add(91)
+        for(var i = 0; i < list.size(); i+=1) {
+            printf("Index: %d value: %d\n", i, list.get(i))
+        }
+        printf("Pop: %d\n", list.pop())
+        printf("Top: %d\n", list.last())
+        for(var i = 0; i < list.size(); i+=1) {
+            printf("Index: %d value: %d\n", i, list.get(i))
+        }
+        printf("Pop: %d\n", list.pop())
+        printf("Top: %d\n", list.last())
+
+        printf("Drain..\n")
+        while(!list.empty()) {
+            printf("Pop: %d\n", list.pop())
+        }
+    }
+
+    list.free()
+}

@@ -45,13 +45,17 @@ struct GenericContext {
     callsite: *Module
 }
 
+public enum TypeCheckerFlags {
+    DISABLE_TRAIT_WRAPPERS = (1<<0),
+}
+
 public struct TypeChecker {
     lita: using *Lita
 
     current: *Module
     moduleStack: Array<*Module>
 
-    funcDeclStack: Array<*FuncTypeInfo>
+    funcDeclStack: Array<*TypeInfo>
 
     pendingValues: Array<*Symbol>
     symbolTypes: Array<*Symbol>     // all types from all modules
@@ -69,7 +73,7 @@ public struct TypeChecker {
     labels: [MAX_LABELS]LabelInfo;
     numOfLabels: i32
 
-    typeCache: TypeCache
+    typeCache: *TypeCache
 
     randomNameIndex: u32
 
@@ -92,7 +96,7 @@ public func (this: *TypeChecker) init(lita: *Lita) {
 
     this.bypassing = false
 
-    this.typeCache.init(lita.allocator)
+    this.typeCache = &lita.typeCache
 
     this.mainEntry = null
 
@@ -101,7 +105,7 @@ public func (this: *TypeChecker) init(lita: *Lita) {
 }
 
 @profile
-public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
+public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : ProgramSymbols {
     if(root.flags & ModuleFlags.TYPE_CHECKED) {
         goto exit;
     }
@@ -136,24 +140,27 @@ public func (this: *TypeChecker) typeCheck(root: *Module) : ProgramSymbols {
     // allow for creating more symbols after initial resolving of symbols
     this.lita.preprocessor.postResolveSymbols(this)
 
-    this.enterModule(root)
-    {
-        var traitDecls = CreateTraitWrappers(this)
-        this.bypassing = true
-        for(var i = 0; i < traitDecls.size(); i += 1) {
-            var decl = traitDecls.get(i)
+    // Generate trait wrappers
+    if(!(flags & TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)) {
+        this.enterModule(root)
+        {
+            var traitDecls = CreateTraitWrappers(this)
+            this.bypassing = true
+            for(var i = 0; i < traitDecls.size(); i += 1) {
+                var decl = traitDecls.get(i)
 
-            var sym = this.createDeclSymbol(decl)
-            if(sym == null) {
-                continue
+                var sym = this.createDeclSymbol(decl)
+                if(sym == null) {
+                    continue
+                }
+
+                this.resolveSymbol(sym)
+                this.finishResolveSymbol(sym)
             }
-
-            this.resolveSymbol(sym)
-            this.finishResolveSymbol(sym)
+            this.bypassing = false
         }
-        this.bypassing = false
+        this.leaveModule()
     }
-    this.leaveModule()
 
     if(!this.lita.result.hasErrors()) {
         var introspect = Introspect{.lita = this.lita}
@@ -170,6 +177,7 @@ exit:
         .interfaceImpls = this.interfaceImpls
     };
 }
+
 
 @inline
 func (this: *TypeChecker) errors() : i32 {
@@ -195,7 +203,7 @@ func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeIn
         }
 
         if(!IsPtr(b) && IsAggregate(b)) {
-            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            var aggInfo = b.getBaseType()
             if(aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
                 b.toString(sb)
@@ -210,7 +218,7 @@ func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeIn
             }
         }
         else if(IsPtrAggregate(b)) {
-            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            var aggInfo = b.getBaseType()
             if(!aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
                 b.toString(sb)
@@ -281,7 +289,7 @@ func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *Type
     if(IsTraitLike(a)) {
         var aTrait = a.getBaseType()
         if(!IsPtr(b) && IsAggregate(b)) {
-            var aggInfo = b.getBaseType() as (*AggregateTypeInfo)
+            var aggInfo = b.getBaseType()
             if(aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
                 b.toString(sb)
@@ -417,56 +425,6 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
 
     this.resolveNotes(module.ast.notes)
 }
-
-func (this: *TypeChecker) enterModule(module: *Module) {
-    this.moduleStack.push(module)
-    this.current = module
-}
-
-func (this: *TypeChecker) leaveModule() {
-    var oldScope = this.current;
-
-    if(this.moduleStack.size()) {
-        this.moduleStack.pop()
-        if(this.moduleStack.size()) {
-            this.current = this.moduleStack.last()
-        }
-    }
-}
-
-public func (this: *TypeChecker) currentScope() : *Scope {
-    return this.current.currentScope
-}
-
-func (this: *TypeChecker) pushScope(scope: *Scope) {
-    scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.allocator);
-    scope.module = this.current
-    this.current.currentScope = scope
-}
-
-func (this: *TypeChecker) popScope() {
-    if(this.currentScope()) {
-        this.current.currentScope = this.current.currentScope.parent
-    }
-}
-
-func (this: *TypeChecker) isGenericParamType(name: *NameTypeSpec) : bool {
-    for(var k = 0; k < this.genericParamStack.size(); k += 1) {
-        var params = &this.genericParamStack.elements[k]
-
-        for(var i = 0; i < params.size(); i+=1) {
-            var param = params.get(i)
-            assert(param.name.token.type == TokenType.IDENTIFIER)
-
-            if(param.name.str.equals(name.name)) {
-                return true;
-            }
-        }
-    }
-
-    return false
-}
-
 
 func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     assert(decl != null)
@@ -646,6 +604,57 @@ err:
     return null
 }
 
+
+func (this: *TypeChecker) enterModule(module: *Module) {
+    this.moduleStack.push(module)
+    this.current = module
+}
+
+func (this: *TypeChecker) leaveModule() {
+    var oldScope = this.current;
+
+    if(this.moduleStack.size()) {
+        this.moduleStack.pop()
+        if(this.moduleStack.size()) {
+            this.current = this.moduleStack.last()
+        }
+    }
+}
+
+public func (this: *TypeChecker) currentScope() : *Scope {
+    return this.current.currentScope
+}
+
+func (this: *TypeChecker) pushScope(scope: *Scope) {
+    scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.current, this.current.allocator)
+    this.current.currentScope = scope
+}
+
+func (this: *TypeChecker) popScope() {
+    if(this.currentScope()) {
+        this.current.currentScope = this.current.currentScope.parent
+    }
+}
+
+func (this: *TypeChecker) isGenericParamType(name: *TypeSpec) : bool {
+    for(var k = 0; k < this.genericParamStack.size(); k += 1) {
+        var params = &this.genericParamStack.elements[k]
+
+        for(var i = 0; i < params.size(); i+=1) {
+            var param = params.get(i)
+            assert(param.name.token.type == TokenType.IDENTIFIER)
+
+            if(param.name.str.equals(name.name)) {
+                return true;
+            }
+        }
+    }
+
+    return false
+}
+
+
+
 func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
     for(var i = 0; i < this.current.ast.imports.size(); i += 1) {
         var other = this.current.ast.imports.get(i)
@@ -781,7 +790,11 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     sym.type = this.typeCache.newAggregateTypeInfo(sym, aggregateDecl) as (*TypeInfo)
                     break;
                 }
+                case StmtKind.POISON_DECL: {
+                    goto err;
+                }
                 default: {
+                    Info("StmtKind %.*s %d %s\n", sym.name.length, sym.name.buffer, sym.decl.kind, StmtKindAsStr(sym.decl.kind))
                     assert(false)
                 }
             }
@@ -806,7 +819,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         case SymbolKind.FUNC: {
             var funcDecl = sym.decl as (*FuncDecl)
             var funcInfo = sym.type != null ?
-                                sym.type as (*FuncTypeInfo) :
+                                sym.type :
                                 this.typeCache.newFuncTypeInfo(sym, funcDecl)
 
             var hasGenerics = !funcDecl.genericParams.empty() //sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
@@ -912,7 +925,7 @@ func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     }
 }
 
-func (this: *TypeChecker) getType(spec: *NameTypeSpec, isFunc: bool = false) : *Symbol {
+func (this: *TypeChecker) getType(spec: *TypeSpec, isFunc: bool = false) : *Symbol {
     assert(spec != null)
     return this.getTypeByName(spec.name, isFunc)
 }
@@ -954,7 +967,7 @@ func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc: bool =
     return type
 }
 
-func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *AggregateTypeInfo) : bool {
+func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInfo) : bool {
     assert(agg != null)
     assert(iface != null)
 
@@ -977,7 +990,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
     var symbols = [MAX_METHODS_FOR_TYPE]*Symbol{}
     var numOfMethods = this.current.getMethodsForType(agg, symbols)
 
-    var numOfTraitFns = iface.decl.fields.size()
+    var numOfTraitFns = iface.aggDecl.fields.size()
 
     if(numOfMethods < numOfTraitFns) {
         return false
@@ -986,7 +999,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
     var matchedCount = 0
 
     for(var i = 0; i < numOfTraitFns; i += 1) {
-        var field = iface.decl.fields.get(i)
+        var field = iface.aggDecl.fields.get(i)
 
         assert(field.typeInfo)
         assert(field.typeInfo.kind == TypeKind.FUNC_PTR)
@@ -994,7 +1007,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
 
         // check to see if the method is in the found symbols
         var functionName = field.traitField.decl.name.token.asString()
-        var traitFn = field.typeInfo as (*FuncPtrTypeInfo)
+        var traitFn = field.typeInfo
 
         for(var index = 0; index < numOfMethods; index += 1) {
             var sym = symbols[index]
@@ -1032,7 +1045,7 @@ func (this: *TypeChecker) implementsTrait(agg: *AggregateTypeInfo, iface: *Aggre
 }
 
 
-func (this: *TypeChecker) resolveNoteTypeSpec(spec: *NameTypeSpec) : *TypeInfo {
+func (this: *TypeChecker) resolveNoteTypeSpec(spec: *TypeSpec) : *TypeInfo {
     if(!spec) {
         return &VOID_TYPE
     }
@@ -1083,7 +1096,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
 
     switch(spec.kind) {
         case TypeSpecKind.NAME: {
-            var nameSpec = spec as (*NameTypeSpec)
+            var nameSpec = spec
 
             if(this.isGenericParamType(nameSpec)) {
                 nameSpec.typeInfo = this.typeCache.newGenericParamTypeInfo(nameSpec.name)
@@ -1125,19 +1138,19 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
             return spec.typeInfo
         }
         case TypeSpecKind.CONST: {
-            var constSpec = spec as (*ConstTypeSpec)
+            var constSpec = spec
             var constOf = this.resolveTypeSpec(constSpec.base)
             spec.typeInfo = this.typeCache.newConstTypeInfo(constOf) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.PTR: {
-            var ptrSpec = spec as (*PtrTypeSpec)
+            var ptrSpec = spec
             var ptrOf = this.resolveTypeSpec(ptrSpec.base)
             spec.typeInfo = this.typeCache.newPtrTypeInfo(ptrOf) as (*TypeInfo)
             return spec.typeInfo
         }
         case TypeSpecKind.ARRAY: {
-            var arraySpec = spec as (*ArrayTypeSpec)
+            var arraySpec = spec
             var arrayOf = this.resolveTypeSpec(arraySpec.base)
             var length: usize = 0
             var isLengthDefined = false
@@ -1171,7 +1184,7 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
             return spec.typeInfo
         }
         case TypeSpecKind.FUNC_PTR: {
-            var funcPtrSpec = spec as (*FuncPtrTypeSpec)
+            var funcPtrSpec = spec
             var paramDecls = Array<*TypeInfo>{}
             if(!funcPtrSpec.args.empty()) {
                 paramDecls.init(funcPtrSpec.args.size(), this.allocator)
@@ -1212,9 +1225,9 @@ func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol 
     return sym
 }
 
-func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *AggregateTypeInfo) {
-    for(var i = 0; i < currentType.decl.fields.size(); i += 1) {
-        var field = currentType.decl.fields.get(i)
+func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {
+    for(var i = 0; i < currentType.aggDecl.fields.size(); i += 1) {
+        var field = currentType.aggDecl.fields.get(i)
 
         switch(field.kind) {
             case StmtKind.VAR_FIELD_DECL: {
@@ -1238,7 +1251,7 @@ func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *
                     }
 
                     assert(IsAggregate(fieldBaseType))
-                    this.addTypeToScope(decl, scope, baseType, fieldBaseType as (*AggregateTypeInfo))
+                    this.addTypeToScope(decl, scope, baseType, fieldBaseType)
                 }
                 break;
             }
@@ -1279,7 +1292,7 @@ func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
 
         assert(IsAggregate(typeInfo))
 
-        var aggInfo = typeInfo as (*AggregateTypeInfo)
+        var aggInfo = typeInfo
 
         for(var j = 0; j < note.arguments.size(); j += 1) {
             var arg = note.arguments.get(j)

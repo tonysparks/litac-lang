@@ -8,59 +8,97 @@ import "std/libc" as c
 // Arena allocator
 =========================================================
 */
-public struct Arena {
-    alloc: Allocator
+public struct ArenaAllocator {
+    allocator: Allocator
     decorated: *const Allocator
-    region: *u8
+    arena: *Arena
+
+    pageSize: usize
+
+    numberOfArenas: u32
+    numberOfBytesAllocated: usize
+}
+
+struct Arena {
     size: usize
     current: usize
     next: *Arena
+    region: *u8
 }
 
 const PAGE_SIZE:usize = 4096_u64 as (usize)
 
-public func (arena: *Arena) init(size: usize = PAGE_SIZE,
-                                 alloc: *const Allocator = defaultAllocator) {
-    arena.decorated = alloc
-    arena.region = alloc.calloc(size, sizeof(:u8)) as (*u8)
-    arena.current = 0
-    arena.size = size
-    arena.next = null
-    arena.alloc = Allocator {
+public func (this: *ArenaAllocator) init(size: usize = PAGE_SIZE,
+                                         alloc: *const Allocator = defaultAllocator) {
+    this.decorated = alloc
+    this.allocator = Allocator {
         .allocFn:   &ArenaMalloc,
         .callocFn:  &ArenaCalloc,
         .reallocFn: &ArenaRealloc,
         .freeFn:    &ArenaFree
     }
+
+    var mem = this.decorated.alloc(sizeof(:Arena) + sizeof(:u8) * size) as (*void)
+    this.arena = mem as (*Arena)
+    this.arena.size = size
+    this.arena.current = 0
+    this.arena.next = null
+    this.arena.region = (mem + sizeof(:Arena)) as (*u8)
+
+    this.numberOfArenas = 1
+    this.numberOfBytesAllocated = size;
+    this.pageSize = size;
 }
 
-public func (arena: *Arena) free() {
-    var alloc = arena.decorated
-    alloc.free(arena.region as (*void))
+public func (this: *ArenaAllocator) free() {
+    this.numberOfArenas = 0
+    this.numberOfBytesAllocated = 0;
 
+    var alloc = this.decorated
+
+    var last = this.arena;
     var next: *Arena = null
-    var last = arena.next;
-
-    if(last == null) {
-        return;
-    }
 
     do {
         next = last.next
-        alloc.free(last.region as (*void))
+        last.next = null
+
         alloc.free(last as (*void))
         last = next
     }
     while(next != null)
 }
 
+public func (this: *ArenaAllocator) clear() {
+    var a = this.arena
+
+    do {
+        a.current = 0;
+        c::memset(a.region, 0, a.size);
+    }
+    while((a = a.next) != null);
+}
+
+public func (this: *ArenaAllocator) unusedBytes() : usize {
+    var a = this.arena
+
+    var numberOfUnusedBytes:usize = 0;
+
+    do {
+        var delta = a.size - a.current;
+        numberOfUnusedBytes += delta
+    }
+    while((a = a.next) != null);
+    return numberOfUnusedBytes;
+}
+
 
 #if (DEBUG)
-    public func (arena: *Arena) malloc(size: usize,
-                                       file: *const char = c::__FILE__,
-                                       line: u64 = c::__LINE__) : *void {
-        var a = arena
-        var last = arena
+    public func (this: *ArenaAllocator) malloc(size: usize,
+                                               file: *const char = c::__FILE__,
+                                               line: u64 = c::__LINE__) : *void {
+        var a = this.arena
+        var last = a
 
         do {
             if((a.size - a.current) > size) {
@@ -72,12 +110,21 @@ public func (arena: *Arena) free() {
         }
         while((a = a.next) != null);
 
-        var asize = size > PAGE_SIZE ? size : PAGE_SIZE
-        var next = new<Arena>(arena.decorated, file, line)
-        next.init(asize, arena.decorated)
+        var asize = size > this.pageSize ? size : this.pageSize;
+
+        var mem = this.decorated.alloc(sizeof(:Arena) + sizeof(:char) * asize, file, line) as (*void)
+        var next: *Arena = mem as (*Arena)
+        next.size = asize
+        next.current = 0
+        next.next = null
+        next.region = (mem + sizeof(:Arena)) as (*u8)
 
         last.next = next
         next.current += size
+
+        this.numberOfArenas += 1;
+        this.numberOfBytesAllocated += asize;
+
         return next.region as (*void)
     }
 
@@ -86,7 +133,7 @@ public func (arena: *Arena) free() {
                      size: usize,
                      file: *const char = c::__FILE__,
                      line: u64 = c::__LINE__) : *void {
-        var arena = alloc as (*Arena);
+        var arena = alloc as (*ArenaAllocator);
         return arena.malloc(size);
     }
 
@@ -95,7 +142,7 @@ public func (arena: *Arena) free() {
                      size: usize,
                      file: *const char = c::__FILE__,
                      line: u64 = c::__LINE__) : *void {
-        var arena = alloc as (*Arena);
+        var arena = alloc as (*ArenaAllocator);
         var result = arena.malloc(size * num);
         if(result) {
             c::memset(result, 0, size * num)
@@ -114,7 +161,7 @@ public func (arena: *Arena) free() {
             return ArenaMalloc(alloc, size)
         }
 
-        var arena = alloc as (*Arena);
+        var arena = alloc as (*ArenaAllocator);
 
         var result = arena.malloc(size);
         if(result) {
@@ -130,9 +177,9 @@ public func (arena: *Arena) free() {
 
 #else
 
-    public func (arena: *Arena) malloc(size: usize) : *void {
-        var a = arena
-        var last = arena
+    public func (this: *ArenaAllocator) malloc(size: usize) : *void {
+        var a = this.arena
+        var last = a
 
         do {
             if((a.size - a.current) > size) {
@@ -144,22 +191,32 @@ public func (arena: *Arena) free() {
         }
         while((a = a.next) != null);
 
-        var asize = size > PAGE_SIZE ? size : PAGE_SIZE
-        var next = new<Arena>(arena.decorated)
-        next.init(asize, arena.decorated)
+        var asize = size > this.pageSize ? size : this.pageSize;
+
+        var mem = this.decorated.alloc(sizeof(:Arena) + sizeof(:char) * asize) as (*void)
+        var next: *Arena = mem as (*Arena)
+        next.size = asize
+        next.current = 0
+        next.next = null
+        next.region = (mem + sizeof(:Arena)) as (*u8)
+
 
         last.next = next
         next.current += size
+
+        this.numberOfArenas += 1;
+        this.numberOfBytesAllocated += asize;
+
         return next.region as (*void)
     }
 
     func ArenaMalloc(alloc: *const Allocator, size: usize) : *void {
-        var arena = alloc as (*Arena);
+        var arena = alloc as (*ArenaAllocator);
         return arena.malloc(size);
     }
 
     func ArenaCalloc(alloc: *const Allocator, num: usize, size: usize) : *void {
-        var arena = alloc as (*Arena);
+        var arena = alloc as (*ArenaAllocator);
         var result = arena.malloc(size * num);
         if(result) {
             c::memset(result, 0, size * num)
@@ -173,7 +230,7 @@ public func (arena: *Arena) free() {
             return ArenaMalloc(alloc, size)
         }
 
-        var arena = alloc as (*Arena);
+        var arena = alloc as (*ArenaAllocator);
 
         var result = arena.malloc(size);
         if(result) {
@@ -191,4 +248,42 @@ public func (arena: *Arena) free() {
 
 func ArenaFree(alloc: *const Allocator, ptr: *void) {
     // do nothing
+}
+
+
+@test
+func testArena() {
+
+    var arena = ArenaAllocator{}
+    arena.init(64)
+
+    var allocator:*const Allocator = &arena.allocator
+
+    c::printf("Alloc 1024\n")
+    var mem = allocator.alloc(1024)
+    c::printf("NumberOfArenas: %d\n", arena.numberOfArenas);
+    c::printf("NumberOfBytesAllocated: %zu\n", arena.numberOfBytesAllocated);
+    c::printf("NumberOfUnused: %zu\n", arena.unusedBytes());
+
+    c::printf("Alloc 32\n")
+    allocator.alloc(32)
+
+    c::printf("NumberOfArenas: %d\n", arena.numberOfArenas);
+    c::printf("NumberOfBytesAllocated: %zu\n", arena.numberOfBytesAllocated);
+    c::printf("NumberOfUnused: %zu\n", arena.unusedBytes());
+
+    c::printf("Alloc 16\n")
+    allocator.alloc(16)
+
+    c::printf("NumberOfArenas: %d\n", arena.numberOfArenas);
+    c::printf("NumberOfBytesAllocated: %zu\n", arena.numberOfBytesAllocated);
+    c::printf("NumberOfUnused: %zu\n", arena.unusedBytes());
+
+    c::printf("clear\n")
+    arena.clear()
+    c::printf("NumberOfArenas: %d\n", arena.numberOfArenas);
+    c::printf("NumberOfBytesAllocated: %zu\n", arena.numberOfBytesAllocated);
+    c::printf("NumberOfUnused: %zu\n", arena.unusedBytes());
+
+    arena.free()
 }

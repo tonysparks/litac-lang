@@ -6,6 +6,7 @@ import "std/string_buffer"
 import "std/system"
 import "std/libc"
 import "std/mem"
+import "std/mem/arena_allocator"
 
 import "phase_result"
 import "symbols"
@@ -15,11 +16,14 @@ import "ast"
 import "ast_new"
 import "lex"
 import "intern"
+import "common"
 
 public enum ModuleFlags {
     TYPE_CHECKED  = (1<<0),
     TYPE_RESOLVED = (1<<1),
     TYPE_IMPORTED = (1<<2),
+
+    INCREMENTAL_COMPILATION = (1<<3),
 }
 
 public struct ModuleId {
@@ -49,6 +53,8 @@ public struct Module {
 
     importedBy: Array<ModuleImport> // modules that import this module
 
+    typeSpecAllocator: TypeSpecAllocator
+    arena: ArenaAllocator
     allocator: *const Allocator
     lita: *Lita
 }
@@ -75,9 +81,10 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.flags = 0
     builtins.allocator = lita.allocator
     builtins.importedBy.init(512, lita.allocator)
-    builtins.symbols.init(ScopeKind.MODULE, null, lita.result, lita.allocator)
+    builtins.symbols.init(ScopeKind.MODULE, null, lita.result, &builtins, lita.allocator)
     builtins.genericSymbols = &lita.genericSymbols
     builtins.lita = lita
+    builtins.typeSpecAllocator.init(lita.allocator)
 
     var filename: [MAX_PATH]char;
     var pathStr = StringInit(filename, MAX_PATH, 0);
@@ -126,15 +133,57 @@ public func NewModule(lita: *Lita,
 public func (this: *Module) init(lita: *Lita) {
     this.text = String{}
     this.ast = null
+
+    // TODO: Figure out optimal arena size and allocator to pass in
+    // TODO: Move to Array of Ast, Symbols
+    this.arena.init(1024 * KiB, lita.allocator)
+    this.allocator = &this.arena.allocator
+    //this.allocator = lita.allocator
+    this.typeSpecAllocator.init(this.allocator)
+
+    // We want these to be owned by the global allocator
     this.importedBy.init(64, lita.allocator)
-    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, lita.allocator)
+    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, this, lita.allocator)
+
     this.flags = 0
-    this.allocator = lita.allocator
     this.currentScope = &this.symbols
     this.genericSymbols = &lita.genericSymbols
     this.lita = lita
+}
 
-    this.symbols.module = this // TEMP
+public func (this: *Module) initIncrementalBuild() {
+    this.text = String{}
+    this.ast = null
+    this.flags = 0
+    this.flags |= ModuleFlags.INCREMENTAL_COMPILATION
+
+    this.arena.clear()
+    this.typeSpecAllocator.init(this.allocator)
+
+    this.symbols.initIncrementalBuild()
+
+    // clear out any generic symbols from this module
+    for(var it = this.genericSymbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
+
+        if(symbol.declared.equals(this)) {
+            it.remove()
+            continue
+        }
+
+        if(symbol.genericCallsiteModule != null &&
+           symbol.genericCallsiteModule.equals(this)) {
+            it.remove()
+            continue
+        }
+    }
+}
+
+public func (this: *Module) postIncrementalBuild() {
+    this.flags &= ~ModuleFlags.INCREMENTAL_COMPILATION;
+    this.symbols.postIncrementalBuild()
 }
 
 public func (this: *Module) getType(type: InternedString) : *Symbol {
@@ -162,22 +211,26 @@ func (this: *Module) isMethodForType(type: *TypeInfo, sym: *Symbol) : bool {
         return false
     }
 
-    var fn = sym.type as (*FuncTypeInfo)
-    if(fn.decl.params.size() == 0) {
+    var fn = sym.type
+    if(fn == null) {
         return false
     }
 
-    var firstArg = fn.decl.params.get(0)
+    if(fn.funcDecl.params.size() == 0) {
+        return false
+    }
+
+    var firstArg = fn.funcDecl.params.get(0)
     if(!firstArg.typeInfo) {
         return false
     }
 
     var base = firstArg.typeInfo.getBaseType()
     if(IsGenericCapable(type)) {
-        var gen = type as (*GenericTypeInfo)
+        var gen = type
 
         if(IsGenericCapable(base)) {
-            var param = base as (*GenericTypeInfo)
+            var param = base
             if(gen.genericTypeid == param.genericTypeid) {
                 return true
             }
@@ -238,36 +291,37 @@ public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport
         moduleName = &importDecl.alias.str;
     }
 
-    this.importModuleSymbols(moduleToImport, moduleName, importDecl.isUsing)
+    this.importModuleSymbols(importDecl.startPos, moduleToImport, moduleName, importDecl.isUsing)
 }
 
 
-func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *InternedString, isUsing: bool) {
+func (this: *Module) importModuleSymbols(
+    importSrcPos: SrcPos,
+    moduleToImport: *Module,
+    moduleName: *InternedString,
+    isUsing: bool) {
+
+    // TODO: Make sure to not add a duplicate importedBy module (happens with incrementalBuilds)
     moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
 
     var symbols = moduleToImport.symbols;
-    for(var i = 0; i < symbols.symbolTypes.capacity; i += 1) {
-        var symName = symbols.symbolTypes.keys[i]
-        var symbol = symbols.symbolTypes.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
-
-        this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
+    for(var it = symbols.symbolTypes.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
+        this.importModuleSymbol(importSrcPos, moduleToImport, moduleName, symbol, symName, isUsing)
     }
 
-    for(var i = 0; i < symbols.symbolFuncs.capacity; i += 1) {
-        var symName = symbols.symbolFuncs.keys[i]
-        var symbol = symbols.symbolFuncs.values[i]
-        if(!symName.addr || !symbol) {
-            continue
-        }
-
-        this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
+    for(var it = symbols.symbolFuncs.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
+        this.importModuleSymbol(importSrcPos, moduleToImport, moduleName, symbol, symName, isUsing)
     }
 }
 
-public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
+public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
+                                               moduleToImport: *Module,
                                                moduleName: *InternedString,
                                                symbol: *Symbol,
                                                symName: InternedString,
@@ -295,16 +349,18 @@ public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
     }
 
     if(moduleName) {
-        var name = StringBufferInit(MAX_SYMBOL_NAME, this.allocator)
+        var buffer = [MAX_SYMBOL_NAME]char{};
+
+        var name = StringInit(buffer, MAX_SYMBOL_NAME, 0)
         name.appendStrn(moduleName.buffer, moduleName.length)
         name.appendStrn("::", 2)
         name.appendStrn(symbol.name.buffer, symbol.name.length)
 
-        var nameIntern = this.lita.strings.intern(name.cStrConst(), name.length)
-        this.symbols.importSymbol(nameIntern, symbol)
+        var nameIntern = this.lita.strings.internCopy(name.cStrConst(), name.length)
+        this.symbols.importSymbol(importSrcPos, nameIntern, symbol)
     }
     else {
-        this.symbols.importSymbol(symName, symbol)
+        this.symbols.importSymbol(importSrcPos, symName, symbol)
     }
 }
 
@@ -340,25 +396,22 @@ public func (this: *Module) print(header: *const char) {
     printf("Module %s %.*s {\n", header, this.id.name.length, this.id.name.buffer)
 
     var symbols = this.symbols
-    for(var i = 0; i < symbols.symbolTypes.capacity; i+=1) {
-        var symName = symbols.symbolTypes.keys[i]
-        var symbol = symbols.symbolTypes.values[i]
-        if(!symName.addr || !symbol) {
-            printf("   %d null\n", i)
-            continue
-        }
+    var i = 0
+    for(var it = symbols.symbolTypes.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
         printf("   %d '%.*s' %s\n", i, symName.length, symName.buffer, SymbolKindAsStr(symbol.kind))
+        i += 1
     }
 
-
-    for(var i = 0; i < symbols.symbolFuncs.capacity; i+=1) {
-        var symName = symbols.symbolFuncs.keys[i]
-        var symbol = symbols.symbolFuncs.values[i]
-        if(!symName.addr || !symbol) {
-            printf("   %d null\n", i)
-            continue
-        }
+    i = 0
+    for(var it = symbols.symbolFuncs.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
         printf("   %d '%.*s' %s\n", i, symName.length, symName.buffer, SymbolKindAsStr(symbol.kind))
+        i += 1
     }
     printf("}\n")
 }
