@@ -674,7 +674,7 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
                 if(sym) {
                     for(var i = 0; i < module.importedBy.size(); i += 1) {
                         var imp = module.importedBy.get(i)
-                        imp.module.importModuleSymbol(module, imp.alias, sym, sym.name, imp.isUsing)
+                        imp.module.importModuleSymbol(decl.startPos, module, imp.alias, sym, sym.name, imp.isUsing)
                     }
 
                     if(context.resolveSymbols) {

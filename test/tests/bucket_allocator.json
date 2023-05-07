@@ -4,6 +4,8 @@
     "program" : `
     @include("assert.h");
     @foreign func assert(e:bool):void;
+    import "std/mem/debug_allocator"
+    import "std/mem/libc_allocator"
 
     //@include("stdio.h");
     //@foreign func printf(...):void;

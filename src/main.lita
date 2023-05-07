@@ -121,11 +121,6 @@ report:
 
     if(runProgram) {
         /*
-        for(var it = lita.modules.iter(); it.hasNext();) {
-            var next = it.next()
-            printf("Building '%s' \n", next.key)
-            lita.incrementalBuild(next.value)
-        }*/
         var m = lita.getModule("src/main.lita")
         lita.incrementalBuild(m)
         lita.incrementalBuild(m)
@@ -138,7 +133,7 @@ report:
                 sb.clear()
             }
             printf("Total errors: %d\n", lita.result.errors.size())
-        }
+        }*/
         return lita.run()
     }
 

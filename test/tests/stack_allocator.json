@@ -2,6 +2,9 @@
     "description": "Tests Declarations",
     "enabled": true,
     "program" : `
+    import "std/mem/debug_allocator"
+    import "std/mem/libc_allocator"
+
     @include("assert.h");
     @foreign func assert(e:bool):void;
 

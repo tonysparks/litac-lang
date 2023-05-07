@@ -14,6 +14,32 @@
     `,
     "tests": [
         {
+            "name" : "Traits With Generics",
+            "definitions": `
+
+                trait Function<T> {
+                    fn: func(T) : T
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function<i32> = &impl
+                assert(function.fn(1) == 5)
+            `,
+        },
+/*
+        {
             "name": "struct default values",
             "definitions": `
                 @include("<string.h>");
@@ -48,5 +74,6 @@
 
             `,
         },
+*/
     ]
 }

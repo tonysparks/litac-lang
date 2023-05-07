@@ -240,6 +240,9 @@ public func (lita: *Lita) endCapture(type: MetricType) {
 
 
 public func (this: *Lita) incrementalBuild(module: *Module) : void {
+    if(!module) {
+        return;
+    }
 
     // TODO:
     // 1) Move allocators to the module level instead of the Lita context level

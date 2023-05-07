@@ -178,7 +178,8 @@ public func (s: *Scope) lookup(name: InternedString, includeFuncs: bool = true) 
     return s.parent.lookup(name, includeFuncs)
 }
 
-public func (this: *Scope) importSymbol(name: InternedString,
+public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
+                                        name: InternedString,
                                         symbol: *Symbol) {
 
     var symbolStorage = &this.symbolFuncs
@@ -194,14 +195,12 @@ public func (this: *Scope) importSymbol(name: InternedString,
         // an incremental build, go ahead with the import -- if/when
         // the symbol gets a declaration in this module, it will error
         // there
-        if(existingSym.flags & SymbolFlags.IS_MARKED_RESET) {
-            // do nothing...
-        }
-        else {
-            //Info("Importing: %.*s is Marked: %d\n", name.length, name.buffer, existingSym.flags & SymbolFlags.IS_MARKED_RESET)
+        if(!(existingSym.flags & SymbolFlags.IS_MARKED_RESET)) {
             var decl = existingSym.decl
-            this.result.addError(symbol.decl.startPos, "can't import symbol '%.*s' because it is already defined in %s:%d",
-                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+            this.result.addError(importSrcPos, "can't import symbol '%.*s' defined in '%s:%d' because it is already defined in '%s:%d'",
+                name.length, name.buffer,
+                symbol.decl.startPos.filename, symbol.decl.startPos.lineNumber,
+                decl.startPos.filename, decl.startPos.lineNumber)
             return;
         }
     }

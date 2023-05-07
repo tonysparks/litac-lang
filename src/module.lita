@@ -291,11 +291,16 @@ public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport
         moduleName = &importDecl.alias.str;
     }
 
-    this.importModuleSymbols(moduleToImport, moduleName, importDecl.isUsing)
+    this.importModuleSymbols(importDecl.startPos, moduleToImport, moduleName, importDecl.isUsing)
 }
 
 
-func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *InternedString, isUsing: bool) {
+func (this: *Module) importModuleSymbols(
+    importSrcPos: SrcPos,
+    moduleToImport: *Module,
+    moduleName: *InternedString,
+    isUsing: bool) {
+
     // TODO: Make sure to not add a duplicate importedBy module (happens with incrementalBuilds)
     moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
 
@@ -304,18 +309,19 @@ func (this: *Module) importModuleSymbols(moduleToImport: *Module, moduleName: *I
         var entry = it.next()
         var symName = entry.key;
         var symbol = entry.value;
-        this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
+        this.importModuleSymbol(importSrcPos, moduleToImport, moduleName, symbol, symName, isUsing)
     }
 
     for(var it = symbols.symbolFuncs.iter(); it.hasNext();) {
         var entry = it.next()
         var symName = entry.key;
         var symbol = entry.value;
-        this.importModuleSymbol(moduleToImport, moduleName, symbol, symName, isUsing)
+        this.importModuleSymbol(importSrcPos, moduleToImport, moduleName, symbol, symName, isUsing)
     }
 }
 
-public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
+public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
+                                               moduleToImport: *Module,
                                                moduleName: *InternedString,
                                                symbol: *Symbol,
                                                symName: InternedString,
@@ -351,10 +357,10 @@ public func (this: *Module) importModuleSymbol(moduleToImport: *Module,
         name.appendStrn(symbol.name.buffer, symbol.name.length)
 
         var nameIntern = this.lita.strings.internCopy(name.cStrConst(), name.length)
-        this.symbols.importSymbol(nameIntern, symbol)
+        this.symbols.importSymbol(importSrcPos, nameIntern, symbol)
     }
     else {
-        this.symbols.importSymbol(symName, symbol)
+        this.symbols.importSymbol(importSrcPos, symName, symbol)
     }
 }
 

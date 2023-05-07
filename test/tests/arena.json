@@ -4,6 +4,8 @@
     "program": `
         @include("assert.h");
         @foreign func assert(e:bool):void;
+        import "std/mem/debug_allocator"
+        import "std/mem/libc_allocator"
 
         %definitions%
 
@@ -54,13 +56,14 @@
 
             `,
             "code": `
+                var debugAllocator = DebugAllocator{}
                 debugAllocator.init()
                 defer {
                     debugAllocator.report();
                     debugAllocator.free();
                 }
 
-                var arena = Arena{}
+                var arena = ArenaAllocator{}
                 arena.init(4096, &debugAllocator.alloc)
                 defer {
                     arena.free()
@@ -68,7 +71,7 @@
                 }
 
                 var array = Array<i32>{}
-                array.init(2, &arena.alloc)
+                array.init(2, &arena.allocator)
 
                 const size = 1024
                 for(var i = 0; i < size; i+=1) {
@@ -78,7 +81,7 @@
                 assert(array.size() == size)
 
                 var map = Map<*const char, i32>{}
-                map.init(0, 1, &StrHashFn, &StrEqualFn, &arena.alloc)
+                map.init(0, 1, &StrHashFn, &StrEqualFn, &arena.allocator)
 
                 map.put("hi1", 421)
                 map.put("hi2", 422)
@@ -89,7 +92,7 @@
                 assert(map.size() == 5)
 
                 var parser = JsonParser{}
-                parser.init(&arena.alloc)
+                parser.init(&arena.allocator)
 
                 var node = parser.parseJson("""
                     {
@@ -124,20 +127,21 @@
 
             `,
             "code": `
+                var debugAllocator = DebugAllocator{}
                 debugAllocator.init(cAllocator)
                 defer {
                     debugAllocator.report();
                     debugAllocator.free();
                 }
 
-                var arena = Arena{}
+                var arena = ArenaAllocator{}
                 arena.init(4096, &debugAllocator.alloc)
                 defer {
                     arena.free()
                     assert(debugAllocator.allocations.empty())
                 }
 
-                defaultAllocator = (&arena.alloc) as (*const Allocator)
+                defaultAllocator = (&arena.allocator) as (*const Allocator)
 
                 var array = Array<i32>{}
                 array.init(2)
