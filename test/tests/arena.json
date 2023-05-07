@@ -103,7 +103,7 @@
                 """);
 
                 var buf = StringBuffer{}
-                buf.init(1, &arena.alloc)
+                buf.init(1, &arena.allocator)
                 node.print(&buf)
 
                 assert(!strcmp("{\"x\":true,\"y\":false,\"z\":[1,2,3]}", buf.cStr()))
