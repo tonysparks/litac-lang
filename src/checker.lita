@@ -60,6 +60,7 @@ public struct TypeChecker {
     pendingValues: Array<*Symbol>
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
+    symbolTraits: Array<*Symbol>
     mainEntry: *Symbol // main entry point to the program
 
     symbolNotes: Array<*Symbol>
@@ -88,6 +89,7 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.pendingValues.init(128, lita.allocator)
     this.symbolTypes.init(256, lita.allocator)
     this.symbolFuncs.init(256, lita.allocator)
+    this.symbolTraits.init(64, lita.allocator)
     this.genericParamStack.init(128, lita.allocator)
     this.genericTemplates.init(64, lita.allocator)
     this.genericContext.callsite = null
@@ -217,7 +219,7 @@ func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeIn
                 return true
             }
         }
-        else if(IsPtrAggregate(b)) {
+        else /*if(IsPtrAggregate(b))*/ {
             var aggInfo = b.getBaseType()
             if(!aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
@@ -232,14 +234,6 @@ func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeIn
                 sb.appendStr("' trait methods")
                 return true
             }
-        }
-        else {
-            sb.appendStrn("'", 1)
-            b.toString(sb)
-            sb.appendStr(description)
-            a.toString(sb)
-            sb.appendStr("'; only aggregate types can implement traits")
-            return true
         }
     }
 
@@ -288,7 +282,7 @@ func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b: *Type
     // comparisons, as they are not as intuitive as other types
     if(IsTraitLike(a)) {
         var aTrait = a.getBaseType()
-        if(!IsPtr(b) && IsAggregate(b)) {
+        if(!IsPtr(b)) {
             var aggInfo = b.getBaseType()
             if(aggInfo.implementsTrait(aTrait, this)) {
                 sb.appendStrn("'", 1)
@@ -343,12 +337,12 @@ func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b: *Type
     return true
 }
 
-func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *TypeInfo) : bool {
+func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *TypeInfo, allowPtrArithmetic: bool = true) : bool {
     if(a == null || b == null) {
         return false
     }
 
-    if(!a.isAssignable(b, this)) {
+    if(!a.isAssignable(b, this, .allowDecay = true, .allowPtrArithmetic = allowPtrArithmetic)) {
         var sb = StringBufferInit(256, this.allocator)
 
         if(this.checkTrait(sb, a, b, "' is not of type '")) {
@@ -1032,7 +1026,6 @@ func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInfo) : bo
 
     var isImpl = matchedCount == numOfTraitFns
     if(isImpl) {
-
         if(!this.interfaceImpls.contains(iface.typeid)) {
             var impls = ArrayInit<Typeid>(32, this.lita.allocator)
             this.interfaceImpls.put(iface.typeid, impls)

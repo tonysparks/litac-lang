@@ -121,6 +121,19 @@ func AddBuiltin(lita: *Lita, type: *TypeInfo) {
     type.sym = sym
 }
 
+public func GetBuiltinSymbol(typeid: Typeid) : *Symbol {
+    if(typeid >= TypeKind.MAX_TYPE_KINDS) {
+        return null
+    }
+
+    var typeInfo = BUILTIN_TYPES[typeid]
+    if(!typeInfo) {
+        return null
+    }
+
+    return typeInfo.sym
+}
+
 public func NewModule(lita: *Lita,
                       filename: *const char) : *Module {
 
@@ -179,6 +192,10 @@ public func (this: *Module) initIncrementalBuild() {
             continue
         }
     }
+}
+
+public func (this: *Module) isBuiltin() : bool {
+    return this == &builtins
 }
 
 public func (this: *Module) postIncrementalBuild() {

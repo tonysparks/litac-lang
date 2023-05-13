@@ -91,163 +91,204 @@ C:
 public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     var allocator = checker.current.allocator
 
-    var decls = ArrayInit<*Decl>(512, allocator)
     var sb = StringBufferInit(2048, allocator)
 
-    //var traitNameBuffer: [MAX_SYMBOL_NAME]char;
     var traitBuffer      = StringBufferInit(MAX_SYMBOL_NAME, allocator)
     var traitFieldBuffer = StringBufferInit(MAX_SYMBOL_NAME, allocator)
 
-    sb.append("// %d number of traits found.\n", checker.interfaceImpls.size())
-    for(var it = checker.interfaceImpls.iter(); it.hasNext();) {
-        var entry = it.next()
-        var traitSym = FindSymbolByTypeid(checker.symbolTypes, entry.key)
+    for(var i = 0; i < checker.symbolTraits.size(); i+=1) {
+        var traitSym = checker.symbolTraits.get(i)
         assert(traitSym)
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
         var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = GetTraitName(traitSym, traitBuffer)
+        GenerateVTable(traitSym, traitDecl, traitName, sb)
 
-        sb.append("// Trait: '%.*s' has %d impls\n", traitDecl.name.str.length, traitDecl.name.str.buffer, entry.value.size())
-        // Generate VTable
-        {
-            //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
-           // printf("Sym: %s vs %s\n", traitName, traitDecl.name.asString())
-            sb.append("@hidden struct %.*s__VirtualTable", traitName.length, traitName.buffer)
+        // there are no implementations, so we can skip generating wrappers
+        // for this trait
+        if(!checker.interfaceImpls.contains(traitSym.type.typeid)) {
+            continue
+        }
+
+        var impls = checker.interfaceImpls.getPtr(traitSym.type.typeid)
+        GenerateWrapperFunctions(
+            checker,
+            traitSym,
+            traitDecl,
+            traitName,
+            sb,
+            traitFieldBuffer,
+            impls)
+
+        GenerateVTableEntries(
+            checker,
+            traitDecl,
+            traitName,
+            sb,
+            traitFieldBuffer,
+            impls)
+    }
+
+    //printf("Traits Source: \n%s\n", sb.cStr())
+    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
+    var stmts = parser.parseModule()
+    return stmts.declarations
+}
+
+func GenerateVTable(
+        traitSym: *Symbol,
+        traitDecl: *AggregateDecl,
+        traitName: StringView,
+        sb: *StringBuffer) {
+    sb.append("@hidden struct %.*s__VirtualTable", traitName.length, traitName.buffer)
+    sb.append(" {\n")
+
+    for(var j = 0; j < traitDecl.fields.size(); j += 1) {
+            var field = traitDecl.fields.get(j)
+            assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+            assert(field.typeInfo != null && field.typeInfo.kind == TypeKind.FUNC_PTR)
+
+            var fn = field.typeInfo
+            var traitField = field.traitField
+            sb.append("    %.*s: func", traitField.name.str.length, traitField.name.str.buffer)
+            PrintGenerics(fn.genericParams, sb)
+            sb.append("(*void")
+            for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+                var param = fn.paramDecls.get(p)
+                sb.append(", ")
+                param.toString(sb)
+            }
+            sb.append(") : ")
+            fn.returnType.toString(sb)
+            sb.append(";\n")
+    }
+    sb.append("}\n")
+}
+
+
+func GenerateWrapperFunctions(
+        checker: *TypeChecker,
+        traitSym: *Symbol,
+        traitDecl: *AggregateDecl,
+        traitName: StringView,
+        sb: *StringBuffer,
+        traitFieldBuffer: *StringBuffer,
+        impls: *Array<Typeid>) {
+    sb.append("// Trait: '%.*s' has %d impls\n", traitDecl.name.str.length, traitDecl.name.str.buffer, impls.size())
+
+    // Generate Wrapper functions
+    for(var i = 0; i < impls.size(); i += 1) {
+        var implSym = FindSymbolByTypeid(checker.symbolTypes, impls.get(i))
+
+        if(!implSym) {
+            continue;
+        }
+
+        var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
+
+        var implName = implSym.name
+
+        if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+            var genericTypeid = implSym.type.genericTypeid
+            var genSym = FindSymbolByTypeid(checker.symbolTypes, genericTypeid)
+            implName = genSym.name
+        }
+
+        for(var j = 0; j < traitDecl.fields.size(); j += 1) {
+            var field = traitDecl.fields.get(j)
+            assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+            assert(field.typeInfo && field.typeInfo.kind == TypeKind.FUNC_PTR)
+
+            var fn = field.typeInfo
+
+            sb.append("@hidden func __%.*s_%.*s_wrapper", implEscapedName.length, implEscapedName.buffer, field.traitField.name.str.length, field.traitField.name.str.buffer)
+            sb.append("(this: *void")
+            for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+                var param = fn.paramDecls.get(p)
+                sb.append(", _%d: ", p)
+                param.toString(sb)
+            }
+
+            if(fn.hasVarargs) {
+                // TODO: do varargs passing
+                sb.append(", ...")
+            }
+
+            sb.append(") : ")
+            fn.returnType.toString(sb)
             sb.append(" {\n")
+            {
+                if(implSym.declared.isBuiltin()) {
+                    sb.append("    var __this = this as (*%.*s", implName.length, implName.buffer)
+                }
+                else {
+                    var moduleName = implSym.declared.id.name
+                    sb.append("    var __this = this as (*%.*s::%.*s",
+                        moduleName.length, moduleName.buffer,
+                        implName.length, implName.buffer)
+                }
+                PrintGenericArgs(implSym.genericArgs, sb)
+                sb.append(")\n")
 
+                if(fn.returnType.kind != TypeKind.VOID) {
+                    sb.append("    return ")
+                }
+                else {
+                    sb.append("    ")
+                }
+
+                sb.append("__this.%.*s", field.traitField.name.str.length, field.traitField.name.str.buffer)
+
+                sb.append("(")
+                for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+                    var param = fn.paramDecls.get(p)
+                    if(p > 0) {
+                        sb.append(", ")
+                    }
+                    sb.append("_%d", p)
+                }
+                sb.append(")")
+            }
+            sb.append("\n}\n")
+        }
+    }
+}
+
+func GenerateVTableEntries(
+        checker: *TypeChecker,
+        traitDecl: *AggregateDecl,
+        traitName: StringView,
+        sb: *StringBuffer,
+        traitFieldBuffer: *StringBuffer,
+        impls: *Array<Typeid>) {
+
+    sb.append("@hidden const %.*s__vtables = []*%.*s__VirtualTable {\n",
+        traitName.length, traitName.buffer, traitName.length, traitName.buffer)
+
+    for(var i = 0; i < impls.size(); i += 1) {
+        var implSym = FindSymbolByTypeid(checker.symbolTypes, impls.get(i))
+        if(!implSym) {
+            continue
+        }
+
+        var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
+        sb.append("    [%d] = &%.*s__VirtualTable {\n", i, traitName.length, traitName.buffer)
+        {
             for(var j = 0; j < traitDecl.fields.size(); j += 1) {
-                  var field = traitDecl.fields.get(j)
-                  assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
-                  assert(field.typeInfo != null && field.typeInfo.kind == TypeKind.FUNC_PTR)
+                var field = traitDecl.fields.get(j)
+                assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
-                  var fn = field.typeInfo
-                  var traitField = field.traitField
-                  sb.append("    %.*s: func", traitField.name.str.length, traitField.name.str.buffer)
-                  PrintGenerics(fn.genericParams, sb)
-                  sb.append("(*void")
-                  for(var p = 0; p < fn.paramDecls.size(); p += 1) {
-                      var param = fn.paramDecls.get(p)
-                      sb.append(", ")
-                      param.toString(sb)
-                  }
-                  sb.append(") : ")
-                  fn.returnType.toString(sb)
-                  sb.append(";\n")
-            }
-            sb.append("}\n")
-        }
-
-        // Generate Wrapper functions
-        {
-            for(var i = 0; i < entry.value.size(); i += 1) {
-                var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
-
-                if(!implSym) {
-                    continue;
-                }
-
-                var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
-
-                var implName = implSym.name
-
-                if(implSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-                    var genericTypeid = implSym.type.genericTypeid
-                    var genSym = FindSymbolByTypeid(checker.symbolTypes, genericTypeid)
-                    implName = genSym.name
-                }
-
-                for(var j = 0; j < traitDecl.fields.size(); j += 1) {
-                    var field = traitDecl.fields.get(j)
-                    assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
-                    assert(field.typeInfo && field.typeInfo.kind == TypeKind.FUNC_PTR)
-
-                    var fn = field.typeInfo
-
-                    sb.append("@hidden func __%.*s_%.*s_wrapper", implEscapedName.length, implEscapedName.buffer, field.traitField.name.str.length, field.traitField.name.str.buffer)
-                    sb.append("(this: *void")
-                    for(var p = 0; p < fn.paramDecls.size(); p += 1) {
-                        var param = fn.paramDecls.get(p)
-                        sb.append(", _%d: ", p)
-                        param.toString(sb)
-                    }
-
-                    if(fn.hasVarargs) {
-                        // TODO: do varargs passing
-                        sb.append(", ...")
-                    }
-
-                    sb.append(") : ")
-                    fn.returnType.toString(sb)
-                    sb.append(" {\n")
-                    {
-                        var moduleName = implSym.declared.id.name
-                        sb.append("    var __this = this as (*%.*s::%.*s", moduleName.length, moduleName.buffer, implName.length, implName.buffer)
-                        PrintGenericArgs(implSym.genericArgs, sb)
-                        sb.append(")\n")
-
-                        if(fn.returnType.kind != TypeKind.VOID) {
-                            sb.append("    return ")
-                        }
-                        else {
-                            sb.append("    ")
-                        }
-
-                        sb.append("__this.%.*s", field.traitField.name.str.length, field.traitField.name.str.buffer)
-
-                        sb.append("(")
-                        for(var p = 0; p < fn.paramDecls.size(); p += 1) {
-                            var param = fn.paramDecls.get(p)
-                            if(p > 0) {
-                                sb.append(", ")
-                            }
-                            sb.append("_%d", p)
-                        }
-                        sb.append(")")
-                    }
-                    sb.append("\n}\n")
-                }
+                sb.append("        .%.*s = __%.*s_%.*s_wrapper",
+                    field.traitField.name.str.length, field.traitField.name.str.buffer,
+                    implEscapedName.length, implEscapedName.buffer,
+                    field.traitField.name.str.length, field.traitField.name.str.buffer)
+                sb.append(",\n")
             }
         }
-
-        // Generate Vtables implementations
-        {
-            //sb.append("@module(\"%s\")\n", traitSym.declared.id.filename)
-            sb.append("@hidden const %.*s__vtables = []*%.*s__VirtualTable {\n",
-                traitName.length, traitName.buffer, traitName.length, traitName.buffer)
-
-            for(var i = 0; i < entry.value.size(); i += 1) {
-                var implSym = FindSymbolByTypeid(checker.symbolTypes, entry.value.get(i))
-                assert(implSym)
-
-                var implEscapedName = GetTraitName(implSym, traitFieldBuffer)
-                sb.append("    [%d] = &%.*s__VirtualTable {\n", i, traitName.length, traitName.buffer)
-                {
-                    for(var j = 0; j < traitDecl.fields.size(); j += 1) {
-                        var field = traitDecl.fields.get(j)
-                        assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
-
-                        sb.append("        .%.*s = __%.*s_%.*s_wrapper",
-                            field.traitField.name.str.length, field.traitField.name.str.buffer,
-                            implEscapedName.length, implEscapedName.buffer,
-                            field.traitField.name.str.length, field.traitField.name.str.buffer)
-                        sb.append(",\n")
-                    }
-                }
-                sb.append("    },\n")
-            }
-            sb.append("}\n")
-        }
+        sb.append("    },\n")
     }
-
-    {
-        //printf("Traits Source: \n%s\n", sb.cStr())
-        var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
-        var stmts = parser.parseModule()
-        decls.addAll(stmts.declarations)
-    }
-
-    return decls
+    sb.append("}\n")
 }
 
 func PrintGenerics(genericParams: *Array<GenericParam>, sb: *StringBuffer) {
@@ -285,6 +326,10 @@ func PrintGenericArgs(genericArgs: *Array<*TypeInfo>, sb: *StringBuffer) {
 }
 
 func FindSymbolByTypeid(symbols: Array<*Symbol>, id: Typeid) : *Symbol {
+    if(id < TypeKind.MAX_TYPE_KINDS) {
+        return GetBuiltinSymbol(id)
+    }
+
     for(var i = 0; i < symbols.size(); i += 1) {
         var sym = symbols.get(i)
         if(sym.type && sym.type.typeid == id) {

@@ -662,8 +662,14 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
                 callArg.index = i
 
-                success = this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo) && success
+                success = this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo, .allowPtrArithmetic = false) && success
                 arg.expectedType = p;
+
+                // don't allow for trait casting on rvalues (i.e., prevents &4)
+                if(IsTrait(p) && arg.operand.isRightValue) {
+                    this.errorRvalueAssignmentToTrait(arg, arg.operand.typeInfo, p)
+                    success = false
+                }
             }
         }
 
@@ -708,8 +714,13 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
                 var arg = callArg.argExpr
                 callArg.index = paramIndex
-                success = this.checkTypeCompatibility(arg.startPos, p.typeInfo, arg.operand.typeInfo) && success
+                success = this.checkTypeCompatibility(arg.startPos, p.typeInfo, arg.operand.typeInfo, .allowPtrArithmetic = false) && success
                 arg.expectedType = p.typeInfo;
+
+                if(IsTrait(p.typeInfo) && arg.operand.isRightValue) {
+                    this.errorRvalueAssignmentToTrait(arg, arg.operand.typeInfo, p.typeInfo)
+                    success = false
+                }
             }
         }
 
@@ -974,6 +985,12 @@ func (this: *TypeChecker) resolveSubscriptSetExpr(expr: *SubscriptSetExpr) : boo
         return false
     }
 
+    // don't allow for trait casting on rvalues (i.e., prevents &4)
+    if(IsTrait(baseObj) && expr.value.operand.isRightValue) {
+        this.errorRvalueAssignmentToTrait(expr.value, expr.value.operand.typeInfo, baseObj)
+        return false
+    }
+
     expr.operand.typeInfo = expr.value.operand.typeInfo
     return true
 }
@@ -1170,6 +1187,11 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
             this.checkAssignability(arg.startPos, field.typeInfo, arg.operand.typeInfo, IsDecayable(arg))
             arg.expectedType = field.typeInfo
             arg.value.expectedType = field.typeInfo
+
+            // don't allow for trait casting on rvalues (i.e., prevents &4)
+            if(IsTrait(field.typeInfo) && arg.operand.isRightValue) {
+                this.errorRvalueAssignmentToTrait(arg, arg.operand.typeInfo, field.typeInfo)
+            }
         }
     }
     else if(type.kind == TypeKind.ARRAY) {
@@ -1180,6 +1202,11 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
             this.checkAssignability(arg.startPos, arrayInfo.arrayOf, arg.operand.typeInfo, IsDecayable(arg))
             arg.expectedType = arrayInfo.arrayOf
             arg.value.expectedType = arrayInfo.arrayOf
+
+            // don't allow for trait casting on rvalues (i.e., prevents &4)
+            if(IsTrait(arrayInfo.arrayOf) && arg.operand.isRightValue) {
+                this.errorRvalueAssignmentToTrait(arg, arg.operand.typeInfo, arrayInfo.arrayOf)
+            }
         }
 
     }
@@ -1345,6 +1372,12 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
 
     expr.field.operand.typeInfo = field.typeInfo
     expr.operand.typeInfo = field.typeInfo
+
+    // don't allow for trait casting on rvalues (i.e., prevents &4)
+    if(IsTrait(field.typeInfo) && expr.value.operand.isRightValue) {
+        this.errorRvalueAssignmentToTrait(expr.value, expr.value.operand.typeInfo, field.typeInfo)
+        return false
+    }
 
     return this.checkTypeCompatibility(expr.startPos, field.typeInfo, expr.value.operand.typeInfo)
 }
@@ -1835,6 +1868,12 @@ func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
 
             if(value.operand.typeInfo) {
                 success = this.checkTypeCompatibility(value.startPos, arrayOf, value.operand.typeInfo) && success
+
+                // don't allow for trait casting on rvalues (i.e., prevents &4)
+                if(IsTrait(arrayOf) && value.operand.isRightValue) {
+                    this.errorRvalueAssignmentToTrait(value, value.operand.typeInfo, arrayOf)
+                    success = false
+                }
             }
         }
         return success
@@ -1954,11 +1993,26 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
     expr.operand.typeInfo = targetType
     expr.operand.isConst = expr.left.operand.isConst &&
                            expr.right.operand.isConst
+    expr.operand.isRightValue = true
 
     return this.errors() == errors
 
 err:
     return false
+}
+
+func (this: *TypeChecker) errorRvalueAssignmentToTrait(expr: *Expr, type: *TypeInfo, typeTrait: *TypeInfo) {
+    assert(expr != null)
+    assert(type != null)
+
+    var sb = StringBufferInit(256, this.allocator)
+    sb.appendStr("invalid trait assignment from rvalue of type '")
+    type.toString(sb)
+    sb.appendStr("' to trait type '")
+    typeTrait.toString(sb)
+    sb.appendStrn("'", 1)
+
+    this.result.addErrorStr(expr.startPos, sb)
 }
 
 func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {

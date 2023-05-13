@@ -363,6 +363,10 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
     const isTrait = aggDecl.sym.flags & SymbolFlags.IS_TRAIT
     const module = this.current
 
+    if(isTrait && !(aggDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {
+        this.symbolTraits.add(aggDecl.sym)
+    }
+
     for(var i = 0; i < aggDecl.fields.size(); i+=1) {
         var field = &aggDecl.fields.elements[i]
 

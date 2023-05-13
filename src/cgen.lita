@@ -305,6 +305,10 @@ func (this: using *CGen) emitModuleNotes() {
 }
 
 func (this: using *CGen) findSymbolByTypeid(id: Typeid) : *Symbol {
+    if(id < TypeKind.MAX_TYPE_KINDS) {
+        return GetBuiltinSymbol(id)
+    }
+
     var symbols = this.lita.programSymbols.symbolTypes
     for(var i = 0; i < symbols.size(); i += 1) {
         var sym = symbols.get(i)
@@ -340,7 +344,11 @@ func (this: using *CGen) emitTraitForwardDecls() {
                 assert(implSym)
 
                 var implName = this.cTypeName(implSym.type)
-                this.emit("%s %s__to__%s(%s* x);\n", traitName, implName, traitName, implName)
+                this.emit("%s %s__to__%s(%s* x);\n",
+                    traitName,
+                    implName,
+                    traitName,
+                    implName)
             }
         }
         this.emitStrn("\n", 1)
