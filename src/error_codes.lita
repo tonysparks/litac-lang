@@ -110,7 +110,7 @@ public func PrintError(sb: *StringBuffer, error: PhaseError) {
         sb.append("%s\n", error.message)
         return;
     }
-
+// TODO: Account for TABS in source code, the alignment is off when tabs are present.
     sb.append("%s:%d:%d error: %s\n", error.pos.filename, error.pos.lineNumber, error.pos.position, error.message)
     sb.append("%.*s\n", error.pos.getLineLength(), error.pos.lineStart)
     var spaceCount = 0

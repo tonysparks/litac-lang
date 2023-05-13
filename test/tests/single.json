@@ -38,6 +38,263 @@
                 assert(function.fn(1) == 5)
             `,
         },
+        {
+            "name" : "Traits With Generics with Default Methods",
+            "definitions": `
+
+                trait Function<T> {
+                    fn: func(T) : T
+                }
+
+                func (this: Function<T>) test<T>(x: T) : T {
+                    return this.fn<T>(x)
+                }
+
+                struct FunctionImpl {
+                    i: i32
+                }
+
+                func (this: *FunctionImpl) fn(i: i32) : i32 {
+                    return this.i + i
+                }
+            `,
+            "code": `
+                var impl = FunctionImpl {
+                    .i = 4
+                }
+
+                var function: Function<i32> = &impl
+                assert(function.fn(1) == 5)
+                assert(function.test(1) == 5)
+            `,
+        },
+        {
+            "name" : "Traits with Default Methods",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                func (this: Adder) subAdd(a: i32) : i32 {
+                    var x = this.add(a)
+                    var result = this.sub(x)
+                    return result
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+            `,
+            "code": `
+                var x = 10
+                var adder: Adder = &x;
+                assert(adder.add(4) == 14)
+                assert(adder.sub(4) == 6)
+                assert(adder.subAdd(2) == -2)
+            `,
+        },
+        {
+            "name" : "Traits with Default Methods with no Impls",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                func (this: Adder) subAdd(a: i32) : i32 {
+                    var x = this.add(a)
+                    var result = this.sub(x)
+                    return result
+                }
+            `,
+            "code": `
+
+            `,
+        },
+        {
+            "name" : "Traits invalid assignment to rvalue",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+            `,
+            "code": `
+                var adder: Adder = &4
+            `,
+            "error": "lvalue required as unary '&' operand"
+        },
+        {
+            "name" : "Traits invalid function argument to rvalue",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+
+                func Test(adder: Adder) : i32 {
+                    return adder.add(4)
+                }
+            `,
+            "code": `
+                Test(4)
+            `,
+            "error": "invalid trait assignment from rvalue of type 'i32' to trait type 'Adder'"
+        },
+        {
+            "name" : "Traits invalid init argument to rvalue",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                struct AdderImpl {
+                    adder: Adder
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+            `,
+            "code": `
+                var adder = AdderImpl {
+                    .adder = 4
+                }
+            `,
+            "error": "invalid trait assignment from rvalue of type 'i32' to trait type 'Adder'"
+        },
+        {
+            "name" : "Traits invalid array init argument to rvalue",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                struct AdderImpl {
+                    adder: Adder
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+            `,
+            "code": `
+                var adders:[4]Adder = [4]Adder{
+                    [0] = 4
+                }
+            `,
+            "error": "invalid trait assignment from rvalue of type 'i32' to trait type 'Adder'"
+        },
+        {
+            "name" : "Traits invalid aggregate argument to rvalue",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                struct AdderImpl {
+                    adder: Adder
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+            `,
+            "code": `
+                var adder = AdderImpl{}
+                adder.adder = 4
+            `,
+            "error": "invalid trait assignment from rvalue of type 'i32' to trait type 'Adder'"
+        },
+        {
+            "name" : "Traits invalid array argument to rvalue",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                struct AdderImpl {
+                    adder: Adder
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+            `,
+            "code": `
+                var adder = [4]Adder{}
+                adder[0] = 4
+            `,
+            "error": "'i32' is not of type 'Adder'"
+        },
+        {
+            "name" : "Traits invalid array argument to rvalue",
+            "definitions": `
+
+                trait Adder {
+                    add: func(i32) : i32
+                    sub: func(i32) : i32
+                }
+
+                struct AdderImpl {
+                    adder: Adder
+                }
+
+                func (this: *i32) add(other: i32) : i32 {
+                    return *this + other
+                }
+                func (this: *i32) sub(other: i32) : i32 {
+                    return *this - other
+                }
+            `,
+            "code": `
+                var adder = [4]Adder{}
+                adder[0] = &4
+            `,
+            "error": "lvalue required as unary '&' operand"
+        },
 /*
         {
             "name": "struct default values",

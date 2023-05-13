@@ -626,5 +626,73 @@
                 assert(t.a() == 4)
             `,
         },
+
+        {
+            "name": "Method definition on i32",
+            "definitions": `
+                func (this: i32) add(other: i32) : i32 {
+                    return this + other
+                }
+            `,
+            "code": `
+                assert(4_i32.add(5) == 9)
+            `,
+        },
+        {
+            "name": "Method definition on f32",
+            "definitions": `
+                func (this: f32) add(other: f32) : f32 {
+                    return this + other
+                }
+            `,
+            "code": `
+                assert(4_f32.add(5_f32) == 9_f32)
+            `,
+        },
+        {
+            "name": "Method definition on bool",
+            "definitions": `
+                func (this: bool) flip() : bool {
+                    return !this
+                }
+            `,
+            "code": `
+                assert(true.flip() == false)
+                assert(false.flip() == true)
+            `,
+        },
+        {
+            "name": "Method definition on str",
+            "definitions": `
+                func (this: *const char) indexAt(i: i32) : char {
+                    return this[i]
+                }
+            `,
+            "code": `
+                assert("hello".indexAt(1) == 'e')
+            `,
+        },
+        {
+            "name": "Method definition on array",
+            "definitions": `
+                func (this: [4]i32) indexAt(i: i32) : char {
+                    return this[i]
+                }
+            `,
+            "code": `
+                assert([4]i32{0,4,6,8}.indexAt(1) == 4)
+            `,
+        },
+        {
+            "name": "Method definition on char",
+            "definitions": `
+                func (this: char) isLowerCase() : bool {
+                    return this >= 97 && this <= 122
+                }
+            `,
+            "code": `
+                assert('a'.isLowerCase() == true)
+            `,
+        },
     ]
 }

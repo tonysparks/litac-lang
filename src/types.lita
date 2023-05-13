@@ -686,7 +686,12 @@ public func (this: *TypeInfo) strictEquals(other: *TypeInfo) : bool {
     return false
 }
 
-public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeChecker, allowDecay: bool = true) : bool {
+public func (this: *TypeInfo) isAssignable(
+        other: *TypeInfo,
+        checker: *TypeChecker,
+        allowDecay: bool = true,
+        allowPtrArithmetic: bool = true) : bool {
+
     assert(this != null)
     assert(other != null)
 
@@ -756,7 +761,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeCheck
 
         case TypeKind.STR: {
             // Allow for pointer arithmetic
-            if(IsInteger(other)) {
+            if(allowPtrArithmetic && IsInteger(other)) {
                 return true
             }
             return this.isDeclarable(other, checker)
@@ -764,7 +769,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeCheck
         case TypeKind.ARRAY: {
 
             // Allow for pointer arithmetic
-            if(IsInteger(other)) {
+            if(allowPtrArithmetic && IsInteger(other)) {
                 return true
             }
 
@@ -777,7 +782,7 @@ public func (this: *TypeInfo) isAssignable(other: *TypeInfo, checker: *TypeCheck
         }
         case TypeKind.PTR: {
             // Allow for pointer arithmetic
-            if(IsInteger(other)) {
+            if(allowPtrArithmetic && IsInteger(other)) {
                 return true
             }
             return this.isDeclarable(other, checker)
@@ -1170,7 +1175,7 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo, checker: *TypeCheck
                 return true
             }
 
-            if(!IsPtrAggregate(other)) {
+            if(!IsPtr(other)) {
                 return false
             }
 
@@ -1339,7 +1344,7 @@ public func IsFuncImpl(traitFn: *TypeInfo, fn: *TypeInfo, checker: *TypeChecker)
 
     // first parameter must be a pointer
     var firstArg = funcInfo.funcDecl.params.get(0).typeInfo
-    if(!IsPtrAggregate(firstArg)) {
+    if(!IsPtr(firstArg)) {
         return false
     }
 
@@ -2058,15 +2063,12 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
 }
 
 public func (this: *TypeInfo) implementsTrait(iface : *TypeInfo, checker: *TypeChecker) : bool {
-    //printf("Here for this: %s iface: %s\n", this.toStringDebug(), iface.toStringDebug())
     if(!IsAggregateLike(iface)) {
-       // printf("iface %s not an aggregate\n", iface.toStringDebug())
         return false
     }
 
     var aggIface = AsAggregate(iface)
     if(!aggIface.sym || !(aggIface.sym.flags & SymbolFlags.IS_TRAIT)) {
-       // printf("iface %s not an interface\n", iface.toStringDebug())
         return false
     }
 
@@ -2151,54 +2153,6 @@ public struct TypeInfo {
     }
 }
 
-/*
-public struct GenericTypeInfo {
-    typeInfo: using TypeInfo
-    genericTypeid: Typeid       // The typeid of the original Generic Template
-}
-
-public struct FuncTypeInfo {
-    info: using GenericTypeInfo
-    returnType: *TypeInfo
-    decl: *FuncDecl
-}
-
-public struct ConstTypeInfo {
-    info: using TypeInfo
-    constOf: *TypeInfo
-}
-
-public struct PtrTypeInfo {
-    info: using TypeInfo
-    ptrOf: *TypeInfo
-}
-
-public struct ArrayTypeInfo {
-    info: using TypeInfo
-    arrayOf: *TypeInfo
-    length: usize
-    numOfElements: *Expr
-    isLengthDefined: bool
-}
-
-public struct FuncPtrTypeInfo {
-    info: using GenericTypeInfo
-    genericParams: Array<GenericParam>
-    returnType: *TypeInfo
-    paramDecls: Array<*TypeInfo>
-    hasVarargs: bool
-    isTrait: bool
-}
-
-public struct EnumTypeInfo {
-    info: using TypeInfo
-    decl: *EnumDecl
-}
-
-public struct AggregateTypeInfo {
-    info: using GenericTypeInfo
-    decl: *AggregateDecl
-}*/
 
 public const BOOL_TYPE = TypeInfo {
     .kind = TypeKind.BOOL,
@@ -2300,4 +2254,24 @@ public const POISON_TYPE = TypeInfo {
     .kind = TypeKind.POISON,
     .typeid = TypeKind.POISON as (Typeid),
     .sym = null
+}
+
+public const BUILTIN_TYPES = [TypeKind.MAX_TYPE_KINDS]*TypeInfo {
+    [TypeKind.BOOL] = &BOOL_TYPE,
+    [TypeKind.CHAR] = &CHAR_TYPE,
+    [TypeKind.I8] = &I8_TYPE,
+    [TypeKind.U8] = &U8_TYPE,
+    [TypeKind.I16] = &I16_TYPE,
+    [TypeKind.U16] = &U16_TYPE,
+    [TypeKind.I32] = &I32_TYPE,
+    [TypeKind.U32] = &U32_TYPE,
+    [TypeKind.I64] = &I64_TYPE,
+    [TypeKind.U64] = &U64_TYPE,
+    [TypeKind.F32] = &F32_TYPE,
+    [TypeKind.F64] = &F64_TYPE,
+    [TypeKind.USIZE] = &USIZE_TYPE,
+    [TypeKind.NULL] = &NULL_TYPE,
+    [TypeKind.VOID] = &VOID_TYPE,
+    [TypeKind.STR] = &STR_TYPE,
+    [TypeKind.POISON] = &POISON_TYPE,
 }
