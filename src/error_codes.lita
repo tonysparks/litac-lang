@@ -110,21 +110,41 @@ public func PrintError(sb: *StringBuffer, error: PhaseError) {
         sb.append("%s\n", error.message)
         return;
     }
-// TODO: Account for TABS in source code, the alignment is off when tabs are present.
+
     sb.append("%s:%d:%d error: %s\n", error.pos.filename, error.pos.lineNumber, error.pos.position, error.message)
-    sb.append("%.*s\n", error.pos.getLineLength(), error.pos.lineStart)
+
+    const len = error.pos.getLineLength()
+    const maxLength = MIN(len, 255)
+
     var spaceCount = 0
-    while(true) {
-        var c = error.pos.lineStart[spaceCount]
+    var atStart = false
+
+    for(var i = 0; i < maxLength; i+=1) {
+        var c = error.pos.lineStart[i]
         if(c == '\0') {
             break;
         }
-        if((error.pos.lineStart + spaceCount) == error.pos.start) {
-            break;
+
+        if((error.pos.lineStart + i) == error.pos.start) {
+            atStart = true
         }
 
-        spaceCount += 1
+        if(c == '\t') {
+            if(!atStart) {
+                spaceCount += 4
+            }
+            sb.append("    ")
+            continue
+        }
+
+        sb.appendChar(c)
+
+        if(!atStart) {
+            spaceCount += 1
+        }
     }
+    sb.append("\n")
+
     for(var i = 0; i < spaceCount; i += 1) {
         sb.append(" ")
     }
