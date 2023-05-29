@@ -51,7 +51,7 @@ public struct Module {
     genericSymbols: *Map<InternedString, *Symbol>
     flags: i32
 
-    importedBy: Array<ModuleImport> // modules that import this module
+    importedBy: Map<*const char, ModuleImport> // modules that import this module
 
     typeSpecAllocator: TypeSpecAllocator
     arena: ArenaAllocator
@@ -80,7 +80,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.ast = null
     builtins.flags = 0
     builtins.allocator = lita.allocator
-    builtins.importedBy.init(512, lita.allocator)
+    builtins.importedBy = StrMap<ModuleImport>(ModuleImport{}, 512, lita.allocator)
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, &builtins, lita.allocator)
     builtins.genericSymbols = &lita.genericSymbols
     builtins.lita = lita
@@ -155,7 +155,7 @@ public func (this: *Module) init(lita: *Lita) {
     this.typeSpecAllocator.init(this.allocator)
 
     // We want these to be owned by the global allocator
-    this.importedBy.init(64, lita.allocator)
+    this.importedBy = StrMap<ModuleImport>(ModuleImport{}, 64, lita.allocator)
     this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, this, lita.allocator)
 
     this.flags = 0
@@ -174,24 +174,6 @@ public func (this: *Module) initIncrementalBuild() {
     this.typeSpecAllocator.init(this.allocator)
 
     this.symbols.initIncrementalBuild()
-
-    // clear out any generic symbols from this module
-    for(var it = this.genericSymbols.iter(); it.hasNext();) {
-        var entry = it.next()
-        var symName = entry.key;
-        var symbol = entry.value;
-
-        if(symbol.declared.equals(this)) {
-            it.remove()
-            continue
-        }
-
-        if(symbol.genericCallsiteModule != null &&
-           symbol.genericCallsiteModule.equals(this)) {
-            it.remove()
-            continue
-        }
-    }
 }
 
 public func (this: *Module) isBuiltin() : bool {
@@ -229,7 +211,8 @@ func (this: *Module) isMethodForType(type: *TypeInfo, sym: *Symbol) : bool {
     }
 
     var fn = sym.type
-    if(fn == null) {
+    if(fn == null || fn.kind != TypeKind.FUNC ||
+       fn.funcDecl == null || fn.funcDecl.params == null) {
         return false
     }
 
@@ -318,8 +301,7 @@ func (this: *Module) importModuleSymbols(
     moduleName: *InternedString,
     isUsing: bool) {
 
-    // TODO: Make sure to not add a duplicate importedBy module (happens with incrementalBuilds)
-    moduleToImport.importedBy.add(ModuleImport{this, moduleName, isUsing})
+    moduleToImport.importedBy.put(this.id.filename, ModuleImport{this, moduleName, isUsing})
 
     var symbols = moduleToImport.symbols;
     for(var it = symbols.symbolTypes.iter(); it.hasNext();) {

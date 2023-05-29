@@ -32,13 +32,9 @@ public struct TextDocument {
     version: u32
 }
 
-public const MAX_DOCUMENT_CONTENT_CHANGES = 16
-
 public struct TextDocumentDidChange {
     textDocument: TextDocument
-
-    contentChanges: [MAX_DOCUMENT_CONTENT_CHANGES]TextDocumentChangeEvent
-    numOfContentChanges: i32
+    contentChanges: Array<TextDocumentChangeEvent>
 }
 
 public struct TextDocumentChangeEvent {
@@ -136,13 +132,13 @@ public func SymbolKindFromSymbol(sym: *sym::Symbol) : SymbolInfoKind {
     if(!sym) return SymbolInfoKind.Null;
 
     switch(sym.kind) {
-        case sym::SymbolKind.CONST: {
-            return SymbolInfoKind.Constant;
-        }
         case sym::SymbolKind.FUNC: {
             return SymbolInfoKind.Function;
         }
         case sym::SymbolKind.VAR: {
+            if(sym.flags & sym::SymbolFlags.IS_CONSTANT) {
+                return SymbolInfoKind.Constant;
+            }
             return SymbolInfoKind.Variable;
         }
         case sym::SymbolKind.TYPE: {
@@ -214,7 +210,10 @@ public func SymbolToSymbolInformation(sym: *sym::Symbol, rootPath: *const char, 
     result.putIntNumber("kind", kind as (i64))
 
     if(sym.decl) {
-        result.put("location", SrcPosToLocation(sym.decl.startPos, rootPath, alloc))
+        var location = SrcPosToLocation(sym.decl.startPos, rootPath, alloc)
+        if(location) {
+            result.put("location", location)
+        }
     }
 
     return result
@@ -315,18 +314,17 @@ public func JsonNodeToTextDocumentChangeEvent(params: *JsonNode, alloc: *const A
 
     result.textDocument.uri = textDoc.getStr("uri", null)
     result.textDocument.version = textDoc.getInt("version", 1)
-    result.numOfContentChanges = 0
 
     var contentArray = params.getArray("contentChanges")
     if(!contentArray) {
         return result;
     }
 
-    result.numOfContentChanges = contentArray.size()
+    result.contentChanges.init(contentArray.size(), alloc)
     for(var i = 0; i < contentArray.size(); i += 1) {
         var content = contentArray.at(i)
 
-        var change = &result.contentChanges[i]
+        var change = TextDocumentChangeEvent{}
         change.hasRange = false
         change.text = content.getStr("text", null)
         change.rangeLength = content.getInt("rangeLength", 0)
@@ -348,6 +346,8 @@ public func JsonNodeToTextDocumentChangeEvent(params: *JsonNode, alloc: *const A
                 r.end.character = end.getInt("character", 0)
             }
         }
+
+        result.contentChanges.add(change)
     }
 
     return result

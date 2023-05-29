@@ -16,7 +16,6 @@ import "common"
 public enum SymbolKind {
     TYPE,
     VAR,
-    CONST,
     FUNC,
 }
 
@@ -54,6 +53,7 @@ public enum SymbolFlags {
     // Marked for reset for incremental compliation
     IS_MARKED_RESET         = (1<<22),
     IS_HIDDEN               = (1<<23),
+    IS_FROM_PREPROCESSOR    = (1<<24),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -182,8 +182,7 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
                                         name: InternedString,
                                         symbol: *Symbol) {
 
-    var symbolStorage = &this.symbolFuncs
-
+    var symbolStorage = &this.symbolFuncs;
     if(symbol.kind != SymbolKind.FUNC) {
         symbolStorage = &this.symbolTypes
     }
@@ -197,6 +196,7 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
         // there
         if(!(existingSym.flags & SymbolFlags.IS_MARKED_RESET)) {
             var decl = existingSym.decl
+
             this.result.addError(importSrcPos, "can't import symbol '%.*s' defined in '%s:%d' because it is already defined in '%s:%d'",
                 name.length, name.buffer,
                 symbol.decl.startPos.filename, symbol.decl.startPos.lineNumber,
@@ -205,7 +205,30 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
         }
     }
 
-    symbolStorage.put(name, symbol)
+    symbolStorage.put(name, symbol);
+}
+
+public func (this: *Scope) removeSymbol(symbol: *Symbol) {
+    var symbolStorage = &this.symbolFuncs
+
+    if(symbol.kind != SymbolKind.FUNC) {
+        symbolStorage = &this.symbolTypes
+    }
+
+    // TODO: Performance!
+    // TODO: We're piercing into the details of Map implementation
+    //       TERRIBLE!!!
+    for(var i = 0; i < symbolStorage.capacity; i += 1) {
+        var value = symbolStorage.values[i]
+        if(!value) {
+            continue
+        }
+        if(value == symbol) {
+            var key = symbolStorage.keys[i].key
+            symbolStorage.remove(key)
+            return;
+        }
+    }
 }
 
 public func (this: *Scope) addSymbol(name: InternedString,
@@ -314,9 +337,8 @@ public func (this: *Scope) addSymbol(name: InternedString,
             break;
         }
         case StmtKind.CONST_DECL: {
-            kind = SymbolKind.CONST
             flags |= SymbolFlags.IS_CONSTANT
-            break;
+            /* fallthru */
         }
         default: {
             kind = SymbolKind.VAR
@@ -324,21 +346,24 @@ public func (this: *Scope) addSymbol(name: InternedString,
         }
     }
 
-    if(!sym) {
+    var isNewSym = sym == null
+    if(isNewSym) {
         sym = new<Symbol>(this.allocator);
+        sym.type = null
     }
 
     sym.kind = kind
     sym.name = name
     sym.state = SymbolState.UNRESOLVED
     sym.decl = decl
-    sym.type = null
     sym.declared = module
     sym.flags = flags
 
     decl.sym = sym
 
-    symbolStorage.put(sym.name, sym)
+    if(isNewSym) {
+        symbolStorage.put(sym.name, sym)
+    }
     return sym
 }
 
@@ -363,17 +388,29 @@ func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
         var entry = it.next()
         var symName = entry.key;
         var symbol = entry.value;
+
+        var isGenericFromThisModule = symbol.genericCallsiteModule != null
+                                   && symbol.genericCallsiteModule.equals(this.module)
+
         // remove entries not declared in this module
         // so that they can be reimported if necessary
-        if(!symbol.declared.equals(this.module)) {
+        if(!isGenericFromThisModule && !symbol.declared.equals(this.module)) {
+            it.remove()
+            continue
+        }
+
+        if(symbol.flags & SymbolFlags.IS_FROM_PREPROCESSOR) {
+            this.removeSymbolFromModules(symbol)
             it.remove()
             continue
         }
 
         symbol.flags |= SymbolFlags.IS_MARKED_RESET
         symbol.state = SymbolState.UNRESOLVED
-        symbol.type = null
         symbol.decl = null
+        // DO NOT clear symbol.type, this is used as a cache and allows
+        // for type look up and equality
+        // symbol.type = null
     }
 }
 
@@ -382,28 +419,27 @@ func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
         var entry = it.next()
         var symbol = entry.value;
 
-        if(!symbol.declared.equals(this.module)) {
+        var isGenericFromThisModule = symbol.genericCallsiteModule != null
+                                   && symbol.genericCallsiteModule.equals(this.module)
+
+
+        if(!isGenericFromThisModule && !symbol.declared.equals(this.module)) {
             continue
         }
 
         // Remove any entries that haven't been stored again
         // this means they were deleted
         if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
+            this.removeSymbolFromModules(symbol)
             it.remove()
-
-            var isFunc = symbol.kind == SymbolKind.FUNC
-            var symName = entry.key
-
-            // TODO: performance...
-            for(var i = 0; i < this.module.importedBy.size(); i+=1) {
-                var m = this.module.importedBy.get(i).module
-                if(isFunc) {
-                    m.symbols.symbolFuncs.remove(symName)
-                }
-                else {
-                    m.symbols.symbolTypes.remove(symName)
-                }
-            }
         }
+    }
+}
+
+func (this: *Scope) removeSymbolFromModules(symbol: *Symbol) {
+    for(var it = this.module.importedBy.iter(); it.hasNext();) {
+        var entry = it.next()
+        var m = entry.value.module
+        m.symbols.removeSymbol(symbol)
     }
 }

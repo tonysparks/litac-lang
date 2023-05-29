@@ -791,6 +791,10 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     if(objectType.kind == TypeKind.FUNC) {
         var funcInfo = objectType
         isMethod = (funcInfo.funcDecl.flags & FuncFlags.IS_METHOD)
+        if(!funcInfo.funcDecl.params) {
+            return false
+        }
+
         maxNumOfArgs = funcInfo.funcDecl.params.size()
         hasVarargs = funcInfo.funcDecl.params.isVararg
         returnType = funcInfo.returnType

@@ -286,35 +286,33 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
         var program = checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
 
         // Reconcile any changed symbols
-        this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs)
-        this.syncSymbols(module, &module.symbols.symbolTypes, &this.programSymbols.symbolTypes)
+        this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs, SymbolKind.FUNC)
+        this.syncSymbols(module, &module.symbols.symbolTypes, &this.programSymbols.symbolTypes, SymbolKind.TYPE)
+        this.syncSymbols(module, &module.symbols.symbolTypes, &this.programSymbols.values, SymbolKind.VAR)
     }
 }
 
-func (this: *Lita) syncSymbols(module: *Module, moduleSymbols: *Map<InternedString, *Symbol>, symbols: *Array<*Symbol>) {
-
-    // first delete the (old) module symbols out of the programSymbols
-    var deletedIndex = symbols.size() - 1
-    for(var i = 0; i <= deletedIndex; i+=1) {
+func (this: *Lita) syncSymbols(module: *Module, moduleSymbols: *Map<InternedString, *Symbol>, symbols: *Array<*Symbol>, kind: SymbolKind) {
+    for(var i = 0; i < symbols.size();) {
         var sym = symbols.get(i)
-        if(!sym.declared.equals(module)) {
+        if(!sym.decl || !sym.declared.equals(module)) {
+            i += 1
             continue;
         }
 
-        symbols.swap(i, deletedIndex)
-        deletedIndex -= 1
+        symbols.removeAt(i);
     }
-    symbols.length = deletedIndex < 0 ? 0 : deletedIndex;
 
     // now add them back, this time the module will have the
     // the most up to date symbols
-    for(var i = 0; i < moduleSymbols.capacity; i+=1) {
-        var symbol = moduleSymbols.values[i]
-        if(!symbol) {
-            continue
+    for(var it = moduleSymbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var key = entry.key
+        var sym = entry.value
+        if(!sym.declared.equals(module) || sym.kind != kind) {
+            continue;
         }
-
-        symbols.add(symbol)
+        symbols.add(sym)
     }
 }
 
