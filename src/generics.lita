@@ -118,7 +118,6 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     }
 
     if(!genericSym) {
-        // Info("Creating generic: '%.*s\n", genericName.length, genericName.buffer)
         var genericDecl = CreateDecl(sym, name.genericArgs, module)
         if(!genericDecl) {
             goto err;
@@ -145,13 +144,6 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             checker.symbolTypes.add(genericSym)
         }
 
-/*{
-    Info("Created generic symbol kind: %s\n", StmtKindAsStr(genericSym.decl.kind))
-    if(genericSym.decl.kind == StmtKind.STRUCT_DECL) {
-        var aggDecl = genericSym.decl as (*AggregateDecl)
-        Info("Number of fields: %d\n", aggDecl.fields.size())
-    }
-}*/
         // if this still has generic parameters, add in the original
         // parameters
         if(HasGenericParam(checker, name.genericArgs)) {
@@ -193,25 +185,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         }
     }
     else {
-        // Info("Re-validing generic: '%.*s\n", genericName.length, genericName.buffer)
 
-        // Happens for incremental compilation
-        if(!genericSym.decl) {
-            Info("Re-validing - creating generic decl: '%.*s\n", genericName.length, genericName.buffer)
-            var genericDecl = CreateDecl(sym, name.genericArgs, module)
-            if(!genericDecl) {
-                goto err;
-            }
-            genericSym.decl = genericDecl as (*Decl)
-        }
-
-/*{
-    Info("StmtKind: %s\n", StmtKindAsStr(genericSym.decl.kind))
-    if(genericSym.decl.kind == StmtKind.STRUCT_DECL) {
-        var aggDecl = genericSym.decl as (*AggregateDecl)
-        Info("Number of fields: %d\n", aggDecl.fields.size())
-    }
-}*/
         // if this symbol is already resolved, we still need resolve the
         // typespec arguments
         var isValidArgs = true

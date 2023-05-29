@@ -197,11 +197,6 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
         if(!(existingSym.flags & SymbolFlags.IS_MARKED_RESET)) {
             var decl = existingSym.decl
 
-            /*Info("ImportSymbol - can't import '%.*s' from module: '%s' to this module: '%s'\n",
-                name.length, name.buffer,
-                symbol.declared.id.filename,
-                this.module.id.filename
-            )*/
             this.result.addError(importSrcPos, "can't import symbol '%.*s' defined in '%s:%d' because it is already defined in '%s:%d'",
                 name.length, name.buffer,
                 symbol.decl.startPos.filename, symbol.decl.startPos.lineNumber,
@@ -209,13 +204,6 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
             return;
         }
     }
-
-    /*Info("ImportSymbol - importing '%.*s' (%.*s) from module: '%s' to this module: '%s'\n",
-                name.length, name.buffer,
-                symbol.name.length, symbol.name.buffer,
-                symbol.declared.id.filename,
-                this.module.id.filename
-            )*/
 
     symbolStorage.put(name, symbol);
 }
@@ -238,12 +226,9 @@ public func (this: *Scope) removeSymbol(symbol: *Symbol) {
         if(value == symbol) {
             var key = symbolStorage.keys[i].key
             symbolStorage.remove(key)
-            Info("RemoveSymbol - removing '%.*s' vs '%.*s'\n", symbol.name.length, symbol.name.buffer, key.length, key.buffer)
             return;
         }
     }
-
-    Info("RemoveSymbol - did not remove '%.*s'\n", symbol.name.length, symbol.name.buffer)
 }
 
 public func (this: *Scope) addSymbol(name: InternedString,
@@ -270,8 +255,6 @@ public func (this: *Scope) addSymbol(name: InternedString,
         if(isRebuild) {
             sym = symbolStorage.get(name)
             if(sym.flags & SymbolFlags.IS_MARKED_RESET) {
-                //Info("AddSymbol - symbol already exist but marked as reset: '%.*s' vs '%.*s'\n", sym.name.length, sym.name.buffer, name.length, name.buffer)
-
                 sym.flags &= ~SymbolFlags.IS_MARKED_RESET
                 isError = false
             }
@@ -281,7 +264,6 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
         if(isError) {
             var existingSym = symbolStorage.get(name)
-            //Info("AddSymbol - symbol already exist: '%.*s' vs '%.*s'\n", existingSym.name.length, existingSym.name.buffer, name.length, name.buffer)
             var decl = existingSym.decl
             this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
                 name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
@@ -402,7 +384,6 @@ public func (this: *Scope) print(header: *const char) {
 }
 
 func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
-    Info("MarkReset - Marking for module: %s\n", this.module.id.filename)
     for(var it = symbols.iter(); it.hasNext();) {
         var entry = it.next()
         var symName = entry.key;
@@ -414,27 +395,16 @@ func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
         // remove entries not declared in this module
         // so that they can be reimported if necessary
         if(!isGenericFromThisModule && !symbol.declared.equals(this.module)) {
-            Info("MarkReset - Removing symbol: '%.*s'\n", symName.length, symName.buffer)
             it.remove()
             continue
         }
 
-
-        // if(symbol.isGenericCapable()) {
-        //     Info("MarkReset - Removing generic symbol: '%.*s'\n", symName.length, symName.buffer)
-        //     this.removeSymbolFromModules(symbol)
-        //     it.remove()
-        //     continue
-        // }
-
         if(symbol.flags & SymbolFlags.IS_FROM_PREPROCESSOR) {
-            Info("MarkReset - Removing preprocessor generated symbol: '%.*s'\n", symName.length, symName.buffer)
             this.removeSymbolFromModules(symbol)
             it.remove()
             continue
         }
 
-        Info("MarkReset - Leaving symbol: '%.*s'\n", symName.length, symName.buffer)
         symbol.flags |= SymbolFlags.IS_MARKED_RESET
         symbol.state = SymbolState.UNRESOLVED
         symbol.decl = null
@@ -442,11 +412,9 @@ func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
         // for type look up and equality
         // symbol.type = null
     }
-    Info("MarkReset - Done for module: %s\n", this.module.id.filename)
 }
 
 func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
-    Info("CleanMark - Cleaning marking for module: %s\n", this.module.id.filename)
     for(var it = symbols.iter(); it.hasNext();) {
         var entry = it.next()
         var symbol = entry.value;
@@ -456,19 +424,16 @@ func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
 
 
         if(!isGenericFromThisModule && !symbol.declared.equals(this.module)) {
-            Info("CleanMark - skipping symbol: '%.*s'\n", symbol.name.length, symbol.name.buffer)
             continue
         }
 
         // Remove any entries that haven't been stored again
         // this means they were deleted
         if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
-            Info("CleanMark - Removing clean marked symbol: '%.*s'\n", symbol.name.length, symbol.name.buffer)
             this.removeSymbolFromModules(symbol)
             it.remove()
         }
     }
-    Info("CleanMark - Done cleaning for module: %s\n", this.module.id.filename)
 }
 
 func (this: *Scope) removeSymbolFromModules(symbol: *Symbol) {

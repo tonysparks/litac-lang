@@ -701,7 +701,6 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
                 if(sym) {
                     // mark that this symbol was created from the pre-processor
                     sym.flags |= SymbolFlags.IS_FROM_PREPROCESSOR
-                    Info("Created symbol: '%.*s' at path: %s\n", sym.name.length, sym.name.buffer, sym.decl.startPos.filename)
 
                     for(var it = module.importedBy.iter(); it.hasNext();) {
                         var entry = it.next()

@@ -174,29 +174,6 @@ public func (this: *Module) initIncrementalBuild() {
     this.typeSpecAllocator.init(this.allocator)
 
     this.symbols.initIncrementalBuild()
-
-    // clear out any generic symbols from this module
-    /*
-    for(var it = this.genericSymbols.iter(); it.hasNext();) {
-        var entry = it.next()
-        var symName = entry.key;
-        var symbol = entry.value;
-
-        if(symbol.declared.equals(this)) {
-            it.remove()
-            Info("RemovingGenericsSymbol: removing '%.*s'\n",
-                symName.length, symName.buffer)
-            continue
-        }
-
-        if(symbol.genericCallsiteModule != null &&
-           symbol.genericCallsiteModule.equals(this)) {
-            it.remove()
-            Info("RemovingGenericsSymbol: removing callsite '%.*s'\n",
-                symName.length, symName.buffer)
-            continue
-        }
-    }*/
 }
 
 public func (this: *Module) isBuiltin() : bool {
