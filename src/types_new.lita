@@ -61,7 +61,9 @@ public func (this: *TypeCache) init(allocator: *const Allocator) {
 
 func (this: *TypeCache) newTypeInfo() : *TypeInfo {
     this.typeInfos.add(TypeInfo{})
-    return this.typeInfos.lastPtr()
+    var type = this.typeInfos.lastPtr()
+    type.typeid = NextTypeId()
+    return type
 }
 
 public func (this: *TypeCache) newGenericParamTypeInfo(name: InternedString) : *TypeInfo {
@@ -69,7 +71,6 @@ public func (this: *TypeCache) newGenericParamTypeInfo(name: InternedString) : *
     if(!type) {
         type = this.newTypeInfo()
         type.kind = TypeKind.GENERIC_PARAM
-        type.typeid = NextTypeId()
         type.name = name
         type.sym = null
 
@@ -81,9 +82,8 @@ public func (this: *TypeCache) newGenericParamTypeInfo(name: InternedString) : *
 public func (this: *TypeCache) newFuncTypeInfo(sym: *Symbol,
                                                funcDecl: *FuncDecl) : *TypeInfo {
 
-    var type = this.newTypeInfo()
+    var type = sym.type != null ? sym.type : this.newTypeInfo()
     type.kind = TypeKind.FUNC
-    type.typeid = NextTypeId()
     type.name = sym.name
     type.sym = sym
     type.funcDecl = funcDecl
@@ -102,7 +102,6 @@ public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
       || type.numOfElements != numOfElements /* this was commented out! */) {
         type = this.newTypeInfo()
         type.kind = TypeKind.ARRAY
-        type.typeid = NextTypeId()
         type.arrayOf = arrayOf
         type.length = length
         type.numOfElements = numOfElements
@@ -121,7 +120,6 @@ public func (this: *TypeCache) newFuncPtrTypeInfo(genericParams: Array<GenericPa
 // TODO: implement cache
     var type = this.newTypeInfo()
     type.kind = TypeKind.FUNC_PTR
-    type.typeid = NextTypeId()
     type.genericParams = genericParams
     type.returnType = returnType
     type.paramDecls = paramDecls
@@ -132,7 +130,7 @@ public func (this: *TypeCache) newFuncPtrTypeInfo(genericParams: Array<GenericPa
 public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
                                                     decl: *AggregateDecl) : *TypeInfo {
 
-    var type = this.newTypeInfo()
+    var type = sym.type != null ? sym.type : this.newTypeInfo()
     switch(decl.kind) {
         case StmtKind.TRAIT_DECL: {
             type.kind = TypeKind.TRAIT
@@ -152,7 +150,6 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
         }
 
     }
-    type.typeid = NextTypeId()
     type.name = sym.name
     type.aggDecl = decl
     type.sym = sym
@@ -162,9 +159,8 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
 public func (this: *TypeCache) newEnumTypeInfo(sym: *Symbol,
                                                enumDecl: *EnumDecl) : *TypeInfo {
 
-    var type = this.newTypeInfo()
+    var type = sym.type != null ? sym.type : this.newTypeInfo()
     type.kind = TypeKind.ENUM
-    type.typeid = NextTypeId()
     type.name = sym.name
     type.enumDecl = enumDecl
     type.sym = sym
@@ -173,9 +169,8 @@ public func (this: *TypeCache) newEnumTypeInfo(sym: *Symbol,
 
 public func (this: *TypeCache) newForeignTypeInfo(sym: *Symbol) : *TypeInfo {
 
-    var type = this.newTypeInfo()
+    var type = sym.type != null ? sym.type : this.newTypeInfo()
     type.kind = TypeKind.I64 // TODO: Create a foreign primitive type?
-    type.typeid = NextTypeId()
     type.name = sym.name
     type.sym = sym
     return type
@@ -191,7 +186,6 @@ public func (this: *TypeCache) newConstTypeInfo(base: *TypeInfo) : *TypeInfo {
     if(!type) {
         type = this.newTypeInfo()
         type.kind = TypeKind.CONST
-        type.typeid = NextTypeId()
         type.constOf = base
 
         this.constCache.put(base.typeid, type)
@@ -205,7 +199,6 @@ public func (this: *TypeCache) newPtrTypeInfo(base: *TypeInfo) : *TypeInfo {
     if(!type) {
         type = this.newTypeInfo()
         type.kind = TypeKind.PTR
-        type.typeid = NextTypeId()
         type.ptrOf = base
 
         this.ptrCache.put(base.typeid, type)

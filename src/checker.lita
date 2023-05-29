@@ -1,4 +1,3 @@
-import "std/map"
 import "std/string_buffer"
 import "std/string_view"
 import "std/array"
@@ -6,6 +5,7 @@ import "std/assert"
 import "std/string"
 import "std/libc"
 import "std/system"
+import "std/map"
 
 import "types"
 import "types_new"
@@ -129,7 +129,8 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
     // allow for preprocessor scripts to create new declarations/symbols
     // if they are created at this stage, we must do this before resolving
     // all symbols
-    this.lita.preprocessor.preResolveSymbols(this)
+    var isIncrementalBuild: bool = (root.flags & ModuleFlags.INCREMENTAL_COMPILATION) > 0
+    this.lita.preprocessor.preResolveSymbols(this, isIncrementalBuild)
 
     // if we have instrumentation enabled, we'll want to instrument all
     // functions at this stage, prior to resolving symbols
@@ -140,7 +141,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
     this.resolveSymbols()
 
     // allow for creating more symbols after initial resolving of symbols
-    this.lita.preprocessor.postResolveSymbols(this)
+    this.lita.preprocessor.postResolveSymbols(this, isIncrementalBuild)
 
     // Generate trait wrappers
     if(!(flags & TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)) {
@@ -356,6 +357,15 @@ func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInfo, b: *
         a.toString(sb)
         sb.appendStrn("'", 1)
 
+        /*sb.append("a.typeid = %llu vs b.typeid = %llu\n", a.typeid, b.typeid)
+        if(IsPtr(a)) {
+            sb.append("a.ptrOf.typeid = %llu\n", a.ptrOf.typeid)
+        }
+
+        if(IsPtr(b)) {
+            sb.append("b.ptrOf.typeid = %llu\n", b.ptrOf.typeid)
+        }*/
+
         this.result.addErrorStr(src, sb)
         return false
     }
@@ -513,7 +523,7 @@ func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 this.genericTemplates.add(sym)
             }
 
-            sym.type = this.typeCache.newFuncTypeInfo(sym, funcDecl) as (*TypeInfo)
+            sym.type = this.typeCache.newFuncTypeInfo(sym, funcDecl)
             this.symbolFuncs.add(sym)
             break;
         }
@@ -794,8 +804,7 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
             }
             break
         }
-        case SymbolKind.VAR:
-        case SymbolKind.CONST: {
+        case SymbolKind.VAR: {
             if(sym.flags & SymbolFlags.IS_CONSTANT) {
                 var decl = sym.decl as (*VarDecl)
                 if(decl && decl.expr && decl.expr.operand.isConst) {
@@ -812,11 +821,9 @@ func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         }
         case SymbolKind.FUNC: {
             var funcDecl = sym.decl as (*FuncDecl)
-            var funcInfo = sym.type != null ?
-                                sym.type :
-                                this.typeCache.newFuncTypeInfo(sym, funcDecl)
+            var funcInfo = this.typeCache.newFuncTypeInfo(sym, funcDecl)
 
-            var hasGenerics = !funcDecl.genericParams.empty() //sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+            var hasGenerics = !funcDecl.genericParams.empty()
             if(hasGenerics) {
                 this.genericParamStack.add(funcDecl.genericParams)
             }
@@ -1133,13 +1140,13 @@ func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false)
         case TypeSpecKind.CONST: {
             var constSpec = spec
             var constOf = this.resolveTypeSpec(constSpec.base)
-            spec.typeInfo = this.typeCache.newConstTypeInfo(constOf) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newConstTypeInfo(constOf)
             return spec.typeInfo
         }
         case TypeSpecKind.PTR: {
             var ptrSpec = spec
             var ptrOf = this.resolveTypeSpec(ptrSpec.base)
-            spec.typeInfo = this.typeCache.newPtrTypeInfo(ptrOf) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newPtrTypeInfo(ptrOf)
             return spec.typeInfo
         }
         case TypeSpecKind.ARRAY: {

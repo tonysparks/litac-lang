@@ -182,6 +182,7 @@ func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDe
             break;
         }
         default: {
+            Info("Field Kind: %s\n", StmtKindAsStr(field.kind))
             assert(false)
         }
     }
@@ -494,6 +495,9 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     // using the appropriate generic arguments create the concrete
                     // symbol
                     sym = CreateTypeFromGenericTemplate(this, sym, nameSpec)
+                    if(!sym) {
+                        return false
+                    }
                     sym.flags |= SymbolFlags.IS_INCOMPLETE
                 }
 
@@ -687,7 +691,7 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         return false
     }
 
-    if(!this.resolveStmt(funcDecl.params)) {
+    if(!funcDecl.params || !this.resolveStmt(funcDecl.params)) {
         return false
     }
 

@@ -21,6 +21,7 @@ import "lita"
 import "types"
 import "symbols"
 import "intern"
+import "common"
 
 import "ape/ape"
 
@@ -44,8 +45,8 @@ public struct Preprocessor {
     lita: *Lita
     ape: *ape_t
     callContext: CallContext
-    preCheckers: Array<*CompStmt>
-    postCheckers: Array<*CompStmt>
+    preCheckers: Array<CheckerContext>
+    postCheckers: Array<CheckerContext>
 }
 
 struct CallContext {
@@ -55,6 +56,11 @@ struct CallContext {
     buffer: StringBuffer
 
     resolveSymbols: bool
+}
+
+struct CheckerContext {
+    module: *Module
+    stmt: *CompStmt
 }
 
 public func PreprocessorInit(lita: *Lita) : Preprocessor {
@@ -147,10 +153,10 @@ public func (this: *Preprocessor) evaluateForModule(
 
     // Preprocessor directives
     if(comp.type.equals(PRECHECK)) {
-        this.preCheckers.add(comp)
+        this.preCheckers.add(CheckerContext{module, comp})
     }
     else if(comp.type.equals(POSTCHECK)) {
-        this.postCheckers.add(comp)
+        this.postCheckers.add(CheckerContext{module, comp})
     }
     else if(comp.type.equals(POSTPARSE)) {
         this.callContext.postParse(module, moduleStmt, comp)
@@ -229,6 +235,49 @@ public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, com
     return comp.evaluatedStmt
 }
 
+public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker, isIncrementalBuild: bool) {
+    this.callContext.checker = checker
+    this.callContext.resolveSymbols = false
+
+    if(isIncrementalBuild) {
+        for(var i = 0; i < this.preCheckers.size(); i += 1) {
+            var ctx = this.preCheckers.get(i)
+            if(ctx.module.flags & ModuleFlags.INCREMENTAL_COMPILATION) {
+                this.callContext.comp = ctx.stmt
+                this.eval(ctx.stmt)
+            }
+        }
+    }
+    else {
+        for(var i = 0; i < this.preCheckers.size(); i += 1) {
+            var ctx = this.preCheckers.get(i)
+            this.callContext.comp = ctx.stmt
+            this.eval(ctx.stmt)
+        }
+    }
+}
+
+public func (this: *Preprocessor) postResolveSymbols(checker: *TypeChecker, isIncrementalBuild: bool) {
+    this.callContext.checker = checker
+    this.callContext.resolveSymbols = true
+
+    if(isIncrementalBuild) {
+        for(var i = 0; i < this.postCheckers.size(); i += 1) {
+            var ctx = this.postCheckers.get(i)
+            if(ctx.module.flags & ModuleFlags.INCREMENTAL_COMPILATION) {
+                this.callContext.comp = ctx.stmt
+                this.eval(ctx.stmt)
+            }
+        }
+    }
+    else {
+        for(var i = 0; i < this.postCheckers.size(); i += 1) {
+            var ctx = this.postCheckers.get(i)
+            this.callContext.comp = ctx.stmt
+            this.eval(ctx.stmt)
+        }
+    }
+}
 
 func ApeGetTypeKind(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
@@ -269,28 +318,6 @@ func (this: *CallContext) logErrors() : bool {
     return true
 }
 
-
-public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker) {
-    this.callContext.checker = checker
-    this.callContext.resolveSymbols = false
-
-    for(var i = 0; i < this.preCheckers.size(); i += 1) {
-        var comp = this.preCheckers.get(i)
-        this.callContext.comp = comp
-        this.eval(comp)
-    }
-}
-
-public func (this: *Preprocessor) postResolveSymbols(checker: *TypeChecker) {
-    this.callContext.checker = checker
-    this.callContext.resolveSymbols = true
-
-    for(var i = 0; i < this.postCheckers.size(); i += 1) {
-        var comp = this.postCheckers.get(i)
-        this.callContext.comp = comp
-        this.eval(comp)
-    }
-}
 
 func (this: *Preprocessor) addNotes(obj: ape_object_t, module: *Module, attributes: *Attributes) {
     if(attributes.notes.size()) {
@@ -672,8 +699,13 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
                 // make sure every import of this module's symbol
                 // has the new symbol we just created
                 if(sym) {
-                    for(var i = 0; i < module.importedBy.size(); i += 1) {
-                        var imp = module.importedBy.get(i)
+                    // mark that this symbol was created from the pre-processor
+                    sym.flags |= SymbolFlags.IS_FROM_PREPROCESSOR
+                    Info("Created symbol: '%.*s' at path: %s\n", sym.name.length, sym.name.buffer, sym.decl.startPos.filename)
+
+                    for(var it = module.importedBy.iter(); it.hasNext();) {
+                        var entry = it.next()
+                        var imp = entry.value
                         imp.module.importModuleSymbol(decl.startPos, module, imp.alias, sym, sym.name, imp.isUsing)
                     }
 

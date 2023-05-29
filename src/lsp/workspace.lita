@@ -130,8 +130,8 @@ public func (this: *Workspace) changeDocument(change: *TextDocumentDidChange) {
         return;
     }
 
-    for(var i = 0; i < change.numOfContentChanges; i += 1) {
-        var event = &change.contentChanges[i]
+    for(var i = 0; i < change.contentChanges.size(); i += 1) {
+        var event = change.contentChanges.getPtr(i)
         if(event.hasRange) {
             doc.insert(event.range, event.text)
         }
@@ -140,9 +140,7 @@ public func (this: *Workspace) changeDocument(change: *TextDocumentDidChange) {
         }
     }
 
-    //this.lsp.log("Changed document: '%s'\n", doc.filename)
     this.runDiagnostics(change.textDocument.uri)
-
 }
 
 public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const Allocator) : *JsonNode {

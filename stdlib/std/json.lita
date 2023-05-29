@@ -284,6 +284,10 @@ public func (node: *JsonNode) put(key: *const char, n: *JsonNode) {
         return;
     }
 
+    if(n == null) {
+        n = JSON_NULL
+    }
+
     var copy = StringClone(key, strlen(key), node.alloc)
     var entry = Entry {
         .key = copy,
@@ -298,6 +302,10 @@ public func (node: *JsonNode) putNoDup(key: *const char, n: *JsonNode) {
         return;
     }
 
+    if(n == null) {
+        n = JSON_NULL
+    }
+
     var entry = Entry {
         .key = key,
         .value = n
@@ -308,6 +316,11 @@ public func (node: *JsonNode) putNoDup(key: *const char, n: *JsonNode) {
 
 public func (node: *JsonNode) putStr(key: *const char, str: *const char, len: i32 = -1) {
     if(node.type != JsonType.OBJECT) {
+        return;
+    }
+
+    if(str == null) {
+        node.put(key, JSON_NULL)
         return;
     }
 

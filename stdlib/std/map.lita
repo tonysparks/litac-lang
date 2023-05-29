@@ -397,10 +397,17 @@ func testRemove() {
     )
     defer map.free()
 
+    map.put(1, 2)
+    map.put(2, 4)
+    map.put(3, 8)
+    
     map.put(1, 4)
     map.put(2, 8)
     map.put(3, 16)
     Print(&map)
+    assert(map.get(1) == 4)
+    assert(map.get(2) == 8)
+    assert(map.get(3) == 16)
 
 
     map.remove(2)
