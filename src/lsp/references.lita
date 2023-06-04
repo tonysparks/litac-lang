@@ -4,6 +4,7 @@ import "std/json"
 import "std/map"
 import "std/array"
 import "std/mem"
+import "std/string_buffer"
 
 import "ast"
 import "common"
@@ -12,6 +13,7 @@ import "lex"
 import "parser"
 import "types"
 import "symbols"
+import "module"
 
 import "lsp/workspace"
 import "lsp/protocol"
@@ -146,6 +148,18 @@ public func (this: *ReferenceDatabase) getSymbolReferences(symbol: *Symbol) : Ar
     }
 
     return Array<SrcPos>{}
+}
+
+public func (this: *ReferenceDatabase) removeLocalSymbolReferences(module: *Module) {
+    if(!module) return;
+
+    for(var it = this.symbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symbol = entry.key as (*Symbol)
+        if(symbol && (symbol.flags & SymbolFlags.IS_LOCAL) && symbol.declared.equals(module)) {
+            it.remove();
+        }
+    }
 }
 
 

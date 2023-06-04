@@ -2,6 +2,7 @@ import "std/libc"
 import "std/array"
 import "std/map"
 import "std/mem"
+import "std/string"
 
 import "ast"
 import "lex"
@@ -28,6 +29,7 @@ public enum SymbolState {
 }
 
 public enum SymbolFlags {
+    // If this symbol was defined in function scope
     IS_LOCAL                = (1<<1),
     IS_FOREIGN              = (1<<2),
     IS_CONSTANT             = (1<<3),
@@ -177,6 +179,23 @@ public func (s: *Scope) lookup(name: InternedString, includeFuncs: bool = true) 
 
     return s.parent.lookup(name, includeFuncs)
 }
+
+public func (this: *Scope) importSymbolWithAlias(importSrcPos: SrcPos,
+                                                 name: InternedString,
+                                                 alias: InternedString,
+                                                 symbol: *Symbol) {
+
+    var buffer = [MAX_SYMBOL_NAME]char{};
+
+    var fullName = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    fullName.appendStrn(alias.buffer, alias.length)
+    fullName.appendStrn("::", 2)
+    fullName.appendStrn(name.buffer, name.length)
+
+    var nameIntern = this.module.lita.strings.internCopy(fullName.cStrConst(), fullName.length)
+    this.importSymbol(importSrcPos, nameIntern, symbol)
+}
+
 
 public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
                                         name: InternedString,

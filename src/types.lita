@@ -5,6 +5,7 @@ import "std/array"
 import "std/assert"
 import "std/libc"
 import "std/mem"
+import "std/map"
 
 import "ast_new"
 import "module"
@@ -1538,14 +1539,25 @@ public func (this: *TypeInfo) getEnumFieldIndex(name: InternedString) : i32 {
 }
 
 
-public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) : *const char {
+public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *InternedString = null) : *const char {
     assert(this != null)
 
     var index = 0
     var n = this.name.buffer
     var len = this.name.length
 
-    while(*n && index < len) {
+    if(alias) {
+        for(;index < alias.length && index < MAX_SYMBOL_NAME; index += 1) {
+            name[index] = alias.buffer[index]
+        }
+        name[index+0] = ':';
+        name[index+1] = ':';
+
+        index += 2;
+        len += index;
+    }
+
+    while(*n && index < len && index < MAX_SYMBOL_NAME) {
         var c = *n
         if(c == '<') {
             break;
@@ -1553,7 +1565,7 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char) : *const 
 
         name[index] = c
 
-        n +=1;
+        n += 1;
         index += 1;
     }
 
@@ -1989,17 +2001,13 @@ public func (this: *TypeInfo) getFieldPathByType(type: *TypeInfo, path: *FieldPa
     return false
 }
 
-//public var funcNameCount = 0
-//public var getMethodCount = 0
-
 @doc("""
 Given a method name, this will return the function name equivalent, which is:
 AggregateName_MethodName
 """)
-public func (this: *TypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, methodName: InternedString) : *const char {
-//funcNameCount += 1
+public func (this: *TypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, methodName: InternedString, alias: *InternedString) : *const char {
     memset(result, 0, MAX_SYMBOL_NAME)
-    this.getBaseName(result);
+    this.getBaseName(result, alias);
 
     var buffer = StringInit(result, MAX_SYMBOL_NAME)
     buffer.appendStrn("_", 1)
@@ -2008,40 +2016,51 @@ public func (this: *TypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, met
     return buffer.cStrConst()
 }
 
-public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, methodName: InternedString) : *Symbol {
-//getMethodCount += 1
+public struct MethodResult {
+    symbol: *Symbol
+    name: InternedString
+}
+
+public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, methodName: InternedString) : MethodResult {
     if(!this.sym) {
-        return null
+        goto not_found;
     }
 
     var funcName = [MAX_SYMBOL_NAME]char {0};
-    this.getFunctionName(funcName, methodName)
+    this.getFunctionName(funcName, methodName, null)
 
     var funcNameInterned = strings.internCopy(funcName)
-
-    // first see if the aggregate declaration module has the method
-    var methodSym = this.sym.declared.getFuncType(funcNameInterned)
+    var methodSym = module.getFuncType(funcNameInterned)
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
-        // otherwise look in the current module
+        // look up if this is an aliased type
+        var alias = module.getImportAlias(this.sym.declared)
+        if(!alias) {
+            goto not_found;
+        }
+
+        this.getFunctionName(funcName, methodName, alias)
+
+        funcNameInterned = strings.internCopy(funcName)
         methodSym = module.getFuncType(funcNameInterned)
-    }
 
-    if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
-        return null;
+        // check again!
+        if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
+            goto not_found;
+        }
     }
 
     var decl = methodSym.decl as (*FuncDecl)
     if(!(decl.flags & FuncFlags.IS_METHOD)) {
-        return null
+        goto not_found;
     }
 
     if(decl.params.empty()) {
-        return null
+        goto not_found;
     }
 
     var base = decl.params.first().typeInfo.getBaseType()
     if(this == null || base == null) {
-        return null
+        goto not_found;
     }
 
     // If this is a generic type, we need to compare against the original
@@ -2050,16 +2069,26 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
         var thisGenericType = this
         var baseGenericType = base
         if(thisGenericType.genericTypeid == baseGenericType.genericTypeid) {
-            return methodSym;
+            return MethodResult {
+                .symbol = methodSym,
+                .name = funcNameInterned
+            }
         }
     }
 
     if(this.strictEquals(base)) {
-        return methodSym;
+        return MethodResult {
+            .symbol = methodSym,
+            .name = funcNameInterned
+        }
     }
 
     // TODO: Check if this is 'using' base
-    return null
+not_found:
+    return MethodResult {
+        .symbol = null,
+        .name = EMPTY_STR,
+    }
 }
 
 public func (this: *TypeInfo) implementsTrait(iface : *TypeInfo, checker: *TypeChecker) : bool {

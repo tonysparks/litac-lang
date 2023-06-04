@@ -8,6 +8,7 @@ import "lita"
 import "symbols"
 import "types"
 import "ast"
+import "phase_result"
 
 @doc("""
     Creates an ordering for C to handle compilation unit correction.  LitaC allows for
