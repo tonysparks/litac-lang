@@ -803,7 +803,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
 
     // find any context information to
     // narrow down auto-completion results
-    while(offset > 0) {
+    /*while(offset > 0) {
         var c = doc.text.buffer[offset]
 
         if(c == '.') {
@@ -821,7 +821,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
         }
 
         offset -= 1;
-    }
+    }*/
 
     const MAX_RESULTS = 50;
 
