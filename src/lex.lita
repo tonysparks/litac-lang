@@ -602,7 +602,7 @@ func (l: *Lexer) nextChar() : rune {
 
 }
 
-func (l: *Lexer) eofToken() : Token {
+public func (l: *Lexer) eofToken() : Token {
     l.token.type = TokenType.END_OF_FILE
     l.token.pos.lineStart = l.lineStart
     l.token.pos.lineNumber = l.lineNumber

@@ -284,6 +284,19 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
     return numOfSymbols
 }
 
+@doc("""
+    Given the supplied module, return the alias name if and only if the supplied module
+    is imported into this module with an alias.  Otherwise, returns an empty string.
+""")
+public func (this: *Module) getImportAlias(module: *Module) : *InternedString {
+    if(!module) {
+        return null;
+    }
+
+    var importInfo = module.importedBy.get(this.id.filename)
+    return importInfo.alias;
+}
+
 public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport: *Module) {
     var moduleName: *InternedString = null;
 
@@ -319,6 +332,11 @@ func (this: *Module) importModuleSymbols(
     }
 }
 
+
+/**
+    Public because the preprocessor wants to import per
+    declaration vs. on a module bases
+*/
 public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
                                                moduleToImport: *Module,
                                                moduleName: *InternedString,
@@ -348,15 +366,7 @@ public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
     }
 
     if(moduleName) {
-        var buffer = [MAX_SYMBOL_NAME]char{};
-
-        var name = StringInit(buffer, MAX_SYMBOL_NAME, 0)
-        name.appendStrn(moduleName.buffer, moduleName.length)
-        name.appendStrn("::", 2)
-        name.appendStrn(symbol.name.buffer, symbol.name.length)
-
-        var nameIntern = this.lita.strings.internCopy(name.cStrConst(), name.length)
-        this.symbols.importSymbol(importSrcPos, nameIntern, symbol)
+        this.symbols.importSymbolWithAlias(importSrcPos, symName, *moduleName, symbol)
     }
     else {
         this.symbols.importSymbol(importSrcPos, symName, symbol)

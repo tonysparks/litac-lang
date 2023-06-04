@@ -504,7 +504,7 @@ func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]cha
     return name.cStr()
 }
 
-func (this: using *CGen) escapeNameStr(name: InternedString) : StringView {
+public func (this: using *CGen) escapeNameStr(name: InternedString) : StringView {
     var sb = StringBufferInit(256, this.allocator)
     EscapeName(name.buffer, name.length, sb)
     return StringView {
@@ -642,7 +642,7 @@ func (this: using *CGen) emitDefers() {
     }
 }
 
-func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
+public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
     if(!stmt || this.options.disableLineSync) {
         return;
     }
@@ -681,9 +681,9 @@ func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
 /**
     Outputs a type in C for the supplied symbol
 */
-func (this: using *CGen) cType(type: *TypeInfo,
-                               isCast: bool = false,
-                               decay: bool = false) : *const char {
+public func (this: using *CGen) cType(type: *TypeInfo,
+                                      isCast: bool = false,
+                                      decay: bool = false) : *const char {
     var sb = StringBufferInit(256, this.allocator)
     switch(type.kind) {
         case TypeKind.PTR: {
@@ -797,7 +797,7 @@ func (this: using *CGen) cType(type: *TypeInfo,
 /**
     Outputs a type declaration in C for the supplied symbol
 */
-func (this: using *CGen) cTypeDecl(type: *TypeInfo,
+public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                                    name: *const char,
                                    decay: bool = false) : *const char {
 
@@ -954,7 +954,7 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
 /**
     Outputs the C name for the symbol
 */
-func (this: using *CGen) cName(sym: *Symbol) : *const char {
+public func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
 
     var declName = sym.name.view
@@ -989,7 +989,7 @@ func (this: using *CGen) cName(sym: *Symbol) : *const char {
 /**
     Outputs the C name for the symbol
 */
-func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
+public func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     assert(type != null)
 
     if(!type.sym) {
@@ -1001,7 +1001,7 @@ func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     return this.cName(type.sym)
 }
 
-func (this: using *CGen) prefix(name: StringView, sb: *StringBuffer) : *const char {
+public func (this: using *CGen) prefix(name: StringView, sb: *StringBuffer) : *const char {
     sb.appendStr(this.options.cPrefix)
     sb.appendStrn(name.buffer, name.length)
     return sb.cStrConst()
@@ -1075,32 +1075,32 @@ func (this: using *CGen) emitTypeSpec(spec: *TypeSpec) {
     }
 }
 
-func (this: using *CGen) flush() {
+public func (this: using *CGen) flush() {
     if(this.output) {
         this.output.writeBytes(buf.buffer, buf.length)
         buf.length = 0
     }
 }
 
-func (this: using *CGen) emitNameStr(name: StringView) {
+public func (this: using *CGen) emitNameStr(name: StringView) {
     buf.appendStrn(name.buffer, name.length)
 }
 
-func (this: using *CGen) emitName(id: Identifier) {
+public func (this: using *CGen) emitName(id: Identifier) {
     var tok = id.token
     if(tok.type != TokenType.ERROR) {
         buf.appendStrn(tok.value.str.buffer, tok.value.str.length)
     }
 }
 
-func (this: using *CGen) emitln() {
+public func (this: using *CGen) emitln() {
     buf.appendChar('\n')
     for(var i = 0; i < indent; i += 1) {
         buf.appendStrn("    ", 4);
     }
 }
 
-func (this: using *CGen) emit(strFormat: *const char, ...) {
+public func (this: using *CGen) emit(strFormat: *const char, ...) {
     if(this.format) {
         line.clear()
 
@@ -1143,12 +1143,12 @@ func (this: using *CGen) emit(strFormat: *const char, ...) {
     }
 }
 
-func (this: using *CGen) emitStr(str: *const char) {
+public func (this: using *CGen) emitStr(str: *const char) {
     var len = strlen(str)
     this.emitStrn(str, len)
 }
 
-func (this: using *CGen) emitStrn(str: *const char, len: i32) {
+public func (this: using *CGen) emitStrn(str: *const char, len: i32) {
     if(this.format) {
         for(var i = 0; i < len; i+=1) {
             var c = str[i]
@@ -1182,7 +1182,7 @@ func (this: using *CGen) emitStrn(str: *const char, len: i32) {
 }
 
 
-func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bool = true) {
+public func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bool = true) {
     if(attributes.notes.empty()) {
         return;
     }
@@ -1546,7 +1546,7 @@ func (this: using *CGen) emitTraitFuncCall(expr: *FuncCallExpr) {
     }
 }
 
-func (this: using *CGen) emitStmt(s: *Stmt) {
+public func (this: using *CGen) emitStmt(s: *Stmt) {
     if(!s) return;
 
     this.emitLineInfo(s)

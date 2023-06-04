@@ -13,6 +13,8 @@
         }
     `,
     "tests": [
+
+        /*
         {
             "name" : "Traits With Generics",
             "definitions": `
@@ -294,7 +296,7 @@
                 adder[0] = &4
             `,
             "error": "lvalue required as unary '&' operand"
-        },
+        },*/
 /*
         {
             "name": "struct default values",

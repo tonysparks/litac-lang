@@ -2,6 +2,7 @@ import "std/string_buffer"
 import "std/libc"
 
 import "phase_result"
+import "lex"
 
 public enum ErrorCode {
     INVALID_ASSIGNMENT,

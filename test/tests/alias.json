@@ -285,6 +285,181 @@
                 assert(t.v == 4)
             `,
         },
+        {
+            "name" : "Aliased Module with methods",
+            "definitions": `
+                import "test_module" as tester;
+
+                public func (this: *tester::TestStruct) testMethod2() : i32 {
+                    return this.a * 2;
+                }
+            `,
+            "modules": [
+                {
+                    "name" : "test_module",
+                    "program" : `
+                        public struct TestStruct {
+                            a: i32
+                        }
+
+                        public func (this: *TestStruct) testMethod() : i32 {
+                            return this.a
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var t = tester::TestStruct {
+                    .a = 4
+                }
+
+                var result = t.testMethod()
+                assert(result == 4)
+
+                var result2 = t.testMethod2()
+                assert(result2 == 8)
+            `,
+        },
+        {
+            "name" : "Aliased Module with generic methods",
+            "definitions": `
+                import "test_module" as tester;
+
+                public func (this: *tester::TestStruct) testMethod2<T>(a : T) : i32 {
+                    return this.a * 2 + a;
+                }
+            `,
+            "modules": [
+                {
+                    "name" : "test_module",
+                    "program" : `
+                        public struct TestStruct {
+                            a: i32
+                        }
+
+                        public func (this: *TestStruct) testMethod<T>(a: T) : i32 {
+                            return this.a + a
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var t = tester::TestStruct {
+                    .a = 4
+                }
+
+                var result = t.testMethod(4)
+                assert(result == 8)
+
+                var result2 = t.testMethod2(8)
+                assert(result2 == 16)
+            `,
+        },
+        {
+            "name" : "Generic Across Modules",
+            "definitions": `
+                import "gen_module";
+
+                public struct TestStruct {
+                    a: i32
+                }
+
+                public func (this: *TestStruct) testMethod() : i32 {
+                    return this.a * 2;
+                }
+            `,
+            "modules": [
+                {
+                    "name" : "gen_module",
+                    "program" : `
+
+                        public func TestGen<T>(a: *void) : i32 {
+                            var this = a as (*T)
+                            return this.testMethod()
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var t = TestStruct {
+                    .a = 4
+                }
+
+                var result = TestGen<TestStruct>(&t)
+                assert(result == 8)
+
+            `,
+        },
+        {
+            "name" : "Generic Alias Across Modules",
+            "definitions": `
+                import "gen_module" as tester;
+
+                public struct TestStruct {
+                    a: i32
+                }
+
+                public func (this: *TestStruct) testMethod() : i32 {
+                    return this.a * 2;
+                }
+            `,
+            "modules": [
+                {
+                    "name" : "gen_module",
+                    "program" : `
+
+                        public func TestGen<T>(a: *void) : i32 {
+                            var this = a as (*T)
+                            return this.testMethod()
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var t = TestStruct {
+                    .a = 4
+                }
+
+                var result = tester::TestGen<TestStruct>(&t)
+                assert(result == 8)
+
+            `,
+        },
+        {
+            "name" : "Generic Alias with Struct Across Modules",
+            "definitions": `
+                import "gen_module" as tester;
+
+                public func (this: *tester::TestStruct) testMethod() : i32 {
+                    return this.a * 2;
+                }
+            `,
+            "modules": [
+                {
+                    "name" : "gen_module",
+                    "program" : `
+
+                        public struct TestStruct {
+                            a: i32
+                        }
+
+                        public func TestGen<T>(a: *void) : i32 {
+                            var this = a as (*T)
+                            return this.testMethod()
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var t = tester::TestStruct {
+                    .a = 4
+                }
+
+                var result = tester::TestGen<tester::TestStruct>(&t)
+                assert(result == 8)
+
+            `,
+        },
 
     ]
 }

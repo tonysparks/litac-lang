@@ -244,13 +244,11 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
         return;
     }
 
-    // TODO:
-    // 1) Move allocators to the module level instead of the Lita context level
-    // 2) Clear symbols that are no longer valid (an edit may have removed a symbol)
-    // 3) Validate imported symbols are cleared of "RESET" -- should we only mark symbols
-    //    in the declared module??
-    // 4) Add any new symbols from the edit to programSymbols
+    // clear any compilation errors
     this.result.clear()
+
+    // clear out any references for this module
+    this.references.removeLocalSymbolReferences(module)
 
     // reset the contents of this module
     module.initIncrementalBuild()
@@ -277,12 +275,9 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
 
     // Re-type check the module
     {
-        // printf("Running checker..\n")
         var checker = TypeChecker{}
         checker.init(this)
 
-        // TODO: Clean up memory leak!!
-        // TODO: Sync values/main/generics
         var program = checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
 
         // Reconcile any changed symbols

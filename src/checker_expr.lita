@@ -20,7 +20,7 @@ import "common"
 import "ast_print"
 import "error_codes"
 import "intern"
-
+import "lsp/references"
 
 public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
     if(!this.resolveExpr(expr)) {
@@ -1496,6 +1496,8 @@ func (this: *TypeChecker) resolveSizeOfExpr(expr: *SizeOfExpr) : bool {
 func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : bool {
     assert(expr != null)
 
+    // we don't allow func ptrs to have methods on them
+    // otherwise, any other type can have methods on them
     if(!type || type.kind == TypeKind.FUNC_PTR) {
         return false
     }
@@ -1524,7 +1526,16 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
         return true;
     }
 
-    var funcSym = type.getMethod(this.lita.strings, this.current, expr.field.type.name)
+    var methodResult = type.getMethod(this.lita.strings, this.current, expr.field.type.name)
+
+    // check to see if this is a method call from a generic type,
+    // in which case, we want to check the callsite module in addition to the template
+    // declaration module
+    if(!methodResult.symbol && this.genericContext.callsite) {
+        methodResult = type.getMethod(this.lita.strings, this.genericContext.callsite, expr.field.type.name)
+    }
+
+    var funcSym = methodResult.symbol
     if(funcSym) {
         var decl = funcSym.decl as (*FuncDecl)
         var typeInfo = funcSym.type;
@@ -1535,12 +1546,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
         if(!(expr.flags & GetExprFlags.IS_METHOD_CALL)) {
             expr.flags |= GetExprFlags.IS_METHOD_CALL
 
-            // We need to update the get expression with the method name
-            var oldName = expr.field.type
-            var functionName = [MAX_SYMBOL_NAME]char;
-            type.getFunctionName(functionName, oldName.name)
-
-            expr.field.type.name = this.lita.strings.internCopy(functionName)
+            expr.field.type.name = methodResult.name
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {

@@ -7,6 +7,7 @@ import "std/array"
 import "symbols" as sym
 import "types"
 import "lex"
+import "ast"
 
 @doc("""
     Protocol specifications from: https://microsoft.github.io/language-server-protocol/specifications

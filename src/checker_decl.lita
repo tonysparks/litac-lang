@@ -21,6 +21,7 @@ import "ast_print"
 import "checker"
 import "checker_expr"
 import "intern"
+import "lsp/references"
 
 public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     assert(decl != null)
