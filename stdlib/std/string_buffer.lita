@@ -4,21 +4,8 @@ import "std/assert";
 import "std/string_view";
 import "std/libc";
 
-/*
-@include("<stdarg.h>");
-@include("<stdio.h>");
-
-@foreign struct va_list;
-@foreign func va_start(args: va_list, format: *const char);
-@foreign func va_end(args: va_list);
-@foreign func va_copy(a: va_list, b: va_list);
-@foreign func vsnprintf(b: *char, len: u64, format: *const char, args: va_list) : i32;
-@foreign func memmove(dst: *void, src: *const char, num: u64) : *void;
-@foreign func strlen(str: *const char) : u64;
-*/
-
-
 const MAX_BUFFER_SIZE = 32;
+
 public struct StringBuffer {
     buffer: *char
     length: i32
