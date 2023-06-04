@@ -4,9 +4,11 @@ import "std/map"
 import "std/json"
 import "std/string_buffer"
 import "std/string"
+import "std/string_view"
 import "std/mem"
 import "std/system"
 import "std/assert"
+import "std/ascii"
 
 import "lita"
 import "phase_result"
@@ -17,6 +19,7 @@ import "ast"
 import "lex"
 import "types"
 import "common"
+import "intern"
 
 import "lsp/lsp"
 import "lsp/protocol"
@@ -761,6 +764,110 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
     return JSON_NULL
 }
 
+
+public func (this: *Workspace) autoComplete(uri: *const char,
+                                            position: *JsonNode,
+                                            context: *JsonNode,
+                                            alloc: *const Allocator) : *JsonNode {
+    this.lsp.log("auto-completion...\n")
+    if(!uri || !position) return JSON_NULL;
+
+    var doc = this.openedDocuments.get(uri)
+    if(!doc)  {
+        return JSON_NULL;
+    }
+
+    var module = this.lsp.lita.getModule(doc.filename)
+    if(!module) {
+        return JSON_NULL;
+    }
+
+    var isMethodLookUp = false
+    if(context) {
+        var trigger = context.getStr("triggerCharacter")
+        if(trigger && strncmp(".", trigger, 1)) {
+            isMethodLookUp = true
+        }
+    }
+
+    var lineNumber = position.getInt("line", 0)
+    var character = position.getInt("character", 0)
+    var lineStart = doc.getLineStart(lineNumber)
+    var offset = lineStart + (character-1)
+
+    if(offset >= doc.text.length) {
+        return JSON_NULL;
+    }
+
+    var endPos = offset;
+
+    // find any context information to
+    // narrow down auto-completion results
+    while(offset > 0) {
+        var c = doc.text.buffer[offset]
+
+        if(c == '.') {
+            isMethodLookUp = true
+            break;
+        }
+
+        if(c.isWhitespace()) {
+            break;
+        }
+
+        // not a valid identifier character
+        if(!c.isAlphanumeric() && c != '_') {
+            break;
+        }
+
+        offset -= 1;
+    }
+
+    const MAX_RESULTS = 50;
+
+    var results = CreateJsonArray(alloc)
+    if(endPos > offset) {
+
+        var prefix = StringViewInit(doc.text.buffer + offset + 1, (endPos - offset) as (i32))
+
+        var i = 0;
+        for(var it = module.symbols.symbolFuncs.iter(); it.hasNext() && i < MAX_RESULTS; i += 1) {
+            var entry = it.next()
+            var symbol = entry.value
+
+            var isMethod = symbol.flags & SymbolFlags.IS_METHOD;
+
+            if(isMethodLookUp && !isMethod) {
+                continue;
+            }
+
+            var name = symbol.name.view
+            if(isMethod && symbol.decl) {
+                name = StringViewInit(symbol.decl.name.str.buffer, symbol.decl.name.str.length)
+            }
+
+            if(name.startsWith(prefix.buffer, prefix.length)) {
+                var item = SymbolToCompletionItem(symbol, alloc)
+                results.add(item)
+            }
+        }
+    }
+    else {
+        var i = 0;
+        for(var it = module.symbols.symbolFuncs.iter(); it.hasNext() && i < MAX_RESULTS; i += 1) {
+            var entry = it.next()
+            var symbol = entry.value
+
+            if(isMethodLookUp && !(symbol.flags & SymbolFlags.IS_METHOD)) {
+                continue;
+            }
+
+            var item = SymbolToCompletionItem(symbol, alloc)
+            results.add(item)
+        }
+    }
+    return results;
+}
 
 public func (this: *Workspace) runDiagnostics(
     docUri: *const char,

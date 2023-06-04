@@ -305,6 +305,21 @@ public func SrcPosToLocations(rootPath: *const char, results: *Array<SrcPos>, al
     return locations
 }
 
+public func SymbolToCompletionItem(symbol: *sym::Symbol, alloc: *const Allocator) : *JsonNode {
+    if(!symbol) {
+        return JSON_NULL
+    }
+
+    var item = CreateJsonObject(alloc)
+    item.putStr("label", symbol.name.buffer, symbol.name.length)
+    if(symbol.flags & sym::SymbolFlags.IS_METHOD) {
+        if(symbol.decl) {
+            item.putStr("insertText", symbol.decl.name.str.buffer, symbol.decl.name.str.length)
+        }
+    }
+    return item
+}
+
 public func JsonNodeToTextDocumentChangeEvent(params: *JsonNode, alloc: *const Allocator) : *TextDocumentDidChange {
     var textDoc = params.getObject("textDocument")
     if(!textDoc) {

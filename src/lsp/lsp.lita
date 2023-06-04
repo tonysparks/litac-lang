@@ -238,6 +238,9 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
     else if(strcmp(method, "textDocument/definition") == 0) {
         this.handleTextDocumentDefinitionMessage(msg, params)
     }
+    else if(strcmp(method, "textDocument/completion") == 0) {
+        this.handleTextDocumentCompletionMessage(msg, params)
+    }
     else if(strcmp(method, "$/cancelRequest") == 0) {
         // do nothing for right now
     }
@@ -372,6 +375,24 @@ public func (this: *LspServer) handleTextDocumentDefinitionMessage(msg: *JsonNod
     var uri = textDoc.getStr("uri", null)
     var pos = params.getObject("position")
     var results = this.workspace.goToDefinition(uri, pos, this.requestAlloc())
+
+    var resp = this.createResponse(msg.getInt("id"))
+    resp.put("result", results)
+    resp.put("error", JSON_NULL)
+
+    this.writeResponse(resp)
+}
+
+public func (this: *LspServer) handleTextDocumentCompletionMessage(msg: *JsonNode, params: *JsonNode) {
+    var textDoc = params.getObject("textDocument")
+    if(!textDoc) {
+        return;
+    }
+
+    var uri = textDoc.getStr("uri", null)
+    var pos = params.getObject("position")
+    var context = params.getObject("context")
+    var results = this.workspace.autoComplete(uri, pos, context, this.requestAlloc())
 
     var resp = this.createResponse(msg.getInt("id"))
     resp.put("result", results)

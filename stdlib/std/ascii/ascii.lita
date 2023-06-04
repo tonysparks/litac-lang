@@ -1,0 +1,46 @@
+// ASCII utility functions
+import "std/assert"
+
+const WHITESPACE = [256]bool {
+    [9] = true,
+    [10] = true,
+    [11] = true,
+    [12] = true,
+    [13] = true,
+    [32] = true,
+}
+
+public func (this: char) isWhitespace() : bool {
+    return WHITESPACE[this & 0xFF]
+}
+
+public func (this: char) isNumeric() : bool {
+    return this > 47 && this < 58
+}
+
+public func (this: char) isAlphabetic() : bool {
+    return (this > 64 && this < 91) ||
+           (this > 96 && this < 123);
+}
+
+public func (this: char) isAlphanumeric() : bool {
+    return this.isNumeric() || this.isAlphabetic();
+}
+
+@test
+func testWhitespace() {
+    assert(' '.isWhitespace() == true)
+    assert('\t'.isWhitespace() == true)
+    assert('\n'.isWhitespace() == true)
+    assert('\r'.isWhitespace() == true)
+
+
+    var c = (-1) as (char)
+    assert(c.isWhitespace() == false)
+
+    var m = (300) as (char)
+    assert(m.isWhitespace() == false)
+
+    assert('x'.isWhitespace() == false)
+    assert(char_isWhitespace(' ') == true)
+}
