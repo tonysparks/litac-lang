@@ -57,6 +57,10 @@ public func (this: *ArenaAllocator) free() {
     var alloc = this.decorated
 
     var last = this.arena;
+    if(!last) {
+        return;
+    }
+
     var next: *Arena = null
 
     do {
@@ -72,23 +76,23 @@ public func (this: *ArenaAllocator) free() {
 public func (this: *ArenaAllocator) clear() {
     var a = this.arena
 
-    do {
+    while(a != null) {
         a.current = 0;
         c::memset(a.region, 0, a.size);
+        a = a.next
     }
-    while((a = a.next) != null);
 }
 
 public func (this: *ArenaAllocator) unusedBytes() : usize {
+    var numberOfUnusedBytes:usize = 0;
     var a = this.arena
 
-    var numberOfUnusedBytes:usize = 0;
-
-    do {
+    while(a != null) {
         var delta = a.size - a.current;
         numberOfUnusedBytes += delta
+        a = a.next
     }
-    while((a = a.next) != null);
+
     return numberOfUnusedBytes;
 }
 
@@ -100,15 +104,15 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
         var a = this.arena
         var last = a
 
-        do {
+        while(a != null) {
             if((a.size - a.current) > size) {
                 a.current += size
                 return (a.region + (a.current - size)) as (*void)
             }
 
             last = a
+            a = a.next
         }
-        while((a = a.next) != null);
 
         var asize = size > this.pageSize ? size : this.pageSize;
 
@@ -181,15 +185,15 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
         var a = this.arena
         var last = a
 
-        do {
+        while(a != null) {
             if((a.size - a.current) > size) {
                 a.current += size
                 return (a.region + (a.current - size)) as (*void)
             }
 
             last = a
+            a = a.next
         }
-        while((a = a.next) != null);
 
         var asize = size > this.pageSize ? size : this.pageSize;
 
