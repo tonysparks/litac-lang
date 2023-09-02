@@ -5,15 +5,11 @@ import "std/web/mongoose"
 import "std/mem"
 import "std/map"
 
+import using "std/web/web_request"
+
 
 @doc("Callback function from a web request annotation")
 public typedef func(*WebContext): i32 as WebController;
-
-@doc("Get Request note")
-public @note get_request {
-    uri: *const char
-}
-
 
 /**
     This will scan all symbols for web annotations.  Functions annotated with
@@ -23,48 +19,7 @@ public @note get_request {
     called.
 */
 #precheck
-    var symbols = getSymbolsByNote("get_request")
-    emitClear()
-
-    emit("public func GetWebController(msg: *mg_http_message) : WebController {")
-
-    for(sym in symbols) {
-        //print("Sym: ", sym.name, "\n")
-        if(sym.kind == "FUNC_DECL" && sym.isPublic) {
-
-            var args = sym.notes[0].arguments
-            if(args) {
-                var alias = addImport(getCurrentModuleFilename(), sym.moduleFilename)
-
-                for(arg in args) {
-                    var name = arg["name"]
-                    if(name == "uri") {
-                        var uri = arg["value"]
-                        if(uri != "") {
-                            if(alias != null) {
-                                emit("\n\tif(mg_match(msg.uri, mg_strx(\"%s\"), null)) return %s::%s;", uri, alias, sym.name)
-                            }
-                            else {
-                                emit("\n\tif(mg_match(msg.uri, mg_strx(\"%s\"), null)) return %s;", uri, sym.name)
-                            }
-                        }
-                    }
-                }
-            }
-
-
-        }
-
-
-    }
-    emit("\n\treturn Web404Controller;\n")
-    emit("} ")
-
-    addDeclaration(getCurrentModuleFilename(), emitStr())
-
-
-    /// DELETE
-
+    "request_preprocessor.ape"
 #end
 
 func Web404Controller(ctx: *WebContext) : i32 {
@@ -75,6 +30,7 @@ public struct WebContext {
     conn: *mg_connection
     request: *WebRequest
     response: *WebResponse
+    userdata: *void
 }
 
 public const MAX_HTTP_HEADERS = MG_MAX_HTTP_HEADERS;
@@ -83,10 +39,6 @@ public struct WebHeader {
     //name: StringView
     //value: StringBuffer
     value: *const char
-}
-
-public struct WebRequest {
-    msg: *mg_http_message
 }
 
 public struct WebResponse {
@@ -98,6 +50,7 @@ public struct WebResponse {
 public struct WebConfig {
     addr: *const char = "http://0.0.0.0:8080"
     poll: i32
+    userdata: *void
 }
 
 public enum WebStatus {
@@ -107,6 +60,7 @@ public enum WebStatus {
 
 public struct WebServer {
     allocator: *const Allocator
+    config: *WebConfig
     mg: mg_mgr
     poll: i32
 }
@@ -135,6 +89,8 @@ public struct WebServer {
 public func (this: *WebServer) init(config: *WebConfig,
                                     allocator: *const Allocator = defaultAllocator) : WebStatus {
     this.allocator = allocator
+    this.config = config
+
     mg_mgr_init(&this.mg)
     mg_http_listen(&this.mg, config.addr, WebCallbackFn, this)
     return WebStatus.OK
@@ -151,6 +107,23 @@ public func (this: *WebServer) start() {
     mg_mgr_free(&this.mg)
 }
 
+
+func GetWebController(msg: *mg_http_message) : WebController {
+    if(mg_vcmp(msg.method, "GET") == 0) {
+        return GET_WebController(msg)
+    }
+    else if(mg_vcmp(msg.method, "POST") == 0) {
+        return POST_WebController(msg)
+    }
+    else if(mg_vcmp(msg.method, "PUT") == 0) {
+        return PUT_WebController(msg)
+    }
+    else if(mg_vcmp(msg.method, "DELETE") == 0) {
+        return DELETE_WebController(msg)
+    }
+
+    return WEB_WebController(msg)
+}
 
 /**
     Handle a mongoose event, this will just delegate to a WebController
@@ -173,7 +146,8 @@ func WebCallbackFn(conn: *mg_connection, ev: i32, ev_data: *void, fn_data: *void
         var context = WebContext {
             .conn = conn,
             .request = &request,
-            .response = &response
+            .response = &response,
+            .userdata = server.config.userdata,
         }
 
         var controller = GetWebController(msg)

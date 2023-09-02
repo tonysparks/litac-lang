@@ -1,0 +1,65 @@
+fn CreateWebController(controllerName, noteName) {
+    var symbols = getSymbolsByNote(noteName)
+
+    emitClear()
+    emit("public func %s(msg: *mg_http_message) : WebController {", controllerName)
+
+    for(sym in symbols) {
+        //print("Sym: ", sym.name, "\n")
+        if(sym.kind == "FUNC_DECL" && sym.isPublic) {
+            var args = sym.notes[0].arguments
+            if(args) {
+                var alias = addImport(getCurrentModuleFilename(), sym.moduleFilename)
+
+                var method = ""
+                var uri = ""
+                var consumes = ""
+
+                for(arg in args) {
+                    var name = arg["name"]
+                    if(name == "uri") {
+                        uri = arg["value"]
+                    }
+                    else if(name == "method") {
+                        method = arg["value"]
+                    }
+                    else if(name == "consumes") {
+                        // TODO: We don't parse array types just yet
+                        // see preprocessor::addNotes to add this functionality
+                    }
+                }
+
+                if(method != "") {
+                    if(alias != null) {
+                        emit("\n\tif(WebRequestMatches(msg, \"%s\", \"%s\", []*const char{}, 0)) return %s::%s;", method, uri, alias, sym.name)
+                    }
+                    else {
+                        emit("\n\tif(WebRequestMatches(msg, \"%s\", \"%s\", []*const char{}, 0)) return %s;", method, uri, sym.name)
+                    }
+                }
+                else if(uri != "") {
+                    if(alias != null) {
+                        emit("\n\tif(WebRequestMatches(msg, null, \"%s\", []*const char{}, 0)) return %s::%s;", uri, alias, sym.name)
+                    }
+                    else {
+                        emit("\n\tif(WebRequestMatches(msg, null, \"%s\", []*const char{}, 0)) return %s;", uri, sym.name)
+                    }
+                }
+            }
+
+
+        }
+    }
+    emit("\n\treturn Web404Controller;\n")
+    emit("} ")
+
+    addDeclaration(getCurrentModuleFilename(), emitStr())
+}
+
+
+CreateWebController("GET_WebController", "get_request")
+CreateWebController("POST_WebController", "post_request")
+CreateWebController("PUT_WebController", "put_request")
+CreateWebController("DELETE_WebController", "delete_request")
+// all other possible methods...
+CreateWebController("WEB_WebController", "web_request")

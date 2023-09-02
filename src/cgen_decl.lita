@@ -37,9 +37,11 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
         buf.appendStr("\n#define ")
         this.emitStr(name)
 
+        this.inTextBlock = true
         buf.appendStrn(" (", 2)
         this.emitStmt(decl.expr)
         buf.appendStrn(")", 1)
+        this.inTextBlock = false
 
 
         // If this isn't a global variable, we need to #undef

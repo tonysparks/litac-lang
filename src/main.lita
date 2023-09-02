@@ -340,6 +340,10 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
         StringCopy(.src = CurrentWorkingPath(), .dest = options.projectPath, .size = MAX_PATH)
     }
 
+    if(strlen(options.projectPath) == 0) {
+        StringCopy(.src = ".", .dest = options.projectPath, .size = 2)
+    }
+
     return ParseStatus.OK
 
 terminate:

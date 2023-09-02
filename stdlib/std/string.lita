@@ -198,6 +198,10 @@ public func (s: String) size() : i32 {
     return s.length
 }
 
+public func (s: String) remaining() : i32 {
+    return s.capacity - s.length
+}
+
 public func (s: String) cStr() : *char {
     if(s.length < s.capacity && s.length > 0) {
         s.buffer[s.length] = '\0'

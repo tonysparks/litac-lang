@@ -1,0 +1,144 @@
+import "std/string_view"
+import "std/string"
+import "std/libc"
+
+import "std/web/mongoose"
+
+
+@doc("GET Request note")
+public @note get_request {
+    uri: *const char
+}
+
+@doc("POST Request note")
+public @note post_request {
+    uri: *const char
+}
+
+@doc("PUT Request note")
+public @note put_request {
+    uri: *const char
+}
+
+@doc("DELETE Request note")
+public @note delete_request {
+    uri: *const char
+}
+
+@doc("A Web Request note")
+public @note web_request {
+    method: *const char
+    uri: *const char
+}
+
+
+
+public struct WebRequest {
+    msg: *mg_http_message
+}
+
+
+public func (this: *WebRequest) getBody(): StringView {
+    return StringView {
+        .buffer = this.msg.body.ptr,
+        .length = this.msg.body.len as (i32),
+    }
+}
+
+
+public func (this: *WebRequest) getMethod(): StringView {
+    return StringView {
+        .buffer = this.msg.method.ptr,
+        .length = this.msg.method.len as (i32),
+    }
+}
+
+public func (this: *WebRequest) getUri(): StringView {
+    return StringView {
+        .buffer = this.msg.uri.ptr,
+        .length = this.msg.uri.len as (i32),
+    }
+}
+
+public func (this: *WebRequest) getQuery(): StringView {
+    return StringView {
+        .buffer = this.msg.query.ptr,
+        .length = this.msg.query.len as (i32),
+    }
+}
+
+public func (this: *WebRequest) getProto(): StringView {
+    return StringView {
+        .buffer = this.msg.proto.ptr,
+        .length = this.msg.proto.len as (i32),
+    }
+}
+
+public func (this: *WebRequest) getMessage(): StringView {
+    return StringView {
+        .buffer = this.msg.message.ptr,
+        .length = this.msg.message.len as (i32),
+    }
+}
+
+public func (this: *WebRequest) getHeader(header: *const char): StringView {
+    var value = mg_http_get_header(this.msg, header)
+    if(!value) {
+        return StringView{}
+    }
+
+    return StringView {
+        .buffer = value.ptr,
+        .length = value.len as (i32),
+    }
+}
+
+public func (this: *WebRequest) getQueryValue(key: *const char, result: *String): bool {
+    var value = mg_http_get_var(&this.msg.query, key, result.buffer, result.remaining())
+    if(value < 0) {
+        return false
+    }
+
+    result.length += value
+    return true
+}
+
+
+/*-------------------------------------------------------------
+    Utility functions for note request matching
+  -------------------------------------------------------------*/
+
+public func WebRequestMatches(
+    msg: *mg_http_message,
+    note_method: *const char,
+    note_uri: *const char,
+    consumes: []*const char,
+    consumesLength: u32) : bool {
+
+    if(note_method != null) {
+        if(mg_vcmp(msg.method, note_method) != 0) {
+            return false;
+        }
+    }
+
+    // Attempt to match on URI
+    if(mg_match(msg.uri, mg_strx(note_uri), null)) {
+        if(consumes && consumesLength > 0) {
+            var contentType = mg_http_get_header(msg, "Content-Type")
+            if(!contentType) {
+                return false;
+            }
+
+
+            for(var i = 0; i < consumesLength; i+=1) {
+                var c = consumes[i];
+                if(mg_match(contentType, mg_strx(c), null)) {
+                    return true;
+                }
+            }
+        }
+        return true;
+    }
+
+    return false;
+}

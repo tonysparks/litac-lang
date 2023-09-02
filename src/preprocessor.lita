@@ -4,10 +4,12 @@ import "std/array"
 import "std/map"
 import "std/string_buffer"
 import "std/string_view"
+import "std/string"
 import "std/mem"
 import "std/profile"
 import "std/regex"
 import "std/system"
+import "std/io"
 
 import "ast"
 import "ast_new"
@@ -112,11 +114,25 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     ape_set_native_function(this.ape, "emit", ApeEmit, &this.callContext)
     ape_set_native_function(this.ape, "emitClear", ApeEmitClear, &this.callContext)
     ape_set_native_function(this.ape, "emitStr", ApeEmitStr, &this.callContext)
+
+    // TODO: Add a Preprocessor Logger that can be enabled via the command line
+    // ape_set_native_function(this.ape, "log", ApeLog, &this.callContext)
 }
 
 @profile
 func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
-    var result = ape_execute(this.ape, comp.expr.buffer, comp.expr.length)
+    var code = StringViewInit(comp.expr.buffer, comp.expr.length)
+    if(comp.isScriptLoad && comp.expr.length > 2) {
+        var filename = StringView{
+            comp.expr.buffer,
+            comp.expr.length,
+        }
+        if(!this.loadScript(comp, filename, &code)) {
+            return false
+        }
+    }
+
+    var result = ape_execute(this.ape, code.buffer, code.length)
     if(ape_has_errors(this.ape)) {
         var error = ape_get_error(this.ape, 0)
         var pos = SrcPos {
@@ -1028,4 +1044,35 @@ func ApeAssert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_o
     }
 
     return ape_object_make_null()
+}
+
+
+func (this: *Preprocessor) loadScript(comp: *CompStmt, filename: *StringView, code: *StringView) : bool {
+    var filepath = [MAX_PATH]char{0};
+    var filepathStr = StringInit(filepath, MAX_PATH, 0)
+
+    FilePath(comp.startPos.filename, filepath)
+
+    filepathStr.adjust()
+    filepathStr.append("/%.*s", filename.length, filename.buffer)
+
+    if(!FileExists(filepathStr.cStr())) {
+        this.lita.result.addError(comp.startPos, "unable to locate '%.*s'", filename.length, filename.buffer)
+        return false
+    }
+
+    var buffer: *char = null;
+    var length: usize = 0;
+
+    var status = ReadFile(filepathStr.cStr(), &buffer, &length, this.lita.allocator)
+
+    if(status != FileStatus.Ok) {
+        this.lita.result.addError(comp.startPos, "error loading '%s'", filepathStr.cStr())
+        return false
+    }
+
+    code.buffer = buffer;
+    code.length = length as (i32);
+
+    return true
 }

@@ -18,7 +18,10 @@ public typedef func(*mg_connection, i32, *void, *void) : void as MgConnectionCal
 public struct mg_connection;
 
 @foreign
-public struct mg_str;
+public struct mg_str {
+  ptr: *const char;  // Pointer to string data
+  len: usize;        // String len
+}
 
 @foreign
 public struct mg_http_header {
@@ -89,3 +92,9 @@ public func mg_vcmp(s1: *const mg_str, s2: *const char) : i32;
 
 @foreign
 public func mg_match(str: mg_str, pattern: mg_str, caps: *mg_str) : bool;
+
+@foreign
+public func mg_http_get_header(msg: *mg_http_message, name: *const char) : *mg_str;
+
+@foreign
+public func mg_http_get_var(buf: *const mg_str, name: *const char, dst: *char, dst_len: usize): i32;

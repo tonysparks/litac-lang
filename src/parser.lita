@@ -1593,7 +1593,7 @@ func (p: *Parser) compStatement() : *Stmt {
         if(end && end.kind != StmtKind.COMP_STMT) {
             goto err;
         }
-        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
+        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), false, p.allocator)
 
     }
     else if(type.equals(PRECHECK)  ||
@@ -1601,21 +1601,38 @@ func (p: *Parser) compStatement() : *Stmt {
             type.equals(POSTPARSE)) {
 
         var pos = p.pos()
-        var stream = pos.start
 
-        // read the tokens until we are caught up with the
-        // eval expression
-        while(!p.atEnd()) {
-            var token = p.peek()
+        var isScriptLoad = false
+        var rewind = p.current
 
-            if(p.check(TokenType.HASH)) {
-                break
+        // determine if we're just loading a script vs.
+        // an inlined script
+        if(p.check(TokenType.STRING)) {
+            var filename = p.consume(TokenType.STRING, ErrorCode.MISSING_IDENTIFIER)
+            if(p.check(TokenType.HASH) && filename) {
+                isScriptLoad = true
+                scriptExpr.buffer = filename.str.buffer
+                scriptExpr.length = filename.str.length
             }
-            p.advance()
+            else {
+                p.current = rewind
+            }
         }
+        else {
+            // read the tokens until we are caught up with the
+            // eval expression
+            while(!p.atEnd()) {
+                var token = p.peek()
 
-        scriptExpr.buffer = pos.start
-        scriptExpr.length = (p.pos().start - pos.start) as (i32)
+                if(p.check(TokenType.HASH)) {
+                    break
+                }
+                p.advance()
+            }
+
+            scriptExpr.buffer = pos.start
+            scriptExpr.length = (p.pos().start - pos.start) as (i32)
+        }
 
         if(!p.consume(TokenType.HASH, ErrorCode.MISSING_COMP_STMT_END)) {
             goto err;
@@ -1626,7 +1643,7 @@ func (p: *Parser) compStatement() : *Stmt {
             goto err;
         }
         var body = Array<*Stmt>{}
-        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
+        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), isScriptLoad, p.allocator)
     }
     else if(type.equals(ELSE)) {
         var body = ArrayInit<*Stmt>(32, p.allocator)
@@ -1649,10 +1666,10 @@ func (p: *Parser) compStatement() : *Stmt {
         if(end && end.kind != StmtKind.COMP_STMT) {
             goto err;
         }
-        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), p.allocator)
+        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), false, p.allocator)
     }
     else if(type.equals(END)) {
-        return NewCompStmt(pos, p.pos(), type, StringView{}, Array<*Stmt>{}, null, p.allocator)
+        return NewCompStmt(pos, p.pos(), type, StringView{}, Array<*Stmt>{}, null, false, p.allocator)
     }
     else {
         p.errorAtToken(p.peek(), ErrorCode.INVALID_COMP_STMT)

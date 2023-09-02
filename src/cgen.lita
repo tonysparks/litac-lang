@@ -38,6 +38,8 @@ public struct CGen {
     tmpVar: i32
     deferStack: i32
 
+    inTextBlock: bool
+
     currentFunc: *TypeInfo
     currentScope: *CGenScope
 
@@ -643,7 +645,7 @@ func (this: using *CGen) emitDefers() {
 }
 
 public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
-    if(!stmt || this.options.disableLineSync) {
+    if(this.inTextBlock || !stmt || this.options.disableLineSync) {
         return;
     }
 
@@ -2313,6 +2315,12 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                             this.emitStrn(".", 1)
                         }
                         this.emitStrn("f", 1)
+                        break;
+                    }
+                    case TypeKind.F64: {
+                        if(!hasDecimal) {
+                            this.emitStrn(".0", 2)
+                        }
                         break;
                     }
                     case TypeKind.U8:

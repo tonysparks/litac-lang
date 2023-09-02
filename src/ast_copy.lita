@@ -449,6 +449,7 @@ public func CopyStmt(stmt: *Stmt, module: *Module) : *Stmt {
                                    original.expr,
                                    CopyStmts(original.body, module),
                                    CopyStmt(end, module) as (*CompStmt),
+                                   original.isScriptLoad,
                                    module.allocator)
             return copy
         }

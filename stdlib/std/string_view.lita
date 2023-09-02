@@ -308,6 +308,19 @@ func testStartsWith() {
     assert(a.startsWith(e.buffer, e.length) == false)
 }
 
+@test("endsWith")
+func testEndsWith() {
+    var a = StringViewInit("Hello World")
+    var e = StringViewInit(null)
+
+    assert(a.endsWith("World") == true)
+    assert(a.endsWith("d") == true)
+    assert(a.endsWith("H") == false)
+    assert(a.endsWith("Hell") == false)
+    assert(a.endsWith("Hello World") == true)
+    assert(a.endsWith("Hello World!") == false)
+}
+
 @test("indexOf")
 func testIndexOf() {
     var a = StringViewInit("Hello World")
