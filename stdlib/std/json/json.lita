@@ -9,6 +9,20 @@ import "std/unicode/utf8"
 
 import "std/io"
 
+public @note json {
+    format: *const char
+}
+
+/**
+    Scan all symbols for json note, generates a serialization
+    mappings
+*/
+// #precheck
+#postcheck
+    "serialization.ape"
+#end
+
+
 @asStr
 public enum JsonType {
     NULL,
