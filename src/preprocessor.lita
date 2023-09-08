@@ -451,6 +451,12 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
                         ape_object_set_map_value(fieldObj, "name", name)
 
                         // TODO: type and defaultExpr
+                        //if(varField.type && varField.type.typeInfo && varField.type.typeInfo.sym) {
+                        if(varField.sym) {
+                            //var typeDecl = this.declToApe(varField.type.typeInfo.sym)
+                            var typeDecl = this.declToApe(varField.sym)
+                            ape_object_set_map_value(fieldObj, "sym", typeDecl)
+                        }
 
                         this.addNotes(fieldObj, sym.declared, varField.attributes)
                         break

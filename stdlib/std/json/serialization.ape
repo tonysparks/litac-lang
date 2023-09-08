@@ -1,0 +1,15 @@
+
+var symbols = getSymbolsByNote("json")
+
+emitClear()
+
+for(sym in symbols) {
+    print("Sym: ", sym.name, "\n")
+    if(sym.kind == "STRUCT_DECL") {
+       for(field in sym.structDecl.fields) {
+          print("Field: ", field.name, " sym: ", field.sym, "\n")
+       }
+    }
+}
+
+//addDeclaration(getCurrentModuleFilename(), emitStr())
