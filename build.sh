@@ -1,6 +1,16 @@
 #!/bin/bash
 
-BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -ltcc -lm -lrt -lpthread -ldl"
+LFLAGS=""
+OUT_FILE="litac_"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  LFLAGS="-L../lib/mac -ltcc -L../lib -lm -lpthread -ldl -lcurl"
+  OUT_FILE="${OUT_FILE}mac"
+else
+  LFLAGS="-L../lib -ltcc -lm -lrt -lpthread -ldl"
+  OUT_FILE="${OUT_FILE}linux"
+fi
+
+BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include $LFLAGS"
 #set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
 
 
@@ -18,7 +28,7 @@ build_litac() {
 
     cd bootstrap
 
-    ./litacc -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac_linux" -maxMemory 1GiB
+    ./litacc -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "$OUT_FILE" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling()
         return 1
@@ -26,7 +36,7 @@ build_litac() {
 
     echo "Running litaC inception!..."
     cd ../bin
-    ./litac_linux -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB
+    ./${OUT_FILE} -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling()
         return 1
@@ -48,6 +58,3 @@ fi
 
 #del ".\bin\litacc.*" /q
 #del ".\bin\litac.*" /q
-
-
-

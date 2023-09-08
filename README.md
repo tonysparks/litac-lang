@@ -656,6 +656,14 @@ build_bootstrap.sh
 build.sh
 ```
 
+Mac
+```
+git clone https://github.com/tonysparks/litac-lang.git
+cd litac-lang
+build_bootstrap_mac.sh
+zsh build.sh
+```
+
 The `build_bootstrap.bat` will compile the `bootstrap/litac.c` file creating a `litac.exe` (`litac` on Ubuntu).  The `build.bat` file will use the `bootstrap/litac.exe` to build the compiler from lita source (`src/`) and output a new binary in `bin/litac.exe`.
 
 # Using LitaC Compiler
