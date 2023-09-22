@@ -97,6 +97,7 @@ jobs:
 
       # Build bootstrap LitaC
       - name: Build Bootstrap
+        shell: cmd
         run: |
           echo Building bootstrap
           set LITAC_HOME=%GITHUB_WORKSPACE%
@@ -104,6 +105,7 @@ jobs:
 
       # Build LitaC Compiler
       - name: Build LitaC Compiler
+        shell: cmd
         run: |
           echo Building LitaC Compiler
           set LITAC_HOME=%GITHUB_WORKSPACE%
@@ -111,6 +113,7 @@ jobs:
 
       # Test LitaC Compiler
       - name: Test LitaC Compiler
+        shell: cmd
         run: |
           echo Testing LitaC Compiler
           set LITAC_HOME=%GITHUB_WORKSPACE%
@@ -130,7 +133,7 @@ jobs:
       - name: Install tcc
         run: |
           echo Install tcc compiler
-          brew install --HEAD tcc
+        # brew install --HEAD tcc
 
       # Print compiler information
       - name: Compiler Info
