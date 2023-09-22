@@ -151,7 +151,7 @@ jobs:
           clang --version
           gcc --version
           curl --version
-          tcc -version
+        # tcc -version
 
       # Build bootstrap LitaC
       - name: Build Bootstrap
