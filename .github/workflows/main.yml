@@ -133,7 +133,16 @@ jobs:
       - name: Install tcc
         run: |
           echo Install tcc compiler
+          git clone https://github.com/Alex2804/libtcc-cmake
+          cd libtcc-cmake
+          mkdir build
+          cd build
+          cmake ..
+          make
+          cd ../..
+          cp libtcc-cmake/build/libtcc.a lib/libtcc.a
         # brew install --HEAD tcc
+
 
       # Print compiler information
       - name: Compiler Info
