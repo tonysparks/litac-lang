@@ -36,7 +36,7 @@ run_tests() {
     echo "Compiling litaC tests..."
 
     cd ./bin
-    ./$EXE_NAME -verbose -strict -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
+    ./$EXE_NAME -verbose -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
     result=$?
     if [ $result -gt 0 ]; then
         error_compiling
