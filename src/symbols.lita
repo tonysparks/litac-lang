@@ -387,25 +387,6 @@ public func (this: *Scope) addSymbol(name: InternedString,
     sym.declared = module
     sym.flags = flags
 
-
-    // Generated symbols can be created either by the compiler
-    // or preprocessor scripts.  We allow redefinitions of symbols
-    // annotated with genearated, moreover, we also allow for omitting
-    // the C output for this declaration as well as another symbol may
-    // have the implementation we want to output
-    /*if(sym.flags & SymbolFlags.IS_GENERATED) {
-        var arg = decl.getNoteArgument("generated", "excludeOutput")
-        //printf("Herere %d\n", arg != null && arg.argExpr != null)
-
-        if(arg && arg.argExpr != null) {
-            printf("Value: %d %d Kind: %s\n", arg.argExpr.operand.val.intValue, arg.argExpr.kind, StmtKindAsStr(arg.argExpr.kind) )
-        }
-        if(arg && arg.argExpr != null && arg.argExpr.operand.val.intValue != 0) {
-            sym.flags |= SymbolFlags.IS_EMITTED
-            printf("Skipping!!!\n")
-        }
-    }*/
-
     decl.sym = sym
 
     if(isNewSym) {

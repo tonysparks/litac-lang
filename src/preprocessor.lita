@@ -595,83 +595,7 @@ func (this: *CallContext) postParse(module: *Module, moduleStmt: *ModuleStmt, co
 
 func ApeEmit(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
-    /*if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
-        context.logErrors()
-        return ape_object_make_null()
-    }*/
     return FormatStr(context, &context.buffer, argc, args)
-//     var context = data as (*CallContext)
-//     /*if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
-//         context.logErrors()
-//         return ape_object_make_null()
-//     }*/
-
-//     var argIndex = 1
-//     var element = ape_object_get_string(args[0]) as (*const char)
-//     if(element) {
-//         var str: *const char = element
-//         while(*str) {
-//             var c = *str
-//             if(c == '%') {
-//                 if(str[1] == '%') {
-//                     context.buffer.append("%s", "%") // escaped %
-//                     str += 2
-//                     continue
-//                 }
-//                 else {
-//                     if(argIndex >= argc) {
-//                         context.pp.lita.result.addError(context.comp.startPos, "invalid argument index, there are more format parameters than supplied function arguments")
-//                         return ape_object_make_null()
-//                     }
-
-//                     if(str[1] == 's') {
-//                         var arg = ape_object_get_string(args[argIndex]) as (*const char)
-//                         context.buffer.append("%s", arg)
-//                     }
-//                     else if(str[1] == 'f') {
-//                         var arg = ape_object_get_number(args[argIndex]) as (f64)
-//                         context.buffer.append("%f", arg)
-//                     }
-//                     else if(str[1] == 'd') {
-//                         var arg = ape_object_get_number(args[argIndex]) as (i64)
-//                         context.buffer.append("%d", arg)
-//                     }
-//                     else if(str[1] == 'b') {
-//                         var arg = ape_object_get_bool(args[argIndex]) as (bool)
-//                         context.buffer.append("%s", arg ? "true" : "false")
-//                     }
-//                     else {
-//                         context.pp.lita.result.addError(context.comp.startPos, "invalid format parameter: '%%%c'", str[1])
-//                         return ape_object_make_null()
-//                     }
-//                     argIndex += 1
-//                     str += 2
-//                     continue
-//                 }
-//             }
-//             else if(c == '\\') {
-//                 if(str[1] == '\\') {
-//                     context.buffer.append("\\")
-//                     str += 2
-//                     continue
-//                 }
-// /*
-//                 if(str[1] == '\\' && str[2] == 'n') {
-//                     context.buffer.append("\\n")
-//                     str += 3
-//                     continue
-//                 }
-//                 else {
-//                     context.buffer.append("\\\\")
-//                 }*/
-//             }
-
-//             context.buffer.append("%c", c)
-//             str += 1
-//         }
-//     }
-
-//     return ape_object_make_null()
 }
 
 func ApeEmitClear(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
@@ -682,16 +606,12 @@ func ApeEmitClear(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
 func ApeEmitStr(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
-    //printf("String: %s\n", context.buffer.cStr())
     return ape_object_make_string(ape, context.buffer.cStr())
 }
 
 func ApeError(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
-    /*if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
-        context.logErrors()
-        return ape_object_make_null()
-    }*/
+
     var sb = StringBufferInit(1024, context.pp.lita.allocator)
     var result = FormatStr(context, &sb, argc, args)
     context.pp.lita.result.addError(context.comp.startPos, "%s", sb.cStr())
