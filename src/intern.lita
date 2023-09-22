@@ -59,6 +59,7 @@ public const PRECHECK = InternedString{};
 public const POSTCHECK = InternedString{};
 public const POSTPARSE = InternedString{};
 public const END = InternedString{};
+public const ELSE_ERROR = InternedString{};
 
 // notes
 public const INCLUDE = InternedString{};
@@ -155,6 +156,7 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("postcheck", 9, &POSTCHECK)
     this.internConstant("postparse", 9, &POSTPARSE)
     this.internConstant("end", 3, &END)
+    this.internConstant("else_error", 10, &ELSE_ERROR)
 
     // notes
     this.internConstant("include", 7, &INCLUDE)

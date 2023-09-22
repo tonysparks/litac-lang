@@ -81,6 +81,101 @@ typedef struct tm tm;
 
 """);
 
+// Define architecture
+@raw("""
+typedef enum Lita_ArchType {
+    Lita_ArchType_UNKNOWN,
+    Lita_ArchType_ARM32,
+    Lita_ArchType_ARM64,
+    Lita_ArchType_X86,
+    Lita_ArchType_X86_64,
+    Lita_ArchType_SPARC,
+} Lita_ArchType;
+
+
+#if defined(__arm__)
+    Lita_ArchType litaArch = Lita_ArchType_ARM32;
+#elif defined(__aarch64__)
+    Lita_ArchType litaArch = Lita_ArchType_ARM64;
+#elif defined(__i386__)
+    Lita_ArchType litaArch = Lita_ArchType_X86;
+#elif defined(__x86_64__)
+    Lita_ArchType litaArch = Lita_ArchType_X86_64;
+#elif defined(__sparc__)
+    Lita_ArchType litaArch = Lita_ArchType_SPARC;
+#else
+    Lita_ArchType litaArch = Lita_ArchType_UNKNOWN;
+#endif
+
+""");
+
+@foreign("Lita_ArchType")
+public enum Arch {
+    @alias("Lita_ArchType_UNKNOWN")
+    @asStr("UNKNOWN")
+    Lita_ArchType_UNKNOWN,
+
+    @alias("Lita_ArchType_ARM32")
+    @asStr("ARM32")
+    Lita_ArchType_ARM32,
+
+    @alias("Lita_ArchType_ARM64")
+    @asStr("ARM64")
+    Lita_ArchType_ARM64,
+
+    @alias("Lita_ArchType_X86")
+    @asStr("X86")
+    Lita_ArchType_X86,
+
+    @alias("Lita_ArchType_X86_64")
+    @asStr("X86_64")
+    Lita_ArchType_X86_64,
+
+    @alias("Lita_ArchType_SPARC")
+    @asStr("SPARC")
+    Lita_ArchType_SPARC,
+}
+
+public func ArchAsStr(type: Arch) : *const char {
+    switch(type) {
+        case Arch.Lita_ArchType_UNKNOWN: return "UNKNOWN";
+        case Arch.Lita_ArchType_ARM32: return "ARM32";
+        case Arch.Lita_ArchType_ARM64: return "ARM64";
+        case Arch.Lita_ArchType_X86: return "X86";
+        case Arch.Lita_ArchType_X86_64: return "X86_64";
+        case Arch.Lita_ArchType_SPARC: return "SPARC";
+        default: return null;
+    }
+}
+
+public func ArchFromStr(str: *const char, len: usize) : Arch {
+    if(!str) {
+        return Arch.Lita_ArchType_UNKNOWN
+    }
+
+    if(strcicmp(str, "ARM32", len) == 0) {
+        return Arch.Lita_ArchType_ARM32
+    }
+
+    if(strcicmp(str, "ARM64", len) == 0) {
+        return Arch.Lita_ArchType_ARM64
+    }
+
+    if(strcicmp(str, "X86", len) == 0) {
+        return Arch.Lita_ArchType_X86
+    }
+
+    if(strcicmp(str, "X86_64", len) == 0) {
+        return Arch.Lita_ArchType_X86_64
+    }
+
+    if(strcicmp(str, "SPARC", len) == 0) {
+        return Arch.Lita_ArchType_SPARC
+    }
+
+    return Arch.Lita_ArchType_UNKNOWN
+}
+
 // TODO - should allow for 'compile time interface' types
 // defined in OS specific module...
 //public const MAX_PATH: i32;
@@ -166,6 +261,9 @@ public func OSFromStr(str: *const char, len: usize) : OS {
 @foreign("litaOS")
 const os: OS;
 
+@foreign("litaArch")
+const arch: Arch;
+
 @foreign
 struct FileStat {
     st_mode: i32;
@@ -215,6 +313,10 @@ public func SystemInit() : bool {
 
 public func GetOS() : OS {
     return os;
+}
+
+public func GetArch() : Arch {
+    return arch;
 }
 
 public func GetEnv(varName: *const char) : *char {

@@ -14,6 +14,7 @@ Note declarations
 public @note compiler_option {
     cc: *const char = "default"
     os: *const char = "default"
+    arch: *const char = "default"
     options: *const char
 }
 
@@ -62,6 +63,9 @@ public @note profile {
     Marks a type that's value will be generated at compile time
 """)
 public @note generated {
+    // @doc("If this function should be included in generated output")
+    // DO NOT rename, @see symbols@addSymbol
+    // excludeOutput: bool = false
 }
 
 @doc("""

@@ -1668,6 +1668,23 @@ func (p: *Parser) compStatement() : *Stmt {
         }
         return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), false, p.allocator)
     }
+    else if(type.equals(ELSE_ERROR)) {
+        var message = p.consume(TokenType.STRING, ErrorCode.MISSING_ERROR_MESSAGE)
+        if(!message) {
+            goto err;
+        }
+
+        if(!p.consume(TokenType.HASH, ErrorCode.MISSING_COMP_STMT_END)) {
+            goto err;
+        }
+
+        var end = p.compStatement()
+        if(end && end.kind != StmtKind.COMP_STMT) {
+            goto err;
+        }
+
+        return NewCompStmt(pos, p.pos(), type, message.str, Array<*Stmt>{}, null, false, p.allocator)
+    }
     else if(type.equals(END)) {
         return NewCompStmt(pos, p.pos(), type, StringView{}, Array<*Stmt>{}, null, false, p.allocator)
     }
@@ -2833,6 +2850,9 @@ func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
             var unaryExpr = expr as (*UnaryExpr)
             return p.checkConstExpr(unaryExpr.unaryExpr)
         }
+        case StmtKind.TYPE_OF_EXPR:
+        case StmtKind.SIZE_OF_EXPR:
+            return true;
         default: {
             p.errorAtPos(expr.startPos, ErrorCode.INVALID_CONST_EXPR)
         }

@@ -1,0 +1,222 @@
+{
+  "description": "Json",
+  "disabled": false,
+  "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+  "tests": [
+    {
+      "name": "Json Type Hierarchy",
+      "definitions": `
+                import "std/json";
+                import "std/json/to_json";
+                import "std/string_buffer";
+                import "std/array"
+                import "std/io";
+                import "std/libc";
+
+                @json
+                public struct Test {
+                    aStr: *const char
+                    aInt: i32
+
+                    @json(.ignore = true)
+                    shouldNotBe: i32
+
+                    another: InnerTest
+                }
+                @json
+                public struct InnerTest {
+                    aStr: *const char
+                    aInt: i32
+                    array: Array<i32>
+
+                    @json(.ignore = true)
+                    shouldNotBe: i32
+                }
+            `,
+      "code": `
+                var test = Test {
+                    .aStr: "Hello World",
+                    .aInt: 42,
+                    .another = InnerTest {
+                      .aStr = "Bye",
+                      .aInt = 33,
+                    },
+
+                };
+
+                test.another.array = ArrayInit<i32>()
+                test.another.array.add(1)
+                test.another.array.add(2)
+
+                var sb = StringBufferInit(1024)
+                test.toJson(&sb)
+                var json = sb.cStr()
+                // printf("Json: %s\n", json)
+                assert(strcmp(json, """{"aStr":"Hello World","aInt":42,"another":{"aStr":"Bye","aInt":33,"array":[1,2]}}""") == 0);
+            `
+    },
+    {
+      "name": "Json Array",
+      "definitions": `
+                import "std/json";
+                import "std/json/to_json";
+                import "std/string_buffer";
+                import "std/array"
+                import "std/io";
+                import "std/libc";
+
+                @json
+                public struct Test {
+                    aStr: *const char
+                    aInt: i32
+
+                    @json(.ignore = true)
+                    shouldNotBe: i32
+                }
+
+            `,
+      "code": `
+                var test1 = Test {
+                    .aStr: "Hello World",
+                    .aInt: 42,
+                };
+                var test2 = Test {
+                    .aStr: "Hello World2",
+                    .aInt: 242,
+                };
+                var array = ArrayInit<Test>()
+                array.add(test1)
+                array.add(test2)
+
+                var sb = StringBufferInit(1024)
+                array.toJson(&sb)
+                var json = sb.cStr()
+                assert(strcmp(json, """[{"aStr":"Hello World","aInt":42},{"aStr":"Hello World2","aInt":242}]""") == 0);
+            `
+    },
+    {
+      "name": "Json Map",
+      "definitions": `
+                import "std/json";
+                import "std/json/to_json";
+                import "std/string_buffer";
+                import "std/map"
+                import "std/io";
+                import "std/libc";
+
+                @json
+                public struct Test {
+                    aStr: *const char
+                    aInt: i32
+
+                    @json(.ignore = true)
+                    shouldNotBe: i32
+                }
+
+            `,
+      "code": `
+                var x = 10
+                var test = Test {
+                    .aStr: "Hello World",
+                    .aInt: 42,
+                };
+
+                var map = StrMap<Test>(Test{})
+                map.put("Hi", test)
+
+                var sb = StringBufferInit(1024)
+                map.toJson(&sb)
+                var json = sb.cStr()
+                //printf("Json: %s\n", json)
+                assert(strcmp(json, """{"Hi":{"aStr":"Hello World","aInt":42}}""") == 0);
+            `
+    },
+    {
+      "name": "to_json on invalid union type",
+      "definitions": `
+                import "std/json";
+
+                @json
+                public union Test {
+                    aPtr: *i32
+                    aStr: *const char
+                }
+
+            `,
+      "error": `Unsupported to_json on declaration 'Test'`
+    },
+    {
+      "name": "Json Serialize",
+      "definitions": `
+                import "std/json";
+                import "std/json/to_json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
+
+                @json
+                public struct Test {
+                    // TODO: This conflicts with method finding, why doesn't *T generic function work?
+                    @json(.ignore = true)
+                    aPtr: *i32
+
+                    aStr: *const char
+                    aU8: u8
+                    aI8: i8
+                    aU16: u16
+                    aI16: i16
+                    aInt: i32
+                    aUInt: u32
+                    aU64: u64
+                    aI64: i64
+
+                    @json(.format = "%3.2f", .name = "float")
+                    aFloat: f32
+
+                    @json(.format = "%3.1f", .name = "float")
+                    aDouble: f64
+
+                    aBool: bool
+
+                    @json(.ignore = true)
+                    shouldNotBe: i32
+                }
+
+            `,
+      "code": `
+                var x = 10
+                var test = Test {
+                    .aPtr: &x,
+                    .aStr: "Hello World",
+                    .aInt: 42,
+                    .aU8: 4u8,
+                    .aI8: 22i8,
+                    .aU16: 33u16,
+                    .aI16: 55i16,
+                    .aUInt: 44u32,
+                    .aU64: 77u64,
+                    .aI64: 66i64,
+                    .aFloat: 3.1415f32,
+                    .aDouble: 3.56_f64,
+                    .aBool: true,
+                };
+
+                var sb = StringBufferInit(1024)
+                test.toJson(&sb)
+                var json = sb.cStr()
+                //printf("Json: %s\n", json)
+                assert(strcmp(json, """{"aStr":"Hello World","aU8":4,"aI8":22,"aU16":33,"aI16":55,"aInt":42,"aUInt":44,"aU64":77,"aI64":66,"float":3.14,"float":3.6,"aBool":true}""") == 0);
+                //assert(strcmp(json, """{"aPtr":null,"aStr":"Hello World","aU8":4,"aI8":22,"aU16":33,"aI16":55,"aInt":42,"aUInt":44,"aU64":77,"aI64":66,"float":3.14,"float":3.6,"aBool":1}""") == 0);
+            `
+    }
+  ]
+}

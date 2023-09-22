@@ -1,0 +1,204 @@
+
+// TODO Write helper reflection functions, this is just a POC
+// We'll only support primitive types - perhaps allow for
+// pluggable decoder/encoders
+fn SerializeTypeInfo(type) {
+   if(type == null) {
+      return "null";
+   }
+   if(type.kind == "PTR") {
+      if(type.base.kind == "CONST") {
+         if(type.base.base.kind == "CHAR") {
+            return "\\\"%s\\\""
+         }
+      }
+      // TODO:
+      return "null";
+   }
+   else if(type.kind == "U8") {
+      return "%d"
+   }
+   else if(type.kind == "I8") {
+      return "%d"
+   }
+   else if(type.kind == "U16") {
+      return "%d"
+   }
+   else if(type.kind == "I16") {
+      return "%d"
+   }
+   else if(type.kind == "U32") {
+      return "%d"
+   }
+   else if(type.kind == "I32") {
+      return "%d"
+   }
+   else if(type.kind == "U64") {
+      return "%lu"
+   }
+   else if(type.kind == "I64") {
+      return "%ld"
+   }
+   else if(type.kind == "F32") {
+      return "%f"
+   }
+   else if(type.kind == "F64") {
+      return "%f"
+   }
+   else if(type.kind == "BOOL") {
+      return "%d"
+   }
+   return "\\\"%s\\\""
+}
+
+fn SerializeStruct(sym) {
+   emit("public func (this: *%s) toJson(sb: *StringBuffer) : bool {\n", sym.name)
+   emit("    sb.append(\"{\")\n")
+   var isFirst = true
+   for(field in sym.structDecl.fields) {
+      // print("\"", field.name, "\": ", field.typeInfo, "\n")
+      // print("Notes", field.notes)
+      var lineEnd = "";
+      var name = field.name
+      var format = ""
+      var value = field.name
+
+      var ignore = false
+
+      if(field.notes) {
+         for(note in field.notes) {
+            if(note.name == "json") {
+               if(note.arguments) {
+                  for(arg in note.arguments) {
+                     if(arg.name == "format") {
+                        format = arg.value
+                     }
+                     else if(arg.name == "name") {
+                        name = arg.value
+                     }
+                     else if(arg.name == "ignore") {
+                        ignore = 1 == arg.value
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      if(ignore) {
+         continue;
+      }
+
+      if(!isFirst) {
+         lineEnd = ","
+      }
+
+      if(format != "") {
+         emit("    sb.append(\"%s\\"%%s\\":%s\", \"%s\", this.%s)\n",
+            lineEnd,
+            format,
+            name,
+            value)
+      }
+      else {
+         emit("    sb.append(\"%s\\"%%s\\":\", \"%s\")\n",
+            lineEnd,
+            name)
+         emit("    this.%s.toJson(sb)\n", field.name)
+      }
+      isFirst = false
+   }
+   emit("    sb.append(\"}\")\n")
+   emit("    return true;\n")
+   emit("\n}\n")
+
+   return true
+}
+
+fn DeserializeStruct(sym) {
+   emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool {\n", sym.name)
+   var isFirst = true
+   for(field in sym.structDecl.fields) {
+      var ignore = false
+      var name = field.name
+
+      if(field.notes) {
+         for(note in field.notes) {
+            if(note.name == "json") {
+               if(note.arguments) {
+                  for(arg in note.arguments) {
+                     if(arg.name == "name") {
+                        name = arg.value
+                     }
+                     else if(arg.name == "ignore") {
+                        ignore = 1 == arg.value
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      if(ignore) {
+         continue;
+      }
+
+      emit("    var %sField = &this.%s", field.name, field.name)
+      emit("    %sField.fromJson(context, json.get(\"%s\"))", field.name, field.name, name)
+   }
+   emit("    return true;\n")
+   emit("\n}\n")
+
+   return true
+}
+
+fn SerializeSymbol(sym) {
+   if(sym.kind == "STRUCT_DECL") {
+       return SerializeStruct(sym)
+   }
+   else {
+      error("Unsupported to_json on declaration '%s'", sym.name)
+   }
+   return false
+}
+
+fn DeserializeSymbol(sym) {
+   if(sym.kind == "STRUCT_DECL") {
+       return DeserializeStruct(sym)
+   }
+   else {
+      error("Unsupported from_json on declaration '%s'", sym.name)
+   }
+   return false
+}
+
+
+var symbols = getSymbolsByNote("json")
+
+for(sym in symbols) {
+   // print("Sym: ", sym.name, "\n")
+
+   emitClear()
+   if(SerializeSymbol(sym)) {
+      replaceDeclaration(sym.moduleFilename, emitStr())
+   }
+
+   emitClear()
+   if(DeserializeSymbol(sym)) {
+      replaceDeclaration(sym.moduleFilename, emitStr())
+   }
+   // print("Output: ", emitStr())
+}
+
+//func SerializeTest(a: *Test, sb: *StringBuffer) : bool {
+//   if(!a) {
+//      sb.append("null")
+//     return true;
+//   }
+
+//   sb.append("{")
+//   sb.append("\"%s\": %s", "aPtr", "")
+//   sb.append("}")
+//}
+
+//addDeclaration(getCurrentModuleFilename(), emitStr())

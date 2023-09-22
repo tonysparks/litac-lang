@@ -1,12 +1,38 @@
 @cFile("libtcc.h");
+// tcc is not supported on anything but x86/64
+
 
 @compiler_option(
     .os = "windows",
+    .arch = "x86",
+    .options = "-llibtcc"
+);
+
+@compiler_option(
+    .os = "windows",
+    .arch = "x86_64",
     .options = "-llibtcc"
 );
 
 @compiler_option(
     .os = "linux",
+    .arch = "x86",
+    .options = "-ltcc"
+);
+@compiler_option(
+    .os = "linux",
+    .arch = "x86_64",
+    .options = "-ltcc"
+);
+
+@compiler_option(
+    .os = "mac",
+    .arch = "x86",
+    .options = "-ltcc"
+);
+@compiler_option(
+    .os = "mac",
+    .arch = "x86_64",
     .options = "-ltcc"
 );
 

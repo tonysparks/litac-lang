@@ -10,17 +10,59 @@ import "std/unicode/utf8"
 import "std/io"
 
 public @note json {
-    format: *const char
+    format: *const char = null
+    name: *const char = null
+    ignore: bool = false
 }
 
 /**
     Scan all symbols for json note, generates a serialization
     mappings
 */
-// #precheck
-#postcheck
-    "serialization.ape"
+#precheck
+    "pre_serialization.ape"
 #end
+
+#postcheck
+    "post_serialization.ape"
+#end
+
+public trait Maker {
+    make: func(*JsonContext) : *void;
+}
+
+//public typedef func() : *void as MakeFn;
+public typedef func(typeid, *JsonContext) : *void as MakeFn;
+
+public struct JsonContext {
+    allocator: *const mem::Allocator
+    maker: MakeFn
+    //makeFns: Map<typeid, *Maker>
+}
+public func JsonContextInit(
+    maker: MakeFn,
+    allocator: *const mem::Allocator = mem::defaultAllocator) : JsonContext {
+
+    var context = JsonContext{}
+    context.init(maker, allocator)
+    return context;
+}
+public func (this: *JsonContext) init(
+    maker: MakeFn,
+    allocator: *const mem::Allocator = mem::defaultAllocator) {
+    this.allocator = allocator
+    this.maker = maker
+   // this.makeFns.init(null as (*Maker), 16, PtrHashFn, PtrEqualFn, allocator, 0_u64)
+}
+
+/*
+public func (this: *JsonContext) getMakeFn(type: typeid) : *Maker {
+    //return null
+    return this.makeFns.get(type)
+}
+public func (this: *JsonContext) bind(type: typeid, maker: *Maker) {
+    this.makeFns.put(type, maker)
+}*/
 
 
 @asStr
@@ -36,14 +78,14 @@ public enum JsonType {
 
 public typedef Array<*JsonNode> as JsonArray;
 
-struct Entry {
+public struct JsonEntry {
     key: *const char
     value: *JsonNode
 }
 
 public struct JsonObject {
     indexes: Map<*const char, i32>
-    values: Array<Entry>
+    values: Array<JsonEntry>
 }
 
 public union JsonValue {
@@ -303,7 +345,7 @@ public func (node: *JsonNode) put(key: *const char, n: *JsonNode) {
     }
 
     var copy = StringClone(key, strlen(key), node.alloc)
-    var entry = Entry {
+    var entry = JsonEntry {
         .key = copy,
         .value = n
     }
@@ -320,7 +362,7 @@ public func (node: *JsonNode) putNoDup(key: *const char, n: *JsonNode) {
         n = JSON_NULL
     }
 
-    var entry = Entry {
+    var entry = JsonEntry {
         .key = key,
         .value = n
     }
@@ -525,6 +567,44 @@ public func (node: *JsonNode) empty() : bool {
     return node.size() == 0
 }
 
+public struct JsonIterator {
+    index: i32
+    json: *JsonNode
+}
+
+public func (node: *JsonNode) iter() : JsonIterator {
+    return JsonIterator {
+        .index = 0,
+        .json = node,
+    }
+}
+public func (this: *JsonIterator) hasNext() : bool {
+    return this.index < this.json.size()
+}
+
+public func (this: *JsonIterator) next() : JsonEntry {
+    if(this.index >= this.json.size()) {
+        return JsonEntry{.key = null, .value = null}
+    }
+
+    this.index+=1
+    if(this.json.isArray()) {
+        var value = this.json.at(this.index)
+        return JsonEntry {
+            .key = null,
+            .value = value
+        }
+    }
+
+    if(this.json.isObject()) {
+        return this.json.objValue.values.get(this.index)
+    }
+
+    return JsonEntry{
+        .key = null,
+        .value = this.json
+    }
+}
 
 public func (node: *JsonNode) equals(other: *JsonNode) : bool {
     if(node == other) {
