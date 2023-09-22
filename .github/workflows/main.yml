@@ -130,7 +130,7 @@ jobs:
       - name: Install tcc
         run: |
           echo Install tcc compiler
-          brew install tcc
+          brew install --HEAD tcc
 
       # Print compiler information
       - name: Compiler Info
