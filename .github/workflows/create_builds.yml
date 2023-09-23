@@ -139,7 +139,14 @@ jobs:
       - name: Install tcc
         run: |
           echo Install tcc compiler
-          brew install tcc
+          git clone https://github.com/Alex2804/libtcc-cmake
+          cd libtcc-cmake
+          mkdir build
+          cd build
+          cmake ..
+          make
+          cd ../..
+          cp libtcc-cmake/build/libtcc.a lib/libtcc.a
 
       # Print compiler information
       - name: Compiler Info
@@ -147,7 +154,6 @@ jobs:
           echo Installed compilers
           clang --version
           gcc --version
-          tcc -version
           curl --version
 
       # Full Build
