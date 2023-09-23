@@ -1,0 +1,266 @@
+{
+    "description": "Aggregates",
+    "disabled": false,
+    "debug": true,
+    "disableLines": true,
+    "includeTypeInfos": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Static If no body",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if IS_TRUE
+                #end
+            `,
+        },
+        {
+            "name": "Static If ElseIf no body",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if IS_FALSE
+                #elseif IS_FALSE
+                #end
+            `,
+        },
+        {
+            "name": "Static If ElseIf Else no body",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if IS_FALSE
+                #elseif IS_FALSE
+                #else
+                #end
+            `,
+        },
+        {
+            "name": "Static Ifdef true",
+            "definitions": `
+                @raw("#define IS_TRUE 1");
+            `,
+            "code": `
+                #static_if IS_TRUE
+                    var x = 0
+                #end
+
+                assert(x == 0)
+            `,
+        },
+        {
+            "name": "Static Ifdef false",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if defined(IS_TRUE)
+                    var x = 0
+                #end
+            `,
+        },
+        {
+            "name": "Static Ifdef Else",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if defined(IS_FALSE)
+                    var x = 0
+                #else
+                    var x = 1
+                #end
+
+                assert(x == 1)
+            `,
+        },
+        // ifndef
+        {
+            "name": "Static Ifndef true",
+            "definitions": `
+                @raw("#define IS_TRUE 1");
+            `,
+            "code": `
+                #static_if defined(IS_TRUE)
+                    var x = 0
+                #end
+            `,
+        },
+        {
+            "name": "Static Ifndef false",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if !defined(IS_TRUE)
+                    var x = 0
+                #end
+                assert(x == 0)
+            `,
+        },
+        {
+            "name": "Static Ifndef Else",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if !defined(IS_FALSE)
+                    var x = 0
+                #else
+                    var x = 1
+                #end
+
+                assert(x == 0)
+            `,
+        },
+
+        // with elseif
+        {
+            "name": "Static If true elseif",
+            "definitions": `
+                @raw("#define IS_TRUE 1");
+            `,
+            "code": `
+                #static_if IS_TRUE
+                    var x = 0
+                #elseif defined(IS_FALSE)
+                    var x = 1
+                #end
+            `,
+        },
+        {
+            "name": "Static If false elseif",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if !defined(IS_TRUE)
+                    var x = 0
+                #elseif IS_FALSE
+                    var x = 1
+                #end
+                assert(x == 0)
+            `,
+        },
+        {
+            "name": "Static If Else elseif",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if defined(IS_FALSE)
+                    var x = 0
+                #elseif defined(IS_FALSE)
+                    var x = 1
+                #else
+                    var x = 2
+                #end
+
+                assert(x == 2)
+            `,
+        },
+        {
+            "name": "Static If Else elseif true",
+            "definitions": `
+                @raw("#define IS_TRUE 1");
+            `,
+            "code": `
+                #static_if defined(IS_FALSE)
+                    var x = 0
+                #elseif IS_TRUE
+                    var x = 1
+                #else
+                    var x = 2
+                #end
+
+                assert(x == 1)
+            `,
+        },
+
+        // Errors
+
+        {
+            "name": "Static If with If false",
+            "definitions": `
+                @raw("#define IS_TRUE 1");
+            `,
+            "code": `
+                #if false
+                    var x = -1
+                #static_if defined(IS_FALSE)
+                    var x = 0
+                #elseif IS_TRUE
+                    var x = 1
+                #else
+                    var x = 2
+                #end
+
+                assert(x == 1)
+            `,
+            "error": "'#static_if' and '#if' are only allowed as the first statement in the preprocessor chain"
+        },
+        {
+            "name": "Static If with If true",
+            "definitions": `
+                @raw("#define IS_TRUE 1");
+            `,
+            "code": `
+                #if true
+                    var x = -1
+                #static_if defined(IS_FALSE)
+                    var x = 0
+                #elseif IS_TRUE
+                    var x = 1
+                #else
+                    var x = 2
+                #end
+            `,
+            "error": "'#static_if' and '#if' are only allowed as the first statement in the preprocessor chain"
+        },
+        {
+            "name": "Static If No Cond",
+            "definitions": `
+
+            `,
+            "code": `
+                #static_if
+                    var x = 0
+                #elseif IS_TRUE
+                    var x = 1
+                #else
+                    var x = 2
+                #end
+            `,
+            "error": "'#static_if' and '#if' must include a conditional expression"
+        },
+        {
+            "name": "If No Cond",
+            "definitions": `
+
+            `,
+            "code": `
+                #if
+                    var x = 0
+                #elseif IS_TRUE
+                    var x = 1
+                #else
+                    var x = 2
+                #end
+            `,
+            "error": "'#static_if' and '#if' must include a conditional expression"
+        },
+    ]
+}

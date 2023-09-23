@@ -757,6 +757,7 @@ public func NewCompStmt(startPos: SrcPos,
                         body: Array<*Stmt>,
                         end: *CompStmt,
                         isScriptLoad: bool,
+                        isStatic: bool,
                         allocator: *const Allocator) : *Stmt {
     var stmt = new<CompStmt>(allocator)
     stmt.kind = StmtKind.COMP_STMT
@@ -768,6 +769,7 @@ public func NewCompStmt(startPos: SrcPos,
     stmt.body = body
     stmt.evaluatedStmt = null
     stmt.isScriptLoad = isScriptLoad
+    stmt.isStatic = isStatic
     return stmt as (*Stmt)
 }
 
