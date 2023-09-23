@@ -450,6 +450,7 @@ public func CopyStmt(stmt: *Stmt, module: *Module) : *Stmt {
                                    CopyStmts(original.body, module),
                                    CopyStmt(end, module) as (*CompStmt),
                                    original.isScriptLoad,
+                                   original.isStatic,
                                    module.allocator)
             return copy
         }

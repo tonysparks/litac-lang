@@ -1555,6 +1555,43 @@ func (this: using *CGen) emitTraitFuncCall(expr: *FuncCallExpr) {
     }
 }
 
+func (this: using *CGen) emitStaticCompStmt(s: *CompStmt) {
+    if(!s.isStatic) {
+        return;
+    }
+
+    if(s.type.equals(STATIC_IF)) {
+        this.emitStrn("#if", 3)
+        this.emit(" %.*s\n", s.expr.length, s.expr.buffer)
+    }
+    else if(s.type.equals(ELSEIF)) {
+        this.emitStrn("#elif", 5)
+        this.emit(" %.*s\n", s.expr.length, s.expr.buffer)
+    }
+    else if(s.type.equals(ELSE)) {
+        this.emitStrn("#else\n", 6)
+    }
+    else if(s.type.equals(END)) {
+        this.emitStrn("#endif\n", 7)
+    }
+
+    var stmts = s.body
+    for(var i = 0; i < stmts.size(); i += 1) {
+        var n = stmts.get(i)
+        this.emitStmt(n)
+        if(IsExpr(n)) {
+            this.emitStrn(";\n", 2)
+        }
+        else {
+            this.emitStrn("\n", 1)
+        }
+    }
+
+    if(s.end) {
+        this.emitStaticCompStmt(s.end)
+    }
+}
+
 public func (this: using *CGen) emitStmt(s: *Stmt) {
     if(!s) return;
 
@@ -1630,6 +1667,10 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.COMP_STMT: {
             var stmt = s as (*CompStmt)
+            if(stmt.isStatic) {
+                this.emitStaticCompStmt(stmt)
+                return;
+            }
 
             var result = stmt.evaluatedStmt
             if(result) {

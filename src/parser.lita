@@ -71,6 +71,8 @@ public struct Parser {
     tryLevel: u32
     tryErrorCounter: u64
     panicMode: bool
+
+    preprocessorLevel: i32
 }
 
 public func ParserInit(filename: *const char,
@@ -96,6 +98,7 @@ public func ParserInit(filename: *const char,
         .aggregateLevel = 0,
         .tryLevel = 0,
         .tryErrorCounter = 0,
+        .preprocessorLevel = 0,
         .panicMode = false,
     }
 
@@ -1504,8 +1507,11 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) compStatement() : *Stmt {
+func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
     var pos = p.pos()
+
+    p.preprocessorLevel += 1
+    defer p.preprocessorLevel -= 1
 
     var type: InternedString = EMPTY_STR
     var scriptExpr = StringView{};
@@ -1525,13 +1531,25 @@ func (p: *Parser) compStatement() : *Stmt {
         type = NewTokenNameIntern(*identifier, p.lita.strings)
     }
 
-    if(type.equals(IF) || type.equals(ELSEIF)) {
+    if(type.equals(STATIC_IF)) {
+        isStaticIf = true
+    }
+
+    var isIf = type.equals(IF) || type.equals(STATIC_IF);
+
+    if(p.preprocessorLevel > 1) {
+        if(isIf) {
+            p.result.addError(pos, "'#static_if' and '#if' are only allowed as the first statement in the preprocessor chain")
+            goto err;
+        }
+    }
+
+    if(type.equals(IF) || type.equals(ELSEIF) || type.equals(STATIC_IF)) {
         // read the expression
-        var pos = p.pos()
         var currentLine = pos.lineNumber
         var script = StringBufferInit(128, p.allocator)
 
-        var stream = pos.start
+        var stream = pos.end
         while(*stream) {
             var c = *stream
             if(c == '\n') {
@@ -1570,8 +1588,15 @@ func (p: *Parser) compStatement() : *Stmt {
             p.advance()
         }
 
+        script.trim()
         scriptExpr.buffer = script.cStr()
         scriptExpr.length = script.length
+
+        if(script.length == 0 && isIf) {
+            p.result.addError(pos,
+                "'#static_if' and '#if' must include a conditional expression")
+            goto err;
+        }
 
         var body = ArrayInit<*Stmt>(32, p.allocator)
         while(!p.atEnd()) {
@@ -1589,11 +1614,20 @@ func (p: *Parser) compStatement() : *Stmt {
             goto err;
         }
 
-        var end = p.compStatement()
+        var end = p.compStatement(isStaticIf)
         if(end && end.kind != StmtKind.COMP_STMT) {
             goto err;
         }
-        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), false, p.allocator)
+        return NewCompStmt(
+            pos,
+            p.pos(),
+            type,
+            scriptExpr,
+            body,
+            end as (*CompStmt),
+            false,
+            isStaticIf,
+            p.allocator)
 
     }
     else if(type.equals(PRECHECK)  ||
@@ -1643,7 +1677,16 @@ func (p: *Parser) compStatement() : *Stmt {
             goto err;
         }
         var body = Array<*Stmt>{}
-        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), isScriptLoad, p.allocator)
+        return NewCompStmt(
+            pos,
+            p.pos(),
+            type,
+            scriptExpr,
+            body,
+            end as (*CompStmt),
+            isScriptLoad,
+            false,
+            p.allocator)
     }
     else if(type.equals(ELSE)) {
         var body = ArrayInit<*Stmt>(32, p.allocator)
@@ -1662,11 +1705,20 @@ func (p: *Parser) compStatement() : *Stmt {
             goto err;
         }
 
-        var end = p.compStatement()
+        var end = p.compStatement(isStaticIf)
         if(end && end.kind != StmtKind.COMP_STMT) {
             goto err;
         }
-        return NewCompStmt(pos, p.pos(), type, scriptExpr, body, end as (*CompStmt), false, p.allocator)
+        return NewCompStmt(
+            pos,
+            p.pos(),
+            type,
+            scriptExpr,
+            body,
+            end as (*CompStmt),
+            false,
+            isStaticIf,
+            p.allocator)
     }
     else if(type.equals(ELSE_ERROR)) {
         var message = p.consume(TokenType.STRING, ErrorCode.MISSING_ERROR_MESSAGE)
@@ -1678,15 +1730,15 @@ func (p: *Parser) compStatement() : *Stmt {
             goto err;
         }
 
-        var end = p.compStatement()
+        var end = p.compStatement(isStaticIf)
         if(end && end.kind != StmtKind.COMP_STMT) {
             goto err;
         }
 
-        return NewCompStmt(pos, p.pos(), type, message.str, Array<*Stmt>{}, null, false, p.allocator)
+        return NewCompStmt(pos, p.pos(), type, message.str, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
     }
     else if(type.equals(END)) {
-        return NewCompStmt(pos, p.pos(), type, StringView{}, Array<*Stmt>{}, null, false, p.allocator)
+        return NewCompStmt(pos, p.pos(), type, StringView{}, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
     }
     else {
         p.errorAtToken(p.peek(), ErrorCode.INVALID_COMP_STMT)

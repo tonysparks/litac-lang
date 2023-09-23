@@ -286,6 +286,7 @@ public struct CompStmt {
     evaluatedStmt: *Stmt
     body: Array<*Stmt>
     isScriptLoad: bool
+    isStatic: bool
 }
 
 public struct ContinueStmt {
