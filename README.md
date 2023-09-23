@@ -636,7 +636,7 @@ If you only want to run a subset of unit tests, you can define a Regular Express
 In order to build litaC compiler you will need:
 * C compiler (tcc, clang and gcc should work -- I haven't tested Visual Studio's compiler)
 
-_NOTE_: Currently, only tested and buildable for Windows x64 and Linux (Ubuntu)
+_NOTE_: Currently, only tested and buildable for Windows x64, Linux (Ubuntu) and MacOS
 
 Admittedly, this process isn't as friendly right now as it should be.  At some point I will write some robust build scripts.  For now, `clang` is hardcoded in the scripts - but should be easy enough to switch to another compiler (tcc or gcc).
 
@@ -648,7 +648,7 @@ build_bootstrap.bat
 build.bat
 ```
 
-Linux
+Linux/Mac
 ```
 git clone https://github.com/tonysparks/litac-lang.git
 cd litac-lang
