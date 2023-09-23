@@ -436,6 +436,10 @@ func (this: *Preprocessor) typeInfoToApe(typeInfo: *TypeInfo) : ape_object_t {
     return typeObj
 }
 
+/**
+    TODO:
+        - This is incredibly incomplete, most elements are missing
+*/
 func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     var declObj = ape_object_make_map(this.ape)
     ape_object_set_map_value(declObj, "name", ape_object_make_stringf(this.ape, "%.*s", sym.name.length, sym.name.buffer))
@@ -489,9 +493,6 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
 
                         // TODO: type and defaultExpr
                         if(varField.type && varField.type.typeInfo) {
-                            //if(field.typeInfo) {
-                            //var typeDecl = this.declToApe(varField.type.typeInfo.sym)
-                            //ape_object_set_map_value(fieldObj, "sym", typeDecl)
                             var typeInfo = this.typeInfoToApe(varField.type.typeInfo)
                             ape_object_set_map_value(fieldObj, "typeInfo", typeInfo)
                         }
