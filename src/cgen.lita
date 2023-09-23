@@ -1575,15 +1575,20 @@ func (this: using *CGen) emitStaticCompStmt(s: *CompStmt) {
         this.emitStrn("#endif\n", 7)
     }
 
-    var stmts = s.body
-    for(var i = 0; i < stmts.size(); i += 1) {
-        var n = stmts.get(i)
-        this.emitStmt(n)
-        if(IsExpr(n)) {
-            this.emitStrn(";\n", 2)
-        }
-        else {
-            this.emitStrn("\n", 1)
+    {
+        this.pushScope(&CGenScope{})
+        defer this.popScope()
+
+        var stmts = s.body
+        for(var i = 0; i < stmts.size(); i += 1) {
+            var n = stmts.get(i)
+            this.emitStmt(n)
+            if(IsExpr(n)) {
+                this.emitStrn(";\n", 2)
+            }
+            else {
+                this.emitStrn("\n", 1)
+            }
         }
     }
 
