@@ -1,8 +1,18 @@
 #!/bin/bash
 
-BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -ltcc -lm -lrt -lpthread -ldl"
-#set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Darwin*)
+        LIBS="-lm -lpthread -lcurl -ldl";
+        EXE_NAME="litac_mac";
+    ;;
+    *)
+        LIBS="-lm -lrt -lpthread -lcurl -ltcc -ldl";
+        EXE_NAME="litac_linux";
+    ;;
+esac
 
+BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
 
 error_compiling() {
     echo ""
@@ -10,7 +20,7 @@ error_compiling() {
     echo "ERROR: Compiling litac compiler           "
     echo "=========================================="
     echo ""
-    exit 2
+    exit 2;
 }
 
 build_litac() {
@@ -18,18 +28,18 @@ build_litac() {
 
     cd bootstrap
 
-    ./litacc -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac_linux" -maxMemory 1GiB
+    ./litacc -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "${EXE_NAME}" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
-        error_compiling()
-        return 1
+        error_compiling
+        return 1;
     fi
 
     echo "Running litaC inception!..."
     cd ../bin
-    ./litac_linux -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB
+    ./$EXE_NAME -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
-        error_compiling()
-        return 1
+        error_compiling
+        return 1;
     fi
 
     echo Completed.
@@ -45,9 +55,4 @@ if [ -z "${LITAC_HOME}" ]; then
 else
     build_litac
 fi
-
-#del ".\bin\litacc.*" /q
-#del ".\bin\litac.*" /q
-
-
 

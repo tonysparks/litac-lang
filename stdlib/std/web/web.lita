@@ -1,12 +1,50 @@
 import "std/string_buffer"
 import "std/string_view"
 import "std/libc"
+import "std/libc/signal"
 import "std/web/mongoose"
 import "std/mem"
 import "std/map"
+import "std/atomic"
 
 import using "std/web/web_request"
 
+@doc("""
+
+A hello world web application:
+
+```litac
+import "std/web"
+
+@get_request(.uri = "/echo")
+public func Hello(ctx: *WebContext) : i32 {
+    var req = ctx.request.getQueryValue("say")
+
+
+    return 200
+}
+
+func main(len: i32, args: **char) : i32 {
+    var server: WebServer;
+    var config = WebConfig{}
+    printf("Starting http server: %s\n", config.addr)
+
+    server.init(&config)
+
+    server.start()
+
+    printf("Terminated http server")
+    return 0
+}
+```
+
+""");
+
+var globalSignalNumber: Atomic<i32>;
+
+func signalHandler(signo: i32) {
+    globalSignalNumber.set(signo)
+}
 
 @doc("Callback function from a web request annotation")
 public typedef func(*WebContext): i32 as WebController;
@@ -35,15 +73,9 @@ public struct WebContext {
 
 public const MAX_HTTP_HEADERS = MG_MAX_HTTP_HEADERS;
 
-public struct WebHeader {
-    //name: StringView
-    //value: StringBuffer
-    value: *const char
-}
-
 public struct WebResponse {
     status: i32
-    headers: Map<*const char, WebHeader>
+    headers: Map<*const char, *const char>
     body: StringBuffer
 }
 
@@ -51,6 +83,7 @@ public struct WebConfig {
     addr: *const char = "http://0.0.0.0:8080"
     poll: i32
     userdata: *void
+    disableSignals: bool
 }
 
 public enum WebStatus {
@@ -63,24 +96,11 @@ public struct WebServer {
     config: *WebConfig
     mg: mg_mgr
     poll: i32
+
+    scratch: StringBuffer
+
+    connection: *mg_connection
 }
-
-/*
-@get_request(
-    .uri = "blah",
-    .method = ["GET","PUT"])
-
-@GetRequest{
-    .uri = "blah",
-    .method = ["GET","PUT"]}
-
-@note GetRequest {
-    uri: *const char
-    method: [5]*const char = [5]*const char {
-        "GET",
-        null
-    }
-}*/
 
 
 @doc("""
@@ -91,8 +111,20 @@ public func (this: *WebServer) init(config: *WebConfig,
     this.allocator = allocator
     this.config = config
 
+    this.scratch = StringBufferInit(2046, allocator)
+
     mg_mgr_init(&this.mg)
-    mg_http_listen(&this.mg, config.addr, WebCallbackFn, this)
+    this.connection = mg_http_listen(&this.mg, config.addr, WebCallbackFn, this)
+    if(!this.connection) {
+        return WebStatus.ERROR
+    }
+
+    if(!this.config.disableSignals) {
+        globalSignalNumber.init(0)
+        signal(SIGINT, signalHandler)
+        signal(SIGTERM, signalHandler)
+    }
+
     return WebStatus.OK
 }
 
@@ -100,8 +132,15 @@ public func (this: *WebServer) init(config: *WebConfig,
     Starts the web server, blocks indefinetly
 """)
 public func (this: *WebServer) start() {
-    for(;;) {
-        mg_mgr_poll(&this.mg, this.poll)
+    if(this.config.disableSignals) {
+        for(;;) {
+            mg_mgr_poll(&this.mg, this.poll)
+        }
+    }
+    else {
+        while(globalSignalNumber.get() == 0) {
+            mg_mgr_poll(&this.mg, this.poll)
+        }
     }
 
     mg_mgr_free(&this.mg)
@@ -140,7 +179,7 @@ func WebCallbackFn(conn: *mg_connection, ev: i32, ev_data: *void, fn_data: *void
         }
 
         var response = WebResponse {}
-        response.headers = StrMap<WebHeader>(WebHeader{}, 16, server.allocator)
+        response.headers = StrMap<*const char>(null, 16, server.allocator)
         response.body.init(1024, server.allocator)
 
         var context = WebContext {
@@ -153,21 +192,27 @@ func WebCallbackFn(conn: *mg_connection, ev: i32, ev_data: *void, fn_data: *void
         var controller = GetWebController(msg)
         response.status = controller(&context)
 
-        mg_http_reply(conn, response.status, "", response.body.cStr());
+        server.scratch.clear()
+        ConvertHeaders(&response.headers, &server.scratch)
+
+        // TODO: Switch on response types
+        // 1) Directory
+        // 2) File
+        // 3) Chunk
+        // 4) standard reply
+
+        /* Send http response */
+        mg_http_reply(
+            conn,
+            response.status,
+            server.scratch.cStr(),
+            response.body.cStr());
     }
 }
 
-
-
-func main(len: i32, args: **char) : i32 {
-    var server: WebServer;
-    var config = WebConfig{}
-    printf("Starting http server: %s\n", config.addr)
-
-    server.init(&config)
-
-    server.start()
-
-    printf("Terminated http server")
-    return 0
+func ConvertHeaders(headers: *Map<*const char, *const char>, buffer: *StringBuffer) {
+    for(var it = headers.iter(); it.hasNext();) {
+        var entry = it.next()
+        buffer.append("%s: %s\r\n", entry.key, entry.value)
+    }
 }

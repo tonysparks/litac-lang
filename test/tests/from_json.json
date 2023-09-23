@@ -1,0 +1,78 @@
+{
+  "description": "Json",
+  "disabled": false,
+  "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+  "tests": [
+    {
+      "name": "From Json Map",
+      "definitions": `
+                import "std/json";
+                import "std/json/from_json";
+                import "std/json/to_json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
+                import "std/mem";
+
+                @json
+                public struct Test {
+                    aStr: *const char
+                    aInt: i32
+                    aFloat: f32
+
+                    @json(.ignore = true)
+                    shouldNotBe: i32
+                }
+
+                public func TestMaker(type: typeid, context: *JsonContext) : *void {
+                    switch(type) {
+                        case typeof(:Test): {
+                            return context.allocator.alloc(sizeof(:Test)) as (*void)
+                        }
+                        default: return null;
+                    }
+                }
+            `,
+      "code": `
+                var test = Test {}
+
+                var json = """
+                {
+                    "aStr": "Hello World",
+                    "aInt": 4,
+                    "aFloat": 3.14,
+                }
+                """
+
+                var parser = JsonParser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson(json)
+                defer if(node) node.free()
+
+                assert(node != null)
+                assert(!parser.hasError())
+
+                var context = JsonContextInit(.maker = TestMaker)
+                test.fromJson(&context, node)
+                assert(strcmp(test.aStr, "Hello World") == 0)
+                assert(test.aInt == 4)
+
+                var x = test.aFloat - 3.14
+                assert(x < 0.1 && x > -0.1)
+                //printf("S: %s I: %d\n", test.aStr, test.aInt)
+                //context.bind(typeof(:Test), &test)
+            `
+    }
+  ]
+}

@@ -1,8 +1,18 @@
 #!/bin/bash
 
-BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -lm -lrt -lpthread %options% -ldl"
-#set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Darwin*)
+        LIBS="-lm -lpthread -lcurl -ldl";
+        EXE_NAME="litac_mac";
+    ;;
+    *)
+        LIBS="-lm -lrt -lpthread -lcurl -ltcc -ldl";
+        EXE_NAME="litac_linux";
+    ;;
+esac
 
+BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
 
 error_compiling() {
     echo ""
@@ -26,7 +36,7 @@ run_tests() {
     echo "Compiling litaC tests..."
 
     cd ./bin
-    ./litac_linux -verbose -strict -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
+    ./$EXE_NAME -verbose -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
     result=$?
     if [ $result -gt 0 ]; then
         error_compiling

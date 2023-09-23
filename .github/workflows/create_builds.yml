@@ -125,3 +125,53 @@ jobs:
           git add -A
           git commit -m "update to latest bootstrap source"
           git push
+
+  full-build-macos:
+    # The type of runner that the job will run on
+    runs-on: macos-13
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # Install tcc
+      - name: Install tcc
+        run: |
+          echo Install tcc compiler
+          brew install tcc
+
+      # Print compiler information
+      - name: Compiler Info
+        run: |
+          echo Installed compilers
+          clang --version
+          gcc --version
+          tcc -version
+          curl --version
+
+      # Full Build
+      - name: Full Build
+        run: |
+          echo Full Build
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_bootstrap_full.sh
+
+      # Test LitaC Compiler
+      - name: Test LitaC Compiler
+        run: |
+          echo Testing LitaC Compiler
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_test.sh
+
+      # Commit the litac_mac.c generated file
+      - name: Commit litac_mac.c
+        run: |
+          echo Commit Changes
+          git config --global user.name "tonysparks"
+          git config --global user.email "anthony.sparks31@gmail.com"
+
+          git pull
+          git add -A
+          git commit -m "update to latest bootstrap source"
+          git push

@@ -38,6 +38,7 @@ public enum ErrorCode {
     MISSING_AS,
     MISSING_GENERIC_END,
     MISSING_COMP_STMT_END,
+    MISSING_ERROR_MESSAGE,
 
     RANGE_INTEGER,
     RANGE_LONG,
@@ -89,7 +90,7 @@ public const errorCodeText = []*const char {
     [ErrorCode.MISSING_AS] = "Missing 'as'",
     [ErrorCode.MISSING_GENERIC_END] = "Missing >",
     [ErrorCode.MISSING_COMP_STMT_END] = "Missing #end",
-
+    [ErrorCode.MISSING_ERROR_MESSAGE] = "Missing error message",
 
     [ErrorCode.RANGE_INTEGER] = "Integer literal out of range",
     [ErrorCode.RANGE_LONG] = "Long literal out of range",

@@ -1,0 +1,158 @@
+import "std/string_buffer";
+import "std/string";
+import "std/string_view";
+import "std/map";
+import "std/array";
+import "std/json"
+
+public func (this: *u8) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asInt() as (u8)
+}
+public func (this: *i8) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asInt() as (i8)
+}
+public func (this: *u16) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asInt() as (u16)
+}
+public func (this: *i16) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asInt() as (i16)
+}
+public func (this: *u32) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asInt() as (u32)
+}
+public func (this: *i32) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asInt() as (i32)
+}
+public func (this: *u64) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asLong() as (u64)
+}
+public func (this: *i64) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asLong() as (i64)
+}
+public func (this: *usize) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asLong() as (usize)
+}
+
+public func (this: *f64) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asFloat() as (f64)
+}
+public func (this: *f32) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asFloat() as (f32)
+}
+
+public func (this: *bool) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asBool()
+}
+
+public func (this: **const char) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = json.asString()
+}
+
+public func (this: *StringView) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = StringViewInit(json.asString())
+}
+
+public func (this: *String) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    this.format("%s", json.asString())
+}
+
+public func (this: *StringBuffer) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    this.append("%s", json.asString())
+}
+
+// public func (this: *T) fromJson<T>(json: *JsonNode) {
+//     var value = *this
+//     value.fromJson(sb)
+// }
+
+public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    if(!json.isObject()) {
+        return;
+    }
+
+    var makeFn = context.getMakeFn(typeof(:V))
+    if(!makeFn) {
+        return;
+    }
+
+    for(var it = json.iter(); it.hasNext();) {
+        var entry = it.next()
+        // TODO: How do we create instances of V
+        // stack vs. heap alloc -- how do we robustly
+        // tell which to use??
+
+        var value = makeFn() as (V)
+        this.put(entry.key, value.fromJson(context, entry.value))
+    }
+}
+/*
+public func (this: *Array<V>) fromJson<V>(context: *JsonContext, json: *JsonNode) {
+    if(!this) {
+        sb.appendStrn("null", 4)
+        return;
+    }
+
+    sb.append("[")
+    var isFirst = true
+    for(var i = 0; i < this.size(); i+= 1) {
+        var entry = this.get(i)
+        if(!isFirst) {
+            sb.append(",")
+        }
+        isFirst = false
+
+        entry.fromJson(sb)
+    }
+    sb.append("]")
+}*/

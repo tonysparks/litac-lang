@@ -681,6 +681,25 @@ public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
     return null;
 }
 
+public func (d: *Decl) getNoteArgument(name: *const char, arg: *const char) : *CallArg {
+    var note = d.getNote(name)
+    if(!note) {
+        return null;
+    }
+
+    if(note.arguments.empty()) {
+        return null;
+    }
+
+    for(var i = 0; i < note.arguments.size(); i+=1) {
+        var a = note.arguments.getPtr(i)
+        if(a.argName.str.equalsStr(arg)) {
+            return a;
+        }
+    }
+    return null;
+}
+
 public func (this: *TypeSpec) getBaseType() : *TypeSpec {
     if(!this) return null;
 

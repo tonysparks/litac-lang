@@ -1,8 +1,8 @@
 {
-    "description": "Compile time Statment",
-    "disabled": false,
-    "includeTypeInfos": true,
-    "program": `
+  "description": "Compile time Statment",
+  "disabled": false,
+  "includeTypeInfos": true,
+  "program": `
         @include("assert.h");
         @foreign func assert(e:bool):void;
 
@@ -12,10 +12,50 @@
             %code%
         }
     `,
-    "tests": [
-		{
-            "name": "If True ElseIf End",
-            "definitions": `
+  "tests": [
+    {
+      "name": "Error directive not active in module",
+      "definitions": `
+                    import "std/libc"
+                    import "std/system"
+
+                    #if true
+                    #else_error "This is an error"
+                    #end
+                `
+    },
+    {
+      "name": "Error directive active in module",
+      "definitions": `
+                      import "std/libc"
+                      import "std/system"
+
+                      #if false
+                      #else_error "This is an error"
+                      #end
+                  `,
+      "error": "This is an error"
+    },
+    {
+      "name": "Error directive not active in function",
+      "code": `
+            #if true
+            #else_error "This is an error"
+            #end
+        `
+    },
+    {
+      "name": "Error directive in else clause",
+      "code": `
+                    #if false
+                    #else_error "This is an error"
+                    #end
+                `,
+      "error": "This is an error"
+    },
+    {
+      "name": "If True ElseIf End",
+      "definitions": `
 
                 #if(1 == 1)
                     struct X {
@@ -30,15 +70,15 @@
                 #end
 
             `,
-            "code": `
+      "code": `
                 var x = Thing{4}
                 assert(x.x == 4)
 
             `
-        },
-        {
-            "name": "If False ElseIf True End",
-            "definitions": `
+    },
+    {
+      "name": "If False ElseIf True End",
+      "definitions": `
 
                 #if(1 == 0)
                     struct X {
@@ -53,15 +93,15 @@
                 #end
 
             `,
-            "code": `
+      "code": `
                 var x = Thing{4}
                 assert(x.y == 4)
 
             `
-        },
-        {
-            "name": "If false ElseIf false Else End",
-            "definitions": `
+    },
+    {
+      "name": "If false ElseIf false Else End",
+      "definitions": `
 
                 #if(1 == 0)
                     struct X {
@@ -81,16 +121,16 @@
                 #end
 
             `,
-            "code": `
+      "code": `
                 var x = Thing{4}
                 assert(x.z == 4)
 
             `
-        },
+    },
 
-        {
-            "name": "If true import note",
-            "definitions": `
+    {
+      "name": "If true import note",
+      "definitions": `
 
                 #if(true)
                     import "std/libc"
@@ -103,31 +143,33 @@
                 #end
 
             `,
-            "code": `
+      "code": `
                 assert(tony == 4)
                 assert(SEEK_END)
             `
-        },
-        {
-            "name": "If OS",
-            "definitions": `
+    },
+    {
+      "name": "If OS",
+      "definitions": `
                 import "std/libc"
                 import "std/system"
                 #if(OS == "WINDOWS")
                     const OpSys = "WINDOWS"
-                #else
-                    // TODO: expand this when we add more OS's
+                #elseif (OS == "LINUX")
                     const OpSys = "LINUX"
+                #elseif (OS == "MAC")
+                    // TODO: expand this when we add more OS's
+                    const OpSys = "MAC"
                 #end
 
             `,
-            "code": `
+      "code": `
                 assert(strcmp(OpSys, OSAsStr(GetOS())) == 0)
             `
-        },
-        {
-            "name": "Body If Simple",
-            "definitions": `
+    },
+    {
+      "name": "Body If Simple",
+      "definitions": `
                 func test<T>(i: T) : T {
                     #if getTypeKind("i") == "BOOL"
                         return i
@@ -140,7 +182,7 @@
                     #end
                 }
             `,
-            "code": `
+      "code": `
                 var x : i32 = test<i32>(1)
                 var y : f32 = test<f32>(3.0f)
                 var z : bool = test<bool>(true)
@@ -149,10 +191,10 @@
                 assert(y == 7.4f)
                 assert(z == true)
             `
-        },
-        {
-            "name": "Body If MultiLine",
-            "definitions": `
+    },
+    {
+      "name": "Body If MultiLine",
+      "definitions": `
                 func test<T>(i: T) : T {
                     #if getTypeKind("i") == "BOOL" ||\
                         getTypeKind("i") == "I32"
@@ -164,7 +206,7 @@
                     #end
                 }
             `,
-            "code": `
+      "code": `
                 var x : i32 = test<i32>(1)
                 var y : f32 = test<f32>(3.0f)
                 var z : bool = test<bool>(true)
@@ -173,10 +215,10 @@
                 assert(y == 7.4f)
                 assert(z == true)
             `
-        },
-        {
-            "name": "Preprocessor Syntax Body Error",
-            "definitions": `
+    },
+    {
+      "name": "Preprocessor Syntax Body Error",
+      "definitions": `
                 func test<T>(i: T) : T {
                     #if this->junk??
                         return i
@@ -187,25 +229,25 @@
                     #end
                 }
             `,
-            "code": `
+      "code": `
                 var x : i32 = test<i32>(1)
                 assert(false)
             `,
-            "error": "error evaluating preprocessor expression: 'No prefix parse function for \">\" found' for line: 'this->junk??'"
-        },
-        {
-            "name": "Preprocessor Syntax Module Error",
-            "definitions": `
+      "error": "error evaluating preprocessor expression: 'No prefix parse function for \">\" found' for line: 'this->junk??'"
+    },
+    {
+      "name": "Preprocessor Syntax Module Error",
+      "definitions": `
                 #if(??OS  "WINDOWS")
                     const OS = "Windows"
                 #else
                     const OS ="NotWindows"
                 #end
             `,
-            "code": `
+      "code": `
                 assert(false)
             `,
-            "error": "error evaluating preprocessor expression: 'Illegal token' for line: '(??OS  \"WINDOWS\")'"
-        },
-    ]
+      "error": "error evaluating preprocessor expression: 'Illegal token' for line: '(??OS  \"WINDOWS\")'"
+    }
+  ]
 }

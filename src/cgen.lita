@@ -1236,6 +1236,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(note.type.name.equals(&COMPILER_OPTION)) {
         var ccOption = CCompilerOption{
             .os = OS.Lita_OSType_OTHER,
+            .arch = Arch.Lita_ArchType_UNKNOWN,
             .options = StringView{},
         }
 
@@ -1271,6 +1272,9 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 if(attr.argName.str.equalsStr("os")) {
                     ccOption.os = OSFromStr(value.buffer, value.length)
                 }
+                else if(attr.argName.str.equalsStr("arch")) {
+                    ccOption.arch = ArchFromStr(value.buffer, value.length)
+                }
                 else if(attr.argName.str.equalsStr("options")) {
                     ccOption.options = value
                 }
@@ -1281,6 +1285,9 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 }
                 else if(i == 1) {
                     ccOption.options = value
+                }
+                else if(i == 2) {
+                    ccOption.arch = ArchFromStr(value.buffer, value.length)
                 }
             }
         }

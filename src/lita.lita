@@ -29,7 +29,9 @@ import "build"
 import "lsp/references"
 import "lsp/workspace"
 
-import "tcc/libtcc"
+#if ARCH == "X86" || ARCH == "X86_64"
+    import "tcc/libtcc"
+#end
 
 public const MAX_PREFIX_SIZE = 32
 public const LITA_VERSION = "0.1.2-alpha"
@@ -92,6 +94,7 @@ public enum TypeInfoOption {
 
 public struct CCompilerOption {
     os: OS
+    arch: Arch
     options: StringView
 }
 
@@ -413,6 +416,7 @@ func LibtccErrorFunc(data: *void, msg: *const char) : void {
 }
 
 public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *const char) : bool {
+#if ARCH == "X86" || ARCH == "X86_64"
     this.startCapture(MetricType.CGEN)
     var cgen = CGen{}
     cgen.init(this, null)
@@ -472,11 +476,12 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
         }
     }
 
-
     if(tcc_compile_string(state, sourceCode) < 0) {
         return false
     }
-
+#else
+    Panic("tcc is not supported on non x86/64 CPU architectures")
+#end
     return true
 }
 
@@ -554,11 +559,17 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
 
     // Add in any @compiler_option's defined in modules
     var os = GetOS()
+    var arch = GetArch()
     for(var i = 0; i < this.compilerOptions.size(); i+= 1) {
         var option = this.compilerOptions.getPtr(i)
 
         // skip this option, if the OS doesn't match
         if(option.os != OS.Lita_OSType_OTHER && option.os != os) {
+            continue
+        }
+
+        // skip this option, if the Arch doesn't match
+        if(option.arch != Arch.Lita_ArchType_UNKNOWN && option.arch != arch) {
             continue
         }
 
@@ -568,7 +579,9 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
 
     if(this.options.isStrict) {
         var index = commandStr.indexOf("%options%")
-        commandStr.replace(index, index+strlen("%options%"), buffer.cStr())
+        if(index >= 0) {
+            commandStr.replace(index, index+strlen("%options%"), buffer.cStr())
+        }
 
         buffer.free()
     }

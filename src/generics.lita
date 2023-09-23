@@ -78,8 +78,23 @@ func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
-            // TODO:
-            assert(false)
+            str.append("func(")
+            for(var i = 0; i < type.args.size(); i+=1) {
+                if(i > 0) {
+                    str.append(",")
+                }
+                var arg = type.args.get(i)
+                GetGenericName(checker, arg, str)
+            }
+            str.append("):")
+            if(type.ret) {
+                GetGenericName(checker, type.ret, str)
+            }
+            else {
+                str.append("void")
+            }
+            printf("Name: %.*s\n", str.length, str.buffer)
+            break;
         }
         case TypeSpecKind.NONE:
         default:

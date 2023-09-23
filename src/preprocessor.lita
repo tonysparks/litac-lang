@@ -91,6 +91,7 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     // TODO: Read options from LitaOptions; allow for custom command line options
     //ape_set_global_constant(this.ape, "OS", ape_object_make_string(this.ape, "LINUX"))
     ape_set_global_constant(this.ape, "OS", ape_object_make_string(this.ape, OSAsStr(GetOS())))
+    ape_set_global_constant(this.ape, "ARCH", ape_object_make_string(this.ape, ArchAsStr(GetArch())))
     ape_set_global_constant(this.ape, "DEBUG", ape_object_make_bool(lita.options.isDebug))
     ape_set_global_constant(this.ape, "REFLECTION", ape_object_make_bool(lita.options.typeOption != TypeInfoOption.NONE))
     ape_set_global_constant(this.ape, "TESTING", ape_object_make_bool(lita.options.testsOnly))
@@ -114,6 +115,7 @@ public func (this: *Preprocessor) init(lita: *Lita) {
     ape_set_native_function(this.ape, "emit", ApeEmit, &this.callContext)
     ape_set_native_function(this.ape, "emitClear", ApeEmitClear, &this.callContext)
     ape_set_native_function(this.ape, "emitStr", ApeEmitStr, &this.callContext)
+    ape_set_native_function(this.ape, "error", ApeError, &this.callContext)
 
     // TODO: Add a Preprocessor Logger that can be enabled via the command line
     // ape_set_native_function(this.ape, "log", ApeLog, &this.callContext)
@@ -176,6 +178,11 @@ public func (this: *Preprocessor) evaluateForModule(
     }
     else if(comp.type.equals(POSTPARSE)) {
         this.callContext.postParse(module, moduleStmt, comp)
+    }
+    else if(comp.type.equals(ELSE_ERROR)) {
+        this.lita.result.addError(
+            comp.startPos, "%.*s", comp.expr.length, comp.expr.buffer)
+
     }
     else if(comp.type.equals(IF)     ||
             comp.type.equals(ELSEIF) ||
@@ -242,6 +249,12 @@ public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, com
         else if(comp.end) {
             comp.evaluatedStmt = this.evaluateForFunction(checker, comp.end)
         }
+    }
+
+    else if(comp.type.equals(ELSE_ERROR)) {
+        this.lita.result.addError(
+            comp.startPos, "%.*s", comp.expr.length, comp.expr.buffer)
+
     }
 
     if(!comp.evaluatedStmt) {
@@ -399,6 +412,34 @@ func (this: *Preprocessor) addNotes(obj: ape_object_t, module: *Module, attribut
     }
 }
 
+
+func (this: *Preprocessor) typeInfoToApe(typeInfo: *TypeInfo) : ape_object_t {
+    var typeObj = ape_object_make_map(this.ape)
+    ape_object_set_map_value(typeObj, "name", ape_object_make_stringf(this.ape, "%.*s", typeInfo.name.length, typeInfo.name.buffer))
+    ape_object_set_map_string(typeObj, "kind", TypeKindAsStr(typeInfo.kind))
+    switch(typeInfo.kind) {
+        case TypeKind.PTR: {
+            var baseTypeObj = this.typeInfoToApe(typeInfo.ptrOf)
+            ape_object_set_map_value(typeObj, "base", baseTypeObj)
+            break
+        }
+        case TypeKind.CONST: {
+            var baseTypeObj = this.typeInfoToApe(typeInfo.ptrOf)
+            ape_object_set_map_value(typeObj, "base", baseTypeObj)
+            break
+        }
+        default:{}
+    }
+    if(typeInfo.sym) {
+        ape_object_set_map_value(typeObj, "symbol", this.declToApe(typeInfo.sym))
+    }
+    return typeObj
+}
+
+/**
+    TODO:
+        - This is incredibly incomplete, most elements are missing
+*/
 func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     var declObj = ape_object_make_map(this.ape)
     ape_object_set_map_value(declObj, "name", ape_object_make_stringf(this.ape, "%.*s", sym.name.length, sym.name.buffer))
@@ -432,7 +473,7 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
             var fieldsArray = ape_object_make_array(this.ape)
             var aggDecl = sym.decl as (*AggregateDecl)
             for(var i = 0; i < aggDecl.fields.size(); i += 1) {
-                var field = aggDecl.fields.get(i)
+                var field = aggDecl.fields.getPtr(i)
 
                 var fieldObj = ape_object_make_map(this.ape)
                 switch(field.kind) {
@@ -451,6 +492,10 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
                         ape_object_set_map_value(fieldObj, "name", name)
 
                         // TODO: type and defaultExpr
+                        if(varField.type && varField.type.typeInfo) {
+                            var typeInfo = this.typeInfoToApe(varField.type.typeInfo)
+                            ape_object_set_map_value(fieldObj, "typeInfo", typeInfo)
+                        }
 
                         this.addNotes(fieldObj, sym.declared, varField.attributes)
                         break
@@ -511,9 +556,7 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
             break
         }
     }
-
     return declObj
-
 }
 
 
@@ -553,69 +596,7 @@ func (this: *CallContext) postParse(module: *Module, moduleStmt: *ModuleStmt, co
 
 func ApeEmit(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
-    /*if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
-        context.logErrors()
-        return ape_object_make_null()
-    }*/
-
-    var argIndex = 1
-    var element = ape_object_get_string(args[0]) as (*const char)
-    if(element) {
-        var str: *const char = element
-        while(*str) {
-            var c = *str
-            if(c == '%') {
-                if(str[1] == '%') {
-                    context.buffer.append("%s", "%") // escaped %
-                }
-                else {
-                    if(argIndex >= argc) {
-                        context.pp.lita.result.addError(context.comp.startPos, "invalid argument index, there are more format parameters than supplied function arguments")
-                        return ape_object_make_null()
-                    }
-
-                    if(str[1] == 's') {
-                        var arg = ape_object_get_string(args[argIndex]) as (*const char)
-                        context.buffer.append("%s", arg)
-                    }
-                    else if(str[1] == 'f') {
-                        var arg = ape_object_get_number(args[argIndex]) as (f64)
-                        context.buffer.append("%f", arg)
-                    }
-                    else if(str[1] == 'd') {
-                        var arg = ape_object_get_number(args[argIndex]) as (i64)
-                        context.buffer.append("%d", arg)
-                    }
-                    else if(str[1] == 'b') {
-                        var arg = ape_object_get_bool(args[argIndex]) as (bool)
-                        context.buffer.append("%s", arg ? "true" : "false")
-                    }
-                    else {
-                        context.pp.lita.result.addError(context.comp.startPos, "invalid format parameter: '%%%c'", str[1])
-                        return ape_object_make_null()
-                    }
-                    argIndex += 1
-                    str += 2
-                    continue
-                }
-            }
-            else if(c == '\\') {
-                if(str[1] == '\\' && str[2] == 'n') {
-                    context.buffer.append("\\n")
-                    str += 3
-                    continue
-                }
-                else {
-                    context.buffer.append("\\\\")
-                }
-            }
-
-            context.buffer.append("%c", c)
-            str += 1
-        }
-    }
-
-    return ape_object_make_null()
+    return FormatStr(context, &context.buffer, argc, args)
 }
 
 func ApeEmitClear(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
@@ -626,9 +607,85 @@ func ApeEmitClear(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
 func ApeEmitStr(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
-    //printf("String: %s\n", context.buffer.cStr())
     return ape_object_make_string(ape, context.buffer.cStr())
 }
+
+func ApeError(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var sb = StringBufferInit(1024, context.pp.lita.allocator)
+    var result = FormatStr(context, &sb, argc, args)
+    context.pp.lita.result.addError(context.comp.startPos, "%s", sb.cStr())
+    return result;
+}
+
+func FormatStr(
+    context: *CallContext,
+    buffer: *StringBuffer,
+    argc: i32,
+    args: *ape_object_t) : ape_object_t {
+
+    var argIndex = 1
+    var str = ape_object_get_string(args[0]) as (*const char)
+    if(!str) {
+        return ape_object_make_null()
+    }
+
+    while(*str) {
+        var c = *str
+        if(c == '%') {
+            if(str[1] == '%') {
+                buffer.append("%s", "%") // escaped %
+                str += 2
+                continue
+            }
+            else {
+                if(argIndex >= argc) {
+                    context.pp.lita.result.addError(context.comp.startPos, "invalid argument index, there are more format parameters than supplied function arguments")
+                    return ape_object_make_null()
+                }
+
+                if(str[1] == 's') {
+                    var arg = ape_object_get_string(args[argIndex]) as (*const char)
+                    buffer.append("%s", arg)
+                }
+                else if(str[1] == 'f') {
+                    var arg = ape_object_get_number(args[argIndex]) as (f64)
+                    buffer.append("%f", arg)
+                }
+                else if(str[1] == 'd') {
+                    var arg = ape_object_get_number(args[argIndex]) as (i64)
+                    buffer.append("%d", arg)
+                }
+                else if(str[1] == 'b') {
+                    var arg = ape_object_get_bool(args[argIndex]) as (bool)
+                    buffer.append("%s", arg ? "true" : "false")
+                }
+                else {
+                    context.pp.lita.result.addError(context.comp.startPos, "invalid format parameter: '%%%c'", str[1])
+                    return ape_object_make_null()
+                }
+                argIndex += 1
+                str += 2
+                continue
+            }
+        }
+        else if(c == '\\') {
+            if(str[1] == '\\') {
+                buffer.append("\\")
+                str += 2
+                continue
+            }
+        }
+
+        buffer.append("%c", c)
+        str += 1
+    }
+
+    return ape_object_make_null()
+}
+
+
 
 func ApeGetSymbolsWithNote(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
@@ -676,7 +733,7 @@ func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t)
     }
 
     var code = ape_object_get_string(args[1]) as (*const char)
-    if(!code) {
+    if(!code || code[0] == '\0') {
         context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
         return ape_object_make_null()
     }
@@ -778,8 +835,23 @@ func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_objec
 
             for(var i = 0; i < stmts.declarations.size(); i += 1) {
                 var decl = stmts.declarations.get(i)
+                var name = decl.name.str
 
-                var sym = context.checker.getTypeByName(decl.name.str)
+                // TODO: Should clean this up with a util
+                // function for getting the canonical name
+                // of a declaration
+                var buffer = [MAX_SYMBOL_NAME]char{0};
+                if(decl.kind == StmtKind.FUNC_DECL) {
+                    var funcDecl = decl as (*FuncDecl)
+                    if(!funcDecl.getName(buffer)) {
+                        context.pp.lita.result.addError(context.comp.startPos,
+                            "symbol '%.*s' could not get declaration method name", decl.name.str.length, decl.name.str.buffer)
+                        return ape_object_make_null()
+                    }
+                    name = context.pp.lita.strings.internCopy(buffer)
+                }
+
+                var sym = context.checker.getTypeByName(name)
                 if(!sym) {
                     context.pp.lita.result.addError(context.comp.startPos,
                         "symbol '%.*s' not found for replacement", decl.name.str.length, decl.name.str.buffer)
@@ -788,6 +860,15 @@ func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_objec
 
                 sym.decl = decl
                 decl.sym = sym
+
+                // mark that this symbol was created from the pre-processor
+                sym.flags |= SymbolFlags.IS_FROM_PREPROCESSOR
+                sym.flags |= SymbolFlags.IS_INCOMPLETE
+
+                if(context.resolveSymbols) {
+                    context.checker.resolveSymbol(sym)
+                    context.checker.finishResolveSymbol(sym)
+                }
             }
         }
     }

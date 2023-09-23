@@ -1298,7 +1298,6 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
 
         for(var j = 0; j < note.arguments.size(); j += 1) {
             var arg = note.arguments.get(j)
-
             if(!this.resolveStmt(arg.argExpr)) {
                 success = false
                 continue

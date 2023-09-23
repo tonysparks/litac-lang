@@ -15,8 +15,8 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  # Build for linux
+  build-linux:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -52,6 +52,107 @@ jobs:
           clang --version
           gcc --version
           tcc -version
+      # Build bootstrap LitaC
+      - name: Build Bootstrap
+        run: |
+          echo Building bootstrap
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_bootstrap.sh
+
+      # Build LitaC Compiler
+      - name: Build LitaC Compiler
+        run: |
+          echo Building LitaC Compiler
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build.sh
+
+      # Test LitaC Compiler
+      - name: Test LitaC Compiler
+        run: |
+          echo Testing LitaC Compiler
+          export set LITAC_HOME=$GITHUB_WORKSPACE
+          sh $GITHUB_WORKSPACE/build_test.sh
+
+  # Build for windows
+  build-windows:
+    # The type of runner that the job will run on
+    runs-on: windows-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Set up Clang
+        uses: egor-tensin/setup-clang@v1
+        with:
+          version: latest
+          platform: x64
+
+      # Print compiler information
+      - name: Compiler Info
+        run: |
+          echo Installed compilers
+          clang --version
+
+      # Build bootstrap LitaC
+      - name: Build Bootstrap
+        shell: cmd
+        run: |
+          echo Building bootstrap
+          set LITAC_HOME=%GITHUB_WORKSPACE%
+          %GITHUB_WORKSPACE%/build_bootstrap.bat
+
+      # Build LitaC Compiler
+      - name: Build LitaC Compiler
+        shell: cmd
+        run: |
+          echo Building LitaC Compiler
+          set LITAC_HOME=%GITHUB_WORKSPACE%
+          %GITHUB_WORKSPACE%/build.bat
+
+      # Test LitaC Compiler
+      - name: Test LitaC Compiler
+        shell: cmd
+        run: |
+          echo Testing LitaC Compiler
+          set LITAC_HOME=%GITHUB_WORKSPACE%
+          %GITHUB_WORKSPACE%/build_test.bat
+
+  # Build for macos
+  build-macos:
+    # The type of runner that the job will run on
+    runs-on: macos-13
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # Install tcc
+      - name: Install tcc
+        run: |
+          echo Install tcc compiler
+          git clone https://github.com/Alex2804/libtcc-cmake
+          cd libtcc-cmake
+          mkdir build
+          cd build
+          cmake ..
+          make
+          cd ../..
+          cp libtcc-cmake/build/libtcc.a lib/libtcc.a
+        # brew install --HEAD tcc
+
+
+      # Print compiler information
+      - name: Compiler Info
+        run: |
+          echo Installed compilers
+          clang --version
+          gcc --version
+          curl --version
+        # tcc -version
+
       # Build bootstrap LitaC
       - name: Build Bootstrap
         run: |

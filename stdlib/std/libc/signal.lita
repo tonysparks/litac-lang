@@ -1,0 +1,33 @@
+@include("<signal.h>");
+
+public typedef func(i32): void as SignalHandler;
+
+@foreign
+public const SIGINT: i32;
+
+@foreign
+public const SIGTERM: i32;
+
+@foreign
+public const SIGKILL: i32;
+
+@foreign
+public const SIGABRT: i32;
+
+@foreign
+public const SIGILL: i32;
+
+@foreign
+public const SIGPIPE: i32;
+
+@foreign
+public const SIGQUIT: i32;
+
+@foreign
+public const SIGSYS: i32;
+
+// TODO: Define other signals
+// TODO: Windows differences??
+
+@foreign
+public func signal(sig: i32, handler: SignalHandler) : i32;

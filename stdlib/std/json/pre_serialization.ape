@@ -1,0 +1,23 @@
+
+fn SerializeStruct(sym) {
+   emit("public func (this: *%s) toJson(sb: *StringBuffer) : bool { return false; }\n", sym.name, sym.name)
+   emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool { return false; }\n", sym.name, sym.name)
+
+   return true
+}
+
+fn SerializeSymbol(sym) {
+   if(sym.kind == "STRUCT_DECL") {
+      return SerializeStruct(sym)
+   }
+   return false
+}
+
+var symbols = getSymbolsByNote("json")
+for(sym in symbols) {
+   emitClear()
+   // print("~Sym: ", sym.name, "\n")
+   if(SerializeSymbol(sym)) {
+      addDeclaration(sym.moduleFilename, emitStr())
+   }
+}

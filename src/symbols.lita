@@ -279,7 +279,12 @@ public func (this: *Scope) addSymbol(name: InternedString,
             }
         }
 
-        isError = isError && !decl.hasNote("generated")
+        // We allow for redefining annotated generated
+        // types, as this types can be redefined by
+        // the preprocessor or the compiler
+        if(decl.hasNote("generated")) {
+            isError = false
+        }
 
         if(isError) {
             var existingSym = symbolStorage.get(name)
@@ -306,6 +311,10 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
     if(decl.hasNote("foreign")) {
         flags |= SymbolFlags.IS_FOREIGN
+    }
+
+    if(decl.hasNote("generated")) {
+        flags |= SymbolFlags.IS_GENERATED
     }
 
     if(decl.hasNote("hidden")) {
