@@ -3,11 +3,11 @@
 unameOut="$(uname -s)"
 case "${unameOut}" in
     Darwin*)
-        LIBS="-lm -lpthread -lcurl -ldl";
+        LIBS="-lm -lpthread";
         EXE_NAME="litac_mac";
     ;;
     *)
-        LIBS="-lm -lrt -lpthread -lcurl -ltcc -ldl";
+        LIBS="-lm -lrt -lpthread";
         EXE_NAME="litac_linux";
     ;;
 esac
@@ -28,7 +28,7 @@ build_litac() {
 
     cd bootstrap
 
-    ./litacc -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "${EXE_NAME}" -maxMemory 1GiB
+    ./litacc -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "${EXE_NAME}" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;

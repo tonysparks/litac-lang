@@ -29,12 +29,11 @@ import "build"
 import "lsp/references"
 import "lsp/workspace"
 
-#if ARCH == "X86" || ARCH == "X86_64"
-    import "tcc/libtcc"
-#end
+import "tcc/libtcc"
+
 
 public const MAX_PREFIX_SIZE = 32
-public const LITA_VERSION = "0.1.2-alpha"
+public const LITA_VERSION = "0.1.3-alpha"
 
 public struct Lita {
     allocator: *const Allocator
@@ -416,7 +415,7 @@ func LibtccErrorFunc(data: *void, msg: *const char) : void {
 }
 
 public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *const char) : bool {
-#if ARCH == "X86" || ARCH == "X86_64"
+#static_if LITA_X86 || LITA_X64
     this.startCapture(MetricType.CGEN)
     var cgen = CGen{}
     cgen.init(this, null)
@@ -479,10 +478,12 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
     if(tcc_compile_string(state, sourceCode) < 0) {
         return false
     }
+    return true
+
 #else
     Panic("tcc is not supported on non x86/64 CPU architectures")
-#end
     return true
+#end
 }
 
 public func (this: *Lita) emitC(module: *Module, cFilename: *const char) : bool {

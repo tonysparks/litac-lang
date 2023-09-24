@@ -140,7 +140,7 @@ jobs:
           cmake ..
           make
           cd ../..
-          cp libtcc-cmake/build/libtcc.a lib/libtcc.a
+          cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a
         # brew install --HEAD tcc
 
 
@@ -151,6 +151,7 @@ jobs:
           clang --version
           gcc --version
           curl --version
+          ls -l $GITHUB_WORKSPACE/lib
         # tcc -version
 
       # Build bootstrap LitaC
