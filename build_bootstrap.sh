@@ -3,7 +3,7 @@
 osType="$(uname -s)"
 case "${osType}" in
     Darwin*)
-        LIBS="-lm -lpthread -lcurl -ldl";
+        LIBS="-lm -lpthread -lcurl";
         SOURCE_FILE="litac_mac.c";
     ;;
     # CYGWIN*)    ;;
@@ -19,7 +19,7 @@ esac
 archType="$(uname -m)"
 case "${archType}" in
     x86_64|i386|i686)
-        LIBS+="-ltcc -ldl";
+        LIBS+=" -ltcc -ldl";
     ;;
 esac
 
