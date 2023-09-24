@@ -26,7 +26,7 @@ public @note json {
 #postcheck
     "post_serialization.ape"
 #end
-
+/*
 public trait Maker {
     make: func(*JsonContext) : *void;
 }
@@ -53,7 +53,7 @@ public func (this: *JsonContext) init(
     this.allocator = allocator
     this.maker = maker
     //this.makeFns.init(null as (*Maker), 16, PtrHashFn, PtrEqualFn<typeid>, allocator, 0_u64)
-}
+}*/
 
 /*
 public func (this: *JsonContext) getMakeFn(type: typeid) : *Maker {
