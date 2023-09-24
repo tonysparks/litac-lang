@@ -140,7 +140,7 @@ jobs:
           cmake ..
           make
           cd ../..
-          cp -force libtcc-cmake/build/libtcc.a lib/libtcc.a
+          cp --force libtcc-cmake/build/libtcc.a lib/libtcc.a
         # brew install --HEAD tcc
 
 
