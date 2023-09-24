@@ -141,8 +141,6 @@ jobs:
           make
           cd ../..
           cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a
-        # brew install --HEAD tcc
-
 
       # Print compiler information
       - name: Compiler Info
@@ -151,8 +149,6 @@ jobs:
           clang --version
           gcc --version
           curl --version
-          ls -l $GITHUB_WORKSPACE/lib
-        # tcc -version
 
       # Build bootstrap LitaC
       - name: Build Bootstrap

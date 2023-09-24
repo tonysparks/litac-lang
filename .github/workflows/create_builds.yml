@@ -146,7 +146,7 @@ jobs:
           cmake ..
           make
           cd ../..
-          cp libtcc-cmake/build/libtcc.a lib/libtcc.a
+          cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a
 
       # Print compiler information
       - name: Compiler Info
