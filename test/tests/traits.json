@@ -1229,5 +1229,57 @@
             `,
             "error": "lvalue required as unary '&' operand"
         },
+        {
+            "name" : "Traits With Complex Type",
+            "definitions": `
+
+
+                public trait List {
+                    size: func() : i32
+                    add:  func(*ComplexType) : void
+                }
+
+                struct ArrayList {
+                    len: i32
+                }
+
+
+                struct ComplexType {
+                    a: i32
+                    list: List
+                }
+
+                func (this: *ArrayList) size() : i32 {
+                    return this.len
+                }
+                func (this: *ArrayList) add(item : *ComplexType) {
+                    this.len += item.a
+                }
+
+                func DoSomething(x: List, item: *ComplexType) : i32 {
+                    x.add(item)
+                    return x.size()
+                }
+            `,
+            "code": `
+                var array = ArrayList{
+                    .len = 0
+                }
+                var complex4 = ComplexType {
+                    .a = 4,
+                    .list = &array
+                }
+
+                var complex2 = ComplexType {
+                    .a = 2,
+                    .list = &array
+                }
+                var result = DoSomething(&array, &complex4)
+                assert(result == 4)
+
+                result = DoSomething(&array, &complex2)
+                assert(result == 6)
+            `,
+        },
     ]
 }

@@ -948,13 +948,15 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc:
     // the current module
     if(!type && this.bypassing) {
         var name = typeName.view
-        var index = name.indexOf("::")
+        var index = name.lastIndexOfAt("::")
         if(index < 0) {
             return null
         }
-        var mod = name.substring(0, index)
+
+        var modulePath = ToModulePath(name.substring(0, index))
         var filename = [MAX_PATH]char{0}
-        if(!FindModulePath(this.lita, mod, filename)) {
+
+        if(!FindModulePath(this.lita, modulePath, filename)) {
             return null
         }
 
