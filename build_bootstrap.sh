@@ -1,7 +1,7 @@
 #!/bin/bash
 
-unameOut="$(uname -s)"
-case "${unameOut}" in
+osType="$(uname -s)"
+case "${osType}" in
     Darwin*)
         LIBS="-lm -lpthread -lcurl -ldl";
         SOURCE_FILE="litac_mac.c";
@@ -11,8 +11,15 @@ case "${unameOut}" in
     # MSYS_NT*)   ;;
     # Linux*)     ;;
     *)
-        LIBS="-lm -lrt -lpthread -lcurl -ltcc -ldl"
+        LIBS="-lm -lrt -lpthread -lcurl"
         SOURCE_FILE="litac_linux.c"
+    ;;
+esac
+
+archType="$(uname -m)"
+case "${archType}" in
+    x86_64|i386|i686)
+        LIBS+="-ltcc -ldl";
     ;;
 esac
 
