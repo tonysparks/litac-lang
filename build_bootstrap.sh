@@ -19,7 +19,7 @@ esac
 archType="$(uname -m)"
 case "${archType}" in
     x86_64|i386|i686)
-        LIBS+=" -ltcc -ldl";
+        LIBS="${LIBS} -ltcc -ldl";
     ;;
 esac
 
