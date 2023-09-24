@@ -151,6 +151,7 @@ jobs:
           clang --version
           gcc --version
           curl --version
+          ls -l $GITHUB_WORKSPACE/lib
         # tcc -version
 
       # Build bootstrap LitaC
