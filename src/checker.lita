@@ -947,14 +947,22 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc:
     // modules without having to import them all into
     // the current module
     if(!type && this.bypassing) {
+        //printf("Finding type in bypass: %.*s\n", typeName.length, typeName.buffer)
         var name = typeName.view
-        var index = name.indexOf("::")
+        var index = name.lastIndexOfAt("::")
         if(index < 0) {
             return null
         }
-        var mod = name.substring(0, index)
+
+        var modulePath = ToModulePath(name.substring(0, index))
         var filename = [MAX_PATH]char{0}
-        if(!FindModulePath(this.lita, mod, filename)) {
+
+        if(!FindModulePath(this.lita, modulePath, filename)) {
+            for(var it = this.lita.modules.iter(); it.hasNext();) {
+                var entry = it.next()
+                printf("Module: %.*s\n",entry.value.id.packageName.length, entry.value.id.packageName.buffer)
+            }
+            printf("Couldn't find module in bypass: %.*s\n", modulePath.length, modulePath.buffer)
             return null
         }
 

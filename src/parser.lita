@@ -357,7 +357,7 @@ func (p: *Parser) notes(notes: *Array<*NoteStmt>) : bool {
     while(p.match(TokenType.AT)) {
         var pos = p.prevPos()
 
-        var type = p.identifierType(true)
+        var type = p.qualifiedIdentifierType(true)
         if(!type) {
             goto err;
         }
@@ -1321,7 +1321,7 @@ func (p: *Parser) primary() : *Expr {
     }
 
     if(p.check(TokenType.IDENTIFIER)) {
-        var name = p.identifierType(true)
+        var name = p.qualifiedIdentifierType(true)
         if(!name) {
             goto err;
         }
@@ -2149,7 +2149,7 @@ func (p: *Parser) type(disambiguate: bool = false) : *TypeSpec {
             return spec as (*TypeSpec)
         }
         case TokenType.IDENTIFIER: {
-            return p.identifierType(disambiguate) as (*TypeSpec)
+            return p.qualifiedIdentifierType(disambiguate) as (*TypeSpec)
         }
         case TokenType.LEFT_BRACKET: {
             var spec = p.arrayType()
@@ -2185,7 +2185,32 @@ func (p: *Parser) identifierType(disambiguate: bool) : *TypeSpec {
     var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
     sb.appendStrn(name.str.buffer, name.str.length)
 
-    if(p.match(TokenType.COLON_COLON)) {
+    var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.typeAllocator)
+    spec.name = p.lita.strings.internCopy(sb.cStr(), sb.length)
+
+    if(p.check(TokenType.LESS_THAN)) {
+        spec.genericArgs = p.tryGenericArguments(disambiguate)
+    }
+
+    return spec;
+
+err:
+    return null
+}
+
+func (p: *Parser) qualifiedIdentifierType(disambiguate: bool) : *TypeSpec {
+    var pos = p.pos()
+
+    var name = p.identifier()
+    if(name.type != TokenType.IDENTIFIER) {
+        goto err;
+    }
+
+    var buffer:[MAX_SYMBOL_NAME]char;
+    var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    sb.appendStrn(name.str.buffer, name.str.length)
+
+    while(p.match(TokenType.COLON_COLON)) {
         var identifier = p.identifier()
         if(identifier.type != TokenType.IDENTIFIER) {
             goto err;

@@ -27,13 +27,13 @@ public enum ModuleFlags {
 }
 
 public struct ModuleId {
-    filename: [MAX_PATH]char   // full path the file of this module
+    filename: [MAX_PATH]char      // full path the file of this module
 
     filenameKey: [MAX_PATH]char   // full path the file of this module, normalized to a 'key', not
                                   // to be used for file retrieval operations
 
-    packageName: StringView    // relative path from the main module's directory
-    name: InternedString       // the name of the module
+    packageName: InternedString   // relative path from the main module's directory
+    name: InternedString          // the name of the module
 }
 
 public struct ModuleImport {
@@ -89,7 +89,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     var filename: [MAX_PATH]char;
     var pathStr = StringInit(filename, MAX_PATH, 0);
     pathStr.format("%s/stdlib/std/builtins.lita", lita.options.litaPath)
-    builtins.id.fromFile(lita, pathStr.cStr())
+    builtins.id.fromFile(lita, StringViewInit("std/builtins"), pathStr.cStr())
 
     AddBuiltin(lita, &BOOL_TYPE)
     AddBuiltin(lita, &CHAR_TYPE)
@@ -135,11 +135,12 @@ public func GetBuiltinSymbol(typeid: Typeid) : *Symbol {
 }
 
 public func NewModule(lita: *Lita,
+                      packageName: StringView,
                       filename: *const char) : *Module {
 
     var mod = new<Module>(lita.allocator)
     mod.init(lita)
-    mod.id.fromFile(lita, filename)
+    mod.id.fromFile(lita, packageName, filename)
     return mod
 }
 
@@ -425,15 +426,64 @@ public func (this: *Module) print(header: *const char) {
     printf("}\n")
 }
 
-public func (moduleId: *ModuleId) fromFile(lita: *Lita, filename: *const char) {
+public func (moduleId: *ModuleId) fromFile(lita: *Lita, packageName: StringView, filename: *const char) {
     GetAbsolutePath(CurrentWorkingPath(), filename, moduleId.filename)
     GetFilenameKey(filename, moduleId.filenameKey)
 
-    moduleId.packageName = StringViewInit(moduleId.filename, 0)
+    var pkg = ToModuleName(packageName)
+    moduleId.packageName = lita.strings.internCopy(pkg.buffer, pkg.length)
 
     var pathStr = StringViewInit(moduleId.filename);
     var name = GetModuleName(pathStr)
     moduleId.name = lita.strings.internCopy(name.buffer, name.length)
+}
+
+public func ToModulePath(moduleName: StringView) : StringView {
+    @static var modulePath = [MAX_SYMBOL_NAME]char{0}
+    var len = 0
+    for(var i = 0; i < moduleName.length; i+=1) {
+        var c = moduleName.buffer[i]
+        if(c == ':') {
+            c = '/'
+
+            // skip the next character
+            i+=1
+        }
+
+        modulePath[len] = c
+        len += 1
+    }
+
+    return StringView {
+        .length = len,
+        .buffer = modulePath,
+    }
+}
+
+public func ToModuleName(modulePath: StringView) : StringView {
+    @static var moduleName = [MAX_SYMBOL_NAME]char{0}
+
+    var len = 0
+    for(var i = 0; i < modulePath.length; i+=1) {
+        var c = modulePath.buffer[i]
+        if(c == '/' || c =='\\') {
+            moduleName[len + 0] = ':'
+            moduleName[len + 1] = ':'
+            len += 2
+        }
+        else if(c == '.') {
+            continue
+        }
+        else {
+            moduleName[len] = c
+            len += 1
+        }
+    }
+
+    return StringView {
+        .length = len,
+        .buffer = moduleName,
+    }
 }
 
 public func GetModuleName(pathStr: StringView) : StringView {
@@ -462,4 +512,3 @@ public func GetModuleName(pathStr: StringView) : StringView {
         .length = endIndex - startIndex
     }
 }
-

@@ -325,7 +325,8 @@ public func (this: *Lita) parse() : *Module {
         return null;
     }
 
-    var root = NewModule(this, this.options.inputFile)
+    var packageName = GetPackageName(this.options.srcPath, this.options.inputFile)
+    var root = NewModule(this, packageName, this.options.inputFile)
     this.addModule(root)
 
     if(!ParseModule(this, root, SrcPos{})) {
@@ -741,7 +742,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
             continue;
         }
 
-        importModule = NewModule(lita, filename)
+        importModule = NewModule(lita, importStmt.name.str.view, filename)
         importStmt.moduleId = &importModule.id
         lita.addModule(importModule)
 
@@ -749,4 +750,51 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
     }
 
     return true
+}
+
+
+func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
+
+    if(!inputFile) {
+        return StringView{}
+    }
+
+    if(srcPath) {
+        var inputFileView = StringViewInit(inputFile)
+        var index = inputFileView.indexOf(srcPath)
+        if(index > -1) {
+            inputFile = &inputFile[index + strlen(srcPath) + 1]
+        }
+    }
+
+    var endCount = 0
+    var startCount = 0
+
+    var inputLen = strlen(inputFile)
+
+    while(*inputFile) {
+
+        var c = *inputFile;
+
+        if(c != '.' && c != '/' && c != '\\') {
+            break
+        }
+
+        inputFile  += 1
+        startCount += 1
+    }
+
+    for(var i = inputLen; i >= 0; i-=1) {
+        var c = inputFile[i]
+        if(c == '.') {
+            break
+        }
+
+        endCount += 1
+    }
+
+    return StringView {
+        .length = inputLen - (endCount+startCount),
+        .buffer = inputFile,
+    }
 }

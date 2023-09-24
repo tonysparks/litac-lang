@@ -130,7 +130,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
             impls)
     }
 
-    //printf("Traits Source: \n%s\n", sb.cStr())
+    // printf("Traits Source: \n%s\n", sb.cStr())
     var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
     var stmts = parser.parseModule()
     return stmts.declarations
@@ -145,23 +145,23 @@ func GenerateVTable(
     sb.append(" {\n")
 
     for(var j = 0; j < traitDecl.fields.size(); j += 1) {
-            var field = traitDecl.fields.get(j)
-            assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
-            assert(field.typeInfo != null && field.typeInfo.kind == TypeKind.FUNC_PTR)
+        var field = traitDecl.fields.get(j)
+        assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+        assert(field.typeInfo != null && field.typeInfo.kind == TypeKind.FUNC_PTR)
 
-            var fn = field.typeInfo
-            var traitField = field.traitField
-            sb.append("    %.*s: func", traitField.name.str.length, traitField.name.str.buffer)
-            PrintGenerics(fn.genericParams, sb)
-            sb.append("(*void")
-            for(var p = 0; p < fn.paramDecls.size(); p += 1) {
-                var param = fn.paramDecls.get(p)
-                sb.append(", ")
-                param.toString(sb)
-            }
-            sb.append(") : ")
-            fn.returnType.toString(sb)
-            sb.append(";\n")
+        var fn = field.typeInfo
+        var traitField = field.traitField
+        sb.append("    %.*s: func", traitField.name.str.length, traitField.name.str.buffer)
+        PrintGenerics(fn.genericParams, sb)
+        sb.append("(*void")
+        for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+            var param = fn.paramDecls.get(p)
+            sb.append(", ")
+            param.toString(sb, true)
+        }
+        sb.append(") : ")
+        fn.returnType.toString(sb, true)
+        sb.append(";\n")
     }
     sb.append("}\n")
 }
@@ -207,7 +207,7 @@ func GenerateWrapperFunctions(
             for(var p = 0; p < fn.paramDecls.size(); p += 1) {
                 var param = fn.paramDecls.get(p)
                 sb.append(", _%d: ", p)
-                param.toString(sb)
+                param.toString(sb, true)
             }
 
             if(fn.hasVarargs) {
@@ -216,7 +216,7 @@ func GenerateWrapperFunctions(
             }
 
             sb.append(") : ")
-            fn.returnType.toString(sb)
+            fn.returnType.toString(sb, true)
             sb.append(" {\n")
             {
                 if(implSym.declared.isBuiltin()) {
@@ -318,7 +318,7 @@ func PrintGenericArgs(genericArgs: *Array<*TypeInfo>, sb: *StringBuffer) {
 
         var type = genericArgs.get(x)
         assert(type)
-        type.toString(sb)
+        type.toString(sb, true)
     }
     if(genericArgs.size() > 0) {
         sb.append(">")
