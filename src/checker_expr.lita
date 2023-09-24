@@ -364,8 +364,6 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
     assert(paramType != null)
     assert(expectedType != null)
 
-//printf("Here for %.*s!!\n", paramType.name.length, paramType.name.buffer)
-
     if(name.str.equals(paramType.name)) {
         return expectedType
     }
