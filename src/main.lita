@@ -30,6 +30,8 @@ import "build"
 
 import "pkg_mgr"
 
+import "config"
+
 func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
 
@@ -227,7 +229,7 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
     }
 
     var lib:*const char = GetEnv("LITAC_HOME")
-    if(!lib) lib = "";
+    if(!lib) lib = LITAC_HOME_DEFAULT;
 
     GetAbsolutePath("", lib, options.litaPath)
 
@@ -294,16 +296,16 @@ func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
         options.compileCmd = parser.getOption("buildCmd").value
     }
     else {
-        options.compileCmd = "clang %input% -std=c99 -o %output% -D_CRT_SECURE_NO_WARNINGS"
+        options.compileCmd = BUILD_CMD_DEFAULT;
     }
 
     var cPrefix = parser.hasOption("cPrefix") ? parser.getOption("cPrefix").value : "litaC_"
     StringCopy(.src = cPrefix, .dest = options.cPrefix, .size = MAX_PREFIX_SIZE)
 
-    var outputFile = parser.hasOption("output") ? parser.getOption("output").value : "a"
+    var outputFile = parser.hasOption("output") ? parser.getOption("output").value : OUTPUT_NAME_DEFAULT
     StringCopy(.src = outputFile, .dest = options.outputFile, .size = MAX_PATH)
 
-    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : "./output"
+    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : OUTPUT_DIR_DEFAULT
     StringCopy(.src = outputPath, .dest = options.outputPath, .size = MAX_PATH)
 
     var len = strlen(options.outputPath)

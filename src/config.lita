@@ -1,0 +1,31 @@
+/*
+  definitions for compiler
+
+  these are the default options for some of the parameters
+  
+  those parameters can always be set by the command line
+*/
+
+// the default LITAC_HOME,
+// this is mostly used to look for the library definition files
+// (the `stdlib` directory)
+// if you plan to _install_ to a _system_ directory (e.g. /opt/litac/, or /usr/lib/litac)
+// you can change this to point there.
+//
+// this can be overriden by the `LITAC_HOME` environment variable
+public const LITAC_HOME_DEFAULT : *const char = "";
+
+// the default -buildCmd
+// change to 'gcc' or 'tcc' if you'd prefer
+public const BUILD_CMD_DEFAULT : *const char = "clang %input% -std=c99 -o %output% -D_CRT_SECURE_NO_WARNINGS";
+
+// default -outputDir
+// this writes the output files to the current directory,
+// you may want to change to `./output` (or similar)
+// if you'd prefer to have a separate directory for builds
+public const OUTPUT_DIR_DEFAULT : *const char = ".";
+
+// default binary name for output (-o,-output)
+// this is the default name for linux binaries
+// for windows you may want to give it a `.exe` extension
+public const OUTPUT_NAME_DEFAULT : *const char = "a.out";
