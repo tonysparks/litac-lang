@@ -44,15 +44,7 @@ build_litac() {
 
     echo Completed.
 }
+LITAC_HOME=${LITAC_HOME:-${PWD}}
 echo "Environment variable: ${LITAC_HOME}"
-if [ -z "${LITAC_HOME}" ]; then
-    echo ""
-    echo "=========================================="
-    echo "ERROR: It appears you do not have the 'LITAC_HOME' system variable defined.  Please make sure this is set to the home directory of litac"
-    echo "=========================================="
-    echo ""
-    exit 2
-else
-    build_litac
-fi
+build_litac
 
