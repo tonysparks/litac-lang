@@ -12,7 +12,122 @@
         }
     `,
     "tests": [
+        {
+            "name": "Generics Type Inference for Struct as Parameter",
+            "definitions": `
 
+                struct Test<X> {
+                    a: X
+                }
+
+                func run<K>(test: Test<K>, x: K) : i32 {
+                    return test.a + x
+                }
+            `,
+            "code": `
+                assert(run(&Test{.a = 4_i32}, 8_i32) == 12)
+            `,
+        },
+        {
+            "name": "Generics Type Inference for FuncPtr as Parameter Missing",
+            "definitions": `
+
+                typedef func<K>(K) : i32 as HashFn<K>;
+                func PtrHashFn<K>(a: K) : i32 {
+                    return a + 8;
+                }
+
+                func run<K>(f: HashFn<K>, x: K) : i32 {
+                    return f(x)
+                }
+            `,
+            "code": `
+                assert(run(&PtrHashFn, 4_i32) == 12)
+            `,
+            "error": "'PtrHashFn' is missing generic arguments ['K']"
+        },
+        {
+            "name": "Generics Type Inference for FuncPtr as Parameter",
+            "definitions": `
+
+                typedef func<K>(K) : i32 as HashFn<K>;
+                func PtrHashFn<K>(a: K) : i32 {
+                    return a + 8;
+                }
+
+                func run<K>(f: HashFn<K>, x: K) : i32 {
+                    return f(x)
+                }
+            `,
+            "code": `
+                assert(run(&PtrHashFn<i32>, 4_i32) == 12)
+            `,
+        },
+        {
+            "name": "Generics Type Inference for Func as Parameter Missing",
+            "definitions": `
+
+                typedef func<K>(K) : i32 as HashFn<K>;
+                func PtrHashFn<K>(a: K) : i32 {
+                    return a + 8;
+                }
+
+                func run<K>(f: HashFn<K>, x: K) : i32 {
+                    return f(x)
+                }
+            `,
+            "code": `
+                assert(run(PtrHashFn, 4_i32) == 12)
+            `,
+            "error": "'PtrHashFn' is missing generic arguments ['K']"
+        },
+        {
+            "name": "Generics Type Inference for Func as Parameter",
+            "definitions": `
+
+                typedef func<K>(K) : i32 as HashFn<K>;
+                func PtrHashFn<K>(a: K) : i32 {
+                    return a + 8;
+                }
+
+                func run<K>(f: HashFn<K>, x: K) : i32 {
+                    return f(x)
+                }
+            `,
+            "code": `
+                assert(run(PtrHashFn<i32>, 4_i32) == 12)
+            `,
+        },
+        {
+            "name": "Generics Type Inference from Func Ptr Generic Type",
+            "definitions": `
+                func test<T>(fn: func<T>(T):T, t: T):T {
+                    return fn<T>(t)
+                }
+                func run(t: i32) : i32 {
+                    return t
+                }
+            `,
+            "code": `
+                assert(test(&run, 4) == 4)
+            `,
+        },
+        {
+            "name": "Generics Type Inference from Func Ptr Generic Type",
+            "definitions": `
+                typedef func<V>(V):V as Func<V>
+
+                func test<T>(fn: Func<T>, t: T):T {
+                    return fn<T>(t)
+                }
+                func run(t: i32) : i32 {
+                    return t
+                }
+            `,
+            "code": `
+                assert(test(&run, 4) == 4)
+            `,
+        },
         {
             "name": "Generics Type Inference",
             "definitions": `
@@ -117,21 +232,6 @@
                 assert(test(t) == 4)
             `,
         },
-        /* TODO: Fix FuncPtr
-        {
-            "name": "Generics Type Inference from Func Ptr Generic Type",
-            "definitions": `
-                func test<T>(fn: func<T>(T):T, t: T):T {
-                    return fn<T>(t)
-                }
-                func run(t: i32) : i32 {
-                    return t
-                }
-            `,
-            "code": `
-                assert(test(&run, 4) == 4)
-            `,
-        },*/
 
         {
             "name": "Generics Type Inference from Struct of Struct Generic Type multiple",
@@ -205,25 +305,6 @@
                 assert(test(t) == 4)
             `,
         },
-
-        /* TODO: Func Ptr
-        {
-            "name": "Generics Type Inference from Func Ptr Generic Type",
-            "definitions": `
-                typedef func<V>(V):V as Func<V>
-
-                func test<T>(fn: Func<T>, t: T):T {
-                    return fn<T>(t)
-                }
-                func run(t: i32) : i32 {
-                    return t
-                }
-            `,
-            "code": `
-                assert(test(&run, 4) == 4)
-            `,
-        },*/
-
 
         {
             "name": "Generics Type Inference from Union Generic Type with typedef",
