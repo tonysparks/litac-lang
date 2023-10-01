@@ -553,7 +553,7 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
 
 func (this: using *CGen) baseTypeName(name: StringView) : StringView {
     // strip module name
-    var index = name.indexOf("::")
+    var index = name.lastIndexOfAt("::")
     if(index >= 0) {
         name = name.substring(index + 2)
     }
