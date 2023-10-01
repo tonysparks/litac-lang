@@ -56,6 +56,9 @@ public enum SymbolFlags {
     IS_MARKED_RESET         = (1<<22),
     IS_HIDDEN               = (1<<23),
     IS_FROM_PREPROCESSOR    = (1<<24),
+
+    // To control name generation
+    IS_EXPORT               = (1<<25),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -319,6 +322,10 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
     if(decl.hasNote("hidden")) {
         flags |= SymbolFlags.IS_HIDDEN
+    }
+
+    if(decl.hasNote("export")) {
+        flags |= SymbolFlags.IS_EXPORT
     }
 
     if(decl.attributes.isPublic) {

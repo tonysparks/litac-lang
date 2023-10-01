@@ -90,6 +90,10 @@ public @note test {
 public @note packed {
 }
 
+public @note export {
+    value: *const char
+}
+
 //=====================================================================================
 
 /*
