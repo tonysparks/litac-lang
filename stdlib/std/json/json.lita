@@ -37,7 +37,7 @@ public typedef func(typeid, *JsonContext) : *void as MakeFn;
 public struct JsonContext {
     allocator: *const mem::Allocator
     maker: MakeFn
-    //makeFns: Map<typeid, *Maker>
+   // makeFns: Map<typeid, *Maker>
 }
 public func JsonContextInit(
     maker: MakeFn,
@@ -52,7 +52,7 @@ public func (this: *JsonContext) init(
     allocator: *const mem::Allocator = mem::defaultAllocator) {
     this.allocator = allocator
     this.maker = maker
-   // this.makeFns.init(null as (*Maker), 16, PtrHashFn, PtrEqualFn, allocator, 0_u64)
+    //this.makeFns.init(null as (*Maker), 16, PtrHashFn, PtrEqualFn<typeid>, allocator, 0_u64)
 }*/
 
 /*

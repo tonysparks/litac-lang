@@ -636,9 +636,16 @@ If you only want to run a subset of unit tests, you can define a Regular Express
 In order to build litaC compiler you will need:
 * C compiler (tcc, clang and gcc should work -- I haven't tested Visual Studio's compiler)
 
-_NOTE_: Currently, only tested and buildable for Windows x64, Linux (Ubuntu) and MacOS
+_NOTE_: Currently, only tested and buildable for Windows x64, Linux (Ubuntu, Fedora 38) and MacOS
 
-Admittedly, this process isn't as friendly right now as it should be.  At some point I will write some robust build scripts.  For now, `clang` is hardcoded in the scripts - but should be easy enough to switch to another compiler (tcc or gcc).
+Admittedly, this process isn't as friendly right now as it should be.  At some point I will write more robust build scripts (also LitaC compiler is lacking some features to enable this).  For now, `clang` is hardcoded in the scripts - but should be easy enough to switch to another compiler (tcc or gcc).
+
+### Configure the compiler
+
+The file `src/config.lita` has some parameters to configure the compiler,
+it is documented and should be easy to grasp.
+
+### Build
 
 Windows
 ```
@@ -657,6 +664,19 @@ build.sh
 ```
 
 The `build_bootstrap.bat` will compile the `bootstrap/litac.c` file creating a `litac.exe` (`litac` on Ubuntu).  The `build.bat` file will use the `bootstrap/litac.exe` to build the compiler from lita source (`src/`) and output a new binary in `bin/litac.exe`.
+
+_NOTE_: For MacOS, `tcc` is a bit finicky to install, ideally `brew install tcc` would just work.  However, this doesn't appear to work on latest versions of MacOS.  As a work around, you can build tcc from (alternative) source:
+
+```
+git clone https://github.com/Alex2804/libtcc-cmake
+cd libtcc-cmake
+mkdir build
+cd build
+cmake ..
+make
+cd ../..
+cp libtcc-cmake/build/libtcc.a lib/libtcc.a
+```
 
 # Using LitaC Compiler
 Once you have built the `litac` executable (which will be located in the `/bin` folder after `build.bat`), you can verify the build is valid by:

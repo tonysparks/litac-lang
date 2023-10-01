@@ -229,11 +229,23 @@ public func (this: *Preprocessor) evaluateForModule(
 }
 
 @profile
-public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, comp: *CompStmt) : *Stmt {
+public func (this: *Preprocessor) evaluateForFunction(
+        checker: *TypeChecker,
+        comp: *CompStmt,
+        isFirst: bool = true) : *Stmt {
+
     assert(comp != null)
 
     if(comp.evaluatedStmt) {
         return comp.evaluatedStmt
+    }
+
+    if(!isFirst) {
+        if(comp.type.equals(IF) || comp.type.equals(STATIC_IF)) {
+            this.lita.result.addError(
+                comp.startPos, "'#static_if' and '#if' are only allowed as the first statement in the preprocessor chain.")
+            return null
+        }
     }
 
     this.callContext.checker = checker
@@ -247,8 +259,19 @@ public func (this: *Preprocessor) evaluateForFunction(checker: *TypeChecker, com
             comp.evaluatedStmt = NewBlockStmt(comp.startPos, comp.endPos, comp.body, this.lita.allocator)
         }
         else if(comp.end) {
-            comp.evaluatedStmt = this.evaluateForFunction(checker, comp.end)
+            comp.evaluatedStmt = this.evaluateForFunction(checker, comp.end, false)
         }
+    }
+    else if(comp.type.equals(STATIC_IF) ||
+            comp.type.equals(ELSE)) {
+
+        this.lita.result.addError(
+            comp.startPos, "'#static_if' is not allowed in '#if' chains")
+        return null
+    }
+    else if(comp.type.equals(ELSE_ERROR)) {
+        this.lita.result.addError(
+            comp.startPos, "%.*s", comp.expr.length, comp.expr.buffer)
     }
 
     else if(comp.type.equals(ELSE_ERROR)) {
@@ -436,6 +459,10 @@ func (this: *Preprocessor) typeInfoToApe(typeInfo: *TypeInfo) : ape_object_t {
     return typeObj
 }
 
+/**
+    TODO:
+        - This is incredibly incomplete, most elements are missing
+*/
 func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     var declObj = ape_object_make_map(this.ape)
     ape_object_set_map_value(declObj, "name", ape_object_make_stringf(this.ape, "%.*s", sym.name.length, sym.name.buffer))
@@ -489,9 +516,6 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
 
                         // TODO: type and defaultExpr
                         if(varField.type && varField.type.typeInfo) {
-                            //if(field.typeInfo) {
-                            //var typeDecl = this.declToApe(varField.type.typeInfo.sym)
-                            //ape_object_set_map_value(fieldObj, "sym", typeDecl)
                             var typeInfo = this.typeInfoToApe(varField.type.typeInfo)
                             ape_object_set_map_value(fieldObj, "typeInfo", typeInfo)
                         }

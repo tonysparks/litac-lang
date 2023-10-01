@@ -22,6 +22,7 @@ public enum ErrorCode {
     INVALID_COMP_STMT,
     INVALID_DEFAULT_ASSIGNMENT,
     INVALID_TRAIT_MEMBER,
+    INVALID_TYPE_IDENTIFIER,
 
     MISSING_COMMA,
     MISSING_SEMICOLON,
@@ -74,6 +75,7 @@ public const errorCodeText = []*const char {
     [ErrorCode.INVALID_COMP_STMT] = "Invalid compile time statement",
     [ErrorCode.INVALID_DEFAULT_ASSIGNMENT] = "Invalid default assignment statement, only allowed for 'struct'",
     [ErrorCode.INVALID_TRAIT_MEMBER] = "Invalid trait member, only function pointers are allowed",
+    [ErrorCode.INVALID_TYPE_IDENTIFIER] = "Invalid fully qualified type identifier.  Qualified names must follow this format 'std.example::MyType'",
 
     [ErrorCode.MISSING_COMMA] = "Missing ,",
     [ErrorCode.MISSING_SEMICOLON] = "Missing ;",

@@ -503,7 +503,7 @@ public func (this: *TypeInfo) toStringDebug() : *const char {
     return sb.cStr()
 }
 
-public func (this: *TypeInfo) toString(sb: *StringBuffer) {
+public func (this: *TypeInfo) toString(sb: *StringBuffer, fullyQualify: bool = false) {
     if(!this) return;
 
     switch(this.kind) {
@@ -522,13 +522,21 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
         case TypeKind.USIZE:
         case TypeKind.NULL:
         case TypeKind.VOID:
+        case TypeKind.GENERIC_PARAM: {
+            sb.appendStrn(this.name.buffer, this.name.length)
+            break;
+        }
         case TypeKind.STRUCT:
         case TypeKind.UNION:
         case TypeKind.TRAIT:
-        case TypeKind.ENUM:
-        case TypeKind.GENERIC_PARAM:
+        case TypeKind.ENUM: {
+            if(fullyQualify && this.sym) {
+                var name = this.sym.declared.id.packageName
+                sb.append("%.*s::", name.length, name.buffer)
+            }
             sb.appendStrn(this.name.buffer, this.name.length)
             break;
+        }
         case TypeKind.STR: {
             sb.appendStr("*const char")
             break;
@@ -541,19 +549,19 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
             else {
                 sb.appendStrn("[]", 2)
             }
-            arrayInfo.arrayOf.toString(sb)
+            arrayInfo.arrayOf.toString(sb, fullyQualify)
             break;
         }
         case TypeKind.PTR: {
             var ptrInfo = this
             sb.appendStrn("*", 1)
-            ptrInfo.ptrOf.toString(sb)
+            ptrInfo.ptrOf.toString(sb, fullyQualify)
             break;
         }
         case TypeKind.CONST: {
             var constInfo = this
             sb.appendStrn("const ", 6)
-            constInfo.constOf.toString(sb)
+            constInfo.constOf.toString(sb, fullyQualify)
             break;
         }
         case TypeKind.FUNC_PTR: {
@@ -572,10 +580,10 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
             for(var i = 0; i < funcPtrInfo.paramDecls.size(); i += 1) {
                 if(i > 0) sb.appendStrn(",", 1)
                 var paramType = funcPtrInfo.paramDecls.get(i)
-                paramType.toString(sb)
+                paramType.toString(sb, fullyQualify)
             }
             sb.appendStr(") : ")
-            funcPtrInfo.returnType.toString(sb)
+            funcPtrInfo.returnType.toString(sb, fullyQualify)
             break;
         }
         case TypeKind.FUNC: {
@@ -594,10 +602,10 @@ public func (this: *TypeInfo) toString(sb: *StringBuffer) {
             for(var i = 0; i < funcInfo.funcDecl.params.size(); i += 1) {
                 if(i > 0) sb.appendStrn(",", 1)
                 var paramType = funcInfo.funcDecl.params.get(i)
-                paramType.typeInfo.toString(sb)
+                paramType.typeInfo.toString(sb, fullyQualify)
             }
             sb.appendStr(") : ")
-            funcInfo.returnType.toString(sb)
+            funcInfo.returnType.toString(sb, fullyQualify)
             break;
         }
         case TypeKind.POISON: {
@@ -1502,6 +1510,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
 public func (this: *TypeInfo) asPtr(typeCache: *TypeCache) : *TypeInfo {
     var genericParams = ArrayInit<GenericParam>(this.funcDecl.genericParams.size(), typeCache.allocator)
     genericParams.addAll(this.funcDecl.genericParams)
+
     var paramDecls = ArrayInit<*TypeInfo>(this.funcDecl.params.size(), typeCache.allocator)
     for(var i = 0; i < this.funcDecl.params.size() ; i += 1) {
         var p = this.funcDecl.params.get(i)

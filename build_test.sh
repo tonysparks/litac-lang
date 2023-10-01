@@ -3,11 +3,11 @@
 unameOut="$(uname -s)"
 case "${unameOut}" in
     Darwin*)
-        LIBS="-lm -lpthread -lcurl -ldl";
+        LIBS="-lm -lpthread";
         EXE_NAME="litac_mac";
     ;;
     *)
-        LIBS="-lm -lrt -lpthread -lcurl -ltcc -ldl";
+        LIBS="-lm -lrt -lpthread";
         EXE_NAME="litac_linux";
     ;;
 esac

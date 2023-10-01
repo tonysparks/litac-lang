@@ -3,6 +3,7 @@ import "std/io";
 import "std/assert";
 import "std/string_view";
 import "std/libc";
+import "std/ascii";
 
 const MAX_BUFFER_SIZE = 32;
 
@@ -275,6 +276,42 @@ public func (b: *StringBuffer) insert(index: i32, format: *const char, ...) : i3
     return len
 }
 
+public func (b: *StringBuffer) trim() {
+    var start = 0
+    var end = 0
+
+    // Delete the left side
+    for(var i = 0; i < b.length; i+=1) {
+        var c = b.buffer[i]
+        if(c.isWhitespace()) {
+            end += 1
+        }
+        else {
+            break
+        }
+    }
+
+    if(end > start) {
+        b.delete(start, end)
+    }
+
+    // Delete the right side
+    start = b.length - 1;
+    end = b.length - 1;
+    for(var i = b.length - 1; i >= 0; i-=1) {
+        var c = b.buffer[i]
+        if(c.isWhitespace()) {
+            start -= 1
+        }
+        else {
+            break
+        }
+    }
+
+    if(end > start) {
+        b.delete(start, end)
+    }
+}
 
 public func (b: *StringBuffer) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
     var view = b.asStringView()

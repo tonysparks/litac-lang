@@ -93,7 +93,6 @@ func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
             else {
                 str.append("void")
             }
-            printf("Name: %.*s\n", str.length, str.buffer)
             break;
         }
         case TypeSpecKind.NONE:

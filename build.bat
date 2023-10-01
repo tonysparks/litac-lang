@@ -4,11 +4,7 @@ if [%LITAC_HOME%] == [] goto error_exit
 del ".\bin\litacc.*" /q
 del ".\bin\litac.*" /q
 
-REM set BUILD_CMD="clang.exe -std=c99 -O3 %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
-REM set BUILD_CMD="clang.exe -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
-REM set BUILD_CMD="tcc.exe %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
-REM set BUILD_CMD="clang.exe -march=native -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -mtune=znver1 -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc -llibcurl.dll.lib"
-set BUILD_CMD="clang.exe -march=native -mavx2 -mbmi2 -mpopcnt -mfma -mcx16 -mtune=znver1 -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS"
+set BUILD_CMD="clang.exe -std=c99 -g -gcodeview -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS"
 
 echo Running bootstrapped litaC...
 cp "bootstrap\litacc.exe" "bin\litacc.exe"

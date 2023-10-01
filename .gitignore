@@ -5,6 +5,7 @@ bin/*.pdb
 bin/*.rdbg
 bin/*.exp
 bin/*.lib
+bin/*.out
 bin/litac_linux
 bin/litac_mac
 bin/test.txt

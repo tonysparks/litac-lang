@@ -77,6 +77,7 @@ func main(len: i32, args: **char) : i32 {
         //"../test/tests/from_json.json",
         //"../test/tests/to_json.json",
 
+        "../test/tests/static_if.json",
         "../test/tests/single.json",
         "../test/tests/bugs.json",
         "../test/tests/bucket_allocator.json",
@@ -334,7 +335,6 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
         }
         else {
             options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
-            //options.compileCmd = "tcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
         }
     }
 

@@ -17,23 +17,23 @@
 @compiler_option(
     .os = "linux",
     .arch = "x86",
-    .options = "-ltcc"
+    .options = "-ltcc -ldl"
 );
 @compiler_option(
     .os = "linux",
     .arch = "x86_64",
-    .options = "-ltcc"
+    .options = "-ltcc -ldl"
 );
 
 @compiler_option(
     .os = "mac",
     .arch = "x86",
-    .options = "-ltcc"
+    .options = "-ltcc -ldl"
 );
 @compiler_option(
     .os = "mac",
     .arch = "x86_64",
-    .options = "-ltcc"
+    .options = "-ltcc -ldl"
 );
 
 @foreign

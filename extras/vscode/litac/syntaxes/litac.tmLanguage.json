@@ -4,7 +4,11 @@
 	"patterns": [
 		{
 			"name": "keyword.control.litac",
-			"match": "\\b(#if|#else|#elseif|#end|var|const|func|struct|union|trait|enum|@note|import|if|else|do|while|for|break|continue|switch|case|default|public|null|true|false|return|void|using|as|sizeof|typeof|offsetof|defer|typedef|goto)\\b"
+			"match": "\\b(var|const|func|struct|union|trait|enum|@note|import|if|else|do|while|for|break|continue|switch|case|default|public|null|true|false|return|void|using|as|sizeof|typeof|offsetof|defer|typedef|goto)\\b"
+		},
+		{
+			"name": "keyword.preprocessor.litac",
+			"match": "#(?:if|static_if|else|elseif|end)\\b"
 		},
 		{
 			"name": "keyword.other.litac",

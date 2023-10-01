@@ -948,13 +948,15 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc:
     // the current module
     if(!type && this.bypassing) {
         var name = typeName.view
-        var index = name.indexOf("::")
+        var index = name.lastIndexOfAt("::")
         if(index < 0) {
             return null
         }
-        var mod = name.substring(0, index)
+
+        var modulePath = ToModulePath(name.substring(0, index))
         var filename = [MAX_PATH]char{0}
-        if(!FindModulePath(this.lita, mod, filename)) {
+
+        if(!FindModulePath(this.lita, modulePath, filename)) {
             return null
         }
 
@@ -1376,6 +1378,28 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         }
         case StmtKind.COMP_STMT: {
             var compStmt = stmt as (*CompStmt)
+            if(compStmt.isStatic) {
+                var stmts = compStmt.body
+                for(var i = 0; i < stmts.size(); i+=1) {
+                    var s = stmts.get(i)
+                    if(!this.resolveStmt(s)) {
+                        return false
+                    }
+                }
+                //
+                // HACK: In order to properly type check
+                // we create a temporary scope, but we only
+                // put the if body in the actual working scope
+                //
+                this.pushScope(&Scope{})
+                defer this.popScope()
+
+                if(compStmt.end && !this.resolveStmt(compStmt.end)) {
+                    return false
+                }
+                return true
+            }
+
             var stmt = this.lita.preprocessor.evaluateForFunction(this, compStmt)
             if(!stmt) {
                 return false;
