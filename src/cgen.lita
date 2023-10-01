@@ -970,7 +970,8 @@ public func (this: using *CGen) cName(sym: *Symbol) : *const char {
                 return sb.cStrConst()
             }
             else {
-                // TODO warning "export argument should be string"
+                // warning "export argument should be string"
+                assert(false)
             }
         }
         else {
