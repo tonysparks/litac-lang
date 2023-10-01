@@ -959,8 +959,8 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
 public func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
 
-    if(sym.flags & SymbolFlags.IS_EXPORT) {
-        var note = sym.decl.getNote("export")
+    if(sym.flags & SymbolFlags.IS_EXTERN) {
+        var note = sym.decl.getNote("extern")
         // TODO assert note != null
         if(!note.arguments.empty()) {
             var arg = note.arguments.getPtr(0)

@@ -58,7 +58,7 @@ public enum SymbolFlags {
     IS_FROM_PREPROCESSOR    = (1<<24),
 
     // To control name generation
-    IS_EXPORT               = (1<<25),
+    IS_EXTERN               = (1<<25),
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -324,8 +324,8 @@ public func (this: *Scope) addSymbol(name: InternedString,
         flags |= SymbolFlags.IS_HIDDEN
     }
 
-    if(decl.hasNote("export")) {
-        flags |= SymbolFlags.IS_EXPORT
+    if(decl.hasNote("extern")) {
+        flags |= SymbolFlags.IS_EXTERN
     }
 
     if(decl.attributes.isPublic) {
