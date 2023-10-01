@@ -974,7 +974,7 @@ public func (this: using *CGen) cName(sym: *Symbol) : *const char {
             }
         }
         else {
-            // TODO warning "export without argument, using default name"
+            this.result.addError(note.startPos, "argument is required'")
         }
     }
 
