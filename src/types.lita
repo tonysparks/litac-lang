@@ -1510,6 +1510,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
 public func (this: *TypeInfo) asPtr(typeCache: *TypeCache) : *TypeInfo {
     var genericParams = ArrayInit<GenericParam>(this.funcDecl.genericParams.size(), typeCache.allocator)
     genericParams.addAll(this.funcDecl.genericParams)
+
     var paramDecls = ArrayInit<*TypeInfo>(this.funcDecl.params.size(), typeCache.allocator)
     for(var i = 0; i < this.funcDecl.params.size() ; i += 1) {
         var p = this.funcDecl.params.get(i)

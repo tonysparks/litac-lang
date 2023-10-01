@@ -320,6 +320,14 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
             return false
         }
     }
+    // promote the function to a function ptr
+    else if (paramInfo.kind == TypeKind.FUNC_PTR && argInfo.kind == TypeKind.FUNC) {
+        var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
+        argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.BAND, groupExpr, this.allocator)
+        if(!this.resolveExpr(argExpr)) {
+            return false
+        }
+    }
 
     expr.node.becomeParentOf(argExpr)
     suppliedArgs.set(index, CallArg { .argExpr = argExpr })
@@ -382,11 +390,6 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
                 break;
             }
         }
-    }
-    else if(paramType.kind == TypeKind.FUNC_PTR) {
-        // TODO: Is this even necessary? Build a test case for
-        // this..
-        assert(false)
     }
 
     switch(paramType.kind) {
@@ -512,12 +515,32 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
     return null
 }
 
+func (this: *TypeChecker) checkInferrability(expr: *Expr, type: *TypeInfo) : bool {
+    // Function ptr with generic arguments can't be inferred when used as a parameter to a generic function
+    // for which we are trying to infer for, as there is nothing in the function ptr to hint for the
+    // actual type.
+
+    if(type.kind == TypeKind.FUNC && type.sym && type.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+        this.errorMissingGenericArguments(expr, type.sym.name, &type.funcDecl.genericParams)
+        return false
+    }
+    else if(type.kind == TypeKind.FUNC_PTR && !type.genericParams.empty()) {
+        this.errorMissingGenericArguments(expr, type.name, &type.genericParams)
+        return false
+    }
+    return true
+}
+
 func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *TypeInfo, suppliedArgs: *Array<CallArg>, isMethodCall: bool) : *TypeInfo {
     assert(IsFuncLike(funcType))
 
     for(var i = 0; i < expr.arguments.size(); i += 1) {
         var arg = expr.arguments.get(i)
         if(!this.resolveExpr(arg.argExpr)) {
+            goto err;
+        }
+
+        if(!this.checkInferrability(arg.argExpr, arg.argExpr.operand.typeInfo)) {
             goto err;
         }
     }
