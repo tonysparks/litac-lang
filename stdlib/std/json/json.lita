@@ -26,19 +26,16 @@ public @note json {
 #postcheck
     "post_serialization.ape"
 #end
-/*
-public trait Maker {
-    make: func(*JsonContext) : *void;
-}
 
-//public typedef func() : *void as MakeFn;
-public typedef func(typeid, *JsonContext) : *void as MakeFn;
+
+
+public typedef func(typeid, *JsonContext, *JsonNode) : *void as MakeFn;
 
 public struct JsonContext {
     allocator: *const mem::Allocator
     maker: MakeFn
-   // makeFns: Map<typeid, *Maker>
 }
+
 public func JsonContextInit(
     maker: MakeFn,
     allocator: *const mem::Allocator = mem::defaultAllocator) : JsonContext {
@@ -52,17 +49,7 @@ public func (this: *JsonContext) init(
     allocator: *const mem::Allocator = mem::defaultAllocator) {
     this.allocator = allocator
     this.maker = maker
-    //this.makeFns.init(null as (*Maker), 16, PtrHashFn, PtrEqualFn<typeid>, allocator, 0_u64)
-}*/
-
-/*
-public func (this: *JsonContext) getMakeFn(type: typeid) : *Maker {
-    //return null
-    return this.makeFns.get(type)
 }
-public func (this: *JsonContext) bind(type: typeid, maker: *Maker) {
-    this.makeFns.put(type, maker)
-}*/
 
 
 @asStr
@@ -589,7 +576,7 @@ public func (this: *JsonIterator) next() : JsonEntry {
 
     this.index+=1
     if(this.json.isArray()) {
-        var value = this.json.at(this.index)
+        var value = this.json.at(this.index - 1)
         return JsonEntry {
             .key = null,
             .value = value
@@ -597,7 +584,7 @@ public func (this: *JsonIterator) next() : JsonEntry {
     }
 
     if(this.json.isObject()) {
-        return this.json.objValue.values.get(this.index)
+        return this.json.objValue.values.get(this.index - 1)
     }
 
     return JsonEntry{

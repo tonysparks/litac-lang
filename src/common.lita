@@ -93,7 +93,7 @@ public func EscapeName(name: *const char, len: i32, sb: *StringBuffer) : *char {
                 if(n < sb.length) {
                     var nc = sb.buffer[n]
                     if(nc == ':') {
-                        sb.replace(i, i+1, "__")
+                        sb.replace(i, i+2, "__")
                         i+=2;
                         break;
                     }

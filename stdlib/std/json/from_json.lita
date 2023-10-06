@@ -121,38 +121,50 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
         return;
     }
 
-    var makeFn = context.getMakeFn(typeof(:V))
-    if(!makeFn) {
-        return;
-    }
-
+    var makeFn = context.maker;
     for(var it = json.iter(); it.hasNext();) {
-        var entry = it.next()
-        // TODO: How do we create instances of V
-        // stack vs. heap alloc -- how do we robustly
-        // tell which to use??
 
-        var value = makeFn() as (V)
-        this.put(entry.key, value.fromJson(context, entry.value))
+        var entry = it.next()
+
+#if getTypeInfo("this").base.symbol.genericArgs["V"].isPrimitive
+        var value: V;
+        var valuePtr = &value;
+
+        valuePtr.fromJson(context, entry.value)
+        this.put<K,V>(entry.key, value)
+/*
+#elseif getTypeInfo("this").base.symbol.genericArgs["V"].name == "String"
+        var value = StringInit(1024, context.allocator)
+#elseif getTypeInfo("this").base.symbol.genericArgs["V"].name == "StringView"
+        var value = StringViewInit("temp")
+        */
+#else
+        var value = makeFn != null ?
+            makeFn(typeof(:V), context, entry.value) as (V) :
+            context.allocator.alloc(sizeof(:V)) as (V)
+
+        this.put<K,V>(entry.key, value)
+#end
+
     }
 }
-/*
+
+
 public func (this: *Array<V>) fromJson<V>(context: *JsonContext, json: *JsonNode) {
-    if(!this) {
-        sb.appendStrn("null", 4)
+    if(!json || !json.isArray()) {
         return;
     }
 
-    sb.append("[")
-    var isFirst = true
-    for(var i = 0; i < this.size(); i+= 1) {
-        var entry = this.get(i)
-        if(!isFirst) {
-            sb.append(",")
-        }
-        isFirst = false
-
-        entry.fromJson(sb)
+    var makeFn = context.getMakeFn(typeof(:V))
+    for(var i = 0; i < json.size(); i += 1) {
+        var element = json.at(i)
+#if isPrimitive("this.emptyValue")
+        var value: V;
+//#elseif
+#else
+        var value = makeFn != null ?
+            makeFn() as (V) :
+            context.allocator.alloc(sizeof(:V)) as (V)
+#end
     }
-    sb.append("]")
-}*/
+}

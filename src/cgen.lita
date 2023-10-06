@@ -982,7 +982,8 @@ public func (this: using *CGen) cName(sym: *Symbol) : *const char {
     }
 
     sb.appendStr(this.options.cPrefix)
-    sb.appendStrn(sym.declared.id.name.buffer, sym.declared.id.name.length)
+    var packageName = this.escapeNameStr(sym.declared.id.packageName)
+    sb.appendStrn(packageName.buffer, packageName.length)
     sb.appendStrn("__", 2)
     sb.appendStrn(declName.buffer, declName.length)
     return sb.cStrConst()
