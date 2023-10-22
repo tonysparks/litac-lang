@@ -88,6 +88,7 @@ public func EscapeName(name: *const char, len: i32, sb: *StringBuffer) : *char {
             case ')': sb.replace(i, i+1, "_pe_");  i+=4; break;
             case ',': sb.replace(i, i+1, "_c_");   i+=3; break;
             case ' ': sb.replace(i, i+1, "_");     i+=1; break;
+            case '-': sb.replace(i, i+1, "_m_");   i+=3; break;
             case ':': {
                 var n = i + 1;
                 if(n < sb.length) {

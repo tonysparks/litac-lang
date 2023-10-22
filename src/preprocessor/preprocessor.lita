@@ -1,0 +1,414 @@
+import "std/libc"
+import "std/assert"
+import "std/array"
+import "std/map"
+import "std/string_buffer"
+import "std/string_view"
+import "std/string"
+import "std/mem"
+import "std/profile"
+import "std/regex"
+import "std/system"
+import "std/io"
+
+import "ast"
+import "ast_new"
+import "ast_copy"
+import "phase_result"
+import "checker"
+import "parser"
+import "lex"
+import "module"
+import "lita"
+import "types"
+import "symbols"
+import "intern"
+import "common"
+
+import "preprocessor/api"
+
+/*
+================================================
+    Compile time processing
+================================================
+*/
+
+
+public struct Preprocessor {
+    lita: *Lita
+    runtime: ScriptRuntime
+    callContext: CallContext
+    preCheckers: Array<CheckerContext>
+    postCheckers: Array<CheckerContext>
+
+    declQueue: Array<ScriptDecl>
+}
+
+public struct CallContext {
+    pp: *Preprocessor
+    checker: *TypeChecker
+    comp: *CompStmt
+    buffer: StringBuffer
+
+    resolveSymbols: bool
+}
+
+public struct CheckerContext {
+    module: *Module
+    stmt: *CompStmt
+}
+
+public struct DeclContext {
+    checker: *TypeChecker
+    comp: *CompStmt
+    resolveSymbols: bool
+}
+
+// We must queue our declarations because Ape does not allow
+// recursive calls into its VM, when adding a declaration, the declaration
+// itself might have preprocessor scripts that need to be invoked.  Therefore
+// we are forced to buffer these and execute any pending ones after a script run.
+public struct ScriptDecl {
+    // The context in which this declaration was created
+    ctx: DeclContext
+
+    // the module file name
+    module: *Module
+
+    // the code that is the declaration(s)
+    declarations: *ModuleStmt
+
+    // if this is meant for replacement of existing declaration
+    // or if it's additive
+    replacement: bool
+}
+
+public func PreprocessorInit(lita: *Lita) : Preprocessor {
+    var pp = Preprocessor{}
+    pp.init(lita)
+
+    return pp
+}
+
+public func (this: *Preprocessor) init(lita: *Lita) {
+    this.lita = lita
+
+    this.preCheckers.init(8, lita.allocator)
+    this.postCheckers.init(8, lita.allocator)
+
+    this.callContext.pp = this
+    this.callContext.checker = null
+    this.callContext.comp = null
+    this.callContext.resolveSymbols = false
+    this.callContext.buffer.init(1024, lita.allocator)
+
+    this.declQueue.init(256, lita.allocator)
+
+    this.registerApi()
+
+}
+
+public func (this: *Preprocessor) free() {
+    this.deregisterApi()
+}
+
+@profile
+public func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
+    var code = StringViewInit(comp.expr.buffer, comp.expr.length)
+    if(comp.isScriptLoad && comp.expr.length > 2) {
+        var filename = StringView{
+            comp.expr.buffer,
+            comp.expr.length,
+        }
+        if(!this.loadScript(comp, filename, &code)) {
+            return false
+        }
+    }
+
+    if(!this.execute(comp, code)) {
+        return false
+    }
+
+    this.drainQueue()
+
+    return true
+}
+/*
+    type: *const char
+    expr: *const char
+    body: Array<*Stmt>
+    end: *CompStmt
+    evaluatedStmt: *Stmt
+*/
+@profile
+public func (this: *Preprocessor) evaluateForModule(
+    module: *Module,
+    moduleStmt: *ModuleStmt,
+    comp: *CompStmt) {
+
+    assert(comp != null)
+
+    // TODO: we need a checker...
+    this.callContext.comp = comp
+
+    // Preprocessor directives
+    if(comp.type.equals(PRECHECK)) {
+        this.preCheckers.add(CheckerContext{module, comp})
+    }
+    else if(comp.type.equals(POSTCHECK)) {
+        this.postCheckers.add(CheckerContext{module, comp})
+    }
+    else if(comp.type.equals(POSTPARSE)) {
+        this.callContext.postParse(module, moduleStmt, comp)
+    }
+    else if(comp.type.equals(ELSE_ERROR)) {
+        this.lita.result.addError(
+            comp.startPos, "%.*s", comp.expr.length, comp.expr.buffer)
+
+    }
+    else if(comp.type.equals(IF)     ||
+            comp.type.equals(ELSEIF) ||
+            comp.type.equals(ELSE)) {
+
+        if(comp.type.equals(ELSE) || this.eval(comp)) {
+            for(var i = 0; i < comp.body.size(); i += 1) {
+                var stmt = comp.body.get(i)
+                switch(stmt.kind) {
+                    case StmtKind.IMPORT_DECL: {
+                        moduleStmt.imports.add(stmt as (*ImportDecl))
+                        break;
+                    }
+                    case StmtKind.NOTE_STMT: {
+                        moduleStmt.notes.add(stmt as (*NoteStmt))
+                        break;
+                    }
+                    case StmtKind.NOTES_DECL: {
+                        var notes = stmt as (*NotesDecl)
+                        moduleStmt.notes.addAll(notes.notes)
+                        break;
+                    }
+                    case StmtKind.BLOCK_STMT: {
+                        var block = stmt as (*BlockStmt)
+                        for(var i = 0; i < block.stmts.size(); i += 1) {
+                            var s = block.stmts.get(i)
+                            if(s.kind == StmtKind.NOTE_STMT) {
+                                moduleStmt.notes.add(s as (*NoteStmt))
+                            }
+                        }
+                    }
+                    default: {
+                        if(IsDecl(stmt)) {
+                            moduleStmt.declarations.add(stmt as (*Decl))
+                        }
+                    }
+                }
+            }
+        }
+        else if(comp.end) {
+            this.evaluateForModule(module, moduleStmt, comp.end)
+        }
+    }
+}
+
+@profile
+public func (this: *Preprocessor) evaluateForFunction(
+        checker: *TypeChecker,
+        comp: *CompStmt,
+        isFirst: bool = true) : *Stmt {
+
+    assert(comp != null)
+
+    if(comp.evaluatedStmt) {
+        return comp.evaluatedStmt
+    }
+
+    if(!isFirst) {
+        if(comp.type.equals(IF) || comp.type.equals(STATIC_IF)) {
+            this.lita.result.addError(
+                comp.startPos, "'#static_if' and '#if' are only allowed as the first statement in the preprocessor chain.")
+            return null
+        }
+    }
+
+    this.callContext.checker = checker
+    this.callContext.comp = comp
+
+    if(comp.type.equals(IF)     ||
+       comp.type.equals(ELSEIF) ||
+       comp.type.equals(ELSE)) {
+
+        if(comp.type.equals(ELSE) || this.eval(comp)) {
+            comp.evaluatedStmt = NewBlockStmt(comp.startPos, comp.endPos, comp.body, this.lita.allocator)
+        }
+        else if(comp.end) {
+            comp.evaluatedStmt = this.evaluateForFunction(checker, comp.end, false)
+        }
+    }
+    else if(comp.type.equals(STATIC_IF) ||
+            comp.type.equals(ELSE)) {
+
+        this.lita.result.addError(
+            comp.startPos, "'#static_if' is not allowed in '#if' chains")
+        return null
+    }
+    else if(comp.type.equals(ELSE_ERROR)) {
+        this.lita.result.addError(
+            comp.startPos, "%.*s", comp.expr.length, comp.expr.buffer)
+    }
+
+    if(!comp.evaluatedStmt) {
+        comp.evaluatedStmt = NewEmptyStmt(comp.startPos, comp.endPos, this.lita.allocator)
+    }
+
+    return comp.evaluatedStmt
+}
+
+public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker, isIncrementalBuild: bool) {
+    this.callContext.checker = checker
+    this.callContext.resolveSymbols = false
+
+    if(isIncrementalBuild) {
+        for(var i = 0; i < this.preCheckers.size(); i += 1) {
+            var ctx = this.preCheckers.get(i)
+            if(ctx.module.flags & ModuleFlags.INCREMENTAL_COMPILATION) {
+                this.callContext.comp = ctx.stmt
+                this.eval(ctx.stmt)
+            }
+        }
+    }
+    else {
+        for(var i = 0; i < this.preCheckers.size(); i += 1) {
+            var ctx = this.preCheckers.get(i)
+            this.callContext.comp = ctx.stmt
+            this.eval(ctx.stmt)
+        }
+    }
+}
+
+public func (this: *Preprocessor) postResolveSymbols(checker: *TypeChecker, isIncrementalBuild: bool) {
+    this.callContext.checker = checker
+    this.callContext.resolveSymbols = true
+
+    if(isIncrementalBuild) {
+        for(var i = 0; i < this.postCheckers.size(); i += 1) {
+            var ctx = this.postCheckers.get(i)
+            if(ctx.module.flags & ModuleFlags.INCREMENTAL_COMPILATION) {
+                this.callContext.comp = ctx.stmt
+                this.eval(ctx.stmt)
+            }
+        }
+    }
+    else {
+        for(var i = 0; i < this.postCheckers.size(); i += 1) {
+            var ctx = this.postCheckers.get(i)
+            this.callContext.comp = ctx.stmt
+            this.eval(ctx.stmt)
+        }
+    }
+}
+
+
+func (this: *Preprocessor) drainQueue() {
+    while(!this.declQueue.empty()) {
+        var scriptDecl = this.declQueue.pop()
+
+        var context = scriptDecl.ctx
+        var module = scriptDecl.module
+        var stmts = scriptDecl.declarations
+
+        if(!stmts) {
+            continue;
+        }
+
+        var moduleStmt = module.ast
+
+        // We are replacing existing declarations
+        if(scriptDecl.replacement) {
+            if(stmts.declarations.size()) {
+                moduleStmt.declarations.addAll(stmts.declarations)
+
+                context.checker.enterModule(module)
+                defer context.checker.leaveModule()
+
+                for(var i = 0; i < stmts.declarations.size(); i += 1) {
+                    var decl = stmts.declarations.get(i)
+                    var name = decl.name.str
+
+                    // TODO: Should clean this up with a util
+                    // function for getting the canonical name
+                    // of a declaration
+                    var buffer = [MAX_SYMBOL_NAME]char{0};
+                    if(decl.kind == StmtKind.FUNC_DECL) {
+                        var funcDecl = decl as (*FuncDecl)
+                        if(!funcDecl.getName(buffer)) {
+                            this.lita.result.addError(context.comp.startPos,
+                                "symbol '%.*s' could not get declaration method name", decl.name.str.length, decl.name.str.buffer)
+                            continue;
+                        }
+                        name = this.lita.strings.internCopy(buffer)
+                    }
+
+                    var sym = context.checker.getTypeByName(name)
+                    if(!sym) {
+                        this.lita.result.addError(context.comp.startPos,
+                            "symbol '%.*s' not found for replacement", decl.name.str.length, decl.name.str.buffer)
+                        continue;
+                    }
+
+                    sym.decl = decl
+                    decl.sym = sym
+
+                    // mark that this symbol was created from the pre-processor
+                    sym.flags |= SymbolFlags.IS_FROM_PREPROCESSOR
+                    sym.flags |= SymbolFlags.IS_INCOMPLETE
+
+                    if(context.resolveSymbols) {
+                        context.checker.resolveSymbol(sym)
+                        context.checker.finishResolveSymbol(sym)
+                    }
+                }
+            }
+        }
+        // We are adding these declarations
+        else {
+
+            if(stmts.imports.size()) {
+                moduleStmt.imports.addAll(stmts.imports)
+            }
+            if(stmts.notes.size()) {
+                moduleStmt.notes.addAll(stmts.notes)
+            }
+            if(stmts.declarations.size()) {
+                moduleStmt.declarations.addAll(stmts.declarations)
+
+                context.checker.enterModule(module)
+                defer context.checker.leaveModule()
+
+                for(var i = 0; i < stmts.declarations.size(); i += 1) {
+                    var decl = stmts.declarations.get(i)
+                    var sym = context.checker.createDeclSymbol(decl)
+
+                    // make sure every import of this module's symbol
+                    // has the new symbol we just created
+                    if(sym) {
+                        // mark that this symbol was created from the pre-processor
+                        sym.flags |= SymbolFlags.IS_FROM_PREPROCESSOR
+
+                        for(var it = module.importedBy.iter(); it.hasNext();) {
+                            var entry = it.next()
+                            var imp = entry.value
+                            imp.module.importModuleSymbol(decl.startPos, module, imp.alias, sym, sym.name, imp.isUsing)
+                        }
+
+                        if(context.resolveSymbols) {
+                            context.checker.resolveSymbol(sym)
+                            context.checker.finishResolveSymbol(sym)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+

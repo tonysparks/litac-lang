@@ -5,6 +5,63 @@ import "std/map";
 import "std/array";
 import "std/json"
 
+#precheck
+    fn json_get_generic_symbol(name, arg) {
+        return getTypeInfo(name).base.symbol.genericArgs[arg];
+    }
+
+    fn json_get_generic_has_json_note(name, arg) {
+        var sym = getTypeInfo(name).base.symbol.genericArgs[arg].symbol;
+
+        if(sym) {
+            if(sym.notes) {
+                for(note in sym.notes) {
+                    if(note.name == "json") {
+                        return true
+                    }
+                }
+            }
+        }
+
+        return false
+    }
+
+    fn json_check_generic_symbol_is_primitive(name, arg) {
+        // print("Checking ", name, " ", arg, "\n")
+        // print("TypeInfo ", getTypeInfo(name), "\n")
+        // print("Base ", getTypeInfo(name).base, "\n")
+        // print("Symbol ", getTypeInfo(name).base.symbol, "\n")
+        // print("Args ", getTypeInfo(name).base.symbol.genericArgs, "\n")
+        return getTypeInfo(name).base.symbol.genericArgs[arg].isPrimitive;
+    }
+
+    fn json_check_generic_symbol_is_string(name, arg) {
+        return getTypeInfo(name).base.symbol.genericArgs[arg].isString;
+    }
+
+    fn json_check_generic_symbol_is_pointer(name, arg) {
+        return getTypeInfo(name).base.symbol.genericArgs[arg].isPointer;
+    }
+
+    fn json_check_generic_symbol(name, arg, type) {
+        var sym = getTypeInfo(name).base.symbol.genericArgs[arg].symbol;
+
+        if(sym) {
+            return sym.declFullName == type
+        }
+        return false
+    }
+
+    fn json_check_generic_symbol(name, arg, type) {
+        var sym = getTypeInfo(name).base.symbol.genericArgs[arg].symbol;
+
+        if(sym) {
+            return sym.declFullName == type
+        }
+        return false
+    }
+#end
+
 public func (this: *u8) fromJson(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;
@@ -126,45 +183,103 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
 
         var entry = it.next()
 
-#if getTypeInfo("this").base.symbol.genericArgs["V"].isPrimitive
+#if json_check_generic_symbol_is_primitive("this", "V")
         var value: V;
         var valuePtr = &value;
 
         valuePtr.fromJson(context, entry.value)
         this.put<K,V>(entry.key, value)
-/*
-#elseif getTypeInfo("this").base.symbol.genericArgs["V"].name == "String"
-        var value = StringInit(1024, context.allocator)
-#elseif getTypeInfo("this").base.symbol.genericArgs["V"].name == "StringView"
-        var value = StringViewInit("temp")
-        */
+
+#elseif json_check_generic_symbol_is_string("this", "V")
+        var str = StringViewInit(entry.value.asString())
+
+        var value = StringClone(str.buffer, str.length, context.allocator)
+        this.put<K,V>(entry.key, value)
+
+#elseif json_check_generic_symbol("this", "V", "std::string::String")
+        var str = StringViewInit(entry.value.asString())
+
+        var clonedStr = StringClone(str.buffer, str.length, context.allocator)
+        var value = StringInit(clonedStr, str.length, str.length)
+        this.put<K,V>(entry.key, value)
+
+#elseif json_check_generic_symbol("this", "V", "std::string_view::StringView")
+        var str = StringViewInit(entry.value.asString())
+
+        var clonedStr = StringClone(str.buffer, str.length, context.allocator)
+        var value = StringViewInit(clonedStr, str.length)
+        this.put<K,V>(entry.key, value)
+
+#elseif json_check_generic_symbol("this", "V", "std::string_buffer::StringBuffer")
+        var str = StringViewInit(entry.value.asString())
+        var value = StringBufferInit(str.length, context.allocator)
+        value.appendStrn(str.buffer, str.length)
+        this.put<K,V>(entry.key, value)
+
+#elseif json_check_generic_symbol_is_pointer("this", "V")
+
 #else
         var value = makeFn != null ?
             makeFn(typeof(:V), context, entry.value) as (V) :
             context.allocator.alloc(sizeof(:V)) as (V)
 
-        this.put<K,V>(entry.key, value)
+        this.put(entry.key, value)
 #end
 
     }
 }
 
 
-public func (this: *Array<V>) fromJson<V>(context: *JsonContext, json: *JsonNode) {
+public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode) {
     if(!json || !json.isArray()) {
         return;
     }
 
-    var makeFn = context.getMakeFn(typeof(:V))
+    var makeFn = context.maker;
     for(var i = 0; i < json.size(); i += 1) {
         var element = json.at(i)
-#if isPrimitive("this.emptyValue")
-        var value: V;
-//#elseif
+#if json_check_generic_symbol_is_primitive("this", "T")
+        var value: T;
+        var valuePtr = &value;
+
+        valuePtr.fromJson(context, element)
+        this.add(value)
+
+#elseif json_check_generic_symbol_is_string("this", "T")
+        var str = StringViewInit(element.asString())
+
+        var value = StringClone(str.buffer, str.length, context.allocator)
+        this.add(value)
+
+#elseif json_check_generic_symbol("this", "T", "std::string::String")
+        var str = StringViewInit(element.asString())
+
+        var clonedStr = StringClone(str.buffer, str.length, context.allocator)
+        var value = StringInit(clonedStr, str.length, str.length)
+        this.add(value)
+
+#elseif json_check_generic_symbol("this", "T", "std::string_view::StringView")
+        var str = StringViewInit(element.asString())
+
+        var clonedStr = StringClone(str.buffer, str.length, context.allocator)
+        var value = StringViewInit(clonedStr, str.length)
+        this.add(value)
+
+#elseif json_check_generic_symbol("this", "T", "std::string_buffer::StringBuffer")
+        var str = StringViewInit(element.asString())
+        var value = StringBufferInit(str.length, context.allocator)
+        value.appendStrn(str.buffer, str.length)
+        this.add(value)
+
+#elseif json_get_generic_has_json_note("this", "T")
+        var value: T;
+        value.fromJson(context, element)
+        this.add(value)
 #else
         var value = makeFn != null ?
-            makeFn() as (V) :
-            context.allocator.alloc(sizeof(:V)) as (V)
+            makeFn(typeof(:T), context, element) as (T) :
+            context.allocator.alloc(sizeof(:T)) as (T)
+        this.add(value)
 #end
     }
 }

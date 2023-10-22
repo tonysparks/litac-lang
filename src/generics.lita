@@ -19,6 +19,10 @@ import "intern"
 public const MAX_GENERIC_NAME = 1024;
 
 func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
+    if(type == null) {
+        return;
+    }
+
     switch(type.kind) {
         case TypeSpecKind.ARRAY: {
             str.append("[]")
@@ -52,9 +56,10 @@ func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
                     }
                 }
             }
+            // Causes an issue with generic types with generic types: Map<i32, Map<i32, i32>>
             else {
                 str.append("%.*s", type.typeInfo.name.length, type.typeInfo.name.buffer)
-                nameSet = true
+                return;
             }
 
             if(!nameSet) {
@@ -120,10 +125,10 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
     GetGenericName(checker, name, genericName)
 
-
     var newNameStr = checker.lita.strings.internCopy(genericName.cStrConst(), genericName.length)
     var genericSym = checker.current.genericSymbols.get(newNameStr)
     const module = checker.current
+
 
     // if this is recompilation, we want to force creating a new
     // Declaration type

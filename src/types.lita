@@ -290,6 +290,46 @@ public func IsBooleanable(type: *TypeInfo) : bool {
     }
 }
 
+public func IsStringLike(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    if(type.kind == TypeKind.STR) {
+        return true;
+    }
+
+    if(type.kind == TypeKind.ARRAY) {
+        return IsCharLike(type.arrayOf)
+    }
+
+    if(!IsPtr(type)) {
+        return false
+    }
+
+    var ptrOf = type.ptrOf;
+    return IsCharLike(ptrOf)
+}
+
+public func IsCharLike(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.CHAR:
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.CONST: {
+            var constInfo = type
+            return IsCharLike(constInfo.constOf)
+        }
+        default: {
+            return false
+        }
+    }
+}
+
 /**
     Converts the trait method into a function pointer.  This adds the first
     void pointer argument

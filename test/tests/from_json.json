@@ -13,6 +13,440 @@
     `,
   "tests": [
     {
+        "name": "From Json Struct with Array Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+
+            @json
+            public struct Test {
+                a: Array<i32>
+            }
+        `,
+        "code": `
+            var json = """
+            {
+                "a": [1,2]
+            }
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = Test{}
+            test.fromJson(&context, node)
+
+            assert(test.a.size() == 2)
+            assert(test.a.get(0) == 1)
+            assert(test.a.get(1) == 2)
+
+        `
+    },
+    {
+        "name": "From Json Array struct Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+
+            @json
+            public struct Test {
+                a: i32
+            }
+        `,
+        "code": `
+            var json = """
+            [
+                {
+                    "a": 3
+                },
+                {
+                    "a": 4
+                },
+            ]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = ArrayInit<Test>(32)
+            test.fromJson(&context, node)
+
+            assert(test.size() == 2)
+            assert(test.get(0).a == 3)
+            assert(test.get(1).a == 4)
+
+        `
+    },
+    {
+        "name": "From Json Array string_buffer Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            ["1","2","3","4"]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = ArrayInit<StringBuffer>(32)
+            test.fromJson(&context, node)
+
+            assert(test.size() == 4)
+            assert(strcmp(test.get(0).buffer, "1") == 0)
+            assert(strcmp(test.get(1).buffer, "2") == 0)
+            assert(strcmp(test.get(2).buffer, "3") == 0)
+            assert(strcmp(test.get(3).buffer, "4") == 0)
+
+        `
+    },
+    {
+        "name": "From Json Array string_view Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_view";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            ["1","2","3","4"]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = ArrayInit<StringView>(32)
+            test.fromJson(&context, node)
+
+            assert(test.size() == 4)
+            assert(strcmp(test.get(0).buffer, "1") == 0)
+            assert(strcmp(test.get(1).buffer, "2") == 0)
+            assert(strcmp(test.get(2).buffer, "3") == 0)
+            assert(strcmp(test.get(3).buffer, "4") == 0)
+
+        `
+    },
+    {
+        "name": "From Json Array string Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            ["1","2","3","4"]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = ArrayInit<String>(32)
+            test.fromJson(&context, node)
+
+            assert(test.size() == 4)
+            assert(strcmp(test.get(0).buffer, "1") == 0)
+            assert(strcmp(test.get(1).buffer, "2") == 0)
+            assert(strcmp(test.get(2).buffer, "3") == 0)
+            assert(strcmp(test.get(3).buffer, "4") == 0)
+
+        `
+    },
+    {
+        "name": "From Json Array const char Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            ["1","2","3","4"]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = ArrayInit<*const char>(32)
+            test.fromJson(&context, node)
+
+            assert(test.size() == 4)
+            assert(strcmp(test.get(0), "1") == 0)
+            assert(strcmp(test.get(1), "2") == 0)
+            assert(strcmp(test.get(2), "3") == 0)
+            assert(strcmp(test.get(3), "4") == 0)
+
+        `
+    },
+    {
+        "name": "From Json Array i32 Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            [1,2,3,4]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = ArrayInit<i32>(32)
+            test.fromJson(&context, node)
+
+            assert(test.size() == 4)
+            assert(test.get(0) == 1)
+            assert(test.get(1) == 2)
+            assert(test.get(2) == 3)
+            assert(test.get(3) == 4)
+
+        `
+    },
+    {
+        "name": "From Json Map Map Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/string";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    case typeof(:Map<*const char, Map<*const char, String>>): {
+
+                    }
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            {
+
+                "aMap": {
+                    "second": "yes"
+                },
+                "aMapAgain": {
+                },
+            }
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = StrMap<*Map<*const char, String>>(null)
+            test.fromJson(&context, node)
+
+            assert(strcmp(test.get("aMap").get("second").buffer, "yes") == 0)
+            assert(test.get("aMapAgain").empty())
+
+        `
+    },
+    {
         "name": "From Json Map i32 Value",
         "definitions": `
             import "std/json";
@@ -61,7 +495,7 @@
         `
     },
     {
-        "name": "From Json Map String Value",
+        "name": "From Json Map String Ptr Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
@@ -126,7 +560,156 @@
 
         `
     },
-    /*
+    {
+        "name": "From Json Map String Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/string";
+            import "std/string_view";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            {
+
+                "aString": "4",
+                "aStringAgain": "8",
+            }
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = StrMap<String>(String{})
+            test.fromJson(&context, node)
+
+            assert(strcmp(test.get("aString").buffer, "4") == 0)
+            assert(strcmp(test.get("aStringAgain").buffer, "8") == 0)
+
+        `
+    },
+    {
+        "name": "From Json Map StringView Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/string";
+            import "std/string_view";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            {
+
+                "aString": "4",
+                "aStringAgain": "8",
+            }
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = StrMap<StringView>(StringView{})
+            test.fromJson(&context, node)
+
+            assert(strcmp(test.get("aString").buffer, "4") == 0)
+            assert(strcmp(test.get("aStringAgain").buffer, "8") == 0)
+
+        `
+    },
+    {
+        "name": "From Json Map StringBuffer Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string_buffer";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/string";
+            import "std/string_view";
+
+
+            public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                switch(type) {
+                    default: return null;
+                }
+            }
+        `,
+        "code": `
+            var json = """
+            {
+
+                "aString": "4",
+                "aStringAgain": "8",
+            }
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit(.maker = TestMaker)
+
+            var test = StrMap<StringBuffer>(StringBuffer{})
+            test.fromJson(&context, node)
+
+            assert(strcmp(test.get("aString").buffer, "4") == 0)
+            assert(strcmp(test.get("aStringAgain").buffer, "8") == 0)
+
+        `
+    },
     {
       "name": "From Json Struct",
       "definitions": `
@@ -148,7 +731,7 @@
                     shouldNotBe: i32
                 }
 
-                public func TestMaker(type: typeid, context: *JsonContext) : *void {
+                public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
                     switch(type) {
                         case typeof(:Test): {
                             return context.allocator.alloc(sizeof(:Test)) as (*void)
@@ -188,6 +771,6 @@
                 //printf("S: %s I: %d\n", test.aStr, test.aInt)
                 //context.bind(typeof(:Test), &test)
             `
-    }*/
+    }
   ]
 }
