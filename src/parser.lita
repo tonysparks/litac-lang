@@ -883,12 +883,22 @@ func (p: *Parser) typeOf() : *Expr {
     var expr: *Expr = null
     var type: *TypeSpec = null
 
+    var isBaseType = false
+    if(p.match(TokenType.COLON_COLON)) {
+        isBaseType = true
+        isType = true
+    }
+
     var backtrack = p.current
 
     if(isType) {
         type = p.type(true)
         if(!type) {
             goto err;
+        }
+
+        if(isBaseType) {
+            type = type.getBaseType()
         }
 
         if(p.check(TokenType.DOT)) {
