@@ -838,6 +838,12 @@ func (p: *Parser) sizeOf() : *Expr {
     var expr: *Expr = null
     var type: *TypeSpec = null
 
+    var isBaseType = false
+    if(p.match(TokenType.COLON_COLON)) {
+        isBaseType = true
+        isType = true
+    }
+
     var backtrack = p.current
 
     if(isType) {
@@ -854,7 +860,7 @@ func (p: *Parser) sizeOf() : *Expr {
             }
         }
         else {
-            expr = NewTypeIdentifierExpr(type.pos, p.pos(), type, p.allocator)
+            expr = NewTypeIdentifierExpr(type.pos, p.pos(), type, isBaseType, p.allocator)
         }
     }
     else {
@@ -897,10 +903,6 @@ func (p: *Parser) typeOf() : *Expr {
             goto err;
         }
 
-        if(isBaseType) {
-            type = type.getBaseType()
-        }
-
         if(p.check(TokenType.DOT)) {
             p.current = backtrack
             expr = p.unary()
@@ -909,7 +911,7 @@ func (p: *Parser) typeOf() : *Expr {
             }
         }
         else {
-            expr = NewTypeIdentifierExpr(type.pos, p.pos(), type, p.allocator)
+            expr = NewTypeIdentifierExpr(type.pos, p.pos(), type, isBaseType, p.allocator)
         }
     }
     else {

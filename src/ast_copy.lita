@@ -390,6 +390,7 @@ public func CopyExpr(expr: *Expr, module: *Module) : *Expr {
             var copy = NewTypeIdentifierExpr(original.startPos,
                                              original.endPos,
                                              CopyTypeSpec(original.type, module),
+                                             original.isBased,
                                              module.allocator)
             return copy
         }

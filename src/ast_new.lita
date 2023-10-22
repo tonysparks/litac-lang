@@ -519,12 +519,14 @@ public func NewIdentifierExpr(startPos: SrcPos,
 public func NewTypeIdentifierExpr(startPos: SrcPos,
                                   endPos: SrcPos,
                                   type: *TypeSpec,
+                                  isBased: bool,
                                   allocator: *const Allocator) : *Expr {
     var expr = new<TypeIdentifierExpr>(allocator)
     expr.kind = StmtKind.TYPE_IDENTIFIER_EXPR
     expr.startPos = startPos
     expr.endPos = endPos
     expr.type = type
+    expr.isBased = isBased
 
     return expr as (*Expr)
 }

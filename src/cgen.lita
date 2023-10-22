@@ -2555,7 +2555,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
             var expr = s as (*TypeIdentifierExpr)
             // TODO: Simplify this...
-            if(expr.type.typeInfo) {
+            if(expr.type.typeInfo && !expr.isBased) {
                 this.emitStr(this.cType(expr.type.typeInfo))
             }
             else {
