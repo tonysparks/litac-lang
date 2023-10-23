@@ -92,8 +92,8 @@ fn DeserializeStruct(sym) {
          continue;
       }
 
-      emit("    var %sField = &this.%s", field.name, field.name)
-      emit("    %sField.fromJson(context, json.get(\"%s\"))", field.name, field.name, name)
+      emit("    var %sField = &this.%s;", field.name, field.name)
+      emit("    %sField.fromJson(context, json.get(\"%s\")); \n", field.name, field.name, name)
    }
    emit("    return true;\n")
    emit("\n}\n")
@@ -131,11 +131,12 @@ for(sym in symbols) {
    if(SerializeSymbol(sym)) {
       replaceDeclaration(sym.moduleFilename, emitStr())
    }
+   //print("Ser: ", emitStr())
 
    emitClear()
    if(DeserializeSymbol(sym)) {
       replaceDeclaration(sym.moduleFilename, emitStr())
    }
-   // print("Output: ", emitStr())
+   //print("Deser: ", emitStr())
 }
 

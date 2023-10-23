@@ -17,6 +17,7 @@
       "definitions": `
                 import "std/json";
                 import "std/json/to_json";
+                import "std/json/from_json";
                 import "std/string_buffer";
                 import "std/array"
                 import "std/io";
@@ -69,6 +70,7 @@
       "definitions": `
                 import "std/json";
                 import "std/json/to_json";
+                import "std/json/from_json";
                 import "std/string_buffer";
                 import "std/array"
                 import "std/io";
@@ -108,6 +110,7 @@
       "definitions": `
                 import "std/json";
                 import "std/json/to_json";
+                import "std/json/from_json";
                 import "std/string_buffer";
                 import "std/map"
                 import "std/io";
@@ -159,6 +162,7 @@
       "definitions": `
                 import "std/json";
                 import "std/json/to_json";
+                import "std/json/from_json";
                 import "std/string_buffer";
                 import "std/io";
                 import "std/libc";

@@ -363,8 +363,17 @@ func (this: *Preprocessor) drainQueue() {
                     sym.flags |= SymbolFlags.IS_INCOMPLETE
 
                     if(context.resolveSymbols) {
+                        // printf("Resolving replacements\n")
                         context.checker.resolveSymbol(sym)
+                        // printf("Sym: %.*s state: %d\n", sym.name.length, sym.name.buffer, sym.state)
                         context.checker.finishResolveSymbol(sym)
+                        // if(sym.decl.kind == StmtKind.FUNC_DECL) {
+                        //     var funcDecl = decl as (*FuncDecl)
+                        //     for(var i = 0; i < funcDecl.params.size(); i+=1) {
+                        //         var param = funcDecl.params.get(i)
+                        //         printf("Param: %s\n", param.typeInfo.toStringDebug())
+                        //     }
+                        // }
                     }
                 }
             }
@@ -401,7 +410,9 @@ func (this: *Preprocessor) drainQueue() {
                         }
 
                         if(context.resolveSymbols) {
+                            printf("Resolving additiions\n")
                             context.checker.resolveSymbol(sym)
+                            printf("Sym: %.*s state: %d\n", sym.name.length, sym.name.buffer, sym.state)
                             context.checker.finishResolveSymbol(sym)
                         }
                     }
