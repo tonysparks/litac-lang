@@ -93,7 +93,7 @@ public func (this: *Preprocessor) execute(comp: *CompStmt, code: StringView) : b
             .lineNumber: comp.startPos.lineNumber /*+ ape_error_get_line_number(error)*/, // doesn't work because repl mode
             .position: comp.startPos.position /* ape_error_get_column_number(error) */
         }
-        this.lita.result.addError(pos, "error evaluating preprocessor expression: '%s' for line: \n%s", ape_error_get_message(error), ape_error_get_line(error))
+        this.lita.result.addError(pos, "error evaluating preprocessor expression: '%s' for line:\n%s", ape_error_get_message(error), ape_error_get_line(error))
         return false
     }
 

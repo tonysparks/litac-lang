@@ -74,9 +74,9 @@ func main(len: i32, args: **char) : i32 {
     var testFiles = []*const char {
         //"../test/tests/notes.json",
         // "../test/tests/misc.json", json syntax error
-        "../test/tests/from_json.json",/*
-        //"../test/tests/to_json.json",
 
+        "../test/tests/to_json.json",
+        "../test/tests/from_json.json",
         "../test/tests/static_if.json",
         "../test/tests/single.json",
         "../test/tests/bugs.json",
@@ -112,7 +112,7 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/var_decl.json",
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",*/
+        "../test/tests/generics_inference.json",
         null
     }
 
