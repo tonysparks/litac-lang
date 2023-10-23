@@ -319,7 +319,9 @@ public func IsCharLike(type: *TypeInfo) : bool {
     switch(type.kind) {
         case TypeKind.CHAR:
         case TypeKind.I8:
-        case TypeKind.U8:
+        case TypeKind.U8: {
+            return true
+        }
         case TypeKind.CONST: {
             var constInfo = type
             return IsCharLike(constInfo.constOf)

@@ -4,6 +4,7 @@ import "std/string_view";
 import "std/map";
 import "std/array";
 import "std/json"
+import "std/libc";
 
 #precheck
     fn json_get_generic_symbol(name, arg) {
@@ -179,6 +180,7 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
     }
 
     var makeFn = context.maker;
+    var makePtrFn = context.makerPtr;
     for(var it = json.iter(); it.hasNext();) {
 
         var entry = it.next()
@@ -217,11 +219,18 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
         this.put<K,V>(entry.key, value)
 
 #elseif json_check_generic_symbol_is_pointer("this", "V")
-
-#else
-        var value = makeFn != null ?
-            makeFn(typeof(:V), context, entry.value) as (V) :
+        var value = makePtrFn != null ?
+            makePtrFn(typeof(::V), context, entry.value) as (V) :
+            // TODO: We need a baseof(*Type) which just returns the "Type"
             context.allocator.alloc(sizeof(:V)) as (V)
+
+        this.put(entry.key, value)
+#else
+        var value: V;
+
+        if(makeFn) {
+            makeFn(typeof(::V), context, entry.value, &value)
+        }
 
         this.put(entry.key, value)
 #end
@@ -233,6 +242,10 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
 public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode) {
     if(!json || !json.isArray()) {
         return;
+    }
+
+    if(this.capacity == 0) {
+        this.init<T>(json.size(), context.allocator)
     }
 
     var makeFn = context.maker;
@@ -277,8 +290,8 @@ public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode
         this.add(value)
 #else
         var value = makeFn != null ?
-            makeFn(typeof(:T), context, element) as (T) :
-            context.allocator.alloc(sizeof(:T)) as (T)
+            makeFn(typeof(::T), context, element) as (T) :
+            context.allocator.alloc(sizeof(::T)) as (T);
         this.add(value)
 #end
     }

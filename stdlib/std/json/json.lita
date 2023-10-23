@@ -27,28 +27,38 @@ public @note json {
     "post_serialization.ape"
 #end
 
+public func DefaultMakePtrFn(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+    return null;
+}
 
+public func DefaultMakeFn(type: typeid, context: *JsonContext, json: *JsonNode, result: *void) : void {
+}
 
-public typedef func(typeid, *JsonContext, *JsonNode) : *void as MakeFn;
+public typedef func(typeid, *JsonContext, *JsonNode) : *void as MakePtrFn;
+public typedef func(typeid, *JsonContext, *JsonNode, *void) : void as MakeFn;
 
 public struct JsonContext {
     allocator: *const mem::Allocator
     maker: MakeFn
+    makerPtr: MakePtrFn
 }
 
 public func JsonContextInit(
-    maker: MakeFn,
+    maker: MakeFn = DefaultMakeFn,
+    makerPtr: MakePtrFn = DefaultMakePtrFn,
     allocator: *const mem::Allocator = mem::defaultAllocator) : JsonContext {
 
     var context = JsonContext{}
-    context.init(maker, allocator)
+    context.init(maker, makerPtr, allocator)
     return context;
 }
 public func (this: *JsonContext) init(
     maker: MakeFn,
+    makerPtr: MakePtrFn,
     allocator: *const mem::Allocator = mem::defaultAllocator) {
     this.allocator = allocator
     this.maker = maker
+    this.makerPtr = makerPtr
 }
 
 
