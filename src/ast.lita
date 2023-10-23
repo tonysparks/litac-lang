@@ -567,6 +567,7 @@ public struct TypeIdentifierExpr {
     //genericArgs: Array<*TypeSpec>
     type: *TypeSpec
     sym: *Symbol
+    isBased: bool
 }
 
 public struct TypeOfExpr {

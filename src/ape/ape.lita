@@ -1,3 +1,6 @@
+@raw("""
+#define APE_AMALGAMATED
+""");
 @cFile("ape.h");
 @cFile("ape.c");
 
@@ -57,19 +60,21 @@ public enum ape_object_type {
 @foreign public typedef void as ape_object_type_t;
 
 @foreign public typedef func(*ape_t, *void, i32, *ape_object_t) : ape_object_t as ape_native_fn;
-@foreign public typedef func(u64, *void) : *void as ape_malloc_fn;
+@foreign public typedef func(*void, u64) : *void as ape_malloc_fn;
 @foreign public typedef func(*void, *void) : void as ape_free_fn;
 @foreign public typedef func(*void) : void as ape_data_destroy_fn;
 @foreign public typedef func(*void) : *void as ape_data_copy_fn;
+
 @foreign public typedef func(*void, *const void, u64) : u64 as ape_stdout_write_fn;
 @foreign public typedef func(*void, *const char) : *char as ape_read_file_fn;
 @foreign public typedef func(*void, *const char, *const char, u64) : u64 as ape_write_file_fn;
 
-@foreign
-public func ape_set_memory_functions(mallocArg: *void, p0: ape_malloc_fn, freeArg: *void, p1: ape_free_fn) : void;
 
 @foreign
 public func ape_make() : *ape_t;
+
+@foreign
+public func ape_make_ex(malloc_fn: ape_malloc_fn, free_fn: ape_free_fn, ctx: *void) : *ape_t;
 
 @foreign
 public func ape_destroy(p0: *ape_t) : void;
@@ -330,7 +335,7 @@ public func ape_error_get_type_string(p0: *const ape_error_t) : *const char;
 public func ape_error_type_to_string(p0: ape_error_type_t) : *const char;
 
 @foreign
-public func ape_error_serialize(p0: *const ape_error_t) : *char;
+public func ape_error_serialize(ape: *ape_t, p0: *const ape_error_t) : *char;
 
 @foreign
 public func ape_error_get_traceback(p0: *const ape_error_t) : *const ape_traceback_t;

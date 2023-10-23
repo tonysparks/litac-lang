@@ -731,6 +731,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
     }
 
     paramDecl.sym = this.addSymbol(paramDecl, typeInfo)
+    paramDecl.typeInfo = typeInfo
 
     if(paramDecl.attributes.isUsing) {
         if(!IsAggregateLike(typeInfo)) {

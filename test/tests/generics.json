@@ -259,7 +259,7 @@
                 var t2 = Test<f32> { &test2 }
                 assert(t2.y(1.4f) == 1.4f)
             `
-        }, 
+        },
         {
             "name": "Generic Func Ptr in Func",
             "buildCmd": "clang -std=c99 -g -gcodeview -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
@@ -506,6 +506,38 @@
                 x.method(8)
             `,
             "error": "unknown type 'T'"
+        },
+        {
+            "name": "Generic With Typedef Generic",
+            "definitions": `
+                import "std/string";
+                import "std/map";
+
+                public typedef Map<i32, String> as StringMap
+
+                public func (this: *Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = StrMap<StringMap>(StringMap{})
+                test.exec()
+
+            `
+        },
+        {
+            "name": "Generic With Generic",
+            "definitions": `
+                import "std/string";
+                import "std/map";
+
+                public func (this: *Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = StrMap<Map<i32, String>>(Map<i32, String>{})
+                test.exec()
+
+            `
         },
 
     ]

@@ -10,6 +10,26 @@ public struct String {
     capacity: i32
 }
 
+public func CString(str: *char, len: i32 = -1) : String {
+    if(str == null) {
+        return String {
+            .buffer = null,
+            .length = 0,
+            .capacity = 0
+        }
+    }
+
+    if(len < 0) {
+        len = strlen(str)
+    }
+
+    return String {
+        .buffer = str,
+        .length = len,
+        .capacity = len
+    }
+}
+
 public func StringInit(str: *char, capacity: i32, len: i32 = -1) : String {
     if(str == null) {
         return String {

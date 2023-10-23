@@ -1,0 +1,993 @@
+import "std/libc"
+import "std/assert"
+import "std/array"
+import "std/map"
+import "std/string_buffer"
+import "std/string_view"
+import "std/string"
+import "std/mem"
+import "std/profile"
+import "std/regex"
+import "std/system"
+import "std/io"
+
+import "preprocessor"
+import "ast"
+import "ast_new"
+import "ast_copy"
+import "phase_result"
+import "checker"
+import "parser"
+import "lex"
+import "module"
+import "lita"
+import "types"
+import "symbols"
+import "intern"
+import "common"
+
+import "ape"
+
+public struct ScriptRuntime {
+    ape: *ape_t
+}
+
+public func (this: *Preprocessor) registerApi() {
+    this.runtime.ape = ape_make_ex(litaMalloc, noOpFree, this.lita as (*void));
+
+    ape_set_repl_mode(this.runtime.ape, true) // allows redefinition of symbols if true
+//    ape_set_gc_interval(this.runtime.ape, 1000000)
+    // ape_set_memory_functions(lita as (*void), &litaMalloc, lita as (*void), &noOpFree)
+
+    // TODO: Read options from LitaOptions; allow for custom command line options
+    //ape_set_global_constant(this.runtime.ape, "OS", ape_object_make_string(this.runtime.ape, "LINUX"))
+    ape_set_global_constant(this.runtime.ape, "OS", ape_object_make_string(this.runtime.ape, OSAsStr(GetOS())))
+    ape_set_global_constant(this.runtime.ape, "ARCH", ape_object_make_string(this.runtime.ape, ArchAsStr(GetArch())))
+    ape_set_global_constant(this.runtime.ape, "DEBUG", ape_object_make_bool(this.lita.options.isDebug))
+    ape_set_global_constant(this.runtime.ape, "REFLECTION", ape_object_make_bool(this.lita.options.typeOption != TypeInfoOption.NONE))
+    ape_set_global_constant(this.runtime.ape, "TESTING", ape_object_make_bool(this.lita.options.testsOnly))
+    ape_set_global_constant(this.runtime.ape, "INSTRUMENT", ape_object_make_bool(this.lita.options.instrument))
+    ape_set_global_constant(this.runtime.ape, "OUTPUT_NAME", ape_object_make_string(this.runtime.ape, this.lita.options.outputFile))
+    ape_set_global_constant(this.runtime.ape, "OUTPUT_PATH", ape_object_make_string(this.runtime.ape, this.lita.options.outputPath))
+
+    ape_set_native_function(this.runtime.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "isPrimitive", ApeIsPrimitive, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getSymbol", ApeGetSymbol, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getSymbolByTypeInfo", ApeGetSymbolByTypeInfo, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getTypeInfo", ApeGetTypeInfo, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getSymbolsByNote", ApeGetSymbolsWithNote, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getSymbolsToTest", ApeGetSymbolsToTest, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "replaceDeclaration", ApeReplaceDeclaration, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "addImport", ApeAddImport, &this.callContext)
+
+    ape_set_native_function(this.runtime.ape, "assert", ApeAssert, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getMainSymbol", ApeGetMainSymbol, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "setMainSymbol", ApeSetMainSymbol, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getInputModuleFilename", ApeGetInputModuleFilename, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "getCurrentModuleFilename", ApeGetCurrentModuleFilename, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "astInsert", ApeAstInsert, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "emit", ApeEmit, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "emitClear", ApeEmitClear, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "emitStr", ApeEmitStr, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "error", ApeError, &this.callContext)
+
+    // TODO: Add a Preprocessor Logger that can be enabled via the command line
+    // ape_set_native_function(this.runtime.ape, "log", ApeLog, &this.callContext)
+}
+
+public func (this: *Preprocessor) deregisterApi() {
+    // TODO: Clean up..
+}
+
+public func (this: *Preprocessor) execute(comp: *CompStmt, code: StringView) : bool {
+    var result = ape_execute(this.runtime.ape, code.buffer, code.length)
+
+    if(ape_has_errors(this.runtime.ape)) {
+        var error = ape_get_error(this.runtime.ape, 0)
+        var pos = SrcPos {
+            .filename: comp.startPos.filename,
+            .lineStart: comp.startPos.lineStart,
+            .start: comp.startPos.start,
+            .end: comp.startPos.end,
+            .lineNumber: comp.startPos.lineNumber /*+ ape_error_get_line_number(error)*/, // doesn't work because repl mode
+            .position: comp.startPos.position /* ape_error_get_column_number(error) */
+        }
+        this.lita.result.addError(pos, "error evaluating preprocessor expression: '%s' for line:\n%s", ape_error_get_message(error), ape_error_get_line(error))
+        return false
+    }
+
+    return ape_object_get_bool(result)
+}
+
+func noOpFree(ctx:*void, mem: *void) {
+    // do nothing
+}
+
+
+func litaMalloc(ctx: *void, len: u64) : *void {
+    var lita = ctx as (*Lita)
+    return lita.allocator.alloc(len)
+}
+
+
+func ApeGetTypeKind(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(!element) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        return ape_object_make_null()
+    }
+
+    var elementIntern = context.pp.lita.strings.internCopy(element)
+    var symbol = context.checker.current.currentScope.lookup(elementIntern)
+    if(!symbol) {
+        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, TypeKindAsStr(symbol.type.kind))
+}
+
+func ApeIsPrimitive(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(!element) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        return ape_object_make_null()
+    }
+
+    var elementIntern = context.pp.lita.strings.internCopy(element)
+    var symbol = context.checker.current.currentScope.lookup(elementIntern)
+    if(!symbol) {
+        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_bool(IsPrimitive(symbol.type))
+}
+
+
+func ApeGetSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(!element) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        return ape_object_make_null()
+    }
+
+    var elementIntern = context.pp.lita.strings.internCopy(element)
+    var symbol = context.checker.current.currentScope.lookup(elementIntern)
+    if(!symbol) {
+        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        return ape_object_make_null()
+    }
+
+    return context.pp.declToApe(symbol)
+}
+
+func ApeGetSymbolByTypeInfo(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_MAP)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var typeInfoObj = args[0]
+    var typePtr = ape_object_get_map_value(typeInfoObj, "typePtr")
+    var typeInfo = ape_object_get_external(typePtr) as (*TypeInfo)
+
+    if(!typeInfo) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid typeInfo pointer")
+        return ape_object_make_null()
+    }
+    return context.pp.declToApe(typeInfo.sym)
+}
+
+func ApeGetTypeInfo(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(!element) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        return ape_object_make_null()
+    }
+
+    var elementIntern = context.pp.lita.strings.internCopy(element)
+    var symbol = context.checker.current.currentScope.lookup(elementIntern)
+    if(!symbol) {
+        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        return ape_object_make_null()
+    }
+
+    return context.pp.typeInfoToApe(symbol.type)
+}
+
+func (this: *CallContext) logErrors() : bool {
+    if(!ape_has_errors(this.pp.runtime.ape)) {
+        return false;
+    }
+
+    var pos = SrcPos{}
+    for (var i = 0; i < ape_errors_count(this.pp.runtime.ape); i+=1) {
+        var err = ape_get_error(this.pp.runtime.ape, i);
+        var errStr = ape_error_serialize(this.pp.runtime.ape, err);
+
+        this.pp.lita.result.addError(pos, "%s", errStr)
+    }
+
+    return true
+}
+
+
+func (this: *Preprocessor) addNotes(obj: ape_object_t, module: *Module, attributes: *Attributes) {
+    if(attributes.notes.size()) {
+
+        /*
+            HACK:
+            Terrible work around - this won't work for all
+            cases!!
+
+            We have a chicken and egg problem here with generated symbols
+            and resolving symbols.  We are generating new symbols in this
+            preprocessor stage, however, we need symbols to be partially resolved
+            (atleast their Notes).  Instead, we cheat and resolve the notes expressions
+            here if they exist.
+        */
+        this.callContext.checker.enterModule(module)
+        this.callContext.checker.resolveNotes(attributes.notes)
+        this.callContext.checker.leaveModule()
+
+        var notesArray = ape_object_make_array(this.runtime.ape)
+        for(var i = 0; i < attributes.notes.size(); i += 1) {
+            var note = attributes.notes.get(i)
+            var noteObj = ape_object_make_map(this.runtime.ape)
+            var name = ape_object_make_stringf(this.runtime.ape, "%.*s", note.type.name.length, note.type.name.buffer)
+            ape_object_set_map_value(noteObj, "name", name)
+
+            if(note.arguments.size()) {
+                var argumentsArray = ape_object_make_array(this.runtime.ape)
+                for(var j = 0; j < note.arguments.size(); j += 1) {
+                    var attr = note.arguments.get(j)
+
+                    var attrObj = ape_object_make_map(this.runtime.ape)
+                    var name = ape_object_make_stringf(this.runtime.ape, "%.*s", attr.argName.str.length, attr.argName.str.buffer)
+
+                    ape_object_set_map_value(attrObj, "name", name)
+                    ape_object_add_array_value(argumentsArray, attrObj)
+
+                    // TODO: Make this much more comprehensible...
+                    if(attr.argExpr != null && attr.argExpr.operand.typeInfo != null) {
+                        if(attr.argExpr.operand.typeInfo.kind == TypeKind.STR)  {
+                            var value = ape_object_make_stringf(this.runtime.ape, "%.*s", attr.argExpr.operand.val.str.length, attr.argExpr.operand.val.str.buffer)
+                            ape_object_set_map_value(attrObj, "value", value)
+                        }
+                        else if(IsNumberLike(attr.argExpr.operand.typeInfo)) {
+                            if(IsInteger(attr.argExpr.operand.typeInfo)) {
+                                ape_object_set_map_number(attrObj, "value", attr.argExpr.operand.val.intValue as (f64))
+                            }
+                            else {
+                                ape_object_set_map_number(attrObj, "value", attr.argExpr.operand.val.floatValue)
+                            }
+                        }
+                        else {
+                            // TODO: other complex types...
+                        }
+                    }
+                }
+                ape_object_set_map_value(noteObj, "arguments", argumentsArray)
+            }
+            ape_object_add_array_value(notesArray, noteObj)
+        }
+
+        ape_object_set_map_value(obj, "notes", notesArray)
+    }
+}
+
+
+func (this: *Preprocessor) typeInfoToApe(typeInfo: *TypeInfo) : ape_object_t {
+    if(!typeInfo) {
+        return ape_object_make_null()
+    }
+    var typeObj = ape_object_make_map(this.runtime.ape)
+    ape_object_set_map_value(typeObj, "name", ape_object_make_stringf(this.runtime.ape, "%.*s", typeInfo.name.length, typeInfo.name.buffer))
+    ape_object_set_map_string(typeObj, "kind", TypeKindAsStr(typeInfo.kind))
+    ape_object_set_map_bool(typeObj, "isPrimitive", IsPrimitive(typeInfo))
+    ape_object_set_map_bool(typeObj, "isString", IsStringLike(typeInfo))
+    ape_object_set_map_bool(typeObj, "isPointer", IsPtr(typeInfo))
+    ape_object_set_map_value(typeObj, "typePtr", ape_object_make_external(this.runtime.ape, typeInfo))
+
+    switch(typeInfo.kind) {
+        case TypeKind.PTR: {
+            var baseTypeObj = this.typeInfoToApe(typeInfo.ptrOf)
+            ape_object_set_map_value(typeObj, "base", baseTypeObj)
+            break
+        }
+        case TypeKind.CONST: {
+            var baseTypeObj = this.typeInfoToApe(typeInfo.ptrOf)
+            ape_object_set_map_value(typeObj, "base", baseTypeObj)
+            break
+        }
+        default:{}
+    }
+    if(typeInfo.sym) {
+        ape_object_set_map_value(typeObj, "symbol", this.declToApe(typeInfo.sym))
+    }
+    return typeObj
+}
+
+/**
+    TODO:
+        - This is incredibly incomplete, most elements are missing
+*/
+func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
+    if(!sym) {
+        return ape_object_make_null()
+    }
+
+    var declObj = ape_object_make_map(this.runtime.ape)
+
+    ape_object_set_map_value(declObj, "name", ape_object_make_stringf(this.runtime.ape, "%.*s", sym.name.length, sym.name.buffer))
+    ape_object_set_map_string(declObj, "kind", StmtKindAsStr(sym.decl.kind))
+    ape_object_set_map_string(declObj, "moduleFilename", sym.declared.id.filename)
+
+    ape_object_set_map_value(declObj, "moduleName",
+        ape_object_make_stringf(this.runtime.ape, "%.*s", sym.declared.id.name.length, sym.declared.id.name.buffer))
+
+    ape_object_set_map_value(declObj, "packageName",
+        ape_object_make_stringf(this.runtime.ape, "%.*s", sym.declared.id.packageName.length, sym.declared.id.packageName.buffer))
+
+    ape_object_set_map_value(declObj, "isPublic", ape_object_make_bool(sym.decl.attributes.isPublic))
+    ape_object_set_map_value(declObj, "isGlobal", ape_object_make_bool(sym.decl.attributes.isGlobal))
+    ape_object_set_map_value(declObj, "declPtr", ape_object_make_external(this.runtime.ape, sym.decl))
+
+    // full name includes module name e.g. std::String
+    ape_object_set_map_value(declObj, "fullName", ape_object_make_stringf(this.runtime.ape, "%.*s::%.*s",
+        sym.declared.id.packageName.length, sym.declared.id.packageName.buffer,
+        sym.name.length, sym.name.buffer))
+
+    ape_object_set_map_value(declObj, "declFullName", ape_object_make_stringf(this.runtime.ape, "%.*s::%.*s",
+        sym.declared.id.packageName.length, sym.declared.id.packageName.buffer,
+        sym.decl.name.str.length, sym.decl.name.str.buffer))
+
+    //ape_object_set_map_value(declObj, "type", this.typeInfoToApe(sym.type))
+
+    if(!sym.genericArgs.empty()) {
+        var genericArgs = ape_object_make_map(this.runtime.ape)
+        var nameSize = sym.genericParams.size()
+        for(var i = 0; i < sym.genericArgs.size(); i+=1) {
+            var arg = sym.genericArgs.get(i)
+            if(i < nameSize) {
+                var name = sym.genericParams.getPtr(i).name
+                var argObj = this.typeInfoToApe(arg)
+
+                var key = ape_object_make_stringf(this.runtime.ape, "%.*s", name.str.length, name.str.buffer)
+                ape_object_set_map_value_with_value_key(genericArgs, key, argObj)
+            }
+        }
+        ape_object_set_map_value(declObj, "genericArgs", genericArgs)
+    }
+
+    this.addNotes(declObj, sym.declared, sym.decl.attributes)
+
+    switch(sym.decl.kind) {
+        case StmtKind.FUNC_DECL: {
+            break;
+        }
+        case StmtKind.TRAIT_DECL:
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL: {
+            var aggObj = ape_object_make_map(this.runtime.ape)
+            if(StmtKind.UNION_DECL == sym.decl.kind) {
+                ape_object_set_map_value(declObj, "unionDecl", aggObj)
+            }
+            else if(StmtKind.TRAIT_DECL == sym.decl.kind) {
+                ape_object_set_map_value(declObj, "traitDecl", aggObj)
+            }
+            else {
+                ape_object_set_map_value(declObj, "structDecl", aggObj)
+            }
+
+            var fieldsArray = ape_object_make_array(this.runtime.ape)
+            var aggDecl = sym.decl as (*AggregateDecl)
+            for(var i = 0; i < aggDecl.fields.size(); i += 1) {
+                var field = aggDecl.fields.getPtr(i)
+
+                var fieldObj = ape_object_make_map(this.runtime.ape)
+                switch(field.kind) {
+                    case StmtKind.TRAIT_FIELD_DECL: {
+                        var varField = field.traitField
+
+                        var name = ape_object_make_stringf(this.runtime.ape, "%.*s", varField.name.str.length, varField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+                        this.addNotes(fieldObj, sym.declared, varField.attributes)
+                        break
+                    }
+                    case StmtKind.VAR_FIELD_DECL: {
+                        var varField = field.varField
+
+                        var name = ape_object_make_stringf(this.runtime.ape, "%.*s", varField.name.str.length, varField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+
+                        // TODO: type and defaultExpr
+                        if(varField.type && varField.type.typeInfo) {
+                            var typeInfo = this.typeInfoToApe(varField.type.typeInfo)
+                            ape_object_set_map_value(fieldObj, "typeInfo", typeInfo)
+                        }
+
+                        this.addNotes(fieldObj, sym.declared, varField.attributes)
+                        break
+                    }
+                    case StmtKind.ENUM_FIELD_DECL: {
+                        var enumField = field.enumField
+                        // TODO
+
+                        var name = ape_object_make_stringf(this.runtime.ape, "%.*s", enumField.name.str.length, enumField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+
+                        this.addNotes(fieldObj, sym.declared, enumField.attributes)
+                        break;
+                    }
+                    case StmtKind.UNION_FIELD_DECL:
+                    case StmtKind.STRUCT_FIELD_DECL: {
+                        var aggregateField = field.aggregateField
+                        // TODO
+                        var name = ape_object_make_stringf(this.runtime.ape, "%.*s", aggregateField.name.str.length, aggregateField.name.str.buffer)
+                        ape_object_set_map_value(fieldObj, "name", name)
+
+                        this.addNotes(fieldObj, sym.declared, aggregateField.attributes)
+                        break;
+                    }
+                    default:
+                        break;
+                }
+
+                ape_object_add_array_value(fieldsArray, fieldObj)
+            }
+            ape_object_set_map_value(aggObj, "fields", fieldsArray)
+            break;
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            // TODO:
+            break;
+        }
+        case StmtKind.ENUM_DECL: {
+            var enumObj = ape_object_make_map(this.runtime.ape)
+            ape_object_set_map_value(declObj, "enumDecl", enumObj)
+
+            var fieldsArray = ape_object_make_array(this.runtime.ape)
+            var enumDecl = sym.decl as (*EnumDecl)
+            for(var i = 0; i < enumDecl.fields.size(); i += 1) {
+                var field = enumDecl.fields.get(i)
+                var fieldObj = ape_object_make_map(this.runtime.ape)
+
+                var name = ape_object_make_stringf(this.runtime.ape, "%.*s", field.name.str.length, field.name.str.buffer)
+                ape_object_set_map_value(fieldObj, "name", name)
+
+                this.addNotes(fieldObj, sym.declared, field.attributes)
+                ape_object_add_array_value(fieldsArray, fieldObj)
+            }
+            ape_object_set_map_value(enumObj, "fields", fieldsArray)
+            break;
+        }
+        default: {
+            break
+        }
+    }
+    return declObj
+}
+
+
+// TODO: Rethink this, is this necessary, why is this different from pre/postCheckers??
+// can't we just rely on the AddDecl API??
+@doc("""
+Parses out the #postparse compile time statement which will attempt to
+generate or alter existing source.
+""")
+public func (this: *CallContext) postParse(module: *Module, moduleStmt: *ModuleStmt, comp: *CompStmt) {
+    this.pp.eval(comp)
+
+    var original = StringViewInit(this.buffer.buffer, this.buffer.length)
+    if(original.empty()) {
+        return;
+    }
+
+    var emitCode = original.copy(this.pp.lita.allocator)
+
+    // TODO: Memory leak with incremental compilation
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, module, this.pp.lita)
+    var stmts = parser.parseModule()
+
+    if(stmts) {
+        if(stmts.imports.size()) {
+            moduleStmt.imports.addAll(stmts.imports)
+        }
+        if(stmts.notes.size()) {
+            moduleStmt.notes.addAll(stmts.notes)
+        }
+        if(stmts.declarations.size()) {
+            moduleStmt.declarations.addAll(stmts.declarations)
+        }
+    }
+}
+
+
+func ApeEmit(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    return FormatStr(context, &context.buffer, argc, args)
+}
+
+func ApeEmitClear(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    context.buffer.clear()
+    return ape_object_make_null()
+}
+
+func ApeEmitStr(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    return ape_object_make_string(ape, context.buffer.cStr())
+}
+
+func ApeError(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var sb = StringBufferInit(1024, context.pp.lita.allocator)
+    var result = FormatStr(context, &sb, argc, args)
+    context.pp.lita.result.addError(context.comp.startPos, "%s", sb.cStr())
+    return result;
+}
+
+func FormatStr(
+    context: *CallContext,
+    buffer: *StringBuffer,
+    argc: i32,
+    args: *ape_object_t) : ape_object_t {
+
+    var argIndex = 1
+    var str = ape_object_get_string(args[0]) as (*const char)
+    if(!str) {
+        return ape_object_make_null()
+    }
+
+    while(*str) {
+        var c = *str
+        if(c == '%') {
+            if(str[1] == '%') {
+                buffer.append("%s", "%") // escaped %
+                str += 2
+                continue
+            }
+            else {
+                if(argIndex >= argc) {
+                    context.pp.lita.result.addError(context.comp.startPos, "invalid argument index, there are more format parameters than supplied function arguments")
+                    return ape_object_make_null()
+                }
+
+                if(str[1] == 's') {
+                    var arg = ape_object_get_string(args[argIndex]) as (*const char)
+                    buffer.append("%s", arg)
+                }
+                else if(str[1] == 'f') {
+                    var arg = ape_object_get_number(args[argIndex]) as (f64)
+                    buffer.append("%f", arg)
+                }
+                else if(str[1] == 'd') {
+                    var arg = ape_object_get_number(args[argIndex]) as (i64)
+                    buffer.append("%d", arg)
+                }
+                else if(str[1] == 'b') {
+                    var arg = ape_object_get_bool(args[argIndex]) as (bool)
+                    buffer.append("%s", arg ? "true" : "false")
+                }
+                else {
+                    context.pp.lita.result.addError(context.comp.startPos, "invalid format parameter: '%%%c'", str[1])
+                    return ape_object_make_null()
+                }
+                argIndex += 1
+                str += 2
+                continue
+            }
+        }
+        else if(c == '\\') {
+            if(str[1] == '\\') {
+                buffer.append("\\")
+                str += 2
+                continue
+            }
+        }
+
+        buffer.append("%c", c)
+        str += 1
+    }
+
+    return ape_object_make_null()
+}
+
+
+
+func ApeGetSymbolsWithNote(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var element = ape_object_get_string(args[0]) as (*const char)
+    if(!element) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty note name")
+        return ape_object_make_null()
+    }
+
+    var results = ape_object_make_array(ape)
+    for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
+        var sym = context.checker.symbolFuncs.get(i)
+        if(sym.decl.hasNote(element)) {
+            var declObj = context.pp.declToApe(sym)
+            ape_object_add_array_value(results, declObj)
+        }
+    }
+    for(var i = 0; i < context.checker.symbolTypes.size(); i += 1) {
+        var sym = context.checker.symbolTypes.get(i)
+        if(sym.decl.hasNote(element)) {
+            var declObj = context.pp.declToApe(sym)
+            ape_object_add_array_value(results, declObj)
+        }
+    }
+
+    return results
+}
+
+func ApeAddDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    return QueueDeclaration(ape, data, argc, args, .replacement = false);
+}
+
+func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    return QueueDeclaration(ape, data, argc, args, .replacement = true);
+}
+
+func QueueDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t, replacement: bool) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        return ape_object_make_null()
+    }
+
+    var code = ape_object_get_string(args[1]) as (*const char)
+    if(!code) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.getModule(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var moduleStmt = module.ast
+
+    var original = StringViewInit(code)
+    var emitCode = original.copy(context.pp.lita.allocator)
+
+    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, module, context.pp.lita)
+    var declarations = parser.parseModule()
+
+    context.pp.declQueue.add(ScriptDecl {
+        .ctx = DeclContext {
+            .checker = context.checker,
+            .comp = context.comp,
+            .resolveSymbols = context.resolveSymbols,
+        },
+        .module = module,
+        .declarations = declarations,
+        .replacement = replacement
+    })
+
+    return ape_object_make_bool(true)
+}
+
+func ApeGetInputModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var moduleFilename = context.pp.lita.options.inputFile
+
+    var mainModule = context.pp.lita.getModule(moduleFilename)
+    if(!mainModule) {
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, moduleFilename)
+}
+
+func ApeGetCurrentModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var moduleFilename = context.comp.startPos.filename
+    var mainModule = context.pp.lita.getModule(moduleFilename)
+    if(!mainModule) {
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, moduleFilename)
+}
+
+
+func ApeGetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var mainEntry = context.checker.mainEntry
+    if(!mainEntry) {
+        return ape_object_make_null()
+    }
+
+    return context.pp.declToApe(mainEntry)
+}
+
+func ApeAstInsert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_EXTERNAL, ape_object_type.APE_OBJECT_STRING,  ape_object_type.APE_OBJECT_NUMBER)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var astPtr = ape_object_get_external(args[0])
+    if(!astPtr) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty ast node")
+        return ape_object_make_null()
+    }
+
+    var code = ape_object_get_string(args[1]) as (*const char)
+    if(!code) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
+        return ape_object_make_null()
+    }
+
+
+    var index = ape_object_get_number(args[2]) as (i32)
+
+    var astNode = astPtr as (*Node)
+    var module = context.checker.current
+
+    // TODO: Memory leak with incremental compilation...
+    var parser = ParserInit(astNode.startPos.filename, code, strlen(code), module, context.pp.lita)
+    var stmt = parser.statement()
+
+    AstInsert(astNode, stmt, index, module, context.pp.lita)
+    return ape_object_make_null()
+}
+
+
+func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    //@static var moduleNameIndex: i32;
+
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.getModule(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var moduleToImport = ape_object_get_string(args[1]) as (*const char)
+    if(!moduleToImport) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module to import name")
+        return ape_object_make_null()
+    }
+
+    // don't import to yourself
+    if(strcmp(moduleName, moduleToImport) == 0) {
+        return ape_object_make_null()
+    }
+
+    var importModule = context.pp.lita.getModule(moduleToImport)
+    if(!importModule) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleToImport)
+        return ape_object_make_null()
+    }
+
+    var alias = AstAddImport(context.pp.lita, context.checker, module, importModule)
+    if(!alias) {
+        // this is already being imported and doesn't have an alias
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, alias)
+}
+
+
+func ApeSetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.getModule(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var symbolName = ape_object_get_string(args[1]) as (*const char)
+    if(!symbolName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        return ape_object_make_null()
+    }
+
+    var symbolNameIntern = context.pp.lita.strings.internCopy(symbolName)
+    var sym = module.getType(symbolNameIntern)
+    if(!sym) {
+        context.pp.lita.result.addError(context.comp.startPos, "can not find symbol '%s' in module: '%s'", symbolName, moduleName)
+        return ape_object_make_null()
+    }
+
+    if(sym.kind != SymbolKind.FUNC) {
+        context.pp.lita.result.addError(context.comp.startPos, "can not make symbol '%s' a main entry point because it isn't a function", symbolName)
+        return ape_object_make_null()
+    }
+
+    context.checker.mainEntry = sym
+    return ape_object_make_bool(true)
+}
+
+
+func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var results = ape_object_make_array(ape)
+    if(!context.pp.lita.options.testsOnly) {
+        return results
+    }
+
+    // if we are testing by regex, test each function with @test attribute
+    if(context.pp.lita.options.testsRegex) {
+        var all = strcmp(context.pp.lita.options.testsRegex, ".*") == 0
+        var pattern = RegexCompile(context.pp.lita.options.testsRegex)
+
+        for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
+            var sym = context.checker.symbolFuncs.get(i)
+            if(sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+                if(all) {
+                    var declObj = context.pp.declToApe(sym)
+                    ape_object_add_array_value(results, declObj)
+                }
+                else {
+                    var note = sym.decl.getNote("test")
+                    const MAX_SIZE = 256
+                    var buffer: [MAX_SIZE]char;
+
+                    for(var i = 0; i < note.arguments.size(); i += 1) {
+                        var att = note.arguments.get(i)
+                        var matchlength = 0
+
+                        if(att.argExpr == null || att.argExpr.operand.typeInfo == null) {
+                            continue
+                        }
+
+                        if(att.argExpr.operand.typeInfo.kind != TypeKind.STR) {
+                            continue
+                        }
+
+                        var value = att.argExpr.operand.val.str
+                        if(value.length >= MAX_SIZE) {
+                            continue
+                        }
+
+                        value.copyTo(buffer, value.length)
+
+                        if(pattern.match(buffer, &matchlength) > -1) {
+                            var declObj = context.pp.declToApe(sym)
+                            ape_object_add_array_value(results, declObj)
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // otherwise we are just testing the input file's tests
+    else {
+        var moduleName = context.pp.lita.options.inputFile
+        var mainModule = context.pp.lita.getModule(moduleName)
+        if(!mainModule) {
+            return results;
+        }
+
+        // iterate thru all symbols, this way we are deterministic in our output
+        for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
+            var sym = context.checker.symbolFuncs.get(i)
+            if(sym.declared == mainModule && sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+                var declObj = context.pp.declToApe(sym)
+                ape_object_add_array_value(results, declObj)
+            }
+        }
+    }
+
+    return results
+}
+
+func ApeAssert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+
+    var stmt = ape_object_get_bool(args[0])
+    if(!stmt) {
+        // TODO: Get the position of the function call...
+        context.pp.lita.result.addError(context.comp.startPos, "preprocessor assertion failure")
+    }
+
+    return ape_object_make_null()
+}
+
+
+public func (this: *Preprocessor) loadScript(comp: *CompStmt, filename: *StringView, code: *StringView) : bool {
+    var filepath = [MAX_PATH]char{0};
+    var filepathStr = StringInit(filepath, MAX_PATH, 0)
+
+    FilePath(comp.startPos.filename, filepath)
+
+    filepathStr.adjust()
+    filepathStr.append("/%.*s", filename.length, filename.buffer)
+
+    if(!FileExists(filepathStr.cStr())) {
+        this.lita.result.addError(comp.startPos, "unable to locate '%.*s'", filename.length, filename.buffer)
+        return false
+    }
+
+    var buffer: *char = null;
+    var length: usize = 0;
+
+    var status = ReadFile(filepathStr.cStr(), &buffer, &length, this.lita.allocator)
+
+    if(status != FileStatus.Ok) {
+        this.lita.result.addError(comp.startPos, "error loading '%s'", filepathStr.cStr())
+        return false
+    }
+
+    code.buffer = buffer;
+    code.length = length as (i32);
+
+    return true
+}

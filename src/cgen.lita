@@ -982,7 +982,8 @@ public func (this: using *CGen) cName(sym: *Symbol) : *const char {
     }
 
     sb.appendStr(this.options.cPrefix)
-    sb.appendStrn(sym.declared.id.name.buffer, sym.declared.id.name.length)
+    var packageName = this.escapeNameStr(sym.declared.id.packageName)
+    sb.appendStrn(packageName.buffer, packageName.length)
     sb.appendStrn("__", 2)
     sb.appendStrn(declName.buffer, declName.length)
     return sb.cStrConst()
@@ -2554,7 +2555,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
             var expr = s as (*TypeIdentifierExpr)
             // TODO: Simplify this...
-            if(expr.type.typeInfo) {
+            if(expr.type.typeInfo && !expr.isBased) {
                 this.emitStr(this.cType(expr.type.typeInfo))
             }
             else {

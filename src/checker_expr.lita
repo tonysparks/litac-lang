@@ -1445,7 +1445,12 @@ func (this: *TypeChecker) resolveTypeIdentifierExpr(expr: *TypeIdentifierExpr) :
         return false
     }
 
-    expr.sym = type.sym // TODO: Is this still necessary?
+    // We allow for taking the base type (e.g., '*const Type' is reduced to just 'Type')
+    if(expr.isBased) {
+        type = type.getBaseType()
+    }
+
+    expr.sym = type.sym
     expr.operand.typeInfo = type
     expr.operand.isRightValue = true
     expr.operand.isConst = true

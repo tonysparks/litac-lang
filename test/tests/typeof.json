@@ -13,6 +13,20 @@
     `,
     "tests": [
         {
+            "name": "Typeof BaseOf",
+            "disabled": false,
+            "definitions": `
+                struct TestStruct {
+                    a: i32
+                }
+            `,
+            "code": `
+                assert(typeof(::*TestStruct) == typeof(:TestStruct))
+                assert(typeof(::**TestStruct) == typeof(:TestStruct))
+                assert(typeof(::*const TestStruct) == typeof(:TestStruct))
+            `,
+        },
+        {
             "name": "Typeof Pointer Caching",
             "disabled": false,
             "definitions": `

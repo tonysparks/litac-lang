@@ -148,6 +148,20 @@ public func (this: *WebServer) start() {
 
 
 func GetWebController(msg: *mg_http_message) : WebController {
+    switch(msg.method.ptr[0]) {
+        case 'G': return GET_WebController(msg);
+        case 'P': {
+            switch(msg.method.ptr[1]) {
+                case 'O': return POST_WebController(msg);
+                default: return PUT_WebController(msg);
+            }
+            break
+        }
+        case 'D': return DELETE_WebController(msg);
+        default: return WEB_WebController(msg);
+    }
+
+    /*
     if(mg_vcmp(msg.method, "GET") == 0) {
         return GET_WebController(msg)
     }
@@ -162,6 +176,7 @@ func GetWebController(msg: *mg_http_message) : WebController {
     }
 
     return WEB_WebController(msg)
+    */
 }
 
 /**

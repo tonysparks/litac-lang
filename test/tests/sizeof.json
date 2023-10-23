@@ -13,6 +13,20 @@
     `,
     "tests": [
         {
+            "name": "Sizeof BaseOf",
+            "disabled": false,
+            "definitions": `
+                struct TestStruct {
+                    a: i32
+                }
+            `,
+            "code": `
+                assert(sizeof(::*TestStruct) == sizeof(:TestStruct))
+                assert(sizeof(::**TestStruct) == sizeof(:TestStruct))
+                assert(sizeof(::*const TestStruct) == sizeof(:TestStruct))
+            `,
+        },
+        {
             "name": "Sizeof Struct Ptr",
             "disabled": false,
             "definitions": `

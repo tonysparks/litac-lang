@@ -2,7 +2,7 @@
   definitions for compiler
 
   these are the default options for some of the parameters
-  
+
   those parameters can always be set by the command line
 */
 
@@ -28,4 +28,4 @@ public const OUTPUT_DIR_DEFAULT : *const char = ".";
 // default binary name for output (-o,-output)
 // this is the default name for linux binaries
 // for windows you may want to give it a `.exe` extension
-public const OUTPUT_NAME_DEFAULT : *const char = "a.out";
+public const OUTPUT_NAME_DEFAULT : *const char = "a";
