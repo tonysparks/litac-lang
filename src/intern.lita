@@ -81,6 +81,7 @@ public const ALIAS = InternedString{};
 public const ASSTR = InternedString{};
 public const TOSTR = InternedString{};
 public const COMPILER_OPTION = InternedString{};
+public const EXTERN = InternedString{};
 
 public func InternHashFn(a: InternedString) : u32 {
     var hash = ((a.addr as (usize)) % 4294967291_u32) as (u32)
@@ -179,6 +180,7 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("asStr", 5, &ASSTR)
     this.internConstant("toStr", 5, &TOSTR)
     this.internConstant("compiler_option", 15, &COMPILER_OPTION)
+    this.internConstant("extern", 6, &EXTERN)
 
 }
 

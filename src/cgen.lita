@@ -959,6 +959,26 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
 public func (this: using *CGen) cName(sym: *Symbol) : *const char {
     var sb = StringBufferInit(256, this.allocator)
 
+    if(sym.flags & SymbolFlags.IS_EXTERN) {
+        var note = sym.decl.getNote("extern")
+        // TODO assert note != null
+        if(!note.arguments.empty()) {
+            var arg = note.arguments.getPtr(0)
+            if(arg.argExpr.kind == StmtKind.STRING_EXPR) {
+                var strExpr = arg.argExpr as (*StringExpr)
+                sb.appendStrn(strExpr.string.str.buffer, strExpr.string.str.length)
+                return sb.cStrConst()
+            }
+            else {
+                // warning "export argument should be string"
+                assert(false)
+            }
+        }
+        else {
+            this.result.addError(note.startPos, "argument is required'")
+        }
+    }
+
     var declName = sym.name.view
     if(IsFuncLike(sym.type)) {
         declName = this.escapeNameStr(sym.name)

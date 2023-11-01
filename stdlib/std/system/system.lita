@@ -465,6 +465,11 @@ public func FileParent(filename: *const char, out:[MAX_PATH]char, length: *i32 =
     }
 
 end:
+    if(index == 0) {
+        // parent directory is current directory
+        out[index] = '.';
+        index += 1;
+    }
     if(length) {
         (*length) = index
     }
