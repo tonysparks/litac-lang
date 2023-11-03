@@ -41,21 +41,24 @@ public enum SymbolFlags {
     IS_FROM_GENERIC_TEMPLATE= (1<<9),
     IS_IMPORTED             = (1<<10),
     IS_PUBLIC               = (1<<11),
-    IS_EMITTED              = (1<<12),
-    IS_TEST                 = (1<<13),
-    IS_ALIAS                = (1<<14),
-    IS_MAIN                 = (1<<15),
-    IS_METHOD               = (1<<16),
-    IS_TRAIT                = (1<<17),
-    IS_TRAIT_METHOD         = (1<<18),
-    IS_TRAIT_GENERATED      = (1<<19),
-    IS_GENERATED            = (1<<20),
-    IS_NOTE                 = (1<<21),
+    IS_INTERNAL             = (1<<12),
+    IS_PRIVATE              = (1<<13),
+    IS_EMITTED              = (1<<14),
+    IS_TEST                 = (1<<15),
+    IS_ALIAS                = (1<<16),
+    IS_MAIN                 = (1<<17),
+    IS_METHOD               = (1<<18),
+    IS_TRAIT                = (1<<19),
+    IS_TRAIT_METHOD         = (1<<20),
+    IS_TRAIT_GENERATED      = (1<<21),
+    IS_GENERATED            = (1<<22),
+    IS_NOTE                 = (1<<23),
 
     // Marked for reset for incremental compliation
-    IS_MARKED_RESET         = (1<<22),
-    IS_HIDDEN               = (1<<23),
-    IS_FROM_PREPROCESSOR    = (1<<24),
+    IS_MARKED_RESET         = (1<<24),
+    IS_HIDDEN               = (1<<25),
+    IS_FROM_PREPROCESSOR    = (1<<26),
+
 }
 
 public const MAX_SYMBOL_NAME = 256;
@@ -321,8 +324,15 @@ public func (this: *Scope) addSymbol(name: InternedString,
         flags |= SymbolFlags.IS_HIDDEN
     }
 
-    if(decl.attributes.isPublic) {
-        flags |= SymbolFlags.IS_PUBLIC
+    switch(decl.attributes.visibility) {
+        case Visibility.PUBLIC:
+            flags |= SymbolFlags.IS_PUBLIC
+            break;
+        case Visibility.INTERNAL:
+            flags |= SymbolFlags.IS_INTERNAL
+            break;
+        default:
+            flags |= SymbolFlags.IS_PRIVATE
     }
 
     if(isNewType) {

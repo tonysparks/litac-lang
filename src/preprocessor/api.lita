@@ -356,7 +356,9 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     ape_object_set_map_value(declObj, "packageName",
         ape_object_make_stringf(this.runtime.ape, "%.*s", sym.declared.id.packageName.length, sym.declared.id.packageName.buffer))
 
-    ape_object_set_map_value(declObj, "isPublic", ape_object_make_bool(sym.decl.attributes.isPublic))
+    ape_object_set_map_value(declObj, "isPublic", ape_object_make_bool(sym.decl.attributes.visibility == Visibility.PUBLIC))
+    ape_object_set_map_value(declObj, "isInternal", ape_object_make_bool(sym.decl.attributes.visibility == Visibility.INTERNAL))
+    ape_object_set_map_value(declObj, "isPrivate", ape_object_make_bool(sym.decl.attributes.visibility == Visibility.PRIVATE))
     ape_object_set_map_value(declObj, "isGlobal", ape_object_make_bool(sym.decl.attributes.isGlobal))
     ape_object_set_map_value(declObj, "declPtr", ape_object_make_external(this.runtime.ape, sym.decl))
 

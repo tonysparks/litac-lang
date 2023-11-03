@@ -148,8 +148,11 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
 
             Printf(indent, "")
-            if(decl.attributes.isPublic) {
+            if(decl.attributes.visibility == Visibility.PUBLIC) {
                 printf("public ")
+            }
+            else if(decl.attributes.visibility == Visibility.INTERNAL) {
+                printf("internal ")
             }
             printf("struct ")
             PrintName(decl.name.token)
@@ -200,8 +203,11 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
 
             Printf(indent, "")
-            if(decl.attributes.isPublic) {
+            if(decl.attributes.visibility == Visibility.PUBLIC) {
                 printf("public ")
+            }
+            else if(decl.attributes.visibility == Visibility.INTERNAL) {
+                printf("internal ")
             }
             printf("union ")
             PrintName(decl.name.token)
@@ -252,8 +258,11 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
 
             Printf(indent, "")
-            if(decl.attributes.isPublic) {
+            if(decl.attributes.visibility == Visibility.PUBLIC) {
                 printf("public ")
+            }
+            else if(decl.attributes.visibility == Visibility.INTERNAL) {
+                printf("internal ")
             }
             printf("trait ")
             PrintName(decl.name.token)
@@ -291,8 +300,11 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
 
             Printf(indent, "")
-            if(decl.attributes.isPublic) {
+            if(decl.attributes.visibility == Visibility.PUBLIC) {
                 printf("public ")
+            }
+            else if(decl.attributes.visibility == Visibility.INTERNAL) {
+                printf("internal ")
             }
             printf("enum ")
             PrintName(decl.name.token)
@@ -314,8 +326,11 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
 
-            if(decl.attributes.isPublic) {
-                Printf(indent, "public ")
+            if(decl.attributes.visibility == Visibility.PUBLIC) {
+                printf("public ")
+            }
+            else if(decl.attributes.visibility == Visibility.INTERNAL) {
+                printf("internal ")
             }
             Printf(indent, "func ")
             PrintName(decl.name.token)
@@ -354,8 +369,11 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
 
-            if(decl.attributes.isPublic) {
+            if(decl.attributes.visibility == Visibility.PUBLIC) {
                 Printf(indent, "public ")
+            }
+            else if(decl.attributes.visibility == Visibility.INTERNAL) {
+                Printf(indent, "internal ")
             }
             Printf(indent, "typedef ")
             PrintTypeSpec(decl.type)

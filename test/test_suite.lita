@@ -9,6 +9,7 @@ import "std/mem"
 import "std/mem/linear_allocator"
 import "std/map"
 import "std/string_buffer"
+import "std/string_view"
 import "std/string"
 import "std/system"
 
@@ -75,6 +76,7 @@ func main(len: i32, args: **char) : i32 {
         //"../test/tests/notes.json",
         // "../test/tests/misc.json", json syntax error
 
+        "../test/tests/visibility_modifiers.json",
         "../test/tests/to_json.json",
         "../test/tests/from_json.json",
         "../test/tests/static_if.json",
@@ -309,8 +311,21 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     var moduleFilenameStr = StringInit(moduleFilename, 260, 0)
     for(var i = 0; i < test.modules.size(); i += 1) {
         var m = test.modules.get(i)
+        var moduleName = StringViewInit(m.name)
+
+        // make sub directories
+        if(moduleName.contains("/")) {
+            var path = moduleName.substring(0, moduleName.lastIndexOfAt("/", 1))
+
+            moduleFilenameStr.clear()
+            moduleFilenameStr.format("test_output/%.*s", path.length, path.buffer)
+            Mkdirs(moduleFilenameStr.cStr())
+        }
+
         moduleFilenameStr.clear()
         moduleFilenameStr.format("test_output/%s.lita", m.name)
+
+
         if(WriteFile(moduleFilenameStr.cStr(), m.code, strlen(m.code)) != FileStatus.Ok) {
             return TestResult.LOADING_ERROR
         }

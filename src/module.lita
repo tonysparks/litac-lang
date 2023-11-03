@@ -345,9 +345,15 @@ public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
                                                symName: InternedString,
                                                isUsing: bool) {
 
-    // only import public symbols
-    if(!(symbol.flags & SymbolFlags.IS_PUBLIC)) {
+    // only import public/internal symbols
+    if(symbol.flags & SymbolFlags.IS_PRIVATE) {
         return;
+    }
+
+    if(symbol.flags & SymbolFlags.IS_INTERNAL) {
+        if(!this.isInPackage(moduleToImport)) {
+            return;
+        }
     }
 
     // only import symbols that are declared in the import module
@@ -400,6 +406,48 @@ public func (this: *Module) equals(other: *Module) : bool {
     if(this == other) return true
     return strcmp(this.id.filename, other.id.filename) == 0
     */
+}
+
+@doc("""
+    Checks to see if the supplied module is within this package
+""")
+public func (this: *Module) isInPackage(other: *Module) : bool {
+    //printf("This: %.*s vs Other: %.*s\n", this.id.packageName.length, this.id.packageName.buffer,
+    //    other.id.packageName.length, other.id.packageName.buffer)
+
+    if(this == other) {
+        return true
+    }
+
+    // check if other is a sub-package of this
+    {
+        var rootIndex = this.id.packageName.view.lastIndexOfAt("::", 2)
+        if(rootIndex < 0) {
+            return true
+        }
+
+        var root = this.id.packageName.view.substring(0, rootIndex)
+        var result = other.id.packageName.view.startsWith(root.buffer, root.length);
+        if(result) {
+            return true
+        }
+    }
+
+    // check if this is a sub-package of other
+    {
+        var rootIndex = other.id.packageName.view.lastIndexOfAt("::", 2)
+        if(rootIndex < 0) {
+            return true
+        }
+
+        var root = other.id.packageName.view.substring(0, rootIndex)
+        var result = this.id.packageName.view.startsWith(root.buffer, root.length);
+        if(result) {
+            return true
+        }
+    }
+
+    return false;
 }
 
 public func (this: *Module) print(header: *const char) {
