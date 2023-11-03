@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 wd=$(pwd)
 echo Current working directory ${wd}
 

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 unameOut="$(uname -s)"
 case "${unameOut}" in
     Darwin*)

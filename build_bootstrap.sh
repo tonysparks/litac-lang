@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 osType="$(uname -s)"
 case "${osType}" in
     Darwin*)
