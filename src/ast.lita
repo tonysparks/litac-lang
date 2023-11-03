@@ -145,8 +145,19 @@ public struct GenericParam {
     name: Identifier
 }
 
+public enum Visibility {
+    /* Only visibility within the defined module -- this is the default */
+    PRIVATE,
+
+    /* Visible to all modules defined in the folder and sub-folders */
+    INTERNAL,
+
+    /* Visible to all */
+    PUBLIC,
+}
+
 public struct Attributes {
-    isPublic: bool
+    visibility: Visibility = Visibility.PRIVATE
     isGlobal: bool
     isUsing: bool
     notes: Array<*NoteStmt>

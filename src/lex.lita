@@ -63,6 +63,7 @@ public enum TokenType {
 
     AS,
     PUBLIC,
+    INTERNAL,
     USING,
     // End KeyWords
 
@@ -185,6 +186,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
 
     [TokenType.AS] = "as",
     [TokenType.PUBLIC] = "public",
+    [TokenType.INTERNAL] = "internal",
     [TokenType.USING] = "using",
 
     // End KeyWords
@@ -362,6 +364,7 @@ const keywordCache = [MAX_KEYWORD_CACHE]**const char {
     [8] = []*const char {
         "continue",
         "offsetof",
+        "internal",
         null
     },
 }
@@ -426,6 +429,7 @@ const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
     [8] = []TokenType {
         TokenType.CONTINUE,
         TokenType.OFFSETOF,
+        TokenType.INTERNAL,
     }
 }
 

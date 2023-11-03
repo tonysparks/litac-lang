@@ -142,6 +142,9 @@ public @note packed {
             if(sym.isPublic) {
                 emit("public ")
             }
+            else if(sym.isInternal) {
+                emit("internal ")
+            }
             emit("func %s(enumType: %s) : *const char {
                       switch(enumType) {\n", symName, sym.name);
             for(field in sym.enumDecl.fields) {

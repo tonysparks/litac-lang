@@ -1,0 +1,253 @@
+{
+    "description": "Tests Visibility Modifiers",
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Test Public Modifier",
+            "definitions": `
+                import "public_module";
+            `,
+            "code": `
+                var publicStruct = TestPublicStruct {
+                    .a = 4
+                }
+                assert(publicStruct.testPublicMethod() == 4)
+            `,
+            "modules": [
+                {
+                    "name" : "public_module",
+                    "program" : `
+                        public struct TestPublicStruct {
+                            a: i32
+                        }
+
+                        public func (this: *TestPublicStruct) testPublicMethod() : i32 {
+                            return this.a
+                        }
+                    `
+                },
+            ],
+        },
+        {
+            "name": "Test Internal Modifier",
+            "definitions": `
+                import "internal_module";
+            `,
+            "code": `
+                var internalStruct = TestStruct {
+                    .a = 4
+                }
+                assert(false)
+            `,
+            "error" : "unknown type 'TestStruct'",
+            "modules": [
+                {
+                    "name" : "sub/internal_module",
+                    "program" : `
+                        internal struct TestStruct {
+                            a: i32
+                        }
+
+                        internal func (this: *TestStruct) testMethod() : i32 {
+                            return this.a
+                        }
+                    `
+                }
+            ],
+        },
+        {
+            "name": "Test Private Modifier",
+            "definitions": `
+                import "private_module";
+            `,
+            "code": `
+                var privateStruct = TestStruct {
+                    .a = 4
+                }
+                assert(false)
+            `,
+            "error" : "unknown type 'TestStruct'",
+            "modules": [
+                {
+                    "name" : "private_module",
+                    "program" : `
+                        struct TestStruct {
+                            a: i32
+                        }
+
+                        func (this: *TestStruct) testMethod() : i32 {
+                            return this.a
+                        }
+                    `
+                }
+            ],
+        },
+        {
+            "name": "Test Internal Modifier is Visible to sub module",
+            "definitions": `
+                import "sub/public_module"
+
+                internal struct TestInternalStruct {
+                    a: i32
+                }
+
+                internal func (this: *TestInternalStruct) testInternalMethod() : i32 {
+                    return this.a
+                }
+            `,
+            "code": `
+
+                assert(test() == 4)
+            `,
+            "modules": [
+                {
+                    "name" : "sub/public_module",
+                    "program" : `
+                        import "lita_test";
+                        import "std/assert";
+
+                        public func test() : i32 {
+                            var internalStruct = TestInternalStruct {
+                                .a = 4
+                            }
+                            assert(internalStruct.testInternalMethod() == 4)
+                            return internalStruct.a
+                        }
+                    `
+                }
+            ],
+        },
+        {
+            "name": "Test Internal Modifier is Visible to module",
+            "definitions": `
+                import "public_module"
+
+                internal struct TestInternalStruct {
+                    a: i32
+                }
+
+                internal func (this: *TestInternalStruct) testInternalMethod() : i32 {
+                    return this.a
+                }
+            `,
+            "code": `
+
+                assert(test() == 4)
+            `,
+            "modules": [
+                {
+                    "name" : "public_module",
+                    "program" : `
+                        import "lita_test";
+                        import "std/assert";
+
+                        public func test() : i32 {
+                            var internalStruct = TestInternalStruct {
+                                .a = 4
+                            }
+                            assert(internalStruct.testInternalMethod() == 4)
+                            return internalStruct.a
+                        }
+                    `
+                }
+            ],
+        },
+        {
+            "name": "Test Private Modifier is Visible to sub module",
+            "definitions": `
+                import "public_module"
+
+                struct TestPrivateStruct {
+                    a: i32
+                }
+
+                func (this: *TestPrivateStruct) testPrivateMethod() : i32 {
+                    return this.a
+                }
+            `,
+            "code": `
+                assert(false)
+            `,
+            "error": "unknown type 'TestPrivateStruct'",
+            "modules": [
+                {
+                    "name" : "public_module",
+                    "program" : `
+                        import "test_module";
+                        import "std/assert";
+
+                        public func test() : i32 {
+                            var privateStruct = TestPrivateStruct {
+                                .a = 4
+                            }
+                            assert(privateStruct.testPrivateMethod() == 4)
+                            return privateStruct.a
+                        }
+                    `
+                }
+            ],
+        },
+        {
+            "name": "Test Public Modifier",
+            "definitions": `
+                import "public_module";
+                import "internal_module";
+                import "private_module";
+            `,
+            "code": `
+                var publicStruct = TestPublicStruct {
+                    .a = 4
+                }
+                assert(publicStruct.testPublicMethod() == 4)
+            `,
+            "modules": [
+                {
+                    "name" : "public_module",
+                    "program" : `
+                        public struct TestPublicStruct {
+                            a: i32
+                        }
+
+                        public func (this: *TestPublicStruct) testPublicMethod() : i32 {
+                            return this.a
+                        }
+                    `
+                },
+                {
+                    "name" : "internal_module",
+                    "program" : `
+                        internal struct TestInternalStruct {
+                            a: i32
+                        }
+
+                        internal func (this: *TestInternalStruct) testInternalMethod() : i32 {
+                            return this.a
+                        }
+                    `
+                },
+                {
+                    "name" : "private_module",
+                    "program" : `
+                        struct TestPrivateStruct {
+                            a: i32
+                        }
+
+                        func (this: *TestPrivateStruct) testPrivateMethod() : i32 {
+                            return this.a
+                        }
+                    `
+                }
+            ],
+        },
+
+    ]
+}

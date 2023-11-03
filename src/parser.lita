@@ -21,11 +21,12 @@ import "module"
 import "intern"
 import "preprocessor"
 
-const DECL_ADJUST_TOKENS_COUNT = 11
+const DECL_ADJUST_TOKENS_COUNT = 12
 const DECL_ADJUST_TOKENS = [DECL_ADJUST_TOKENS_COUNT]TokenType {
     TokenType.IMPORT,
     TokenType.HASH,
     TokenType.PUBLIC,
+    TokenType.INTERNAL,
     TokenType.VAR,
     TokenType.CONST,
     TokenType.FUNC,
@@ -40,6 +41,7 @@ const STMT_ADJUST_TOKENS = []TokenType {
     TokenType.IMPORT,
     TokenType.HASH,
     TokenType.PUBLIC,
+    TokenType.INTERNAL,
     TokenType.VAR,
     TokenType.CONST,
     TokenType.FUNC,
@@ -183,7 +185,14 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             return;
         }
 
-        var isPublic = p.match(TokenType.PUBLIC)
+        var visibility = Visibility.PRIVATE
+        if(p.match(TokenType.INTERNAL)) {
+            visibility = Visibility.INTERNAL
+        }
+        else if(p.match(TokenType.PUBLIC)) {
+            visibility = Visibility.PUBLIC
+        }
+
         if(p.match(TokenType.VAR)) {
             var decl = p.varDeclaration()
             moduleStmt.declarations.add(decl)
@@ -233,7 +242,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
 
         var decl = moduleStmt.declarations.last()
         decl.attributes.notes = notes
-        decl.attributes.isPublic = isPublic
+        decl.attributes.visibility = visibility
         decl.attributes.isGlobal = true
     }
 }
@@ -256,7 +265,14 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
             goto err;
         }
 
-        var isPublic = p.match(TokenType.PUBLIC)
+        var visibility = Visibility.PRIVATE
+        if(p.match(TokenType.INTERNAL)) {
+            visibility = Visibility.INTERNAL
+        }
+        else if(p.match(TokenType.PUBLIC)) {
+            visibility = Visibility.PUBLIC
+        }
+
         var decl: *Decl = null
 
         if(p.match(TokenType.VAR)) {
@@ -298,7 +314,7 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
         }
 
         decl.attributes.notes = notes
-        decl.attributes.isPublic = isPublic
+        decl.attributes.visibility = visibility
         decl.attributes.isGlobal = true
 
         return decl as (*Stmt);
