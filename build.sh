@@ -36,7 +36,7 @@ build_litac() {
 
     echo "Running litaC inception!..."
     cd ../bin
-    ./$EXE_NAME -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB
+    ./$EXE_NAME -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
