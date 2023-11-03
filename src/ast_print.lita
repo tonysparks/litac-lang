@@ -327,10 +327,10 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
 
             if(decl.attributes.visibility == Visibility.PUBLIC) {
-                printf("public ")
+                Printf(indent, "public ")
             }
             else if(decl.attributes.visibility == Visibility.INTERNAL) {
-                printf("internal ")
+                Printf(indent, "internal ")
             }
             Printf(indent, "func ")
             PrintName(decl.name.token)
