@@ -102,6 +102,7 @@ import "std/string_view"
 import "pkg_mgr/pkg"
 import "pkg_mgr/pkg_install"
 import "pkg_mgr/pkg_run"
+import "pkg_mgr/pkg_init"
 
 import "build"
 
@@ -110,6 +111,14 @@ public struct PackageSyncOptions {
     pkgDir: *const char = ".pkgs"       // the .pkgs directory
     fullSync: bool = false              // force a full download of all packages
     httpOptions: HttpOptions            // http options
+}
+
+
+public struct PackageInitOptions {
+    name: *const char
+    version: *const char = "0.0.1"
+    type: *const char = "executable"
+    repo: *const char = ""
 }
 
 @asStr
@@ -133,6 +142,7 @@ public enum PkgStatus {
     ERROR_HTTP_STATUS,
     ERROR_INVALID_DIRECTORY,
     ERROR_INVALID_REPO,
+    ERROR_INIT_PACKAGE,
 }
 
 public struct PackageManager {
@@ -182,6 +192,14 @@ func (this: *PackageManager) printMessages() {
     if(this.errors.length > 0) {
         printf("Error: %s\n", this.errors.cStr())
     }
+}
+
+@doc("""
+    Initializes a new LitaC project, writing out scaffolding files
+""")
+public func (this: *PackageManager) initCommand(options: PackageInitOptions) : PkgStatus {
+    defer this.printMessages()
+    return PackageInit(this, options)
 }
 
 @doc("""

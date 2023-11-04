@@ -1,0 +1,103 @@
+import "pkg_mgr"
+import "std/system"
+import "std/string"
+import "std/string_buffer"
+import "std/array"
+import "std/json"
+import "std/libc"
+import "std/io"
+
+
+public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgStatus {
+    const MAX_BUFFER = 1024
+    var buffer = [MAX_BUFFER]char{};
+    var path = StringInit(buffer, MAX_BUFFER, 0)
+
+    path.format("%s/bin", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+    path.format("%s/doc", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+    path.format("%s/lib", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+    path.format("%s/src", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+    path.format("%s/test", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+
+    var sb = StringBufferInit(1024)
+    defer sb.free()
+
+    // Write out main.lita
+    {
+        sb.append("%s",
+"""
+import "std/libc"
+
+func main(len: i32, args: **char) : i32 {
+    printf("Hello World")
+}
+""")
+
+        path.format("%s/src/main.lita", pm.options.projectPath)
+        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+            return PkgStatus.ERROR_INIT_PACKAGE
+        }
+    }
+
+    // Write out main_test.lita
+    {
+        sb.clear().append("%s",
+"""
+import "main"
+
+@test("project_test")
+func test() {
+    assert(true)
+}
+
+""")
+
+        path.format("%s/test/main_test.lita", pm.options.projectPath)
+        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+            return PkgStatus.ERROR_INIT_PACKAGE
+        }
+    }
+
+    // Write out pkg.json
+    {
+        sb.clear().append("""
+{
+    "name" : "%s",
+    "version" : "%s",
+    "type" : "%s",
+    "repo" : "%s",
+
+    "build_command" : {
+        "default" : {
+            "default" : {
+                "cc" : "clang",
+                "cc_options" : "-std=c99 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
+                "lita_options" : ""
+            }
+        }
+    },
+
+    "dependencies": [],
+
+}
+""" // TODO: Json escape strings...
+        , options.name, options.version, options.type, options.repo)
+
+        path.format("%s/pkg.json", pm.options.projectPath)
+        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+            return PkgStatus.ERROR_INIT_PACKAGE
+        }
+    }
+
+    return PkgStatus.OK
+}
