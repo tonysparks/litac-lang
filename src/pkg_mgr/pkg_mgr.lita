@@ -104,6 +104,7 @@ import "pkg_mgr/pkg_install"
 import "pkg_mgr/pkg_build"
 import "pkg_mgr/pkg_run"
 import "pkg_mgr/pkg_init"
+import "pkg_mgr/pkg_init"
 
 import "build"
 import "lita"
@@ -129,6 +130,14 @@ public struct PackageBuildOptions {
 public struct PackageInstallOptions {
     fullSync: bool = false              // force a full download of all packages
     httpOptions: HttpOptions            // http options
+}
+
+
+public struct PackageInitOptions {
+    name: *const char
+    version: *const char = "0.0.1"
+    type: *const char = "executable"
+    repo: *const char = ""
 }
 
 @asStr
