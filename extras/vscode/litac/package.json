@@ -8,8 +8,8 @@
         "url": "https://github.com/tonysparks/litac-lang"
     },
     "homepage" : "https://github.com/tonysparks/litac-lang/README.md",
-    "keywords" : ["litac"],    
-	"version": "0.0.3",
+    "keywords" : ["litac"],
+	"version": "0.0.4",
 	"publisher": "tonysparks",
 	"engines": {
 		"vscode": "^1.35.0"
