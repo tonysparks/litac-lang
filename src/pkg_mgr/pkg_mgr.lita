@@ -142,6 +142,7 @@ public enum PkgStatus {
     ERROR_HTTP_STATUS,
     ERROR_INVALID_DIRECTORY,
     ERROR_INVALID_REPO,
+    ERROR_INIT_PACKAGE,
 }
 
 public struct PackageManager {

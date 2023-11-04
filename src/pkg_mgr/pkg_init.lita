@@ -9,13 +9,6 @@ import "std/io"
 
 
 public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgStatus {
-
-    printf("Project Dir: %s\n", pm.options.projectPath)
-    printf("Name: %s\n", options.name)
-    printf("Version: %s\n", options.version)
-    printf("Type: %s\n", options.type)
-    printf("Repo: %s\n", options.repo)
-
     const MAX_BUFFER = 1024
     var buffer = [MAX_BUFFER]char{};
     var path = StringInit(buffer, MAX_BUFFER, 0)
@@ -32,9 +25,14 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
     path.format("%s/src", pm.options.projectPath)
     Mkdir(path.cStr())
 
+    path.format("%s/test", pm.options.projectPath)
+    Mkdir(path.cStr())
+
 
     var sb = StringBufferInit(1024)
     defer sb.free()
+
+    // Write out main.lita
     {
         sb.append("%s",
 """
@@ -46,9 +44,31 @@ func main(len: i32, args: **char) : i32 {
 """)
 
         path.format("%s/src/main.lita", pm.options.projectPath)
-        WriteFile(path.cStr(), sb.buffer, sb.length)
+        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+            return PkgStatus.ERROR_INIT_PACKAGE
+        }
     }
 
+    // Write out main_test.lita
+    {
+        sb.clear().append("%s",
+"""
+import "main"
+
+@test("project_test")
+func test() {
+    assert(true)
+}
+
+""")
+
+        path.format("%s/test/main_test.lita", pm.options.projectPath)
+        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+            return PkgStatus.ERROR_INIT_PACKAGE
+        }
+    }
+
+    // Write out pkg.json
     {
         sb.clear().append("""
 {
@@ -60,7 +80,8 @@ func main(len: i32, args: **char) : i32 {
     "build_command" : {
         "default" : {
             "default" : {
-                "build_cmd" : "clang.exe -std=c99 -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS",
+                "cc" : "clang",
+                "cc_options" : "-std=c99 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
                 "lita_options" : ""
             }
         }
@@ -73,7 +94,9 @@ func main(len: i32, args: **char) : i32 {
         , options.name, options.version, options.type, options.repo)
 
         path.format("%s/pkg.json", pm.options.projectPath)
-        WriteFile(path.cStr(), sb.buffer, sb.length)
+        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+            return PkgStatus.ERROR_INIT_PACKAGE
+        }
     }
 
     return PkgStatus.OK
