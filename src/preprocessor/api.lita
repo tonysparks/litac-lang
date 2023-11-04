@@ -60,6 +60,7 @@ public func (this: *Preprocessor) registerApi() {
     ape_set_native_function(this.runtime.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
     ape_set_native_function(this.runtime.ape, "replaceDeclaration", ApeReplaceDeclaration, &this.callContext)
     ape_set_native_function(this.runtime.ape, "addImport", ApeAddImport, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "flushDeclarations", ApeFlushDeclarations, &this.callContext)
 
     ape_set_native_function(this.runtime.ape, "assert", ApeAssert, &this.callContext)
     ape_set_native_function(this.runtime.ape, "getMainSymbol", ApeGetMainSymbol, &this.callContext)
@@ -738,6 +739,12 @@ func ApeGetCurrentModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape
     return ape_object_make_string(ape, moduleFilename)
 }
 
+
+func ApeFlushDeclarations(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    context.pp.drainQueue()
+    return ape_object_make_null()
+}
 
 func ApeGetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)

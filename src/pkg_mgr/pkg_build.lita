@@ -1,0 +1,229 @@
+import "pkg_mgr"
+import "std/system" as sys
+import "std/mem"
+import "std/string"
+import "std/string_buffer"
+import "std/array"
+import "std/json"
+import "std/libc"
+import "std/io"
+import "std/cmdline"
+
+import "main"
+import "lita"
+
+struct CommandArgs {
+    n: i32
+    args: **char
+}
+
+public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : PkgStatus {
+    if(!pm.pkg) {
+        return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
+    }
+
+    if(!pm.pkg.json) {
+        return PkgStatus.ERROR_PARSING_PKG_JSON
+    }
+
+    var buildCommand = pm.pkg.json.get("build_command")
+    if(!buildCommand) {
+        return PkgStatus.ERROR_COMMAND_NOT_DEFINED
+    }
+
+    var litaOptions = new<LitaOptions>()
+    memset(litaOptions, 0, sizeof(:LitaOptions))
+    defer defaultAllocator.free(litaOptions)
+
+    var args = CommandArgs{}
+    var result = pm.buildCommandArgs(buildCommand, options, &args)
+    if(result != PkgStatus.OK) {
+        return result
+    }
+
+    if(ParseArgs(args.n, args.args, litaOptions) != CmdParserStatus.OK) {
+        return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
+    }
+
+    // printf("Options: \n")
+    // for(var i = 0; i < args.n; i+=1) {
+    //     printf("%s\n", args.args[i])
+    // }
+
+    RunLitac(litaOptions)
+    return PkgStatus.OK
+}
+
+func (this: *PackageManager) buildCommandArgs(
+    buildCommand: *JsonNode,
+    options: PackageBuildOptions,
+    args: *CommandArgs) : PkgStatus {
+
+    var buildSection: *JsonNode = null
+
+    var defaultTarget = buildCommand.get("default")
+    var target: *JsonNode = GetTarget(buildCommand, defaultTarget, options)
+    if(target) {
+        var defaultOS = target.get("default")
+        var os: *JsonNode = GetOS(target, defaultTarget)
+        if(os) {
+            var arch: *JsonNode = GetArch(os, defaultOS)
+            buildSection = arch
+        }
+    }
+
+    var programArgs = ArrayInit<*const char>(64, this.allocator)
+    programArgs.add("litac")
+
+    if(buildSection) {
+        var script = buildSection.get("script")
+        if(script) {
+            return this.buildWithScript(script)
+        }
+
+        var buildCmd = StringBufferInit(1024)
+        var cc = buildSection.getStr("cc", "clang")
+        var ccOptions = buildSection.get("cc_options")
+        if(ccOptions) {
+            buildCmd.append("%s ", cc)
+            if(ccOptions.isString()) {
+                buildCmd.append("%s", ccOptions.asString())
+            }
+            else if(ccOptions.isArray()) {
+                var isFirst = true
+                for(var i = 0; i < ccOptions.size(); i+=1) {
+                    if(!isFirst) {
+                        buildCmd.appendStrn(" ", 1)
+                    }
+
+                    isFirst = false
+
+                    var n = ccOptions.at(i)
+                    buildCmd.append("%s", n.asString())
+                }
+            }
+        }
+
+
+        var litaOptions = buildSection.get("lita_options")
+        if(litaOptions) {
+           buildCmd.append("%s ", cc)
+            if(litaOptions.isString()) {
+                programArgs.add(litaOptions.asString())
+            }
+            else if(litaOptions.isArray()) {
+                for(var i = 0; i < litaOptions.size(); i+=1) {
+                    var n = litaOptions.at(i)
+                    programArgs.add(n.asString())
+                }
+            }
+        }
+
+        if(!buildCmd.empty()) {
+            programArgs.add("-buildCmd")
+            programArgs.add(buildCmd.cStr())
+        }
+    }
+
+    programArgs.add("-outputDir")
+    programArgs.add("./bin/")
+
+    programArgs.add("-output")
+    programArgs.add(this.pkg.json.getStr("name", "a"))
+
+    programArgs.add("./src/main.lita")
+
+    // TEMP: should move into specific commands?
+    {
+        if(this.options.litaOptions.run) {
+            programArgs.add("-run")
+        }
+
+        if(this.options.litaOptions.testsOnly && this.options.litaOptions.testsRegex) {
+            programArgs.add("-test")
+            programArgs.add(this.options.litaOptions.testsRegex)
+        }
+    }
+
+    args.n = programArgs.size()
+    args.args = programArgs.elements as (**char)
+
+    return PkgStatus.OK
+}
+
+
+func (this: *PackageManager) buildWithScript(script: *JsonNode) : PkgStatus {
+    // TODO: Implement running script..
+    printf("'script' is not implemented yet...")
+    return PkgStatus.OK
+}
+
+func GetTarget(buildCommand: *JsonNode, defaultTarget: *JsonNode, options: PackageBuildOptions) : *JsonNode {
+    var target: *JsonNode = null
+    if(options.isRelease) {
+        target = buildCommand.get("release")
+    }
+    else {
+        target = buildCommand.get("debug")
+    }
+
+    if(!target) {
+        target = defaultTarget
+    }
+
+    return target
+}
+
+func GetOS(target: *JsonNode, defaultTarget: *JsonNode) : *JsonNode {
+    var os: *JsonNode = null
+    var defaultOS = target.get("default")
+
+#static_if defined(_WIN32) || defined(_WIN64)
+    os = target.get("windows")
+#elseif defined(__linux__)
+    os = target.get("linux")
+#elseif defined(__APPLE__) && defined(__MACH__)
+    os = target.get("mac")
+#end
+
+    if(!os) {
+        os = defaultOS
+    }
+
+    // Try to use the default
+    if(!os) {
+        if(!os && defaultTarget) {
+            os = GetOS(defaultTarget, null)
+        }
+    }
+
+    return os
+}
+
+func GetArch(os: *JsonNode, defaultOS: *JsonNode) : *JsonNode {
+    var arch: *JsonNode = null
+    var defaultArch = os.get("default")
+
+#static_if defined(LITA_X86)
+    arch = os.get("x86")
+#elseif defined(LITA_X64)
+    arch = os.get("x64")
+#elseif defined(LITA_ARM32)
+    arch = os.get("arm32")
+#elseif defined(LITA_ARM64)
+    arch = os.get("arm64")
+#end
+
+    if(!arch) {
+        arch = defaultArch
+    }
+
+    // Try to use the default
+    if(!arch) {
+        if(defaultOS) {
+            arch = GetArch(defaultOS, null)
+        }
+    }
+
+    return arch
+}

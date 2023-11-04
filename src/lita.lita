@@ -102,6 +102,7 @@ public enum PkgCommand {
     PKG_INSTALL,
     PKG_RUN,
     PKG_INIT,
+    PKG_BUILD,
 }
 
 public struct PkgOptions {
