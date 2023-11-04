@@ -1,0 +1,80 @@
+import "pkg_mgr"
+import "std/system"
+import "std/string"
+import "std/string_buffer"
+import "std/array"
+import "std/json"
+import "std/libc"
+import "std/io"
+
+
+public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgStatus {
+
+    printf("Project Dir: %s\n", pm.options.projectPath)
+    printf("Name: %s\n", options.name)
+    printf("Version: %s\n", options.version)
+    printf("Type: %s\n", options.type)
+    printf("Repo: %s\n", options.repo)
+
+    const MAX_BUFFER = 1024
+    var buffer = [MAX_BUFFER]char{};
+    var path = StringInit(buffer, MAX_BUFFER, 0)
+
+    path.format("%s/bin", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+    path.format("%s/doc", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+    path.format("%s/lib", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+    path.format("%s/src", pm.options.projectPath)
+    Mkdir(path.cStr())
+
+
+    var sb = StringBufferInit(1024)
+    defer sb.free()
+    {
+        sb.append("%s",
+"""
+import "std/libc"
+
+func main(len: i32, args: **char) : i32 {
+    printf("Hello World")
+}
+""")
+
+        path.format("%s/src/main.lita", pm.options.projectPath)
+        WriteFile(path.cStr(), sb.buffer, sb.length)
+    }
+
+    {
+        sb.clear().append("""
+{
+    "name" : "%s",
+    "version" : "%s",
+    "type" : "%s",
+    "repo" : "%s",
+
+    "build_command" : {
+        "default" : {
+            "default" : {
+                "build_cmd" : "clang.exe -std=c99 -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS",
+                "lita_options" : ""
+            }
+        }
+    },
+
+    "dependencies": [],
+
+}
+""" // TODO: Json escape strings...
+        , options.name, options.version, options.type, options.repo)
+
+        path.format("%s/pkg.json", pm.options.projectPath)
+        WriteFile(path.cStr(), sb.buffer, sb.length)
+    }
+
+    return PkgStatus.OK
+}

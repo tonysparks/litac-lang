@@ -337,8 +337,9 @@ public func (b: *StringBuffer) size() : i32 {
 }
 
 @inline
-public func (b: *StringBuffer) clear() {
+public func (b: *StringBuffer) clear() : *StringBuffer {
     b.length = 0
+    return b
 }
 
 public func (b: *StringBuffer) cStrConst() : *const char {
