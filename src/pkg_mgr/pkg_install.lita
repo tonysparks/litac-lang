@@ -23,15 +23,13 @@ import "std/thread/thread_pool"
 
 const INSTALL_COMPLETED_FILE = ".litac_pkg"
 
-public func PackageSync(pm: *PackageManager) : PkgStatus {
+public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) : PkgStatus {
     if(!pm.pkg) {
         return PkgStatus.OK
     }
 
-    var options = pm.options
-
-    Mkdir(options.pkgDir)
-    if(!FileExists(options.pkgDir)) {
+    Mkdir(pm.options.pkgDir)
+    if(!FileExists(pm.options.pkgDir)) {
         return PkgStatus.ERROR_CREATING_PKG_DIR
     }
 
@@ -40,10 +38,10 @@ public func PackageSync(pm: *PackageManager) : PkgStatus {
         return PkgStatus.OK
     }
 
-    if(pm.options.fullSync) {
+    if(options.fullSync) {
         var temp:[MAX_PATH]char;
         var pkgPath = StringInit(temp, MAX_PATH, 0)
-        pkgPath.format("%s/%s", CurrentWorkingPath(), options.pkgDir)
+        pkgPath.format("%s/%s", CurrentWorkingPath(), pm.options.pkgDir)
 
         var status = cleanPackageDirectory(pm, pkgPath.cStr())
         if(status != PkgStatus.OK) {
@@ -60,7 +58,7 @@ public func PackageSync(pm: *PackageManager) : PkgStatus {
     }
 
     var http = Http{}
-    http.init(pm.options.httpOptions)
+    http.init(options.httpOptions)
     defer http.free()
 
     var pkgPath:[MAX_PATH]char;

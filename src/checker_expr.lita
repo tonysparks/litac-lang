@@ -134,7 +134,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
 func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
 
-    var type = this.resolveTypeSpec(expr.type, .isFunc = true)
+    var type = this.resolveTypeSpec(expr.type, SearchType.FUNC)
     if(!type) {
         this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
@@ -1534,14 +1534,14 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
     // if this is a generic symbol and must be re-resolved - this happens
     // during type inference for methods -- @see resolveFuncCallExpr and inferFuncCallExpr
     if(expr.flags & GetExprFlags.IS_METHOD_CALL) {
-        var funcSym = this.getType(expr.field.type, .isFunc = true)
+        var funcSym = this.getType(expr.field.type, SearchType.FUNC)
         if(!funcSym) {
             // TODO: mark an error?
             return false
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
-            var typeInfo = this.resolveTypeSpec(expr.field.type, .isFunc = true)
+            var typeInfo = this.resolveTypeSpec(expr.field.type, SearchType.FUNC)
             if(!typeInfo) {
                 // TODO: mark an error?
                 return false;
@@ -1578,7 +1578,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
-            typeInfo = this.resolveTypeSpec(expr.field.type, .isFunc = true)
+            typeInfo = this.resolveTypeSpec(expr.field.type, SearchType.FUNC)
             if(!typeInfo) {
                 // TODO: mark an error?
                 return false

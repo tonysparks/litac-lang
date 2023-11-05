@@ -101,16 +101,17 @@ import "std/string_view"
 
 import "pkg_mgr/pkg"
 import "pkg_mgr/pkg_install"
+import "pkg_mgr/pkg_build"
 import "pkg_mgr/pkg_run"
 import "pkg_mgr/pkg_init"
 
 import "build"
+import "lita"
 
-public struct PackageSyncOptions {
+public struct PackageOptions {
     projectPath: *const char
     pkgDir: *const char = ".pkgs"       // the .pkgs directory
-    fullSync: bool = false              // force a full download of all packages
-    httpOptions: HttpOptions            // http options
+    litaOptions: *LitaOptions
 }
 
 
@@ -120,6 +121,16 @@ public struct PackageInitOptions {
     type: *const char = "executable"
     repo: *const char = ""
 }
+
+public struct PackageBuildOptions {
+    isRelease: bool = false
+}
+
+public struct PackageInstallOptions {
+    fullSync: bool = false              // force a full download of all packages
+    httpOptions: HttpOptions            // http options
+}
+
 
 @asStr
 public enum PkgStatus {
@@ -143,10 +154,14 @@ public enum PkgStatus {
     ERROR_INVALID_DIRECTORY,
     ERROR_INVALID_REPO,
     ERROR_INIT_PACKAGE,
+    ERROR_PARSING_BUILD_OPTIONS,
+    ERROR_INVALID_BUILD_TARGET,
+    ERROR_INVALID_BUILD_OS,
+    ERROR_INVALID_BUILD_ARCH,
 }
 
 public struct PackageManager {
-    options: PackageSyncOptions
+    options: PackageOptions
     allocator: *const Allocator
 
     packages: Map<*const char, *PackageDef>
@@ -157,7 +172,7 @@ public struct PackageManager {
 }
 
 public func (this: *PackageManager) init(
-    options: PackageSyncOptions,
+    options: PackageOptions,
     allocator: *const Allocator = defaultAllocator) {
 
     this.options = options
@@ -203,9 +218,23 @@ public func (this: *PackageManager) initCommand(options: PackageInitOptions) : P
 }
 
 @doc("""
+    Initializes a new LitaC project, writing out scaffolding files
+""")
+public func (this: *PackageManager) buildCommand(options: PackageBuildOptions) : PkgStatus {
+    defer this.printMessages()
+
+    var status = this.readProjectPkg()
+    if(status != PkgStatus.OK) {
+        return status;
+    }
+
+    return PackageBuild(this, options)
+}
+
+@doc("""
     Installs all packages defined the pkg.json to the file system.
 """)
-public func (this: *PackageManager) install() : PkgStatus {
+public func (this: *PackageManager) installCommand(options: PackageInstallOptions) : PkgStatus {
     defer this.printMessages()
 
     var status = this.readProjectPkg()
@@ -223,7 +252,7 @@ public func (this: *PackageManager) install() : PkgStatus {
         }
     }
 
-    return PackageSync(this)
+    return PackageInstall(this, options)
 }
 
 @doc("""

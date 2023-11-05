@@ -60,6 +60,7 @@ public func (this: *Preprocessor) registerApi() {
     ape_set_native_function(this.runtime.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
     ape_set_native_function(this.runtime.ape, "replaceDeclaration", ApeReplaceDeclaration, &this.callContext)
     ape_set_native_function(this.runtime.ape, "addImport", ApeAddImport, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "flushDeclarations", ApeFlushDeclarations, &this.callContext)
 
     ape_set_native_function(this.runtime.ape, "assert", ApeAssert, &this.callContext)
     ape_set_native_function(this.runtime.ape, "getMainSymbol", ApeGetMainSymbol, &this.callContext)
@@ -739,6 +740,12 @@ func ApeGetCurrentModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape
 }
 
 
+func ApeFlushDeclarations(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    var context = data as (*CallContext)
+    context.pp.drainQueue()
+    return ape_object_make_null()
+}
+
 func ApeGetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
 
@@ -884,6 +891,12 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
         return results
     }
 
+    var moduleName = context.pp.lita.options.inputFile
+    var mainModule = context.pp.lita.getModule(moduleName)
+    if(!mainModule) {
+        return results;
+    }
+
     // if we are testing by regex, test each function with @test attribute
     if(context.pp.lita.options.testsRegex) {
         var all = strcmp(context.pp.lita.options.testsRegex, ".*") == 0
@@ -891,7 +904,12 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
 
         for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
             var sym = context.checker.symbolFuncs.get(i)
-            if(sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+            if(sym.kind == SymbolKind.FUNC && sym.flags & SymbolFlags.IS_TEST) {
+
+                if(!sym.isVisibleTo(mainModule)) {
+                    continue;
+                }
+
                 if(all) {
                     var declObj = context.pp.declToApe(sym)
                     ape_object_add_array_value(results, declObj)
@@ -932,16 +950,10 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
     }
     // otherwise we are just testing the input file's tests
     else {
-        var moduleName = context.pp.lita.options.inputFile
-        var mainModule = context.pp.lita.getModule(moduleName)
-        if(!mainModule) {
-            return results;
-        }
-
         // iterate thru all symbols, this way we are deterministic in our output
         for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
             var sym = context.checker.symbolFuncs.get(i)
-            if(sym.declared == mainModule && sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+            if(sym.declared == mainModule && sym.kind == SymbolKind.FUNC && sym.flags & SymbolFlags.IS_TEST) {
                 var declObj = context.pp.declToApe(sym)
                 ape_object_add_array_value(results, declObj)
             }
