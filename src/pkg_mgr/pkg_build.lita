@@ -45,10 +45,7 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
         return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
     }
 
-    // printf("Options: \n")
-    // for(var i = 0; i < args.n; i+=1) {
-    //     printf("%s\n", args.args[i])
-    // }
+    // TODO: Recursively build dependencies too...
 
     RunLitac(litaOptions)
     return PkgStatus.OK
