@@ -131,7 +131,6 @@ public struct PackageInstallOptions {
     httpOptions: HttpOptions            // http options
 }
 
-
 @asStr
 public enum PkgStatus {
     OK = 0,
