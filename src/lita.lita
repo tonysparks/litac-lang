@@ -33,7 +33,8 @@ import "tcc/libtcc"
 
 
 public const MAX_PREFIX_SIZE = 32
-public const LITA_VERSION = "0.1.3-alpha"
+public const LITA_VERSION = "0.1.5-alpha"
+public const DEFAULT_BUILD_CMD = "clang -std=99 %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
 
 public struct Lita {
     allocator: *const Allocator
@@ -398,6 +399,13 @@ public func (this: *Lita) transpile(module: *Module) : bool {
         return false
     }
 
+    if(!IsLibtccAvailable()) {
+        this.options.isTcc = false
+        if(!this.options.compileCmd) {
+            this.options.compileCmd = DEFAULT_BUILD_CMD
+        }
+    }
+
     // if there is no build cmd, attempt to compile using libtcc
     if(!this.options.compileCmd || this.options.isTcc) {
 
@@ -427,7 +435,7 @@ func LibtccErrorFunc(data: *void, msg: *const char) : void {
 }
 
 public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *const char) : bool {
-#static_if LITA_X86 || LITA_X64
+#static_if LIBTCC_AVAILABLE
     this.startCapture(MetricType.CGEN)
     var cgen = CGen{}
     cgen.init(this, null)

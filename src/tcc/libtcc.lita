@@ -35,6 +35,21 @@
     .arch = "x86_64",
     .options = "-ltcc -ldl"
 );
+@raw("""
+#if LITA_X86 || LITA_X64
+#define LIBTCC_AVAILABLE 1
+#else
+#define LIBTCC_AVAILABLE 0
+#endif
+""");
+
+public func IsLibtccAvailable() : bool {
+#static_if LITA_X86 || LITA_X64
+    return true
+#else
+    return false
+#end
+}
 
 @foreign
 public struct TCCState;
