@@ -340,6 +340,13 @@ func (this: *Module) importModuleSymbols(
         var symbol = entry.value;
         this.importModuleSymbol(importSrcPos, moduleToImport, moduleName, symbol, symName, isUsing)
     }
+
+    for(var it = symbols.symbolNotes.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
+        this.importModuleSymbol(importSrcPos, moduleToImport, moduleName, symbol, symName, isUsing)
+    }
 }
 
 
@@ -464,6 +471,7 @@ public func (this: *Module) print(header: *const char) {
 
     var symbols = this.symbols
     var i = 0
+
     for(var it = symbols.symbolTypes.iter(); it.hasNext();) {
         var entry = it.next()
         var symName = entry.key;
@@ -474,6 +482,15 @@ public func (this: *Module) print(header: *const char) {
 
     i = 0
     for(var it = symbols.symbolFuncs.iter(); it.hasNext();) {
+        var entry = it.next()
+        var symName = entry.key;
+        var symbol = entry.value;
+        printf("   %d '%.*s' %s\n", i, symName.length, symName.buffer, SymbolKindAsStr(symbol.kind))
+        i += 1
+    }
+
+    i = 0
+    for(var it = symbols.symbolNotes.iter(); it.hasNext();) {
         var entry = it.next()
         var symName = entry.key;
         var symbol = entry.value;

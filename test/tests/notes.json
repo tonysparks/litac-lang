@@ -151,7 +151,7 @@
             "code": `
 
             `,
-            "error": "'get_request' is not a note type"
+            "error": "unknown note type 'get_request'"
         },
         {
             "name": "Invalid note argument no field",

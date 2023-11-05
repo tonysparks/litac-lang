@@ -1367,6 +1367,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.TRAIT_DECL:
+        case StmtKind.NOTE_DECL:
         case StmtKind.ENUM_DECL:
         case StmtKind.FUNC_DECL:
         case StmtKind.TYPEDEF_DECL:
