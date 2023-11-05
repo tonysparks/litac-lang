@@ -896,9 +896,16 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
         var all = strcmp(context.pp.lita.options.testsRegex, ".*") == 0
         var pattern = RegexCompile(context.pp.lita.options.testsRegex)
 
+        var testModule = context.checker.current
+
         for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
             var sym = context.checker.symbolFuncs.get(i)
-            if(sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+            if(sym.kind == SymbolKind.FUNC && sym.flags & SymbolFlags.IS_TEST) {
+
+                if(!sym.isVisibleTo(testModule)) {
+                    continue;
+                }
+
                 if(all) {
                     var declObj = context.pp.declToApe(sym)
                     ape_object_add_array_value(results, declObj)
@@ -948,7 +955,7 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
         // iterate thru all symbols, this way we are deterministic in our output
         for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
             var sym = context.checker.symbolFuncs.get(i)
-            if(sym.declared == mainModule && sym.kind == SymbolKind.FUNC && sym.decl.hasNote("test")) {
+            if(sym.declared == mainModule && sym.kind == SymbolKind.FUNC && sym.flags & SymbolFlags.IS_TEST) {
                 var declObj = context.pp.declToApe(sym)
                 ape_object_add_array_value(results, declObj)
             }

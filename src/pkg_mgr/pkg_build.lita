@@ -153,6 +153,10 @@ func (this: *PackageManager) buildCommandArgs(
         }
     }
 
+    if(strlen(this.options.litaOptions.inputFile) > 0) {
+        mainFile = this.options.litaOptions.inputFile as (*const char)
+    }
+
     programArgs.add(mainFile)
 
     args.n = programArgs.size()

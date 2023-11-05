@@ -220,13 +220,23 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     }
 
     options.languageServer = parser.hasOption("languageServer")
-    if(!options.languageServer && options.pkgOptions.pkgCmd == PkgCommand.PKG_NONE) {
-        if(parser.args.size() < 2) {
-            printf("Missing input file\n")
-            goto err;
-        }
+    if(!options.languageServer) {
 
-        GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
+        // if we are not running a pkg* command, we must have an input file
+        if(options.pkgOptions.pkgCmd == PkgCommand.PKG_NONE) {
+            if(parser.args.size() < 2) {
+                printf("Missing input file\n")
+                goto err;
+            }
+
+            GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
+        }
+        else {
+            // we optionally can provide an input file for pkg* commands
+            if(parser.args.size() > 1) {
+                GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
+            }
+        }
     }
 
     var lib:*const char = GetEnv("LITAC_HOME")

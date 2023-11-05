@@ -87,6 +87,22 @@ public func (this: *Symbol) isGenericCapable() : bool {
            this.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE
 }
 
+public func (this: *Symbol) isVisibleTo(module: *Module) : bool {
+    if(this.declared == module) {
+        return true
+    }
+
+    if(this.flags & SymbolFlags.IS_PRIVATE) {
+        return false
+    }
+
+    if(this.flags & SymbolFlags.IS_PUBLIC) {
+        return true
+    }
+
+    return this.declared.isInPackage(module)
+}
+
 public enum ScopeKind {
     MODULE,
     FUNC,
