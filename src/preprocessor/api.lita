@@ -891,18 +891,22 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
         return results
     }
 
+    var moduleName = context.pp.lita.options.inputFile
+    var mainModule = context.pp.lita.getModule(moduleName)
+    if(!mainModule) {
+        return results;
+    }
+
     // if we are testing by regex, test each function with @test attribute
     if(context.pp.lita.options.testsRegex) {
         var all = strcmp(context.pp.lita.options.testsRegex, ".*") == 0
         var pattern = RegexCompile(context.pp.lita.options.testsRegex)
 
-        var testModule = context.checker.current
-
         for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
             var sym = context.checker.symbolFuncs.get(i)
             if(sym.kind == SymbolKind.FUNC && sym.flags & SymbolFlags.IS_TEST) {
 
-                if(!sym.isVisibleTo(testModule)) {
+                if(!sym.isVisibleTo(mainModule)) {
                     continue;
                 }
 
@@ -946,12 +950,6 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
     }
     // otherwise we are just testing the input file's tests
     else {
-        var moduleName = context.pp.lita.options.inputFile
-        var mainModule = context.pp.lita.getModule(moduleName)
-        if(!mainModule) {
-            return results;
-        }
-
         // iterate thru all symbols, this way we are deterministic in our output
         for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {
             var sym = context.checker.symbolFuncs.get(i)

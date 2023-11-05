@@ -140,12 +140,18 @@ func (this: *PackageManager) buildCommandArgs(
             programArgs.add("-run")
         }
 
-        if(this.options.litaOptions.testsOnly && this.options.litaOptions.testsRegex) {
+        if(this.options.litaOptions.testsOnly) {
             programArgs.add("-testDir")
             programArgs.add("./test/")
 
-            programArgs.add("-test")
-            programArgs.add(this.options.litaOptions.testsRegex)
+            if(this.options.litaOptions.testsRegex) {
+                programArgs.add("-test")
+                programArgs.add(this.options.litaOptions.testsRegex)
+            }
+            else {
+                programArgs.add("-testFile")
+            }
+
             mainFile = "./test/main_test.lita"
         }
     }
