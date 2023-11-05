@@ -40,6 +40,10 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
             this.addSymbol(decl, type)
             return true;
         }
+        case StmtKind.NOTE_DECL: {
+            var aggDecl = decl as (*AggregateDecl)
+            return this.resolveNoteDecl(aggDecl)
+        }
         case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {

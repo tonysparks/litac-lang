@@ -203,7 +203,7 @@ public @note packed {
         emit("  return 0; }")
 
         addDeclaration(moduleName, emitStr())
-        flushDeclarations()
+        ///flushDeclarations()
 
         setMainSymbol(moduleName, testFunctionName)
 
