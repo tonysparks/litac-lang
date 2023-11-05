@@ -106,6 +106,7 @@ public struct Scope {
     allocator: *const Allocator
     result: *PhaseResult
     parent: *Scope
+    symbolNotes: Map<InternedString, *Symbol>
     symbolTypes: Map<InternedString, *Symbol>
     symbolFuncs: Map<InternedString, *Symbol>
 
@@ -135,7 +136,17 @@ public func (scope: *Scope) init(kind: ScopeKind,
     scope.result = result
     scope.module = module
     scope.symbolTypes = InternMap<*Symbol>(null, 16, allocator)
-    scope.symbolFuncs = InternMap<*Symbol>(null, 16, allocator)
+
+    // we can only declare notes and functions at the module
+    // level
+    if(kind == ScopeKind.MODULE) {
+        scope.symbolFuncs = InternMap<*Symbol>(null, 16, allocator)
+        scope.symbolNotes = InternMap<*Symbol>(null, 16, allocator)
+    }
+    else {
+        scope.symbolFuncs = Map<InternedString, *Symbol>{}
+        scope.symbolNotes = Map<InternedString, *Symbol>{}
+    }
 }
 
 public func (scope: *Scope) initIncrementalBuild() {
@@ -159,6 +170,19 @@ public func (s: *Scope) lookupFunc(name: InternedString) : *Symbol {
     }
 
     return s.parent.lookupFunc(name)
+}
+
+public func (s: *Scope) lookupNote(name: InternedString) : *Symbol {
+    var sym = s.symbolNotes.get(name)
+    if(sym && !(sym.flags & SymbolFlags.IS_MARKED_RESET)) {
+        return sym
+    }
+
+    if(!s.parent) {
+        return null
+    }
+
+    return s.parent.lookupNote(name)
 }
 
 public func (s: *Scope) lookup(name: InternedString, includeFuncs: bool = true) : *Symbol {
@@ -204,9 +228,12 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
                                         name: InternedString,
                                         symbol: *Symbol) {
 
-    var symbolStorage = &this.symbolFuncs;
-    if(symbol.kind != SymbolKind.FUNC) {
-        symbolStorage = &this.symbolTypes
+    var symbolStorage = &this.symbolTypes;
+    if(symbol.kind == SymbolKind.FUNC) {
+        symbolStorage = &this.symbolFuncs
+    }
+    else if(symbol.flags & SymbolFlags.IS_NOTE) {
+        symbolStorage = &this.symbolNotes
     }
 
     if(symbolStorage.contains(name) && !symbol.decl.hasNote("generated")) {
@@ -231,10 +258,12 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
 }
 
 public func (this: *Scope) removeSymbol(symbol: *Symbol) {
-    var symbolStorage = &this.symbolFuncs
-
-    if(symbol.kind != SymbolKind.FUNC) {
-        symbolStorage = &this.symbolTypes
+    var symbolStorage = &this.symbolTypes;
+    if(symbol.kind == SymbolKind.FUNC) {
+        symbolStorage = &this.symbolFuncs
+    }
+    else if(symbol.flags & SymbolFlags.IS_NOTE) {
+        symbolStorage = &this.symbolNotes
     }
 
     // TODO: Performance!
@@ -260,9 +289,14 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
     var symbolStorage = &this.symbolTypes
 
-    var isFunc = decl.kind == StmtKind.FUNC_DECL
-    if(isFunc) {
-        symbolStorage = &this.symbolFuncs
+    switch(decl.kind) {
+        case StmtKind.FUNC_DECL:
+            symbolStorage = &this.symbolFuncs
+            break;
+        case StmtKind.NOTE_DECL:
+            symbolStorage = &this.symbolNotes
+            break;
+        default: // do nothing
     }
 
     var sym: *Symbol = null;

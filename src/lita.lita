@@ -140,6 +140,7 @@ public struct LitaOptions {
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include
     testFileOnly: bool             // if we should only test the supplied file only
+    testPath: [MAX_PATH]char       // directory for tests
 
     typeOption: TypeInfoOption     // type generation option
 
@@ -329,7 +330,13 @@ public func (this: *Lita) parse() : *Module {
         return null;
     }
 
-    var packageName = GetPackageName(this.options.srcPath, this.options.inputFile)
+    var srcPath = this.options.testsOnly
+        ? this.options.testPath : this.options.srcPath;
+
+    var absolutePath = [MAX_PATH]char{0};
+    GetAbsolutePath(CurrentWorkingPath(), srcPath, absolutePath)
+
+    var packageName = GetPackageName(absolutePath, this.options.inputFile)
     var root = NewModule(this, packageName, this.options.inputFile)
     this.addModule(root)
 
@@ -679,6 +686,16 @@ public func FindModulePath(lita: *Lita,
         }
     }
 
+    // check to see if this is in the test path
+    {
+        if(lita.options.testsOnly) {
+            pathStr.format("%s/%.*s.lita", lita.options.testPath, moduleName.length, moduleName.buffer)
+            if(FileExists(pathStr.cStrConst())) {
+                return true
+            }
+        }
+    }
+
     pathStr.clear()
     return false
 }
@@ -767,17 +784,11 @@ func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
         var inputFileView = StringViewInit(inputFile)
         var index = inputFileView.indexOf(srcPath)
         if(index > -1) {
-            inputFile = &inputFile[index + strlen(srcPath) + 1]
+            inputFile = &inputFile[index + strlen(srcPath)]
         }
     }
 
-    var endCount = 0
-    var startCount = 0
-
-    var inputLen = strlen(inputFile)
-
     while(*inputFile) {
-
         var c = *inputFile;
 
         if(c != '.' && c != '/' && c != '\\') {
@@ -785,9 +796,10 @@ func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
         }
 
         inputFile  += 1
-        startCount += 1
     }
 
+    var inputLen = strlen(inputFile)
+    var endCount = 0
     for(var i = inputLen; i >= 0; i-=1) {
         var c = inputFile[i]
         if(c == '.') {
@@ -798,7 +810,7 @@ func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
     }
 
     return StringView {
-        .length = inputLen - (endCount+startCount),
+        .length = inputLen - endCount,
         .buffer = inputFile,
     }
 }

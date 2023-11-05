@@ -928,18 +928,23 @@ public func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     }
 }
 
-public func (this: *TypeChecker) getType(spec: *TypeSpec, isFunc: bool = false) : *Symbol {
-    assert(spec != null)
-    return this.getTypeByName(spec.name, isFunc)
+public enum SearchType {
+    TYPE,
+    FUNC,
+    NOTE
 }
 
-public func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc: bool = false) : *Symbol {
-    var type = isFunc ? this.current.getFuncType(typeName) :
-                            this.current.getType(typeName)
+public func (this: *TypeChecker) getType(spec: *TypeSpec, searchType: SearchType = SearchType.TYPE) : *Symbol {
+    assert(spec != null)
+    return this.getTypeByName(spec.name, searchType)
+}
+
+public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchType: SearchType = SearchType.TYPE) : *Symbol {
+
+    var type = GetTypeFromModule(this.current, typeName, searchType)
     if(!type) {
         if(this.genericContext.callsite) {
-            type = isFunc ? this.genericContext.callsite.getFuncType(typeName) :
-                                this.genericContext.callsite.getType(typeName)
+            type = GetTypeFromModule(this.genericContext.callsite, typeName, searchType)
         }
     }
 
@@ -965,8 +970,24 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, isFunc:
         var namePart = name.substring(index + 2)
 
         var namePartType = this.lita.strings.internCopy(namePart.buffer, namePart.length)
-        return isFunc ? module.getFuncType(namePartType) :
-                            module.getType(namePartType)
+        return GetTypeFromModule(module, namePartType, searchType)
+    }
+
+    return type
+}
+
+func GetTypeFromModule(module: *Module, typeName: InternedString, searchType: SearchType) : *Symbol {
+    var type: *Symbol = null;
+    switch(searchType) {
+        case SearchType.FUNC:
+            type = module.getFuncType(typeName)
+            break;
+        case SearchType.NOTE:
+            type = module.getNoteType(typeName)
+            break;
+        default:
+            type = module.getType(typeName)
+            break;
     }
 
     return type
@@ -1064,13 +1085,12 @@ func (this: *TypeChecker) resolveNoteTypeSpec(spec: *TypeSpec) : *TypeInfo {
     }
 
     // TODO: This creates conflicts if notes name collide with functions
-    var sym = this.getType(spec, false)
+    var sym = this.getType(spec, SearchType.NOTE)
     if(!sym || !sym.type) {
         this.result.addError(spec.pos, "unknown note type '%.*s'", spec.name.length, spec.name.buffer)
         goto err;
     }
 
-    /* TODO: Silence until bootstrap is completed */
     if(!(sym.flags & SymbolFlags.IS_NOTE)) {
         this.result.addError(spec.pos, "'%.*s' is not a note type", spec.name.length, spec.name.buffer)
         goto err;
@@ -1089,7 +1109,7 @@ err:
     return &POISON_TYPE
 }
 
-public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool = false) : *TypeInfo {
+public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, searchType: SearchType = SearchType.TYPE) : *TypeInfo {
     if(!spec) {
         return &VOID_TYPE
     }
@@ -1107,7 +1127,7 @@ public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, isFunc: bool =
                 return nameSpec.typeInfo
             }
 
-            var sym = this.getType(nameSpec, isFunc)
+            var sym = this.getType(nameSpec, searchType)
             if(!sym) {
                 sym = this.currentScope().lookup(nameSpec.name)
                 if(!sym) {

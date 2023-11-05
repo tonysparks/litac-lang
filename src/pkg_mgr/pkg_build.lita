@@ -131,7 +131,11 @@ func (this: *PackageManager) buildCommandArgs(
     programArgs.add("-output")
     programArgs.add(this.pkg.json.getStr("name", "a"))
 
-    programArgs.add("./src/main.lita")
+    programArgs.add("-srcDir")
+    programArgs.add("./src/")
+
+    var mainFile = "./src/main.lita"
+
 
     // TEMP: should move into specific commands?
     {
@@ -140,10 +144,16 @@ func (this: *PackageManager) buildCommandArgs(
         }
 
         if(this.options.litaOptions.testsOnly && this.options.litaOptions.testsRegex) {
+            programArgs.add("-testDir")
+            programArgs.add("./test/")
+
             programArgs.add("-test")
             programArgs.add(this.options.litaOptions.testsRegex)
+            mainFile = "./test/main_test.lita"
         }
     }
+
+    programArgs.add(mainFile)
 
     args.n = programArgs.size()
     args.args = programArgs.elements as (**char)
