@@ -106,7 +106,7 @@ func noOpFree(ctx:*void, mem: *void) {
 }
 
 
-func litaMalloc(ctx: *void, len: u64) : *void {
+func litaMalloc(ctx: *void, len: usize) : *void {
     var lita = ctx as (*Lita)
     return lita.allocator.alloc(len)
 }

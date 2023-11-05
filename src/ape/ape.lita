@@ -60,7 +60,7 @@ public enum ape_object_type {
 @foreign public typedef void as ape_object_type_t;
 
 @foreign public typedef func(*ape_t, *void, i32, *ape_object_t) : ape_object_t as ape_native_fn;
-@foreign public typedef func(*void, u64) : *void as ape_malloc_fn;
+@foreign public typedef func(*void, usize) : *void as ape_malloc_fn;
 @foreign public typedef func(*void, *void) : void as ape_free_fn;
 @foreign public typedef func(*void) : void as ape_data_destroy_fn;
 @foreign public typedef func(*void) : *void as ape_data_copy_fn;
