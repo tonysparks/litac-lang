@@ -204,6 +204,15 @@ public func (this: *Module) getFuncType(type: InternedString) : *Symbol {
     return this.genericSymbols.get(type) // TODO: Separate out Func in generic symbols
 }
 
+public func (this: *Module) getNoteType(type: InternedString) : *Symbol {
+    var sym = this.symbols.lookupNote(type)
+    if(sym) {
+        return sym
+    }
+
+    return this.genericSymbols.get(type)
+}
+
 public const MAX_METHODS_FOR_TYPE = 2048; // TODO: this should be big enough??
 
 func (this: *Module) isMethodForType(type: *TypeInfo, sym: *Symbol) : bool {

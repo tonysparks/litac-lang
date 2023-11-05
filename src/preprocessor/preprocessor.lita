@@ -308,7 +308,7 @@ public func (this: *Preprocessor) postResolveSymbols(checker: *TypeChecker, isIn
 }
 
 
-func (this: *Preprocessor) drainQueue() {
+public func (this: *Preprocessor) drainQueue() {
     while(!this.declQueue.empty()) {
         var scriptDecl = this.declQueue.pop()
 
