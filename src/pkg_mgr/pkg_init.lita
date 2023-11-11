@@ -39,7 +39,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
 import "std/libc"
 
 func main(len: i32, args: **char) : i32 {
-    printf("Hello World")
+    printf("Hello World\n")
     return 0
 }
 """)
@@ -55,6 +55,7 @@ func main(len: i32, args: **char) : i32 {
         sb.clear().append("%s",
 """
 import "main"
+import "std/assert"
 
 @test("project_test")
 func test() {

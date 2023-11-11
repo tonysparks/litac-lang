@@ -25,7 +25,7 @@ public const GiB:usize = 1024 * MiB;
 
     public func new<T>(a: *const Allocator = defaultAllocator,
                       file: *const char = c::__FILE__,
-                      line: u64 = c::__LINE__) : *T {
+                      line: usize = c::__LINE__) : *T {
 
         var result = a.calloc(1, sizeof(:T), file, line) as (*T)
         return result
@@ -84,16 +84,16 @@ public func alignForward(ptr: usize, align: usize) : usize {
 
 #if (DEBUG)
     public struct Allocator {
-        allocFn:   func(*const Allocator, usize, *const char, u64): *void
-        callocFn:  func(*const Allocator, usize, usize, *const char, u64): *void
-        reallocFn: func(*const Allocator, *void, usize, usize, *const char, u64) : *void
+        allocFn:   func(*const Allocator, usize, *const char, usize): *void
+        callocFn:  func(*const Allocator, usize, usize, *const char, usize): *void
+        reallocFn: func(*const Allocator, *void, usize, usize, *const char, usize) : *void
         freeFn:    func(*const Allocator, *void) : void
     }
 
     @inline
     public func (a: *const Allocator) alloc(size: usize,
                                             file: *const char = c::__FILE__,
-                                            line: u64 = c::__LINE__) : *void {
+                                            line: usize = c::__LINE__) : *void {
         return a.allocFn(a, size, file, line)
     }
 
@@ -101,7 +101,7 @@ public func alignForward(ptr: usize, align: usize) : usize {
     public func (a: *const Allocator) calloc(num: usize,
                                              size: usize,
                                              file: *const char = c::__FILE__,
-                                             line: u64 = c::__LINE__) : *void {
+                                             line: usize = c::__LINE__) : *void {
         return a.callocFn(a, num, size, file, line)
     }
 
@@ -110,7 +110,7 @@ public func alignForward(ptr: usize, align: usize) : usize {
                                               oldsize: usize,
                                               newsize: usize,
                                               file: *const char = c::__FILE__,
-                                              line: u64 = c::__LINE__) : *void {
+                                              line: usize = c::__LINE__) : *void {
         return a.reallocFn(a, ptr, oldsize, newsize, file, line)
     }
 
@@ -155,7 +155,7 @@ public func alignForward(ptr: usize, align: usize) : usize {
     public func GenericMalloc<T>(alloc: *const Allocator,
                         size: usize,
                         file: *const char = c::__FILE__,
-                        line: u64 = c::__LINE__) : *void {
+                        line: usize = c::__LINE__) : *void {
         var this = alloc as (*T);
         var result = this.malloc(size);
         return result
@@ -165,7 +165,7 @@ public func alignForward(ptr: usize, align: usize) : usize {
                         num: usize,
                         size: usize,
                         file: *const char = c::__FILE__,
-                        line: u64 = c::__LINE__) : *void {
+                        line: usize = c::__LINE__) : *void {
         var this = alloc as (*T);
         var result = this.malloc(size * num);
         if(result) {
@@ -180,7 +180,7 @@ public func alignForward(ptr: usize, align: usize) : usize {
                         oldSize: usize,
                         size: usize,
                         file: *const char = c::__FILE__,
-                        line: u64 = c::__LINE__) : *void {
+                        line: usize = c::__LINE__) : *void {
         if(ptr == null) {
             return GenericMalloc<T>(alloc, size)
         }

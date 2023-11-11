@@ -18,7 +18,7 @@ public const cAllocator : *const Allocator = (&Allocator {
     public func cMalloc(a: *const Allocator,
                  size: usize,
                  file: *const char = c::__FILE__,
-                 line: u64 = c::__LINE__) : *void {
+                 line: usize = c::__LINE__) : *void {
         return c::malloc(size);
     }
 
@@ -26,7 +26,7 @@ public const cAllocator : *const Allocator = (&Allocator {
                  num: usize,
                  size: usize,
                  file: *const char = c::__FILE__,
-                 line: u64 = c::__LINE__) : *void {
+                 line: usize = c::__LINE__) : *void {
         return c::calloc(num, size);
     }
 
@@ -35,7 +35,7 @@ public const cAllocator : *const Allocator = (&Allocator {
                   oldSize: usize,
                   size: usize,
                   file: *const char = c::__FILE__,
-                  line: u64 = c::__LINE__) : *void {
+                  line: usize = c::__LINE__) : *void {
         return c::realloc(ptr, size);
     }
 

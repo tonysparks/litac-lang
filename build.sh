@@ -6,11 +6,9 @@ unameOut="$(uname -s)"
 case "${unameOut}" in
     Darwin*)
         LIBS="-lm -lpthread";
-        EXE_NAME="litac_mac";
     ;;
     *)
         LIBS="-lm -lrt -lpthread";
-        EXE_NAME="litac_linux";
     ;;
 esac
 
@@ -30,7 +28,7 @@ build_litac() {
 
     cd bootstrap
 
-    ./litacc -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "${EXE_NAME}" -maxMemory 1GiB
+    ./litacc -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
@@ -38,7 +36,7 @@ build_litac() {
 
     echo "Running litaC inception!..."
     cd ../bin
-    ./$EXE_NAME -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
+    ./litac -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
@@ -47,15 +45,7 @@ build_litac() {
     echo Completed.
 }
 
+export LITAC_HOME=${LITAC_HOME:-${PWD}}
 echo "Environment variable: ${LITAC_HOME}"
-if [ -z "${LITAC_HOME}" ]; then
-    echo ""
-    echo "=========================================="
-    echo "ERROR: It appears you do not have the 'LITAC_HOME' system variable defined.  Please make sure this is set to the home directory of litac"
-    echo "=========================================="
-    echo ""
-    exit 2
-else
-    build_litac
-fi
+build_litac
 

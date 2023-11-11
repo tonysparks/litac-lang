@@ -67,7 +67,7 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
     func LinearMalloc(alloc: *const Allocator,
                         size: usize,
                         file: *const char = c::__FILE__,
-                        line: u64 = c::__LINE__) : *void {
+                        line: usize = c::__LINE__) : *void {
         var this = alloc as (*LinearAllocator);
         var result = this.malloc(size);
         return result
@@ -77,7 +77,7 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
                         num: usize,
                         size: usize,
                         file: *const char = c::__FILE__,
-                        line: u64 = c::__LINE__) : *void {
+                        line: usize = c::__LINE__) : *void {
         var this = alloc as (*LinearAllocator);
         var result = this.malloc(size * num);
         if(result) {
@@ -92,7 +92,7 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
                         oldSize: usize,
                         size: usize,
                         file: *const char = c::__FILE__,
-                        line: u64 = c::__LINE__) : *void {
+                        line: usize = c::__LINE__) : *void {
         if(ptr == null) {
             return LinearMalloc(alloc, size)
         }
