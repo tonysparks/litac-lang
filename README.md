@@ -376,13 +376,13 @@ func main(len:i32, args:**char):i32 {
     var pos = Vec2 { .x: 0_f32,
                      .y: 0_f32 }
 
-    var vel: Vec2 = Vec2{1.5, 2.5}
+    var vel: Vec2 = Vec2{1.5f, 2.5f}
 
     // call a function
     Vec2Add(pos, vel, pos)
 
     // function pointer
-    var f : func(Vec2, Vec2, Vec2) : Vec2 = &Vec2Add;
+    var fn : func(Vec2, Vec2, Vec2) : Vec2 = &Vec2Add;
     // or simply:
     var myAdd = &Vec2Add;
 
@@ -469,7 +469,7 @@ import "std/libc" // place libc public types in this scope
 
 func main(len:i32, args:**char):i32 {
     if (true) {
-        defer printf("there\n") // will execute at the end of this scope
+        defer printf(" there\n") // will execute at the end of this scope
         printf("Hi")
     }
     else {
@@ -478,7 +478,7 @@ func main(len:i32, args:**char):i32 {
 
     var i = 0
     while (i < 10) {
-        if i % 2 == 0 {
+        if ((i % 2) == 0) {
             break
         }
         else {
@@ -489,7 +489,7 @@ func main(len:i32, args:**char):i32 {
 
     i = 0
     do {
-        if i % 2 == 0 {
+        if ((i % 2) == 0) {
             break
         }
         else {
@@ -497,7 +497,7 @@ func main(len:i32, args:**char):i32 {
             continue
         }
     }
-    while (i < 10)
+    while (i < 10);
 
     for(var j = 0; j < 10; j+=1) {
        printf("%d\n", j)
@@ -516,7 +516,7 @@ func main(len:i32, args:**char):i32 {
 
     printf("The Packers are ")
     goto end;  // jump over this lie
-    prinf("not ")
+    printf("not ")
 
 end:
     printf("the best\n");
@@ -527,7 +527,6 @@ end:
 # Generics
 
 ```C
-
 // Defines a generic structure
 struct Vec2<T> {
     x: T
@@ -547,8 +546,8 @@ typedef Vec2<i32> as Vec2i
 
 func main(len:i32, args:**char):i32 {
     //
-    var origin = Vec2<f32> { 0.0, 0.0 }  // using generics syntax
-    var vel    = Vec2i { 0,0 }           // using the alias
+    var origin = Vec2<f32> { 0.0f, 0.0f }  // using generics syntax
+    var vel    = Vec2i { 0,0 }             // using the alias
 
     Vec2Add<i32>(vel, vel, vel)
     Vec2Add<f32>(origin, origin, origin)
