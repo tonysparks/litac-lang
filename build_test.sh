@@ -6,11 +6,9 @@ unameOut="$(uname -s)"
 case "${unameOut}" in
     Darwin*)
         LIBS="-lm -lpthread";
-        EXE_NAME="litac_mac";
     ;;
     *)
         LIBS="-lm -lrt -lpthread";
-        EXE_NAME="litac_linux";
     ;;
 esac
 
@@ -38,7 +36,7 @@ run_tests() {
     echo "Compiling litaC tests..."
 
     cd ./bin
-    ./$EXE_NAME -verbose -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
+    ./litac -verbose -buildCmd "${BUILD_CMD}" -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
     result=$?
     if [ $result -gt 0 ]; then
         error_compiling
@@ -55,14 +53,8 @@ run_tests() {
 
     echo Completed.
 }
+
+
+export LITAC_HOME=${LITAC_HOME:-${PWD}}
 echo "Environment variable: ${LITAC_HOME}"
-if [ -z "${LITAC_HOME}" ]; then
-    echo ""
-    echo "=========================================="
-    echo "ERROR: It appears you do not have the 'LITAC_HOME' system variable defined.  Please make sure this is set to the home directory of litac"
-    echo "=========================================="
-    echo ""
-    exit 2
-else
-    run_tests
-fi
+run_tests

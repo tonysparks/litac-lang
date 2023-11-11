@@ -13,7 +13,7 @@ const MAX_PATH = 256
 public struct Allocation {
     addr: *void
     size: usize
-    line: u64
+    line: usize
     filename: [MAX_PATH]char
 }
 #else
@@ -55,7 +55,7 @@ public func (d: *DebugAllocator) free() {
         for(var i = 0; i < d.allocations.size(); i += 1) {
             var a = d.allocations.get(i)
             if(a.line > 0) {
-                c::printf("   Leak at %p (%zu bytes) allocated in '%s' at line: %ju\n", a.addr, a.size, a.filename, a.line)
+                c::printf("   Leak at %p (%zu bytes) allocated in '%s' at line: %zu\n", a.addr, a.size, a.filename, a.line)
             }
             else {
                 c::printf("   Leak at %p (%zu bytes)\n", a.addr, a.size)
@@ -66,7 +66,7 @@ public func (d: *DebugAllocator) free() {
 
     public func (d: *DebugAllocator) malloc(size: usize,
                                             file: *const char,
-                                            line: u64) : *void {
+                                            line: usize) : *void {
 
         var allocationSize = sizeof(:Allocation) + size;
         var mem = d.decorated.alloc(allocationSize, file, line);
@@ -104,7 +104,7 @@ public func (d: *DebugAllocator) free() {
     func DebugMalloc(alloc: *const Allocator,
                      size: usize,
                      file: *const char = c::__FILE__,
-                     line: u64 = c::__LINE__) : *void {
+                     line: usize = c::__LINE__) : *void {
         var debug = alloc as (*DebugAllocator);
         return debug.malloc(size, file, line);
     }
@@ -113,7 +113,7 @@ public func (d: *DebugAllocator) free() {
                      num: usize,
                      size: usize,
                      file: *const char = c::__FILE__,
-                     line: u64 = c::__LINE__) : *void {
+                     line: usize = c::__LINE__) : *void {
         var debug = alloc as (*DebugAllocator);
         var result = debug.malloc(size * num, file, line);
         if(result) {
@@ -128,7 +128,7 @@ public func (d: *DebugAllocator) free() {
                       oldSize: usize,
                       size: usize,
                       file: *const char = c::__FILE__,
-                      line: u64 = c::__LINE__) : *void {
+                      line: usize = c::__LINE__) : *void {
         if(ptr == null) {
             return DebugMalloc(alloc, size, file, line)
         }

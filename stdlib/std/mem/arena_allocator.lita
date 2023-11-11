@@ -100,7 +100,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
 #if (DEBUG)
     public func (this: *ArenaAllocator) malloc(size: usize,
                                                file: *const char = c::__FILE__,
-                                               line: u64 = c::__LINE__) : *void {
+                                               line: usize = c::__LINE__) : *void {
         var a = this.arena
         var last = a
 
@@ -136,7 +136,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
     func ArenaMalloc(alloc: *const Allocator,
                      size: usize,
                      file: *const char = c::__FILE__,
-                     line: u64 = c::__LINE__) : *void {
+                     line: usize = c::__LINE__) : *void {
         var arena = alloc as (*ArenaAllocator);
         return arena.malloc(size);
     }
@@ -145,7 +145,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
                      num: usize,
                      size: usize,
                      file: *const char = c::__FILE__,
-                     line: u64 = c::__LINE__) : *void {
+                     line: usize = c::__LINE__) : *void {
         var arena = alloc as (*ArenaAllocator);
         var result = arena.malloc(size * num);
         if(result) {
@@ -160,7 +160,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
                       oldSize: usize,
                       size: usize,
                       file: *const char = c::__FILE__,
-                      line: u64 = c::__LINE__) : *void {
+                      line: usize = c::__LINE__) : *void {
         if(ptr == null) {
             return ArenaMalloc(alloc, size)
         }

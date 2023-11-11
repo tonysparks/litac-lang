@@ -41,6 +41,13 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
         return result
     }
 
+    // we're running a script outside
+    // of the litac command line args, so
+    // bail out...
+    if(args.n == 0) {
+        return PkgStatus.OK
+    }
+
     if(ParseArgs(args.n, args.args, litaOptions) != CmdParserStatus.OK) {
         return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
     }
@@ -75,6 +82,10 @@ func (this: *PackageManager) buildCommandArgs(
     if(buildSection) {
         var script = buildSection.get("script")
         if(script) {
+            // denote we are running a script outside of
+            // the standard litac cli
+            args.n = 0
+
             return this.buildWithScript(script)
         }
 
@@ -84,7 +95,7 @@ func (this: *PackageManager) buildCommandArgs(
         if(ccOptions) {
             buildCmd.append("%s ", cc)
             if(ccOptions.isString()) {
-                buildCmd.append("%s", ccOptions.asString())
+                buildCmd.append("%s ", ccOptions.asString())
             }
             else if(ccOptions.isArray()) {
                 var isFirst = true
@@ -104,7 +115,7 @@ func (this: *PackageManager) buildCommandArgs(
 
         var litaOptions = buildSection.get("lita_options")
         if(litaOptions) {
-           buildCmd.append("%s ", cc)
+
             if(litaOptions.isString()) {
                 programArgs.add(litaOptions.asString())
             }
@@ -170,8 +181,20 @@ func (this: *PackageManager) buildCommandArgs(
 
 
 func (this: *PackageManager) buildWithScript(script: *JsonNode) : PkgStatus {
-    // TODO: Implement running script..
-    printf("'script' is not implemented yet...")
+    var process = sys::SystemExec(script.asString())
+    if(!process.pipe) {
+        return PkgStatus.ERROR_RUNNING_COMMAND
+    }
+    defer process.close()
+
+
+    const BUFFER_SIZE = 16
+    var buffer = [BUFFER_SIZE]char{0};
+
+    var bytesRead = -1_i64
+    while((bytesRead = process.readOutput(buffer, BUFFER_SIZE)) > 0) {
+        printf("%.*s", bytesRead as (i32), buffer)
+    }
     return PkgStatus.OK
 }
 

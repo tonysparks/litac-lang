@@ -15,6 +15,10 @@ case "${unameOut}" in
     ;;
 esac
 
+if [ -z "${LITAC_HOME}" ]; then
+    export LITAC_HOME=$(pwd)
+fi
+
 sh ${wd}/build_bootstrap.sh
 if [ $? -gt 0 ]; then
     return 1
