@@ -44,7 +44,12 @@ public func (this: bool) toJson(sb: *StringBuffer) {
 }
 
 public func (this: *const char) toJson(sb: *StringBuffer) {
-    sb.append("\"%s\"", this)
+    if(!this) {
+        sb.append("null")
+    }
+    else {
+        sb.append("\"%s\"", this)
+    }
 }
 
 public func (this: StringView) toJson(sb: *StringBuffer) {

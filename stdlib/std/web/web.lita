@@ -4,6 +4,7 @@ import "std/libc"
 import "std/libc/signal"
 import "std/web/mongoose"
 import "std/mem"
+import "std/mem/bucket_allocator"
 import "std/map"
 import "std/atomic"
 
@@ -14,12 +15,29 @@ import using "std/web/web_request"
 A hello world web application:
 
 ```litac
+
+import "std/libc"
 import "std/web"
+import "std/string"
+import "std/json"
+import "std/json/to_json"
+import "std/json/from_json"
+import "std/string_buffer"
+
+@json
+public struct EchoResponse {
+    text: *const char
+    errors: *const char
+}
 
 @get_request(.uri = "/echo")
-public func Hello(ctx: *WebContext) : i32 {
-    var req = ctx.request.getQueryValue("say")
+public func Echo(ctx: *WebContext) : i32 {
+    var param = ctx.request.getQueryValueCopy("say")
 
+    var response = EchoResponse{
+        .text = param.cStr()
+    }
+    response.toJson(ctx.response.body)
 
     return 200
 }
@@ -36,6 +54,7 @@ func main(len: i32, args: **char) : i32 {
     printf("Terminated http server")
     return 0
 }
+
 ```
 
 """);
@@ -69,6 +88,8 @@ public struct WebContext {
     request: *WebRequest
     response: *WebResponse
     userdata: *void
+
+    allocator: *const Allocator
 }
 
 public const MAX_HTTP_HEADERS = MG_MAX_HTTP_HEADERS;
@@ -84,6 +105,8 @@ public struct WebConfig {
     poll: i32
     userdata: *void
     disableSignals: bool
+
+    memBucketSizeInBytes: usize = 1024
 }
 
 public enum WebStatus {
@@ -100,6 +123,8 @@ public struct WebServer {
     scratch: StringBuffer
 
     connection: *mg_connection
+
+    bucketAllocator: *BucketAllocator
 }
 
 
@@ -119,11 +144,17 @@ public func (this: *WebServer) init(config: *WebConfig,
         return WebStatus.ERROR
     }
 
+    if(config.memBucketSizeInBytes <= 0) {
+       config.memBucketSizeInBytes = 1 * MiB
+    }
+
     if(!this.config.disableSignals) {
         globalSignalNumber.init(0)
         signal(SIGINT, signalHandler)
         signal(SIGTERM, signalHandler)
     }
+
+    this.bucketAllocator.init(allocator, config.memBucketSizeInBytes)
 
     return WebStatus.OK
 }
@@ -189,20 +220,27 @@ func WebCallbackFn(conn: *mg_connection, ev: i32, ev_data: *void, fn_data: *void
     if(ev == MgEvent.MG_EV_HTTP_MSG) {
         var msg = ev_data as (*mg_http_message)
 
+        server.bucketAllocator.clear()
+        var allocator = &server.bucketAllocator.allocator
+
         var request = WebRequest {
             .msg = msg
         }
 
         var response = WebResponse {}
-        response.headers = StrMap<*const char>(null, 16, server.allocator)
-        response.body.init(1024, server.allocator)
+        response.headers = StrMap<*const char>(null, 16, allocator)
+        response.body.init(1024, allocator)
 
         var context = WebContext {
             .conn = conn,
             .request = &request,
             .response = &response,
             .userdata = server.config.userdata,
+            .allocator = allocator,
         }
+
+        // TODO: We should probably pre-process the request entirely??
+        request.context = &context
 
         var controller = GetWebController(msg)
         response.status = controller(&context)

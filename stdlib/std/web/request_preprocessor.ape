@@ -5,7 +5,7 @@ fn CreateWebController(controllerName, noteName) {
     emit("public func %s(msg: *mg_http_message) : WebController {", controllerName)
 
     for(sym in symbols) {
-        //print("Sym: ", sym.name, "\n")
+        // print("Sym: ", sym.name, "\n")
         if(sym.kind == "FUNC_DECL" && sym.isPublic) {
             var args = sym.notes[0].arguments
             if(args) {
@@ -46,14 +46,13 @@ fn CreateWebController(controllerName, noteName) {
                     }
                 }
             }
-
-
         }
     }
     emit("\n\treturn Web404Controller;\n")
     emit("} ")
 
     addDeclaration(getCurrentModuleFilename(), emitStr())
+    flushDeclarations()
 }
 
 

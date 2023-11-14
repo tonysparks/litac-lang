@@ -1,8 +1,10 @@
 import "std/string_view"
 import "std/string"
 import "std/libc"
+import "std/mem"
 
 import "std/web/mongoose"
+import "std/web"
 
 
 @doc("GET Request note")
@@ -34,6 +36,7 @@ public @note web_request {
 
 
 public struct WebRequest {
+    context: *WebContext
     msg: *mg_http_message
 }
 
@@ -103,6 +106,12 @@ public func (this: *WebRequest) getQueryValue(key: *const char, result: *String)
     return true
 }
 
+public func (this: *WebRequest) getQueryValueCopy(key: *const char, length: u32 = 128): String {
+    var buffer = this.context.allocator.alloc(sizeof(:char) * length) as (*char)
+    var result = StringInit(buffer, length as (i32), 0)
+    this.getQueryValue(key, &result)
+    return result
+}
 
 /*-------------------------------------------------------------
     Utility functions for note request matching
