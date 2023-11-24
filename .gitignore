@@ -15,6 +15,7 @@ bin/litaC.lib
 bin/litaC.pdb
 litac-lsp.log
 bin/litaC
+bin/litac
 bin/test_output
 bin/litaC_test.*
 bin/litaC_test
@@ -42,3 +43,4 @@ bootstrap/output/litac_tests.pdb
 bootstrap/output/**
 /.pkgs
 .build.json
+
