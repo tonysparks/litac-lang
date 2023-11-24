@@ -529,7 +529,6 @@ public func GetAbsolutePath(pwd: *const char, path: *const char, output: [MAX_PA
         absStr.append("%s/", pwd);
     }
 
-    var start = path
     while(*path) {
         if(path[0] == '\\') {
             if(path[1] == '\\') {
@@ -616,7 +615,7 @@ public func FilePathToUri(path: *const char, output: [MAX_PATH]char) : *char {
 #end
 
     while(*path) {
-        var escaped = uriEscapeChars[*path]
+        var escaped = uriEscapeChars[(*path) as (i32)]
         if(escaped) {
             outputStr.append("%s", escaped)
         }
@@ -642,7 +641,6 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
     var outputStr = StringInit(output, MAX_PATH, 0)
     while(*uri) {
         if(*uri == '%') {
-            var escaped = [2]char{0};
             if(uri[1] == '2') {
                 if(uri[2] == '0') {
                     outputStr.appendChar(' ')

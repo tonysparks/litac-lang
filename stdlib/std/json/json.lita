@@ -653,7 +653,6 @@ public func (node: *JsonNode) equals(other: *JsonNode) : bool {
 
             for(var i = 0; i < other.objValue.values.size(); i += 1) {
                 var entry = other.objValue.values.get(i)
-                var key = entry.key
                 var otherValue = entry.value
 
                 if(otherValue != null && otherValue.type != JsonType.NULL) {

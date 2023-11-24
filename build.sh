@@ -28,7 +28,7 @@ build_litac() {
 
     cd bootstrap
 
-    ./litacc -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
+    ./litacc -disableLine -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
@@ -36,7 +36,7 @@ build_litac() {
 
     echo "Running litaC inception!..."
     cd ../bin
-    ./litac -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
+    ./litac -disableLine -verbose -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;

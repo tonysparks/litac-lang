@@ -171,8 +171,8 @@ public func (scope: *Scope) initIncrementalBuild() {
 }
 
 public func (scope: *Scope) postIncrementalBuild() {
-    scope.cleanMarked(&scope.symbolTypes)
-    scope.cleanMarked(&scope.symbolFuncs)
+    //scope.cleanMarked(&scope.symbolTypes)
+    //scope.cleanMarked(&scope.symbolFuncs)
 }
 
 public func (s: *Scope) lookupFunc(name: InternedString) : *Symbol {
@@ -474,7 +474,6 @@ public func (this: *Scope) print(header: *const char) {
 func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
     for(var it = symbols.iter(); it.hasNext();) {
         var entry = it.next()
-        var symName = entry.key;
         var symbol = entry.value;
 
         var isGenericFromThisModule = symbol.genericCallsiteModule != null
@@ -502,7 +501,7 @@ func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
     }
 }
 
-func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
+func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>, remove: bool = false) {
     for(var it = symbols.iter(); it.hasNext();) {
         var entry = it.next()
         var symbol = entry.value;
@@ -519,7 +518,13 @@ func (this: *Scope) cleanMarked(symbols: *Map<InternedString, *Symbol>) {
         // this means they were deleted
         if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
             this.removeSymbolFromModules(symbol)
-            it.remove()
+
+            // We may not want to remove it from this scope's
+            // cache, as the symbol may be re-added at which point
+            // the symbol should be re-used along with the TypeInfo.
+            if(remove) {
+                it.remove()
+            }
         }
     }
 }

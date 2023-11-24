@@ -28,13 +28,14 @@ import "build"
 
 import "lsp/references"
 import "lsp/workspace"
+import "lsp/document"
 
 import "tcc/libtcc"
 
 
 public const MAX_PREFIX_SIZE = 32
 public const LITA_VERSION = "0.1.6-alpha"
-public const DEFAULT_BUILD_CMD = "clang -std=99 %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
+public const DEFAULT_BUILD_CMD = "clang -std=c99 %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
 
 public struct Lita {
     allocator: *const Allocator
@@ -286,7 +287,7 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
         var checker = TypeChecker{}
         checker.init(this)
 
-        var program = checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
+        checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
 
         // Reconcile any changed symbols
         this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs, SymbolKind.FUNC)
@@ -310,7 +311,7 @@ func (this: *Lita) syncSymbols(module: *Module, moduleSymbols: *Map<InternedStri
     // the most up to date symbols
     for(var it = moduleSymbols.iter(); it.hasNext();) {
         var entry = it.next()
-        var key = entry.key
+
         var sym = entry.value
         if(!sym.declared.equals(module) || sym.kind != kind) {
             continue;

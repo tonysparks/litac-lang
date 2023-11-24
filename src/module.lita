@@ -278,19 +278,6 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
         currentSyms = currentSyms.parent ? currentSyms.parent : null
     }
 
-/* I don't think this is needed?
-    for(var it = this.genericSymbols.iter(); it.hasNext();) {
-        var entry = it.next()
-        var sym = entry.value
-
-        if(!this.isMethodForType(type, sym)) {
-            continue
-        }
-
-        result[numOfSymbols] = sym
-        numOfSymbols += 1
-    }
-*/
     return numOfSymbols
 }
 

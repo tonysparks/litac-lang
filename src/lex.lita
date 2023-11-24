@@ -960,8 +960,6 @@ func IsHexChar(c: char) : bool {
 }
 
 func (l: *Lexer) scanNumber() : Token {
-    var start = l.stream
-
     var numBuf: [256]char;
     var numIndex = 0
 
@@ -1147,7 +1145,6 @@ func (l: *Lexer) validateCodepoint(str: *const char, len: i32) : bool {
 }
 
 func (l: *Lexer) scanString() : Token {
-    var length = 0
     var isVerbatim = false
     var isValid = true
     var startPos: *const char = null

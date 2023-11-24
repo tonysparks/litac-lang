@@ -59,7 +59,6 @@ public func (this: *BucketAllocator) init(decorated: *const Allocator, bucketSiz
 public func (this: *BucketAllocator) clear() {
     assert(this.buckets != null)
 
-    var i = 0
     var n = this.head
     while(n && n != this.buckets) {
         var prev = n.prev

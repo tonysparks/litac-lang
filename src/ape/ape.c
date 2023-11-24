@@ -2643,7 +2643,9 @@ bool array_add(array_t_ *arr, const void *value) {
         if (!new_data) {
             return false;
         }
-        memcpy(new_data, arr->data, arr->count * arr->element_size);
+        if(arr->data) {
+            memcpy(new_data, arr->data, arr->count * arr->element_size);
+        }
         allocator_free(arr->alloc, arr->data_allocated);
         arr->data_allocated = new_data;
         arr->data = arr->data_allocated;

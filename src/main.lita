@@ -131,7 +131,7 @@ report:
     return 0
 }
 
-enum ParseStatus {
+public enum ParseStatus {
     OK,
     ERROR,
     TERMINATE,

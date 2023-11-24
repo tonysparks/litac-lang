@@ -25,19 +25,13 @@ import "lsp/lsp"
 import "lsp/protocol"
 import "lsp/references"
 import "lsp/util"
+import "lsp/document"
 
 public struct Workspace {
     allocator: *const Allocator
     lsp: *LspServer
     rootPath: *const char
     openedDocuments: Map<*const char, *Document>
-}
-
-public struct Document {
-    filename: [MAX_PATH]char
-    text: StringBuffer
-
-    lineMap: Array<u32>
 }
 
 public func (this: *Workspace) init(lsp: *LspServer, alloc: *const Allocator) {
@@ -150,68 +144,46 @@ public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const A
     if(!uri) return null;
 
     var doc = this.openedDocuments.get(uri)
-    this.lsp.log("Uri: '%s' has doc: %d\n", uri, doc != null)
     if(!doc) return null;
 
-    /*var runResults = this.runDiagnostics(uri)
-    if(!runResults.isReadable) {
-        return null
-    }*/
+    var module = this.lsp.lita.getModule(doc.filename)
+    if(!module) return null;
 
-    var syms = &this.lsp.lita.programSymbols
     var results = CreateJsonArray(alloc)
 
-    //this.lsp.log("Number of Symbols: %d\n", syms.values.size() + syms.symbolTypes.size() + syms.symbolFuncs.size())
-
-    // Generics
-    /*for(var it = this.lsp.lita.genericSymbols.iter(); it.hasNext();) {
-        var entry = it.next()
-        var sym = entry.value
-
-        this.addDocumentSymbol(results, sym, doc.filename, alloc)
-    }*/
-
-    // Values
-    for(var i = 0; i < syms.values.size(); i += 1) {
-        var sym = syms.values.get(i)
-        if(sym.flags & SymbolFlags.IS_HIDDEN) {
-            continue
-        }
-        this.addDocumentSymbol(results, sym, doc.filename, alloc)
-    }
-
-    // Types
-    for(var i = 0; i < syms.symbolTypes.size(); i += 1) {
-        var sym = syms.symbolTypes.get(i)
-        if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-            continue
-        }
-        if(sym.flags & SymbolFlags.IS_HIDDEN) {
-            continue
-        }
-        this.addDocumentSymbol(results, sym, doc.filename, alloc)
-    }
-
-    // Show functions
-    for(var i = 0; i < syms.symbolFuncs.size(); i += 1) {
-        var sym = syms.symbolFuncs.get(i)
-        if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
-            continue
-        }
-        if(sym.flags & SymbolFlags.IS_HIDDEN) {
-            continue
-        }
-        this.addDocumentSymbol(results, sym, doc.filename, alloc)
-    }
+    var syms = &module.symbols
+    this.addDocumentSymbols(results, module, &syms.symbolNotes, doc.filename, alloc)
+    this.addDocumentSymbols(results, module, &syms.symbolTypes, doc.filename, alloc)
+    this.addDocumentSymbols(results, module, &syms.symbolFuncs, doc.filename, alloc)
 
     return results
 }
 
-func (this: *Workspace) addDocumentSymbol(results: *JsonNode, sym: *Symbol, docFilename: *const char, alloc: *const Allocator) {
-    var absPath = [MAX_PATH]char{0}
-    var path = GetAbsolutePath(this.rootPath, sym.declared.id.filename, absPath)
+func (this: *Workspace) addDocumentSymbols(
+    results: *JsonNode,
+    module: *Module,
+    symbols: Map<InternedString, *Symbol>,
+    docFilename: *const char,
+    alloc: *const Allocator) {
 
-    if(PathEquals(path, docFilename)) {
+    for(var it = symbols.iter(); it.hasNext();) {
+        var sym = it.next().value
+
+        if(sym.flags & SymbolFlags.IS_MARKED_RESET) {
+            continue
+        }
+
+        if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+            continue
+        }
+        if(sym.flags & SymbolFlags.IS_HIDDEN) {
+            continue
+        }
+
+        if(!sym.declared.equals(module)) {
+            continue
+        }
+
         var info = SymbolToSymbolInformation(sym, this.rootPath, alloc)
         if(info) {
             results.add(info)
@@ -928,40 +900,4 @@ public func (this: *Workspace) runDiagnostics(
 
 report:
     return &lita.result
-}
-
-
-
-func (this: *Document) refreshLineMap() {
-    this.lineMap.clear()
-    this.lineMap.add(0) // first line starts with the first character
-
-    for(var i = 0; i < this.text.length; i+=1) {
-        var c = this.text.buffer[i]
-
-        // NOTE: no need to account for unicode here
-        if(c == '\n') {
-            this.lineMap.add(i + 1)
-        }
-    }
-}
-
-@inline
-func (this: *Document) getLineStart(lineNumber: i32) : u32 {
-    return this.lineMap.get(lineNumber)
-}
-
-func (this: *Document) insert(range: Range, text: *const char) {
-    var fromIndex = (this.getLineStart(range.start.line) + range.start.character) as (i32)
-    var toIndex   = (this.getLineStart(range.end.line) + range.end.character) as (i32)
-
-    this.text.replace(fromIndex, toIndex, text)
-    this.refreshLineMap()
-}
-
-func (this: *Document) setText(text: *const char) {
-    this.text.clear()
-    this.text.appendStr(text)
-
-    this.refreshLineMap()
 }

@@ -822,8 +822,6 @@ public func AstAddImport(lita: *Lita,
         }
     }
 
-    var strings = lita.strings
-
     // this module isn't being imported, so we must inject an import
     // statement for it; but also give it an alias that *shouldn't*
     // collide with other imports

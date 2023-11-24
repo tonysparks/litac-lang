@@ -2031,8 +2031,6 @@ public func (this: *TypeInfo) getFieldPathByType(type: *TypeInfo, path: *FieldPa
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
-                var aggField = field.aggregateField
-
                 var baseType = field.typeInfo.getBaseType()
                 path.add(field)
 

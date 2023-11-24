@@ -210,6 +210,10 @@ public func SymbolToSymbolInformation(sym: *sym::Symbol, rootPath: *const char, 
     var kind = SymbolKindFromSymbol(sym) as (i32)
     result.putIntNumber("kind", kind as (i64))
 
+    if(sym.type) {
+        result.putIntNumber("typeid", sym.type.typeid as (i64))
+    }
+
     if(sym.decl) {
         var location = SrcPosToLocation(sym.decl.startPos, rootPath, alloc)
         if(location) {

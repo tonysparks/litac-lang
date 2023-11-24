@@ -534,7 +534,6 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             break;
         }
         case StmtKind.NOTE_DECL: {
-            var noteDecl = decl as (*AggregateDecl)
             this.resolveSymbol(sym)
             this.finishResolveSymbol(sym)
             break;
@@ -617,8 +616,6 @@ public func (this: *TypeChecker) enterModule(module: *Module) {
 }
 
 public func (this: *TypeChecker) leaveModule() {
-    var oldScope = this.current;
-
     if(this.moduleStack.size()) {
         this.moduleStack.pop()
         if(this.moduleStack.size()) {

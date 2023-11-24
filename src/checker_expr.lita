@@ -1152,13 +1152,9 @@ func (this: *TypeChecker) addInitArgumentsReferences(type: *TypeInfo, expr: *Ini
         var aggInfo = type
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
-            var field: FieldStmt;
 
             if(arg.fieldName.token.type == TokenType.IDENTIFIER) {
                 var fieldName = arg.fieldName.str
-
-                field = aggInfo.getField(fieldName)
-
                 var fieldResult = aggInfo.getFieldPosition(fieldName)
                 if(fieldResult.aggInfo) {
                     this.lita.references.addFieldReference(arg.startPos,
@@ -1565,7 +1561,6 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
 
     var funcSym = methodResult.symbol
     if(funcSym) {
-        var decl = funcSym.decl as (*FuncDecl)
         var typeInfo = funcSym.type;
 
         // if this is the first time we are processing this AST node

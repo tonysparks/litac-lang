@@ -12,6 +12,11 @@
     typedef struct timeval timeval;
     typedef struct stat FileStat;
 #endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 256
+#endif
+
 """);
 
 
@@ -43,7 +48,6 @@ struct FileStat {
 func stat(filename: *const char, stat: *FileStat) : i32;
 
 
-@module_init
 @no_profile
 public func _SystemInit() : bool {
     return true

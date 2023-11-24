@@ -48,7 +48,7 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
         return PkgStatus.OK
     }
 
-    if(ParseArgs(args.n, args.args, litaOptions) != CmdParserStatus.OK) {
+    if(ParseArgs(args.n, args.args, litaOptions) != ParseStatus.OK) {
         return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
     }
 

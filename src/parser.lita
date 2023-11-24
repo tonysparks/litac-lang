@@ -1684,8 +1684,6 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
             // read the tokens until we are caught up with the
             // eval expression
             while(!p.atEnd()) {
-                var token = p.peek()
-
                 if(p.check(TokenType.HASH)) {
                     break
                 }

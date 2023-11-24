@@ -20,31 +20,6 @@ import "lsp/protocol"
 import "lsp/lsp"
 import "lsp/util"
 
-public func FindTokenByPosition(lsp: *LspServer, alloc: *const Allocator, doc: *Document, pos: Position) : Token {
-    var lex = LexerInit(doc.filename, doc.text.cStr(), doc.text.length, alloc)
-
-    var targetLine = pos.line + 1
-    lsp.log("Searching for token at: %d:%d\n", pos.line, pos.character)
-    while(!lex.eof()) {
-        var token = lex.nextToken()
-        if(token.pos.lineNumber == targetLine) {
-            do {
-                var len = (token.pos.end - token.pos.start) as (i32)
-                if(token.pos.position >= pos.character &&
-                   pos.character <=  token.pos.position + len) {
-                       lsp.log("Found token: '%s'\n", token.asString())
-                    return token
-                }
-
-                token = lex.nextToken()
-            }
-            while(!lex.eof() && token.pos.lineNumber == targetLine);
-            break;
-        }
-    }
-    lsp.log("No token found!\n")
-    return lex.eofToken()
-}
 
 public struct Reference {
     type: Typeid

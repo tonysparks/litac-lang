@@ -1,0 +1,47 @@
+import "std/system"
+import "std/string_buffer"
+import "std/array"
+
+import "lsp/protocol"
+
+public struct Document {
+    filename: [MAX_PATH]char
+    text: StringBuffer
+
+    lineMap: Array<u32>
+}
+
+
+internal func (this: *Document) refreshLineMap() {
+    this.lineMap.clear()
+    this.lineMap.add(0) // first line starts with the first character
+
+    for(var i = 0; i < this.text.length; i+=1) {
+        var c = this.text.buffer[i]
+
+        // NOTE: no need to account for unicode here
+        if(c == '\n') {
+            this.lineMap.add(i + 1)
+        }
+    }
+}
+
+@inline
+internal func (this: *Document) getLineStart(lineNumber: i32) : u32 {
+    return this.lineMap.get(lineNumber)
+}
+
+internal func (this: *Document) insert(range: Range, text: *const char) {
+    var fromIndex = (this.getLineStart(range.start.line) + range.start.character) as (i32)
+    var toIndex   = (this.getLineStart(range.end.line) + range.end.character) as (i32)
+
+    this.text.replace(fromIndex, toIndex, text)
+    this.refreshLineMap()
+}
+
+internal func (this: *Document) setText(text: *const char) {
+    this.text.clear()
+    this.text.appendStr(text)
+
+    this.refreshLineMap()
+}
