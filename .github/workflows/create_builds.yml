@@ -89,7 +89,7 @@ jobs:
       - name: Set up Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: 17.0.3
+          version: 16.0.6
 
       # Print compiler information
       - name: Compiler Info
