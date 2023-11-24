@@ -609,7 +609,11 @@ const uriEscapeChars = [256]*const char {
 
 public func FilePathToUri(path: *const char, output: [MAX_PATH]char) : *char {
     var outputStr = StringInit(output, MAX_PATH, 0)
+#if OS == "WINDOWS"
     outputStr.append("%s", "file:///")
+#else
+    outputStr.append("%s", "file://")
+#end
 
     while(*path) {
         var escaped = uriEscapeChars[*path]
@@ -628,7 +632,11 @@ public func FilePathToUri(path: *const char, output: [MAX_PATH]char) : *char {
 
 public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
     if(strncmp(uri, "file:///", 8) == 0) {
+#if OS == "WINDOWS"
         uri = &uri[8]
+#else
+        uri = &uri[7]
+#end
     }
 
     var outputStr = StringInit(output, MAX_PATH, 0)

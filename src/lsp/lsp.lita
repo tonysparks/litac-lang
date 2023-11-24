@@ -149,12 +149,13 @@ public func (this: *LspServer) readMessage() {
 }
 
 func (this: *LspServer) readHeader() : i32 {
-    var header = [256]char{0};
+    const MAX_HEADER_SIZE = 256
+    var header = [MAX_HEADER_SIZE]char{0};
     var sizeIndex = 0
     var index = 0
 
     this.log("Reading header:\n'")
-    while(true) {
+    while(index < MAX_HEADER_SIZE) {
         var r = getchar()
         if(r == EOF) {
             break
@@ -186,7 +187,7 @@ func (this: *LspServer) readHeader() : i32 {
     }
 
     var size = atoi(&header[sizeIndex])
-    return size + 1 /* for the \r\n\r\n */
+    return size + 3 /* for the \r\n\r\n */
 }
 
 public func (this: *LspServer) handleMessage(msg: *JsonNode) {
@@ -482,7 +483,7 @@ public func (this: *LspServer) writeResponse(msg: *JsonNode) {
 
 
     //headerStr.append("Content-Length: %d\r\n\r\n", length)
-    this.outbound.append("Content-Length: %d\n\n%.*s", length, length, this.output.buffer)
+    this.outbound.append("Content-Length: %d\r\n\r\n%.*s", length, length, this.output.buffer)
     this.log("Sending: Len: %d %.*s\n", this.outbound.length, this.outbound.length, this.outbound.buffer)
 
     //fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)
