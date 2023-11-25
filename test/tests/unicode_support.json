@@ -5,10 +5,6 @@
     "disableLines": true,
     "includeTypeInfos": false,
 
-    // Unicode escape sequences don't work with TCC :S
-    "buildCmd": "clang -std=c99 -g -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
-    //"buildCmd": "gcc -std=c99 -g -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
-
     "program": `
         @include("assert.h");
         @foreign func assert(e:bool):void;

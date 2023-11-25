@@ -262,7 +262,6 @@
         },
         {
             "name": "Generic Func Ptr in Func",
-            "buildCmd": "clang -std=c99 -g -gcodeview -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
             "definitions": `
                 func testx(a:i32) : i32 {
                     return a;
