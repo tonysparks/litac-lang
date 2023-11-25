@@ -645,7 +645,7 @@ func (this: using *CGen) emitDefers() {
 }
 
 public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
-    if(this.inTextBlock || !stmt || this.options.disableLineSync) {
+    if(this.options.disableLineSync || this.inTextBlock || !stmt) {
         return;
     }
 
@@ -1568,18 +1568,18 @@ func (this: using *CGen) emitStaticCompStmt(s: *CompStmt) {
     }
 
     if(s.type.equals(STATIC_IF)) {
-        this.emitStrn("#if", 3)
+        this.emitStrn("\n#if", 4)
         this.emit(" %.*s\n", s.expr.length, s.expr.buffer)
     }
     else if(s.type.equals(ELSEIF)) {
-        this.emitStrn("#elif", 5)
+        this.emitStrn("\n#elif", 6)
         this.emit(" %.*s\n", s.expr.length, s.expr.buffer)
     }
     else if(s.type.equals(ELSE)) {
-        this.emitStrn("#else\n", 6)
+        this.emitStrn("\n#else\n", 7)
     }
     else if(s.type.equals(END)) {
-        this.emitStrn("#endif\n", 7)
+        this.emitStrn("\n#endif\n", 8)
     }
 
     {

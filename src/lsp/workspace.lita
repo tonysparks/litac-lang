@@ -795,7 +795,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
         offset -= 1;
     }
 
-    const MAX_RESULTS = 50;
+    const MAX_RESULTS = 1024 * 2;
 
     var results = CreateJsonArray(alloc)
     if(endPos > offset) {
