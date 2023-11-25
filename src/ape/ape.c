@@ -849,7 +849,7 @@ APE_INTERNAL statement_t* statement_make_block(allocator_t *alloc, code_block_t 
 APE_INTERNAL statement_t* statement_make_import(allocator_t *alloc, char *path);
 APE_INTERNAL statement_t* statement_make_recover(allocator_t *alloc, ident_t *error_ident, code_block_t *body);
 
-APE_INTERNAL void statement_destroy(statement_t *stmt);
+APE_INTERNAL void statement_destroy(void *stmt);
 
 APE_INTERNAL statement_t* statement_copy(const statement_t *stmt);
 
@@ -874,6 +874,7 @@ APE_INTERNAL expression_t* expression_make_logical(allocator_t *alloc, operator_
 APE_INTERNAL expression_t* expression_make_ternary(allocator_t *alloc, expression_t *test, expression_t *if_true, expression_t *if_false);
 
 APE_INTERNAL void expression_destroy(expression_t *expr);
+APE_INTERNAL void expression_destroy_wrapper(void *expr);
 
 APE_INTERNAL expression_t* expression_copy(expression_t *expr);
 
@@ -888,10 +889,13 @@ APE_INTERNAL const char *expression_type_to_string(expression_type_t type);
 APE_INTERNAL ident_t* ident_make(allocator_t *alloc, token_t tok);
 APE_INTERNAL ident_t* ident_copy(ident_t *ident);
 APE_INTERNAL void ident_destroy(ident_t *ident);
+APE_INTERNAL void ident_destroy_wrapper(void *ident);
 
 APE_INTERNAL if_case_t *if_case_make(allocator_t *alloc, expression_t *test, code_block_t *consequence);
 APE_INTERNAL void if_case_destroy(if_case_t *cond);
 APE_INTERNAL if_case_t* if_case_copy(if_case_t *cond);
+
+APE_INTERNAL void if_case_destroy_wrapper(void *cond);
 
 #endif /* ast_h */
 //FILE_END
@@ -1201,6 +1205,9 @@ typedef struct symbol_table {
 APE_INTERNAL symbol_t *symbol_make(allocator_t *alloc, const char *name, symbol_type_t type, int index, bool assignable);
 APE_INTERNAL void symbol_destroy(symbol_t *symbol);
 APE_INTERNAL symbol_t* symbol_copy(symbol_t *symbol);
+
+APE_INTERNAL void symbol_destroy_wrapper(void *symbol);
+APE_INTERNAL void* symbol_copy_wrapper(void *symbol);
 
 APE_INTERNAL symbol_table_t *symbol_table_make(allocator_t *alloc, symbol_table_t *outer, global_store_t *global_store, int module_global_offset);
 APE_INTERNAL void symbol_table_destroy(symbol_table_t *st);
@@ -4310,12 +4317,12 @@ void expression_destroy(expression_t *expr) {
             break;
         }
         case EXPRESSION_ARRAY_LITERAL: {
-            ptrarray_destroy_with_items(expr->array, expression_destroy);
+            ptrarray_destroy_with_items(expr->array, expression_destroy_wrapper);
             break;
         }
         case EXPRESSION_MAP_LITERAL: {
-            ptrarray_destroy_with_items(expr->map.keys, expression_destroy);
-            ptrarray_destroy_with_items(expr->map.values, expression_destroy);
+            ptrarray_destroy_with_items(expr->map.keys, expression_destroy_wrapper);
+            ptrarray_destroy_with_items(expr->map.values, expression_destroy_wrapper);
             break;
         }
         case EXPRESSION_PREFIX: {
@@ -4330,12 +4337,12 @@ void expression_destroy(expression_t *expr) {
         case EXPRESSION_FUNCTION_LITERAL: {
             fn_literal_t *fn = &expr->fn_literal;
             allocator_free(expr->alloc, fn->name);
-            ptrarray_destroy_with_items(fn->params, ident_destroy);
+            ptrarray_destroy_with_items(fn->params, ident_destroy_wrapper);
             code_block_destroy(fn->body);
             break;
         }
         case EXPRESSION_CALL: {
-            ptrarray_destroy_with_items(expr->call_expr.args, expression_destroy);
+            ptrarray_destroy_with_items(expr->call_expr.args, expression_destroy_wrapper);
             expression_destroy(expr->call_expr.function);
             break;
         }
@@ -4363,6 +4370,10 @@ void expression_destroy(expression_t *expr) {
     }
     allocator_free(expr->alloc, expr);
 
+}
+
+void expression_destroy_wrapper(void *expr) {
+    expression_destroy(expr);
 }
 
 expression_t* expression_copy(expression_t *expr) {
@@ -4412,29 +4423,29 @@ expression_t* expression_copy(expression_t *expr) {
             break;
         }
         case EXPRESSION_ARRAY_LITERAL: {
-            ptrarray(expression_t) *values_copy = ptrarray_copy_with_items(expr->array, expression_copy, expression_destroy);
+            ptrarray(expression_t) *values_copy = ptrarray_copy_with_items(expr->array, expression_copy, expression_destroy_wrapper);
             if (!values_copy) {
                 return NULL;
             }
             res = expression_make_array_literal(expr->alloc, values_copy);
             if (!res) {
-                ptrarray_destroy_with_items(values_copy, expression_destroy);
+                ptrarray_destroy_with_items(values_copy, expression_destroy_wrapper);
                 return NULL;
             }
             break;
         }
         case EXPRESSION_MAP_LITERAL: {
-            ptrarray(expression_t) *keys_copy = ptrarray_copy_with_items(expr->map.keys, expression_copy, expression_destroy);
-            ptrarray(expression_t) *values_copy = ptrarray_copy_with_items(expr->map.values, expression_copy, expression_destroy);
+            ptrarray(expression_t) *keys_copy = ptrarray_copy_with_items(expr->map.keys, expression_copy, expression_destroy_wrapper);
+            ptrarray(expression_t) *values_copy = ptrarray_copy_with_items(expr->map.values, expression_copy, expression_destroy_wrapper);
             if (!keys_copy || !values_copy) {
-                ptrarray_destroy_with_items(keys_copy, expression_destroy);
-                ptrarray_destroy_with_items(values_copy, expression_destroy);
+                ptrarray_destroy_with_items(keys_copy, expression_destroy_wrapper);
+                ptrarray_destroy_with_items(values_copy, expression_destroy_wrapper);
                 return NULL;
             }
             res = expression_make_map_literal(expr->alloc, keys_copy, values_copy);
             if (!res) {
-                ptrarray_destroy_with_items(keys_copy, expression_destroy);
-                ptrarray_destroy_with_items(values_copy, expression_destroy);
+                ptrarray_destroy_with_items(keys_copy, expression_destroy_wrapper);
+                ptrarray_destroy_with_items(values_copy, expression_destroy_wrapper);
                 return NULL;
             }
             break;
@@ -4468,18 +4479,18 @@ expression_t* expression_copy(expression_t *expr) {
             break;
         }
         case EXPRESSION_FUNCTION_LITERAL: {
-            ptrarray(ident_t) *params_copy = ptrarray_copy_with_items(expr->fn_literal.params, ident_copy, ident_destroy);
+            ptrarray(ident_t) *params_copy = ptrarray_copy_with_items(expr->fn_literal.params, ident_copy, ident_destroy_wrapper);
             code_block_t *body_copy = code_block_copy(expr->fn_literal.body);
             char *name_copy =  ape_strdup(expr->alloc, expr->fn_literal.name);
             if (!params_copy || !body_copy) {
-                ptrarray_destroy_with_items(params_copy, ident_destroy);
+                ptrarray_destroy_with_items(params_copy, ident_destroy_wrapper);
                 code_block_destroy(body_copy);
                 allocator_free(expr->alloc, name_copy);
                 return NULL;
             }
             res = expression_make_fn_literal(expr->alloc, params_copy, body_copy);
             if (!res) {
-                ptrarray_destroy_with_items(params_copy, ident_destroy);
+                ptrarray_destroy_with_items(params_copy, ident_destroy_wrapper);
                 code_block_destroy(body_copy);
                 allocator_free(expr->alloc, name_copy);
                 return NULL;
@@ -4489,16 +4500,16 @@ expression_t* expression_copy(expression_t *expr) {
         }
         case EXPRESSION_CALL: {
             expression_t *function_copy = expression_copy(expr->call_expr.function);
-            ptrarray(expression_t) *args_copy = ptrarray_copy_with_items(expr->call_expr.args, expression_copy, expression_destroy);
+            ptrarray(expression_t) *args_copy = ptrarray_copy_with_items(expr->call_expr.args, expression_copy, expression_destroy_wrapper);
             if (!function_copy || !args_copy) {
                 expression_destroy(function_copy);
-                ptrarray_destroy_with_items(expr->call_expr.args, expression_destroy);
+                ptrarray_destroy_with_items(expr->call_expr.args, expression_destroy_wrapper);
                 return NULL;
             }
             res = expression_make_call(expr->alloc, function_copy, args_copy);
             if (!res) {
                 expression_destroy(function_copy);
-                ptrarray_destroy_with_items(expr->call_expr.args, expression_destroy);
+                ptrarray_destroy_with_items(expr->call_expr.args, expression_destroy_wrapper);
                 return NULL;
             }
             break;
@@ -4694,7 +4705,8 @@ statement_t* statement_make_recover(allocator_t *alloc, ident_t *error_ident, co
     return res;
 }
 
-void statement_destroy(statement_t *stmt) {
+void statement_destroy(void* arg) {
+    statement_t *stmt = arg;
     if (!stmt) {
         return;
     }
@@ -4709,7 +4721,7 @@ void statement_destroy(statement_t *stmt) {
             break;
         }
         case STATEMENT_IF: {
-            ptrarray_destroy_with_items(stmt->if_statement.cases, if_case_destroy);
+            ptrarray_destroy_with_items(stmt->if_statement.cases, if_case_destroy_wrapper);
             code_block_destroy(stmt->if_statement.alternative);
             break;
         }
@@ -4785,16 +4797,16 @@ statement_t* statement_copy(const statement_t *stmt) {
             break;
         }
         case STATEMENT_IF: {
-            ptrarray(if_case_t) *cases_copy = ptrarray_copy_with_items(stmt->if_statement.cases, if_case_copy, if_case_destroy);
+            ptrarray(if_case_t) *cases_copy = ptrarray_copy_with_items(stmt->if_statement.cases, if_case_copy, if_case_destroy_wrapper);
             code_block_t *alternative_copy = code_block_copy(stmt->if_statement.alternative);
             if (!cases_copy || !alternative_copy) {
-                ptrarray_destroy_with_items(cases_copy, if_case_destroy);
+                ptrarray_destroy_with_items(cases_copy, if_case_destroy_wrapper);
                 code_block_destroy(alternative_copy);
                 return NULL;
             }
             res = statement_make_if(stmt->alloc, cases_copy, alternative_copy);
             if (res) {
-                ptrarray_destroy_with_items(cases_copy, if_case_destroy);
+                ptrarray_destroy_with_items(cases_copy, if_case_destroy_wrapper);
                 code_block_destroy(alternative_copy);
                 return NULL;
             }
@@ -5338,6 +5350,10 @@ void ident_destroy(ident_t *ident) {
     allocator_free(ident->alloc, ident);
 }
 
+void ident_destroy_wrapper(void *ident) {
+    ident_destroy(ident);
+}
+
 if_case_t *if_case_make(allocator_t *alloc, expression_t *test, code_block_t *consequence) {
     if_case_t *res = allocator_malloc(alloc, sizeof(if_case_t));
     if (!res) {
@@ -5356,6 +5372,10 @@ void if_case_destroy(if_case_t *cond) {
     expression_destroy(cond->test);
     code_block_destroy(cond->consequence);
     allocator_free(cond->alloc, cond);
+}
+
+void if_case_destroy_wrapper(void *cond) {
+    if_case_destroy(cond);
 }
 
 if_case_t* if_case_copy(if_case_t *if_case) {
@@ -5821,7 +5841,7 @@ static statement_t* parse_if_statement(parser_t *p) {
     }
     return res;
 err:
-    ptrarray_destroy_with_items(cases, if_case_destroy);
+    ptrarray_destroy_with_items(cases, if_case_destroy_wrapper);
     code_block_destroy(alternative);
     return NULL;
 }
@@ -6408,7 +6428,7 @@ static expression_t* parse_array_literal(parser_t *p) {
     }
     expression_t *res = expression_make_array_literal(p->alloc, array);
     if (!res) {
-        ptrarray_destroy_with_items(array, expression_destroy);
+        ptrarray_destroy_with_items(array, expression_destroy_wrapper);
         return NULL;
     }
     return res;
@@ -6495,8 +6515,8 @@ static expression_t* parse_map_literal(parser_t *p) {
     }
     return res;
 err:
-    ptrarray_destroy_with_items(keys, expression_destroy);
-    ptrarray_destroy_with_items(values, expression_destroy);
+    ptrarray_destroy_with_items(keys, expression_destroy_wrapper);
+    ptrarray_destroy_with_items(values, expression_destroy_wrapper);
     return NULL;
 }
 
@@ -6574,7 +6594,7 @@ static expression_t* parse_function_literal(parser_t *p) {
     return res;
 err:
     code_block_destroy(body);
-    ptrarray_destroy_with_items(params, ident_destroy);
+    ptrarray_destroy_with_items(params, ident_destroy_wrapper);
     p->depth -= 1;
     return NULL;
 }
@@ -6645,7 +6665,7 @@ static expression_t* parse_call_expression(parser_t *p, expression_t *left) {
     }
     expression_t *res = expression_make_call(p->alloc, function, args);
     if (!res) {
-        ptrarray_destroy_with_items(args, expression_destroy);
+        ptrarray_destroy_with_items(args, expression_destroy_wrapper);
         return NULL;
     }
     return res;
@@ -6702,7 +6722,7 @@ static ptrarray(expression_t)* parse_expression_list(parser_t *p, token_type_t s
 
     return res;
 err:
-    ptrarray_destroy_with_items(res, expression_destroy);
+    ptrarray_destroy_with_items(res, expression_destroy_wrapper);
     return NULL;
 }
 
@@ -7133,7 +7153,7 @@ global_store_t *global_store_make(allocator_t *alloc, gcmem_t *mem) {
     }
     memset(store, 0, sizeof(global_store_t));
     store->alloc = alloc;
-    store->symbols = dict_make(alloc, symbol_copy, symbol_destroy);
+    store->symbols = dict_make(alloc, symbol_copy_wrapper, symbol_destroy_wrapper);
     if (!store->symbols) {
         goto err;
     }
@@ -7244,7 +7264,7 @@ int global_store_get_object_count(global_store_t *store) {
 #include "global_store.h"
 #endif
 
-static block_scope_t* block_scope_copy(block_scope_t *scope);
+static void* block_scope_copy(void *arg);
 static block_scope_t* block_scope_make(allocator_t *alloc, int offset);
 static void block_scope_destroy(block_scope_t *scope);
 static bool set_symbol(symbol_table_t *table, symbol_t *symbol);
@@ -7279,6 +7299,14 @@ void symbol_destroy(symbol_t *symbol) {
 
 symbol_t* symbol_copy(symbol_t *symbol) {
     return symbol_make(symbol->alloc, symbol->name, symbol->type, symbol->index, symbol->assignable);
+}
+
+void symbol_destroy_wrapper(void *symbol) {
+    symbol_destroy(symbol);
+}
+
+void* symbol_copy_wrapper(void *symbol) {
+    return symbol_copy(symbol);
 }
 
 symbol_table_t *symbol_table_make(allocator_t *alloc, symbol_table_t *outer, global_store_t *global_store, int module_global_offset) {
@@ -7328,8 +7356,8 @@ void symbol_table_destroy(symbol_table_t *table) {
         symbol_table_pop_block_scope(table);
     }
     ptrarray_destroy(table->block_scopes);
-    ptrarray_destroy_with_items(table->module_global_symbols, symbol_destroy);
-    ptrarray_destroy_with_items(table->free_symbols, symbol_destroy);
+    ptrarray_destroy_with_items(table->module_global_symbols, symbol_destroy_wrapper);
+    ptrarray_destroy_with_items(table->free_symbols, symbol_destroy_wrapper);
     allocator_t *alloc = table->alloc;
     memset(table, 0, sizeof(symbol_table_t));
     allocator_free(alloc, table);
@@ -7348,11 +7376,11 @@ symbol_table_t* symbol_table_copy(symbol_table_t *table) {
     if (!copy->block_scopes) {
         goto err;
     }
-    copy->free_symbols = ptrarray_copy_with_items(table->free_symbols, symbol_copy, symbol_destroy);
+    copy->free_symbols = ptrarray_copy_with_items(table->free_symbols, symbol_copy_wrapper, symbol_destroy_wrapper);
     if (!copy->free_symbols) {
         goto err;
     }
-    copy->module_global_symbols = ptrarray_copy_with_items(table->module_global_symbols, symbol_copy, symbol_destroy);
+    copy->module_global_symbols = ptrarray_copy_with_items(table->module_global_symbols, symbol_copy_wrapper, symbol_destroy_wrapper);
     if (!copy->module_global_symbols) {
         goto err;
     }
@@ -7608,7 +7636,7 @@ static block_scope_t* block_scope_make(allocator_t *alloc, int offset) {
     }
     memset(new_scope, 0, sizeof(block_scope_t));
     new_scope->alloc = alloc;
-    new_scope->store = dict_make(alloc, symbol_copy, symbol_destroy);
+    new_scope->store = dict_make(alloc, symbol_copy_wrapper, symbol_destroy_wrapper);
     if (!new_scope->store) {
         block_scope_destroy(new_scope);
         return NULL;
@@ -7623,7 +7651,8 @@ static void block_scope_destroy(block_scope_t *scope) {
     allocator_free(scope->alloc, scope);
 }
 
-static block_scope_t* block_scope_copy(block_scope_t *scope) {
+static void* block_scope_copy(void* arg) {
+    block_scope_t *scope = arg;
     block_scope_t *copy = allocator_malloc(scope->alloc, sizeof(block_scope_t));
     if (!copy) {
         return NULL;
@@ -9565,7 +9594,7 @@ static bool compile_expression(compiler_t *comp, expression_t *expr) {
 
             compilation_result_t *comp_res = compilation_scope_orphan_result(compilation_scope);
             if (!comp_res) {
-                ptrarray_destroy_with_items(free_symbols, symbol_destroy);
+                ptrarray_destroy_with_items(free_symbols, symbol_destroy_wrapper);
                 goto error;
             }
             pop_symbol_table(comp);
@@ -9577,7 +9606,7 @@ static bool compile_expression(compiler_t *comp, expression_t *expr) {
                                                 num_locals, ptrarray_count(fn->params), 0);
 
             if (object_is_null(obj)) {
-                ptrarray_destroy_with_items(free_symbols, symbol_destroy);
+                ptrarray_destroy_with_items(free_symbols, symbol_destroy_wrapper);
                 compilation_result_destroy(comp_res);
                 goto error;
             }
@@ -9586,24 +9615,24 @@ static bool compile_expression(compiler_t *comp, expression_t *expr) {
                 symbol_t *symbol = ptrarray_get(free_symbols, i);
                 ok = read_symbol(comp, symbol);
                 if (!ok) {
-                    ptrarray_destroy_with_items(free_symbols, symbol_destroy);
+                    ptrarray_destroy_with_items(free_symbols, symbol_destroy_wrapper);
                     goto error;
                 }
             }
 
             int pos = add_constant(comp, obj);
             if (pos < 0) {
-                ptrarray_destroy_with_items(free_symbols, symbol_destroy);
+                ptrarray_destroy_with_items(free_symbols, symbol_destroy_wrapper);
                 goto error;
             }
 
             ip = emit(comp, OPCODE_FUNCTION, 2, (uint64_t[]){pos, ptrarray_count(free_symbols)});
             if (ip < 0) {
-                ptrarray_destroy_with_items(free_symbols, symbol_destroy);
+                ptrarray_destroy_with_items(free_symbols, symbol_destroy_wrapper);
                 goto error;
             }
 
-            ptrarray_destroy_with_items(free_symbols, symbol_destroy);
+            ptrarray_destroy_with_items(free_symbols, symbol_destroy_wrapper);
 
             break;
         }
@@ -10074,7 +10103,7 @@ static void module_destroy(module_t *module) {
         return;
     }
     allocator_free(module->alloc, module->name);
-    ptrarray_destroy_with_items(module->symbols, symbol_destroy);
+    ptrarray_destroy_with_items(module->symbols, symbol_destroy_wrapper);
     allocator_free(module->alloc, module);
 }
 
@@ -10090,7 +10119,7 @@ static module_t* module_copy(module_t *src) {
         module_destroy(copy);
         return NULL;
     }
-    copy->symbols = ptrarray_copy_with_items(src->symbols, symbol_copy, symbol_destroy);
+    copy->symbols = ptrarray_copy_with_items(src->symbols, symbol_copy_wrapper, symbol_destroy_wrapper);
     if (!copy->symbols) {
         module_destroy(copy);
         return NULL;
@@ -10172,9 +10201,11 @@ static const symbol_t* define_symbol(compiler_t *comp, src_pos_t pos, const char
 
 static object_t object_deep_copy_internal(gcmem_t *mem, object_t obj, valdict(object_t, object_t) *copies);
 static bool object_equals_wrapped(const object_t *a, const object_t *b);
+static bool object_equals_wrapped_ext(const void *a, const void *b);
 static unsigned long object_hash(object_t *obj_ptr);
 static unsigned long object_hash_string(const char *str);
 static unsigned long object_hash_double(double val);
+static unsigned long object_hash_wrapper(const void *obj_ptr);
 static array(object_t)* object_get_allocated_array(object_t object);
 static bool object_is_number(object_t obj);
 static uint64_t get_type_tag(object_type_t type);
@@ -10322,8 +10353,8 @@ object_t object_make_map_with_capacity(gcmem_t *mem, unsigned capacity) {
     if (!data->map) {
         return object_make_null();
     }
-    valdict_set_hash_function(data->map, (collections_hash_fn)object_hash);
-    valdict_set_equals_function(data->map, (collections_equals_fn)object_equals_wrapped);
+    valdict_set_hash_function(data->map, (collections_hash_fn)object_hash_wrapper);
+    valdict_set_equals_function(data->map, (collections_equals_fn)object_equals_wrapped_ext);
     return object_make_from_data(OBJECT_MAP, data);
 }
 
@@ -11310,6 +11341,10 @@ static bool object_equals_wrapped(const object_t *a_ptr, const object_t *b_ptr) 
     return object_equals(a, b);
 }
 
+static bool object_equals_wrapped_ext(const void *a_ptr, const void *b_ptr) {
+    return object_equals_wrapped(a_ptr, b_ptr);
+}
+
 static unsigned long object_hash(object_t *obj_ptr) {
     object_t obj = *obj_ptr;
     object_type_t type = object_get_type(obj);
@@ -11330,6 +11365,10 @@ static unsigned long object_hash(object_t *obj_ptr) {
             return 0;
         }
     }
+}
+
+static unsigned long object_hash_wrapper(const void *obj_ptr) {
+    return object_hash((object_t*)obj_ptr);
 }
 
 static unsigned long object_hash_string(const char *str) { /* djb2 */

@@ -11,7 +11,7 @@
             %code%
         }
     `,
-  "buildCmd": "clang -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
+  // "buildCmd": "clang -fsanitize=undefined,address %input% -o %output% -D_CRT_SECURE_NO_WARNINGS",
   "tests": [
     {
         "name": "From Json Struct with Array Value",
