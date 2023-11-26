@@ -45,8 +45,10 @@ func main(len: i32, args: **char) : i32 {
 """)
 
         path.format("%s/src/main.lita", pm.options.projectPath)
-        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
-            return PkgStatus.ERROR_INIT_PACKAGE
+        if(!FileExists(path.cStr())) {
+            if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                return PkgStatus.ERROR_INIT_PACKAGE
+            }
         }
     }
 
@@ -65,8 +67,10 @@ func test() {
 """)
 
         path.format("%s/test/main_test.lita", pm.options.projectPath)
-        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
-            return PkgStatus.ERROR_INIT_PACKAGE
+        if(!FileExists(path.cStr())) {
+            if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                return PkgStatus.ERROR_INIT_PACKAGE
+            }
         }
     }
 
@@ -96,8 +100,10 @@ func test() {
         , options.name, options.version, options.type, options.repo)
 
         path.format("%s/pkg.json", pm.options.projectPath)
-        if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
-            return PkgStatus.ERROR_INIT_PACKAGE
+        if(!FileExists(path.cStr())) {
+            if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                return PkgStatus.ERROR_INIT_PACKAGE
+            }
         }
     }
 

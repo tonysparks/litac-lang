@@ -12,7 +12,7 @@ case "${unameOut}" in
     ;;
 esac
 
-BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
+BUILD_CMD="gcc -g %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
 
 error_compiling() {
     echo ""
