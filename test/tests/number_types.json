@@ -1,0 +1,56 @@
+{
+    "description": "Number Types",
+    "enabled": true,
+    "program" : `
+    @include("assert.h");
+    @foreign func assert(e:bool):void;
+
+    %definitions%
+
+    func main(len:i32, args:**char):i32 {
+        %code%
+    }
+    `,
+    "tests": [
+        {
+            "name" : "Literal Type Designators",
+            "definitions": `
+
+            `,
+            "code": `
+                var x1 = 0_usize
+                var x2 = 0usize
+
+                var x3 = 0i32
+                var x4 = 0__i32
+
+                var x5 = 0u32
+                var x6 = 0__u32
+
+                var x7 = 0i16
+                var x8 = 0__i16
+
+                var x9 = 0u16
+                var x10 = 0__u16
+
+                var x11 = 0i64
+                var x12 = 0__i64
+
+                var x13 = 0u64
+                var x14 = 0__u64
+
+                var x15 = 0i8
+                var x16 = 0__i8
+
+                var x17 = 0u8
+                var x18 = 0__u8
+
+                var x19 = 0f32
+                var x20 = 0__f32
+
+                var x21 = 0f64
+                var x22 = 0__f64
+            `,
+        },
+    ]
+}

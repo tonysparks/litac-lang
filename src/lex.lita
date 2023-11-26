@@ -847,6 +847,24 @@ func (l: *Lexer) scanFloat(stream: *char) {
     l.token.value.floatValue = val;
 }
 
+const VALID_TYPE_INFO_CHAR = [256]bool {
+    ['0'] = true,
+    ['1'] = true,
+    ['2'] = true,
+    ['3'] = true,
+    ['4'] = true,
+    ['5'] = true,
+    ['6'] = true,
+    ['7'] = true,
+    ['8'] = true,
+    ['9'] = true,
+    ['u'] = true,
+    ['s'] = true,
+    ['i'] = true,
+    ['z'] = true,
+    ['e'] = true,
+}
+
 func (l: *Lexer) scanTypeInfo() {
     var c = *l.stream
     if(c == 'u' || c == 'i') {
@@ -861,7 +879,7 @@ func (l: *Lexer) scanTypeInfo() {
             len += 1
             l.nextChar()
 
-            if(!isdigit(*l.stream)) {
+            if(!VALID_TYPE_INFO_CHAR[*l.stream]) {
                 break;
             }
         } while(!l.eof())
@@ -898,6 +916,10 @@ func (l: *Lexer) scanTypeInfo() {
             }
             case TypeKind.U64: {
                 l.token.typeInfo = &U64_TYPE
+                break;
+            }
+            case TypeKind.USIZE: {
+                l.token.typeInfo = &USIZE_TYPE
                 break;
             }
             default: {

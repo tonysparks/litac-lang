@@ -53,6 +53,7 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func fflush(stream: *FILE) : void;
 @foreign public func fopen(fileName:*const char, openType:*const char) : *FILE;
 @foreign public func fgets(buf: *char, n:i64, stream: *FILE): *char;
+@foreign public func fputc(c: i32, stream: *FILE): i32;
 @foreign public func fread(buf: *char, size:usize, n:usize, stream: *FILE) : i64;
 @foreign public func fwrite(buf: *const void, sizeOfElements: usize, numOfElements: usize, stream: *FILE) : u64;
 @foreign public func fclose(stream: *FILE) : void;
@@ -69,6 +70,7 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public const SEEK_END : i32;
 @foreign public var errno: i32;
 @foreign public func perror(str: *const char);
+@foreign public func fileno(stream: *FILE) : i32;
 
 // Math operations
 @foreign public func MAX<T>(a: T, b: T) : T;

@@ -337,6 +337,10 @@ public func (this: *Lita) parse() : *Module {
 
     var absolutePath = [MAX_PATH]char{0};
     GetAbsolutePath(CurrentWorkingPath(), srcPath, absolutePath)
+    if(!FileExists(absolutePath)) {
+        this.result.addError(SrcPos{}, "unable to parse '%s' because it was not found", absolutePath)
+        return null;
+    }
 
     var packageName = GetPackageName(absolutePath, this.options.inputFile)
     var root = NewModule(this, packageName, this.options.inputFile)

@@ -83,6 +83,34 @@ public func (file: *File) open(filename: *const char, op: FileOpenOp) : FileStat
 #end
 }
 
+public func (file: *File) length() : usize {
+#if (USE_WINDOWS)
+    // TODO?
+    return 0
+#else
+    if(!file || !file.file) {
+        return 0
+    }
+
+
+    if (fseek(file.file, 0, SEEK_END)) {
+        return 0;
+    }
+
+    const len = ftell(file.file)
+    return len;
+#end
+}
+
+public func (file: *File) handle() : i32 {
+#if (USE_WINDOWS)
+    // TODO?
+    return 0
+#else
+    return fileno(file.file)
+#end
+}
+
 public func (file: *File) close() {
 #if (USE_WINDOWS)
 //#if (OS == "WINDOWS")
