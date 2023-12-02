@@ -31,6 +31,13 @@ size_t strnlen(const char * s, size_t len) {
 }
 #endif
 
+#if defined(_MSC_VER) || defined(__TINYC__) && (defined(_WIN32) || defined(_WIN64))
+#include <io.h>
+
+#define ftruncate(fd, sz) (-(_chsize_s((fd), (sz)) != 0))
+#define fileno _fileno
+#endif
+
 """);
 
 // mem
@@ -71,6 +78,7 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public var errno: i32;
 @foreign public func perror(str: *const char);
 @foreign public func fileno(stream: *FILE) : i32;
+@foreign public func ftruncate(fd: i32, size: usize) : bool;
 
 // Math operations
 @foreign public func MAX<T>(a: T, b: T) : T;

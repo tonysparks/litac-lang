@@ -199,6 +199,7 @@ public @note packed {
             else {
                 emit("  %s()\n", sym.name)
             }
+            emit("  __lita_test_printf(\"Passed '%s'!\\\\n\")\n", sym.name)
         }
         emit("  return 0; }")
 

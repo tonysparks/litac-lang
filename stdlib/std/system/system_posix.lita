@@ -26,11 +26,6 @@ import "std/string"
 import "std/string_view"
 import "std/system"
 
-// @foreign
-// func fileno(file: *FILE) : i32;
-
-@foreign
-func ftruncate(fd: i32, size: usize) : bool;
 
 @foreign
 func rmdir(filename: *const char) : i32;

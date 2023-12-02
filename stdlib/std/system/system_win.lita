@@ -25,21 +25,6 @@ typedef struct _stat FileStat;
 //#endif
 
 #include <errno.h>
-
-#ifdef _MSC_VER
-#include <io.h>
-
-#define ftruncate(fd, sz) (-(_chsize_s((fd), (sz)) != 0))
-#define fileno _fileno
-#endif
-
-#if defined(__TINYC__) && (defined(_WIN32) || defined(_WIN64))
-#include <io.h>
-
-#define ftruncate(fd, sz) (-(_chsize_s((fd), (sz)) != 0))
-#define fileno _fileno
-#endif
-
 """);
 
 import "std/libc"
@@ -49,12 +34,6 @@ import "std/string_view"
 
 import "std/system"
 
-
-@foreign
-func fileno(file: *FILE) : i32;
-
-@foreign
-func ftruncate(fd: i32, size: usize) : bool;
 
 
 @foreign("_MAX_PATH")
