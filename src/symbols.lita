@@ -168,6 +168,7 @@ public func (scope: *Scope) init(kind: ScopeKind,
 public func (scope: *Scope) initIncrementalBuild() {
     scope.markReset(&scope.symbolTypes)
     scope.markReset(&scope.symbolFuncs)
+    scope.markReset(&scope.symbolNotes)
 }
 
 public func (scope: *Scope) postIncrementalBuild() {

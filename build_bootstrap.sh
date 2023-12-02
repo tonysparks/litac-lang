@@ -35,7 +35,7 @@ error_compiling() {
 }
 
 cd bootstrap
-gcc -o "litacc" "${SOURCE_FILE}" -D_CRT_SECURE_NO_WARNINGS -D_DEFAULT_SOURCE -I../include -L../lib -I../stdlib/std/http/libcurl/include ${LIBS}
+gcc -g -o "litacc" "${SOURCE_FILE}" -D_CRT_SECURE_NO_WARNINGS -D_DEFAULT_SOURCE -I../include -L../lib -I../stdlib/std/http/libcurl/include ${LIBS}
 if [ $? -gt 0 ]; then
     error_compiling
     return 1;
