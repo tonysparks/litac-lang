@@ -111,6 +111,7 @@ public struct PkgOptions {
     pkgCmd: PkgCommand             // the Package Manager command we're running (if any)
     pkgRunCmdArg: *const char      // the pkg-run {arg} argument
     forceClean: bool               // force cleaning of package directories
+    isRelease: bool                // if this is release mode for building
 
     pkgName: *const char           // pkg-init options
 }
@@ -684,7 +685,7 @@ public func FindModulePath(lita: *Lita,
     {
         for(var i = 0; i < lita.buildFile.pkgPaths.size(); i+=1) {
             var pkgPath = lita.buildFile.pkgPaths.get(i)
-            pathStr.format("%s%s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer)
+            pathStr.format("%s/%s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer)
             if(FileExists(pathStr.cStrConst())) {
                 return true
             }
@@ -692,7 +693,7 @@ public func FindModulePath(lita: *Lita,
             var index = moduleName.lastIndexOfAt("/", 1)
             var name = index < 0 ? moduleName : moduleName.substring(index + 1)
 
-            pathStr.format("%s%s/%.*s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
+            pathStr.format("%s/%s/%.*s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
             if(FileExists(pathStr.cStrConst())) {
                 return true
             }
@@ -791,7 +792,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 }
 
 
-func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
+public func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
 
     if(!inputFile) {
         return StringView{}

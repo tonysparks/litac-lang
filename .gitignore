@@ -9,6 +9,8 @@ bin/*.out
 bin/litac_linux
 bin/litac_mac
 bin/test.txt
+bin/release/**
+bin/debug/**
 .vscode/ipch
 bin/litaC.exp
 bin/litaC.lib

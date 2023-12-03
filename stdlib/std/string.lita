@@ -105,7 +105,7 @@ public func (b: *String) appendStrn(str: *const char, len: i32) {
     }
 
     if(b.length + len > b.capacity) {
-        len = b.capacity
+        len = b.capacity - b.length
     }
 
     memcpy((&b.buffer[b.length]) as (*void),

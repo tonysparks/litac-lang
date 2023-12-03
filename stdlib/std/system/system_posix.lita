@@ -55,8 +55,10 @@ const pwd = [MAX_PATH]char{0};
 public func _CurrentWorkingPath() : *const char {
     @static var path: [MAX_PATH]char;
     if(pwd[0] == 0) {
-        getcwd(path, MAX_PATH)
-        GetAbsolutePath("", path, pwd)
+        var result = getcwd(path, MAX_PATH)
+        if(result) {
+            GetAbsolutePath("", path, pwd)
+        }
     }
 
     return pwd;

@@ -1,3 +1,13 @@
+@compiler_option(
+    .os = "linux",
+    .options = "-lm"
+);
+
+@compiler_option(
+    .os = "mac",
+    .options = "-lm"
+);
+
 @include("<stdarg.h>");
 @include("<stdio.h>");
 @include("<stdlib.h>");

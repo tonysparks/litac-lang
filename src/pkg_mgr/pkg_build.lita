@@ -65,6 +65,10 @@ func (this: *PackageManager) buildCommandArgs(
 
     var buildSection: *JsonNode = null
 
+    // build_command
+    //  -> TARGET[debug|release|default]
+    //  -> OS[linux|mac|windows|default]
+    //  -> ARCH[x86|x64|arm32|arm64|default]
     var defaultTarget = buildCommand.get("default")
     var target: *JsonNode = GetTarget(buildCommand, defaultTarget, options)
     if(target) {
@@ -133,17 +137,22 @@ func (this: *PackageManager) buildCommandArgs(
         }
     }
 
-    programArgs.add("-outputDir")
-    programArgs.add("./bin/")
+    if(!ContainsOption("-outputDir", &programArgs)) {
+        programArgs.add("-outputDir")
+        programArgs.add("./bin/")
+    }
 
-    programArgs.add("-output")
-    programArgs.add(this.pkg.json.getStr("name", "a"))
+    if(!ContainsOption("-output", &programArgs)) {
+        programArgs.add("-output")
+        programArgs.add(this.pkg.json.getStr("name", "a"))
+    }
 
-    programArgs.add("-srcDir")
-    programArgs.add("./src/")
+    if(!ContainsOption("-srcDir", &programArgs)) {
+        programArgs.add("-srcDir")
+        programArgs.add("./src/")
+    }
 
     var mainFile = "./src/main.lita"
-
 
     // TEMP: should move into specific commands?
     {
@@ -177,6 +186,16 @@ func (this: *PackageManager) buildCommandArgs(
     args.args = programArgs.elements as (**char)
 
     return PkgStatus.OK
+}
+
+func ContainsOption(option: *const char, programArgs: *Array<*const char>) : bool {
+    for(var i = 0; i < programArgs.size(); i+=1) {
+        var arg = programArgs.get(i)
+        if(strcmp(arg, option) == 0) {
+            return true
+        }
+    }
+    return false
 }
 
 

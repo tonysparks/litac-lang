@@ -1,0 +1,494 @@
+
+@compiler_option(
+    .options = "-lpthread"
+);
+
+@compiler_option(
+    .os = "linux",
+    .options = "-lrt"
+);
+
+/*==============================================================
+    Mutex Public API
+  ==============================================================
+*/
+@raw("""
+#undef _FEATURES_H
+#if !defined(_GNU_SOURCE)
+    #define _GNU_SOURCE
+#endif
+#if !defined(_POSIX_C_SOURCE) || ((_POSIX_C_SOURCE - 0) < 199309L)
+    #undef _POSIX_C_SOURCE
+    #define _POSIX_C_SOURCE 199309L
+#endif
+#if !defined(_XOPEN_SOURCE) || ((_XOPEN_SOURCE - 0) < 500)
+    #undef _XOPEN_SOURCE
+    #define _XOPEN_SOURCE 500
+#endif
+#define _XPG6
+
+#include <time.h>
+#include <pthread.h>
+
+
+/* Compiler-specific information */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+  #define TTHREAD_NORETURN _Noreturn
+#elif defined(__GNUC__)
+  #define TTHREAD_NORETURN __attribute__((__noreturn__))
+#else
+  #define TTHREAD_NORETURN
+#endif
+
+/* If TIME_UTC is missing, provide it and provide a wrapper for
+   timespec_get. */
+#ifndef TIME_UTC
+    #define TIME_UTC 1
+    #define _TTHREAD_EMULATE_TIMESPEC_GET_
+
+    int _tthread_timespec_get(struct timespec *ts, int base);
+    #define timespec_get _tthread_timespec_get
+#endif
+
+#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L)) && !defined(_Thread_local)
+    #if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(__SUNPRO_CC) || defined(__IBMCPP__)
+        #define _Thread_local __thread
+    #else
+        #define _Thread_local __declspec(thread)
+    #endif
+#elif defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) < ((4 << 8) | 9))
+    #define _Thread_local __thread
+#endif
+
+#define TSS_DTOR_ITERATIONS PTHREAD_DESTRUCTOR_ITERATIONS
+
+
+#include <signal.h>
+#include <sched.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <errno.h>
+
+""");
+
+/*==============================================================
+    POSIX specific Types bindings
+  ==============================================================
+*/
+import "std/libc"
+
+@foreign
+struct pthread_mutex_t;
+
+@foreign
+struct pthread_mutexattr_t;
+
+@foreign
+func pthread_mutexattr_init(attr: *pthread_mutexattr_t);
+
+@foreign
+func pthread_mutexattr_settype(attr: *pthread_mutexattr_t, type: i32);
+
+@foreign
+func pthread_mutex_init(m: *pthread_mutex_t, attr: *pthread_mutexattr_t) : i32;
+
+@foreign
+func pthread_mutex_destroy(m: *pthread_mutex_t) : i32;
+
+@foreign
+func pthread_mutex_lock(m: *pthread_mutex_t) : i32;
+
+@foreign
+func pthread_mutex_timedlock(m: *pthread_mutex_t, ts: *timespec) : i32;
+
+@foreign
+func pthread_mutex_trylock(m: *pthread_mutex_t) : i32;
+
+@foreign
+func pthread_mutex_unlock(m: *pthread_mutex_t) : i32;
+
+@foreign
+func pthread_mutexattr_destroy(attr: *pthread_mutexattr_t);
+
+@foreign
+const PTHREAD_MUTEX_RECURSIVE: i32;
+
+@foreign
+const EBUSY: i32;
+
+@foreign
+const ETIMEDOUT: i32;
+
+@foreign
+const EINTR: i32;
+
+@foreign
+const TIME_UTC: i32;
+
+@foreign
+typedef i64 as time_t;
+
+@foreign
+struct timespec {
+    tv_sec: time_t
+    tv_nsec: i64
+}
+typedef timespec as TimeSpec;
+
+@foreign
+func timespec_get(ts: *timespec, base: i32) : i32;
+
+@foreign
+func nanosleep(ts: *const timespec, rem: *timespec) : i32;
+
+
+@foreign
+struct pthread_cond_t;
+
+@foreign
+struct pthread_condattr_t;
+
+@foreign
+func pthread_cond_init(cond: *pthread_cond_t, attr: *pthread_condattr_t) : i32;
+
+@foreign
+func pthread_cond_destroy(cond: *pthread_cond_t) : i32;
+
+@foreign
+func pthread_cond_signal(cond: *pthread_cond_t) : i32;
+
+@foreign
+func pthread_cond_broadcast(cond: *pthread_cond_t) : i32;
+
+@foreign
+func pthread_cond_wait(cond: *pthread_cond_t, mtx: *pthread_mutex_t) : i32;
+
+@foreign
+func pthread_cond_timedwait(cond: *pthread_cond_t, mtx: *pthread_mutex_t, ts: *const timespec) : i32;
+
+
+
+@foreign
+typedef u64 as pthread_t;
+
+@foreign
+struct pthread_attr_t;
+
+@foreign
+func pthread_create(thread: *pthread_t, attr: *pthread_attr_t, fn: func(*void) : *void, arg: *void) : i32;
+
+
+@foreign
+func pthread_self() : pthread_t;
+
+@foreign
+func pthread_exit(retval: *void);
+
+@foreign
+func pthread_detach(thread: pthread_t) : i32;
+
+@foreign
+func pthread_equal(a: pthread_t, b: pthread_t) : i32;
+
+@foreign
+func pthread_join(thread: pthread_t, retval: **void) : i32;
+
+
+@foreign
+func sched_yield(): i32;
+
+@foreign
+func sysconf(name: i32) : i64;
+
+@foreign
+const _SC_NPROCESSORS_ONLN: i32;
+
+/*==============================================================
+    Public APIs
+  ==============================================================
+*/
+
+@asStr
+public enum ThreadStatus {
+    ERROR    = 0,
+    SUCCESS  = 1,
+    TIMEDOUT = 2,
+    BUSY     = 3,
+    NOMEM    = 4,
+}
+
+@asStr
+public enum MutexType {
+    PLAIN     = 0,
+    TIMED     = 1,
+    RECURSIVE = 2,
+}
+
+/*==============================================================
+    Mutex Public API
+  ==============================================================
+*/
+
+public struct Mutex {
+    mtx: pthread_mutex_t;
+}
+
+public func (this: *Mutex) init(type: i32 = MutexType.PLAIN) : ThreadStatus {
+    var attr: pthread_mutexattr_t;
+    pthread_mutexattr_init(&attr);
+
+    if (type & MutexType.RECURSIVE) {
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    }
+
+    var ret = pthread_mutex_init(this.mtx, &attr);
+    pthread_mutexattr_destroy(&attr);
+    return ret == 0 ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+public func (this: *Mutex) destroy() {
+    pthread_mutex_destroy(this.mtx);
+}
+
+public func (this: *Mutex) lock() : ThreadStatus {
+    return pthread_mutex_lock(this.mtx) == 0
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+public func (this: *Mutex) tryLock() : ThreadStatus {
+    return (pthread_mutex_trylock(this.mtx) == 0)
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+public func (this: *Mutex) unlock() : ThreadStatus {
+    return pthread_mutex_unlock(this.mtx) == 0
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+public func (this: *Mutex) timedLock(ts: *TimeSpec) : ThreadStatus {
+#static_if defined(_POSIX_TIMEOUTS) && (_POSIX_TIMEOUTS >= 200112L) && defined(_POSIX_THREADS) && (_POSIX_THREADS >= 200112L)
+    switch (pthread_mutex_timedlock(this.mtx, ts)) {
+        case 0:
+            return ThreadStatus.SUCCESS;
+        case ETIMEDOUT:
+            return ThreadStatus.TIMEDOUT;
+        default:
+            return ThreadStatus.ERROR;
+    }
+#else
+    var rc: i32 = 0;
+    var cur: timespec;
+    var dur: timespec;
+
+    // Try to acquire the lock and, if we fail, sleep for 5ms.
+    while ((rc = pthread_mutex_trylock (this.mtx)) == EBUSY) {
+        timespec_get(&cur, TIME_UTC);
+
+        if ((cur.tv_sec > ts.tv_sec) || ((cur.tv_sec == ts.tv_sec) && (cur.tv_nsec >= ts.tv_nsec))) {
+            break;
+        }
+
+        dur.tv_sec = ts.tv_sec - cur.tv_sec;
+        dur.tv_nsec = ts.tv_nsec - cur.tv_nsec;
+        if (dur.tv_nsec < 0) {
+            dur.tv_sec -= 1;
+            dur.tv_nsec += 1_000_000_000;
+        }
+
+        if ((dur.tv_sec != 0) || (dur.tv_nsec > 5_000_000)) {
+            dur.tv_sec = 0;
+            dur.tv_nsec = 5_000_000;
+        }
+
+        nanosleep(&dur, null);
+    }
+
+    switch (rc) {
+        case 0:
+            return ThreadStatus.SUCCESS;
+        case ETIMEDOUT:
+        case EBUSY:
+            return ThreadStatus.TIMEDOUT;
+        default:
+            return ThreadStatus.ERROR;
+    }
+#end
+    return ThreadStatus.SUCCESS;
+}
+
+
+/*==============================================================
+    Cond Public API
+  ==============================================================
+*/
+
+
+public struct Cond {
+    cond: pthread_cond_t
+}
+
+public func (this: *Cond) init() : ThreadStatus {
+    return pthread_cond_init(this.cond, null) == 0
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+public func (this: *Cond) destroy() {
+    pthread_cond_destroy(this.cond);
+}
+
+
+public func (this: *Cond) signal() : ThreadStatus {
+    return pthread_cond_signal(this.cond) == 0
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+public func (this: *Cond) broadcast() : ThreadStatus {
+    return pthread_cond_broadcast(this.cond) == 0
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+
+public func (this: *Cond) wait(mtx: *Mutex) : ThreadStatus {
+    return pthread_cond_wait(this.cond, mtx.mtx) == 0
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+public func (this: *Cond) timedWait(mtx: *Mutex, ts: *const TimeSpec) : ThreadStatus {
+
+    var ret = pthread_cond_timedwait(this.cond, mtx.mtx, ts);
+    if (ret == ETIMEDOUT) {
+        return ThreadStatus.TIMEDOUT;
+    }
+    return ret == 0 ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+}
+
+
+/*==============================================================
+    Thread Public APIs
+  ==============================================================
+*/
+
+struct _thread_start_info {
+    mFunction: ThreadStartFn;
+    mArg: *void;
+}
+
+func _thrd_wrapper_function(aArg: *void): *void {
+    /* Get thread startup information */
+    var ti = aArg as (*_thread_start_info);
+    var fun = ti.mFunction;
+    var arg = ti.mArg;
+
+    /* The thread is responsible for freeing the startup information */
+    free(ti as (*void));
+
+    /* Call the actual client thread function */
+    var res = fun(arg);
+
+    return res as (*void);
+}
+
+public typedef func(*void) : i32 as ThreadStartFn;
+public struct Thread {
+    thrd: pthread_t
+}
+
+
+// Information to pass to the new thread (what to run).
+public struct ThreadStartInfo {
+    mFunction: ThreadStartFn; // < Pointer to the function to be executed.
+    mArg: *void;              // < Function argument for the thread function.
+}
+
+
+public func (this: *Thread) create(fun: ThreadStartFn, arg: *void, suspend: bool = true) : ThreadStatus {
+    // Fill out the thread startup information (passed to the thread wrapper,
+    // which will eventually free it)
+    var ti = malloc(sizeof(:ThreadStartInfo)) as (*ThreadStartInfo);
+    if (ti == null) {
+        return ThreadStatus.NOMEM;
+    }
+    ti.mFunction = fun;
+    ti.mArg = arg;
+
+    if(pthread_create(&this.thrd, null, _thrd_wrapper_function, ti as (*void)) != 0) {
+        this.thrd = 0;
+    }
+
+    // Did we fail to create the thread?
+    if(!this.thrd) {
+        free(ti);
+        return ThreadStatus.ERROR;
+    }
+
+    return ThreadStatus.SUCCESS;
+}
+
+public func (thr: *Thread) resume() : ThreadStatus {
+    // TODO: use pthread_cond_wait?
+    return ThreadStatus.ERROR;
+}
+
+public func (thr: *Thread) suspend() : ThreadStatus {
+    // TODO: use pthread_cond_wait?
+    return ThreadStatus.ERROR;
+}
+
+
+public func ThreadCurrent() : Thread {
+    var thrd = pthread_self();
+    return Thread{thrd}
+}
+
+@raw("TTHREAD_NORETURN ")
+public func ThreadExit(res: i32) {
+    pthread_exit(&res);
+}
+
+public func (this: Thread) detach() : ThreadStatus {
+    return pthread_detach(this.thrd) == 0
+        ? ThreadStatus.SUCCESS : ThreadStatus.ERROR
+}
+
+public func (this: Thread) id() : i32 {
+    return this.thrd as (i32)
+}
+
+public func (this: Thread) equal(other: Thread) : bool {
+    return pthread_equal(this.thrd, other.thrd);
+}
+
+public func (this: Thread) join(res: *i32) : ThreadStatus {
+    var pres: *void;
+    if (pthread_join(this.thrd, &pres) != 0) {
+        return ThreadStatus.ERROR;
+    }
+
+    if (res != null) {
+        *res = pres as (i32);
+    }
+    return ThreadStatus.SUCCESS;
+}
+
+public func (this: Thread) sleep(duration: *TimeSpec, remaining: *TimeSpec = null) : i32 {
+    var res = nanosleep(duration, remaining);
+    if (res == 0) {
+        return 0;
+    } else if (errno == EINTR) {
+        return -1;
+    } else {
+        return -2;
+    }
+}
+
+public func (thr: Thread) yield() {
+    sched_yield();
+}
+
+public func GetNumberOfSystemThreads() : u32 {
+    var result = sysconf(_SC_NPROCESSORS_ONLN);
+    if(result < 1) {
+        result = 1
+    }
+    return result
+}

@@ -284,6 +284,10 @@ public func OSFromStr(str: *const char, len: usize) : OS {
         return OS.Lita_OSType_MAC
     }
 
+    if(strcicmp(str, "MACOS", len) == 0) {
+        return OS.Lita_OSType_MAC
+    }
+
     return OS.Lita_OSType_OTHER
 }
 

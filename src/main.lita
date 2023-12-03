@@ -171,6 +171,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     parser.addOption("pkg-run",        '\0', "Runs a script defined in the `commands` section in this projects `pkg.json`.  The argument passed of this option is used to run the `commands.{option}` command", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("pkg-init",       '\0', "Initializes a new LitaC package project", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("pkg-build",      '\0', "Builds the LitaC package", 0, null);
+    parser.addOption("release",        '\0', "Marks builds in release mode", 0, null);
     parser.addOption("proxy",          '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null);
@@ -217,6 +218,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     if(parser.hasOption("pkg-build")) {
         options.pkgOptions.pkgCmd = PkgCommand.PKG_BUILD
+        options.pkgOptions.isRelease = parser.hasOption("release")
     }
 
     options.languageServer = parser.hasOption("languageServer")
@@ -368,6 +370,13 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         StringCopy(.src = ".", .dest = options.projectPath, .size = 2)
     }
 
+    // sanitize paths
+    TrimPath(options.projectPath)
+    TrimPath(options.srcPath)
+    TrimPath(options.libPath)
+    TrimPath(options.litaPath)
+    TrimPath(options.testPath)
+
     return ParseStatus.OK
 
 terminate:
@@ -385,6 +394,16 @@ err:
     return ParseStatus.ERROR
 }
 
+func TrimPath(path: [MAX_PATH]char) {
+    var len = strlen(path)
+    if(len < 1) {
+        return;
+    }
+
+    if(path[len - 1] == '/' || path[len - 1] == '\\') {
+        path[len - 1] = '\0'
+    }
+}
 
 func HandlePkgCommand(options: *LitaOptions) : i32 {
     var size: usize = options.maxMemory > 0
@@ -488,6 +507,7 @@ func RunPkgInit(options: *LitaOptions, pm: *PackageManager) : i32 {
 
 func RunPkgBuild(options: *LitaOptions, pm: *PackageManager) : i32 {
     var status = pm.buildCommand(PackageBuildOptions {
+        .isRelease = options.pkgOptions.isRelease
     })
     if(status != PkgStatus.OK) {
         printf("Error running pkg build:\nErrorCode: %s - %s\n",

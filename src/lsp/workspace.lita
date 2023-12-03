@@ -888,8 +888,10 @@ public func (this: *Workspace) runDiagnostics(
 
         var module = lita.getModule(doc.filename)
         if(!module) {
-            this.lsp.log("Failed to find module: '%s' from URI: '%s'\n", doc.filename, docUri)
-            goto report
+            this.lsp.log("module: '%s' from URI: '%s' module has not been generated yet\n", doc.filename, docUri)
+            var packageName = GetPackageName(lita.options.srcPath, doc.filename)
+            module = NewModule(lita, packageName, doc.filename)
+            lita.addModule(module)
         }
 
         lita.incrementalBuild(module)

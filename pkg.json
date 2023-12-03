@@ -13,6 +13,75 @@
     "dependencies": [
     ],
 
+    "build_command": {
+        "debug": {
+            "linux": {
+                "default": {
+                    "cc": "gcc",
+                    "cc_options": [
+                        "-std=gnu11", "-g", "%input%", "-o", "%output%", "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
+                        "-cFormat",
+                        "-disableLine",
+                        "-verbose",
+                        "-maxMemory", "1GiB",
+                        "-outputDir", "./bin/debug/",
+                        "-output", "litac"
+                    ]
+                }
+            },
+            "default": {
+                "default": {
+                    "cc": "clang",
+                    "cc_options": [
+                        "-std=c11", "-g", "%%input%%", "-o", "%%output%%", "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
+                        "-cFormat",
+                        "-disableLine",
+                        "-verbose",
+                        "-maxMemory", "1GiB",
+                        "-outputDir", "./bin/debug/",
+                        "-output", "litac"
+                    ]
+                }
+            }
+        },
+        "release": {
+            "linux": {
+                "default": {
+                    "cc": "gcc",
+                    "cc_options": [
+                        "-std=gnu11", "-O3", "-march=native", "-mtune=native", "%input%", "-o", "%output%", "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
+                        "-cFormat",
+                        "-disableLine",
+                        "-maxMemory", "1GiB",
+                        "-outputDir", "./bin/release/",
+                        "-output", "litac"
+                    ]
+                }
+            },
+            "default": {
+                "default": {
+                    "cc": "clang",
+                    "cc_options": [
+                        "-std=c11", "-O3", "-march=native", "-mtune=native", "%%input%%", "-o", "%%output%%", "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
+                        "-cFormat",
+                        "-disableLine",
+                        "-maxMemory", "1GiB",
+                        "-outputDir", "./bin/release/",
+                        "-output", "litac"
+                    ]
+                }
+            }
+        }
+    },
+
     "commands": {
         "windows": {
             "build": "build.bat",
@@ -21,10 +90,10 @@
             "full": "build_bootstrap_full.bat"
         },
         "linux": {
-            "build": "build.sh",
-            "test": "build_test.sh",
-            "bootstrap": "build_bootstrap.sh",
-            "full": "build_bootstrap_full.sh"
-        },
+            "build": "./build.sh",
+            "test": "./build_test.sh",
+            "bootstrap": "./build_bootstrap.sh",
+            "full": "./build_bootstrap_full.sh"
+        }
     }
 }

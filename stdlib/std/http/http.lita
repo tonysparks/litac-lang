@@ -117,9 +117,9 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
         return false;
     }
 
-    var code = 0
+    var code = 0_i64
     curl_easy_getinfo(curl, CURLinfo.CURLINFO_RESPONSE_CODE, &code)
-    resp.statusCode = code
+    resp.statusCode = code as (i32)
 
     return true
 }
