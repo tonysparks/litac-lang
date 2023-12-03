@@ -187,7 +187,12 @@ func (this: *LspServer) readHeader() : i32 {
     }
 
     var size = atoi(&header[sizeIndex])
-    return size + 3 /* for the \r\n\r\n */
+#static_if defined(_WIN32) || defined(_WIN64)
+    var endingsSize = 1 /* windows converts \r\n to one character */
+#else
+    var endingsSize = 3 /* posix will read each byte */
+#end
+    return size + endingsSize /* for the \r\n\r\n */
 }
 
 public func (this: *LspServer) handleMessage(msg: *JsonNode) {
@@ -481,9 +486,11 @@ public func (this: *LspServer) writeResponse(msg: *JsonNode) {
         return;
     }
 
-
-    //headerStr.append("Content-Length: %d\r\n\r\n", length)
+#static_if defined(_WIN32) || defined(_WIN64)
+    this.outbound.append("Content-Length: %d\n\n%.*s", length, length, this.output.buffer)
+#else
     this.outbound.append("Content-Length: %d\r\n\r\n%.*s", length, length, this.output.buffer)
+#end
     this.log("Sending: Len: %d %.*s\n", this.outbound.length, this.outbound.length, this.outbound.buffer)
 
     //fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)

@@ -749,6 +749,11 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
         goto err;
     }
 
+    // If in LSP mode, ignore deleted symbols
+    if(sym.flags & SymbolFlags.IS_MARKED_RESET) {
+        return;
+    }
+
     this.enterModule(sym.declared)
     defer this.leaveModule()
 
@@ -868,6 +873,11 @@ public func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
     // check to see if this symbol is completed; if it is
     // we don't need to finish resolving this
     if(!(sym.flags & SymbolFlags.IS_INCOMPLETE)) {
+        return;
+    }
+
+    // If in LSP mode, ignore deleted symbols
+    if(sym.flags & SymbolFlags.IS_MARKED_RESET) {
         return;
     }
 

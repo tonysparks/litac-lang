@@ -375,6 +375,12 @@ public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
         symbol.usingModule = this
     }
 
+    // if we're an LSP mode, we want to ignore
+    // marked symbols
+    if(symbol.flags & SymbolFlags.IS_MARKED_RESET) {
+        return;
+    }
+
     if(moduleName) {
         this.symbols.importSymbolWithAlias(importSrcPos, symName, *moduleName, symbol)
     }
