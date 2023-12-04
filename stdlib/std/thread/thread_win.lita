@@ -757,25 +757,23 @@ public struct Thread {
 public struct ThreadStartInfo {
     mFunction: ThreadStartFn; /**< Pointer to the function to be executed. */
     mArg: *void;              /**< Function argument for the thread function. */
+    allocator: *const Allocator
 }
 
 
 @raw("WINAPI ")
 func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
-    var fun : ThreadStartFn;
-    var arg: *void;
-    var res: i32;
 
     /* Get thread startup information */
     var ti: *ThreadStartInfo = aArg as (*ThreadStartInfo);
-    fun = ti.mFunction;
-    arg = ti.mArg;
+    var fun = ti.mFunction;
+    var arg = ti.mArg;
 
     /* The thread is responsible for freeing the startup information */
-    c::free(ti as (*void));
+    ti.allocationr.free(ti as (*void));
 
     /* Call the actual client thread function */
-    res = fun(arg);
+    var res = fun(arg);
 
     if (_tinycthread_tss_head != null) {
         _tinycthread_tss_cleanup();
@@ -784,23 +782,27 @@ func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
     return res as (DWORD);
 }
 
-public func (thr: *Thread) create(fun: ThreadStartFn, arg: *void, suspend: bool = true) : ThreadStatus {
+public func (thr: *Thread) create(
+    fun: ThreadStartFn,
+    arg: *void,
+    allocator: *const Allocator = defaultAllocator) : ThreadStatus {
     /* Fill out the thread startup information (passed to the thread wrapper,
      which will eventually free it) */
-    var ti = c::malloc(sizeof(:ThreadStartInfo)) as (*ThreadStartInfo);
+    var ti = allocator.alloc(sizeof(:ThreadStartInfo)) as (*ThreadStartInfo);
     if (ti == null) {
         return ThreadStatus.NOMEM;
     }
     ti.mFunction = fun;
     ti.mArg = arg;
+    ti.allocator = allocator;
 
-    var state = suspend ? CREATE_SUSPENDED : 0
+    var state = 0; // suspend ? CREATE_SUSPENDED : 0
 
     thr.hnd = CreateThread(null, 0, _thrd_wrapper_function, ti as (LPVOID), state, null);
 
     /* Did we fail to create the thread? */
     if(!thr.hnd) {
-        c::free(ti);
+        allocator.free(ti);
         return ThreadStatus.ERROR;
     }
 
@@ -815,22 +817,6 @@ public func (thr: *Thread) resume() : ThreadStatus {
 public func (thr: *Thread) suspend() : ThreadStatus {
     var result = SuspendThread(thr.hnd)
     return result < 0 ? ThreadStatus.ERROR : ThreadStatus.SUCCESS
-}
-
-
-
-public func ThreadCurrent() : Thread {
-    var hnd = GetCurrentThread();
-    return Thread{hnd}
-}
-
-@raw("TTHREAD_NORETURN ")
-public func ThreadExit(res: i32) {
-    if (_tinycthread_tss_head != null) {
-        _tinycthread_tss_cleanup();
-    }
-
-    ExitThread(res as (DWORD));
 }
 
 public func (thr: Thread) detach() : ThreadStatus {
@@ -864,7 +850,36 @@ public func (thr: Thread) join(res: *i32) : ThreadStatus {
     return ThreadStatus.SUCCESS;
 }
 
-public func (thr: Thread) sleep(duration: *TimeSpec, remaining: *TimeSpec = null) : i32 {
+public func (thr: Thread) yield() {
+    Sleep(0)
+}
+
+
+public func ThreadCurrent() : Thread {
+    var hnd = GetCurrentThread();
+    return Thread{hnd}
+}
+
+@raw("TTHREAD_NORETURN ")
+public func ThreadExit(res: i32) {
+    if (_tinycthread_tss_head != null) {
+        _tinycthread_tss_cleanup();
+    }
+
+    ExitThread(res as (DWORD));
+}
+
+public func ThreadSleepMSec(msec: i64) : i32 {
+    var t = SleepEx(msec as (DWORD), true);
+
+    if (t == 0) {
+        return 0;
+    }
+
+    return (t == WAIT_IO_COMPLETION) ? -1 : -2;
+}
+
+public func ThreadSleep(duration: *TimeSpec, remaining: *TimeSpec = null) : i32 {
     var start: TimeSpec;
     var t: DWORD;
 
@@ -889,10 +904,6 @@ public func (thr: Thread) sleep(duration: *TimeSpec, remaining: *TimeSpec = null
 
     return (t == WAIT_IO_COMPLETION) ? -1 : -2;
 
-}
-
-public func (thr: Thread) yield() {
-    Sleep(0)
 }
 
 public func GetNumberOfSystemThreads() : u32 {

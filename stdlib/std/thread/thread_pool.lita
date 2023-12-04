@@ -11,21 +11,21 @@ public enum TaskStatus {
     OK,
     ERROR,
 }
-    
+
 public struct ThreadPool {
     allocator: *const Allocator
     started: Atomic<bool>
-    
+
     minThreads: i32
     maxThreads: i32
-    
+
     threadMutex: Mutex
     threads: Array<TaskThread>
     distribution: u64
 }
 
-public func (this: *ThreadPool) init(minThreads: i32, 
-                                     maxThreads: i32, 
+public func (this: *ThreadPool) init(minThreads: i32,
+                                     maxThreads: i32,
                                      allocator: *const Allocator = defaultAllocator) : ThreadStatus {
     if(maxThreads < 0) {
         maxThreads = MAX_I32
@@ -33,36 +33,36 @@ public func (this: *ThreadPool) init(minThreads: i32,
     if(minThreads < 0) {
         minThreads = 1
     }
-    
+
     this.allocator = allocator
     this.minThreads = minThreads
     this.maxThreads = maxThreads
     this.distribution = 0_u64
-    
+
     this.started.init(false)
-        
+
     var threadMutexResult = this.threadMutex.init()
     if(threadMutexResult != ThreadStatus.SUCCESS) {
         return threadMutexResult
     }
-    
+
     this.threadMutex.lock()
     this.threads.init(this.maxThreads, allocator)
     this.threadMutex.unlock()
-    
+
     return ThreadStatus.SUCCESS
 }
 
 public func (this: *ThreadPool) destroy() {
     this.stop()
-    
+
     this.threadMutex.lock()
     for(var i = 0; i < this.threads.size(); i+=1) {
         var taskThread = this.threads.getPtr(i)
         taskThread.destroy()
     }
     this.threadMutex.unlock()
-    
+
     this.threadMutex.destroy()
 }
 
@@ -70,38 +70,38 @@ func (this: *ThreadPool) addTaskThread() : ThreadStatus {
     if(this.threads.size() >= this.maxThreads) {
         return ThreadStatus.ERROR
     }
-        
+
     this.threads.add(TaskThread {
         .pool = this,
         .tasks = null,
-        .tail = null,        
+        .tail = null,
     })
-    
+
     var taskThread = this.threads.lastPtr()
     taskThread.state.set(TaskThreadState.WAITING)
-    
+
     var taskMutexResult = taskThread.taskMutex.init()
     if(taskMutexResult != ThreadStatus.SUCCESS) {
         return taskMutexResult
     }
-    
+
     var taskCondResult = taskThread.taskCond.init()
     if(taskCondResult != ThreadStatus.SUCCESS) {
         return taskCondResult
     }
-    
-    var threadStatus = taskThread.thread.create(TaskThreadFn, taskThread, .suspend = false)
+
+    var threadStatus = taskThread.thread.create(TaskThreadFn, taskThread, this.allocator)
     if(threadStatus != ThreadStatus.SUCCESS) {
         return threadStatus
     }
-        
+
     return ThreadStatus.SUCCESS
 }
 
 
 
 @doc("""
-    The current design gives each TaskThread a queue of Tasks.  As of right now, there is 
+    The current design gives each TaskThread a queue of Tasks.  As of right now, there is
     no task stealing and tasks get assigned in a round-robin fashion
 """)
 public func (this: *ThreadPool) submit(task: TaskFn, arg: *void = null) : void /*Future?*/ {
@@ -109,10 +109,10 @@ public func (this: *ThreadPool) submit(task: TaskFn, arg: *void = null) : void /
 
     //printf("Submit.task start\n")
     var threadToUse: *TaskThread = null
-    
+
     this.threadMutex.lock()
     {
-    
+
         // Find a non-busy thread
         for(var i = 0; i < this.threads.size(); i+=1) {
             var taskThread = this.threads.getPtr(i)
@@ -122,7 +122,7 @@ public func (this: *ThreadPool) submit(task: TaskFn, arg: *void = null) : void /
                 break
             }
         }
-        
+
         // if all threads are busy, see if we can allocate a new thread
         // otherwise, start queing up the work
         if(!threadToUse) {
@@ -138,23 +138,23 @@ public func (this: *ThreadPool) submit(task: TaskFn, arg: *void = null) : void /
         }
     }
     this.threadMutex.unlock()
-    
+
     assert(threadToUse != null)
-    
-    threadToUse.addTask(this, task, arg)    
-    //printf("Submit.task end\n")    
+
+    threadToUse.addTask(this, task, arg)
+    //printf("Submit.task end\n")
 }
 
 public func (this: *ThreadPool) start(daemonThread: bool = true) : ThreadStatus {
     if(this.started.get()) {
         return ThreadStatus.BUSY;
     }
-    
+
     this.started.set(true)
-    
+
     this.threadMutex.lock()
     defer this.threadMutex.unlock()
-    
+
     for(var i = 0; i < this.minThreads; i+=1) {
         var status = this.addTaskThread()
         if(status != ThreadStatus.SUCCESS) {
@@ -170,7 +170,7 @@ public func (this: *ThreadPool) stop(forceStop: bool = true) {
     //defer printf("ThreadPool.stop Stopped\n")
 
     this.started.set(false)
-    
+
     this.threadMutex.lock()
     {
         for(var i = 0; i < this.threads.size(); i+=1) {
@@ -189,10 +189,10 @@ public func (this: *ThreadPool) stop(forceStop: bool = true) {
 struct Task {
     fn: TaskFn;
     arg: *void
-    
+
     prev: *Task
     next: *Task
-    
+
     thread: *Thread
 }
 
@@ -204,14 +204,14 @@ enum TaskThreadState {
 
 struct TaskThread {
     pool: *ThreadPool
-    
+
     tasks: *Task
     tail: *Task
-    
+
     taskMutex: Mutex
     taskCond: Cond
-    
-    thread: Thread    
+
+    thread: Thread
     state: Atomic<TaskThreadState>
 }
 
@@ -227,24 +227,24 @@ func (this: *TaskThread) countTasks() : i32 {
 
 func (this: *TaskThread) destroy() {
     this.stop(true)
-    
+
     this.taskCond.destroy()
     this.taskMutex.destroy()
 }
 
 func (this: *TaskThread) addTask(pool: *ThreadPool, task: TaskFn, arg: *void = null) : *Task {
     this.state.set(TaskThreadState.WORKING)
-    
+
     var newTask = new<Task>(pool.allocator)
     newTask.fn = task
     newTask.arg = arg
     newTask.prev = null
     newTask.next = null
     newTask.thread = null
-    
+
     //printf("addTask before lock\n")
     var sum = 0
-    
+
     this.taskMutex.lock()
     {
         if(!this.tasks) {
@@ -254,30 +254,30 @@ func (this: *TaskThread) addTask(pool: *ThreadPool, task: TaskFn, arg: *void = n
             this.tail.next = newTask
             newTask.prev = this.tail
         }
-        
+
         this.tail = newTask
         sum = this.countTasks()
-        
+
         this.taskCond.signal()
     }
     this.taskMutex.unlock()
-    
+
     //printf("addTask after lock/signal: #ofTasks: %d\n", sum)
-    
+
     return newTask
 }
 
 func (this: *TaskThread) stop(force: bool = true) {
-    
+
     var tasksToDelete = this.tasks
-    
-    this.taskMutex.lock()    
+
+    this.taskMutex.lock()
     this.tasks = null
     this.tail = null
     this.taskCond.signal()
     this.taskMutex.unlock()
-    
-    if(force) {    
+
+    if(force) {
         this.thread.suspend()
         this.thread.detach()
     }
@@ -285,12 +285,12 @@ func (this: *TaskThread) stop(force: bool = true) {
         var result = 0
         this.thread.join(&result)
     }
-    
+
     var t = tasksToDelete
     while(t) {
         var next = t.next
         this.pool.allocator.free(t)
-        
+
         t = next
     }
 }
@@ -298,20 +298,20 @@ func (this: *TaskThread) stop(force: bool = true) {
 func TaskThreadFn(arg: *void) : i32 {
     var taskThread = arg as (*TaskThread)
     var pool = taskThread.pool
-    
+
     //printf("task_thread_%d Begin PoolState: %d\n", taskThread.thread.id(), pool.started.get())
-    
+
     // main loop
     while(pool.started.get()) {
         //printf("task_thread_%d waiting for a task\n", taskThread.thread.id())
         var task: *Task = null
-        
+
         taskThread.taskMutex.lock()
         {
             while(!taskThread.tasks) {
                 taskThread.state.set(TaskThreadState.WAITING)
                 taskThread.taskCond.wait(taskThread.taskMutex)
-                
+
                 // check again if we should be running or not,
                 // because we awake this thread on shutdown too
                 if(!pool.started.get()) {
@@ -319,31 +319,31 @@ func TaskThreadFn(arg: *void) : i32 {
                     goto exit;
                 }
             }
-                        
+
             //printf("task_thread_%d found task\n", taskThread.thread.id())
-            
-            // take a task                    
+
+            // take a task
             if(taskThread.tail == taskThread.tasks) {
                 taskThread.tail = null
             }
-            
+
             task = taskThread.tasks
             taskThread.tasks = taskThread.tasks.next
-            
+
         }
         taskThread.taskMutex.unlock()
-        
+
         // if we have a task to work on, let's go ahead and
         // do so
         //printf("task_thread_%d running task\n", taskThread.thread.id())
-        if(task) {            
+        if(task) {
             task.fn(task.arg)
             pool.allocator.free(task)
             //printf("task_thread_%d completed task\n", taskThread.thread.id())
         }
     }
-    
-exit:    
+
+exit:
     taskThread.state.set(TaskThreadState.DEAD)
     //printf("task_thread_%d: End PoolState: %d\n", taskThread.thread.id(), pool.started.get())
     return 1
@@ -354,35 +354,37 @@ func exampleTask(arg:*void) : TaskStatus {
     var id = arg as (*i32)
     var tid = ThreadCurrent().id()
     printf("In example task: %d on thread_%d\n", *id, tid)
-    Sleep(1_000)
+    ThreadSleepMSec(1_000_i64)
     printf("End example task: %d on thread_%d\n", *id, tid)
     return TaskStatus.OK
 }
 
-func main(len: i32, args: **char) : i32 {
+//func main(len: i32, args: **char) : i32 {
+@test("testThreadPool")
+func testThreadPool() {
     printf("Hello\n")
-   
+
     var pool: ThreadPool
     pool.init(.minThreads = 1, .maxThreads = 10)
     pool.start()
-    
+
     fflush(stdout)
-    
+
     const size = 100
     var ids:[size]i32;
-   
+
     for(var i = 0; i < size; i += 1) {
         ids[i] = i
         pool.submit(exampleTask, &ids[i])
-        Sleep(10)
+        ThreadSleepMSec(10)
         fflush(stdout)
     }
-    
-    Sleep(30_000)
+
+    ThreadSleepMSec(30_000)
     fflush(stdout)
-    
+
     pool.stop(true)
-    
+
     pool.destroy()
-    return 0
+    printf("Example done.\n")
 }

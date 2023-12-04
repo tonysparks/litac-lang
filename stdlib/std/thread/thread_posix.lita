@@ -1,3 +1,4 @@
+import "std/mem"
 
 @compiler_option(
     .options = "-lpthread"
@@ -62,6 +63,7 @@
 
 #define TSS_DTOR_ITERATIONS PTHREAD_DESTRUCTOR_ITERATIONS
 
+typedef struct timespec timespec;
 
 #include <signal.h>
 #include <sched.h>
@@ -133,7 +135,16 @@ struct timespec {
     tv_sec: time_t
     tv_nsec: i64
 }
-typedef timespec as TimeSpec;
+
+struct TimeSpec {
+    union {
+        ts: timespec
+        struct {
+            sec: time_t
+            nsec: i64
+        }
+    }
+}
 
 @foreign
 func timespec_get(ts: *timespec, base: i32) : i32;
@@ -265,7 +276,9 @@ public func (this: *Mutex) unlock() : ThreadStatus {
         ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
 }
 
-public func (this: *Mutex) timedLock(ts: *TimeSpec) : ThreadStatus {
+public func (this: *Mutex) timedLock(timeSpec: *TimeSpec) : ThreadStatus {
+    var ts = timeSpec.ts;
+
 #static_if defined(_POSIX_TIMEOUTS) && (_POSIX_TIMEOUTS >= 200112L) && defined(_POSIX_THREADS) && (_POSIX_THREADS >= 200112L)
     switch (pthread_mutex_timedlock(this.mtx, ts)) {
         case 0:
@@ -368,24 +381,19 @@ public func (this: *Cond) timedWait(mtx: *Mutex, ts: *const TimeSpec) : ThreadSt
   ==============================================================
 */
 
-struct _thread_start_info {
-    mFunction: ThreadStartFn;
-    mArg: *void;
-}
-
 func _thrd_wrapper_function(aArg: *void): *void {
     /* Get thread startup information */
-    var ti = aArg as (*_thread_start_info);
+    var ti = aArg as (*ThreadStartInfo);
     var fun = ti.mFunction;
     var arg = ti.mArg;
 
     /* The thread is responsible for freeing the startup information */
-    free(ti as (*void));
+    ti.allocator.free(ti as (*void));
 
     /* Call the actual client thread function */
     var res = fun(arg);
 
-    return res as (*void);
+    return (res as (usize)) as (*void);
 }
 
 public typedef func(*void) : i32 as ThreadStartFn;
@@ -395,21 +403,27 @@ public struct Thread {
 
 
 // Information to pass to the new thread (what to run).
-public struct ThreadStartInfo {
+struct ThreadStartInfo {
     mFunction: ThreadStartFn; // < Pointer to the function to be executed.
     mArg: *void;              // < Function argument for the thread function.
+    allocator: *const Allocator;
 }
 
 
-public func (this: *Thread) create(fun: ThreadStartFn, arg: *void, suspend: bool = true) : ThreadStatus {
+public func (this: *Thread) create(
+    fun: ThreadStartFn,
+    arg: *void,
+    allocator: *const Allocator = defaultAllocator) : ThreadStatus {
+
     // Fill out the thread startup information (passed to the thread wrapper,
     // which will eventually free it)
-    var ti = malloc(sizeof(:ThreadStartInfo)) as (*ThreadStartInfo);
+    var ti = allocator.alloc(sizeof(:ThreadStartInfo)) as (*ThreadStartInfo);
     if (ti == null) {
         return ThreadStatus.NOMEM;
     }
     ti.mFunction = fun;
     ti.mArg = arg;
+    ti.allocator = allocator;
 
     if(pthread_create(&this.thrd, null, _thrd_wrapper_function, ti as (*void)) != 0) {
         this.thrd = 0;
@@ -417,7 +431,7 @@ public func (this: *Thread) create(fun: ThreadStartFn, arg: *void, suspend: bool
 
     // Did we fail to create the thread?
     if(!this.thrd) {
-        free(ti);
+        allocator.free(ti);
         return ThreadStatus.ERROR;
     }
 
@@ -432,17 +446,6 @@ public func (thr: *Thread) resume() : ThreadStatus {
 public func (thr: *Thread) suspend() : ThreadStatus {
     // TODO: use pthread_cond_wait?
     return ThreadStatus.ERROR;
-}
-
-
-public func ThreadCurrent() : Thread {
-    var thrd = pthread_self();
-    return Thread{thrd}
-}
-
-@raw("TTHREAD_NORETURN ")
-public func ThreadExit(res: i32) {
-    pthread_exit(&res);
 }
 
 public func (this: Thread) detach() : ThreadStatus {
@@ -465,12 +468,47 @@ public func (this: Thread) join(res: *i32) : ThreadStatus {
     }
 
     if (res != null) {
-        *res = pres as (i32);
+        *res = (pres as (usize)) as (i32);
     }
     return ThreadStatus.SUCCESS;
 }
 
-public func (this: Thread) sleep(duration: *TimeSpec, remaining: *TimeSpec = null) : i32 {
+public func (thr: Thread) destroy() {
+    sched_yield();
+}
+
+public func (thr: Thread) yield() {
+    sched_yield();
+}
+
+public func ThreadCurrent() : Thread {
+    var thrd = pthread_self();
+    return Thread{thrd}
+}
+
+@raw("TTHREAD_NORETURN ")
+public func ThreadExit(res: i32) {
+    pthread_exit(&res);
+}
+
+public func ThreadSleepMSec(msec: i64) : i32 {
+    var duration = TimeSpec {
+        .sec = msec / 1_000_i64,
+        .nsec = (msec % 1_000_i64) * 1_000_000_i64
+    }
+
+    var res = nanosleep(duration, null);
+    if (res == 0) {
+        return 0;
+    } else if (errno == EINTR) {
+        return -1;
+    } else {
+        return -2;
+    }
+}
+
+
+public func ThreadSleep(duration: *TimeSpec, remaining: *TimeSpec = null) : i32 {
     var res = nanosleep(duration, remaining);
     if (res == 0) {
         return 0;
@@ -481,14 +519,58 @@ public func (this: Thread) sleep(duration: *TimeSpec, remaining: *TimeSpec = nul
     }
 }
 
-public func (thr: Thread) yield() {
-    sched_yield();
-}
-
 public func GetNumberOfSystemThreads() : u32 {
     var result = sysconf(_SC_NPROCESSORS_ONLN);
     if(result < 1) {
         result = 1
     }
-    return result
+    return result as (u32)
+}
+
+
+struct Arg {
+    state: i32
+    mtx: *Mutex
+}
+
+func threadFunction(arg: *void) : i32 {
+    var x = arg as (*Arg)
+    printf("Processing thread: %d with value: %d\n", ThreadCurrent().id(), x.state)
+
+    x.mtx.lock()
+    x.state += 1
+    x.mtx.unlock()
+
+    return 0
+}
+
+@test("test threads")
+func testThreads() {
+    var mtx = Mutex{}
+
+    mtx.init()
+    defer mtx.destroy()
+
+    var arg = Arg {
+        .state = 1,
+        .mtx = &mtx
+    }
+
+    const NTHREADS = GetNumberOfSystemThreads()
+
+    printf("Spawning threads: %d\n", NTHREADS)
+    for(var i = 0; i < NTHREADS; i+=1) {
+        var thread = Thread{}
+        thread.create(threadFunction, &arg)
+    }
+
+    var duration = TimeSpec {
+        .sec = 3
+    }
+
+    ThreadSleep(duration)
+
+    var res = 0
+    //thread.join(&res)
+    printf("Done with result: %d\n", res)
 }

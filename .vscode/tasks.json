@@ -75,23 +75,13 @@
         {
             "label": "BuildTestFile",
             "type": "shell",
-            "command": "sh",
+            "command": "litac",
             "args": [
-                "build_test_file.sh",
+                "-pkg-build",
+                "-run",
+                "-testFile",
                 "${file}"
             ],
-            "windows": {
-                "options": {
-                    "shell": {
-                        "executable": "cmd.exe",
-                        "args": [
-                            "/d", "/c"
-                        ]
-                    }
-                },
-                "command": "build_test_file.bat",
-                "args": ["${file}"]
-            },
             "problemMatcher": [
                 "$gcc"
             ],
