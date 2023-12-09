@@ -135,26 +135,28 @@ func deleteDir(pm: *PackageManager, path: *String) : PkgStatus {
 
     var file: FileHandle;
     if(!file.open(path.cStr())) {
+        pm.errors.append("unable to open: '%s'\n", path.cStr())
         return PkgStatus.ERROR_CLEANING_PKG
     }
+    defer file.close()
 
-    while(file.hasNext()) {
+    while(file.next()) {
         var len = path.length
         path.append("/%s", file.name())
         defer path.length = len
 
         if(file.isDirectory()) {
             if(deleteDir(pm, path) != PkgStatus.OK) {
+                pm.errors.append("unable to delete directory: '%s'\n", path.cStr())
                 return PkgStatus.ERROR_CLEANING_PKG
             }
         }
 
         if(!FileDelete(path.cStr())) {
-            pm.errors.append("Failed to delete: '%s'\n", path.cStr())
+            pm.errors.append("failed to delete: '%s'\n", path.cStr())
             return PkgStatus.ERROR_CLEANING_PKG
         }
 
-        file.next();
     }
     return PkgStatus.OK
 }
@@ -240,7 +242,7 @@ func downloadPackage(
 
     uri.format(uriTemplate,
             repo.length, repo.buffer,
-            name.length, name.buffer,
+            // name.length, name.buffer,
             version.length, version.buffer)
 
     var file: File;
@@ -257,6 +259,11 @@ func downloadPackage(
     http.get(uri.cStr(), &resp)
 
     if(resp.statusCode < 200 || resp.statusCode > 299) {
+        pm.errors.append(
+            "error returned http status code: %d for request '%s'\n",
+            resp.statusCode,
+            uri.cStr()
+        )
         return PkgStatus.ERROR_HTTP_STATUS
     }
 
@@ -285,7 +292,7 @@ func getRepoTemplate(pkgId: *PackageId) : *const char {
 
     if(repo.startsWith("https://github.com")) {
         // Example: https://github.com/tonysparks/seventh/archive/refs/tags/v0.4.1-beta.zip
-        return "%.*s/%.*s/archive/refs/tags/%.*s.zip"
+        return "%.*s/archive/refs/tags/%.*s.zip"
     }
 
     return null

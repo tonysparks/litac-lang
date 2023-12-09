@@ -26,6 +26,7 @@ error_compiling() {
 profile_litac() {
     echo "Profiling build"
     cd bin
+    # valgrind --leak-check=full --show-leak-kinds=all
     valgrind --tool=callgrind --callgrind-out-file=profile.data.txt ./litac -disableLine -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
     if [ $? -gt 0 ]; then
         error_compiling

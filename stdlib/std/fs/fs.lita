@@ -21,18 +21,11 @@ public func (this: *FileHandle) openEx(path: *const char, len: i32) : bool {
 
 public func (this: *FileHandle) open(path: *const char) : bool {
     if(tinydir_open(&this.dir, path) == -1) {
+        this.close()
         return false
     }
 
-    /*
-    if(this.dir.has_next) {
-        if(tinydir_readfile(&this.dir, &this.file) == -1) {
-            return false
-        }
-    }
-    return true*/
-
-    return this.next()
+    return tinydir_readfile(&this.dir, &this.file) > -1
 }
 
 
@@ -55,12 +48,10 @@ public func (this: *FileHandle) hasNext() : bool {
 public func (this: *FileHandle) next() : bool {
     while(this.dir.has_next) {
         if(tinydir_next(&this.dir) == -1) {
-            printf("Error in next\n")
             return false
         }
 
         if(tinydir_readfile(&this.dir, &this.file) == -1) {
-            printf("Error in read\n")
             return false
         }
 
@@ -68,12 +59,14 @@ public func (this: *FileHandle) next() : bool {
             continue;
         }
 
-        // if(strncmp(this.file.name, ".", MAX_PATH) == 0) {
-        //     continue;
-        // }
-        break;
+        if(strncmp(this.file.name, ".", MAX_PATH) == 0) {
+            continue;
+        }
+
+        return true;
     }
-    return true
+
+    return false;
 }
 
 public func (this: *FileHandle) close() : bool {
@@ -86,16 +79,38 @@ public func (this: *FileHandle) close() : bool {
 @test
 func testFileHandle() {
 
-    var handle: FileHandle{}
-    handle.open("C:/Users/antho/git/litac-lang/bin")
+    var dir: tinydir_dir
+    var file: tinydir_file
+    var result = tinydir_open(&dir, "/home/tony/projects/ring-http/.pkgs/liburing/0.0.1")
+    printf("Result: %d\n", result)
 
-    while(handle.hasNext()) {
-        printf("%s", handle.name())
+    while(dir.has_next) {
+        result = tinydir_readfile(&dir, &file)
+        printf("Read File Result: %d\n", result)
+        printf("Name: '%s'\n", file.name)
 
-        if(handle.isDirectory()) {
-            printf("/")
-        }
-        printf("\n")
-        handle.next()
+        tinydir_next(&dir)
     }
+
+    printf("~~~~~~~~\n")
+
+    var handle: FileHandle{}
+    if(!handle.open("/home/tony/projects/ring-http/.pkgs/liburing/0.0.1")) {
+        printf("Failed to open\n")
+    }
+
+    printf("Name: '%s'\n", handle.name())
+
+    while(handle.next()) {
+        //if(handle.next())
+        {
+            printf("visiting '%s'", handle.name())
+
+            if(handle.isDirectory()) {
+                printf("/")
+            }
+            printf("\n")
+        }
+    }
+
 }

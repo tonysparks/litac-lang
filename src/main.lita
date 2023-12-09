@@ -471,6 +471,7 @@ func RunPkgInstall(options: *LitaOptions, pm: *PackageManager) : i32 {
 
     var file = File{}
     file.open(build.cStr(), FileOpenOp.WRITE)
+    defer file.close()
 
     printf("Writing '%s'.\n", build.cStr())
     if(!buildFile.writeTo(&file)) {

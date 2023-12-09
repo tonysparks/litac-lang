@@ -3,6 +3,7 @@
 @foreign
 public struct tinydir_dir {
     has_next: bool
+    path: *const char
 }
 
 @foreign
