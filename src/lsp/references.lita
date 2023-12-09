@@ -45,9 +45,11 @@ public struct ReferenceDatabase {
 
 public func (this: *ReferenceDatabase) init(allocator: *const Allocator) {
     this.allocator = allocator
-    this.typeReferences.init(1024, allocator)
-    this.fieldReferences.init(1024, allocator)
-    this.symbols.init(Array<SrcPos>{}, 1024, PtrHashFn<usize>, PtrEqualFn<usize>, allocator)
+
+    const INITIAL_SIZE = 1024
+    this.typeReferences.init(INITIAL_SIZE, allocator)
+    this.fieldReferences.init(INITIAL_SIZE, allocator)
+    this.symbols.init(Array<SrcPos>{}, INITIAL_SIZE, PtrHashFn<usize>, PtrEqualFn<usize>, allocator)
 }
 
 public func (this: *ReferenceDatabase) addSymbolReference(symbol: *Symbol, pos: SrcPos) {

@@ -1,0 +1,125 @@
+
+@raw("""
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+typedef struct sockaddr sockaddr;
+""");
+
+@foreign
+typedef usize as socklen_t;
+
+@foreign
+struct sockaddr {
+    sa_family: i32
+    sa_data: [14]char
+}
+
+struct sockaddr_in {
+    sin_family: i32;     /* AF_INET */
+    sin_port: u16;       /* Port number */
+    sin_addr: u32;       /* IPv4 address */
+};
+
+@foreign
+func socket(domain: i32, type: i32, protocol: i32) : i32;
+
+@foreign
+func bind(socket: i32, addr: *sockaddr, addrlen: socklen_t) : i32;
+
+@foreign
+func accept(socket: i32, addr: *sockaddr, addrlen: socklen_t) : i32;
+
+@foreign
+func listen(socket: i32, backlog: i32) : i32;
+
+@foreign
+func recv(socket: i32, buf: *void, len: usize, flags: i32) : i64;
+
+@foreign
+func close(socket: i32) : i32;
+
+@foreign
+const AF_INET: i32;
+
+@foreign
+const AF_INET6: i32;
+
+@foreign
+const SOCK_STREAM: i32;
+
+@foreign
+const SOCK_DGRAM: i32;
+
+@foreign
+const SOCK_NONBLOCK: i32;
+
+
+@foreign
+func htonl(hostlong: u32) : u32;
+
+@foreign
+func htons(hostshort: u16) : u16;
+
+@foreign
+func ntohl(netlong: u32) : u32;
+
+@foreign
+func ntohs(netshort: u16) : u16;
+
+@foreign
+func inet_pton(af: i32, src: *const char, dst: *void): i32;
+
+@foreign
+func inet_ntop(af: i32, src: *const char, dst: *void, size: socklen_t): *const char;
+
+public enum AddressType {
+    IPV4,
+    IPV6,
+}
+
+public enum SocketType {
+    DATAGRAM,
+    STREAM,
+}
+
+public struct SocketAddress {
+    type: AddressType;
+    address: *const char
+    port: i32
+
+    // internal implementation information
+    addr: sockaddr_in
+}
+
+public struct Socket {
+    socket: i32
+    address: SocketAddress
+}
+
+public func (this: *Socket) bind(address: SocketAddress) {
+
+}
+
+public func (this: *Socket) listen() : bool {
+    return listen(this.socket, 0) == -1
+}
+
+
+public func (this: *Socket) accept(clientSocket: *Socket) : *Socket {
+    if(accept(this.socket, (&clientSocket.address.addr) as (*sockaddr), sizeof(clientSocket.address.addr)) == -1) {
+        return null
+    }
+    return clientSocket
+}
+
+public func (this: *Socket) read(buffer: *void, len: usize) : i64 {
+    return recv(this.socket, buffer, len, 0)
+}
+
+public func (this: *Socket) close() {
+    close(this.socket)
+}
+

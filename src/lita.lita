@@ -293,6 +293,7 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
         // Reconcile any changed symbols
         this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs, SymbolKind.FUNC)
         this.syncSymbols(module, &module.symbols.symbolTypes, &this.programSymbols.symbolTypes, SymbolKind.TYPE)
+        this.syncSymbols(module, &module.symbols.symbolNotes, &this.programSymbols.symbolTypes, SymbolKind.TYPE)
         this.syncSymbols(module, &module.symbols.symbolTypes, &this.programSymbols.values, SymbolKind.VAR)
     }
 }

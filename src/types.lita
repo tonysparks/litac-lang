@@ -1608,7 +1608,7 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *I
         len += index;
     }
 
-    while(*n && index < len && index < MAX_SYMBOL_NAME) {
+    while(index < len && index < MAX_SYMBOL_NAME && *n) {
         var c = *n
         if(c == '<') {
             break;

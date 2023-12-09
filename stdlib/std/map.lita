@@ -278,7 +278,7 @@ func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) {
         .length: 0,
         .capacity: newlength,
         .keys: m.alloc.calloc(newlength, sizeof(:Key<K>)) as (*Key<K>),
-        .values: m.alloc.alloc(newlength * sizeof(:V)) as (*V),
+        .values: m.alloc.calloc(newlength, sizeof(:V)) as (*V),
         .hashFn: m.hashFn,
         .equalFn: m.equalFn,
         .emptyValue = m.emptyValue,
@@ -400,7 +400,7 @@ func testRemove() {
     map.put(1, 2)
     map.put(2, 4)
     map.put(3, 8)
-    
+
     map.put(1, 4)
     map.put(2, 8)
     map.put(3, 16)

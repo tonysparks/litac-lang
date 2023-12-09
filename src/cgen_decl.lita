@@ -62,7 +62,24 @@ public func (this: using *CGen) emitVarDecl(decl: *VarDecl) {
                 this.emitStmt(decl.expr)
             }
         }
+        else {
+            // TODO: Add syntax to allow uninitialized variables...
+            buf.appendStrn(" = ", 3)
+            this.emitDefaultInitValue(decl.sym)
+        }
         buf.appendStrn(";", 1)
+    }
+}
+
+
+public func (this: using *CGen) emitDefaultInitValue(sym: *Symbol) {
+    assert(sym != null)
+
+    if(IsPtr(sym.type)) {
+        buf.appendStrn("NULL", 4)
+    }
+    else {
+        buf.appendStrn("{0}", 3)
     }
 }
 

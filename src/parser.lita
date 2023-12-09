@@ -2996,10 +2996,10 @@ func (p: *Parser) prevPos() : SrcPos {
 
 @inline
 func (p: *Parser) peek() : *Token {
-    /*assert(p.current >= 0 && p.current <= p.tokens.size())
+    assert(p.current >= 0 && p.current <= p.tokens.size())
     if(p.current >= p.tokens.size()) {
         return &p.tokens.elements[p.tokens.size() - 1]
-    }*/
+    }
     return &p.tokens.elements[p.current]
 }
 
