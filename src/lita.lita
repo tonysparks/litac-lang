@@ -162,15 +162,14 @@ public func (this: *Lita) init(options: *LitaOptions) {
     var size: usize = options.maxMemory > 0 ? options.maxMemory : 1024 * 1024 * 1024;
 
     this.linearAllocator.init(
-        .mem = defaultAllocator.alloc(size),
-        .size = size,
-        .align = LITAC_DEFAULT_ALIGNMENT,
-        .expandInfo = ExpandInfo {
+        defaultAllocator.alloc(size),
+        size,
+        LITAC_DEFAULT_ALIGNMENT,
+        ExpandInfo {
             .allocator = defaultAllocator,
             .strategy = ExpandStrategy.DOUBLE_MEMORY,
         }
     )
-
 
     this.allocator = &this.linearAllocator.allocator
     this.options = options
