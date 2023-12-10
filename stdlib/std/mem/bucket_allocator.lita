@@ -26,7 +26,8 @@ public struct BucketAllocator {
     bucketSize: usize
     currentOffset: usize
     totalAllocations: u32
-    totalBytesAllocated: usize
+    totalBytesAllocated: usize  // total number of bytes requested to be allocated
+    totalGrossBytesAllocated: usize
     totalBuckets: u32
 }
 
@@ -41,7 +42,10 @@ public func (this: *BucketAllocator) init(decorated: *const Allocator, bucketSiz
 
     bucketSize = c::MAX(bucketSize, LITAC_DEFAULT_ALIGNMENT)
 
-    var memory = decorated.alloc(sizeof(:Bucket) + bucketSize) as (*u8)
+    var requestSize = sizeof(:Bucket) + bucketSize
+    var memory = decorated.alloc(requestSize) as (*u8)
+    assert(memory)
+
     this.buckets = memory as (*Bucket)
     this.buckets.mem = memory + sizeof(:Bucket)
     this.buckets.size = bucketSize
@@ -50,10 +54,13 @@ public func (this: *BucketAllocator) init(decorated: *const Allocator, bucketSiz
     this.head = this.buckets
     this.bucketSize = bucketSize
 
+    this.totalGrossBytesAllocated = 0
     this.totalBytesAllocated = 0
     this.totalAllocations = 0
     this.currentOffset = 0
     this.totalBuckets = 1
+
+    this.totalGrossBytesAllocated += requestSize
 }
 
 public func (this: *BucketAllocator) clear() {
@@ -91,6 +98,7 @@ public func (this: *BucketAllocator) free() {
     this.totalAllocations = 0
     this.currentOffset = 0
     this.totalBuckets = 0
+    this.totalGrossBytesAllocated = 0
 }
 
 public func (this: *BucketAllocator) malloc(size: usize) : *void {
@@ -103,16 +111,27 @@ public func (this: *BucketAllocator) malloc(size: usize) : *void {
     var newOffset = offset + size
     var allocationSize:usize = newOffset - this.currentOffset
 
-   // c::printf("currentOffset: %zu newOffset: %zu, limit: %zu allocation: %zu actualAllocation: %zu\n",
-   //     this.currentOffset, offset, this.head.size, size, allocationSize)
+/*
+    c::fprintf(c::stderr, "currentOffset: %zu newOffset: %zu, limit: %zu allocation: %zu actualAllocation: %zu\n",
+        this.currentOffset,
+        newOffset,
+        this.head.size,
+        size,
+        allocationSize)*/
 
 
     // check to see if there is enough room in this bucket
     if(newOffset > this.head.size) {
         const bucketSize = c::MAX(size, this.bucketSize)
-        //c::printf(">>>>>Creating a new bucket of size: %zu\n", bucketSize)
+        //c::fprintf(c::stderr, ">>>>>Creating a new bucket of size: %zu already allocated: %zu with gross: %zu\n", bucketSize, this.totalBytesAllocated, this.totalGrossBytesAllocated)
 
-        var memory = this.decorated.alloc(sizeof(:Bucket) + bucketSize) as (*u8)
+        var requestSize = sizeof(:Bucket) + bucketSize
+        var memory = this.decorated.alloc(requestSize) as (*u8)
+        assert(memory)
+
+        if(!memory) {
+            return null
+        }
 
         var bucket = memory as (*Bucket)
         bucket.prev = this.head
@@ -129,7 +148,9 @@ public func (this: *BucketAllocator) malloc(size: usize) : *void {
         allocationSize = size + (offset - currPtr)
 
         offset -= this.head.mem as (usize)
-        //c::printf("AllocationSize: %zu  offset: %zu\n", allocationSize, offset)
+        newOffset = offset + size
+
+        this.totalGrossBytesAllocated += requestSize
     }
 
     this.currentOffset = newOffset

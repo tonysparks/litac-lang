@@ -197,7 +197,7 @@ public func (this: *Lita) reset() {
 
     this.genericSymbols = InternMap<*Symbol>(null, 128, this.allocator)
 
-    this.stringsAllocator.init(this.allocator, 5 * KiB)
+    this.stringsAllocator.init(this.allocator, 1 * MiB)
     this.strings.init(this.stringsAllocator)
 
     this.typeCache.init(this.allocator)
