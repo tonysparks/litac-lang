@@ -1,6 +1,5 @@
 import "std/io"
 import "std/mem"
-import "std/mem/linear_allocator"
 import "std/mem/bucket_allocator"
 import "std/array"
 import "std/map"
@@ -39,7 +38,7 @@ public const DEFAULT_BUILD_CMD = "clang -std=c99 %input% -o %output%  -D_CRT_SEC
 
 public struct Lita {
     allocator: *const Allocator
-    linearAllocator: LinearAllocator
+    globalAllocator: BucketAllocator
     stringsAllocator: BucketAllocator
 
     preprocessor: Preprocessor
@@ -161,6 +160,7 @@ public struct LitaOptions {
 public func (this: *Lita) init(options: *LitaOptions) {
     var size: usize = options.maxMemory > 0 ? options.maxMemory : 1024 * 1024 * 1024;
 
+/*
     this.linearAllocator.init(
         defaultAllocator.alloc(size),
         size,
@@ -170,8 +170,13 @@ public func (this: *Lita) init(options: *LitaOptions) {
             .strategy = ExpandStrategy.DOUBLE_MEMORY,
         }
     )
+*/
+    this.globalAllocator.init(
+        defaultAllocator,
+        100 * MiB
+    )
 
-    this.allocator = &this.linearAllocator.allocator
+    this.allocator = &this.globalAllocator.allocator
     this.options = options
 
     memset(this.binaryFilename, 0, MAX_PATH)
@@ -182,7 +187,7 @@ public func (this: *Lita) init(options: *LitaOptions) {
 
 @doc("Resets the state reading for another compile")
 public func (this: *Lita) reset() {
-    this.linearAllocator.clear()
+    this.globalAllocator.clear()
     this.totalSourceLines = 0
     this.totalAllocations = 0
 
@@ -222,9 +227,7 @@ public func (this: *Lita) reset() {
 }
 
 public func (lita: *Lita) free() {
-    if(lita.linearAllocator.mem) {
-        defaultAllocator.free(lita.linearAllocator.mem)
-    }
+    lita.globalAllocator.free()
     // TODO: clear module allocators
 }
 
@@ -242,7 +245,7 @@ public func (lita: *Lita) getModule(filename: *const char) : *Module {
 public func (lita: *Lita) startCapture(type: MetricType) {
     var metric = &lita.metrics[type]
 
-    var allocator = lita.allocator as (*LinearAllocator)
+    var allocator = lita.globalAllocator
     metric.bytesAllocated = allocator.totalBytesAllocated
     metric.allocationCount = allocator.totalAllocations
     metric.startTime = SystemTimeMSec()
@@ -251,7 +254,7 @@ public func (lita: *Lita) startCapture(type: MetricType) {
 public func (lita: *Lita) endCapture(type: MetricType) {
     var metric = &lita.metrics[type]
 
-    var allocator = lita.allocator as (*LinearAllocator)
+    var allocator = lita.globalAllocator
     metric.bytesAllocated = allocator.totalBytesAllocated - metric.bytesAllocated
     metric.allocationCount = allocator.totalAllocations - metric.allocationCount
     metric.executionTime = SystemTimeMSec() - metric.startTime
