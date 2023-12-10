@@ -1,2 +1,140 @@
+import "std/libc"
+
+#if OS == "WINDOWS"
+    import "std/net/net_win"
+#else
+    import "std/net/net_posix"
+#end
 
 
+public enum AddressType {
+    IPV4,
+    IPV6,
+}
+
+public enum SocketType {
+    DATAGRAM,
+    STREAM,
+}
+
+@generated(.stub = true)
+public const MAX_ADDRESS_SIZE: u32 = 0;
+
+
+@generated(.stub = true)
+public struct SocketAddress {
+}
+
+@generated(.stub = true)
+public func FromIPAddress(ip: *const char, port: u16, result: *SocketAddress) : *SocketAddress {
+    return null;
+}
+
+@generated(.stub = true)
+public func FromPort(port: u16, result: *SocketAddress) : *SocketAddress {
+    return null;
+}
+
+
+/*
+===================================================
+Socket API
+===================================================
+*/
+
+@generated(.stub = true)
+public struct Socket {}
+
+@generated(.stub = true)
+public func (this: *Socket) create(type: SocketType = SocketType.STREAM) : bool {
+    return false
+}
+
+@generated(.stub = true)
+public func (this: *Socket) bind() : bool {
+    return false
+}
+
+@generated(.stub = true)
+public func (this: *Socket) listen(backlog: i32 = 128) : bool {
+    return false
+}
+
+@generated(.stub = true)
+public func (this: *Socket) accept(clientSocket: *Socket) : *Socket {
+    return null
+}
+
+@generated(.stub = true)
+public func (this: *Socket) read(buffer: *void, len: usize) : i64 {
+    return 0
+}
+
+@generated(.stub = true)
+public func (this: *Socket) write(buffer: *void, len: usize) : i64 {
+    return 0
+}
+
+@generated(.stub = true)
+public func (this: *Socket) close() {
+}
+
+
+import "std/assert"
+
+@test
+public func testGenerated() {
+    var serverSocket:Socket;
+    if(!serverSocket.create()) {
+        printf("Unable to create socket!\n")
+        return;
+    }
+
+    defer serverSocket.close();
+
+
+    assert(FromPort(8083_u16, &serverSocket.address))
+    var addr = serverSocket.address
+
+    if(!serverSocket.bind()) {
+        printf("Unable to bind to address: %s:%d -> errono: %d\n", addr.address, addr.port, errno)
+        perror("bind")
+        return;
+    }
+
+
+    if(!serverSocket.listen()) {
+        printf("Unable to listen on address: %s:%d\n", addr.address, addr.port)
+        return;
+    }
+
+    printf("Listening on port: %d\n", addr.port)
+
+    const BUFFER_SIZE = 1024;
+    var buffer:[BUFFER_SIZE]char;
+
+    while(true) {
+        var clientSocket: Socket;
+        defer clientSocket.close();
+
+        if(!serverSocket.accept(&clientSocket)) {
+            printf("Failed to connect client\n")
+            perror("accept")
+            continue;
+        }
+        printf("Client connected!\n")
+
+        var bytesReceived: i64;
+        do {
+            bytesReceived = clientSocket.read(buffer, BUFFER_SIZE);
+            if(bytesReceived > 0) {
+                printf("Received '%.*s'\n", bytesReceived as (i32), buffer)
+
+                var echo = "Server says: ";
+                clientSocket.write(echo as (*void), strlen(echo))
+                clientSocket.write(buffer, bytesReceived)
+            }
+        }
+        while(bytesReceived > 0);
+    }
+}

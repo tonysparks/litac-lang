@@ -63,6 +63,7 @@ public @note profile {
     Marks a type that's value will be generated at compile time
 """)
 public @note generated {
+    stub: bool = true
 }
 
 @doc("""

@@ -1,5 +1,6 @@
 
 import "std/string"
+import "std/net"
 
 @raw("""
 #include <sys/socket.h>
@@ -101,18 +102,10 @@ Address API
 ===================================================
 */
 
+@generated
 public const MAX_ADDRESS_SIZE = INET_ADDRSTRLEN;
 
-public enum AddressType {
-    IPV4,
-    IPV6,
-}
-
-public enum SocketType {
-    DATAGRAM,
-    STREAM,
-}
-
+@generated
 public struct SocketAddress {
     type: AddressType;
     address: [MAX_ADDRESS_SIZE]char
@@ -122,6 +115,7 @@ public struct SocketAddress {
     addr: sockaddr_in
 }
 
+@generated
 public func FromIPAddress(ip: *const char, port: u16, result: *SocketAddress) : *SocketAddress {
     memset(&result.addr, 0, sizeof(result.addr))
     if(inet_pton(AF_INET, ip, (&result.addr.sin_addr) as (*void)) < 0) {
@@ -138,6 +132,7 @@ public func FromIPAddress(ip: *const char, port: u16, result: *SocketAddress) : 
     return result
 }
 
+@generated
 public func FromPort(port: u16, result: *SocketAddress) : *SocketAddress {
     StringCopy(.src = "0.0.0.0", .dest = result.address, .size = MAX_ADDRESS_SIZE)
     result.port = port
@@ -162,11 +157,13 @@ Socket API
 ===================================================
 */
 
+@generated
 public struct Socket {
     socket: i32
     address: SocketAddress
 }
 
+@generated
 public func (this: *Socket) create(type: SocketType = SocketType.STREAM) : bool {
     var sck = type == SocketType.STREAM ? SOCK_STREAM : SOCK_DGRAM;
 
@@ -174,16 +171,19 @@ public func (this: *Socket) create(type: SocketType = SocketType.STREAM) : bool 
     return this.socket > -1
 }
 
+@generated
 public func (this: *Socket) bind() : bool {
     var addr = (&this.address.addr) as (*sockaddr);
     var len = sizeof(this.address.addr) as (socklen_t);
     return bind(this.socket, addr, len) > -1
 }
 
+@generated
 public func (this: *Socket) listen(backlog: i32 = 128) : bool {
     return listen(this.socket, backlog) > -1
 }
 
+@generated
 public func (this: *Socket) accept(clientSocket: *Socket) : *Socket {
     var socketLen: socklen_t = sizeof(clientSocket.address.addr) as (socklen_t)
     var addr = (&clientSocket.address.addr) as (*sockaddr)
@@ -200,154 +200,17 @@ public func (this: *Socket) accept(clientSocket: *Socket) : *Socket {
     return clientSocket
 }
 
+@generated
 public func (this: *Socket) read(buffer: *void, len: usize) : i64 {
     return recv(this.socket, buffer, len, 0)
 }
 
+@generated
 public func (this: *Socket) write(buffer: *void, len: usize) : i64 {
     return send(this.socket, buffer, len, 0)
 }
 
+@generated
 public func (this: *Socket) close() {
     close(this.socket)
 }
-
-import "std/assert"
-import "std/libc"
-
-@test
-func testSockets() {
-    var serverSocket:Socket;
-    if(!serverSocket.create()) {
-        printf("Unable to create socket!\n")
-        return;
-    }
-
-    defer serverSocket.close();
-
-
-    assert(FromPort(8083_u16, &serverSocket.address))
-    var addr = serverSocket.address
-
-    if(!serverSocket.bind()) {
-        printf("Unable to bind to address: %s:%d -> errono: %d\n", addr.address, addr.port, errno)
-        perror("bind")
-        return;
-    }
-
-
-    if(!serverSocket.listen()) {
-        printf("Unable to listen on address: %s:%d\n", addr.address, addr.port)
-        return;
-    }
-
-    printf("Listening on port: %d\n", addr.port)
-
-    const BUFFER_SIZE = 1024;
-    var buffer:[BUFFER_SIZE]char;
-
-    while(true) {
-        var clientSocket: Socket;
-        defer clientSocket.close();
-
-        if(!serverSocket.accept(&clientSocket)) {
-            printf("Failed to connect client\n")
-            perror("accept")
-            continue;
-        }
-        printf("Client connected!\n")
-
-        var bytesReceived: i64;
-        do {
-            bytesReceived = clientSocket.read(buffer, BUFFER_SIZE);
-            if(bytesReceived > 0) {
-                printf("Received '%.*s'\n", bytesReceived as (i32), buffer)
-
-                var echo = "Server says: ";
-                clientSocket.write(echo as (*void), strlen(echo))
-                clientSocket.write(buffer, bytesReceived)
-            }
-        }
-        while(bytesReceived > 0);
-    }
-
-}
-
-/**
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-
-#define PORT 8080
-#define MAX_BUFFER_SIZE 1024
-
-int main() {
-    int server_socket, client_socket;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
-    char buffer[MAX_BUFFER_SIZE];
-
-    // Create socket
-    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
-
-    // Initialize server address struct
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(PORT);
-
-    // Bind the socket
-    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-        perror("Binding failed");
-        close(server_socket);
-        exit(EXIT_FAILURE);
-    }
-
-    // Listen for incoming connections
-    if (listen(server_socket, 5) == -1) {
-        perror("Listening failed");
-        close(server_socket);
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Server listening on port %d...\n", PORT);
-
-    while (1) {
-        // Accept a connection from a client
-        if ((client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_len)) == -1) {
-            perror("Acceptance failed");
-            continue;
-        }
-
-        printf("Connection accepted from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-
-        // Receive and echo back data
-        ssize_t bytes_received;
-        while ((bytes_received = recv(client_socket, buffer, sizeof(buffer), 0)) > 0) {
-            buffer[bytes_received] = '\0'; // Null-terminate the received data
-            printf("Received: %s", buffer);
-
-            // Echo back to the client
-            send(client_socket, buffer, bytes_received, 0);
-        }
-
-        if (bytes_received == 0) {
-            printf("Client disconnected.\n");
-        } else if (bytes_received == -1) {
-            perror("Receiving failed");
-        }
-
-        // Close the client socket
-        close(client_socket);
-    }
-
-    // Close the server socket
-    close(server_socket);
-
-    return 0;
-}
-*/

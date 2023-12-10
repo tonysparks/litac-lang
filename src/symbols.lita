@@ -253,21 +253,35 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
         symbolStorage = &this.symbolNotes
     }
 
-    if(symbolStorage.contains(name) && !symbol.decl.hasNote("generated")) {
-        var existingSym = symbolStorage.get(name)
+    if(symbolStorage.contains(name) /*&& !(symbol.flags & SymbolFlags.IS_GENERATED)*/) {
+        if(symbol.flags & SymbolFlags.IS_GENERATED) {
 
-        // if this symbol was previously defined and we're doing
-        // an incremental build, go ahead with the import -- if/when
-        // the symbol gets a declaration in this module, it will error
-        // there
-        if(!(existingSym.flags & SymbolFlags.IS_MARKED_RESET)) {
-            var decl = existingSym.decl
+            // allow presedence to be set
+            var isStub = symbol.decl.getNoteArgument("generated", "stub")
+            if(isStub && isStub.argExpr && isStub.argExpr.kind == StmtKind.BOOLEAN_EXPR) {
+                var boolExpr = isStub.argExpr as (*BooleanExpr)
 
-            this.result.addError(importSrcPos, "can't import symbol '%.*s' defined in '%s:%d' because it is already defined in '%s:%d'",
-                name.length, name.buffer,
-                symbol.decl.startPos.filename, symbol.decl.startPos.lineNumber,
-                decl.startPos.filename, decl.startPos.lineNumber)
-            return;
+                if(boolExpr.boolean) {
+                    return;
+                }
+            }
+        }
+        else {
+            var existingSym = symbolStorage.get(name)
+
+            // if this symbol was previously defined and we're doing
+            // an incremental build, go ahead with the import -- if/when
+            // the symbol gets a declaration in this module, it will error
+            // there
+            if(!(existingSym.flags & SymbolFlags.IS_MARKED_RESET)) {
+                var decl = existingSym.decl
+
+                this.result.addError(importSrcPos, "can't import symbol '%.*s' defined in '%s:%d' because it is already defined in '%s:%d'",
+                    name.length, name.buffer,
+                    symbol.decl.startPos.filename, symbol.decl.startPos.lineNumber,
+                    decl.startPos.filename, decl.startPos.lineNumber)
+                return;
+            }
         }
     }
 
