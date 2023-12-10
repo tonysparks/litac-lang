@@ -331,6 +331,13 @@ public func (this: *Scope) addSymbol(name: InternedString,
                 sym.flags &= ~SymbolFlags.IS_MARKED_RESET
                 isError = false
             }
+            else if(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE) {
+                var existingSym = symbolStorage.get(name)
+                var decl = existingSym.decl
+                if(decl == null) {
+                    isError = false
+                }
+            }
         }
 
         // We allow for redefining annotated generated

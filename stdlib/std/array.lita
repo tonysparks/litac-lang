@@ -48,6 +48,10 @@ public func (a: *Array<T>) add<T>(element: T) {
         ArrayGrow<T>(a, 1)
     }
 
+    assert(a.length < a.capacity)
+    assert(a.capacity > 0)
+    assert(a.elements)
+
     #if (getTypeKind("element") == "ARRAY")
         memcpy(&a.elements[a.length], element as (*void), sizeof(:T));
     #else
@@ -225,6 +229,8 @@ func ArrayGrow<T>(a: *Array<T>, increment: i32) {
     var newlength = (sizeof(:T) * n as (usize));
     var oldlength = (sizeof(:T) * a.capacity as(usize));
     a.elements = a.alloc.realloc(a.elements as (*void), oldlength, newlength) as (*T)
+    assert(a.elements)
+
     a.capacity = n;
 }
 

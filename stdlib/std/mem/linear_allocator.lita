@@ -2,6 +2,24 @@ import "std/mem"
 import "std/assert"
 import "std/libc" as c
 
+public enum ExpandStrategy {
+    // no allocation, return null
+    NO_ALLOC_MEMORY,
+
+    // double the current memory pool
+    DOUBLE_MEMORY,
+}
+
+public struct ExpandInfo {
+    allocator: *const Allocator
+    strategy: ExpandStrategy
+}
+
+public const DEFAULT_EXPAND_INFO = ExpandInfo {
+    .allocator = null,
+    .strategy = ExpandStrategy.NO_ALLOC_MEMORY,
+}
+
 /**
 =========================================================
 // Linear allocator
@@ -16,9 +34,19 @@ public struct LinearAllocator {
 
     totalAllocations: u32
     totalBytesAllocated: usize
+
+    // optional allocator used if this allocator
+    // runs out of memory
+    expandInfo: ExpandInfo
+
 }
 
-public func (this: *LinearAllocator) init(mem: *void, size: usize, align: usize = LITAC_DEFAULT_ALIGNMENT) {
+public func (this: *LinearAllocator) init(
+    mem: *void,
+    size: usize,
+    align: usize = LITAC_DEFAULT_ALIGNMENT,
+    expandInfo: ExpandInfo = DEFAULT_EXPAND_INFO) {
+
     this.allocator = Allocator {
         .allocFn:   &LinearMalloc,
         .callocFn:  &LinearCalloc,
@@ -31,6 +59,7 @@ public func (this: *LinearAllocator) init(mem: *void, size: usize, align: usize 
     this.totalAllocations = 0
     this.currentOffset = 0
     this.alignment = align
+    this.expandInfo = expandInfo
 }
 
 @doc("Zero out all allocated memory and reset current offset")
@@ -50,8 +79,31 @@ public func (this: *LinearAllocator) malloc(size: usize) : *void {
 
     var newOffset = offset + size
     if(newOffset > this.size) {
-        c::printf("Failed to allocate: %zu, %zu + %zu will exceed limit of %zu\n", size, offset, size, this.size)
-        return null
+        switch(this.expandInfo.strategy) {
+            case ExpandStrategy.DOUBLE_MEMORY: {
+                var newSize = this.size << 1;
+                while(newOffset > newSize) {
+                    newSize = newSize << 1;
+                }
+
+                var newMem = this.expandInfo.allocator.realloc(this.mem, this.size, newSize)
+                if(!newMem) {
+                    c::fprintf(c::stderr,
+                        "Failed to allocate: %zu, %zu + %zu will exceed limit of %zu, then failed to realloc from expanding strategy\n",
+                        size, offset, size, this.size
+                    )
+                    return null
+                }
+
+                this.mem = newMem;
+                this.size = newSize;
+                break;
+            }
+            default: {
+                c::fprintf(c::stderr, "Failed to allocate: %zu, %zu + %zu will exceed limit of %zu\n", size, offset, size, this.size)
+                return null
+            }
+        }
     }
 
     this.currentOffset = newOffset

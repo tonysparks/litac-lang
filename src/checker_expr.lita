@@ -330,7 +330,8 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
     }
 
     expr.node.becomeParentOf(argExpr)
-    suppliedArgs.set(index, CallArg { .argExpr = argExpr })
+    var callArg = suppliedArgs.getPtr(index)
+    callArg.argExpr = argExpr
     return true
 }
 

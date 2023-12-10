@@ -15,6 +15,7 @@
 @include("<ctype.h>");
 @include("<limits.h>");
 @include("<string.h>");
+@include("<errno.h>");
 
 @raw("""
 #ifndef MIN
@@ -82,13 +83,15 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func scanf(format: *const char, ...) : i32;
 @foreign public func fscanf(stream: *FILE, format: *const char, ...) : i32;
 @foreign public func getchar() : i32;
+@foreign public func fileno(stream: *FILE) : i32;
+@foreign public func ftruncate(fd: i32, size: usize) : bool;
 @foreign public const SEEK_SET : i32;
 @foreign public const SEEK_CUR : i32;
 @foreign public const SEEK_END : i32;
+
+// TODOL move errno into separate module
 @foreign public var errno: i32;
 @foreign public func perror(str: *const char);
-@foreign public func fileno(stream: *FILE) : i32;
-@foreign public func ftruncate(fd: i32, size: usize) : bool;
 
 // Math operations
 @foreign public func MAX<T>(a: T, b: T) : T;
