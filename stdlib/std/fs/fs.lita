@@ -25,7 +25,7 @@ public func (this: *FileHandle) open(path: *const char) : bool {
         return false
     }
 
-    return tinydir_readfile(&this.dir, &this.file) > -1
+    return true
 }
 
 
@@ -46,27 +46,27 @@ public func (this: *FileHandle) hasNext() : bool {
 }
 
 public func (this: *FileHandle) next() : bool {
-    while(this.dir.has_next) {
-        if(tinydir_next(&this.dir) == -1) {
-            return false
-        }
-
+    var nextFileFound = false
+    while(this.dir.has_next && !nextFileFound) {
         if(tinydir_readfile(&this.dir, &this.file) == -1) {
             return false
         }
 
+        nextFileFound = true
         if(strncmp(this.file.name, "..", MAX_PATH) == 0) {
-            continue;
+            nextFileFound = false;
         }
 
         if(strncmp(this.file.name, ".", MAX_PATH) == 0) {
-            continue;
+            nextFileFound = false;
         }
 
-        return true;
+        if(tinydir_next(&this.dir) == -1) {
+            return false
+        }
     }
 
-    return false;
+    return nextFileFound;
 }
 
 public func (this: *FileHandle) close() : bool {
@@ -81,7 +81,7 @@ func testFileHandle() {
 
     var dir: tinydir_dir
     var file: tinydir_file
-    var result = tinydir_open(&dir, "/home/tony/projects/ring-http/.pkgs/liburing/0.0.1")
+    var result = tinydir_open(&dir, "/home/tony/projects/ring-http/.pkgs/liburing")
     printf("Result: %d\n", result)
 
     while(dir.has_next) {
@@ -95,7 +95,7 @@ func testFileHandle() {
     printf("~~~~~~~~\n")
 
     var handle: FileHandle{}
-    if(!handle.open("/home/tony/projects/ring-http/.pkgs/liburing/0.0.1")) {
+    if(!handle.open("/home/tony/projects/ring-http/.pkgs/liburing")) {
         printf("Failed to open\n")
     }
 
@@ -112,5 +112,4 @@ func testFileHandle() {
             printf("\n")
         }
     }
-
 }
