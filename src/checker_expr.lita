@@ -561,10 +561,21 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
     nameSpec.typeInfo = null // clear out the cached value, so it can be created with the generic types
 
+    // NOTE: If returnType is a generic parameter, this
+    // is resolved in checker.resolveStmt(RETURN_STMT) as
+    // this will know the return type by way of type checking.
+    // This will be populated when the generic type is created
+    // in CreateTypeFromGenericTemplate when the symbol is
+    // resolved; there are scenarios of returned generic type
+    // that we don't support inferrence at the moment.
+
+    var returnType: *TypeInfo = null
+
     // TODO: Clean this up, too much duplicate code...
     var genericParams: Array<GenericParam>;
     if(funcType.kind == TypeKind.FUNC_PTR) {
         var funcPtr = funcType
+        returnType = funcPtr.returnType
         genericParams = funcPtr.genericParams;
         var size = genericParams.size()
 
@@ -597,6 +608,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
     }
     else {
         var funcInfo = funcType
+        returnType = funcInfo.returnType
         genericParams = funcInfo.funcDecl.genericParams;
 
         var size = genericParams.size()
@@ -626,7 +638,6 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
                 }
             }
         }
-
     }
 
     if(!this.resolveExpr(expr.object)) {
@@ -649,6 +660,26 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         var decl = type.sym.decl as (*GenericDecl)
         this.errorMissingGenericArguments(funcExpr, nameSpec.name, decl.genericParams)
         goto err;
+    }
+
+    // TODO: If this is a type that contains generic arguments, we
+    // currently don't support type inference this deep :(
+    // Will need to think how to support this scenario
+    if(returnType &&
+       returnType.sym &&
+       returnType.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+
+        var isFullyResolved = genericParams.size() == nameSpec.genericArgs.size()
+        if(!isFullyResolved) {
+            var buffer:[512]char;
+            var error = StringInit(buffer, 512, 0)
+            error.format(
+                "return type of '%.*s' containing a generic argument that can not be inferred",
+                returnType.sym.name.length, returnType.sym.name.buffer
+            )
+            this.errorInferGenericParameters(funcExpr, genericParams, error.cStr())
+            goto err;
+        }
     }
 
     return type
@@ -2181,7 +2212,7 @@ func (this: *TypeChecker) errorInferGenericParameter(expr: *Expr, param: *Generi
     this.result.addError(expr.startPos, "unable to infer generic parameter '%.*s'", param.name.str.length, param.name.str.buffer)
 }
 
-func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Array<GenericParam>) {
+func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Array<GenericParam>, details: *const char = null) {
     assert(expr != null)
     assert(params != null)
 
@@ -2195,6 +2226,11 @@ func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Arra
         sb.append("'%.*s'", p.name.str.length, p.name.str.buffer)
     }
     sb.appendStrn("]", 1)
+
+    if(details) {
+        sb.append(" due to %s", details)
+    }
+
     this.result.addErrorStr(expr.startPos, sb)
 }
 

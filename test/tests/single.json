@@ -13,6 +13,240 @@
         }
     `,
     "tests": [
+        /*{
+            "name" : "Generic Type Infer Return Type Simple",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                func doSomething<T, Y>(a: T) : Y {
+                    return a.doThat()
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                assert(doSomething(t) == 8)
+            `,
+        },
+        {
+            "name" : "Generic Type Infer Return Void",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() {
+                    return;
+                }
+
+                func doSomething<T, Y>(a: T) : Y {
+                    return a.doThat()
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                doSomething(t)
+            `,
+        },
+        {
+            "name" : "Generic Type Infer Return Type With Generic",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Y {
+                    return a.x.doThat()
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = Other {.x = t }
+                assert(doSomething(o) == 8)
+            `,
+        },*/
+        {
+            "name" : "Generic Type Infer Return Type With Generic Type",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Other<Y> {
+                    var r = a.doThat()
+                    return Other<Y> {
+                        .x = r
+                    }
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = doSomething(t)
+                assert(o.x == 8)
+            `,
+            "error" : "unable to infer generic parameters ['T', 'Y'] due to return type of 'Other<Y>' containing a generic argument that can not be inferred"
+        },
+        {
+            "name" : "Generic Type Infer Return Type With Generic Type Partial",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Other<Y> {
+                    var r = a.doThat()
+                    return Other<Y> {
+                        .x = r
+                    }
+                }
+
+                func doSomething2<T>(a: T) : Other<i32> {
+                    return doSomething<T, i32>(a)
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = doSomething2(t)
+                assert(o.x == 8)
+            `,
+        },
+        {
+            "name": "From Json Map String Ptr Value",
+            "definitions": `
+                import "std/json";
+                import "std/json/from_json";
+                import "std/json/to_json";
+                import "std/string_buffer";
+                import "std/io";
+                import "std/libc";
+                import "std/mem";
+                import "std/map";
+                import "std/string";
+                import "std/string_view";
+
+
+                public func TestMakerPtr(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
+                    switch(type) {
+                        case typeof(:String): {
+                            if(!json.isString()) {
+                                return null;
+                            }
+
+                            var str = StringViewInit(json.asString())
+                            var buffer = context.allocator.alloc(sizeof(:String) + ((str.length+1) * sizeof(:char)))
+                            var bufferStart = buffer + sizeof(:String)
+                            StringCopy(.src = str.buffer, .dest = bufferStart as (*char),  .size = str.length + 1)
+
+                            var result = buffer as (*String)
+                            result.length = str.length;
+                            result.capacity = str.length;
+                            result.buffer = bufferStart as (*char)
+                            return result
+                        }
+                        default: return null;
+                    }
+                }
+            `,
+            "code": `
+                var json = """
+                {
+
+                    "aString": "4",
+                    "aStringAgain": "8",
+                }
+                """
+
+                var parser = JsonParser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson(json)
+                defer if(node) node.free()
+
+                assert(node != null)
+                assert(!parser.hasError())
+
+                var context = JsonContextInit(.makerPtr = TestMakerPtr)
+
+                var test = StrMap<*String>(String{})
+                defer test.free()
+                test.fromJson(&context, node)
+
+                assert(strcmp(test.get("aString").cStr(), "4") == 0)
+                assert(strcmp(test.get("aStringAgain").cStr(), "8") == 0)
+
+                for(var it = test.iter(); it.hasNext();) {
+                    var entry = it.next()
+                    context.allocator.free(entry.value as (*void))
+                }
+
+            `
+        },
+        /*
+        {
+            "name" : "Generic Type Infer Return Type With Generic Type No Inferrence",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Other<Y> {
+                    var r = a.doThat()
+                    return Other<Y> {
+                        .x = r
+                    }
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = doSomething<Thing, i32>(t)
+                assert(o.x == 8)
+            `,
+        },*/
+        /*
         {
             "name" : "Traits With No Impl",
             "definitions": `
@@ -36,7 +270,7 @@
             "code": `
 
             `,
-        },
+        },*/
 
     ]
 }

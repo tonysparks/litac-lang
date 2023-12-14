@@ -611,6 +611,166 @@
                 assert(x.methodV() == 5.6f)
             `,
         },
+        {
+            "name" : "Generic Type Infer Return Type Simple",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                func doSomething<T, Y>(a: T) : Y {
+                    return a.doThat()
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                assert(doSomething(t) == 8)
+            `,
+        },
+        {
+            "name" : "Generic Type Infer Return Void",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() {
+                    return;
+                }
+
+                func doSomething<T, Y>(a: T) : Y {
+                    return a.doThat()
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                doSomething(t)
+            `,
+        },
+        {
+            "name" : "Generic Type Infer Return Type With Generic",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Y {
+                    return a.x.doThat()
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = Other {.x = t }
+                assert(doSomething(o) == 8)
+            `,
+        },
+        {
+            "name" : "Generic Type Infer Return Type With Generic Type",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Other<Y> {
+                    var r = a.doThat()
+                    return Other<Y> {
+                        .x = r
+                    }
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = doSomething(t)
+                assert(o.x == 8)
+            `,
+            "error" : "unable to infer generic parameters ['T', 'Y'] due to return type of 'Other<Y>' containing a generic argument that can not be inferred"
+        },
+        {
+            "name" : "Generic Type Infer Return Type With Generic Type No Inferrence",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Other<Y> {
+                    var r = a.doThat()
+                    return Other<Y> {
+                        .x = r
+                    }
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = doSomething<Thing, i32>(t)
+                assert(o.x == 8)
+            `,
+        },
+        {
+            "name" : "Generic Type Infer Return Type With Generic Type Partial",
+            "definitions": `
+
+                struct Thing {
+                    a: i32
+                }
+
+                func (this: *Thing) doThat() : i32 {
+                    return this.a * 2
+                }
+
+                struct Other<X> {
+                    x: X
+                }
+
+                func doSomething<T, Y>(a: T) : Other<Y> {
+                    var r = a.doThat()
+                    return Other<Y> {
+                        .x = r
+                    }
+                }
+
+                func doSomething2<T>(a: T) : Other<i32> {
+                    return doSomething<T, i32>(a)
+                }
+            `,
+            "code": `
+                var t = Thing {4}
+                var o = doSomething2(t)
+                assert(o.x == 8)
+            `,
+        },
 
     ]
 }

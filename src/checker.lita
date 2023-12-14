@@ -1621,9 +1621,20 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
 
                 this.checkTypeCompatibility(ret.expr.startPos, currentFuncDecl.returnType, ret.expr.operand.typeInfo)
                 ret.expr.expectedType = currentFuncDecl.returnType
+
+                // If the return type is a generic type, do the type inference
+                if(currentFuncDecl.returnType && currentFuncDecl.returnType.kind == TypeKind.GENERIC_PARAM) {
+                    if(ret.expr.operand.typeInfo && ret.expr.operand.typeInfo.kind != TypeKind.GENERIC_PARAM) {
+                        currentFuncDecl.returnType = ret.expr.operand.typeInfo
+                    }
+                }
             }
             else {
                 this.checkTypeCompatibility(ret.startPos, currentFuncDecl.returnType, &VOID_TYPE)
+
+                if(currentFuncDecl.returnType && currentFuncDecl.returnType.kind == TypeKind.GENERIC_PARAM) {
+                    currentFuncDecl.returnType = &VOID_TYPE
+                }
             }
             return count == this.errors();
         }
