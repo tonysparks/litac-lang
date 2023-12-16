@@ -1415,7 +1415,7 @@ public func IsFuncImpl(traitFn: *TypeInfo, fn: *TypeInfo, checker: *TypeChecker)
     return true
 }
 
-public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
+public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = false) : *TypeSpec {
     var pos = (this.sym) ? this.sym.decl.startPos : SrcPos{};
     var allocator = &module.typeSpecAllocator
 
@@ -1475,20 +1475,20 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
         case TypeKind.ARRAY: {
             var arrayInfo = this
             var arrayTypeSpec = NewTypeSpec(TypeSpecKind.ARRAY, pos, allocator)
-            arrayTypeSpec.base = arrayInfo.arrayOf.asTypeSpec(module)
+            arrayTypeSpec.base = arrayInfo.arrayOf.asTypeSpec(module, fullyQualify)
             arrayTypeSpec.numElements = arrayInfo.numOfElements
             return arrayTypeSpec
         }
         case TypeKind.PTR: {
             var ptrInfo = this
             var ptrTypeSpec = NewTypeSpec(TypeSpecKind.PTR, pos, allocator)
-            ptrTypeSpec.base = ptrInfo.ptrOf.asTypeSpec(module)
+            ptrTypeSpec.base = ptrInfo.ptrOf.asTypeSpec(module, fullyQualify)
             return ptrTypeSpec
         }
         case TypeKind.CONST: {
             var constInfo = this
             var constTypeSpec = NewTypeSpec(TypeSpecKind.CONST, pos, allocator)
-            constTypeSpec.base = constInfo.constOf.asTypeSpec(module)
+            constTypeSpec.base = constInfo.constOf.asTypeSpec(module, fullyQualify)
             return constTypeSpec
         }
         case TypeKind.FUNC_PTR: {
@@ -1497,11 +1497,11 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
             args.init(funcInfo.paramDecls.size(), module.allocator)
             for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
                 var param = funcInfo.paramDecls.get(i)
-                args.add(param.asTypeSpec(module))
+                args.add(param.asTypeSpec(module, fullyQualify))
             }
 
             var result = NewTypeSpec(TypeSpecKind.FUNC_PTR, pos, allocator)
-            result.ret = funcInfo.returnType.asTypeSpec(module)
+            result.ret = funcInfo.returnType.asTypeSpec(module, fullyQualify)
             result.args = args
             result.hasVarargs = funcInfo.hasVarargs
             result.genericParams = funcInfo.genericParams
@@ -1511,18 +1511,66 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
         case TypeKind.UNION:
         case TypeKind.STRUCT: {
             var aggInfo = this
-            var result = NewNameTypeSpecIntern(pos, aggInfo.name, allocator)
 
-            var args = Array<*TypeSpec>{}
-            args.init(aggInfo.aggDecl.genericParams.size(), module.allocator)
-            for(var i = 0; i < aggInfo.aggDecl.genericParams.size(); i += 1) {
-                var param = aggInfo.aggDecl.genericParams.get(i)
-                var name = param.name.str
+            var buffer:[MAX_SYMBOL_NAME]char;
+            var nameStr = StringInit(buffer, MAX_SYMBOL_NAME, 0)
 
-                args.add(NewNameTypeSpecIntern(pos, name, allocator))
+            if(aggInfo.sym && fullyQualify) {
+                var name = aggInfo.sym.declared.id.packageName
+                nameStr.append("%.*s::", name.length, name.buffer)
             }
 
+            var baseName = aggInfo.name.view
+            if(fullyQualify) {
+                var index = aggInfo.name.view.indexOf("<", 1)
+
+                if(index > -1) {
+                    baseName = aggInfo.name.view.substring(0, index)
+                }
+            }
+
+            nameStr.append("%.*s", baseName.length, baseName.buffer)
+
+            var args = Array<*TypeSpec>{}
+
+            // try to use resolve symbol information, which has much more context
+            // of the type information
+            if(aggInfo.sym) {
+                args.init(aggInfo.sym.genericArgs.size(), module.allocator)
+                for(var i = 0; i < aggInfo.sym.genericArgs.size(); i += 1) {
+                    var param = aggInfo.sym.genericArgs.get(i)
+
+                    args.add(param.asTypeSpec(module, fullyQualify))
+                }
+            }
+            else {
+                args.init(aggInfo.aggDecl.genericParams.size(), module.allocator)
+                for(var i = 0; i < aggInfo.aggDecl.genericParams.size(); i += 1) {
+                    var param = aggInfo.aggDecl.genericParams.get(i)
+                    var name = param.name.str
+
+                    args.add(NewNameTypeSpecIntern(pos, name, allocator))
+                }
+            }
+
+            if(!args.empty() && false) {
+                nameStr.appendStrn("<", 1)
+                for(var i = 0; i < args.size(); i += 1) {
+                    var paramSpec = args.get(i)
+
+                    if(i > 0) {
+                        nameStr.appendStrn(",", 1)
+                    }
+                    nameStr.append("%.*s", paramSpec.name.length, paramSpec.name.buffer)
+                }
+                nameStr.appendStrn(">", 1)
+            }
+
+            var name = module.lita.strings.internCopy(nameStr.buffer, nameStr.length)
+            var result = NewNameTypeSpecIntern(pos, name, allocator)
             result.genericArgs = args;
+            result.isQualified = fullyQualify;
+
             return result
         }
         case TypeKind.ENUM: {
@@ -1537,12 +1585,6 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module) : *TypeSpec {
             return NewNameTypeSpecIntern(pos, POISON, allocator)
         }
         default: {
-            /*printf("TypeId: '%d'\n", this.kind)
-            printf("Type: '%s'\n", TypeKindAsStr(this.kind))
-            // force crash report
-            var x: *char = null
-            x[0] = 2
-            */
             assert(false)
         }
     }
@@ -1597,9 +1639,20 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *I
     var n = this.name.buffer
     var len = this.name.length
 
+    var packageName: *InternedString = null;
+
     if(alias) {
-        for(;index < alias.length && index < MAX_SYMBOL_NAME; index += 1) {
-            name[index] = alias.buffer[index]
+        packageName = alias
+    }/*
+    else {
+        if(!IsPrimitive(this) && this.sym) {
+            packageName = &this.sym.declared.id.packageName
+        }
+    }*/
+
+    if(packageName) {
+        for(;index < packageName.length && index < MAX_SYMBOL_NAME; index += 1) {
+            name[index] = packageName.buffer[index]
         }
         name[index+0] = ':';
         name[index+1] = ':';
@@ -1622,7 +1675,6 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *I
 
 
     name[index] = '\0'
-
     return name
 }
 
@@ -2134,6 +2186,14 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
 
     // TODO: Check if this is 'using' base
 not_found:
+/*@static var found: i32 = 0
+//if(found == 114)
+{
+    //module.print("Functions")
+    printf("func name: %s\n", funcName)
+}
+found += 1
+*/
     return MethodResult {
         .symbol = null,
         .name = EMPTY_STR,
