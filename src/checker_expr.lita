@@ -599,6 +599,9 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
                 var inferredType = this.inferredType(genericParam.name, paramType, argType)
                 if(inferredType) {
+                    /*var isGenericType = (inferredType.sym && (inferredType.sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE)))
+                    var xx = inferredType.asTypeSpec(this.current, isGenericType)
+                    nameSpec.genericArgs.add(xx)*/
                     nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current))
                     break
                 }
@@ -633,7 +636,12 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
 
                 var inferredType = this.inferredType(genericParam.name, paramType, argType)
                 if(inferredType) {
-                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current))
+                    var isGenericType = (inferredType.sym && (inferredType.sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE)))
+                    var xx = inferredType.asTypeSpec(this.current, isGenericType)
+                    //printf("InferredType: %.*s %d kind: %s %d\n",
+                        //xx.name.length, xx.name.buffer, xx.genericArgs.size(), TypeKindAsStr(inferredType.kind), isGenericType)
+                    nameSpec.genericArgs.add(xx)
+                    //nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current))
                     break
                 }
             }

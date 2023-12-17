@@ -4,6 +4,7 @@ import "std/assert"
 import "std/mem"
 import "std/map"
 import "std/array"
+import "std/string_view"
 
 import "symbols"
 import "ast"
@@ -18,50 +19,160 @@ import "intern"
 
 public const MAX_GENERIC_NAME = 1024;
 
-func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
-    if(type == null) {
+func GetGenericName(checker: *TypeChecker, typeSpec: *TypeSpec, str: *String, fullyQualified: bool) {
+    if(typeSpec == null) {
         return;
     }
 
-    switch(type.kind) {
+    switch(typeSpec.kind) {
         case TypeSpecKind.ARRAY: {
             str.append("[]")
-            GetGenericName(checker, type.base, str)
+            GetGenericName(checker, typeSpec.base, str, fullyQualified)
             return;
         }
         case TypeSpecKind.PTR: {
             str.append("*")
-            GetGenericName(checker, type.base, str)
+            GetGenericName(checker, typeSpec.base, str, fullyQualified)
             return;
         }
         case TypeSpecKind.CONST: {
             str.append("const ")
-            GetGenericName(checker, type.base, str)
+            GetGenericName(checker, typeSpec.base, str, fullyQualified)
             return;
         }
         case TypeSpecKind.NAME: {
-            var name = type
+            var name = typeSpec
 
             // We must account for typedef'd types, if they
             // are typedef'd we need to use the real type
             // for the naming
             var nameSet = false
-            if(!type.typeInfo) {
-                var unaliasedType = checker.getType(name)
-                if(unaliasedType) {
-                    var type = unaliasedType.type
-                    if(type && !type.name.empty()) {
-                        str.appendStrn(type.name.buffer, type.name.length)
+            var sym: *Symbol = null
+            var typeInfo: *TypeInfo = null
+
+            var isX = name.name.equalsStr("Map") && fullyQualified && false
+            if(isX) {
+                printf("Starting visit\n")
+            }
+
+            defer if(isX) {
+                printf("Final Gen Name: %.*s => %.*s\n",
+                    name.name.length, name.name.buffer,
+                    str.length, str.buffer)
+            }
+
+            // if this typespec hasn't been resolved,
+            // get the associated type
+            if(!typeSpec.typeInfo) {
+                sym = checker.getType(name)
+                if(sym) {
+                    typeInfo = sym.type
+                    if(sym.isAliased()) {
+                        sym = sym.type.sym
+                    }
+
+                    if(typeInfo && !typeInfo.name.empty()) {
+                        if(!IsPrimitive(typeInfo) && fullyQualified) {
+                            var name = sym.declared.id.packageName
+                            str.append("%.*s::", name.length, name.buffer)
+                        }
+
+                        str.appendStrn(typeInfo.name.buffer, typeInfo.name.length)
                         nameSet = true
                     }
                 }
             }
-            // Causes an issue with generic types with generic types: Map<i32, Map<i32, i32>>
             else {
-                str.append("%.*s", type.typeInfo.name.length, type.typeInfo.name.buffer)
-                return;
+                typeInfo = typeSpec.typeInfo
+                sym = typeInfo.sym
+                if(sym.isAliased()) {
+                    sym = sym.type.sym
+                }
             }
 
+            // ensure generic types contain generic arguments
+            if(sym && !sym.genericArgs.empty()/* && name.genericArgs.empty()*/) {
+                var newName = sym.type.asTypeSpec(checker.current, true)
+                name = newName
+            }
+
+            if(sym && !nameSet) {
+                var isGeneric = (sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE));
+                var isBuiltin = (sym.flags & SymbolFlags.IS_BUILTIN)
+                var includePackage = !isGeneric && !isBuiltin && fullyQualified && !IsPrimitive(sym.type);
+
+                // include the fully qualified package name if not already included
+                if(includePackage) {
+                    var name = sym.declared.id.packageName
+                    str.append("%.*s::", name.length, name.buffer)
+                }
+
+                // if this isn't a generic type, we want to use the symbol name, otherwise the TypeSpec name
+                // should be used
+                if(!isGeneric) {
+                    str.append("%.*s", sym.name.length, sym.name.buffer)
+                    nameSet = true;
+                }
+            }
+
+/*
+            var isX = name.name.equalsStr("Typeid")// && name.name.view.contains("SrcPos")
+            defer if(isX && fullyQualified) {
+                printf("Final Gen Name: %.*s => %.*s has sym: %d isQ: %d\n",
+                    name.name.length, name.name.buffer,
+                    str.length, str.buffer, sym != null, typeSpec.isQualified)
+            }
+
+            if(!typeSpec.typeInfo) {
+                var unaliasedType = checker.getType(name)
+                if(unaliasedType) {
+                    sym = unaliasedType
+
+                    var type = unaliasedType.type
+                    if(type && !type.name.empty()) {
+                        if(!IsPrimitive(type) && fullyQualified) {
+                            var name = unaliasedType.declared.id.packageName
+                            str.append("%.*s::", name.length, name.buffer)
+                        }
+                        str.appendStrn(type.name.buffer, type.name.length)
+                        nameSet = true
+if(isX)
+printf("Would have created: %.*s vs %.*s\n", type.name.length, type.name.buffer, name.name.length, name.name.buffer)
+                        //if(fullyQualified)
+                        //    printf("Simple Name: %.*s\n", str.length, str.buffer)
+                    }
+                }
+
+                // if(isX) {
+                //     printf("Did not sub: %.*s set %d\n", name.name.length, name.name.buffer, nameSet)
+                // }
+            }
+            // Causes an issue with generic types with generic types: Map<i32, Map<i32, i32>>
+            else {
+                sym = typeSpec.typeInfo.sym
+                var includePackage = sym && !(sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE))
+                    && !IsPrimitive(typeSpec.typeInfo) && typeSpec.typeInfo.sym && fullyQualified// && !typeSpec.isQualified;
+
+                //if(!IsPrimitive(typeSpec.typeInfo) && typeSpec.typeInfo.sym && fullyQualified && !typeSpec.isQualified) {
+                if(includePackage) {
+                    var name = typeSpec.typeInfo.sym.declared.id.packageName
+                    str.append("%.*s::", name.length, name.buffer)
+                }
+
+                if(sym && !(sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE))) {
+                    //printf("sym.flags: %b -> %d\n", sym.flags, sym.flags & SymbolFlags.IS_ALIAS)
+                    //str.append("%.*s", type.typeInfo.name.length, type.typeInfo.name.buffer)
+                    str.append("%.*s", sym.name.length, sym.name.buffer)
+                    nameSet = true;
+
+                }
+
+                //printf("*** %.*s\n", type.typeInfo.name.length, type.typeInfo.name.buffer)
+                //if(fullyQualified)
+                //    printf("~Simple Name: %.*s\n", str.length, str.buffer)
+                //return;
+            }
+*/
             if(!nameSet) {
                 str.appendStrn(name.name.buffer, name.name.length)
             }
@@ -71,29 +182,30 @@ func GetGenericName(checker: *TypeChecker, type: *TypeSpec, str: *String) {
             }
 
             // TODO: Check we fit the whole name!
+
             str.append("<")
             for(var i = 0; i < name.genericArgs.size(); i+=1) {
                 if(i > 0) {
                     str.append(",")
                 }
                 var arg = name.genericArgs.get(i)
-                GetGenericName(checker, arg, str)
+                GetGenericName(checker, arg, str, fullyQualified)
             }
             str.append(">")
             return;
         }
         case TypeSpecKind.FUNC_PTR: {
             str.append("func(")
-            for(var i = 0; i < type.args.size(); i+=1) {
+            for(var i = 0; i < typeSpec.args.size(); i+=1) {
                 if(i > 0) {
                     str.append(",")
                 }
-                var arg = type.args.get(i)
-                GetGenericName(checker, arg, str)
+                var arg = typeSpec.args.get(i)
+                GetGenericName(checker, arg, str, fullyQualified)
             }
             str.append("):")
-            if(type.ret) {
-                GetGenericName(checker, type.ret, str)
+            if(typeSpec.ret) {
+                GetGenericName(checker, typeSpec.ret, str, fullyQualified)
             }
             else {
                 str.append("void")
@@ -123,12 +235,20 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
 
     var buffer: [MAX_GENERIC_NAME]char;
     var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
-    GetGenericName(checker, name, genericName)
 
-    var newNameStr = checker.lita.strings.internCopy(genericName.cStrConst(), genericName.length)
-    var genericSym = checker.current.genericSymbols.get(newNameStr)
+    //
+    GetGenericName(checker, name, genericName, true)
+    var lookupNameStr = checker.lita.strings.internCopy(genericName.cStrConst(), genericName.length)
+
+//printf("Looking up Generic: %.*s\n", lookupNameStr.length, lookupNameStr.buffer)
+    var genericSym = checker.current.genericSymbols.get(lookupNameStr)
     const module = checker.current
 
+var isNew = genericSym == null
+
+genericName.clear()
+GetGenericName(checker, name, genericName, false)
+var newNameStr = checker.lita.strings.internCopy(genericName.cStrConst(), genericName.length)
 
     // if this is recompilation, we want to force creating a new
     // Declaration type
@@ -137,25 +257,33 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     }
 
     if(!genericSym) {
+        //printf("Creating Decl for: %.*s\n", lookupNameStr.length, lookupNameStr.buffer)
         var genericDecl = CreateDecl(sym, name.genericArgs, module)
+        //printf("Done Creating Decl for: %.*s\n", lookupNameStr.length, lookupNameStr.buffer)
         if(!genericDecl) {
             goto err;
         }
 
+
+        // genericName.clear()
+        // GetGenericName(checker, name, genericName, false)
+        // var newNameStr = checker.lita.strings.internCopy(genericName.cStrConst(), genericName.length)
+//printf("Now Adding\n")
         genericSym = checker.current.symbols.addSymbol(newNameStr,
                                                        sym.declared,
                                                        genericDecl,
                                                        SymbolFlags.IS_INCOMPLETE|
                                                        SymbolFlags.IS_FROM_GENERIC_TEMPLATE)
-
+//printf("Done Adding\n")
         if(!genericSym) {
+  //          printf("Creating an error!\n")
             goto err;
         }
 
         genericSym.genericCallsiteModule = checker.current
         genericSym.genericParams = genericDecl.genericParams.copy(checker.allocator)
 
-        checker.current.genericSymbols.put(newNameStr, genericSym)
+        checker.current.genericSymbols.put(lookupNameStr, genericSym)
         if(genericSym.decl.kind == StmtKind.FUNC_DECL) {
             checker.symbolFuncs.add(genericSym)
         }
@@ -200,6 +328,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         }
 
         if(!isValidArgs) {
+      //      printf("Invalid args for: %.*s\n", lookupNameStr.length, lookupNameStr.buffer)
             goto err;
         }
     }
@@ -231,6 +360,16 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         var genericType = genericSym.type
         genericType.genericTypeid = sym.type.typeid
     }
+/*
+if(isNew) {
+printf("Created NewGeneric: %.*s vs. %.*s typeid: %zu\n",
+    newNameStr.length, newNameStr.buffer, lookupNameStr.length, lookupNameStr.buffer, genericSym.type.typeid
+)
+}
+else {
+    printf("Referenced Generic: %.*s typeid: %zu\n",
+    lookupNameStr.length, lookupNameStr.buffer, genericSym.type.typeid)
+}*/
 
     return genericSym
 
