@@ -135,14 +135,14 @@ size_t strnlen(const char * s, size_t len) {
 
 // string operations
 @foreign public func strcat(dest: *char, src: *const char) : *char;
-@foreign public func strncat(dest: *char, src: *const char, num: u64) : *char;
-@foreign public func strncpy(dest: *char, src: *const char, num: u64) : *char;
+@foreign public func strncat(dest: *char, src: *const char, num: usize) : *char;
+@foreign public func strncpy(dest: *char, src: *const char, num: usize) : *char;
 @foreign public func strcpy(dest: *char, src: *const char) : *char;
 @foreign public func strlen(str: *const char) : i32;
-@foreign public func strnlen(str: *const char, len: u64) : i32;
-@foreign public func strncmp(a: *const char, b: *const char, num: u64) : i32;
+@foreign public func strnlen(str: *const char, len: usize) : i32;
+@foreign public func strncmp(a: *const char, b: *const char, num: usize) : i32;
 @foreign public func strcmp(a: *const char, b: *const char) : i32;
-@foreign public func snprintf(s: *char, n: u64, format: *const char, ...): i32;
+@foreign public func snprintf(s: *char, n: usize, format: *const char, ...): i32;
 @foreign public func sprintf(b: *char, format: *const char, ...) : i32;
 @foreign public func strtok(str: *char, delim: *const char) : *char;
 @foreign public func strtol(str: *const char, end: **char, base: i32) : i64;

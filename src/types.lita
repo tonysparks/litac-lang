@@ -1515,6 +1515,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
             var buffer:[MAX_SYMBOL_NAME]char;
             var nameStr = StringInit(buffer, MAX_SYMBOL_NAME, 0)
 
+
             if(aggInfo.sym && fullyQualify) {
                 var name = aggInfo.sym.declared.id.packageName
                 nameStr.append("%.*s::", name.length, name.buffer)
@@ -1553,23 +1554,9 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
                 }
             }
 
-            if(!args.empty() && false) {
-                nameStr.appendStrn("<", 1)
-                for(var i = 0; i < args.size(); i += 1) {
-                    var paramSpec = args.get(i)
-
-                    if(i > 0) {
-                        nameStr.appendStrn(",", 1)
-                    }
-                    nameStr.append("%.*s", paramSpec.name.length, paramSpec.name.buffer)
-                }
-                nameStr.appendStrn(">", 1)
-            }
-
             var name = module.lita.strings.internCopy(nameStr.buffer, nameStr.length)
             var result = NewNameTypeSpecIntern(pos, name, allocator)
             result.genericArgs = args;
-            result.isQualified = fullyQualify;
 
             return result
         }
@@ -1676,6 +1663,14 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *I
 
     name[index] = '\0'
     return name
+}
+
+public func (this: *TypeInfo) getBaseNameView() : StringView {
+    var index = this.name.view.indexOf("<", 1)
+    if(index > -1) {
+        return this.name.view.substring(0, index)
+    }
+    return this.name.view
 }
 
 

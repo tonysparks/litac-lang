@@ -37,7 +37,7 @@ public func (b: *StringBuffer) init(initialSize: i32 = 16,
 }
 
 public func (b: *StringBuffer) free() {
-    if(b && b.buffer) {
+    if(b && b.buffer && b.alloc) {
         b.alloc.free(b.buffer as (*void))
         b.buffer = null
         b.length = 0

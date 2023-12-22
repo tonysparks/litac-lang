@@ -369,11 +369,29 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
     return true
 }
 
-func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, expectedType: *TypeInfo) : *TypeInfo {
-    assert(paramType != null)
+struct ParamInfo {
+    spec: *TypeSpec
+    typeInfo: *TypeInfo
+}
+
+func (this: *TypeChecker) inferredType(
+    name: Identifier,
+    paramInfo: *ParamInfo,
+    expectedType: *TypeInfo) : *TypeInfo {
+
+    assert(paramInfo != null)
     assert(expectedType != null)
 
+    var paramType = paramInfo.typeInfo
+    assert(paramType != null)
+
+    var paramSpec = paramInfo.spec
+
     if(name.str.equals(paramType.name)) {
+        return expectedType
+    }
+
+    if(paramSpec && name.str.equals(paramSpec.name)) {
         return expectedType
     }
 
@@ -382,13 +400,26 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
     }
 
     var index = 0;
-    if(paramType.sym && (paramType.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
-        var genericArgs = paramType.sym.genericArgs
-        for(; index < genericArgs.size(); index += 1) {
-            var arg = genericArgs.get(index)
+    if(paramSpec && paramSpec.kind == TypeSpecKind.NAME) {
+        for(; index < paramSpec.genericArgs.size(); index += 1) {
+            var arg = paramSpec.genericArgs.get(index)
 
-            if(name.str.equals(arg.name)) {
-                break;
+            if(arg.kind == TypeSpecKind.NAME) {
+                if(name.str.equals(arg.name)) {
+                    break;
+                }
+            }
+        }
+    }
+    else {
+        if(paramType.sym && (paramType.sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
+            var genericArgs = paramType.sym.genericArgs
+            for(; index < genericArgs.size(); index += 1) {
+                var arg = genericArgs.get(index)
+
+                if(name.str.equals(arg.name)) {
+                    break;
+                }
             }
         }
     }
@@ -397,17 +428,20 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
         case TypeKind.ARRAY: {
             var arrayInfo = paramType
             var expectedArrayInfo = expectedType
-            return this.inferredType(name, arrayInfo.arrayOf, expectedArrayInfo.arrayOf)
+            var info = ParamInfo{.spec = paramInfo.spec, .typeInfo = arrayInfo.arrayOf}
+            return this.inferredType(name, &info, expectedArrayInfo.arrayOf)
         }
         case TypeKind.CONST: {
             var constInfo = paramType
             var expectedConstInfo = expectedType
-            return this.inferredType(name, constInfo.constOf, expectedConstInfo.constOf)
+            var info = ParamInfo{.spec = paramInfo.spec, .typeInfo = constInfo.constOf}
+            return this.inferredType(name, &info, expectedConstInfo.constOf)
         }
         case TypeKind.PTR: {
             var ptrInfo = paramType
             var expectedPtrInfo = expectedType
-            return this.inferredType(name, ptrInfo.ptrOf, expectedPtrInfo.ptrOf)
+            var info = ParamInfo{.spec = paramInfo.spec, .typeInfo = ptrInfo.ptrOf}
+            return this.inferredType(name, &info, expectedPtrInfo.ptrOf)
         }
         case TypeKind.TRAIT:
         case TypeKind.UNION:
@@ -422,13 +456,10 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
             var genericName = aggInfo.aggDecl.genericParams.get(index).name
             var expectedAggInfo = expectedType
 
-            var aggBaseName: [MAX_SYMBOL_NAME]char;
-            var expectedBaseName: [MAX_SYMBOL_NAME]char;
+            var aggBaseName = aggInfo.getBaseNameView()
+            var expectedBaseName = expectedAggInfo.getBaseNameView()
 
-            aggInfo.getBaseName(aggBaseName);
-            expectedAggInfo.getBaseName(expectedBaseName)
-
-            if(strcmp(aggBaseName, expectedBaseName) == 0) {
+            if(aggBaseName.equalsStringView(expectedBaseName)) {
                 var sym = expectedAggInfo.sym; // expectedAggInfo.decl.genericParams?
                 var pSize = sym.genericParams.size()
                 if(pSize) {
@@ -476,7 +507,8 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
                 if(argumentField.kind != StmtKind.POISON_EXPR) {
                     assert(field.typeInfo != null)
 
-                    var fieldType = this.inferredType(genericName, field.typeInfo, argumentField.typeInfo)
+                    var info = ParamInfo{.typeInfo = field.typeInfo}
+                    var fieldType = this.inferredType(genericName, &info, argumentField.typeInfo)
                     if(fieldType) {
                         return fieldType
                     }
@@ -492,14 +524,16 @@ func (this: *TypeChecker) inferredType(name: Identifier, paramType: *TypeInfo, e
             var genericName = funcInfo.genericParams.get(index).name
             var argumentFuncInfo = expectedType
 
-            var retType = this.inferredType(genericName, funcInfo.returnType, argumentFuncInfo.returnType)
+            var info = ParamInfo{.typeInfo = funcInfo.returnType}
+            var retType = this.inferredType(genericName, &info, argumentFuncInfo.returnType)
             if(retType) {
                 return retType
             }
 
             for(var i = 0; i < funcInfo.paramDecls.size(); i+=1) {
                 if(i < argumentFuncInfo.paramDecls.size()) {
-                    var pType = this.inferredType(genericName, funcInfo.paramDecls.get(i), argumentFuncInfo.paramDecls.get(i))
+                    var info = ParamInfo{.typeInfo = funcInfo.paramDecls.get(i)}
+                    var pType = this.inferredType(genericName, &info, argumentFuncInfo.paramDecls.get(i))
                     if(pType) {
                         return pType
                     }
@@ -545,7 +579,6 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
             goto err;
         }
     }
-
     var objectExpr: *Expr = expr.object
     if(isMethodCall) {
         var getExpr: *GetExpr = expr.object as (*GetExpr);
@@ -597,12 +630,11 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
                 assert(argType != null)
                 assert(paramType != null)
 
-                var inferredType = this.inferredType(genericParam.name, paramType, argType)
+                var info = ParamInfo{.typeInfo = paramType}
+                var inferredType = this.inferredType(genericParam.name, &info, argType)
                 if(inferredType) {
-                    /*var isGenericType = (inferredType.sym && (inferredType.sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE)))
-                    var xx = inferredType.asTypeSpec(this.current, isGenericType)
-                    nameSpec.genericArgs.add(xx)*/
-                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current))
+                    var isGenericType = (inferredType.sym && (inferredType.sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE)))
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current, isGenericType))
                     break
                 }
             }
@@ -619,29 +651,37 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         nameSpec.genericArgs.init(size, this.allocator)
         expr.genericArgs.init(size, this.allocator)
 
+//printf("Inferring Func Call: %.*s => %p\n", funcInfo.name.length, funcInfo.name.buffer, funcInfo.funcDecl)
         var suppliedArgsSize = suppliedArgs.size()
         for(var i = 0; i < size; i+=1) {
             var genericParam = genericParams.get(i)
-
+// printf("    Checking: %.*s\n", genericParam.name.str.length, genericParam.name.str.buffer)
             for(var j = 0; j < funcInfo.funcDecl.params.size(); j+=1) {
-                var paramType = funcInfo.funcDecl.params.get(j).typeInfo
-
                 if(j >= suppliedArgsSize) {
                     break
                 }
+                var paramDecl = funcInfo.funcDecl.params.get(j)
+                var paramType = paramDecl.typeInfo
 
                 var argType = suppliedArgs.get(j).argExpr.operand.typeInfo
                 assert(argType != null)
                 assert(paramType != null)
 
-                var inferredType = this.inferredType(genericParam.name, paramType, argType)
+// printf("    ParamType: %.*s vs arg type: %.*s  paramDecl type: %.*s args: %d %p\n",
+//     paramType.name.length, paramType.name.buffer,
+//     argType.name.length, argType.name.buffer,
+//     paramDecl.type.name.length, paramDecl.type.name.buffer, paramDecl.type.genericArgs.size(), paramDecl)
+
+//     for(var ii = 0; ii < paramDecl.type.genericArgs.size(); ii+=1) {
+//         var aa = paramDecl.type.genericArgs.get(ii)
+//         printf("        Arg: %d %.*s\n", ii, aa.name.length, aa.name.buffer)
+//     }
+
+                var info = ParamInfo{.spec = paramDecl.type, .typeInfo = paramType}
+                var inferredType = this.inferredType(genericParam.name, &info, argType)
                 if(inferredType) {
                     var isGenericType = (inferredType.sym && (inferredType.sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE)))
-                    var xx = inferredType.asTypeSpec(this.current, isGenericType)
-                    //printf("InferredType: %.*s %d kind: %s %d\n",
-                        //xx.name.length, xx.name.buffer, xx.genericArgs.size(), TypeKindAsStr(inferredType.kind), isGenericType)
-                    nameSpec.genericArgs.add(xx)
-                    //nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current))
+                    nameSpec.genericArgs.add(inferredType.asTypeSpec(this.current, isGenericType))
                     break
                 }
             }
@@ -1303,7 +1343,8 @@ func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *TypeInfo) : *
         var genericParam = aggInfo.aggDecl.genericParams.get(genericIndex)
 
         for(var fieldIndex = 0; fieldIndex < aggInfo.aggDecl.fields.size(); fieldIndex += 1) {
-            var paramType = aggInfo.aggDecl.fields.get(fieldIndex).typeInfo
+            var field = aggInfo.aggDecl.fields.getPtr(fieldIndex)
+            var paramType = field.typeInfo
             if(!paramType) {
                 this.errorInferGenericParameter(expr, genericParam)
                 goto err
@@ -1313,7 +1354,18 @@ func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *TypeInfo) : *
                 break
             }
 
-            var inferredType = this.inferredType(genericParam.name, paramType, suppliedArgs.get(fieldIndex))
+            var spec: *TypeSpec = null
+            switch(field.kind) {
+                case StmtKind.VAR_FIELD_DECL:
+                case StmtKind.TRAIT_FIELD_DECL: {
+                    spec = (field as (*VarFieldDecl)).type
+                    break;
+                }
+                default:  // nothing
+            }
+
+            var info = ParamInfo{.spec = spec, .typeInfo = paramType}
+            var inferredType = this.inferredType(genericParam.name, &info, suppliedArgs.get(fieldIndex))
             if(inferredType) {
                 expr.type.genericArgs.add(inferredType.asTypeSpec(this.current))
                 break

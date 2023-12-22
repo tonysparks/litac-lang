@@ -305,7 +305,6 @@
                 assert(test(t) == 4)
             `,
         },
-
         {
             "name": "Generics Type Inference from Union Generic Type with typedef",
             "definitions": `
@@ -325,6 +324,26 @@
             `,
         },
 
+
+        {
+            "name": "Generics Type Inference from Union Generic Type with typedef x2",
+            "definitions": `
+                union Test<V> {
+                    a : V
+                }
+
+                typedef Test<V> as Foo<V>
+                typedef Foo<V> as Bar<V>
+
+                func test<T>(t:Bar<T>):T {
+                    return t.a
+                }
+            `,
+            "code": `
+                var t = Test<i32> { 4 }
+                assert(test(t) == 4)
+            `,
+        },
         {
             "name": "Generics Type Inference Partial from Union Generic Type",
             "definitions": `

@@ -327,6 +327,10 @@ func (this: *Strings) grow(newlength: i32) {
 
 @inline
 public func (this: *InternedString) equalsStr(other: *const char) : bool {
+    var otherLen = strlen(other)
+    if(otherLen != this.length) {
+        return false
+    }
     return strncmp(this.buffer, other, this.length) == 0
 }
 

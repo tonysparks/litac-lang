@@ -359,13 +359,14 @@ public func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInf
         a.toString(sb)
         sb.appendStrn("'", 1)
 
+
         /*sb.append("a.typeid = %llu vs b.typeid = %llu\n", a.typeid, b.typeid)
         if(IsPtr(a)) {
-            sb.append("a.ptrOf.typeid = %llu\n", a.ptrOf.typeid)
+            sb.append("a.base.typeid = %llu\n", a.getBaseType().typeid)
         }
 
         if(IsPtr(b)) {
-            sb.append("b.ptrOf.typeid = %llu\n", b.ptrOf.typeid)
+            sb.append("b.base.typeid = %llu\n", b.getBaseType().typeid)
         }*/
 
         this.result.addErrorStr(src, sb)
@@ -947,7 +948,6 @@ public func (this: *TypeChecker) getType(spec: *TypeSpec, searchType: SearchType
 }
 
 public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchType: SearchType = SearchType.TYPE) : *Symbol {
-
     var type = GetTypeFromModule(this.current, typeName, searchType)
     if(!type) {
         if(this.genericContext.callsite) {
@@ -955,12 +955,19 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchT
         }
     }
 
+    if(type) {
+        return type
+    }
+
+    var qualifiedIndex = typeName.view.lastIndexOfAt("::")
+    var fullScan = this.bypassing || qualifiedIndex > -1
+
     // a work around that allows for looking up ALL
     // modules without having to import them all into
     // the current module
-    if(!type && this.bypassing) {
+    if(fullScan) {
         var name = typeName.view
-        var index = name.lastIndexOfAt("::")
+        var index = qualifiedIndex
         if(index < 0) {
             return null
         }

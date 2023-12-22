@@ -1480,13 +1480,10 @@ func (p: *JsonParser) expect(kind: TokenKind) : bool {
 
 @test
 public func testParser() {
-    #if true ||\
-        false
-        printf("Hello!\n")
-    #end
     var data:*char;
     var length: usize;
-    if(ReadFile("C:/Users/antho/git/litac-lang/test/tests/example.json", &data, &length) != FileStatus.Ok) {
+    if(ReadFile("./test/tests/example.json", &data, &length) != FileStatus.Ok) {
+        printf("Failed to read file\n")
         goto err;
     }
 
@@ -1506,5 +1503,10 @@ public func testParser() {
         var def = node.getStr("definitions")
         printf("%s\n", def)
     }
+
+    return;
+
+
 err:
+    assert(false)
 }

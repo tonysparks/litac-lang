@@ -3,6 +3,7 @@ import "std/array"
 import "std/map"
 import "std/mem"
 import "std/string"
+import "std/assert"
 
 import "ast"
 import "lex"
@@ -80,6 +81,21 @@ public struct Symbol {
     genericCallsiteModule: *Module
     genericArgs: Array<*TypeInfo>
     genericParams: Array<GenericParam>
+}
+
+public func (this: *Symbol) isAliased() : bool {
+    if(!this) {
+        return false
+    }
+
+    // the type of this symbol
+    var typeInfo = this.type
+    if(!typeInfo) {
+        return false
+    }
+
+    // now see if the symbol is the same
+    return typeInfo.sym != this
 }
 
 public func (this: *Symbol) isGenericCapable() : bool {
@@ -253,7 +269,7 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
         symbolStorage = &this.symbolNotes
     }
 
-    if(symbolStorage.contains(name) /*&& !(symbol.flags & SymbolFlags.IS_GENERATED)*/) {
+    if(symbolStorage.contains(name)) {
         if(symbol.flags & SymbolFlags.IS_GENERATED) {
 
             // allow presedence to be set
@@ -365,7 +381,10 @@ public func (this: *Scope) addSymbol(name: InternedString,
             var existingSym = symbolStorage.get(name)
             var decl = existingSym.decl
             this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
-                name.length, name.buffer, decl.startPos.filename, decl.startPos.lineNumber)
+                name.length, name.buffer,
+                existingSym.decl.startPos.filename,
+                existingSym.decl.startPos.lineNumber
+            )
             return null;
         }
     }
@@ -476,7 +495,6 @@ public func (this: *Scope) addSymbol(name: InternedString,
     }
     return sym
 }
-
 
 // TEMP
 public func (this: *Scope) print(header: *const char) {

@@ -506,6 +506,7 @@
             `,
             "error": "unknown type 'T'"
         },
+
         {
             "name": "Generic With Typedef Generic",
             "definitions": `
@@ -521,7 +522,7 @@
                 var test = StrMap<StringMap>(StringMap{})
                 test.exec()
 
-            `
+            `,
         },
         {
             "name": "Generic With Generic",
@@ -534,6 +535,72 @@
             `,
             "code": `
                 var test = StrMap<Map<i32, String>>(Map<i32, String>{})
+                test.exec()
+
+            `
+        },
+
+        {
+            "name": "Generic With Typedef Generic with alias",
+            "definitions": `
+                import "std/string" as str;
+                import "std/map";
+
+                public typedef Map<i32, str::String> as StringMap
+
+                public func (this: *Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = StrMap<StringMap>(StringMap{})
+                test.exec()
+
+            `,
+        },
+        {
+            "name": "Generic With Generic with alias",
+            "definitions": `
+                import "std/string" as str;
+                import "std/map";
+
+                public func (this: *Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = StrMap<Map<i32, str::String>>(Map<i32, str::String>{})
+                test.exec()
+
+            `
+        },
+
+        {
+            "name": "Generic With Typedef Generic with alias2",
+            "definitions": `
+                import "std/string" as str;
+                import "std/map" as m;
+
+                public typedef m::Map<i32, str::String> as StringMap
+
+                public func (this: *m::Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = m::StrMap<StringMap>(StringMap{})
+                test.exec()
+
+            `,
+        },
+        {
+            "name": "Generic With Generic with alias2",
+            "definitions": `
+                import "std/string" as str;
+                import "std/map" as m;
+
+                public func (this: *m::Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = m::StrMap<m::Map<i32, str::String>>(m::Map<i32, str::String>{})
                 test.exec()
 
             `
