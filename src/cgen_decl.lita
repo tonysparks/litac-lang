@@ -4,6 +4,7 @@ import "std/string"
 import "std/libc"
 import "std/array"
 import "std/map"
+import "std/hash"
 
 import "ast"
 import "types"

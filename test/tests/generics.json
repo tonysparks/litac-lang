@@ -661,6 +661,7 @@
             "definitions": `
                 import "std/string";
                 import "std/map";
+                import "std/hash"
 
                 public typedef Map<i32, String> as StringMap
 
@@ -678,6 +679,7 @@
             "definitions": `
                 import "std/string";
                 import "std/map";
+                import "std/hash"
 
                 public func (this: *Map<K, V>) exec<K,V>() {
                 }
@@ -694,6 +696,7 @@
             "definitions": `
                 import "std/string" as str;
                 import "std/map";
+                import "std/hash"
 
                 public typedef Map<i32, str::String> as StringMap
 
@@ -711,6 +714,7 @@
             "definitions": `
                 import "std/string" as str;
                 import "std/map";
+                import "std/hash"
 
                 public func (this: *Map<K, V>) exec<K,V>() {
                 }
@@ -727,6 +731,7 @@
             "definitions": `
                 import "std/string" as str;
                 import "std/map" as m;
+                import "std/hash"
 
                 public typedef m::Map<i32, str::String> as StringMap
 
@@ -744,6 +749,48 @@
             "definitions": `
                 import "std/string" as str;
                 import "std/map" as m;
+                import "std/hash"
+
+                public func (this: *m::Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = m::StrMap<m::Map<i32, str::String>>(m::Map<i32, str::String>{})
+                test.exec()
+
+            `
+        },
+        {
+            "name": "Generic With Generic with alias2",
+            "definitions": `
+                import "Person" as p
+            `,
+            "modules": [
+                {
+                    "name": "Person",
+                    "program": `
+                        public struct Person {
+                            age: i32
+                        }
+
+                        public func (this: *Person) getAge() : i32 {
+                            return this.age
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var person = p::Person {.age = 31}
+                assert(person.getAge() == 31)
+
+            `
+        },
+        {
+            "name": "Generic With Generic with alias2",
+            "definitions": `
+                import "std/string" as str;
+                import "std/map" as m;
+                import "std/hash"
 
                 public func (this: *m::Map<K, V>) exec<K,V>() {
                 }

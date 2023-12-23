@@ -2,6 +2,7 @@ import "std/assert"
 import "std/mem"
 import "std/libc"
 import "std/map"
+import "std/hash"
 import "std/array"
 
 import "lita"
@@ -71,8 +72,6 @@ public func (this: *DependencyGraph) init(lita: *Lita) {
 
     this.dependencies.init(EmptyDependency,
                            symbols.symbolTypes.size(),
-                           PtrHashFn<*Symbol>,
-                           PtrEqualFn<*Symbol>,
                            lita.allocator)
 }
 

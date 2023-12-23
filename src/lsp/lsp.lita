@@ -5,6 +5,7 @@ import "std/string"
 import "std/json"
 import "std/libc"
 import "std/map"
+import "std/hash"
 import "std/system"
 import "std/array"
 

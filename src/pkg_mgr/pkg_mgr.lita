@@ -90,6 +90,7 @@
 import "std/http"
 import "std/mem"
 import "std/map"
+import "std/hash"
 import "std/array"
 import "std/libc"
 import "std/io"

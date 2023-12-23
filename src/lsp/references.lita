@@ -5,6 +5,7 @@ import "std/map"
 import "std/array"
 import "std/mem"
 import "std/string_buffer"
+import "std/hash"
 
 import "ast"
 import "common"
@@ -49,7 +50,7 @@ public func (this: *ReferenceDatabase) init(allocator: *const Allocator) {
     const INITIAL_SIZE = 1024
     this.typeReferences.init(INITIAL_SIZE, allocator)
     this.fieldReferences.init(INITIAL_SIZE, allocator)
-    this.symbols.init(Array<SrcPos>{}, INITIAL_SIZE, PtrHashFn<usize>, PtrEqualFn<usize>, allocator)
+    this.symbols.init(Array<SrcPos>{}, INITIAL_SIZE, allocator)
 }
 
 public func (this: *ReferenceDatabase) addSymbolReference(symbol: *Symbol, pos: SrcPos) {

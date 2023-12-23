@@ -3,6 +3,7 @@ import "std/assert";
 import "std/string_buffer";
 import "std/string";
 import "std/map";
+import "std/hash";
 import "std/array";
 import "std/libc";
 import "std/unicode/utf8"
@@ -326,7 +327,7 @@ public func CreateJsonObject(alloc: *const mem::Allocator = mem::defaultAllocato
         .objValue = mem::new<JsonObject>(alloc)
     }
 
-    node.value.objValue.indexes.init(-1, 16, &StrHashFn, &StrEqualFn, alloc)
+    node.value.objValue.indexes.init(-1, 16, alloc)
     node.value.objValue.values.init(16, alloc)
 
     return node
@@ -1482,7 +1483,7 @@ func (p: *JsonParser) expect(kind: TokenKind) : bool {
 public func testParser() {
     var data:*char;
     var length: usize;
-    if(ReadFile("./test/tests/example.json", &data, &length) != FileStatus.Ok) {
+    if(ReadFile("/home/tony/projects/litac-lang/test/tests/example.json", &data, &length) != FileStatus.Ok) {
         printf("Failed to read file\n")
         goto err;
     }

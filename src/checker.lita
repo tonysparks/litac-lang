@@ -6,6 +6,7 @@ import "std/string"
 import "std/libc"
 import "std/system"
 import "std/map"
+import "std/hash"
 
 import "types"
 import "types_new"
@@ -96,7 +97,7 @@ public func (this: *TypeChecker) init(lita: *Lita) {
     this.genericTemplates.init(64, lita.allocator)
     this.genericContext.callsite = null
 
-    this.interfaceImpls.init(Array<Typeid>{}, 128, PtrHashFn<Typeid>, PtrEqualFn<Typeid>, lita.allocator, 0)
+    this.interfaceImpls.init(Array<Typeid>{}, 128, lita.allocator, 0)
 
     this.bypassing = false
 

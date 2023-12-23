@@ -1,5 +1,6 @@
 import "std/array"
 import "std/map"
+import "std/hash"
 import "std/string"
 import "std/string_view"
 import "std/string_buffer"
@@ -51,8 +52,8 @@ public struct Module {
     genericSymbols: *Map<InternedString, *Symbol>
     flags: i32
 
-    importedBy: Map<*const char, ModuleImport> // modules that import this module
-    importAliases: Map<InternedString, *Module>    // modules imported via an alias
+    importedBy: Map<*const char, ModuleImport>  // modules that import this module
+    importAliases: Map<InternedString, *Module> // modules imported via an alias
 
     typeSpecAllocator: TypeSpecAllocator
     arena: ArenaAllocator
@@ -282,6 +283,43 @@ public func (this: *Module) getMethodsForType(type: *TypeInfo, result: [MAX_METH
         currentSyms = currentSyms.parent ? currentSyms.parent : null
     }
 
+    return numOfSymbols
+}
+
+public func (this: *Module) getMethodsForTypeWithName(
+    type: *TypeInfo,
+    methodName: InternedString,
+    maxResults: i32,
+    result: [MAX_METHODS_FOR_TYPE]*Symbol) : i32 {
+
+    var numOfSymbols = 0
+
+    var currentSyms: *Scope = &this.symbols
+    while(currentSyms) {
+        for(var it = currentSyms.symbolFuncs.iter(); it.hasNext();) {
+            var n = it.next()
+            var sym = n.value
+
+            if(!this.isMethodForType(type, sym)) {
+                continue
+            }
+
+            if(!n.key.view.endsWith(methodName.buffer, methodName.length)) {
+                continue
+            }
+
+            result[numOfSymbols] = sym
+            numOfSymbols += 1
+
+            if(numOfSymbols >= maxResults && maxResults > 0) {
+                goto done;
+            }
+        }
+
+        currentSyms = currentSyms.parent ? currentSyms.parent : null
+    }
+
+done:
     return numOfSymbols
 }
 

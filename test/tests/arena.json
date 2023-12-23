@@ -50,9 +50,11 @@
                 import "std/array";
                 import "std/io";
                 import "std/map";
+                import "std/hash"
                 import "std/json";
                 import "std/string_buffer"
                 import "std/libc"
+                import "std/string";
 
             `,
             "code": `
@@ -81,7 +83,7 @@
                 assert(array.size() == size)
 
                 var map = Map<*const char, i32>{}
-                map.init(0, 1, &StrHashFn, &StrEqualFn, &arena.allocator)
+                map.init(0, 1, &arena.allocator)
 
                 map.put("hi1", 421)
                 map.put("hi2", 422)
@@ -121,9 +123,11 @@
                 import "std/array";
                 import "std/io";
                 import "std/map";
+                import "std/hash"
                 import "std/json";
                 import "std/string_buffer"
                 import "std/libc"
+                import "std/string";
 
             `,
             "code": `
@@ -154,7 +158,7 @@
                 assert(array.size() == size)
 
                 var map = Map<*const char, i32>{}
-                map.init(0, 1, &StrHashFn, &StrEqualFn)
+                map.init(0, 1)
 
                 map.put("hi1", 421)
                 map.put("hi2", 422)

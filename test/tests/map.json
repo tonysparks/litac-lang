@@ -3,6 +3,8 @@
     "disabled": false,
     "program": `
         import "std/map";
+        import "std/hash";
+        import "std/string";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;

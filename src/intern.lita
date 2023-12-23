@@ -1,4 +1,5 @@
 import "std/map"
+import "std/hash"
 import "std/mem"
 import "std/string_view"
 import "std/libc"
@@ -82,14 +83,6 @@ public const ASSTR = InternedString{};
 public const TOSTR = InternedString{};
 public const COMPILER_OPTION = InternedString{};
 
-public func InternHashFn(a: InternedString) : u32 {
-    var hash = ((a.addr as (usize)) % 4294967291_u32) as (u32)
-    return hash;
-}
-
-public func InternEqualFn(a: InternedString, b: InternedString) : bool {
-    return a.addr == b.addr;
-}
 
 public func InternMap<V>(emptyValue: V,
                          initialSize: i32 = 16,
@@ -97,8 +90,6 @@ public func InternMap<V>(emptyValue: V,
     var map = Map<InternedString, V>{}
     map.init<InternedString, V>(emptyValue,
                        initialSize,
-                       InternHashFn,
-                       InternEqualFn,
                        allocator,
                        EMPTY_STR)
     return map
@@ -336,9 +327,14 @@ public func (this: *InternedString) equalsStr(other: *const char) : bool {
 
 @inline
 public func (this: *InternedString) equals(other: *InternedString) : bool {
-//equalCount += 1
     return this.addr == other.addr
 }
+
+public func (this: *InternedString) hash() : u32 {
+    var hash = ((this.addr as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
 
 @inline
 public func (this: *InternedString) empty() : bool {
@@ -351,6 +347,7 @@ public func (this: *InternedString) asStringView() : StringView {
         .length = this.length,
     }
 }
+
 
 import "std/assert"
 import "std/mem/bucket_allocator"

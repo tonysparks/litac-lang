@@ -319,6 +319,7 @@
             import "std/mem";
             import "std/map";
             import "std/array";
+            import "std/hash";
 
         `,
         "code": `
@@ -419,6 +420,7 @@
             import "std/libc";
             import "std/mem";
             import "std/map";
+            import "std/string";
 
         `,
         "code": `

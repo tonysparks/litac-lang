@@ -1,0 +1,129 @@
+
+
+public func PtrHashFn<K>(a: K) : u32 {
+    var hash = ((a as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func PtrEqualFn<K>(a: K, b: K) : bool {
+    return a == b;
+}
+
+public func (this: i8) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: i8) equals(other: i8) : bool {
+    return this == other
+}
+
+public func (this: u8) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: u8) equals(other: u8) : bool {
+    return this == other
+}
+
+public func (this: i16) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: i16) equals(other: i16) : bool {
+    return this == other
+}
+
+public func (this: u16) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: u16) equals(other: u16) : bool {
+    return this == other
+}
+
+public func (this: i32) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: i32) equals(other: i32) : bool {
+    return this == other
+}
+
+public func (this: u32) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: u32) equals(other: u32) : bool {
+    return this == other
+}
+
+public func (this: i64) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: i64) equals(other: i64) : bool {
+    return this == other
+}
+
+public func (this: u64) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: u64) equals(other: u64) : bool {
+    return this == other
+}
+
+public func (this: usize) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: usize) equals(other: usize) : bool {
+    return this == other
+}
+
+public func (this: f32) hash() : u32 {
+    // TODO
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: f32) equals(other: f32) : bool {
+    return this == other
+}
+
+public func (this: f64) hash() : u32 {
+    // TODO
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: f64) equals(other: f64) : bool {
+    return this == other
+}
+
+// public func (this: char) hash() : u32 {
+//     var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+//     return hash;
+// }
+
+// public func (this: char) equals(other: char) : bool {
+//     return this == other
+// }
+
+public func (this: bool) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: bool) equals(other: bool) : bool {
+    return this == other
+}
