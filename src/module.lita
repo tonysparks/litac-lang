@@ -52,6 +52,7 @@ public struct Module {
     flags: i32
 
     importedBy: Map<*const char, ModuleImport> // modules that import this module
+    importAliases: Map<InternedString, *Module>    // modules imported via an alias
 
     typeSpecAllocator: TypeSpecAllocator
     arena: ArenaAllocator
@@ -82,6 +83,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.allocator = lita.allocator
     builtins.importedBy = StrMap<ModuleImport>(ModuleImport{}, 512, lita.allocator)
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, &builtins, lita.allocator)
+    builtins.importAliases = InternMap<*Module>(null, 16, lita.allocator)
     builtins.genericSymbols = &lita.genericSymbols
     builtins.lita = lita
     builtins.typeSpecAllocator.init(lita.allocator)
@@ -154,10 +156,12 @@ public func (this: *Module) init(lita: *Lita) {
     this.allocator = &this.arena.allocator
     //this.allocator = lita.allocator
     this.typeSpecAllocator.init(this.allocator)
+    this.importAliases = InternMap<*Module>(null, 16, this.allocator)
 
     // We want these to be owned by the global allocator
     this.importedBy = StrMap<ModuleImport>(ModuleImport{}, 64, lita.allocator)
     this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, this, lita.allocator)
+
 
     this.flags = 0
     this.currentScope = &this.symbols
@@ -294,11 +298,16 @@ public func (this: *Module) getImportAlias(module: *Module) : *InternedString {
     return importInfo.alias;
 }
 
+public func (this: *Module) getImportedModuleByAlias(alias: InternedString) : *Module {
+    return this.importAliases.get(alias)
+}
+
 public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport: *Module) {
     var moduleName: *InternedString = null;
 
     if(importDecl.alias.token.type == TokenType.IDENTIFIER) {
         moduleName = &importDecl.alias.str;
+        this.importAliases.put(*moduleName, moduleToImport)
     }
 
     this.importModuleSymbols(importDecl.startPos, moduleToImport, moduleName, importDecl.isUsing)

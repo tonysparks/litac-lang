@@ -972,19 +972,27 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchT
             return null
         }
 
-        var modulePath = ToModulePath(name.substring(0, index))
-        var filename = [MAX_PATH]char{0}
+        var modulePath = name.substring(0, index)
+        var module = this.current.getImportedModuleByAlias(this.lita.strings.internCopy(modulePath.buffer, modulePath.length))
 
-        if(!FindModulePath(this.lita, modulePath, filename)) {
-            return null
+        // if this isn't an aliased module, check the
+        // fully qualifed path of the module
+        if(!module) {
+            var moduleFilePath = ToModulePath(modulePath)
+            var filename = [MAX_PATH]char{0}
+
+            if(!FindModulePath(this.lita, moduleFilePath, filename)) {
+                return null
+            }
+
+            module = this.lita.getModule(filename)
         }
 
-        var module = this.lita.getModule(filename)
         assert(module != null)
         var namePart = name.substring(index + 2)
 
         var namePartType = this.lita.strings.internCopy(namePart.buffer, namePart.length)
-        return GetTypeFromModule(module, namePartType, searchType)
+        type = GetTypeFromModule(module, namePartType, searchType)
     }
 
     return type

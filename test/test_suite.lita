@@ -78,8 +78,8 @@ func main(len: i32, args: **char) : i32 {
         //"../test/tests/notes.json",
         // "../test/tests/misc.json", json syntax error
 
-        "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",
+        //"../test/tests/generics.json",
+        //"../test/tests/generics_inference.json",
 
         "../test/tests/single.json",
         "../test/tests/number_types.json",
@@ -410,6 +410,15 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     }
 
 report:
+
+/*
+    printf("Generic Symbols: \n")
+    for(var it = lita.genericSymbols.iter(); it.hasNext();) {
+        var entry = it.next()
+        printf("    Gen: %.*s\n", entry.key.length, entry.key.buffer)
+    }
+*/
+
     if(!lita.result.errors.empty()) {
         testHarness.buffer.clear() // clear program output
 

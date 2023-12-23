@@ -11,6 +11,155 @@
         }
     `,
     "tests": [
+        {
+            "name": "Generics with module alias",
+            "definitions": `
+                import "map1" as m1;
+            `,
+            "modules": [
+                {
+                    "name": "map1",
+                    "program": `
+                        public struct XMap<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *XMap<K,V>) call<K,V>() : V {
+                            return this.value
+                        }
+                    `
+                },
+            ],
+            "code": `
+                var k1 = "Hello";
+                var m1 = m1::XMap {
+                    .key = k1,
+                    .value = 32
+                }
+
+                assert(m1.key == k1)
+                assert(m1.value == 32)
+                assert(m1.call() == 32)
+
+            `
+        },
+
+        {
+            "name": "Generics with conflicting type names",
+            "definitions": `
+                import "map1" as m1
+                import "map2" as m2
+
+            `,
+            "modules": [
+                {
+                    "name": "map1",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value * 2
+                        }
+                    `
+                },
+                {
+                    "name": "map2",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var k1 = "Hello";
+                var v2 = "Hi"
+                var m1 = m1::Map {
+                    .key = k1,
+                    .value = 32
+                }
+
+                var m2 = m2::Map {
+                    .key = 44,
+                    .value = v2
+                }
+
+                assert(m1.key == k1)
+                assert(m1.value == 32)
+
+                assert(m2.key == 44)
+                assert(m2.value == v2)
+
+                assert(m1.call() == 64)
+                assert(m2.call() == v2)
+
+            `
+        },
+
+        {
+            "name": "Generics with conflicting type names generic",
+            "definitions": `
+                import "map1" as m1
+                import "map2" as m2
+
+            `,
+            "modules": [
+                {
+                    "name": "map1",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value
+                        }
+                    `
+                },
+                {
+                    "name": "map2",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var k1 = "Hello";
+                var v2 = "Hi"
+                var m1 = m1::Map {
+                    .key = k1,
+                    .value = m2::Map {
+                        .key = 44,
+                        .value = v2
+                    }
+                }
+
+                assert(m1.key == k1)
+                assert(m1.value.key == 44)
+                assert(m1.value.value == v2)
+
+                assert(m1.call().key == 44)
+                assert(m1.value.call() == v2)
+
+            `
+        },
 
         {
             "name": "Generics struct with union",
@@ -605,6 +754,5 @@
 
             `
         },
-
     ]
 }

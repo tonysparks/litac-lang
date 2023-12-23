@@ -651,11 +651,9 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         nameSpec.genericArgs.init(size, this.allocator)
         expr.genericArgs.init(size, this.allocator)
 
-//printf("Inferring Func Call: %.*s => %p\n", funcInfo.name.length, funcInfo.name.buffer, funcInfo.funcDecl)
         var suppliedArgsSize = suppliedArgs.size()
         for(var i = 0; i < size; i+=1) {
             var genericParam = genericParams.get(i)
-// printf("    Checking: %.*s\n", genericParam.name.str.length, genericParam.name.str.buffer)
             for(var j = 0; j < funcInfo.funcDecl.params.size(); j+=1) {
                 if(j >= suppliedArgsSize) {
                     break
@@ -666,16 +664,6 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
                 var argType = suppliedArgs.get(j).argExpr.operand.typeInfo
                 assert(argType != null)
                 assert(paramType != null)
-
-// printf("    ParamType: %.*s vs arg type: %.*s  paramDecl type: %.*s args: %d %p\n",
-//     paramType.name.length, paramType.name.buffer,
-//     argType.name.length, argType.name.buffer,
-//     paramDecl.type.name.length, paramDecl.type.name.buffer, paramDecl.type.genericArgs.size(), paramDecl)
-
-//     for(var ii = 0; ii < paramDecl.type.genericArgs.size(); ii+=1) {
-//         var aa = paramDecl.type.genericArgs.get(ii)
-//         printf("        Arg: %d %.*s\n", ii, aa.name.length, aa.name.buffer)
-//     }
 
                 var info = ParamInfo{.spec = paramDecl.type, .typeInfo = paramType}
                 var inferredType = this.inferredType(genericParam.name, &info, argType)
@@ -1367,7 +1355,8 @@ func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *TypeInfo) : *
             var info = ParamInfo{.spec = spec, .typeInfo = paramType}
             var inferredType = this.inferredType(genericParam.name, &info, suppliedArgs.get(fieldIndex))
             if(inferredType) {
-                expr.type.genericArgs.add(inferredType.asTypeSpec(this.current))
+                var isGenericType = (inferredType.sym && (inferredType.sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE)))
+                expr.type.genericArgs.add(inferredType.asTypeSpec(this.current, isGenericType))
                 break
             }
         }

@@ -1466,7 +1466,12 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
             return NewNameTypeSpecIntern(pos, VOID, allocator)
         }
         case TypeKind.STR: {
-            return NewNameTypeSpecIntern(pos, STRING, allocator)
+            var ptrTypeSpec = NewTypeSpec(TypeSpecKind.PTR, pos, allocator)
+            var constTypeSpec = NewTypeSpec(TypeSpecKind.CONST, pos, allocator)
+
+            ptrTypeSpec.base = constTypeSpec
+            constTypeSpec.base = NewNameTypeSpecIntern(pos, CHAR, allocator)
+            return ptrTypeSpec
         }
         case TypeKind.GENERIC_PARAM: {
             var genericParamInfo = this
