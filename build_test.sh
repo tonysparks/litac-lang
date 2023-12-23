@@ -12,7 +12,7 @@ case "${unameOut}" in
     ;;
 esac
 
-BUILD_CMD="gcc %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
+BUILD_CMD="gcc -g %input% -o %output% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
 
 error_compiling() {
     echo ""
@@ -43,6 +43,7 @@ run_tests() {
     fi
 
     echo "Running litaC tests..."
+    # valgrind --leak-check=full --show-leak-kinds=all ./litac_tests
     ./litac_tests
     result=$?
 

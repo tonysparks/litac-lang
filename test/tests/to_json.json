@@ -112,7 +112,9 @@
                 import "std/json/to_json";
                 import "std/json/from_json";
                 import "std/string_buffer";
-                import "std/map"
+                import "std/map";
+                import "std/hash";
+                import "std/string";
                 import "std/io";
                 import "std/libc";
 

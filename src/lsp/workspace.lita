@@ -1,6 +1,7 @@
 import "std/libc"
 import "std/array"
 import "std/map"
+import "std/hash"
 import "std/json"
 import "std/string_buffer"
 import "std/string"

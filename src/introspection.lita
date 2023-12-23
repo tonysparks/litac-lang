@@ -5,6 +5,7 @@ import "std/string_buffer"
 import "std/string_view"
 import "std/array"
 import "std/map"
+import "std/hash"
 
 import "checker"
 import "checker_decl"

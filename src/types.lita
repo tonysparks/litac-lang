@@ -6,6 +6,7 @@ import "std/assert"
 import "std/libc"
 import "std/mem"
 import "std/map"
+import "std/hash"
 
 import "ast_new"
 import "module"
@@ -2136,13 +2137,22 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
         // look up if this is an aliased type
         var alias = module.getImportAlias(this.sym.declared)
         if(!alias) {
-            goto not_found;
+
+            // now do the expensive path of looking at this modules imported
+            // methods for this type.
+            var results: [MAX_METHODS_FOR_TYPE]*Symbol;
+            var numFound = module.getMethodsForTypeWithName(this, funcNameInterned, .maxResults = 1, .result = results)
+
+            if(numFound > 0) {
+                methodSym = results[0]
+            }
         }
+        else {
+            this.getFunctionName(funcName, methodName, alias)
 
-        this.getFunctionName(funcName, methodName, alias)
-
-        funcNameInterned = strings.internCopy(funcName)
-        methodSym = module.getFuncType(funcNameInterned)
+            funcNameInterned = strings.internCopy(funcName)
+            methodSym = module.getFuncType(funcNameInterned)
+        }
 
         // check again!
         if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
@@ -2186,14 +2196,6 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
 
     // TODO: Check if this is 'using' base
 not_found:
-/*@static var found: i32 = 0
-//if(found == 114)
-{
-    //module.print("Functions")
-    printf("func name: %s\n", funcName)
-}
-found += 1
-*/
     return MethodResult {
         .symbol = null,
         .name = EMPTY_STR,
@@ -2215,6 +2217,8 @@ public func (this: *TypeInfo) implementsTrait(iface : *TypeInfo, checker: *TypeC
 
 public typedef i64 as Typeid;
 var idGen: Typeid = TypeKind.MAX_TYPE_KINDS as (i64);
+
+
 
 public func NextTypeId() : Typeid {
     idGen += 1

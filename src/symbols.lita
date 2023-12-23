@@ -4,6 +4,7 @@ import "std/map"
 import "std/mem"
 import "std/string"
 import "std/assert"
+import "std/hash"
 
 import "ast"
 import "lex"
@@ -117,6 +118,15 @@ public func (this: *Symbol) isVisibleTo(module: *Module) : bool {
     }
 
     return this.declared.isInPackage(module)
+}
+
+public func (this: *Symbol) hash() : u32 {
+    var hash = ((this as (usize)) % 4294967291_u32) as (u32)
+    return hash;
+}
+
+public func (this: *Symbol) equals(other: *Symbol) : bool {
+    return this == other
 }
 
 public enum ScopeKind {

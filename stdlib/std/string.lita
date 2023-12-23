@@ -310,17 +310,15 @@ public func StringHash(str: *const char) : u32 {
 }
 
 public func StringEqualLen(a: *const char, b: *const char, size: usize) : bool {
-    if(a == null || b == null) {
-        return false;
-    }
+    if(!a && !b) return true
+    if(!a || !b) return false
 
     return strncmp(a, b, size) == 0
 }
 
 public func StringEqual(a: *const char, b: *const char) : bool {
-    if(a == null || b == null) {
-        return false;
-    }
+    if(!a && !b) return true
+    if(!a || !b) return false
 
     return strcmp(a, b) == 0
 }
@@ -330,9 +328,8 @@ public func (str: *const char) hash() : u32 {
 }
 
 public func (str: *const char) equals(other: *const char) : bool {
-    if(str == null || other == null) {
-        return false
-    }
+    if(!str && !other) return true
+    if(!str || !other) return false
 
     return strcmp(str, other) == 0
 }
