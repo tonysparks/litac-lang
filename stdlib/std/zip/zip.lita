@@ -170,7 +170,7 @@ func (this: *ZipFile) zipFolder(
     }
     defer handle.close()
 
-    while(handle.hasNext()) {
+    while(handle.next()) {
         if(handle.isDirectory()) {
             var len = path.length
             path.append("/%s", handle.name())
@@ -197,7 +197,6 @@ func (this: *ZipFile) zipFolder(
             }
             path.length = len
         }
-        handle.next()
     }
 
     return ZipStatus.OK
@@ -297,6 +296,7 @@ func testUnzip() {
 
 
 import "std/mem/linear_allocator"
+/*
 @test
 func testZipDir() {
     var zip: ZipFile{}
@@ -310,17 +310,20 @@ func testZipDir() {
     assert(zip.open("test.zip", ZipOpen.WRITE, alloc.allocator) == ZipStatus.OK)
     assert(zip.zipDir("C:/Users/antho/git/c2litac", strlen("C:/Users/antho/git/c2litac"), "pkg") == ZipStatus.OK)
     assert(zip.finalize() == ZipStatus.OK)
-}
+}*/
 
-/*
+
 @test
 func testZipDir() {
     var zip: ZipFile{}
     defer zip.close()
 
     assert(zip.open("test.zip", ZipOpen.WRITE) == ZipStatus.OK)
-    assert(zip.addFile("pkg/pkg.json", "C:/Users/antho/git/c2litacx/pkg.json") == ZipStatus.OK)
-    assert(zip.addFile("pkg/src/test.txt", "C:/Users/antho/git/c2litacx/src/test.txt") == ZipStatus.OK)
-    //assert(zip.zipDir("C:/Users/antho/git/c2litacx", strlen("C:/Users/antho/git/c2litacx")) == ZipStatus.OK)
+    //assert(zip.addFile("pkg/pkg.json", "C:/Users/antho/git/c2litacx/pkg.json") == ZipStatus.OK)
+    //assert(zip.addFile("pkg/src/test.txt", "C:/Users/antho/git/c2litacx/src/test.txt") == ZipStatus.OK)
+
+    var path = "/home/tony/projects/libio_uring"
+    var len = strlen(path)
+    assert(zip.zipDir(path, len, "pkg") == ZipStatus.OK)
     assert(zip.finalize() == ZipStatus.OK)
-}*/
+}

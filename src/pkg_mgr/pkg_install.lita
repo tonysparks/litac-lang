@@ -520,8 +520,8 @@ func zipLocalPackage(
         return PkgStatus.ERROR_OPENING_LOCAL_FILE_PKG
     }
 
-    const len = 7 // "file://"
-    var basePath = pkgId.repo().substring(7)
+    const len = strlen("file://")
+    var basePath = pkgId.repo().substring(len)
 
     if(zip.zipDir(basePath.buffer, basePath.length, "pkg") != ZipStatus.OK) {
         return PkgStatus.ERROR_WRITING_LOCAL_FILE_PKG
