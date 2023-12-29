@@ -1,0 +1,50 @@
+import "std/mem"
+import "std/assert"
+import "std/libc" as c
+import "std/thread"
+
+/**
+=========================================================
+// Thread Safe Allocator
+=========================================================
+*/
+
+public struct ThreadSafeAllocator {
+    allocator: using Allocator
+    decorated: *const Allocator
+
+    mtx: Mutex
+}
+
+public func (this: *ThreadSafeAllocator) init(decorated: *const Allocator) {
+    this.allocator = Allocator {
+        .allocFn:   &GenericMalloc<ThreadSafeAllocator>,
+        .callocFn:  &GenericCalloc<ThreadSafeAllocator>,
+        .reallocFn: &GenericRealloc<ThreadSafeAllocator>,
+        .freeFn:    &ThreadSafeAllocatorFree
+    }
+    this.decorated = decorated
+    this.mtx.init()
+}
+
+
+@doc("Free all memory associated with this allocator.")
+public func (this: *ThreadSafeAllocator) free() {
+    this.mtx.destroy()
+}
+
+public func (this: *ThreadSafeAllocator) malloc(size: usize) : *void {
+    this.mtx.lock()
+    defer this.mtx.unlock()
+
+    var memory = this.decorated.alloc(size)
+    return memory
+}
+
+func ThreadSafeAllocatorFree(alloc: *const Allocator, ptr: *void) {
+    var tsAllocator = alloc as (*ThreadSafeAllocator)
+    tsAllocator.mtx.lock()
+    defer tsAllocator.mtx.unlock()
+
+    tsAllocator.decorated.free(ptr)
+}

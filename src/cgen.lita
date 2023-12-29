@@ -1375,7 +1375,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 this.emit("#line %d \"%s\"\n", 0, filename)
             }
 
-            var bytesRead = 0_i64;
+            var bytesRead = 0_usize;
             do {
                 bytesRead = fread(filedata, 1, BUFFER_SIZE, file)
                 if(this.output) {

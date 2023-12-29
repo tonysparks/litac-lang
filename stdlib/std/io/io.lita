@@ -10,10 +10,12 @@ const USE_WINDOWS = false;
 
     public struct File {
         handle: HANDLE
+        _position: i64
     }
 #else
     public struct File {
         file: *FILE
+        _position: i64
     }
 #end
 
@@ -75,6 +77,8 @@ public func (file: *File) open(filename: *const char, op: FileOpenOp) : FileStat
     }
 
     file.file = fopen(filename, opStr)
+    file._position = 0
+
     if(file.file == null) {
         return FileStatus.FileNotFoundError;
     }
@@ -83,7 +87,7 @@ public func (file: *File) open(filename: *const char, op: FileOpenOp) : FileStat
 #end
 }
 
-public func (file: *File) length() : usize {
+public func (file: *File) length() : i64 {
 #if (USE_WINDOWS)
     // TODO?
     return 0
@@ -111,9 +115,20 @@ public func (file: *File) handle() : i32 {
 #end
 }
 
+public func (file: *File) position() : i64 {
+    return file._position
+}
+
+public func (this: *File) seek(pos: i64) : FileStatus {
+    if (fseek(this.file, this._position, SEEK_SET)) {
+        return FileStatus.IOError;
+    }
+    this._position = pos
+    return FileStatus.Ok;
+}
+
 public func (file: *File) close() {
 #if (USE_WINDOWS)
-//#if (OS == "WINDOWS")
     WinFileClose(file)
 #else
     if(file && file.file) {
@@ -121,6 +136,52 @@ public func (file: *File) close() {
     }
 #end
 }
+
+
+
+public func (this: *File) readBytes(
+                     buffer: *char,
+                     length: usize) : FileStatus {
+
+    if (fseek(this.file, this._position, SEEK_SET)) {
+        return FileStatus.IOError;
+    }
+
+    var bytesRead = fread(buffer, sizeof(:char), length, this.file);
+    if(ferror(this.file)) {
+        return FileStatus.IOError;
+    }
+
+    if(bytesRead > 0) {
+        this._position += bytesRead as (i64)
+    }
+
+    return FileStatus.Ok;
+}
+
+
+public func (this: *File) writeBytes(buffer: *const char, len: usize) : FileStatus {
+#if (USE_WINDOWS)
+    return WinWriteBytes(this, buffer, len)
+#else
+    if (fseek(this.file, this._position, SEEK_SET)) {
+        return FileStatus.IOError;
+    }
+
+    var bytesWritten = fwrite(buffer as (*const void), sizeof(:char), len, this.file)
+    if(bytesWritten > 0) {
+        this._position += bytesWritten as (i64)
+    }
+
+    if(bytesWritten != len) {
+        return FileStatus.IOError;
+    }
+
+    return FileStatus.Ok
+#end
+}
+
+//----------------------------------------------------
 
 public func FileLength(fileName: *const char) : i64 {
     var fp = fopen(fileName, "r")
@@ -184,6 +245,8 @@ public func ReadFile(fileName: *const char,
 #end
 }
 
+
+
 public func WriteFile(fileName: *const char, buffer: *const char, len: usize) : FileStatus {
 #if (USE_WINDOWS)
     return WinWriteFile(fileName, buffer, len)
@@ -196,19 +259,6 @@ public func WriteFile(fileName: *const char, buffer: *const char, len: usize) : 
 
     var file = File{.file = fp}
     return file.writeBytes(buffer, len)
-#end
-}
-
-public func (file: *File) writeBytes(buffer: *const char, len: usize) : FileStatus {
-#if (USE_WINDOWS)
-    return WinWriteBytes(file, buffer, len)
-#else
-    var bytesWritten = fwrite(buffer as (*const void), sizeof(:char), len, file.file)
-    if(bytesWritten != len) {
-        return FileStatus.IOError;
-    }
-
-    return FileStatus.Ok
 #end
 }
 

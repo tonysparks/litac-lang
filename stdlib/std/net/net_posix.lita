@@ -1,6 +1,7 @@
 
 import "std/string"
 import "std/net"
+import "std/libc"
 
 @raw("""
 #include <sys/socket.h>
@@ -34,6 +35,65 @@ struct in_addr {
     s_addr: u64
 };
 
+@foreign
+const SO_DEBUG:i32
+@foreign
+const SO_BROADCAST:i32
+@foreign
+const SO_REUSEADDR:i32
+@foreign
+const SO_KEEPALIVE:i32
+@foreign
+const SO_LINGER:i32
+@foreign
+const SO_OOBINLINE:i32
+@foreign
+const SO_SNDBUF:i32
+@foreign
+const SO_RCVBUF:i32
+@foreign
+const SO_DONTROUTE:i32
+@foreign
+const SO_RCVLOWAT:i32
+@foreign
+const SO_RCVTIMEO:i32
+@foreign
+const SO_SNDLOWAT:i32
+@foreign
+const SO_SNDTIMEO:i32
+
+@foreign
+const SOL_SOCKET:i32
+
+
+@foreign
+const MSG_CONFIRM:i32
+@foreign
+const MSG_DONTROUTE:i32
+@foreign
+const MSG_DONTWAIT:i32
+@foreign
+const MSG_EOR:i32
+@foreign
+const MSG_MORE:i32
+@foreign
+const MSG_NOSIGNAL:i32
+@foreign
+const MSG_OOB:i32
+@foreign
+const MSG_FASTOPEN:i32
+
+@generated
+public enum SocketFlags {
+    MSG_CONFIRM     = MSG_CONFIRM,
+    MSG_DONTROUTE   = MSG_DONTROUTE,
+    MSG_DONTWAIT    = MSG_DONTWAIT,
+    MSG_EOR         = MSG_EOR,
+    MSG_MORE        = MSG_MORE,
+    MSG_NOSIGNAL    = MSG_NOSIGNAL,
+    MSG_OOB         = MSG_OOB,
+    MSG_FASTOPEN    = MSG_FASTOPEN,
+}
 
 
 @foreign
@@ -53,6 +113,9 @@ func recv(socket: i32, buf: *void, len: usize, flags: i32) : i64;
 
 @foreign
 func send(socket: i32, buf: *void, len: usize, flags: i32) : i64;
+
+@foreign
+func setsockopt(socket: i32, level: i32, option_name: i32, option_value: *const void, option_len: socklen_t) : i32;
 
 @foreign
 func close(socket: i32) : i32;
@@ -108,8 +171,8 @@ public const MAX_ADDRESS_SIZE = INET_ADDRSTRLEN;
 @generated
 public struct SocketAddress {
     type: AddressType;
-    address: [MAX_ADDRESS_SIZE]char
-    port: i32
+    _address: [MAX_ADDRESS_SIZE]char
+    _port: u16
 
     // internal implementation information
     addr: sockaddr_in
@@ -122,8 +185,8 @@ public func FromIPAddress(ip: *const char, port: u16, result: *SocketAddress) : 
         return null
     }
 
-    StringCopy(.src = ip, .dest = result.address, .size = MAX_ADDRESS_SIZE)
-    result.port = port
+    StringCopy(.src = ip, .dest = result._address, .size = MAX_ADDRESS_SIZE)
+    result._port = port
     result.type = AddressType.IPV4
 
     result.addr.sin_family = AF_INET
@@ -134,8 +197,8 @@ public func FromIPAddress(ip: *const char, port: u16, result: *SocketAddress) : 
 
 @generated
 public func FromPort(port: u16, result: *SocketAddress) : *SocketAddress {
-    StringCopy(.src = "0.0.0.0", .dest = result.address, .size = MAX_ADDRESS_SIZE)
-    result.port = port
+    StringCopy(.src = "0.0.0.0", .dest = result._address, .size = MAX_ADDRESS_SIZE)
+    result._port = port
     result.type = AddressType.IPV4
 
     memset(&result.addr, 0, sizeof(result.addr))
@@ -146,9 +209,20 @@ public func FromPort(port: u16, result: *SocketAddress) : *SocketAddress {
     return result
 }
 
+@generated
+public func (this: *SocketAddress) address(): *const char {
+    return this._address;
+}
+
+@generated
+public func (this: *SocketAddress) port(): u16 {
+    return this._port
+}
+
 public func (this: *SocketAddress) toString() : *const char {
     @static var buffer:[INET_ADDRSTRLEN]char;
     inet_ntop(AF_INET, &this.addr.sin_addr, buffer, INET_ADDRSTRLEN);
+    return buffer
 }
 
 /*
@@ -169,6 +243,11 @@ public func (this: *Socket) create(type: SocketType = SocketType.STREAM) : bool 
 
     this.socket = socket(AF_INET, sck, 0)
     return this.socket > -1
+}
+
+@generated
+public func (this: *Socket) socketAddress() : *SocketAddress {
+    return &this.address
 }
 
 @generated
@@ -194,10 +273,32 @@ public func (this: *Socket) accept(clientSocket: *Socket) : *Socket {
         return null
     }
 
-    inet_ntop(AF_INET, &clientSocket.address.addr.sin_addr, clientSocket.address.address, INET_ADDRSTRLEN);
-    clientSocket.address.port = ntohs(clientSocket.address.addr.sin_port)
+    inet_ntop(AF_INET, &clientSocket.address.addr.sin_addr, clientSocket.address._address, INET_ADDRSTRLEN);
+    clientSocket.address._port = ntohs(clientSocket.address.addr.sin_port)
 
     return clientSocket
+}
+
+@generated
+public func (this: *Socket) setSocketOpt(option: SocketOption, value: *const void, len: usize) : i32 {
+    var nativeOption = 0
+    switch(option) {
+        case SocketOption.SO_DEBUG: nativeOption = SO_DEBUG; break;
+        case SocketOption.SO_BROADCAST: nativeOption = SO_BROADCAST; break;
+        case SocketOption.SO_REUSEADDR: nativeOption = SO_REUSEADDR; break;
+        case SocketOption.SO_KEEPALIVE: nativeOption = SO_KEEPALIVE; break;
+        case SocketOption.SO_LINGER: nativeOption = SO_LINGER; break;
+        case SocketOption.SO_OOBINLINE: nativeOption = SO_OOBINLINE; break;
+        case SocketOption.SO_SNDBUF: nativeOption = SO_SNDBUF; break;
+        case SocketOption.SO_RCVBUF: nativeOption = SO_RCVBUF; break;
+        case SocketOption.SO_DONTROUTE: nativeOption = SO_DONTROUTE; break;
+        case SocketOption.SO_RCVLOWAT: nativeOption = SO_RCVLOWAT; break;
+        case SocketOption.SO_RCVTIMEO: nativeOption = SO_RCVTIMEO; break;
+        case SocketOption.SO_SNDLOWAT: nativeOption = SO_SNDLOWAT; break;
+        case SocketOption.SO_SNDTIMEO: nativeOption = SO_SNDTIMEO; break;
+        default: return -1;
+    }
+    return setsockopt(this.socket, SOL_SOCKET, nativeOption, value, len as (socklen_t))
 }
 
 @generated
@@ -206,8 +307,13 @@ public func (this: *Socket) read(buffer: *void, len: usize) : i64 {
 }
 
 @generated
-public func (this: *Socket) write(buffer: *void, len: usize) : i64 {
-    return send(this.socket, buffer, len, 0)
+public func (this: *Socket) write(buffer: *void, len: usize, flags: i32 = 0) : i64 {
+    return send(this.socket, buffer, len, flags)
+}
+
+@generated
+public func (this: *Socket) handle() : i32 {
+    return this.socket
 }
 
 @generated

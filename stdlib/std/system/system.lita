@@ -33,24 +33,30 @@ typedef enum Lita_OSType {
 #if defined(_WIN32)
     // Windows
     Lita_OSType litaOS = Lita_OSType_WINDOWS;
+    #define LITA_IS_POSIX 0
 #elif defined(_WIN64)
     // Windows
     Lita_OSType litaOS = Lita_OSType_WINDOWS;
+    #define LITA_IS_POSIX 0
 #elif defined(__CYGWIN__) && !defined(_WIN32)
     // Windows (Cygwin POSIX under Microsoft Window)
     Lita_OSType litaOS = Lita_OSType_WINDOWS;
+    #define LITA_IS_POSIX 1
 #elif defined(__ANDROID__)
     // Android (implies Linux, so it must come first)
     Lita_OSType litaOS = Lita_OSType_ANDROID;
+    #define LITA_IS_POSIX 1
 #elif defined(__linux__)
     // Debian, Ubuntu, Gentoo, Fedora, openSUSE, RedHat, Centos and other
     Lita_OSType litaOS = Lita_OSType_LINUX;
+    #define LITA_IS_POSIX 1
 #elif defined(__unix__) || !defined(__APPLE__) && defined(__MACH__)
     #include <sys/param.h>
     #if defined(BSD)
         // FreeBSD, NetBSD, OpenBSD, DragonFly BSD
         Lita_OSType litaOS = Lita_OSType_BSD;
     #endif
+    #define LITA_IS_POSIX 1
 #elif defined(__hpux)
     // HP-UX
     Lita_OSType litaOS = Lita_OSType_OTHER;
@@ -69,11 +75,14 @@ typedef enum Lita_OSType {
         // Apple OSX
         Lita_OSType litaOS = Lita_OSType_MAC;
     #endif
+    #define LITA_IS_POSIX 1
 #elif defined(__sun) && defined(__SVR4)
     // Oracle Solaris, Open Indiana
     Lita_OSType litaOS = Lita_OSType_OTHER;
+    #define LITA_IS_POSIX 0
 #else
     Lita_OSType litaOS = Lita_OSType_OTHER;
+    #define LITA_IS_POSIX 0
 #endif
 
 
@@ -803,15 +812,15 @@ public func (this: *Process) readOutput(buffer: *char, length: usize) : i64 {
         return -1;
     }
 
-    return fread(buffer, sizeof(:char), length, this.pipe)
+    return fread(buffer, sizeof(:char), length, this.pipe) as (i64)
 }
 
-public func (this: *Process) writeInput(buffer: *char, length: usize) : u64 {
+public func (this: *Process) writeInput(buffer: *char, length: usize) : i64 {
     if(!this.pipe) {
         return -1;
     }
 
-    return fwrite(buffer, sizeof(:char), length, this.pipe)
+    return fwrite(buffer, sizeof(:char), length, this.pipe) as (i64)
 }
 
 public func (this: *Process) close() {

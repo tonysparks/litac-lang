@@ -5,7 +5,27 @@ import "std/limits"
 import "std/array"
 import "std/assert"
 
-public typedef func(*void) : TaskStatus as TaskFn;
+
+// The Function callback for actually doing work on a thread with provided
+// inputs
+public typedef func(ThreadContext, TaskContext) : TaskStatus as TaskFn;
+
+// Function to create a ThreadContext when a thread is created, this is invoked
+// when a thread is created in the pool
+public typedef func(/*arg*/ *void) : ThreadContext as CreateThreadContextFn;
+
+// task specific inputs
+public typedef *void as TaskContext;
+
+// thread specific inputs, available to the task to use
+// that are isolated to just the thread (much like a ThreadLocal)
+public typedef *void as ThreadContext;
+
+
+public struct CreateThread {
+    callback: CreateThreadContextFn
+    arg: *void
+}
 
 public enum TaskStatus {
     OK,
@@ -22,10 +42,13 @@ public struct ThreadPool {
     threadMutex: Mutex
     threads: Array<TaskThread>
     distribution: u64
+
+    createThread: CreateThread
 }
 
 public func (this: *ThreadPool) init(minThreads: i32,
                                      maxThreads: i32,
+                                     createThread: CreateThread,
                                      allocator: *const Allocator = defaultAllocator) : ThreadStatus {
     if(maxThreads < 0) {
         maxThreads = MAX_I32
@@ -34,6 +57,7 @@ public func (this: *ThreadPool) init(minThreads: i32,
         minThreads = 1
     }
 
+    this.createThread = createThread
     this.allocator = allocator
     this.minThreads = minThreads
     this.maxThreads = maxThreads
@@ -71,10 +95,16 @@ func (this: *ThreadPool) addTaskThread() : ThreadStatus {
         return ThreadStatus.ERROR
     }
 
+    var threadContext: ThreadContext = null
+    if(this.createThread.callback) {
+        threadContext = this.createThread.callback(this.createThread.arg)
+    }
+
     this.threads.add(TaskThread {
         .pool = this,
         .tasks = null,
         .tail = null,
+        .context = threadContext,
     })
 
     var taskThread = this.threads.lastPtr()
@@ -202,6 +232,7 @@ enum TaskThreadState {
     WORKING,
 }
 
+
 struct TaskThread {
     pool: *ThreadPool
 
@@ -213,6 +244,8 @@ struct TaskThread {
 
     thread: Thread
     state: Atomic<TaskThreadState>
+
+    context: ThreadContext
 }
 
 func (this: *TaskThread) countTasks() : i32 {
@@ -243,7 +276,7 @@ func (this: *TaskThread) addTask(pool: *ThreadPool, task: TaskFn, arg: *void = n
     newTask.thread = null
 
     //printf("addTask before lock\n")
-    var sum = 0
+    //var sum = 0
 
     this.taskMutex.lock()
     {
@@ -256,7 +289,7 @@ func (this: *TaskThread) addTask(pool: *ThreadPool, task: TaskFn, arg: *void = n
         }
 
         this.tail = newTask
-        sum = this.countTasks()
+        //sum = this.countTasks()
 
         this.taskCond.signal()
     }
@@ -337,7 +370,7 @@ func TaskThreadFn(arg: *void) : i32 {
         // do so
         //printf("task_thread_%d running task\n", taskThread.thread.id())
         if(task) {
-            task.fn(task.arg)
+            task.fn(taskThread.context, task.arg)
             pool.allocator.free(task)
             //printf("task_thread_%d completed task\n", taskThread.thread.id())
         }
@@ -350,13 +383,22 @@ exit:
 }
 
 import "std/libc"
-func exampleTask(arg:*void) : TaskStatus {
-    var id = arg as (*i32)
+func exampleTask(threadContext: ThreadContext, taskContext: TaskContext) : TaskStatus {
+    var id = taskContext as (*i32)
+    var example = threadContext as (*Example)
     var tid = ThreadCurrent().id()
-    printf("In example task: %d on thread_%d\n", *id, tid)
+    printf("In example task: %d on thread_%d with thread context: %d\n", *id, tid, example.count)
     ThreadSleepMSec(1_000_i64)
     printf("End example task: %d on thread_%d\n", *id, tid)
     return TaskStatus.OK
+}
+
+struct Example {
+    count: i32
+}
+
+func exampleThreadContext(arg: *void) : ThreadContext {
+    return arg as (ThreadContext)
 }
 
 //func main(len: i32, args: **char) : i32 {
@@ -364,8 +406,19 @@ func exampleTask(arg:*void) : TaskStatus {
 func testThreadPool() {
     printf("Hello\n")
 
+    var example = Example {
+        .count = 4
+    }
+
     var pool: ThreadPool
-    pool.init(.minThreads = 1, .maxThreads = 10)
+    pool.init(
+        .minThreads = 1,
+        .maxThreads = 10,
+        .createThread = CreateThread {
+            .callback = exampleThreadContext,
+            .arg = &example,
+        }
+    )
     pool.start()
 
     fflush(stdout)

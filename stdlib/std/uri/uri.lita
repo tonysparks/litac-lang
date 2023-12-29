@@ -1,0 +1,7 @@
+@cFile("uri_encode.h", "uri_encode.c");
+
+@foreign("litac_uri_encode")
+public func UriEncode(src: *const char, len: usize, dst: *char);
+
+@foreign("litac_uri_decode")
+public func UriDecode(src: *const char, len: usize, dst: *char);

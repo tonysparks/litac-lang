@@ -1,9 +1,9 @@
 import "std/libc"
 
 #if OS == "WINDOWS"
-    import "std/net/net_win"
+    import using "std/net/net_win"
 #else
-    import "std/net/net_posix"
+    import using "std/net/net_posix"
 #end
 
 
@@ -26,6 +26,16 @@ public struct SocketAddress {
 }
 
 @generated(.stub = true)
+public func (this: *SocketAddress) address(): *const char {
+    return null;
+}
+
+@generated(.stub = true)
+public func (this: *SocketAddress) port(): u16 {
+    return 0_u16;
+}
+
+@generated(.stub = true)
 public func FromIPAddress(ip: *const char, port: u16, result: *SocketAddress) : *SocketAddress {
     return null;
 }
@@ -42,6 +52,34 @@ Socket API
 ===================================================
 */
 
+public enum SocketOption {
+    SO_DEBUG,
+    SO_BROADCAST,
+    SO_REUSEADDR,
+    SO_KEEPALIVE,
+    SO_LINGER,
+    SO_OOBINLINE,
+    SO_SNDBUF,
+    SO_RCVBUF,
+    SO_DONTROUTE,
+    SO_RCVLOWAT,
+    SO_RCVTIMEO,
+    SO_SNDLOWAT,
+    SO_SNDTIMEO,
+}
+
+@generated(.stub = true)
+public enum SocketFlags {
+    MSG_CONFIRM     = (1<<1),
+    MSG_DONTROUTE   = (1<<2),
+    MSG_DONTWAIT    = (1<<3),
+    MSG_EOR         = (1<<4),
+    MSG_MORE        = (1<<5),
+    MSG_NOSIGNAL    = (1<<6),
+    MSG_OOB         = (1<<7),
+    MSG_FASTOPEN    = (1<<8),
+}
+
 @generated(.stub = true)
 public struct Socket {}
 
@@ -51,9 +89,15 @@ public func (this: *Socket) create(type: SocketType = SocketType.STREAM) : bool 
 }
 
 @generated(.stub = true)
+public func (this: *Socket) socketAddress() : *SocketAddress {
+    return null
+}
+
+@generated(.stub = true)
 public func (this: *Socket) bind() : bool {
     return false
 }
+
 
 @generated(.stub = true)
 public func (this: *Socket) listen(backlog: i32 = 128) : bool {
@@ -71,8 +115,17 @@ public func (this: *Socket) read(buffer: *void, len: usize) : i64 {
 }
 
 @generated(.stub = true)
-public func (this: *Socket) write(buffer: *void, len: usize) : i64 {
+public func (this: *Socket) write(buffer: *void, len: usize, flags: i32) : i64 {
     return 0
+}
+
+@generated(.stub = true)
+public func (this: *Socket) setSocketOpt(option: SocketOption, value: *const void, len: usize) : i32 {
+    return 0
+}
+
+@generated(.stub = true)
+public func (this: *Socket) handle() : i32 {
 }
 
 @generated(.stub = true)
