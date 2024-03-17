@@ -2,6 +2,10 @@ import "std/libc"
 import "std/mem" as mem
 import "std/assert"
 
+
+@foreign
+func strncasecmp(a: *const char, b: *const char, n: usize) : i32;
+
 public struct StringView {
     buffer: *const char
     length: i32
@@ -90,6 +94,21 @@ public func (b: StringView) equals(str: *const char, len: i32 = -1) : bool {
 
 public func (b: StringView) equalsStringView(other: StringView) : bool {
     return b.equals(other.buffer, other.length)
+}
+
+
+
+public func (b: StringView) equalsIgnoreCase(str: *const char, len: i32 = -1) : bool {
+    if(!str) {
+        return b.buffer == null;
+    }
+
+    len = (len < 0) ? strlen(str) : len;
+    if(b.length != len) {
+        return false;
+    }
+
+    return strncasecmp(b.buffer, str, len) == 0
 }
 
 public func (b: StringView) contains(str: *const char, len: i32 = -1) : bool {

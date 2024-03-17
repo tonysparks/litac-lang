@@ -244,7 +244,7 @@ static void NTAPI _tinycthread_tss_callback(PVOID h, DWORD dwReason, PVOID pv)
 import "std/libc" as c
 
 
-@asStr
+@generated
 public enum ThreadStatus {
     ERROR    = 0,
     SUCCESS  = 1,
@@ -253,7 +253,7 @@ public enum ThreadStatus {
     NOMEM    = 4,
 }
 
-@asStr
+@generated
 public enum MutexType {
     PLAIN     = 0,
     TIMED     = 1,

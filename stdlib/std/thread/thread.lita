@@ -4,3 +4,22 @@
 #else
     import using "std/thread/thread_posix"
 #end
+
+// TODO - bug with auto generated type + using import
+@asStr
+@generated(.stub = true)
+public enum ThreadStatus {
+    ERROR    = 0,
+    SUCCESS  = 1,
+    TIMEDOUT = 2,
+    BUSY     = 3,
+    NOMEM    = 4,
+}
+
+@asStr
+@generated(.stub = true)
+public enum MutexType {
+    PLAIN     = 0,
+    TIMED     = 1,
+    RECURSIVE = 2,
+}

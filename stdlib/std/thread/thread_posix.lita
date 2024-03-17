@@ -116,6 +116,9 @@ func pthread_mutexattr_destroy(attr: *pthread_mutexattr_t);
 const PTHREAD_MUTEX_RECURSIVE: i32;
 
 @foreign
+const PTHREAD_CREATE_DETACHED: i32;
+
+@foreign
 const EBUSY: i32;
 
 @foreign
@@ -186,11 +189,23 @@ typedef u64 as pthread_t;
 struct pthread_attr_t;
 
 @foreign
+func pthread_attr_init(attr: *pthread_attr_t) : i32;
+
+@foreign
+func pthread_attr_destroy(attr: *pthread_attr_t) : i32;
+
+@foreign
+func pthread_attr_setdetachstate(attr: *pthread_attr_t, prop: i32) : i32;
+
+@foreign
 func pthread_create(thread: *pthread_t, attr: *pthread_attr_t, fn: func(*void) : *void, arg: *void) : i32;
 
 
 @foreign
 func pthread_self() : pthread_t;
+
+@foreign
+func pthread_cancel(thread: pthread_t) : i32;
 
 @foreign
 func pthread_exit(retval: *void);
@@ -219,7 +234,8 @@ const _SC_NPROCESSORS_ONLN: i32;
   ==============================================================
 */
 
-@asStr
+// TODO - bug with auto generated type + using import
+@generated
 public enum ThreadStatus {
     ERROR    = 0,
     SUCCESS  = 1,
@@ -228,7 +244,7 @@ public enum ThreadStatus {
     NOMEM    = 4,
 }
 
-@asStr
+@generated
 public enum MutexType {
     PLAIN     = 0,
     TIMED     = 1,
@@ -425,6 +441,11 @@ public func (this: *Thread) create(
     ti.mArg = arg;
     ti.allocator = allocator;
 
+    // var attr: pthread_attr_t;
+    // pthread_attr_init(&attr);
+    // defer pthread_attr_destroy(&attr)
+    // pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
     if(pthread_create(&this.thrd, null, _thrd_wrapper_function, ti as (*void)) != 0) {
         this.thrd = 0;
     }
@@ -461,7 +482,7 @@ public func (this: Thread) equal(other: Thread) : bool {
     return pthread_equal(this.thrd, other.thrd);
 }
 
-public func (this: Thread) join(res: *i32) : ThreadStatus {
+public func (this: Thread) join(res: *i32 = null) : ThreadStatus {
     var pres: *void;
     if (pthread_join(this.thrd, &pres) != 0) {
         return ThreadStatus.ERROR;
@@ -473,11 +494,11 @@ public func (this: Thread) join(res: *i32) : ThreadStatus {
     return ThreadStatus.SUCCESS;
 }
 
-public func (thr: Thread) destroy() {
-    sched_yield();
+public func (this: Thread) destroy() {
+    pthread_cancel(this.thrd);
 }
 
-public func (thr: Thread) yield() {
+public func (this: Thread) yield() {
     sched_yield();
 }
 

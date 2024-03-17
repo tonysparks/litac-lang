@@ -147,7 +147,7 @@ public func (this: *BucketList<T>) get<T>(index: usize) : T {
 }
 
 public func (this: *BucketList<T>) getPtr<T>(index: i32) : *T {
-    assert(index >= 0 && index < a.length)
+    assert(index >= 0 && index < this.length)
 
     var iterations = 0
     var bucket = this.getBucketAt<T>(index, &iterations)
@@ -157,7 +157,7 @@ public func (this: *BucketList<T>) getPtr<T>(index: i32) : *T {
 }
 
 public func (this: *BucketList<T>) set<T>(index: i32, element: T) {
-    assert(index >= 0 && index < a.length);
+    assert(index >= 0 && index < this.length);
 
     var iterations = 0
     var bucket = this.getBucketAt<T>(index, &iterations)

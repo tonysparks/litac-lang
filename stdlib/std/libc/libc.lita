@@ -42,6 +42,10 @@ size_t strnlen(const char * s, size_t len) {
 }
 #endif
 
+#if defined(OS_WIN)
+#define _strnicmp(a, b, n)  strncasecmp((a), (b), (n))
+#endif
+
 #if defined(_MSC_VER) || defined(__TINYC__) && (defined(_WIN32) || defined(_WIN64))
 #include <io.h>
 

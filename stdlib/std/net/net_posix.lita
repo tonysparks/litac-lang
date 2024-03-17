@@ -2,86 +2,7 @@
 import "std/string"
 import "std/net"
 import "std/libc"
-
-@raw("""
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-
-
-typedef struct sockaddr sockaddr;
-typedef struct sockaddr_in sockaddr_in;
-""");
-
-@foreign
-typedef void as socklen_t;
-
-@foreign
-struct sockaddr {
-    sa_family: i32
-    sa_data: [14]char
-}
-
-@foreign
-struct sockaddr_in {
-    sin_family: i32;     /* AF_INET */
-    sin_port: u16;       /* Port number */
-    sin_addr: in_addr;   /* IPv4 address */
-};
-
-@foreign
-struct in_addr {
-    s_addr: u64
-};
-
-@foreign
-const SO_DEBUG:i32
-@foreign
-const SO_BROADCAST:i32
-@foreign
-const SO_REUSEADDR:i32
-@foreign
-const SO_KEEPALIVE:i32
-@foreign
-const SO_LINGER:i32
-@foreign
-const SO_OOBINLINE:i32
-@foreign
-const SO_SNDBUF:i32
-@foreign
-const SO_RCVBUF:i32
-@foreign
-const SO_DONTROUTE:i32
-@foreign
-const SO_RCVLOWAT:i32
-@foreign
-const SO_RCVTIMEO:i32
-@foreign
-const SO_SNDLOWAT:i32
-@foreign
-const SO_SNDTIMEO:i32
-
-@foreign
-const SOL_SOCKET:i32
-
-
-@foreign
-const MSG_CONFIRM:i32
-@foreign
-const MSG_DONTROUTE:i32
-@foreign
-const MSG_DONTWAIT:i32
-@foreign
-const MSG_EOR:i32
-@foreign
-const MSG_MORE:i32
-@foreign
-const MSG_NOSIGNAL:i32
-@foreign
-const MSG_OOB:i32
-@foreign
-const MSG_FASTOPEN:i32
+import "std/net/posix_socket"
 
 @generated
 public enum SocketFlags {
@@ -96,69 +17,6 @@ public enum SocketFlags {
 }
 
 
-@foreign
-func socket(domain: i32, type: i32, protocol: i32) : i32;
-
-@foreign
-func bind(socket: i32, addr: *sockaddr, addrlen: socklen_t) : i32;
-
-@foreign
-func accept(socket: i32, addr: *sockaddr, addrlen: *socklen_t) : i32;
-
-@foreign
-func listen(socket: i32, backlog: i32) : i32;
-
-@foreign
-func recv(socket: i32, buf: *void, len: usize, flags: i32) : i64;
-
-@foreign
-func send(socket: i32, buf: *void, len: usize, flags: i32) : i64;
-
-@foreign
-func setsockopt(socket: i32, level: i32, option_name: i32, option_value: *const void, option_len: socklen_t) : i32;
-
-@foreign
-func close(socket: i32) : i32;
-
-@foreign
-const AF_INET: i32;
-
-@foreign
-const AF_INET6: i32;
-
-@foreign
-const SOCK_STREAM: i32;
-
-@foreign
-const SOCK_DGRAM: i32;
-
-@foreign
-const SOCK_NONBLOCK: i32;
-
-@foreign
-const INET_ADDRSTRLEN: i32;
-
-@foreign
-const INADDR_ANY: i32;
-
-@foreign
-func htonl(hostlong: u32) : u32;
-
-@foreign
-func htons(hostshort: u16) : u16;
-
-@foreign
-func ntohl(netlong: u32) : u32;
-
-@foreign
-func ntohs(netshort: u16) : u16;
-
-@foreign
-func inet_pton(af: i32, src: *const char, dst: *void): i32;
-
-@foreign
-func inet_ntop(af: i32, src: *const void, dst: *void, size: socklen_t): *const char;
-
 /*
 ===================================================
 Address API
@@ -171,7 +29,7 @@ public const MAX_ADDRESS_SIZE = INET_ADDRSTRLEN;
 @generated
 public struct SocketAddress {
     type: AddressType;
-    _address: [MAX_ADDRESS_SIZE]char
+    _address: [INET_ADDRSTRLEN]char
     _port: u16
 
     // internal implementation information

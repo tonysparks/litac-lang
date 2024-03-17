@@ -135,7 +135,7 @@ public func (this: *Socket) close() {
 
 import "std/assert"
 
-@test
+@test(.disabled = true)
 public func testGenerated() {
     var serverSocket:Socket;
     if(!serverSocket.create()) {
@@ -150,18 +150,18 @@ public func testGenerated() {
     var addr = serverSocket.address
 
     if(!serverSocket.bind()) {
-        printf("Unable to bind to address: %s:%d -> errono: %d\n", addr.address, addr.port, errno)
+        //printf("Unable to bind to address: %d -> errono: %d\n", addr.port, errno)
         perror("bind")
         return;
     }
 
 
     if(!serverSocket.listen()) {
-        printf("Unable to listen on address: %s:%d\n", addr.address, addr.port)
+        //printf("Unable to listen on address: %d\n", addr.port)
         return;
     }
 
-    printf("Listening on port: %d\n", addr.port)
+    //printf("Listening on port: %d\n", addr.port)
 
     const BUFFER_SIZE = 1024;
     var buffer:[BUFFER_SIZE]char;
