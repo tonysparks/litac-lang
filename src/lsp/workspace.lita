@@ -10,6 +10,7 @@ import "std/mem"
 import "std/system"
 import "std/assert"
 import "std/ascii"
+import "std/mem/track_allocator"
 
 import "lita"
 import "phase_result"
@@ -22,6 +23,7 @@ import "types"
 import "common"
 import "intern"
 
+
 import "lsp/lsp"
 import "lsp/protocol"
 import "lsp/references"
@@ -30,6 +32,8 @@ import "lsp/document"
 
 public struct Workspace {
     allocator: *const Allocator
+    docAllocator: TrackAllocator
+
     lsp: *LspServer
     rootPath: *const char
     openedDocuments: Map<*const char, *Document>
@@ -39,6 +43,8 @@ public func (this: *Workspace) init(lsp: *LspServer, alloc: *const Allocator) {
     this.allocator = alloc
     this.lsp = lsp
     this.openedDocuments = StrMap<*Document>(null, 64, this.allocator)
+
+    this.docAllocator.init(defaultAllocator)
 }
 
 public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char) {
@@ -93,11 +99,15 @@ public func (this: *Workspace) isDocumentOpen(uri: *const char) : bool {
 public func (this: *Workspace) openDocument(uri: *const char, text: *const char) {
     if(!uri) return;
 
+    // TODO: intern these?
     var moduleUri = StringClone(uri, -1, this.allocator)
 
-    var doc = new<Document>(this.allocator)
-    doc.lineMap.init(256, this.allocator)
-    doc.text = StringBufferInit(strlen(text), this.allocator)
+    var allocator = this.allocator
+    //&this.docAllocator.alloc
+
+    var doc = new<Document>(allocator)
+    doc.lineMap.init(256, allocator)
+    doc.text = StringBufferInit(strlen(text), allocator)
 
     doc.setText(text)
 
@@ -109,9 +119,12 @@ public func (this: *Workspace) openDocument(uri: *const char, text: *const char)
 public func (this: *Workspace) closeDocument(uri: *const char) {
     if(!uri) return;
 
+    this.lsp.log("Close request for document: %s\n", uri)
     var doc = this.openedDocuments.remove(uri)
-    if(!doc) {
-        // Remove from file cache
+    if(doc) {
+        doc.free()
+        this.allocator.free(doc)
+        this.lsp.log("Closed document: %s\n", uri)
     }
 }
 

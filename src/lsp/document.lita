@@ -1,6 +1,7 @@
 import "std/system"
 import "std/string_buffer"
 import "std/array"
+import "std/mem"
 
 import "lsp/protocol"
 
@@ -9,6 +10,11 @@ public struct Document {
     text: StringBuffer
 
     lineMap: Array<u32>
+}
+
+internal func (this: *Document) free() {
+    this.text.free()
+    this.lineMap.free()
 }
 
 
