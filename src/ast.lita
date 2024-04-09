@@ -1,6 +1,6 @@
 import "std/assert"
 import "std/string"
-import "std/string_buffer"
+import "std/string/buffer"
 import "std/libc"
 import "std/array"
 import "std/mem"

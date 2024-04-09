@@ -1,4 +1,4 @@
-import "std/string_builder"
+import "std/string/builder"
 import "std/libc"
 
 import "phase_result"

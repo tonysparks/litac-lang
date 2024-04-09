@@ -1,5 +1,5 @@
-import "std/string_builder";
-import "std/string_buffer";
+import "std/string/builder";
+import "std/string/buffer";
 import "std/string";
 import "std/map";
 import "std/hash";
@@ -199,7 +199,7 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
         var value = StringClone(str.buffer, str.length, context.allocator)
         this.put<K,V>(entry.key, value)
 
-#elseif json_check_generic_symbol("this", "V", "std::string_buffer::StringBuffer")
+#elseif json_check_generic_symbol("this", "V", "std::string::buffer::StringBuffer")
         var str = StringInit(entry.value.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
@@ -213,7 +213,7 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
         var value = StringInit(clonedStr, str.length)
         this.put<K,V>(entry.key, value)
 
-#elseif json_check_generic_symbol("this", "V", "std::string_builder::StringBuilder")
+#elseif json_check_generic_symbol("this", "V", "std::string::builder::StringBuilder")
         var str = StringInit(entry.value.asString())
         var value = StringBuilderInit(str.length, context.allocator)
         value.appendStrn(str.buffer, str.length)
@@ -265,7 +265,7 @@ public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode
         var value = StringClone(str.buffer, str.length, context.allocator)
         this.add(value)
 
-#elseif json_check_generic_symbol("this", "T", "std::string_buffer::StringBuffer")
+#elseif json_check_generic_symbol("this", "T", "std::string::buffer::StringBuffer")
         var str = StringInit(element.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
@@ -279,7 +279,7 @@ public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode
         var value = StringInit(clonedStr, str.length)
         this.add(value)
 
-#elseif json_check_generic_symbol("this", "T", "std::string_builder::StringBuilder")
+#elseif json_check_generic_symbol("this", "T", "std::string::builder::StringBuilder")
         var str = StringInit(element.asString())
         var value = StringBuilderInit(str.length, context.allocator)
         value.appendStrn(str.buffer, str.length)

@@ -2,7 +2,7 @@
     "description": "StringBuilder",
     "disabled": false,
     "program": `
-        import "std/string_builder";
+        import "std/string/builder";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;

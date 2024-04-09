@@ -1,5 +1,5 @@
 import "std/system"
-import "std/string_builder"
+import "std/string/builder"
 import "std/array"
 
 import "lsp/protocol"

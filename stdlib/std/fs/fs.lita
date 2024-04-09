@@ -1,6 +1,6 @@
 import "std/fs/tinydir"
 import "std/system" // TODO: move the FS stuff into here!!
-import "std/string_buffer"
+import "std/string/buffer"
 import "std/libc"
 
 public struct FileHandle {

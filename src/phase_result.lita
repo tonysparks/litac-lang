@@ -1,5 +1,5 @@
 import "std/array"
-import "std/string_builder"
+import "std/string/builder"
 import "std/mem"
 import "std/libc"
 

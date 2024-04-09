@@ -659,7 +659,7 @@
         {
             "name": "Generic With Typedef Generic",
             "definitions": `
-                import "std/string_buffer";
+                import "std/string/buffer";
                 import "std/map";
                 import "std/hash"
 
@@ -677,7 +677,7 @@
         {
             "name": "Generic With Generic",
             "definitions": `
-                import "std/string_buffer";
+                import "std/string/buffer";
                 import "std/map";
                 import "std/hash"
 
@@ -694,7 +694,7 @@
         {
             "name": "Generic With Typedef Generic with alias",
             "definitions": `
-                import "std/string_buffer" as str;
+                import "std/string/buffer" as str;
                 import "std/map";
                 import "std/hash"
 
@@ -712,7 +712,7 @@
         {
             "name": "Generic With Generic with alias",
             "definitions": `
-                import "std/string_buffer" as str;
+                import "std/string/buffer" as str;
                 import "std/map";
                 import "std/hash"
 
@@ -729,7 +729,7 @@
         {
             "name": "Generic With Typedef Generic with alias2",
             "definitions": `
-                import "std/string_buffer" as str;
+                import "std/string/buffer" as str;
                 import "std/map" as m;
                 import "std/hash"
 
@@ -747,7 +747,7 @@
         {
             "name": "Generic With Generic with alias2",
             "definitions": `
-                import "std/string_buffer" as str;
+                import "std/string/buffer" as str;
                 import "std/map" as m;
                 import "std/hash"
 
@@ -788,7 +788,7 @@
         {
             "name": "Generic With Generic with alias2",
             "definitions": `
-                import "std/string_buffer" as str;
+                import "std/string/buffer" as str;
                 import "std/map" as m;
                 import "std/hash"
 

@@ -1,5 +1,5 @@
 import "std/http/libcurl"
-import "std/string_builder"
+import "std/string/builder"
 import "std/mem"
 import "std/map"
 import "std/libc"

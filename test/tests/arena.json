@@ -52,9 +52,9 @@
                 import "std/map";
                 import "std/hash"
                 import "std/json";
-                import "std/string_builder"
+                import "std/string/builder"
                 import "std/libc"
-                import "std/string_buffer";
+                import "std/string/buffer";
 
             `,
             "code": `
@@ -125,9 +125,9 @@
                 import "std/map";
                 import "std/hash"
                 import "std/json";
-                import "std/string_builder"
+                import "std/string/builder"
                 import "std/libc"
-                import "std/string_buffer";
+                import "std/string/buffer";
 
             `,
             "code": `

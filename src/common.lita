@@ -1,6 +1,6 @@
 import "std/libc"
 import "std/mem"
-import "std/string_builder"
+import "std/string/builder"
 
 public enum LogLevel {
     TRACE,
