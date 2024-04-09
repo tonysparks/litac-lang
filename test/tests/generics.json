@@ -663,13 +663,13 @@
                 import "std/map";
                 import "std/hash"
 
-                public typedef Map<i32, StringBuffer> as StringMap
+                public typedef Map<i32, StringBuffer> as XStringMap
 
                 public func (this: *Map<K, V>) exec<K,V>() {
                 }
             `,
             "code": `
-                var test = StrMap<StringMap>(StringMap{})
+                var test = StrMap<XStringMap>(XStringMap{})
                 test.exec()
 
             `,
@@ -698,13 +698,13 @@
                 import "std/map";
                 import "std/hash"
 
-                public typedef Map<i32, str::StringBuffer> as StringMap
+                public typedef Map<i32, str::StringBuffer> as XStringMap
 
                 public func (this: *Map<K, V>) exec<K,V>() {
                 }
             `,
             "code": `
-                var test = StrMap<StringMap>(StringMap{})
+                var test = StrMap<XStringMap>(XStringMap{})
                 test.exec()
 
             `,
