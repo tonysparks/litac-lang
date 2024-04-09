@@ -6,26 +6,26 @@ import "std/assert"
 @foreign
 func strncasecmp(a: *const char, b: *const char, n: usize) : i32;
 
-public struct StringView {
+public struct String {
     buffer: *const char
     length: i32
 }
 
-public func StringViewInit(str: *const char, len: i32 = -1) : StringView {
+public func StringInit(str: *const char, len: i32 = -1) : String {
     if(str == null) {
-        return StringView {
+        return String {
             .buffer = null,
             .length = 0
         }
     }
 
-    return StringView {
+    return String {
         .buffer = str,
         .length = (len < 0) ? strlen(str) : len
     }
 }
 
-public func (b: StringView) hash() : u32 {
+public func (b: String) hash() : u32 {
     var hash = 5381_u32;
     for(var i = 0; i < b.length; i+=1) {
         hash = ((hash << 5_u32) + hash) + ((b.buffer[i]) as (u32));
@@ -33,23 +33,23 @@ public func (b: StringView) hash() : u32 {
     return hash;
 }
 
-public func (b: StringView) substring(start: i32, end: i32 = -1) : StringView {
+public func (b: String) substring(start: i32, end: i32 = -1) : String {
     var endIndex = end < 0 ? b.length : end
 
     if(endIndex <= start || start < 0 || start >= b.length) {
-        return StringView {
+        return String {
             .buffer = null,
             .length = 0
         }
     }
 
-    return StringView {
+    return String {
         .buffer = &b.buffer[start],
         .length = endIndex - start
     }
 }
 
-public func (b: StringView) startsWith(prefix: *const char, len: i32 = -1, fromIndex: i32 = 0) : bool {
+public func (b: String) startsWith(prefix: *const char, len: i32 = -1, fromIndex: i32 = 0) : bool {
     if(!prefix) return false;
 
     var ta = b.buffer;
@@ -72,14 +72,14 @@ public func (b: StringView) startsWith(prefix: *const char, len: i32 = -1, fromI
     return true;
 }
 
-public func (b: StringView) endsWith(suffix: *const char, len: i32 = -1) : bool {
+public func (b: String) endsWith(suffix: *const char, len: i32 = -1) : bool {
     if(!suffix) return false;
 
     len = (len < 0) ? strlen(suffix) : len;
     return b.startsWith(suffix, len, b.length - len)
 }
 
-public func (b: StringView) equals(str: *const char, len: i32 = -1) : bool {
+public func (b: String) equals(str: *const char, len: i32 = -1) : bool {
     if(!str) {
         return b.buffer == null;
     }
@@ -92,13 +92,13 @@ public func (b: StringView) equals(str: *const char, len: i32 = -1) : bool {
     return strncmp(b.buffer, str, len) == 0
 }
 
-public func (b: StringView) equalsStringView(other: StringView) : bool {
+public func (b: String) equalsString(other: String) : bool {
     return b.equals(other.buffer, other.length)
 }
 
 
 
-public func (b: StringView) equalsIgnoreCase(str: *const char, len: i32 = -1) : bool {
+public func (b: String) equalsIgnoreCase(str: *const char, len: i32 = -1) : bool {
     if(!str) {
         return b.buffer == null;
     }
@@ -111,15 +111,15 @@ public func (b: StringView) equalsIgnoreCase(str: *const char, len: i32 = -1) : 
     return strncasecmp(b.buffer, str, len) == 0
 }
 
-public func (b: StringView) contains(str: *const char, len: i32 = -1) : bool {
+public func (b: String) contains(str: *const char, len: i32 = -1) : bool {
     return b.indexOf(str, len) > -1;
 }
 
-public func (b: StringView) indexOf(str: *const char, len: i32 = -1) : i32 {
+public func (b: String) indexOf(str: *const char, len: i32 = -1) : i32 {
     return b.indexOfAt(str, len, 0)
 }
 
-public func (b: StringView) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
+public func (b: String) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
     if(!str) return -1;
 
     var target = str
@@ -163,7 +163,7 @@ public func (b: StringView) indexOfAt(str: *const char, len: i32 = -1, fromIndex
     return -1;
 }
 
-public func (b: StringView) lastIndexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = -1) : i32 {
+public func (b: String) lastIndexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = -1) : i32 {
     var sourceCount = b.length
     var targetCount = len < 0 ? strlen(str) : len
 
@@ -215,7 +215,7 @@ startSearchForLastChar:
 
 }
 
-public func (b: StringView) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
+public func (b: String) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
     if(!buf || len == 0) return 0;
 
     var bytesCopied = len
@@ -232,9 +232,9 @@ public func (b: StringView) copyTo(buf: *char, len: i32, addZero: bool = true) :
     return (bytesCopied)
 }
 
-public func (s: StringView) copy(allocator: *const mem::Allocator = mem::defaultAllocator) : StringView {
+public func (s: String) copy(allocator: *const mem::Allocator = mem::defaultAllocator) : String {
     if(s.length < 1) {
-        return StringView {
+        return String {
             .buffer = null,
             .length = 0
         }
@@ -245,13 +245,13 @@ public func (s: StringView) copy(allocator: *const mem::Allocator = mem::default
 
     copiedStr[s.length] = '\0'
 
-    return StringView{
+    return String{
         .buffer = copiedStr,
         .length = s.length
     }
 }
 
-public func (b: StringView) forEach(fn : func(char) : bool) {
+public func (b: String) forEach(fn : func(char) : bool) {
     for(var i = 0; i < b.length; i+=1) {
         if(fn(b.buffer[i])) {
             break;
@@ -259,19 +259,19 @@ public func (b: StringView) forEach(fn : func(char) : bool) {
     }
 }
 
-public func (b: StringView) empty() : bool {
+public func (b: String) empty() : bool {
     return b.length == 0
 }
 
-public func (b: StringView) size() : i32 {
+public func (b: String) size() : i32 {
     return b.length
 }
 
-public func (b: StringView) clear() {
+public func (b: String) clear() {
     b.length = 0
 }
 
-public func (b: StringView) get(index: i32) : char {
+public func (b: String) get(index: i32) : char {
     if(index < 0 || index >= b.length) {
         return '\0'
     }
@@ -281,11 +281,11 @@ public func (b: StringView) get(index: i32) : char {
 
 @test("equals")
 func testEquals() {
-    var a = StringViewInit("Hello World")
-    var b = StringViewInit("Bye World")
+    var a = StringInit("Hello World")
+    var b = StringInit("Bye World")
     var c = a
-    var d = StringViewInit("HelloWorld")
-    var e = StringViewInit(null)
+    var d = StringInit("HelloWorld")
+    var e = StringInit(null)
 
     assert(a.equals(c.buffer, c.length) == true)
     assert(a.equals("Hell") == false)
@@ -299,8 +299,8 @@ func testEquals() {
 
 @test("contains")
 func testContains() {
-    var a = StringViewInit("Hello World")
-    var e = StringViewInit(null)
+    var a = StringInit("Hello World")
+    var e = StringInit(null)
 
     assert(a.contains("World") == true)
     assert(a.contains("d") == true)
@@ -312,8 +312,8 @@ func testContains() {
 
 @test("startsWith")
 func testStartsWith() {
-    var a = StringViewInit("Hello World")
-    var e = StringViewInit(null)
+    var a = StringInit("Hello World")
+    var e = StringInit(null)
 
     assert(a.startsWith("World") == false)
     assert(a.startsWith("d") == false)
@@ -329,8 +329,8 @@ func testStartsWith() {
 
 @test("endsWith")
 func testEndsWith() {
-    var a = StringViewInit("Hello World")
-    var e = StringViewInit(null)
+    var a = StringInit("Hello World")
+    var e = StringInit(null)
 
     assert(a.endsWith("World") == true)
     assert(a.endsWith("d") == true)
@@ -342,8 +342,8 @@ func testEndsWith() {
 
 @test("indexOf")
 func testIndexOf() {
-    var a = StringViewInit("Hello World")
-    var e = StringViewInit(null)
+    var a = StringInit("Hello World")
+    var e = StringInit(null)
 
     assert(a.indexOfAt("World", 2) == 6)
     assert(a.indexOfAt("World", 7) == -1)
@@ -358,8 +358,8 @@ func testIndexOf() {
 
 @test("lastIndexOf")
 func testLastIndexOf() {
-    var a = StringViewInit("Hello World")
-    var e = StringViewInit(null)
+    var a = StringInit("Hello World")
+    var e = StringInit(null)
 
     assert(a.lastIndexOfAt("World") == 6)
     assert(a.lastIndexOfAt("World", .fromIndex: 5) == -1)

@@ -7,7 +7,7 @@ import "std/hash"
 import "std/libc"
 import "std/system"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 
 import "symbols"
@@ -96,7 +96,7 @@ public enum TypeInfoOption {
 public struct CCompilerOption {
     os: OS
     arch: Arch
-    options: StringView
+    options: String
 }
 
 public enum PkgCommand {
@@ -646,7 +646,7 @@ public func (this: *Lita) run() : i32 {
 
 
 public func FindModulePath(lita: *Lita,
-                           moduleName: StringView,
+                           moduleName: String,
                            filename: [MAX_PATH]char) : bool {
 
     var path = [MAX_PATH]char{0}
@@ -806,14 +806,14 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 }
 
 
-public func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
+public func GetPackageName(srcPath: *const char, inputFile: *const char) : String {
 
     if(!inputFile) {
-        return StringView{}
+        return String{}
     }
 
     if(srcPath) {
-        var inputFileView = StringViewInit(inputFile)
+        var inputFileView = StringInit(inputFile)
         var index = inputFileView.indexOf(srcPath)
         if(index > -1) {
             inputFile = &inputFile[index + strlen(srcPath)]
@@ -841,7 +841,7 @@ public func GetPackageName(srcPath: *const char, inputFile: *const char) : Strin
         endCount += 1
     }
 
-    return StringView {
+    return String {
         .length = inputLen - endCount,
         .buffer = inputFile,
     }

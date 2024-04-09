@@ -1,6 +1,6 @@
 import "std/io"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 import "std/libc"
 import "std/array"
@@ -507,25 +507,25 @@ func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]cha
     return name.cStr()
 }
 
-public func (this: using *CGen) escapeNameStr(name: InternedString) : StringView {
+public func (this: using *CGen) escapeNameStr(name: InternedString) : String {
     var sb = StringBuilderInit(256, this.allocator)
     EscapeName(name.buffer, name.length, sb)
-    return StringView {
+    return String {
         .buffer = sb.buffer,
         .length = sb.length
     }
 }
 
-func (this: using *CGen) escapeNameChars(name: *const char) : StringView {
+func (this: using *CGen) escapeNameChars(name: *const char) : String {
     var sb = StringBuilderInit(256, this.allocator)
     EscapeName(name, strlen(name), sb)
-    return StringView {
+    return String {
         .buffer = sb.buffer,
         .length = sb.length
     }
 }
 
-func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
+func (this: using *CGen) escapeName(type: *TypeInfo) : String {
     if(IsAggregate(type)) {
         return this.escapeNameStr(type.name)
     }
@@ -543,7 +543,7 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
             }
         }
         // function pointer
-        return StringView {
+        return String {
             .buffer = "_",
             .length = 1
         }
@@ -552,7 +552,7 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
     return type.name.view
 }
 
-func (this: using *CGen) baseTypeName(name: StringView) : StringView {
+func (this: using *CGen) baseTypeName(name: String) : String {
     // strip module name
     var index = name.lastIndexOfAt("::")
     if(index >= 0) {
@@ -932,7 +932,7 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     }
 }
 
-func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : StringView {
+func (this: using *CGen) foreignName(decl: *Decl, defaultName: String) : String {
     if(!decl) {
         return defaultName
     }
@@ -1005,7 +1005,7 @@ public func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
     return this.cName(type.sym)
 }
 
-public func (this: using *CGen) prefix(name: StringView, sb: *StringBuilder) : *const char {
+public func (this: using *CGen) prefix(name: String, sb: *StringBuilder) : *const char {
     sb.appendStr(this.options.cPrefix)
     sb.appendStrn(name.buffer, name.length)
     return sb.cStrConst()
@@ -1086,7 +1086,7 @@ public func (this: using *CGen) flush() {
     }
 }
 
-public func (this: using *CGen) emitNameStr(name: StringView) {
+public func (this: using *CGen) emitNameStr(name: String) {
     buf.appendStrn(name.buffer, name.length)
 }
 
@@ -1239,7 +1239,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
         var ccOption = CCompilerOption{
             .os = OS.Lita_OSType_OTHER,
             .arch = Arch.Lita_ArchType_UNKNOWN,
-            .options = StringView{},
+            .options = String{},
         }
 
         var temp:[MAX_PATH]char;
@@ -1266,7 +1266,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                     buffer.append("%.*s", value.length, value.buffer)
 
                     buffer.replace(index, index + len, FileParent(note.startPos.filename, temp))
-                    value = buffer.asStringView()
+                    value = buffer.asString()
                 }
             }
 

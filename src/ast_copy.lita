@@ -2,7 +2,7 @@ import "std/mem"
 import "std/array"
 import "std/assert"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/libc"
 import "std/system"
 
@@ -844,7 +844,7 @@ public func AstAddImport(lita: *Lita,
         .token = Token {
             .type = TokenType.IDENTIFIER,
             .pos = module.ast.startPos,
-            .value = Value{ .str = StringViewInit(sb.cStr(), sb.length)}
+            .value = Value{ .str = StringInit(sb.cStr(), sb.length)}
         }
     }
     var importStmt = NewImportDecl(module.ast.startPos,

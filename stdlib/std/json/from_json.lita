@@ -1,6 +1,6 @@
 import "std/string_builder";
 import "std/string_buffer";
-import "std/string_view";
+import "std/string";
 import "std/map";
 import "std/hash";
 import "std/array";
@@ -146,11 +146,11 @@ public func (this: **const char) fromJson(context: *JsonContext, json: *JsonNode
     *this = json.asString()
 }
 
-public func (this: *StringView) fromJson(context: *JsonContext, json: *JsonNode) {
+public func (this: *String) fromJson(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;
     }
-    *this = StringViewInit(json.asString())
+    *this = StringInit(json.asString())
 }
 
 public func (this: *StringBuffer) fromJson(context: *JsonContext, json: *JsonNode) {
@@ -194,27 +194,27 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
         this.put<K,V>(entry.key, value)
 
 #elseif json_check_generic_symbol_is_string("this", "V")
-        var str = StringViewInit(entry.value.asString())
+        var str = StringInit(entry.value.asString())
 
         var value = StringClone(str.buffer, str.length, context.allocator)
         this.put<K,V>(entry.key, value)
 
 #elseif json_check_generic_symbol("this", "V", "std::string_buffer::StringBuffer")
-        var str = StringViewInit(entry.value.asString())
+        var str = StringInit(entry.value.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
         var value = StringBufferInit(clonedStr, str.length, str.length)
         this.put<K,V>(entry.key, value)
 
-#elseif json_check_generic_symbol("this", "V", "std::string_view::StringView")
-        var str = StringViewInit(entry.value.asString())
+#elseif json_check_generic_symbol("this", "V", "std::string::String")
+        var str = StringInit(entry.value.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
-        var value = StringViewInit(clonedStr, str.length)
+        var value = StringInit(clonedStr, str.length)
         this.put<K,V>(entry.key, value)
 
 #elseif json_check_generic_symbol("this", "V", "std::string_builder::StringBuilder")
-        var str = StringViewInit(entry.value.asString())
+        var str = StringInit(entry.value.asString())
         var value = StringBuilderInit(str.length, context.allocator)
         value.appendStrn(str.buffer, str.length)
         this.put<K,V>(entry.key, value)
@@ -260,27 +260,27 @@ public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode
         this.add(value)
 
 #elseif json_check_generic_symbol_is_string("this", "T")
-        var str = StringViewInit(element.asString())
+        var str = StringInit(element.asString())
 
         var value = StringClone(str.buffer, str.length, context.allocator)
         this.add(value)
 
 #elseif json_check_generic_symbol("this", "T", "std::string_buffer::StringBuffer")
-        var str = StringViewInit(element.asString())
+        var str = StringInit(element.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
         var value = StringBufferInit(clonedStr, str.length, str.length)
         this.add(value)
 
-#elseif json_check_generic_symbol("this", "T", "std::string_view::StringView")
-        var str = StringViewInit(element.asString())
+#elseif json_check_generic_symbol("this", "T", "std::string::String")
+        var str = StringInit(element.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
-        var value = StringViewInit(clonedStr, str.length)
+        var value = StringInit(clonedStr, str.length)
         this.add(value)
 
 #elseif json_check_generic_symbol("this", "T", "std::string_builder::StringBuilder")
-        var str = StringViewInit(element.asString())
+        var str = StringInit(element.asString())
         var value = StringBuilderInit(str.length, context.allocator)
         value.appendStrn(str.buffer, str.length)
         this.add(value)

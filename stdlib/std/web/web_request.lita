@@ -1,4 +1,4 @@
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 import "std/libc"
 import "std/mem"
@@ -41,56 +41,56 @@ public struct WebRequest {
 }
 
 
-public func (this: *WebRequest) getBody(): StringView {
-    return StringView {
+public func (this: *WebRequest) getBody(): String {
+    return String {
         .buffer = this.msg.body.ptr,
         .length = this.msg.body.len as (i32),
     }
 }
 
 
-public func (this: *WebRequest) getMethod(): StringView {
-    return StringView {
+public func (this: *WebRequest) getMethod(): String {
+    return String {
         .buffer = this.msg.method.ptr,
         .length = this.msg.method.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getUri(): StringView {
-    return StringView {
+public func (this: *WebRequest) getUri(): String {
+    return String {
         .buffer = this.msg.uri.ptr,
         .length = this.msg.uri.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getQuery(): StringView {
-    return StringView {
+public func (this: *WebRequest) getQuery(): String {
+    return String {
         .buffer = this.msg.query.ptr,
         .length = this.msg.query.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getProto(): StringView {
-    return StringView {
+public func (this: *WebRequest) getProto(): String {
+    return String {
         .buffer = this.msg.proto.ptr,
         .length = this.msg.proto.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getMessage(): StringView {
-    return StringView {
+public func (this: *WebRequest) getMessage(): String {
+    return String {
         .buffer = this.msg.message.ptr,
         .length = this.msg.message.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getHeader(header: *const char): StringView {
+public func (this: *WebRequest) getHeader(header: *const char): String {
     var value = mg_http_get_header(this.msg, header)
     if(!value) {
-        return StringView{}
+        return String{}
     }
 
-    return StringView {
+    return String {
         .buffer = value.ptr,
         .length = value.len as (i32),
     }

@@ -1,4 +1,4 @@
-import "std/string_view"
+import "std/string"
 import "std/string_builder"
 import "std/libc"
 import "std/mem"
@@ -447,7 +447,7 @@ public union Value {
     floatValue: f64
     intValue: i64
     uintValue: u64
-    str: StringView
+    str: String
 }
 
 public enum Mod {
@@ -750,7 +750,7 @@ func (l: *Lexer) scanWord() : Token {
     l.token.pos.end = l.stream
     //l.token.pos.lineNumber = l.lineNumber
     l.token.type = TokenType.IDENTIFIER
-    l.token.str = StringViewInit(l.token.pos.start, length)
+    l.token.str = StringInit(l.token.pos.start, length)
 
     l.checkKeyword()
 

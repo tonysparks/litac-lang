@@ -1,8 +1,8 @@
 {
-    "description": "StringView",
+    "description": "String",
     "disabled": false,
     "program": `
-        import "std/string_view";
+        import "std/string";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;
@@ -22,17 +22,17 @@
     `,
     "tests": [
         {
-            "name": "StringView_equals",
+            "name": "String_equals",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var a = StringViewInit("Hello World")
-                var b = StringViewInit("Bye World")
+                var a = StringInit("Hello World")
+                var b = StringInit("Bye World")
                 var c = a
-                var d = StringViewInit("HelloWorld")
-                var e = StringViewInit(null)
+                var d = StringInit("HelloWorld")
+                var e = StringInit(null)
 
                 assert(a.equals(c.buffer, c.length) == true)
                 assert(a.equals("Hell") == false)
@@ -44,14 +44,14 @@
             `,
         },
         {
-            "name": "StringView_contains",
+            "name": "String_contains",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var a = StringViewInit("Hello World")
-                var e = StringViewInit(null)
+                var a = StringInit("Hello World")
+                var e = StringInit(null)
 
                 assert(a.contains("World") == true)
                 assert(a.contains("d") == true)
@@ -62,14 +62,14 @@
             `,
         },
         {
-            "name": "StringView_startsWith",
+            "name": "String_startsWith",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var a = StringViewInit("Hello World")
-                var e = StringViewInit(null)
+                var a = StringInit("Hello World")
+                var e = StringInit(null)
 
                 assert(a.startsWith("World") == false)
                 assert(a.startsWith("World", -1, 2) == false)
@@ -86,14 +86,14 @@
             `,
         },
         {
-            "name": "StringView_endsWith",
+            "name": "String_endsWith",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var a = StringViewInit("Hello World")
-                var e = StringViewInit(null)
+                var a = StringInit("Hello World")
+                var e = StringInit(null)
 
                 assert(a.endsWith("World") == true)
                 assert(a.endsWith("d") == true)
@@ -108,14 +108,14 @@
             `,
         },
         {
-            "name": "StringView_indexOfAt",
+            "name": "String_indexOfAt",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var a = StringViewInit("Hello World")
-                var e = StringViewInit(null)
+                var a = StringInit("Hello World")
+                var e = StringInit(null)
 
                 assert(a.indexOfAt("World", 2) == 6)
                 assert(a.indexOfAt("World", 7) == -1)
@@ -128,14 +128,14 @@
             `,
         },
         {
-            "name": "StringView_substring",
+            "name": "String_substring",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var a = StringViewInit("Hello World")
-                var e = StringViewInit(null)
+                var a = StringInit("Hello World")
+                var e = StringInit(null)
 
                 assert(a.substring(-1, 2).length == 0)
                 assert(strncmp(a.substring(0, 2).buffer, "He", 2) == 0)
@@ -155,21 +155,21 @@
             `,
         },
         {
-            "name": "StringView_copyTo",
+            "name": "String_copyTo",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var a = StringViewInit("Hello World")
-                var e = StringViewInit(null)
+                var a = StringInit("Hello World")
+                var e = StringInit(null)
 
                 var b : [255]char
                 assert(a.copyTo(null, 255) == 0)
                 assert(a.copyTo(b, 0) == 0)
                 assert(a.copyTo(b, 255) == a.size())
 
-                var v = StringViewInit(b)
+                var v = StringInit(b)
                 assert(v.equals(a.buffer))
                 assert(e.copyTo(b, 255) == 0)
             `,

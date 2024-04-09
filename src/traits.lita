@@ -4,7 +4,7 @@ import "std/array"
 import "std/map"
 import "std/hash"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 
 import "types"
@@ -140,7 +140,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 func GenerateVTable(
         traitSym: *Symbol,
         traitDecl: *AggregateDecl,
-        traitName: StringView,
+        traitName: String,
         sb: *StringBuilder) {
     sb.append("@hidden struct %.*s__VirtualTable", traitName.length, traitName.buffer)
     sb.append(" {\n")
@@ -172,7 +172,7 @@ func GenerateWrapperFunctions(
         checker: *TypeChecker,
         traitSym: *Symbol,
         traitDecl: *AggregateDecl,
-        traitName: StringView,
+        traitName: String,
         sb: *StringBuilder,
         traitFieldBuffer: *StringBuilder,
         impls: *Array<Typeid>) {
@@ -259,7 +259,7 @@ func GenerateWrapperFunctions(
 func GenerateVTableEntries(
         checker: *TypeChecker,
         traitDecl: *AggregateDecl,
-        traitName: StringView,
+        traitName: String,
         sb: *StringBuilder,
         traitFieldBuffer: *StringBuilder,
         impls: *Array<Typeid>) {
@@ -341,7 +341,7 @@ func FindSymbolByTypeid(symbols: Array<*Symbol>, id: Typeid) : *Symbol {
     return null
 }
 
-func GetTraitName(traitSym: *Symbol, sb: *StringBuilder) : StringView {
+func GetTraitName(traitSym: *Symbol, sb: *StringBuilder) : String {
 
     // if this isn't a generic generated trait, just use the symbol name
     if(!(traitSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
@@ -353,7 +353,7 @@ func GetTraitName(traitSym: *Symbol, sb: *StringBuilder) : StringView {
     // otherwise, we have to calculate the new name using the generic type arguments
     EscapeName(traitSym.name.buffer, traitSym.name.length, sb)
 
-    return StringView {
+    return String {
         .buffer = sb.buffer,
         .length = sb.length
     }

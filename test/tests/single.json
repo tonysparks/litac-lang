@@ -156,7 +156,7 @@
                 import "std/mem";
                 import "std/map";
                 import "std/string_buffer";
-                import "std/string_view";
+                import "std/string";
 
 
                 public func TestMakerPtr(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
@@ -166,7 +166,7 @@
                                 return null;
                             }
 
-                            var str = StringViewInit(json.asString())
+                            var str = StringInit(json.asString())
                             var buffer = context.allocator.alloc(sizeof(:StringBuffer) + ((str.length+1) * sizeof(:char)))
                             var bufferStart = buffer + sizeof(:StringBuffer)
                             StringCopy(.src = str.buffer, .dest = bufferStart as (*char),  .size = str.length + 1)

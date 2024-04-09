@@ -1,5 +1,5 @@
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/libc"
 import "std/libc/signal"
 import "std/web/mongoose"

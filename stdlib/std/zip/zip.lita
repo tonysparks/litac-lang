@@ -6,7 +6,7 @@ import "std/io"
 import "std/system"
 import "std/string_buffer"
 import "std/array"
-import "std/string_view"
+import "std/string"
 import "std/fs"
 
 
@@ -145,7 +145,7 @@ public func (this: *ZipFile) zipDir(
     baseName: *const char,
     level: ZipCompressionLevel = ZipCompressionLevel.DEFAULT_LEVEL) : ZipStatus {
 
-    var basePath = StringViewInit(pathToZip, len)
+    var basePath = StringInit(pathToZip, len)
 
     var tempArch:[MAX_PATH]char;
     var tempPath:[MAX_PATH]char;
@@ -159,7 +159,7 @@ public func (this: *ZipFile) zipDir(
 
 func (this: *ZipFile) zipFolder(
     baseName: *const char,
-    basePath: *StringView,
+    basePath: *String,
     archiveName: *StringBuffer,
     path: *StringBuffer,
     level: ZipCompressionLevel) : ZipStatus {

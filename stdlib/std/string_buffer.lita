@@ -1,7 +1,7 @@
 import "std/mem" as mem;
 import "std/io" as io;
 import "std/assert";
-import "std/string_view";
+import "std/string";
 import "std/libc";
 
 public struct StringBuffer {
@@ -155,23 +155,23 @@ public func (s: *StringBuffer) appendChar(c: char) {
     s.length += 1
 }
 
-public func (s: StringBuffer) substring(start: i32, end: i32) : StringView {
+public func (s: StringBuffer) substring(start: i32, end: i32) : String {
     if(start < 0 || end < start) {
-        return StringView{
+        return String{
             .buffer = null,
             .length = 0
         }
     }
 
     var len = end - start
-    return StringView {
+    return String {
         .buffer = s.buffer + start,
         .length = len
     }
 }
 
-public func (s: StringBuffer) asView() : StringView {
-    return StringView {
+public func (s: StringBuffer) asView() : String {
+    return String {
         .buffer = s.buffer,
         .length = s.length
     }

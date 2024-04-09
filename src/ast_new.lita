@@ -1,7 +1,7 @@
 import "std/mem"
 import "std/array"
 import "std/bucket_list"
-import "std/string_view"
+import "std/string"
 import "std/assert"
 
 import "ast"
@@ -755,7 +755,7 @@ public func NewModuleStmt(startPos: SrcPos,
 public func NewCompStmt(startPos: SrcPos,
                         endPos: SrcPos,
                         type: InternedString,
-                        expr: StringView,
+                        expr: String,
                         body: Array<*Stmt>,
                         end: *CompStmt,
                         isScriptLoad: bool,
