@@ -22,7 +22,7 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
 
     const BUFFER_SIZE = 16
     var buffer = [BUFFER_SIZE]char{0};
-    var bufferStr = StringInit(buffer, BUFFER_SIZE, 0)
+    var bufferStr = StringBufferInit(buffer, BUFFER_SIZE, 0)
     bufferStr.format("%s", OSAsStr(GetOS()))
     bufferStr.toLower()
 

@@ -377,7 +377,7 @@ func (this: using *CGen) emitTraitDecls() {
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
-        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
+        var vtableNameStr = StringBufferInit(vtableName, MAX_SYMBOL_NAME, 0)
         var escapedName = this.escapeNameStr(traitSym.name)
         vtableNameStr.format("%s%.*s__%.*s",
             this.options.cPrefix,
@@ -497,7 +497,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
 }
 
 func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]char) : *const char {
-    var name = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    var name = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
     name.format("__tmp%d", this.tmpVar)
     this.tmpVar += 1
 
@@ -1334,7 +1334,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(note.type.name.equals(&CFILE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
-        var filenameStr = StringInit(filename, MAX_PATH, 0)
+        var filenameStr = StringBufferInit(filename, MAX_PATH, 0)
         var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
@@ -1389,7 +1389,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(note.type.name.equals(&CINCLUDE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
-        var filenameStr = StringInit(filename, MAX_PATH, 0)
+        var filenameStr = StringBufferInit(filename, MAX_PATH, 0)
         var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
@@ -1908,7 +1908,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitNotes(&decl.attributes)
 
             var name: [MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
+            var nameStr = StringBufferInit(name, MAX_SYMBOL_NAME, 0)
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")
@@ -1933,7 +1933,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitNotes(&decl.attributes)
 
             var name: [MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
+            var nameStr = StringBufferInit(name, MAX_SYMBOL_NAME, 0)
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")

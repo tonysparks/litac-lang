@@ -11,7 +11,7 @@ import "std/io"
 public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgStatus {
     const MAX_BUFFER = 1024
     var buffer = [MAX_BUFFER]char{};
-    var path = StringInit(buffer, MAX_BUFFER, 0)
+    var path = StringBufferInit(buffer, MAX_BUFFER, 0)
 
     path.format("%s/bin", pm.options.projectPath)
     Mkdir(path.cStr())

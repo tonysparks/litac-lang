@@ -233,7 +233,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
-        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
+        var vtableNameStr = StringBufferInit(vtableName, MAX_SYMBOL_NAME, 0)
         var escapedName = this.escapeNameStr(decl.sym.name)
         var module = root
 

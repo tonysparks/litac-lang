@@ -979,7 +979,7 @@ func ApeAssert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_o
 
 public func (this: *Preprocessor) loadScript(comp: *CompStmt, filename: *StringView, code: *StringView) : bool {
     var filepath = [MAX_PATH]char{0};
-    var filepathStr = StringInit(filepath, MAX_PATH, 0)
+    var filepathStr = StringBufferInit(filepath, MAX_PATH, 0)
 
     FilePath(comp.startPos.filename, filepath)
 

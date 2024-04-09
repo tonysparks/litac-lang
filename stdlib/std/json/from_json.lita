@@ -203,7 +203,7 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
         var str = StringViewInit(entry.value.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
-        var value = StringInit(clonedStr, str.length, str.length)
+        var value = StringBufferInit(clonedStr, str.length, str.length)
         this.put<K,V>(entry.key, value)
 
 #elseif json_check_generic_symbol("this", "V", "std::string_view::StringView")
@@ -269,7 +269,7 @@ public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode
         var str = StringViewInit(element.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
-        var value = StringInit(clonedStr, str.length, str.length)
+        var value = StringBufferInit(clonedStr, str.length, str.length)
         this.add(value)
 
 #elseif json_check_generic_symbol("this", "T", "std::string_view::StringView")

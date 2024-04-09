@@ -152,7 +152,7 @@ public func (p: *CmdParser) printHelp(sb: *StringBuilder) {
     }
 
     var name: [256]char;
-    var nameStr = StringInit(name, 256, 0);
+    var nameStr = StringBufferInit(name, 256, 0);
 
     for(var i = 0; i < p.options.size(); i += 1) {
         var opt = &p.options.elements[i]

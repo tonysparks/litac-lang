@@ -315,7 +315,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     }
 
     var moduleFilename = [260]char {};
-    var moduleFilenameStr = StringInit(moduleFilename, 260, 0)
+    var moduleFilenameStr = StringBufferInit(moduleFilename, 260, 0)
     for(var i = 0; i < test.modules.size(); i += 1) {
         var m = test.modules.get(i)
         var moduleName = StringViewInit(m.name)

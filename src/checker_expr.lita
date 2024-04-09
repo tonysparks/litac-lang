@@ -709,7 +709,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         var isFullyResolved = genericParams.size() == nameSpec.genericArgs.size()
         if(!isFullyResolved) {
             var buffer:[512]char;
-            var error = StringInit(buffer, 512, 0)
+            var error = StringBufferInit(buffer, 512, 0)
             error.format(
                 "return type of '%.*s' containing a generic argument that can not be inferred",
                 returnType.sym.name.length, returnType.sym.name.buffer

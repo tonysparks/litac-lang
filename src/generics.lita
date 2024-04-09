@@ -175,7 +175,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
     defer if(isNewContext) checker.genericContext.callsite = null
 
     var buffer: [MAX_GENERIC_NAME]char;
-    var genericName = StringInit(buffer, MAX_GENERIC_NAME, 0)
+    var genericName = StringBufferInit(buffer, MAX_GENERIC_NAME, 0)
 
     // We must make fully qualifed generic names to avoid conflicts/duplicates
     GetGenericName(checker, name, genericName, true)

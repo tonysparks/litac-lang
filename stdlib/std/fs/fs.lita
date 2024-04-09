@@ -14,7 +14,7 @@ public func (this: *FileHandle) openEx(path: *const char, len: i32) : bool {
     }
 
     var temp:[MAX_PATH]char;
-    var str = StringInit(temp, MAX_PATH, 0)
+    var str = StringBufferInit(temp, MAX_PATH, 0)
     str.format("%.*s", len, path)
     return this.open(str.cStr())
 }

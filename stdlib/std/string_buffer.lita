@@ -30,7 +30,7 @@ public func CString(str: *char, len: i32 = -1) : StringBuffer {
     }
 }
 
-public func StringInit(str: *char, capacity: i32, len: i32 = -1) : StringBuffer {
+public func StringBufferInit(str: *char, capacity: i32, len: i32 = -1) : StringBuffer {
     if(str == null) {
         return StringBuffer {
             .buffer = null,
