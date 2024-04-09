@@ -3,7 +3,7 @@ import "std/map"
 import "std/hash"
 import "std/array"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 import "std/assert"
 

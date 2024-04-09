@@ -1,7 +1,7 @@
 import "std/map"
 import "std/hash"
 import "std/mem"
-import "std/string_view"
+import "std/string"
 import "std/libc"
 /*
 public var internCount = 0
@@ -20,7 +20,7 @@ public union InternedString {
         addr: usize
         size: i32
     };
-    view: StringView
+    view: String
 }
 
 public const EMPTY_STR = InternedString {
@@ -100,7 +100,7 @@ public struct Strings {
 
     length: i32
     capacity: i32
-    keys: *StringView
+    keys: *String
     values: *InternedString
 }
 
@@ -186,7 +186,7 @@ func (this: *Strings) internConstant(string: *const char, length: i32, intern: *
     intern.length = str.length
 }
 
-public func (this: *Strings) internStringView(string: *StringView) : InternedString {
+public func (this: *Strings) internString(string: *String) : InternedString {
     return this.internCopy(string.buffer, string.length)
 }
 
@@ -197,7 +197,7 @@ public func (this: *Strings) internStringView(string: *StringView) : InternedStr
 public func (this: *Strings) intern(string: *const char, length: i32) : InternedString {
     //internCount += 1
 
-    var view = StringView {
+    var view = String {
         .buffer = string,
         .length = length
     }
@@ -218,7 +218,7 @@ public func (this: *Strings) intern(string: *const char, length: i32) : Interned
 public func (this: *Strings) internCopy(string: *const char, length: i32 = -1) : InternedString {
 //    internCount += 1
 
-    var view = StringView {
+    var view = String {
         .buffer = string,
         .length = (length < 0) ? strlen(string) : length
     }
@@ -237,7 +237,7 @@ public func (this: *Strings) internCopy(string: *const char, length: i32 = -1) :
     return result
 }
 
-public func (this: *Strings) put(key: StringView, value: InternedString) {
+public func (this: *Strings) put(key: String, value: InternedString) {
 //putCount += 1
 
     if( this.length >= (this.capacity * 0.55)) {
@@ -269,7 +269,7 @@ public func (this: *Strings) size() : i32 {
     return this.length
 }
 
-func (this: *Strings) get(key: *StringView) : InternedString {
+func (this: *Strings) get(key: *String) : InternedString {
 //getCount += 1
     if(this.length == 0) {
         return EMPTY_STR;
@@ -301,7 +301,7 @@ func (this: *Strings) grow(newlength: i32) {
     var oldValues = this.values
     var oldCapacity = this.capacity
 
-    this.keys     = this.allocator.calloc(newlength, sizeof(StringView)) as (*StringView)
+    this.keys     = this.allocator.calloc(newlength, sizeof(String)) as (*String)
     this.values   = this.allocator.calloc(newlength, sizeof(InternedString)) as (*InternedString)
     this.capacity = newlength
     this.length   = 0
@@ -341,8 +341,8 @@ public func (this: *InternedString) empty() : bool {
     return this.buffer == null || this.length == 0
 }
 
-public func (this: *InternedString) asStringView() : StringView {
-    return StringView {
+public func (this: *InternedString) asString() : String {
+    return String {
         .buffer = this.buffer,
         .length = this.length,
     }

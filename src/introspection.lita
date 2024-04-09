@@ -2,7 +2,7 @@ import "std/assert"
 import "std/system"
 import "std/libc"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/array"
 import "std/map"
 import "std/hash"
@@ -32,7 +32,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
 
 
     var filename = [MAX_PATH]char{0}
-    var moduleName = StringViewInit("type")
+    var moduleName = StringInit("type")
     if(!FindModulePath(this.lita, moduleName, filename)) {
         this.lita.result.addError(SrcPos{}, "could not find builtin module 'type' on the system path.")
         return;

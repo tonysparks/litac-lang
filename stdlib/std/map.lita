@@ -2,7 +2,7 @@ import "std/mem" as mem;
 import "std/io";
 import "std/assert";
 import "std/libc";
-import "std/string_view";
+import "std/string";
 
 
 enum KeyState {
@@ -51,12 +51,12 @@ public func StrMap<V>(emptyValue: V,
     return m;
 }
 
-public func StringViewMap<V>(emptyValue: V,
+public func StringMap<V>(emptyValue: V,
                              initialSize: i32 = 16,
-                             alloc: *const mem::Allocator = null) : Map<StringView, V> {
+                             alloc: *const mem::Allocator = null) : Map<String, V> {
 
-    var m = Map<StringView, V>{};
-    m.init<StringView, V>(emptyValue, initialSize, alloc, StringView{.buffer = 0, .length = 0});
+    var m = Map<String, V>{};
+    m.init<String, V>(emptyValue, initialSize, alloc, String{.buffer = 0, .length = 0});
     return m;
 }
 

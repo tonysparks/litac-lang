@@ -2,7 +2,7 @@ import "std/libc"
 import "std/map"
 import "std/hash"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 import "std/array"
 import "std/assert"
@@ -460,7 +460,7 @@ func (this: *TypeChecker) inferredType(
             var aggBaseName = aggInfo.getBaseNameView()
             var expectedBaseName = expectedAggInfo.getBaseNameView()
 
-            if(aggBaseName.equalsStringView(expectedBaseName)) {
+            if(aggBaseName.equalsString(expectedBaseName)) {
                 var sym = expectedAggInfo.sym; // expectedAggInfo.decl.genericParams?
                 var pSize = sym.genericParams.size()
                 if(pSize) {

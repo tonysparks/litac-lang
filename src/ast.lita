@@ -1,5 +1,5 @@
 import "std/assert"
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 import "std/libc"
 import "std/array"
@@ -292,7 +292,7 @@ public struct BreakStmt {
 public struct CompStmt {
     stmt: using Stmt
     type: InternedString
-    expr: StringView
+    expr: String
     end: *CompStmt
     evaluatedStmt: *Stmt
     body: Array<*Stmt>

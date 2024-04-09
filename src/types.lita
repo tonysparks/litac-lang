@@ -1,4 +1,4 @@
-import "std/string_view"
+import "std/string"
 import "std/string_builder"
 import "std/string_buffer"
 import "std/array"
@@ -92,7 +92,7 @@ const typeKindText = [TypeKind.MAX_TYPE_KINDS + 1]*const char {
 }
 
 public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
-    var view = StringViewInit(str, len)
+    var view = StringInit(str, len)
     for(var i = TypeKind.BOOL; i < TypeKind.MAX_TYPE_KINDS; i += 1) {
         if(view.equals(typeKindText[i])) {
             return i;
@@ -1671,7 +1671,7 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *I
     return name
 }
 
-public func (this: *TypeInfo) getBaseNameView() : StringView {
+public func (this: *TypeInfo) getBaseNameView() : String {
     var index = this.name.view.indexOf("<", 1)
     if(index > -1) {
         return this.name.view.substring(0, index)

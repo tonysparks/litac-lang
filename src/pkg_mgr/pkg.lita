@@ -1,4 +1,4 @@
-import "std/string_view"
+import "std/string"
 import "std/string_builder"
 import "std/string_buffer"
 import "std/array"
@@ -63,20 +63,20 @@ public struct PackageId {
     versionLength: i32
 }
 
-public func (this: *PackageId) repo() : StringView {
-    return StringViewInit(this.id + this.repoOffset, this.repoLength)
+public func (this: *PackageId) repo() : String {
+    return StringInit(this.id + this.repoOffset, this.repoLength)
 }
 
-public func (this: *PackageId) name() : StringView {
-    return StringViewInit(this.id + this.nameOffset, this.nameLength)
+public func (this: *PackageId) name() : String {
+    return StringInit(this.id + this.nameOffset, this.nameLength)
 }
 
-public func (this: *PackageId) version() : StringView {
-    return StringViewInit(this.id + this.versionOffset, this.versionLength)
+public func (this: *PackageId) version() : String {
+    return StringInit(this.id + this.versionOffset, this.versionLength)
 }
 
 public func PackageIdFromString(id: *const char, pkgId: *PackageId) : bool {
-    var view = StringViewInit(id)
+    var view = StringInit(id)
     var nameIndex = view.indexOfAt(SEPARATOR, .len = SEPARATOR_LENGTH, .fromIndex = 0)
     if(nameIndex < 0) {
         goto invalid

@@ -169,7 +169,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_view";
+            import "std/string";
             import "std/string_buffer";
             import "std/io";
             import "std/libc";
@@ -195,7 +195,7 @@
 
             var context = JsonContextInit()
 
-            var test = ArrayInit<StringView>(32)
+            var test = ArrayInit<String>(32)
             defer test.free()
             test.fromJson(&context, node)
 
@@ -465,7 +465,7 @@
             import "std/mem";
             import "std/map";
             import "std/string_buffer";
-            import "std/string_view";
+            import "std/string";
 
 
             public func TestMakerPtr(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
@@ -475,7 +475,7 @@
                             return null;
                         }
 
-                        var str = StringViewInit(json.asString())
+                        var str = StringInit(json.asString())
                         var buffer = context.allocator.alloc(sizeof(:StringBuffer) + ((str.length+1) * sizeof(:char)))
                         var bufferStart = buffer + sizeof(:StringBuffer)
                         StringCopy(.src = str.buffer, .dest = bufferStart as (*char),  .size = str.length + 1)
@@ -537,7 +537,7 @@
             import "std/mem";
             import "std/map";
             import "std/string_buffer";
-            import "std/string_view";
+            import "std/string";
 
         `,
         "code": `
@@ -576,7 +576,7 @@
         `
     },
     {
-        "name": "From Json Map StringView Value",
+        "name": "From Json Map String Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
@@ -587,7 +587,7 @@
             import "std/mem";
             import "std/map";
             import "std/string_buffer";
-            import "std/string_view";
+            import "std/string";
         `,
         "code": `
             var json = """
@@ -610,7 +610,7 @@
 
             var context = JsonContextInit()
 
-            var test = StrMap<StringView>(StringView{})
+            var test = StrMap<String>(String{})
             defer test.free()
             test.fromJson(&context, node)
 
@@ -636,7 +636,7 @@
             import "std/mem";
             import "std/map";
             import "std/string_buffer";
-            import "std/string_view";
+            import "std/string";
 
         `,
         "code": `

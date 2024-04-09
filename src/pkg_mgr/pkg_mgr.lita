@@ -98,7 +98,7 @@ import "std/system"
 import "std/string_buffer"
 import "std/assert"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 
 import "pkg_mgr/pkg"
 import "pkg_mgr/pkg_install"
@@ -269,7 +269,7 @@ public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : Pkg
         var entry = it.next()
 
         // TODO: Update all of the other's, include,library,staticLibs, etc.
-        var fullPkgPath = StringViewInit(entry.value.path)
+        var fullPkgPath = StringInit(entry.value.path)
         if(fullPkgPath.startsWith(this.options.projectPath, len)) {
             fullPkgPath = fullPkgPath.substring(.start = len, .end = -1)
         }

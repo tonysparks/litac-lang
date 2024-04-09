@@ -1,7 +1,7 @@
 import "std/mem" as mem;
 import "std/io";
 import "std/assert";
-import "std/string_view";
+import "std/string";
 import "std/libc";
 import "std/ascii";
 
@@ -216,7 +216,7 @@ public func (b: *StringBuilder) indexOf(str: *const char, len: i32 = -1) : i32 {
 }
 
 public func (b: *StringBuilder) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
-    var view = b.asStringView()
+    var view = b.asString()
     return view.indexOfAt(str, len, fromIndex)
 }
 
@@ -314,7 +314,7 @@ public func (b: *StringBuilder) trim() {
 }
 
 public func (b: *StringBuilder) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
-    var view = b.asStringView()
+    var view = b.asString()
     return view.copyTo(buf, len, addZero)
 }
 
@@ -356,8 +356,8 @@ public func (b: *StringBuilder) cStr() : *char {
 }
 
 @inline
-public func (b: *StringBuilder) asStringView() : StringView {
-    return StringView {
+public func (b: *StringBuilder) asString() : String {
+    return String {
         .buffer = b.buffer,
         .length = b.length
     }

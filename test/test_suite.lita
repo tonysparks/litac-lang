@@ -10,7 +10,7 @@ import "std/mem/linear_allocator"
 import "std/map"
 import "std/hash"
 import "std/string_builder"
-import "std/string_view"
+import "std/string"
 import "std/string_buffer"
 import "std/system"
 
@@ -318,7 +318,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     var moduleFilenameStr = StringBufferInit(moduleFilename, 260, 0)
     for(var i = 0; i < test.modules.size(); i += 1) {
         var m = test.modules.get(i)
-        var moduleName = StringViewInit(m.name)
+        var moduleName = StringInit(m.name)
 
         // make sub directories
         if(moduleName.contains("/")) {

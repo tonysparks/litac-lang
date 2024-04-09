@@ -5,7 +5,7 @@ import "std/hash"
 import "std/json"
 import "std/string_builder"
 import "std/string_buffer"
-import "std/string_view"
+import "std/string"
 import "std/mem"
 import "std/system"
 import "std/assert"
@@ -801,7 +801,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
     var results = CreateJsonArray(alloc)
     if(endPos > offset) {
 
-        var prefix = StringViewInit(doc.text.buffer + offset + 1, (endPos - offset) as (i32))
+        var prefix = StringInit(doc.text.buffer + offset + 1, (endPos - offset) as (i32))
 
         var i = 0;
         for(var it = module.symbols.symbolFuncs.iter(); it.hasNext() && i < MAX_RESULTS; i += 1) {
@@ -816,7 +816,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
 
             var name = symbol.name.view
             if(isMethod && symbol.decl) {
-                name = StringViewInit(symbol.decl.name.str.buffer, symbol.decl.name.str.length)
+                name = StringInit(symbol.decl.name.str.buffer, symbol.decl.name.str.length)
             }
 
             if(name.startsWith(prefix.buffer, prefix.length)) {
