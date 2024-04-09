@@ -8,7 +8,7 @@ import "std/libc"
 import "std/system"
 import "std/string_builder"
 import "std/string_view"
-import "std/string"
+import "std/string_buffer"
 
 import "symbols"
 import "preprocessor"

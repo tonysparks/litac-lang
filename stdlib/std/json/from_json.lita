@@ -1,5 +1,5 @@
 import "std/string_builder";
-import "std/string";
+import "std/string_buffer";
 import "std/string_view";
 import "std/map";
 import "std/hash";
@@ -153,7 +153,7 @@ public func (this: *StringView) fromJson(context: *JsonContext, json: *JsonNode)
     *this = StringViewInit(json.asString())
 }
 
-public func (this: *String) fromJson(context: *JsonContext, json: *JsonNode) {
+public func (this: *StringBuffer) fromJson(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;
     }
@@ -199,7 +199,7 @@ public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *Json
         var value = StringClone(str.buffer, str.length, context.allocator)
         this.put<K,V>(entry.key, value)
 
-#elseif json_check_generic_symbol("this", "V", "std::string::String")
+#elseif json_check_generic_symbol("this", "V", "std::string_buffer::StringBuffer")
         var str = StringViewInit(entry.value.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)
@@ -265,7 +265,7 @@ public func (this: *Array<T>) fromJson<T>(context: *JsonContext, json: *JsonNode
         var value = StringClone(str.buffer, str.length, context.allocator)
         this.add(value)
 
-#elseif json_check_generic_symbol("this", "T", "std::string::String")
+#elseif json_check_generic_symbol("this", "T", "std::string_buffer::StringBuffer")
         var str = StringViewInit(element.asString())
 
         var clonedStr = StringClone(str.buffer, str.length, context.allocator)

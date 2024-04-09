@@ -1,6 +1,6 @@
 import "pkg_mgr"
 import "std/system"
-import "std/string"
+import "std/string_buffer"
 import "std/string_builder"
 import "std/array"
 import "std/json"

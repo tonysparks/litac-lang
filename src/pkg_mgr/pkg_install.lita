@@ -8,7 +8,7 @@ import "std/system"
 import "std/libc"
 import "std/array"
 import "std/mem"
-import "std/string"
+import "std/string_buffer"
 import "std/string_builder"
 import "std/string_view"
 import "std/zip"
@@ -128,7 +128,7 @@ func cleanPackageDirectory(pm: *PackageManager, pkgPath: *const char) : PkgStatu
     return deleteDir(pm, path)
 }
 
-func deleteDir(pm: *PackageManager, path: *String) : PkgStatus {
+func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
     if(!FileExists(path.cStr())) {
         return PkgStatus.OK
     }

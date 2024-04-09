@@ -1,5 +1,5 @@
 import "std/string_view"
-import "std/string"
+import "std/string_buffer"
 import "std/libc"
 import "std/mem"
 
@@ -96,7 +96,7 @@ public func (this: *WebRequest) getHeader(header: *const char): StringView {
     }
 }
 
-public func (this: *WebRequest) getQueryValue(key: *const char, result: *String): bool {
+public func (this: *WebRequest) getQueryValue(key: *const char, result: *StringBuffer): bool {
     var value = mg_http_get_var(&this.msg.query, key, result.buffer, result.remaining())
     if(value < 0) {
         return false
@@ -106,7 +106,7 @@ public func (this: *WebRequest) getQueryValue(key: *const char, result: *String)
     return true
 }
 
-public func (this: *WebRequest) getQueryValueCopy(key: *const char, length: u32 = 128): String {
+public func (this: *WebRequest) getQueryValueCopy(key: *const char, length: u32 = 128): StringBuffer {
     var buffer = this.context.allocator.alloc(sizeof(:char) * length) as (*char)
     var result = StringInit(buffer, length as (i32), 0)
     this.getQueryValue(key, &result)

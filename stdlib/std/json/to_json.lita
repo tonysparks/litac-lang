@@ -1,5 +1,5 @@
 import "std/string_builder";
-import "std/string";
+import "std/string_buffer";
 import "std/string_view";
 import "std/map";
 import "std/array";
@@ -56,7 +56,7 @@ public func (this: StringView) toJson(sb: *StringBuilder) {
     sb.append("\"%.*s\"", this.length, this.buffer)
 }
 
-public func (this: String) toJson(sb: *StringBuilder) {
+public func (this: StringBuffer) toJson(sb: *StringBuilder) {
     sb.append("\"%.*s\"", this.length, this.buffer)
 }
 

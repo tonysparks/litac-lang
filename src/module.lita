@@ -1,7 +1,7 @@
 import "std/array"
 import "std/map"
 import "std/hash"
-import "std/string"
+import "std/string_buffer"
 import "std/string_view"
 import "std/string_builder"
 import "std/system"
@@ -45,7 +45,7 @@ public struct ModuleImport {
 
 public struct Module {
     id: ModuleId        // TODO: don't make a separate allocation
-    text: String        // text of modules file
+    text: StringBuffer        // text of modules file
     ast: *ModuleStmt
     symbols: Scope
     currentScope: *Scope
@@ -78,7 +78,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     BUILTIN_IMPORT_IDENT.str = BUILTIN
     BUILTIN_IMPORT_IDENT.token = BUILTIN_IMPORT_TOKEN
 
-    builtins.text = String{}
+    builtins.text = StringBuffer{}
     builtins.ast = null
     builtins.flags = 0
     builtins.allocator = lita.allocator
@@ -148,7 +148,7 @@ public func NewModule(lita: *Lita,
 }
 
 public func (this: *Module) init(lita: *Lita) {
-    this.text = String{}
+    this.text = StringBuffer{}
     this.ast = null
 
     // TODO: Figure out optimal arena size and allocator to pass in
@@ -171,7 +171,7 @@ public func (this: *Module) init(lita: *Lita) {
 }
 
 public func (this: *Module) initIncrementalBuild() {
-    this.text = String{}
+    this.text = StringBuffer{}
     this.ast = null
     this.flags = 0
     this.flags |= ModuleFlags.INCREMENTAL_COMPILATION

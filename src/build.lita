@@ -16,7 +16,7 @@ import "std/json"
 import "std/io"
 import "std/mem"
 import "std/string_builder"
-import "std/string"
+import "std/string_buffer"
 import "std/assert"
 import "std/libc"
 

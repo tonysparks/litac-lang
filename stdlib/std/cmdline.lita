@@ -2,7 +2,7 @@ import "std/array"
 import "std/io"
 import "std/mem"
 import "std/string_builder"
-import "std/string"
+import "std/string_buffer"
 import "std/libc" as c
 
 const MAX_MESSAGE_SIZE = 256

@@ -5,7 +5,7 @@ import "std/map"
 import "std/hash"
 import "std/string_builder"
 import "std/string_view"
-import "std/string"
+import "std/string_buffer"
 import "std/mem"
 import "std/profile"
 import "std/regex"
@@ -364,7 +364,7 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     ape_object_set_map_value(declObj, "isGlobal", ape_object_make_bool(sym.decl.attributes.isGlobal))
     ape_object_set_map_value(declObj, "declPtr", ape_object_make_external(this.runtime.ape, sym.decl))
 
-    // full name includes module name e.g. std::String
+    // full name includes module name e.g. std::StringBuffer
     ape_object_set_map_value(declObj, "fullName", ape_object_make_stringf(this.runtime.ape, "%.*s::%.*s",
         sym.declared.id.packageName.length, sym.declared.id.packageName.buffer,
         sym.name.length, sym.name.buffer))
