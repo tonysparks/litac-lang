@@ -18,7 +18,7 @@
            // disabled: true,
             "definitions": `
                 import "std/json";
-                import "std/string_builder";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
 
@@ -70,7 +70,7 @@
             "name": "Json Create",
             "definitions": `
                 import "std/json";
-                import "std/string_builder";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
 
@@ -109,7 +109,7 @@
             "name": "Json Error",
             "definitions": `
                 import "std/json";
-                import "std/string_builder";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
 
@@ -142,7 +142,7 @@
             "name": "Json Token Error",
             "definitions": `
                 import "std/json";
-                import "std/string_builder";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
 
@@ -169,7 +169,7 @@
             "name": "Json Token in complex Error",
             "definitions": `
                 import "std/json";
-                import "std/string_builder";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
 
@@ -203,7 +203,7 @@
             "name": "Json Token Stream Error",
             "definitions": `
                 import "std/json";
-                import "std/string_builder";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
 

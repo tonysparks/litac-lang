@@ -1,7 +1,7 @@
 import "std/assert"
 import "std/system"
 import "std/libc"
-import "std/string_builder"
+import "std/string/builder"
 import "std/string"
 import "std/array"
 import "std/map"

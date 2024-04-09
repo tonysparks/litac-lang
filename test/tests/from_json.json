@@ -19,8 +19,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -68,8 +68,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -121,8 +121,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -170,7 +170,7 @@
             import "std/json/from_json";
             import "std/json/to_json";
             import "std/string";
-            import "std/string_buffer";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -217,8 +217,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -265,8 +265,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -312,8 +312,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -358,8 +358,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -415,12 +415,12 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
-            import "std/string_buffer";
+            import "std/string/buffer";
 
         `,
         "code": `
@@ -459,12 +459,12 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
-            import "std/string_buffer";
+            import "std/string/buffer";
             import "std/string";
 
 
@@ -531,12 +531,12 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
-            import "std/string_buffer";
+            import "std/string/buffer";
             import "std/string";
 
         `,
@@ -581,12 +581,12 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
-            import "std/string_buffer";
+            import "std/string/buffer";
             import "std/string";
         `,
         "code": `
@@ -630,12 +630,12 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_builder";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
-            import "std/string_buffer";
+            import "std/string/buffer";
             import "std/string";
 
         `,
@@ -680,7 +680,7 @@
                 import "std/json";
                 import "std/json/from_json";
                 import "std/json/to_json";
-                import "std/string_builder";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
                 import "std/mem";

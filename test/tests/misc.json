@@ -113,7 +113,7 @@
                 import "std/io";
                 import "std/map";
                 import "std/json";
-                import "std/string_builder"
+                import "std/string/builder"
 
             `,
             "code": `
@@ -178,7 +178,7 @@
                 import "std/io";
                 import "std/map";
                 import "std/json";
-                import "std/string_builder"
+                import "std/string/builder"
 
             `,
             "code": `
@@ -1002,7 +1002,7 @@
                 import "std/io";
                 import "std/map";
                 import "std/json";
-                import "std/string_builder"
+                import "std/string/builder"
 
             `,
             "code": `

@@ -1,4 +1,4 @@
-import "std/string_buffer"
+import "std/string/buffer"
 import "std/libc"
 import "std/assert"
 import "std/mem"

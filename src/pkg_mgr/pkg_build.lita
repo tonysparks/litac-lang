@@ -1,8 +1,8 @@
 import "pkg_mgr"
 import "std/system" as sys
 import "std/mem"
-import "std/string_buffer"
-import "std/string_builder"
+import "std/string/buffer"
+import "std/string/builder"
 import "std/array"
 import "std/json"
 import "std/libc"
