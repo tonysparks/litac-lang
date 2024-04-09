@@ -3,7 +3,7 @@ import "std/array"
 import "std/map"
 import "std/hash"
 import "std/json"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string"
 import "std/string_view"
 import "std/mem"
@@ -97,7 +97,7 @@ public func (this: *Workspace) openDocument(uri: *const char, text: *const char)
 
     var doc = new<Document>(this.allocator)
     doc.lineMap.init(256, this.allocator)
-    doc.text = StringBufferInit(strlen(text), this.allocator)
+    doc.text = StringBuilderInit(strlen(text), this.allocator)
 
     doc.setText(text)
 

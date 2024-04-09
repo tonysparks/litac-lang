@@ -1,5 +1,5 @@
 import "std/string_view"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string"
 import "std/array"
 import "std/assert"
@@ -541,12 +541,12 @@ public func (this: *TypeInfo) getTypeOf() : *TypeInfo {
 }
 
 public func (this: *TypeInfo) toStringDebug() : *const char {
-    var sb = StringBufferInit(256)
+    var sb = StringBuilderInit(256)
     this.toString(sb)
     return sb.cStr()
 }
 
-public func (this: *TypeInfo) toString(sb: *StringBuffer, fullyQualify: bool = false) {
+public func (this: *TypeInfo) toString(sb: *StringBuilder, fullyQualify: bool = false) {
     if(!this) return;
 
     switch(this.kind) {

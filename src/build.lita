@@ -15,7 +15,7 @@ import "std/array"
 import "std/json"
 import "std/io"
 import "std/mem"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string"
 import "std/assert"
 import "std/libc"
@@ -77,7 +77,7 @@ public func (this: *BuildFile) writeTo(file: *File) : bool {
     root.put("library_paths", CreateArray(&this.libraryPaths, this.allocator))
     root.put("static_libs", CreateArray(&this.staticLibs, this.allocator))
 
-    var sb = StringBufferInit(1024, this.allocator)
+    var sb = StringBuilderInit(1024, this.allocator)
     defer sb.free()
 
     root.print(sb)

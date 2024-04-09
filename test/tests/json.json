@@ -18,13 +18,13 @@
            // disabled: true,
             "definitions": `
                 import "std/json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
 
             `,
             "code": `
-                var buf : StringBuffer;
+                var buf : StringBuilder;
                 buf.init(16)
 
                 var parser = JsonParser{}
@@ -70,13 +70,13 @@
             "name": "Json Create",
             "definitions": `
                 import "std/json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
 
             `,
             "code": `
-                var buf : StringBuffer;
+                var buf : StringBuilder;
                 buf.init(16)
 
                 var parser = JsonParser{}
@@ -109,13 +109,13 @@
             "name": "Json Error",
             "definitions": `
                 import "std/json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
 
             `,
             "code": `
-                var buf : StringBuffer;
+                var buf : StringBuilder;
                 buf.init(16)
 
                 var parser = JsonParser{}
@@ -142,13 +142,13 @@
             "name": "Json Token Error",
             "definitions": `
                 import "std/json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
 
             `,
             "code": `
-                var buf : StringBuffer;
+                var buf : StringBuilder;
                 buf.init(16)
 
                 var parser = JsonParser{}
@@ -169,13 +169,13 @@
             "name": "Json Token in complex Error",
             "definitions": `
                 import "std/json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
 
             `,
             "code": `
-                var buf : StringBuffer;
+                var buf : StringBuilder;
                 buf.init(16)
 
                 var parser = JsonParser{}
@@ -203,13 +203,13 @@
             "name": "Json Token Stream Error",
             "definitions": `
                 import "std/json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
 
             `,
             "code": `
-                var buf : StringBuffer;
+                var buf : StringBuilder;
                 buf.init(16)
 
                 var parser = JsonParser{}

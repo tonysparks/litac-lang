@@ -3,7 +3,7 @@ import "std/assert"
 import "std/array"
 import "std/map"
 import "std/hash"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 import "std/string"
 import "std/mem"
@@ -49,7 +49,7 @@ public struct CallContext {
     pp: *Preprocessor
     checker: *TypeChecker
     comp: *CompStmt
-    buffer: StringBuffer
+    buffer: StringBuilder
 
     resolveSymbols: bool
 }

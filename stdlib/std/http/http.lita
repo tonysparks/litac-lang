@@ -1,5 +1,5 @@
 import "std/http/libcurl"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/mem"
 import "std/map"
 import "std/libc"
@@ -24,7 +24,7 @@ public struct HttpResponse {
     statusCode: i32
     headers: Map<*const char, *const char>
 
-    body: StringBuffer
+    body: StringBuilder
 
     userdata: *void
     bodyFn : HttpResponseCallback
@@ -142,7 +142,7 @@ func testFileDownload() {
     http.init(HttpOptions{})
     defer http.free()
 
-    var body = StringBuffer{}
+    var body = StringBuilder{}
     body.init(256)
     // defer body.free() TODO: causes double free??!?!
 

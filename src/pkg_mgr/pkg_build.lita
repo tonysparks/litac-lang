@@ -2,7 +2,7 @@ import "pkg_mgr"
 import "std/system" as sys
 import "std/mem"
 import "std/string"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/array"
 import "std/json"
 import "std/libc"
@@ -93,7 +93,7 @@ func (this: *PackageManager) buildCommandArgs(
             return this.buildWithScript(script)
         }
 
-        var buildCmd = StringBufferInit(1024)
+        var buildCmd = StringBuilderInit(1024)
         var cc = buildSection.getStr("cc", "clang")
         var ccOptions = buildSection.get("cc_options")
         if(ccOptions) {

@@ -6,7 +6,7 @@ import "std/map"
 import "std/hash"
 import "std/libc"
 import "std/system"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 import "std/string"
 
@@ -493,7 +493,7 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
     if(!this.compilerOptions.empty()) {
         var os = GetOS()
 
-        var ccOptions = StringBufferInit(256)
+        var ccOptions = StringBuilderInit(256)
         defer ccOptions.free()
         for(var i = 0; i < this.compilerOptions.size(); i+= 1) {
             var option = this.compilerOptions.getPtr(i)
@@ -547,7 +547,7 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
     this.startCapture(MetricType.CCOMPILE)
     defer this.endCapture(MetricType.CCOMPILE)
 
-    var commandStr = StringBufferInit(1024)
+    var commandStr = StringBuilderInit(1024)
     defer commandStr.free()
 
     commandStr.appendStr(this.options.compileCmd)
@@ -574,10 +574,10 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
     return false
 }
 
-func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
-    var buffer: *StringBuffer = commandStr;
+func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
+    var buffer: *StringBuilder = commandStr;
 
-    var replaceBuffer: StringBuffer;
+    var replaceBuffer: StringBuilder;
     if(this.options.isStrict) {
         replaceBuffer.init(256)
         buffer = &replaceBuffer;
@@ -629,7 +629,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
 }
 
 public func (this: *Lita) run() : i32 {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     defer sb.free()
 
     var path: [MAX_PATH]char;

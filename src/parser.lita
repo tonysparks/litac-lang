@@ -1,4 +1,4 @@
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 import "std/string"
 import "std/mem"
@@ -1575,7 +1575,7 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
     if(type.equals(IF) || type.equals(ELSEIF) || type.equals(STATIC_IF)) {
         // read the expression
         var currentLine = pos.lineNumber
-        var script = StringBufferInit(128, p.allocator)
+        var script = StringBuilderInit(128, p.allocator)
 
         var stream = pos.end
         while(*stream) {

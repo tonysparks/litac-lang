@@ -1,4 +1,4 @@
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 import "std/array"
 import "std/assert"
@@ -190,7 +190,7 @@ public func (this: *TypeChecker) errors() : i32 {
     return this.result.errors.size()
 }
 
-func (this: *TypeChecker) checkTrait(sb: *StringBuffer, a: *TypeInfo, b: *TypeInfo, description: *const char) : bool {
+func (this: *TypeChecker) checkTrait(sb: *StringBuilder, a: *TypeInfo, b: *TypeInfo, description: *const char) : bool {
     // get more descriptive information if this is trait
     // comparisons, as they are not as intuitive as other types
     if(IsTraitLike(a)) {
@@ -250,7 +250,7 @@ public func (this: *TypeChecker) checkCastability(src: SrcPos, a: *TypeInfo, b: 
     }
 
     if(!a.canCastTo(b, this)) {
-        var sb = StringBufferInit(256, this.allocator)
+        var sb = StringBuilderInit(256, this.allocator)
 
         if(this.checkTrait(sb, a, b, "' can't be casted to '")) {
             this.result.addErrorStr(src, sb)
@@ -281,7 +281,7 @@ public func (this: *TypeChecker) checkAssignability(src: SrcPos, a: *TypeInfo, b
         return true
     }
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     // get more descriptive information if this is trait
     // comparisons, as they are not as intuitive as other types
     if(IsTraitLike(a)) {
@@ -321,7 +321,7 @@ public func (this: *TypeChecker) checkDeclarability(src: SrcPos, a: *TypeInfo, b
     }
 
     if(!a.isDeclarable(b, this)) {
-        var sb = StringBufferInit(256, this.allocator)
+        var sb = StringBuilderInit(256, this.allocator)
 
         if(this.checkTrait(sb, a, b, "' can't be assigned to '")) {
             this.result.addErrorStr(src, sb)
@@ -347,7 +347,7 @@ public func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInf
     }
 
     if(!a.isAssignable(b, this, .allowDecay = true, .allowPtrArithmetic = allowPtrArithmetic)) {
-        var sb = StringBufferInit(256, this.allocator)
+        var sb = StringBuilderInit(256, this.allocator)
 
         if(this.checkTrait(sb, a, b, "' is not of type '")) {
             this.result.addErrorStr(src, sb)
@@ -382,7 +382,7 @@ func (this: *TypeChecker) checkNote(src: SrcPos, a: *TypeInfo) : bool {
     }
 
     if(!IsFieldAccessible(a)) {
-        var sb = StringBufferInit(256, this.allocator)
+        var sb = StringBuilderInit(256, this.allocator)
         sb.appendStrn("'", 1)
         a.toString(sb)
         sb.appendStr("' must be either a struct, union or enum")

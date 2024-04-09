@@ -1,5 +1,5 @@
 import "std/io"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 import "std/string"
 import "std/libc"
@@ -25,8 +25,8 @@ import "intern"
 
 public struct CGen {
     lita: using *Lita
-    buf: StringBuffer
-    line: StringBuffer
+    buf: StringBuilder
+    line: StringBuilder
     format: bool
     indent: i32
     aggregateLevel: i32
@@ -508,7 +508,7 @@ func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]cha
 }
 
 public func (this: using *CGen) escapeNameStr(name: InternedString) : StringView {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     EscapeName(name.buffer, name.length, sb)
     return StringView {
         .buffer = sb.buffer,
@@ -517,7 +517,7 @@ public func (this: using *CGen) escapeNameStr(name: InternedString) : StringView
 }
 
 func (this: using *CGen) escapeNameChars(name: *const char) : StringView {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     EscapeName(name, strlen(name), sb)
     return StringView {
         .buffer = sb.buffer,
@@ -687,7 +687,7 @@ public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
 public func (this: using *CGen) cType(type: *TypeInfo,
                                       isCast: bool = false,
                                       decay: bool = false) : *const char {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type
@@ -734,8 +734,8 @@ public func (this: using *CGen) cType(type: *TypeInfo,
             var baseInfo = arrayInfo.getBaseType()
             var baseName = this.cType(baseInfo)
 
-            var buf = StringBufferInit(256, this.allocator)
-            var line = StringBufferInit(256, this.allocator)
+            var buf = StringBuilderInit(256, this.allocator)
+            var line = StringBuilderInit(256, this.allocator)
             do {
                 if(arrayInfo.length < 0) {
                     if(arrayInfo.numOfElements) {
@@ -774,7 +774,7 @@ public func (this: using *CGen) cType(type: *TypeInfo,
         }
         case TypeKind.FUNC_PTR: {
             var funcInfo = type
-            var params = StringBufferInit(512, this.allocator)
+            var params = StringBuilderInit(512, this.allocator)
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
             }
@@ -804,7 +804,7 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                                    name: *const char,
                                    decay: bool = false) : *const char {
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type
@@ -852,8 +852,8 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             var baseInfo = arrayInfo.getBaseType()
             var baseName = this.cType(baseInfo)
 
-            var buf = StringBufferInit(256, this.allocator)
-            var line = StringBufferInit(256, this.allocator)
+            var buf = StringBuilderInit(256, this.allocator)
+            var line = StringBuilderInit(256, this.allocator)
             do {
                 if(arrayInfo.length == 0) {
                     if(arrayInfo.numOfElements) {
@@ -906,7 +906,7 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
         }
         case TypeKind.FUNC_PTR: {
             var funcInfo = type
-            var params = StringBufferInit(512, this.allocator)
+            var params = StringBuilderInit(512, this.allocator)
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
             }
@@ -958,7 +958,7 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
     Outputs the C name for the symbol
 */
 public func (this: using *CGen) cName(sym: *Symbol) : *const char {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
 
     var declName = sym.name.view
     if(IsFuncLike(sym.type)) {
@@ -998,14 +998,14 @@ public func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
 
     if(!type.sym) {
         var typeName = this.escapeName(type)
-        var sb = StringBufferInit(256, this.allocator)
+        var sb = StringBuilderInit(256, this.allocator)
         return this.prefix(typeName, sb)
     }
 
     return this.cName(type.sym)
 }
 
-public func (this: using *CGen) prefix(name: StringView, sb: *StringBuffer) : *const char {
+public func (this: using *CGen) prefix(name: StringView, sb: *StringBuilder) : *const char {
     sb.appendStr(this.options.cPrefix)
     sb.appendStrn(name.buffer, name.length)
     return sb.cStrConst()
@@ -1262,7 +1262,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             {
                 var index = value.indexOf("{relativePath}", len)
                 if(index > -1 && note.startPos.filename != null) {
-                    var buffer = StringBufferInit(MAX_PATH, this.lita.allocator)
+                    var buffer = StringBuilderInit(MAX_PATH, this.lita.allocator)
                     buffer.append("%.*s", value.length, value.buffer)
 
                     buffer.replace(index, index + len, FileParent(note.startPos.filename, temp))

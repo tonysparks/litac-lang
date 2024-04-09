@@ -19,7 +19,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/string";
             import "std/io";
             import "std/libc";
@@ -68,7 +68,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/string";
             import "std/io";
             import "std/libc";
@@ -116,12 +116,12 @@
         `
     },
     {
-        "name": "From Json Array string_buffer Value",
+        "name": "From Json Array string_builder Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/string";
             import "std/io";
             import "std/libc";
@@ -147,7 +147,7 @@
 
             var context = JsonContextInit()
 
-            var test = ArrayInit<StringBuffer>(32)
+            var test = ArrayInit<StringBuilder>(32)
             defer test.free()
             test.fromJson(&context, node)
 
@@ -217,7 +217,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/string";
             import "std/io";
             import "std/libc";
@@ -265,7 +265,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/string";
             import "std/io";
             import "std/libc";
@@ -312,7 +312,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/string";
             import "std/io";
             import "std/libc";
@@ -358,7 +358,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/string";
             import "std/io";
             import "std/libc";
@@ -415,7 +415,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -459,7 +459,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -531,7 +531,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -581,7 +581,7 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -625,12 +625,12 @@
         `
     },
     {
-        "name": "From Json Map StringBuffer Value",
+        "name": "From Json Map StringBuilder Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string_builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -660,7 +660,7 @@
 
             var context = JsonContextInit()
 
-            var test = StrMap<StringBuffer>(StringBuffer{})
+            var test = StrMap<StringBuilder>(StringBuilder{})
             defer test.free()
             test.fromJson(&context, node)
 
@@ -680,7 +680,7 @@
                 import "std/json";
                 import "std/json/from_json";
                 import "std/json/to_json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
                 import "std/mem";

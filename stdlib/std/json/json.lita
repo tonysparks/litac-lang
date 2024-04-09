@@ -1,6 +1,6 @@
 import "std/mem" as mem;
 import "std/assert";
-import "std/string_buffer";
+import "std/string_builder";
 import "std/string";
 import "std/map";
 import "std/hash";
@@ -224,7 +224,7 @@ public func CreateJsonString(str: *const char, len: i32 = -1,
         len = strlen(str);
     }
 
-    var sb = StringBufferInit(len + 1, alloc)
+    var sb = StringBuilderInit(len + 1, alloc)
     //sb.appendStrn(str, len)
     EscapeString(sb, str, len)
 
@@ -255,7 +255,7 @@ const escapeChars = [256]*const char {
     ['\0'] = "\\0",
 }
 
-func EscapeString(buf: *StringBuffer, string: *const char, length: i32) {
+func EscapeString(buf: *StringBuilder, string: *const char, length: i32) {
     for(var i = 0; i < length; i += 1) {
         var c:char = string[i]
         var escaped = escapeStrings[c as (u32)]
@@ -686,7 +686,7 @@ public func (node: *JsonNode) equals(other: *JsonNode) : bool {
 
 }
 
-public func (node: *JsonNode) print(buf: *StringBuffer) : *const char {
+public func (node: *JsonNode) print(buf: *StringBuilder) : *const char {
     PrintJson(node, buf)
     return buf.cStr()
 }
@@ -867,7 +867,7 @@ public struct JsonParser {
     errorMsg: [MAX_MESSAGE_SIZE]char
 
     token: Token
-    buffer: StringBuffer
+    buffer: StringBuilder
     stream: *const char
     lineStart: *const char
 }
@@ -918,7 +918,7 @@ public func (p: *JsonParser) hasError() : bool {
     return p.status == JsonParserStatus.ERROR
 }
 
-public func PrintJson(node: *JsonNode, buf: *StringBuffer) {
+public func PrintJson(node: *JsonNode, buf: *StringBuilder) {
     if(!node) {
         return;
     }

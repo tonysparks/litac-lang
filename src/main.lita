@@ -9,7 +9,7 @@ import "std/map"
 import "std/hash"
 import "std/string"
 import "std/string_view"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/profile"
 import "std/http"
 
@@ -88,7 +88,7 @@ public func RunLitac(options: *LitaOptions) : i32 {
 report:
     var totalTime = SystemTimeMSec() - startTime
 
-    var sb = StringBufferInit(1024)
+    var sb = StringBuilderInit(1024)
     defer sb.free()
 
     if(!lita.result.errors.empty()) {
@@ -192,7 +192,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     if(parser.hasOption("help")) {
         {
-            var sb = StringBufferInit()
+            var sb = StringBuilderInit()
             defer sb.free()
 
             parser.printHelp(sb)
@@ -385,7 +385,7 @@ terminate:
 
 err_print:
     {
-        var sb = StringBufferInit()
+        var sb = StringBuilderInit()
         defer sb.free()
 
         parser.printHelp(sb)

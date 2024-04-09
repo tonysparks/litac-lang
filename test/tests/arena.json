@@ -52,7 +52,7 @@
                 import "std/map";
                 import "std/hash"
                 import "std/json";
-                import "std/string_buffer"
+                import "std/string_builder"
                 import "std/libc"
                 import "std/string";
 
@@ -104,7 +104,7 @@
                     }
                 """);
 
-                var buf = StringBuffer{}
+                var buf = StringBuilder{}
                 buf.init(1, &arena.allocator)
                 node.print(&buf)
 
@@ -125,7 +125,7 @@
                 import "std/map";
                 import "std/hash"
                 import "std/json";
-                import "std/string_buffer"
+                import "std/string_builder"
                 import "std/libc"
                 import "std/string";
 
@@ -179,7 +179,7 @@
                     }
                 """);
 
-                var buf = StringBuffer{}
+                var buf = StringBuilder{}
                 buf.init(1)
                 node.print(&buf)
 

@@ -36,10 +36,10 @@ enum MyEnum {
 const SIZE3 = 55
 */
 /*
-func toJson<T>(sb: *StringBuffer, type: T) {
+func toJson<T>(sb: *StringBuilder, type: T) {
 }
 
-func toJson_<T>(sb: *StringBuffer, type: T) {
+func toJson_<T>(sb: *StringBuilder, type: T) {
     var typeid = typeof(:T)
     var typeInfo = getTypeInfo(typeid)
     var input: *void = (&type) as (*void)
@@ -160,7 +160,7 @@ func main(len:i32, args:**char) : i32 {
    // printf("%llu\n", 0xFFFF_FFFF)
 
 /*
-    var sb = StringBufferInit()
+    var sb = StringBuilderInit()
     defer sb.free()
 
     toJson(sb, 4)

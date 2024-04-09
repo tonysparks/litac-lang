@@ -1,4 +1,4 @@
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 import "std/libc"
 import "std/libc/signal"
@@ -22,7 +22,7 @@ import "std/string"
 import "std/json"
 import "std/json/to_json"
 import "std/json/from_json"
-import "std/string_buffer"
+import "std/string_builder"
 
 @json
 public struct EchoResponse {
@@ -97,7 +97,7 @@ public const MAX_HTTP_HEADERS = MG_MAX_HTTP_HEADERS;
 public struct WebResponse {
     status: i32
     headers: Map<*const char, *const char>
-    body: StringBuffer
+    body: StringBuilder
 }
 
 public struct WebConfig {
@@ -120,7 +120,7 @@ public struct WebServer {
     mg: mg_mgr
     poll: i32
 
-    scratch: StringBuffer
+    scratch: StringBuilder
 
     connection: *mg_connection
 
@@ -136,7 +136,7 @@ public func (this: *WebServer) init(config: *WebConfig,
     this.allocator = allocator
     this.config = config
 
-    this.scratch = StringBufferInit(2046, allocator)
+    this.scratch = StringBuilderInit(2046, allocator)
 
     mg_mgr_init(&this.mg)
     this.connection = mg_http_listen(&this.mg, config.addr, WebCallbackFn, this)
@@ -263,7 +263,7 @@ func WebCallbackFn(conn: *mg_connection, ev: i32, ev_data: *void, fn_data: *void
     }
 }
 
-func ConvertHeaders(headers: *Map<*const char, *const char>, buffer: *StringBuffer) {
+func ConvertHeaders(headers: *Map<*const char, *const char>, buffer: *StringBuilder) {
     for(var it = headers.iter(); it.hasNext();) {
         var entry = it.next()
         buffer.append("%s: %s\r\n", entry.key, entry.value)
