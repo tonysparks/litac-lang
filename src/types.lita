@@ -1,6 +1,6 @@
 import "std/string_view"
 import "std/string_builder"
-import "std/string"
+import "std/string_buffer"
 import "std/array"
 import "std/assert"
 import "std/libc"
@@ -1519,7 +1519,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
             var aggInfo = this
 
             var buffer:[MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+            var nameStr = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
 
 
             if(aggInfo.sym && fullyQualify) {
@@ -2111,7 +2111,7 @@ public func (this: *TypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, met
     memset(result, 0, MAX_SYMBOL_NAME)
     this.getBaseName(result, alias);
 
-    var buffer = StringInit(result, MAX_SYMBOL_NAME)
+    var buffer = StringBufferInit(result, MAX_SYMBOL_NAME)
     buffer.appendStrn("_", 1)
     buffer.appendStrn(methodName.buffer, methodName.length)
 

@@ -18,7 +18,7 @@ A hello world web application:
 
 import "std/libc"
 import "std/web"
-import "std/string"
+import "std/string_buffer"
 import "std/json"
 import "std/json/to_json"
 import "std/json/from_json"

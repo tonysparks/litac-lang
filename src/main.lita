@@ -7,7 +7,7 @@ import "std/system"
 import "std/array"
 import "std/map"
 import "std/hash"
-import "std/string"
+import "std/string_buffer"
 import "std/string_view"
 import "std/string_builder"
 import "std/profile"
@@ -467,7 +467,7 @@ func RunPkgInstall(options: *LitaOptions, pm: *PackageManager) : i32 {
     }
 
     var temp: [MAX_PATH]char;
-    var build = StringInit(temp, MAX_PATH, 0)
+    var build = StringBufferInit(temp, MAX_PATH, 0)
     build.format("%s/.build.json", options.projectPath)
 
     var file = File{}

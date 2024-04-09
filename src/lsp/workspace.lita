@@ -4,7 +4,7 @@ import "std/map"
 import "std/hash"
 import "std/json"
 import "std/string_builder"
-import "std/string"
+import "std/string_buffer"
 import "std/string_view"
 import "std/mem"
 import "std/system"
@@ -46,7 +46,7 @@ public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char
     var lita = this.lsp.lita
 
     var filepath = [MAX_PATH]char{0};
-    var pathStr = StringInit(filepath, MAX_PATH, 0);
+    var pathStr = StringBufferInit(filepath, MAX_PATH, 0);
 
     // TODO:
     // Defer full build compilation if no main is found

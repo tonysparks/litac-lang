@@ -1,6 +1,6 @@
 import "std/string_builder"
 import "std/string_view"
-import "std/string"
+import "std/string_buffer"
 import "std/mem"
 import "std/array"
 import "std/libc"
@@ -2208,7 +2208,7 @@ func (p: *Parser) identifierType(disambiguate: bool) : *TypeSpec {
     }
 
     var buffer:[MAX_SYMBOL_NAME]char;
-    var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    var sb = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
     sb.appendStrn(name.str.buffer, name.str.length)
 
     var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.typeAllocator)
@@ -2233,7 +2233,7 @@ func (p: *Parser) qualifiedIdentifierType(disambiguate: bool) : *TypeSpec {
     }
 
     var buffer:[MAX_SYMBOL_NAME]char;
-    var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    var sb = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
     sb.appendStrn(name.str.buffer, name.str.length)
 
     while(p.match(TokenType.COLON_COLON)) {

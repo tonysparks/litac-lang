@@ -95,7 +95,7 @@ import "std/array"
 import "std/libc"
 import "std/io"
 import "std/system"
-import "std/string"
+import "std/string_buffer"
 import "std/assert"
 import "std/string_builder"
 import "std/string_view"
@@ -297,7 +297,7 @@ public func (this: *PackageManager) runCommand(cmd: *const char) : PkgStatus {
 func (this: *PackageManager) readProjectPkg() : PkgStatus {
     var temp:[MAX_PATH]char;
 
-    var pkgDef = StringInit(temp, MAX_PATH, 0)
+    var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
     pkgDef.format("%s/pkg.json", CurrentWorkingPath())
 
     if(!FileExists(pkgDef.cStr())) {
@@ -312,7 +312,7 @@ func (this: *PackageManager) readProjectPkg() : PkgStatus {
 
     // TODO: Get the actual /src directory -- this can be taken off of
     // LitaOptions..
-    var pkgPath = StringInit(this.pkg.path, MAX_PATH, 0)
+    var pkgPath = StringBufferInit(this.pkg.path, MAX_PATH, 0)
     pkgPath.format("%s/src", CurrentWorkingPath())
     pkgPath.cStr()
 

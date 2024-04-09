@@ -1,5 +1,5 @@
 
-import "std/string"
+import "std/string_buffer"
 import "std/net"
 import "std/libc"
 import "std/net/posix_socket"

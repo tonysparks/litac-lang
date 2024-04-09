@@ -1,6 +1,6 @@
 import "std/fs/tinydir"
 import "std/system" // TODO: move the FS stuff into here!!
-import "std/string"
+import "std/string_buffer"
 import "std/libc"
 
 public struct FileHandle {
@@ -14,7 +14,7 @@ public func (this: *FileHandle) openEx(path: *const char, len: i32) : bool {
     }
 
     var temp:[MAX_PATH]char;
-    var str = StringInit(temp, MAX_PATH, 0)
+    var str = StringBufferInit(temp, MAX_PATH, 0)
     str.format("%.*s", len, path)
     return this.open(str.cStr())
 }

@@ -8,7 +8,7 @@ import "std/libc"
 import "std/system"
 import "std/string_builder"
 import "std/string_view"
-import "std/string"
+import "std/string_buffer"
 
 import "symbols"
 import "preprocessor"
@@ -215,7 +215,7 @@ public func (this: *Lita) reset() {
     // see if there is a .build.json file
     {
         var temp: [MAX_PATH]char;
-        var build = StringInit(temp, MAX_PATH, 0)
+        var build = StringBufferInit(temp, MAX_PATH, 0)
         build.format("%s/.build.json", this.options.projectPath)
 
         memset((&this.buildFile) as (*void), 0, sizeof(:BuildFile))
@@ -476,7 +476,7 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
 
 
     var temp:[256]char;
-    var buf = StringInit(temp, 256, 0)
+    var buf = StringBufferInit(temp, 256, 0)
 
     buf.format("%s/lib", this.options.projectPath)
     if(FileExists(buf.cStr())) {
@@ -586,7 +586,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
     // Add in this projects lib and include folder if they exist
     {
         var temp:[256]char;
-        var path = StringInit(temp, 256, 0)
+        var path = StringBufferInit(temp, 256, 0)
         path.format("%s/lib", this.options.projectPath)
         if(FileExists(path.cStr())) {
             buffer.append(" -L%s", path.cStr())
@@ -650,7 +650,7 @@ public func FindModulePath(lita: *Lita,
                            filename: [MAX_PATH]char) : bool {
 
     var path = [MAX_PATH]char{0}
-    var pathStr = StringInit(path, MAX_PATH, 0);
+    var pathStr = StringBufferInit(path, MAX_PATH, 0);
     defer {
         GetAbsolutePath(CurrentWorkingPath(), pathStr.cStr(), filename)
     }

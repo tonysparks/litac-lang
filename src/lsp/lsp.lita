@@ -1,7 +1,7 @@
 import "std/mem"
 import "std/mem/linear_allocator"
 import "std/string_builder"
-import "std/string"
+import "std/string_buffer"
 import "std/json"
 import "std/libc"
 import "std/map"
@@ -478,7 +478,7 @@ public func (this: *LspServer) writeResponse(msg: *JsonNode) {
     this.outbound.clear()
 
     //var header = [256]char{0};
-    //var headerStr = StringInit(header, 256)
+    //var headerStr = StringBufferInit(header, 256)
 
     var jsonStr = msg.print(this.output)
     var length = this.output.length

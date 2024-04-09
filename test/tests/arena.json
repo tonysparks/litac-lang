@@ -54,7 +54,7 @@
                 import "std/json";
                 import "std/string_builder"
                 import "std/libc"
-                import "std/string";
+                import "std/string_buffer";
 
             `,
             "code": `
@@ -127,7 +127,7 @@
                 import "std/json";
                 import "std/string_builder"
                 import "std/libc"
-                import "std/string";
+                import "std/string_buffer";
 
             `,
             "code": `

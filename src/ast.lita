@@ -1,6 +1,6 @@
 import "std/assert"
 import "std/string_view"
-import "std/string"
+import "std/string_buffer"
 import "std/libc"
 import "std/array"
 import "std/mem"
@@ -775,7 +775,7 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
             return false
         }
 
-        var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
+        var nameStr = StringBufferInit(name, MAX_SYMBOL_NAME, 0)
         nameStr.format("%s%.*s_%.*s",
             prefix,
             typeSpec.name.length, typeSpec.name.buffer,
@@ -784,7 +784,7 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
         return true
     }
 
-    var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
+    var nameStr = StringBufferInit(name, MAX_SYMBOL_NAME, 0)
     nameStr.format("%.*s", f.name.str.length, f.name.str.buffer)
     return true
 }

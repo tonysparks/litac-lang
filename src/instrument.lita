@@ -5,7 +5,7 @@ import "std/array"
 import "std/map"
 import "std/string_builder"
 import "std/string_view"
-import "std/string"
+import "std/string_buffer"
 import "std/system"
 
 import "checker"

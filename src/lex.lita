@@ -2,7 +2,7 @@ import "std/string_view"
 import "std/string_builder"
 import "std/libc"
 import "std/mem"
-import "std/string"
+import "std/string_buffer"
 import "std/unicode/utf8"
 import "std/assert"
 //import "std/intrinsics"
@@ -493,7 +493,7 @@ correct for very long
 public func (t: *Token) asString() : *const char {
     @static var buffer: [260]char;
     if(t.type == TokenType.IDENTIFIER || t.type == TokenType.STRING) {
-        var str = StringInit(buffer, 260, 0)
+        var str = StringBufferInit(buffer, 260, 0)
         str.format("%.*s", t.str.length, t.str.buffer)
         return str.cStr()
     }
