@@ -13,6 +13,21 @@
         }
     `,
     "tests": [
+        {
+            "name": "String Using",
+            "definitions": `
+                import "std/string/buffer"
+                import "std/string/builder"
+                import "std/string"
+            `,
+            "code": `
+                var sb = StringBuilderInit(32)
+                sb.append("Hello World")
+                var str = sb.asString()
+                assert(str.buffer == sb.buffer)
+                assert(str.length == sb.length)
+            `
+        },
 		{
             "name": "Using in struct",
             "definitions": `

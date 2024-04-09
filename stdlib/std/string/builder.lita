@@ -2,15 +2,14 @@ import "std/mem" as mem;
 import "std/io";
 import "std/assert";
 import "std/string";
+import "std/string/buffer"
 import "std/libc";
 import "std/ascii";
 
 const MAX_BUFFER_SIZE = 32;
 
 public struct StringBuilder {
-    buffer: *char
-    length: i32
-    capacity: i32
+    asBuffer: using StringBuffer
     alloc: *const mem::Allocator
 }
 
@@ -356,11 +355,8 @@ public func (b: *StringBuilder) cStr() : *char {
 }
 
 @inline
-public func (b: *StringBuilder) asString() : String {
-    return String {
-        .buffer = b.buffer,
-        .length = b.length
-    }
+public func (b: *StringBuilder) asStringBuffer() : StringBuffer {
+    return b.asBuffer
 }
 
 public func (b: *StringBuilder) get(index: i32) : char {

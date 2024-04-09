@@ -2,6 +2,7 @@ import "std/mem" as mem;
 import "std/assert";
 import "std/string/builder";
 import "std/string/buffer";
+import "std/string";
 import "std/map";
 import "std/hash";
 import "std/array";

@@ -279,6 +279,94 @@ public func (b: String) get(index: i32) : char {
     return b.buffer[index]
 }
 
+
+
+public func StringClone(original: *const char, len: i32 = -1, allocator: *const mem::Allocator = mem::defaultAllocator) : *char {
+    if(!original) {
+        return null
+    }
+
+    if(len < 0) {
+        len = strlen(original)
+    }
+
+    var copiedStr: *char = null
+
+    if(len > 0) {
+        copiedStr = allocator.alloc((len + 1) * sizeof(:char)) as (*char)
+        memcpy(copiedStr, original, len)
+
+        copiedStr[len] = '\0'
+    }
+    return copiedStr
+}
+
+public func StringCopy(src: *const char, dest: *char, size: usize) : *char {
+    if(!src) {
+        return null
+    }
+
+    if (size > 0) {
+        var i:usize;
+        for (i = 0; i < size - 1 && src[i]; i+=1) {
+             dest[i] = src[i];
+        }
+        dest[i] = '\0';
+    }
+    return dest;
+}
+
+public func StringHashLen(str: *const char, size: usize) : u32 {
+    var hash = 5381_u32;
+
+    var index = 0
+    while (index < size) {
+        hash = ((hash << 5_u32) + hash) ^ ((*str) as (u32));
+        str   += 1;
+        index += 1;
+    }
+    return hash;
+}
+
+public func StringHash(str: *const char) : u32 {
+    var hash = 5381_u32;
+
+    while (*str) {
+        hash = ((hash << 5_u32) + hash) ^ ((*str) as (u32));
+        str += 1;
+    }
+    return hash;
+}
+
+public func StringEqualLen(a: *const char, b: *const char, size: usize) : bool {
+    if(!a && !b) return true
+    if(!a || !b) return false
+
+    return strncmp(a, b, size) == 0
+}
+
+public func StringEqual(a: *const char, b: *const char) : bool {
+    if(!a && !b) return true
+    if(!a || !b) return false
+
+    return strcmp(a, b) == 0
+}
+
+public func (str: *const char) hash() : u32 {
+    return StringHash(str)
+}
+
+public func (str: *const char) equals(other: *const char) : bool {
+    if(!str && !other) return true
+    if(!str || !other) return false
+
+    return strcmp(str, other) == 0
+}
+
+
+
+
+
 @test("equals")
 func testEquals() {
     var a = StringInit("Hello World")
