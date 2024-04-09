@@ -150,7 +150,7 @@
                 import "std/json";
                 import "std/json/from_json";
                 import "std/json/to_json";
-                import "std/string_buffer";
+                import "std/string_builder";
                 import "std/io";
                 import "std/libc";
                 import "std/mem";

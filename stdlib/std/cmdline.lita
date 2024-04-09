@@ -1,7 +1,7 @@
 import "std/array"
 import "std/io"
 import "std/mem"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string"
 import "std/libc" as c
 
@@ -146,7 +146,7 @@ public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
     return CmdParserStatus.OK
 }
 
-public func (p: *CmdParser) printHelp(sb: *StringBuffer) {
+public func (p: *CmdParser) printHelp(sb: *StringBuilder) {
     if(p.header) {
         sb.append("%s\n", p.header)
     }

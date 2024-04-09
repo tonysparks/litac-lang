@@ -1,8 +1,8 @@
 {
-    "description": "StringBuffer",
+    "description": "StringBuilder",
     "disabled": false,
     "program": `
-        import "std/string_buffer";
+        import "std/string_builder";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;
@@ -23,13 +23,13 @@
     `,
     "tests": [
         {
-            "name": "StringBuffer",
+            "name": "StringBuilder",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var s = StringBuffer{}
+                var s = StringBuilder{}
                 s.init(16)
 
                 s.appendStrn("hello", 5)
@@ -58,13 +58,13 @@
             `,
         },
         {
-            "name": "StringBuffer_appends",
+            "name": "StringBuilder_appends",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var s = StringBuffer{}
+                var s = StringBuilder{}
                 s.init(16)
 
                 s.appendStrn("hi", 2)
@@ -110,13 +110,13 @@
             `,
         },
         {
-            "name": "StringBuffer cStr",
+            "name": "StringBuilder cStr",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var s = StringBuffer{}
+                var s = StringBuilder{}
                 s.init(16)
 
                 assert(strcmp(s.cStr(), "") == 0)
@@ -134,13 +134,13 @@
         },
 
         {
-            "name": "StringBuffer insert",
+            "name": "StringBuilder insert",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var s = StringBuffer{}
+                var s = StringBuilder{}
                 s.init(16)
 
                 // internal buffer is 32
@@ -456,7 +456,7 @@
         },
 
         {
-            "name": "StringBuffer_appends extend",
+            "name": "StringBuilder_appends extend",
             "disabled": false,
             "definitions": `
 
@@ -473,7 +473,7 @@
 
                 // empty
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -484,7 +484,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -495,7 +495,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -506,7 +506,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -520,7 +520,7 @@
 
                 // with str
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -533,7 +533,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -546,7 +546,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -559,7 +559,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -575,7 +575,7 @@
 
                 // after
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -587,7 +587,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -599,7 +599,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -611,7 +611,7 @@
                     assert(strcmp(s.cStr(), buf) == 0)
                 }
                 {
-                    var s = StringBuffer{}
+                    var s = StringBuilder{}
                     s.init(16)
                     defer s.free()
 
@@ -626,13 +626,13 @@
         },
 
         {
-            "name": "StringBuffer_delete",
+            "name": "StringBuilder_delete",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var s = StringBuffer{}
+                var s = StringBuilder{}
                 s.init(16)
 
                 s.append("hello cruel world")
@@ -656,13 +656,13 @@
             `,
         },
         {
-            "name": "StringBuffer_contains",
+            "name": "StringBuilder_contains",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var s = StringBuffer{}
+                var s = StringBuilder{}
                 s.init(16)
 
                 s.append("hello cruel world")
@@ -674,13 +674,13 @@
             `,
         },
         {
-            "name": "StringBuffer_indexOf",
+            "name": "StringBuilder_indexOf",
             "disabled": false,
             "definitions": `
 
             `,
             "code": `
-                var s = StringBuffer{}
+                var s = StringBuilder{}
                 s.init(16)
 
                 s.append("hello cruel world")

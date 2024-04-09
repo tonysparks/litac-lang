@@ -1,7 +1,7 @@
 import "pkg_mgr"
 import "std/system"
 import "std/string"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/array"
 import "std/json"
 import "std/libc"
@@ -29,7 +29,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
     Mkdir(path.cStr())
 
 
-    var sb = StringBufferInit(1024)
+    var sb = StringBuilderInit(1024)
     defer sb.free()
 
     // Write out main.lita

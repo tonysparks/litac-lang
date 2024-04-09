@@ -1,5 +1,5 @@
 import "std/string_view"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/libc"
 import "std/mem"
 import "std/string"
@@ -563,7 +563,7 @@ public func (l: *Lexer) hasError() : bool {
 }
 
 func (l: *Lexer) error(format: *const char, ...) {
-    var sb = StringBufferInit(256, l.allocator)
+    var sb = StringBuilderInit(256, l.allocator)
 
     var args: va_list;
     va_start(args, format);

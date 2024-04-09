@@ -1,6 +1,6 @@
 
 fn SerializeStruct(sym) {
-   emit("public func (this: *%s) toJson(sb: *StringBuffer) : bool {\n", sym.name)
+   emit("public func (this: *%s) toJson(sb: *StringBuilder) : bool {\n", sym.name)
    emit("    sb.append(\"{\")\n")
    var isFirst = true
    for(field in sym.structDecl.fields) {

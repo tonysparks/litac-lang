@@ -1,49 +1,49 @@
-import "std/string_buffer";
+import "std/string_builder";
 import "std/string";
 import "std/string_view";
 import "std/map";
 import "std/array";
 
-public func (this: u8) toJson(sb: *StringBuffer) {
+public func (this: u8) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
 }
-public func (this: i8) toJson(sb: *StringBuffer) {
+public func (this: i8) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
 }
-public func (this: u16) toJson(sb: *StringBuffer) {
+public func (this: u16) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
 }
-public func (this: i16) toJson(sb: *StringBuffer) {
+public func (this: i16) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
 }
-public func (this: u32) toJson(sb: *StringBuffer) {
+public func (this: u32) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
 }
-public func (this: i32) toJson(sb: *StringBuffer) {
+public func (this: i32) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
 }
-public func (this: u64) toJson(sb: *StringBuffer) {
+public func (this: u64) toJson(sb: *StringBuilder) {
     sb.append("%llu", this)
 }
-public func (this: i64) toJson(sb: *StringBuffer) {
+public func (this: i64) toJson(sb: *StringBuilder) {
     sb.append("%lld", this)
 }
-public func (this: usize) toJson(sb: *StringBuffer) {
+public func (this: usize) toJson(sb: *StringBuilder) {
     sb.append("%zu", this)
 }
 
-public func (this: f64) toJson(sb: *StringBuffer) {
+public func (this: f64) toJson(sb: *StringBuilder) {
     sb.append("%f", this)
 }
-public func (this: f32) toJson(sb: *StringBuffer) {
+public func (this: f32) toJson(sb: *StringBuilder) {
     sb.append("%f", this)
 }
 
-public func (this: bool) toJson(sb: *StringBuffer) {
+public func (this: bool) toJson(sb: *StringBuilder) {
     sb.append("%s", this ? "true" : "false")
 }
 
-public func (this: *const char) toJson(sb: *StringBuffer) {
+public func (this: *const char) toJson(sb: *StringBuilder) {
     if(!this) {
         sb.append("null")
     }
@@ -52,24 +52,24 @@ public func (this: *const char) toJson(sb: *StringBuffer) {
     }
 }
 
-public func (this: StringView) toJson(sb: *StringBuffer) {
+public func (this: StringView) toJson(sb: *StringBuilder) {
     sb.append("\"%.*s\"", this.length, this.buffer)
 }
 
-public func (this: String) toJson(sb: *StringBuffer) {
+public func (this: String) toJson(sb: *StringBuilder) {
     sb.append("\"%.*s\"", this.length, this.buffer)
 }
 
-public func (this: StringBuffer) toJson(sb: *StringBuffer) {
+public func (this: StringBuilder) toJson(sb: *StringBuilder) {
     sb.append("\"%.*s\"", this.length, this.buffer)
 }
 
-// public func (this: *T) toJson<T>(sb: *StringBuffer) {
+// public func (this: *T) toJson<T>(sb: *StringBuilder) {
 //     var value = *this
 //     value.toJson(sb)
 // }
 
-public func (this: *Map<K, V>) toJson<K, V>(sb: *StringBuffer) {
+public func (this: *Map<K, V>) toJson<K, V>(sb: *StringBuilder) {
     if(!this) {
         sb.appendStrn("null", 4)
         return;
@@ -92,7 +92,7 @@ public func (this: *Map<K, V>) toJson<K, V>(sb: *StringBuffer) {
     sb.append("}")
 }
 
-public func (this: *Array<V>) toJson<V>(sb: *StringBuffer) {
+public func (this: *Array<V>) toJson<V>(sb: *StringBuilder) {
     if(!this) {
         sb.appendStrn("null", 4)
         return;

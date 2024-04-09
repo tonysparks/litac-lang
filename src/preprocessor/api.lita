@@ -3,7 +3,7 @@ import "std/assert"
 import "std/array"
 import "std/map"
 import "std/hash"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 import "std/string"
 import "std/mem"
@@ -554,7 +554,7 @@ func ApeEmitStr(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_
 func ApeError(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
 
-    var sb = StringBufferInit(1024, context.pp.lita.allocator)
+    var sb = StringBuilderInit(1024, context.pp.lita.allocator)
     var result = FormatStr(context, &sb, argc, args)
     context.pp.lita.result.addError(context.comp.startPos, "%s", sb.cStr())
     return result;
@@ -562,7 +562,7 @@ func ApeError(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_ob
 
 func FormatStr(
     context: *CallContext,
-    buffer: *StringBuffer,
+    buffer: *StringBuilder,
     argc: i32,
     args: *ape_object_t) : ape_object_t {
 

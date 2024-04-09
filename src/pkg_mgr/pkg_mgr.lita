@@ -97,7 +97,7 @@ import "std/io"
 import "std/system"
 import "std/string"
 import "std/assert"
-import "std/string_buffer"
+import "std/string_builder"
 import "std/string_view"
 
 import "pkg_mgr/pkg"
@@ -167,8 +167,8 @@ public struct PackageManager {
     packages: Map<*const char, *PackageDef>
     pkg: *PackageDef   // this projects package definition
 
-    errors: StringBuffer
-    warnings: StringBuffer
+    errors: StringBuilder
+    warnings: StringBuilder
 }
 
 public func (this: *PackageManager) init(
@@ -178,8 +178,8 @@ public func (this: *PackageManager) init(
     this.options = options
     this.allocator = allocator
     this.packages = StrMap<*PackageDef>(null, 32, allocator)
-    this.errors = StringBufferInit(128, allocator)
-    this.warnings = StringBufferInit(128, allocator)
+    this.errors = StringBuilderInit(128, allocator)
+    this.warnings = StringBuilderInit(128, allocator)
 }
 
 

@@ -113,7 +113,7 @@
                 import "std/io";
                 import "std/map";
                 import "std/json";
-                import "std/string_buffer"
+                import "std/string_builder"
 
             `,
             "code": `
@@ -162,7 +162,7 @@
                     }
                 """);
 
-                var buf = StringBuffer{}
+                var buf = StringBuilder{}
                 buf.init(1, &arena.alloc)
                 node.print(&buf)
 
@@ -178,7 +178,7 @@
                 import "std/io";
                 import "std/map";
                 import "std/json";
-                import "std/string_buffer"
+                import "std/string_builder"
 
             `,
             "code": `
@@ -229,7 +229,7 @@
                     }
                 """);
 
-                var buf = StringBuffer{}
+                var buf = StringBuilder{}
                 buf.init(1)
                 node.print(&buf)
 
@@ -1002,7 +1002,7 @@
                 import "std/io";
                 import "std/map";
                 import "std/json";
-                import "std/string_buffer"
+                import "std/string_builder"
 
             `,
             "code": `
@@ -1051,7 +1051,7 @@
                     }
                 """);
 
-                var buf = StringBuffer{}
+                var buf = StringBuilder{}
                 buf.init(1, &arena.alloc)
                 node.print(&buf)
 
