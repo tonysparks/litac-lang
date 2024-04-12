@@ -95,10 +95,10 @@ import "std/array"
 import "std/libc"
 import "std/io"
 import "std/system"
-import "std/string"
+import "std/string/buffer"
 import "std/assert"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
+import "std/string"
 
 import "pkg_mgr/pkg"
 import "pkg_mgr/pkg_install"
@@ -167,8 +167,8 @@ public struct PackageManager {
     packages: Map<*const char, *PackageDef>
     pkg: *PackageDef   // this projects package definition
 
-    errors: StringBuffer
-    warnings: StringBuffer
+    errors: StringBuilder
+    warnings: StringBuilder
 }
 
 public func (this: *PackageManager) init(
@@ -178,8 +178,8 @@ public func (this: *PackageManager) init(
     this.options = options
     this.allocator = allocator
     this.packages = StrMap<*PackageDef>(null, 32, allocator)
-    this.errors = StringBufferInit(128, allocator)
-    this.warnings = StringBufferInit(128, allocator)
+    this.errors = StringBuilderInit(128, allocator)
+    this.warnings = StringBuilderInit(128, allocator)
 }
 
 
@@ -269,7 +269,7 @@ public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : Pkg
         var entry = it.next()
 
         // TODO: Update all of the other's, include,library,staticLibs, etc.
-        var fullPkgPath = StringViewInit(entry.value.path)
+        var fullPkgPath = StringInit(entry.value.path)
         if(fullPkgPath.startsWith(this.options.projectPath, len)) {
             fullPkgPath = fullPkgPath.substring(.start = len, .end = -1)
         }
@@ -297,7 +297,7 @@ public func (this: *PackageManager) runCommand(cmd: *const char) : PkgStatus {
 func (this: *PackageManager) readProjectPkg() : PkgStatus {
     var temp:[MAX_PATH]char;
 
-    var pkgDef = StringInit(temp, MAX_PATH, 0)
+    var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
     pkgDef.format("%s/pkg.json", CurrentWorkingPath())
 
     if(!FileExists(pkgDef.cStr())) {
@@ -312,7 +312,7 @@ func (this: *PackageManager) readProjectPkg() : PkgStatus {
 
     // TODO: Get the actual /src directory -- this can be taken off of
     // LitaOptions..
-    var pkgPath = StringInit(this.pkg.path, MAX_PATH, 0)
+    var pkgPath = StringBufferInit(this.pkg.path, MAX_PATH, 0)
     pkgPath.format("%s/src", CurrentWorkingPath())
     pkgPath.cStr()
 

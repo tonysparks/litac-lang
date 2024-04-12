@@ -1,5 +1,5 @@
 import "std/array"
-import "std/string_buffer"
+import "std/string/builder"
 import "std/mem"
 import "std/libc"
 
@@ -36,7 +36,7 @@ public func PhaseResultInit(allocator: *const Allocator) : PhaseResult {
 }
 
 public func (r: *PhaseResult) addError(pos: SrcPos, format: *const char, ...) {
-    var sb = StringBufferInit(256, r.allocator)
+    var sb = StringBuilderInit(256, r.allocator)
     var args: va_list;
     va_start(args, format);
     sb.appendArgs(format, args)
@@ -45,7 +45,7 @@ public func (r: *PhaseResult) addError(pos: SrcPos, format: *const char, ...) {
     r.addErrorStr(pos, sb)
 }
 
-public func (r: *PhaseResult) addErrorStr(pos: SrcPos, sb: *StringBuffer) {
+public func (r: *PhaseResult) addErrorStr(pos: SrcPos, sb: *StringBuilder) {
     if(!r.enabled) {
         return;
     }

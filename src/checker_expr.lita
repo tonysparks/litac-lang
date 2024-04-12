@@ -1,9 +1,9 @@
 import "std/libc"
 import "std/map"
 import "std/hash"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 import "std/array"
 import "std/assert"
 
@@ -460,7 +460,7 @@ func (this: *TypeChecker) inferredType(
             var aggBaseName = aggInfo.getBaseNameView()
             var expectedBaseName = expectedAggInfo.getBaseNameView()
 
-            if(aggBaseName.equalsStringView(expectedBaseName)) {
+            if(aggBaseName.equalsString(expectedBaseName)) {
                 var sym = expectedAggInfo.sym; // expectedAggInfo.decl.genericParams?
                 var pSize = sym.genericParams.size()
                 if(pSize) {
@@ -709,7 +709,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         var isFullyResolved = genericParams.size() == nameSpec.genericArgs.size()
         if(!isFullyResolved) {
             var buffer:[512]char;
-            var error = StringInit(buffer, 512, 0)
+            var error = StringBufferInit(buffer, 512, 0)
             error.format(
                 "return type of '%.*s' containing a generic argument that can not be inferred",
                 returnType.sym.name.length, returnType.sym.name.buffer
@@ -1853,7 +1853,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                     break
                 }
                 default: {
-                    var sb = StringBufferInit(256, this.allocator)
+                    var sb = StringBuilderInit(256, this.allocator)
                     sb.appendStrn("'", 1)
                     type.toString(sb)
                     sb.appendStr("' is not a pointer type")
@@ -2120,7 +2120,7 @@ func (this: *TypeChecker) errorRvalueAssignmentToTrait(expr: *Expr, type: *TypeI
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStr("invalid trait assignment from rvalue of type '")
     type.toString(sb)
     sb.appendStr("' to trait type '")
@@ -2134,7 +2134,7 @@ func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStr("invalid index into '")
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2146,7 +2146,7 @@ func (this: *TypeChecker) errorSetIndexingConstType(expr: *Expr, type: *TypeInfo
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStr("invalid read-only assignment to '")
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2158,7 +2158,7 @@ func (this: *TypeChecker) errorIndexType(expr: *Expr, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2171,7 +2171,7 @@ func (this: *TypeChecker) errorNonAggregateType(expr: *Expr, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2184,7 +2184,7 @@ func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2197,7 +2197,7 @@ func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *cons
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.append("illegal, %s operand has type '", side)
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2209,7 +2209,7 @@ func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field:
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStr("can't reassign enum '")
     type.toString(sb)
     sb.append("' field '%.*s'", field.length, field.buffer)
@@ -2221,7 +2221,7 @@ public func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, fiel
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2234,7 +2234,7 @@ func (this: *TypeChecker) errorNoFieldAt(expr: *Expr, type: *TypeInfo, position:
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2247,7 +2247,7 @@ func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field
     assert(expr != null)
     assert(type != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStrn("'", 1)
     type.toString(sb)
     sb.appendStrn("'", 1)
@@ -2266,7 +2266,7 @@ func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Arra
     assert(expr != null)
     assert(params != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.appendStr("unable to infer generic parameters [")
     for(var i = 0; i < params.size(); i += 1) {
         if(i > 0) {
@@ -2288,7 +2288,7 @@ func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: In
     assert(expr != null)
     assert(genericParams != null)
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.append("'%.*s' is missing generic arguments [", typeName.length, typeName.buffer)
     for(var i = 0; i < genericParams.size(); i += 1) {
         var param = genericParams.get(i)
@@ -2305,7 +2305,7 @@ func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: In
 func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Expr) {
     assert(arg != null)
 
-    var sb = StringBufferInit(128, this.allocator)
+    var sb = StringBuilderInit(128, this.allocator)
     sb.appendStr("Named argument specifications must appear after all fixed arguments have been specified")
 
     this.result.addErrorStr(arg.startPos, sb)
@@ -2315,14 +2315,14 @@ func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Expr) {
 func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Expr) {
     assert(expr != null)
 
-    var sb = StringBufferInit(128, this.allocator)
+    var sb = StringBuilderInit(128, this.allocator)
     sb.appendStr("Named arguments are not allowed on function pointers")
 
     this.result.addErrorStr(expr.startPos, sb)
 }
 
 func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *InternedString, funcInfo: *TypeInfo) {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     sb.append("Invalid named parameter: '%.*s'; no parameter with that name found in 'func %.*s(",
         name.length, name.buffer, funcInfo.name.length, funcInfo.name.buffer)
 
@@ -2383,7 +2383,7 @@ func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) : bool {
     assert(type != null)
 
     if(!IsBooleanable(type)) {
-        var sb = StringBufferInit(256, this.allocator)
+        var sb = StringBuilderInit(256, this.allocator)
         sb.appendStrn("'", 1)
         type.toString(sb)
         sb.appendStr("' can't be coerced to boolean")

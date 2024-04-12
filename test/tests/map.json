@@ -4,7 +4,7 @@
     "program": `
         import "std/map";
         import "std/hash";
-        import "std/string";
+        import "std/string/buffer";
 
         @include("assert.h");
         @foreign func assert(e:bool):void;

@@ -1,18 +1,18 @@
 import "std/mem" as mem;
 import "std/io" as io;
 import "std/assert";
-import "std/string_view";
+import "std/string";
 import "std/libc";
 
-public struct String {
+public struct StringBuffer {
     buffer: *char
     length: i32
     capacity: i32
 }
 
-public func CString(str: *char, len: i32 = -1) : String {
+public func CString(str: *char, len: i32 = -1) : StringBuffer {
     if(str == null) {
-        return String {
+        return StringBuffer {
             .buffer = null,
             .length = 0,
             .capacity = 0
@@ -23,16 +23,16 @@ public func CString(str: *char, len: i32 = -1) : String {
         len = strlen(str)
     }
 
-    return String {
+    return StringBuffer {
         .buffer = str,
         .length = len,
         .capacity = len
     }
 }
 
-public func StringInit(str: *char, capacity: i32, len: i32 = -1) : String {
+public func StringBufferInit(str: *char, capacity: i32, len: i32 = -1) : StringBuffer {
     if(str == null) {
-        return String {
+        return StringBuffer {
             .buffer = null,
             .length = 0,
             .capacity = 0
@@ -47,7 +47,7 @@ public func StringInit(str: *char, capacity: i32, len: i32 = -1) : String {
         len = capacity
     }
 
-    return String {
+    return StringBuffer {
         .buffer = str,
         .length = len,
         .capacity = capacity
@@ -55,11 +55,11 @@ public func StringInit(str: *char, capacity: i32, len: i32 = -1) : String {
 }
 
 
-public func (s: *String) hash() : u32 {
+public func (s: *StringBuffer) hash() : u32 {
     return StringHashLen(s.buffer, s.length)
 }
 
-public func (s: *String) equals(other: *String) : bool {
+public func (s: *StringBuffer) equals(other: *StringBuffer) : bool {
     if(s == null || other == null) {
         return false
     }
@@ -70,7 +70,7 @@ public func (s: *String) equals(other: *String) : bool {
     return strncmp(s.buffer, other.buffer, s.length) == 0
 }
 
-public func (s: *String) format(format: *const char, ...) : i32{
+public func (s: *StringBuffer) format(format: *const char, ...) : i32{
     // get the variable args
     var args:va_list;
     va_start(args, format);
@@ -88,7 +88,7 @@ public func (s: *String) format(format: *const char, ...) : i32{
     return len
 }
 
-public func (s: *String) append(format: *const char, ...) : i32 {
+public func (s: *StringBuffer) append(format: *const char, ...) : i32 {
     // get the variable args
     var args1:va_list;
     va_start(args1, format);
@@ -106,7 +106,7 @@ public func (s: *String) append(format: *const char, ...) : i32 {
     return len
 }
 
-public func (b: *String) appendStr(str: *const char) {
+public func (b: *StringBuffer) appendStr(str: *const char) {
     if(str == null) {
         return;
     }
@@ -115,7 +115,7 @@ public func (b: *String) appendStr(str: *const char) {
 }
 
 
-public func (b: *String) appendStrn(str: *const char, len: i32) {
+public func (b: *StringBuffer) appendStrn(str: *const char, len: i32) {
     if(str == null || len < 1) {
         return;
     }
@@ -131,7 +131,7 @@ public func (b: *String) appendStrn(str: *const char, len: i32) {
 }
 
 
-public func (s: *String) setStrn(str: *const char, len: i32) {
+public func (s: *StringBuffer) setStrn(str: *const char, len: i32) {
     if(str == null || len < 1) {
         return;
     }
@@ -146,7 +146,7 @@ public func (s: *String) setStrn(str: *const char, len: i32) {
     s.length = len
 }
 
-public func (s: *String) appendChar(c: char) {
+public func (s: *StringBuffer) appendChar(c: char) {
     if(s.length >= s.capacity) {
         return;
     }
@@ -155,50 +155,43 @@ public func (s: *String) appendChar(c: char) {
     s.length += 1
 }
 
-public func (s: String) substring(start: i32, end: i32) : StringView {
+public func (s: StringBuffer) substring(start: i32, end: i32) : String {
     if(start < 0 || end < start) {
-        return StringView{
+        return String{
             .buffer = null,
             .length = 0
         }
     }
 
     var len = end - start
-    return StringView {
+    return String {
         .buffer = s.buffer + start,
         .length = len
     }
 }
 
-public func (s: String) asView() : StringView {
-    return StringView {
-        .buffer = s.buffer,
-        .length = s.length
-    }
-}
-
-public func (s: String) memset(value: i32 = 0) {
+public func (s: StringBuffer) memset(value: i32 = 0) {
     if(s.capacity < 1) return;
 
     memset(s.buffer as (*void), value, s.capacity * sizeof(:char))
 }
 
 
-public func (s: String) toLower() {
+public func (s: StringBuffer) toLower() {
     for(var i = 0; i < s.length; i+=1) {
         s.buffer[i] = tolower(s.buffer[i]) as (char)
     }
 }
 
-public func (s: String) toUpper() {
+public func (s: StringBuffer) toUpper() {
     for(var i = 0; i < s.length; i+=1) {
         s.buffer[i] = toupper(s.buffer[i]) as (char)
     }
 }
 
-public func (s: String) copy(allocator: *const mem::Allocator = mem::defaultAllocator) : String {
+public func (s: StringBuffer) copy(allocator: *const mem::Allocator = mem::defaultAllocator) : StringBuffer {
     if(s.length < 1) {
-        return String {
+        return StringBuffer {
             .buffer = null,
             .length = 0,
             .capacity = 0
@@ -210,126 +203,52 @@ public func (s: String) copy(allocator: *const mem::Allocator = mem::defaultAllo
 
     copiedStr[s.length] = '\0'
 
-    return String{
+    return StringBuffer{
         .buffer = copiedStr,
         .length = s.length,
         .capacity = s.length
     }
 }
 
-public func (s: *String) adjust() {
+public func (s: *StringBuffer) adjust() {
     s.length = strnlen(s.buffer, s.capacity)
 }
 
-public func (s: *String) clear() {
+public func (s: *StringBuffer) clear() {
     s.memset(0)
     s.length = 0
 }
 
-public func (s: String) empty() : bool {
+public func (s: StringBuffer) empty() : bool {
     return s.length < 1
 }
 
-public func (s: String) size() : i32 {
+public func (s: StringBuffer) size() : i32 {
     return s.length
 }
 
-public func (s: String) remaining() : i32 {
+public func (s: StringBuffer) remaining() : i32 {
     return s.capacity - s.length
 }
 
-public func (s: String) cStr() : *char {
+public func (s: StringBuffer) cStr() : *char {
     if(s.length < s.capacity && s.length > 0) {
         s.buffer[s.length] = '\0'
     }
     return s.buffer
 }
 
-public func (s: String) cStrConst() : *const char {
+public func (s: StringBuffer) cStrConst() : *const char {
     if(s.length < s.capacity && s.length > 0) {
         s.buffer[s.length] = '\0'
     }
     return s.buffer as (*const char)
 }
 
-public func StringClone(original: *const char, len: i32 = -1, allocator: *const mem::Allocator = mem::defaultAllocator) : *char {
-    if(!original) {
-        return null
+@inline
+public func (b: *StringBuffer) asString() : String {
+    return String {
+        .buffer = b.buffer,
+        .length = b.length
     }
-
-    if(len < 0) {
-        len = strlen(original)
-    }
-
-    var copiedStr: *char = null
-
-    if(len > 0) {
-        copiedStr = allocator.alloc((len + 1) * sizeof(:char)) as (*char)
-        memcpy(copiedStr, original, len)
-
-        copiedStr[len] = '\0'
-    }
-    return copiedStr
-}
-
-public func StringCopy(src: *const char, dest: *char, size: usize) : *char {
-    if(!src) {
-        return null
-    }
-
-    if (size > 0) {
-        var i:usize;
-        for (i = 0; i < size - 1 && src[i]; i+=1) {
-             dest[i] = src[i];
-        }
-        dest[i] = '\0';
-    }
-    return dest;
-}
-
-public func StringHashLen(str: *const char, size: usize) : u32 {
-    var hash = 5381_u32;
-
-    var index = 0
-    while (index < size) {
-        hash = ((hash << 5_u32) + hash) ^ ((*str) as (u32));
-        str   += 1;
-        index += 1;
-    }
-    return hash;
-}
-
-public func StringHash(str: *const char) : u32 {
-    var hash = 5381_u32;
-
-    while (*str) {
-        hash = ((hash << 5_u32) + hash) ^ ((*str) as (u32));
-        str += 1;
-    }
-    return hash;
-}
-
-public func StringEqualLen(a: *const char, b: *const char, size: usize) : bool {
-    if(!a && !b) return true
-    if(!a || !b) return false
-
-    return strncmp(a, b, size) == 0
-}
-
-public func StringEqual(a: *const char, b: *const char) : bool {
-    if(!a && !b) return true
-    if(!a || !b) return false
-
-    return strcmp(a, b) == 0
-}
-
-public func (str: *const char) hash() : u32 {
-    return StringHash(str)
-}
-
-public func (str: *const char) equals(other: *const char) : bool {
-    if(!str && !other) return true
-    if(!str || !other) return false
-
-    return strcmp(str, other) == 0
 }

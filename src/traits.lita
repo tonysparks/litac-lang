@@ -3,9 +3,9 @@ import "std/libc"
 import "std/array"
 import "std/map"
 import "std/hash"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 
 import "types"
 import "lita"
@@ -92,10 +92,10 @@ C:
 public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     var allocator = checker.current.allocator
 
-    var sb = StringBufferInit(2048, allocator)
+    var sb = StringBuilderInit(2048, allocator)
 
-    var traitBuffer      = StringBufferInit(MAX_SYMBOL_NAME, allocator)
-    var traitFieldBuffer = StringBufferInit(MAX_SYMBOL_NAME, allocator)
+    var traitBuffer      = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
+    var traitFieldBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
 
     for(var i = 0; i < checker.symbolTraits.size(); i+=1) {
         var traitSym = checker.symbolTraits.get(i)
@@ -140,8 +140,8 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 func GenerateVTable(
         traitSym: *Symbol,
         traitDecl: *AggregateDecl,
-        traitName: StringView,
-        sb: *StringBuffer) {
+        traitName: String,
+        sb: *StringBuilder) {
     sb.append("@hidden struct %.*s__VirtualTable", traitName.length, traitName.buffer)
     sb.append(" {\n")
 
@@ -172,9 +172,9 @@ func GenerateWrapperFunctions(
         checker: *TypeChecker,
         traitSym: *Symbol,
         traitDecl: *AggregateDecl,
-        traitName: StringView,
-        sb: *StringBuffer,
-        traitFieldBuffer: *StringBuffer,
+        traitName: String,
+        sb: *StringBuilder,
+        traitFieldBuffer: *StringBuilder,
         impls: *Array<Typeid>) {
     sb.append("// Trait: '%.*s' has %d impls\n", traitDecl.name.str.length, traitDecl.name.str.buffer, impls.size())
 
@@ -259,9 +259,9 @@ func GenerateWrapperFunctions(
 func GenerateVTableEntries(
         checker: *TypeChecker,
         traitDecl: *AggregateDecl,
-        traitName: StringView,
-        sb: *StringBuffer,
-        traitFieldBuffer: *StringBuffer,
+        traitName: String,
+        sb: *StringBuilder,
+        traitFieldBuffer: *StringBuilder,
         impls: *Array<Typeid>) {
 
     sb.append("@hidden const %.*s__vtables = []*%.*s__VirtualTable {\n",
@@ -292,7 +292,7 @@ func GenerateVTableEntries(
     sb.append("}\n")
 }
 
-func PrintGenerics(genericParams: *Array<GenericParam>, sb: *StringBuffer) {
+func PrintGenerics(genericParams: *Array<GenericParam>, sb: *StringBuilder) {
     for(var x = 0; x < genericParams.size(); x += 1) {
         if(x == 0) {
             sb.append("<")
@@ -308,7 +308,7 @@ func PrintGenerics(genericParams: *Array<GenericParam>, sb: *StringBuffer) {
     }
 }
 
-func PrintGenericArgs(genericArgs: *Array<*TypeInfo>, sb: *StringBuffer) {
+func PrintGenericArgs(genericArgs: *Array<*TypeInfo>, sb: *StringBuilder) {
     for(var x = 0; x < genericArgs.size(); x += 1) {
         if(x == 0) {
             sb.append("<")
@@ -341,7 +341,7 @@ func FindSymbolByTypeid(symbols: Array<*Symbol>, id: Typeid) : *Symbol {
     return null
 }
 
-func GetTraitName(traitSym: *Symbol, sb: *StringBuffer) : StringView {
+func GetTraitName(traitSym: *Symbol, sb: *StringBuilder) : String {
 
     // if this isn't a generic generated trait, just use the symbol name
     if(!(traitSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
@@ -353,13 +353,13 @@ func GetTraitName(traitSym: *Symbol, sb: *StringBuffer) : StringView {
     // otherwise, we have to calculate the new name using the generic type arguments
     EscapeName(traitSym.name.buffer, traitSym.name.length, sb)
 
-    return StringView {
+    return String {
         .buffer = sb.buffer,
         .length = sb.length
     }
 }
 
-func Parse(sb: *StringBuffer, checker: *TypeChecker, decls: *Array<*Decl>) {
+func Parse(sb: *StringBuilder, checker: *TypeChecker, decls: *Array<*Decl>) {
     var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
     var stmts = parser.parseModule()
     decls.addAll(stmts.declarations)

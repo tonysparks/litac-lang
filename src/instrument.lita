@@ -3,9 +3,9 @@ import "std/libc"
 import "std/mem"
 import "std/array"
 import "std/map"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 import "std/system"
 
 import "checker"
@@ -23,7 +23,7 @@ import "intern"
 public func Instrument(lita: *Lita, checker: *TypeChecker) {
 
     var filename = [MAX_PATH]char{0}
-    var moduleName = StringViewInit("profile")
+    var moduleName = StringInit("profile")
     if(!FindModulePath(lita, moduleName, filename)) {
         lita.result.addError(SrcPos{}, "could not find module 'profile' on the system path.")
         return;
@@ -34,7 +34,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
         return;
     }
 
-    var sb = StringBufferInit(2048*2, lita.allocator)
+    var sb = StringBuilderInit(2048*2, lita.allocator)
     var profileAll = true
 
     // creating the Profile tags
@@ -123,7 +123,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
     }
 
 
-    sb = StringBufferInit(2048, lita.allocator)
+    sb = StringBuilderInit(2048, lita.allocator)
 
 
     // Now inject each function with start/stop watch

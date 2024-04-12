@@ -1,28 +1,27 @@
 import "std/mem" as mem;
 import "std/io";
 import "std/assert";
-import "std/string_view";
+import "std/string";
+import "std/string/buffer"
 import "std/libc";
 import "std/ascii";
 
 const MAX_BUFFER_SIZE = 32;
 
-public struct StringBuffer {
-    buffer: *char
-    length: i32
-    capacity: i32
+public struct StringBuilder {
+    asBuffer: using StringBuffer
     alloc: *const mem::Allocator
 }
 
-public func StringBufferInit(initialSize: i32 = 16,
-                             alloc: *const mem::Allocator = null) : StringBuffer {
-    var sb = StringBuffer{}
+public func StringBuilderInit(initialSize: i32 = 16,
+                             alloc: *const mem::Allocator = null) : StringBuilder {
+    var sb = StringBuilder{}
     sb.init(initialSize, alloc)
 
     return sb;
 }
 
-public func (b: *StringBuffer) init(initialSize: i32 = 16,
+public func (b: *StringBuilder) init(initialSize: i32 = 16,
                                     alloc: *const mem::Allocator = null) {
     if(!alloc) {
         alloc = mem::defaultAllocator
@@ -36,7 +35,7 @@ public func (b: *StringBuffer) init(initialSize: i32 = 16,
     b.buffer = alloc.calloc(length, sizeof(:char)) as (*char)
 }
 
-public func (b: *StringBuffer) free() {
+public func (b: *StringBuilder) free() {
     if(b && b.buffer && b.alloc) {
         b.alloc.free(b.buffer as (*void))
         b.buffer = null
@@ -45,7 +44,7 @@ public func (b: *StringBuffer) free() {
     }
 }
 
-public func (b: *StringBuffer) appendStr(str: *const char) {
+public func (b: *StringBuilder) appendStr(str: *const char) {
     if(str == null) {
         return;
     }
@@ -54,7 +53,7 @@ public func (b: *StringBuffer) appendStr(str: *const char) {
 }
 
 
-public func (b: *StringBuffer) appendStrn(str: *const char, len: i32) {
+public func (b: *StringBuilder) appendStrn(str: *const char, len: i32) {
     if(str == null || len < 1) {
         return;
     }
@@ -70,27 +69,27 @@ public func (b: *StringBuffer) appendStrn(str: *const char, len: i32) {
 }
 
 
-public func (b: *StringBuffer) appendFloat(f: f64) : i32 {
+public func (b: *StringBuilder) appendFloat(f: f64) : i32 {
     return b.append("%f", f)
 }
 
-public func (b: *StringBuffer) appendI32(i: i32) : i32 {
+public func (b: *StringBuilder) appendI32(i: i32) : i32 {
     return b.append("%d", i)
 }
 
-public func (b: *StringBuffer) appendI64(i: i64) : i32 {
+public func (b: *StringBuilder) appendI64(i: i64) : i32 {
     return b.append("%ld", i)
 }
 
-public func (b: *StringBuffer) appendU32(i: u32) : i32 {
+public func (b: *StringBuilder) appendU32(i: u32) : i32 {
     return b.append("%u", i)
 }
 
-public func (b: *StringBuffer) appendU64(i: u64) : i32 {
+public func (b: *StringBuilder) appendU64(i: u64) : i32 {
     return b.append("%lu", i)
 }
 
-public func (b: *StringBuffer) appendChar(c: char) : i32 {
+public func (b: *StringBuilder) appendChar(c: char) : i32 {
     // ensure we have enough of a buffer initially
     if(b.length + 1 >= b.capacity) {
         BufferGrow(b, 1)
@@ -101,7 +100,7 @@ public func (b: *StringBuffer) appendChar(c: char) : i32 {
     return 1
 }
 
-public func (b: *StringBuffer) append(format: *const char, ...) : i32 {
+public func (b: *StringBuilder) append(format: *const char, ...) : i32 {
     // get the variable args
     var args1:va_list;
     va_start(args1, format);
@@ -123,7 +122,7 @@ public func (b: *StringBuffer) append(format: *const char, ...) : i32 {
     return len
 }
 
-public func (b: *StringBuffer) appendArgs(format: *const char, args: va_list) : i32 {
+public func (b: *StringBuilder) appendArgs(format: *const char, args: va_list) : i32 {
     var copyArgs: va_list;
     va_copy(copyArgs, args);
 
@@ -182,7 +181,7 @@ func Print(b: *const char, n: i32) {
     printf("'\n")
 }*/
 
-public func (b: *StringBuffer) delete(start: i32, end: i32) {
+public func (b: *StringBuilder) delete(start: i32, end: i32) {
     if(b.length == 0) {
         return;
     }
@@ -207,25 +206,25 @@ public func (b: *StringBuffer) delete(start: i32, end: i32) {
     b.length -= (end - start)
 }
 
-public func (b: *StringBuffer) contains(str: *const char, len: i32 = -1) : bool {
+public func (b: *StringBuilder) contains(str: *const char, len: i32 = -1) : bool {
     return b.indexOf(str, len) > -1;
 }
 
-public func (b: *StringBuffer) indexOf(str: *const char, len: i32 = -1) : i32 {
+public func (b: *StringBuilder) indexOf(str: *const char, len: i32 = -1) : i32 {
     return b.indexOfAt(str, len, 0)
 }
 
-public func (b: *StringBuffer) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
-    var view = b.asStringView()
+public func (b: *StringBuilder) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
+    var view = b.asString()
     return view.indexOfAt(str, len, fromIndex)
 }
 
-public func (b: *StringBuffer) replace(start: i32, end: i32, str: *const char) : i32 {
+public func (b: *StringBuilder) replace(start: i32, end: i32, str: *const char) : i32 {
     b.delete(start, end)
     return b.insert(start, "%s", str)
 }
 
-public func (b: *StringBuffer) insert(index: i32, format: *const char, ...) : i32 {
+public func (b: *StringBuilder) insert(index: i32, format: *const char, ...) : i32 {
 
     if(index < 0) {
         index = 0
@@ -276,7 +275,7 @@ public func (b: *StringBuffer) insert(index: i32, format: *const char, ...) : i3
     return len
 }
 
-public func (b: *StringBuffer) trim() {
+public func (b: *StringBuilder) trim() {
     var start = 0
     var end = 0
 
@@ -313,12 +312,12 @@ public func (b: *StringBuffer) trim() {
     }
 }
 
-public func (b: *StringBuffer) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
-    var view = b.asStringView()
+public func (b: *StringBuilder) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
+    var view = b.asString()
     return view.copyTo(buf, len, addZero)
 }
 
-public func (b: *StringBuffer) forEach(fn : func(char) : bool) {
+public func (b: *StringBuilder) forEach(fn : func(char) : bool) {
     for(var i = 0; i < b.length; i+=1) {
         if(fn(b.buffer[i])) {
             break;
@@ -327,26 +326,26 @@ public func (b: *StringBuffer) forEach(fn : func(char) : bool) {
 }
 
 @inline
-public func (b: *StringBuffer) empty() : bool {
+public func (b: *StringBuilder) empty() : bool {
     return b.length == 0
 }
 
 @inline
-public func (b: *StringBuffer) size() : i32 {
+public func (b: *StringBuilder) size() : i32 {
     return b.length
 }
 
 @inline
-public func (b: *StringBuffer) clear() : *StringBuffer {
+public func (b: *StringBuilder) clear() : *StringBuilder {
     b.length = 0
     return b
 }
 
-public func (b: *StringBuffer) cStrConst() : *const char {
+public func (b: *StringBuilder) cStrConst() : *const char {
     return b.cStr() as (*const char)
 }
 
-public func (b: *StringBuffer) cStr() : *char {
+public func (b: *StringBuilder) cStr() : *char {
     if(b.length + 1 > b.capacity) {
         BufferGrow(b, 1)
     }
@@ -356,14 +355,11 @@ public func (b: *StringBuffer) cStr() : *char {
 }
 
 @inline
-public func (b: *StringBuffer) asStringView() : StringView {
-    return StringView {
-        .buffer = b.buffer,
-        .length = b.length
-    }
+public func (b: *StringBuilder) asStringBuffer() : StringBuffer {
+    return b.asBuffer
 }
 
-public func (b: *StringBuffer) get(index: i32) : char {
+public func (b: *StringBuilder) get(index: i32) : char {
     if(index < 0 || index >= b.length) {
         return '\0'
     }
@@ -371,7 +367,7 @@ public func (b: *StringBuffer) get(index: i32) : char {
     return b.buffer[index]
 }
 
-public func (b: *StringBuffer) reserve(length: i32) {
+public func (b: *StringBuilder) reserve(length: i32) {
     var available = b.capacity - b.length
     if(available >= length) {
         return;
@@ -380,7 +376,7 @@ public func (b: *StringBuffer) reserve(length: i32) {
     BufferGrow(b, length - available)
 }
 
-func BufferGrow(b: *StringBuffer, increment: i32) {
+func BufferGrow(b: *StringBuilder, increment: i32) {
     var doubleCurrent = b.capacity * 2
     var minReq = b.capacity + increment
     var n = minReq

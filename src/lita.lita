@@ -6,9 +6,9 @@ import "std/map"
 import "std/hash"
 import "std/libc"
 import "std/system"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 
 import "symbols"
 import "preprocessor"
@@ -96,7 +96,7 @@ public enum TypeInfoOption {
 public struct CCompilerOption {
     os: OS
     arch: Arch
-    options: StringView
+    options: String
 }
 
 public enum PkgCommand {
@@ -215,7 +215,7 @@ public func (this: *Lita) reset() {
     // see if there is a .build.json file
     {
         var temp: [MAX_PATH]char;
-        var build = StringInit(temp, MAX_PATH, 0)
+        var build = StringBufferInit(temp, MAX_PATH, 0)
         build.format("%s/.build.json", this.options.projectPath)
 
         memset((&this.buildFile) as (*void), 0, sizeof(:BuildFile))
@@ -476,7 +476,7 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
 
 
     var temp:[256]char;
-    var buf = StringInit(temp, 256, 0)
+    var buf = StringBufferInit(temp, 256, 0)
 
     buf.format("%s/lib", this.options.projectPath)
     if(FileExists(buf.cStr())) {
@@ -493,7 +493,7 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
     if(!this.compilerOptions.empty()) {
         var os = GetOS()
 
-        var ccOptions = StringBufferInit(256)
+        var ccOptions = StringBuilderInit(256)
         defer ccOptions.free()
         for(var i = 0; i < this.compilerOptions.size(); i+= 1) {
             var option = this.compilerOptions.getPtr(i)
@@ -547,7 +547,7 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
     this.startCapture(MetricType.CCOMPILE)
     defer this.endCapture(MetricType.CCOMPILE)
 
-    var commandStr = StringBufferInit(1024)
+    var commandStr = StringBuilderInit(1024)
     defer commandStr.free()
 
     commandStr.appendStr(this.options.compileCmd)
@@ -574,10 +574,10 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
     return false
 }
 
-func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
-    var buffer: *StringBuffer = commandStr;
+func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
+    var buffer: *StringBuilder = commandStr;
 
-    var replaceBuffer: StringBuffer;
+    var replaceBuffer: StringBuilder;
     if(this.options.isStrict) {
         replaceBuffer.init(256)
         buffer = &replaceBuffer;
@@ -586,7 +586,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
     // Add in this projects lib and include folder if they exist
     {
         var temp:[256]char;
-        var path = StringInit(temp, 256, 0)
+        var path = StringBufferInit(temp, 256, 0)
         path.format("%s/lib", this.options.projectPath)
         if(FileExists(path.cStr())) {
             buffer.append(" -L%s", path.cStr())
@@ -629,7 +629,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuffer) {
 }
 
 public func (this: *Lita) run() : i32 {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     defer sb.free()
 
     var path: [MAX_PATH]char;
@@ -646,11 +646,11 @@ public func (this: *Lita) run() : i32 {
 
 
 public func FindModulePath(lita: *Lita,
-                           moduleName: StringView,
+                           moduleName: String,
                            filename: [MAX_PATH]char) : bool {
 
     var path = [MAX_PATH]char{0}
-    var pathStr = StringInit(path, MAX_PATH, 0);
+    var pathStr = StringBufferInit(path, MAX_PATH, 0);
     defer {
         GetAbsolutePath(CurrentWorkingPath(), pathStr.cStr(), filename)
     }
@@ -806,14 +806,14 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 }
 
 
-public func GetPackageName(srcPath: *const char, inputFile: *const char) : StringView {
+public func GetPackageName(srcPath: *const char, inputFile: *const char) : String {
 
     if(!inputFile) {
-        return StringView{}
+        return String{}
     }
 
     if(srcPath) {
-        var inputFileView = StringViewInit(inputFile)
+        var inputFileView = StringInit(inputFile)
         var index = inputFileView.indexOf(srcPath)
         if(index > -1) {
             inputFile = &inputFile[index + strlen(srcPath)]
@@ -841,7 +841,7 @@ public func GetPackageName(srcPath: *const char, inputFile: *const char) : Strin
         endCount += 1
     }
 
-    return StringView {
+    return String {
         .length = inputLen - endCount,
         .buffer = inputFile,
     }

@@ -150,28 +150,28 @@
                 import "std/json";
                 import "std/json/from_json";
                 import "std/json/to_json";
-                import "std/string_buffer";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
                 import "std/mem";
                 import "std/map";
+                import "std/string/buffer";
                 import "std/string";
-                import "std/string_view";
 
 
                 public func TestMakerPtr(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
                     switch(type) {
-                        case typeof(:String): {
+                        case typeof(:StringBuffer): {
                             if(!json.isString()) {
                                 return null;
                             }
 
-                            var str = StringViewInit(json.asString())
-                            var buffer = context.allocator.alloc(sizeof(:String) + ((str.length+1) * sizeof(:char)))
-                            var bufferStart = buffer + sizeof(:String)
+                            var str = StringInit(json.asString())
+                            var buffer = context.allocator.alloc(sizeof(:StringBuffer) + ((str.length+1) * sizeof(:char)))
+                            var bufferStart = buffer + sizeof(:StringBuffer)
                             StringCopy(.src = str.buffer, .dest = bufferStart as (*char),  .size = str.length + 1)
 
-                            var result = buffer as (*String)
+                            var result = buffer as (*StringBuffer)
                             result.length = str.length;
                             result.capacity = str.length;
                             result.buffer = bufferStart as (*char)
@@ -202,7 +202,7 @@
 
                 var context = JsonContextInit(.makerPtr = TestMakerPtr)
 
-                var test = StrMap<*String>(String{})
+                var test = StrMap<*StringBuffer>(StringBuffer{})
                 defer test.free()
                 test.fromJson(&context, node)
 

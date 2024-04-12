@@ -8,9 +8,9 @@ import "std/system"
 import "std/libc"
 import "std/array"
 import "std/mem"
+import "std/string/buffer"
+import "std/string/builder"
 import "std/string"
-import "std/string_buffer"
-import "std/string_view"
 import "std/zip"
 import "std/json"
 import "std/fs"
@@ -40,7 +40,7 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
 
     if(options.fullSync) {
         var temp:[MAX_PATH]char;
-        var pkgPath = StringInit(temp, MAX_PATH, 0)
+        var pkgPath = StringBufferInit(temp, MAX_PATH, 0)
         pkgPath.format("%s/%s", CurrentWorkingPath(), pm.options.pkgDir)
 
         var status = cleanPackageDirectory(pm, pkgPath.cStr())
@@ -86,7 +86,7 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
             return status
         }
 
-        var pkgFile = StringInit(pkgPath, MAX_PATH)
+        var pkgFile = StringBufferInit(pkgPath, MAX_PATH)
         pkgFile.appendStr("/pkg.zip")
 
         if(pkgId.repo().startsWith("file://")) {
@@ -110,7 +110,7 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
 
 func isPackageInstalled(pm: *PackageManager, pkgId: *PackageId, pkgDir: *const char) : bool {
     var temp:[MAX_PATH]char;
-    var lockFile = StringInit(temp, MAX_PATH, 0);
+    var lockFile = StringBufferInit(temp, MAX_PATH, 0);
     lockFile.format("%s/%s", pkgDir, INSTALL_COMPLETED_FILE)
 
     if(FileExists(lockFile.cStr())) {
@@ -122,13 +122,13 @@ func isPackageInstalled(pm: *PackageManager, pkgId: *PackageId, pkgDir: *const c
 
 func cleanPackageDirectory(pm: *PackageManager, pkgPath: *const char) : PkgStatus {
     var temp:[MAX_PATH]char;
-    var path = StringInit(temp, MAX_PATH, 0)
+    var path = StringBufferInit(temp, MAX_PATH, 0)
     path.append("%s", pkgPath)
 
     return deleteDir(pm, path)
 }
 
-func deleteDir(pm: *PackageManager, path: *String) : PkgStatus {
+func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
     if(!FileExists(path.cStr())) {
         return PkgStatus.OK
     }
@@ -177,7 +177,7 @@ func makePackageDirectory(
     pkgId: *PackageId,
     output: [MAX_PATH]char) : PkgStatus {
 
-    var pkgDirectory = StringInit(output, MAX_PATH, 0);
+    var pkgDirectory = StringBufferInit(output, MAX_PATH, 0);
 
     // the ${PWD}/.pkgs directory
     {
@@ -234,7 +234,7 @@ func downloadPackage(
     }
 
     var temp:[MAX_PATH]char;
-    var uri = StringInit(temp, MAX_PATH, 0)
+    var uri = StringBufferInit(temp, MAX_PATH, 0)
 
     var repo = pkgId.repo()
     var name = pkgId.name()
@@ -374,10 +374,10 @@ func installPackage(
     // project bin directory
     {
         var temp1:[MAX_PATH]char;
-        var libPath = StringInit(temp1, MAX_PATH, 0)
+        var libPath = StringBufferInit(temp1, MAX_PATH, 0)
 
         var temp2:[MAX_PATH]char;
-        var destPath = StringInit(temp2, MAX_PATH, 0)
+        var destPath = StringBufferInit(temp2, MAX_PATH, 0)
 
         for(var i = 0; i < pkg.dynamicLibraries.size(); i+=1) {
             var lib = pkg.dynamicLibraries.get(i)
@@ -402,7 +402,7 @@ func installPackage(
     // TODO: should we invert this, create a lock file upon start, and
     // remove it once it's done?
     {
-        var pkgLck = StringInit(pkgPath, MAX_PATH)
+        var pkgLck = StringBufferInit(pkgPath, MAX_PATH)
         pkgLck.append("/%s", INSTALL_COMPLETED_FILE)
 
         var lockFile = File{}
@@ -424,7 +424,7 @@ func readPackage(
     var version = pkgId.version()
 
     var temp:[MAX_PATH]char;
-    var pkgDef = StringInit(temp, MAX_PATH, 0)
+    var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
     pkgDef.format("%s/pkg/pkg.json", pkgPath)
 
     if(!FileExists(pkgDef.cStr())) {
@@ -438,7 +438,7 @@ func readPackage(
     }
 
     var pkg: *PackageDef = (*resultPkg);
-    var srcPath = StringInit(pkg.path, MAX_PATH, 0)
+    var srcPath = StringBufferInit(pkg.path, MAX_PATH, 0)
 
     // TODO: Do we want packages to allow to define an alternative
     // folder for src/bin/lib directories, or should this be
@@ -477,10 +477,10 @@ func dealWithGithubBS(
 
 
     var temp1:[MAX_PATH]char;
-    var srcPath = StringInit(temp1, MAX_PATH, 0)
+    var srcPath = StringBufferInit(temp1, MAX_PATH, 0)
 
     var temp2:[MAX_PATH]char;
-    var destPath = StringInit(temp2, MAX_PATH, 0)
+    var destPath = StringBufferInit(temp2, MAX_PATH, 0)
 
     var root = extractedFiles.get(0)
     var rootLength = strlen(root)
@@ -538,7 +538,7 @@ func zipLocalPackage(
 @test
 func testSanitizeFilename() {
     var temp: [MAX_PATH]char;
-    var pkgDirectory = StringInit(temp, MAX_PATH, 0);
+    var pkgDirectory = StringBufferInit(temp, MAX_PATH, 0);
     pkgDirectory.format("%s/%s/%s", "http://root", "name-complex", "1.0.3")
 
     sanitizeFilename(pkgDirectory.cStr(), pkgDirectory.cStr())

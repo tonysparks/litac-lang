@@ -9,9 +9,9 @@ import "std/mem"
 import "std/mem/linear_allocator"
 import "std/map"
 import "std/hash"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 import "std/system"
 
 import "../src/lita"
@@ -22,7 +22,7 @@ import "../src/symbols"
 
 struct TestHarness {
     allocator: *const Allocator
-    buffer: StringBuffer
+    buffer: StringBuilder
     numberOfTests: i32
     numberOfFailures: i32
 }
@@ -42,7 +42,7 @@ struct TestModule {
 }
 
 struct Test {
-    programText: StringBuffer
+    programText: StringBuilder
     name: *const char
     buildCmd: *const char
 
@@ -132,7 +132,7 @@ func main(len: i32, args: **char) : i32 {
 
     linearAllocator.init(mem, memSize)
     testHarness.allocator = (&linearAllocator) as (*Allocator)
-    testHarness.buffer = StringBufferInit(1024 * 1024, defaultAllocator)
+    testHarness.buffer = StringBuilderInit(1024 * 1024, defaultAllocator)
     defer testHarness.buffer.free()
 
     testHarness.numberOfTests = 0
@@ -261,7 +261,7 @@ err:
 }
 
 func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
-    var programText = StringBufferInit(2048, testHarness.allocator)
+    var programText = StringBuilderInit(2048, testHarness.allocator)
     programText.append("%s\n", suite.programTemplate)
 
     const defsTemplate = "%definitions%"
@@ -315,10 +315,10 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     }
 
     var moduleFilename = [260]char {};
-    var moduleFilenameStr = StringInit(moduleFilename, 260, 0)
+    var moduleFilenameStr = StringBufferInit(moduleFilename, 260, 0)
     for(var i = 0; i < test.modules.size(); i += 1) {
         var m = test.modules.get(i)
-        var moduleName = StringViewInit(m.name)
+        var moduleName = StringInit(m.name)
 
         // make sub directories
         if(moduleName.contains("/")) {
@@ -452,7 +452,7 @@ err:
 }
 
 
-public func (this: *Lita) runCaptureOutput(sb: *StringBuffer) : *const char {
+public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
     var path: [MAX_PATH]char;
     FilePath(this.binaryFilename, path)
 

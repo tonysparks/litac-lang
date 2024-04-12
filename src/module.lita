@@ -1,9 +1,9 @@
 import "std/array"
 import "std/map"
 import "std/hash"
+import "std/string/buffer"
 import "std/string"
-import "std/string_view"
-import "std/string_buffer"
+import "std/string/builder"
 import "std/system"
 import "std/libc"
 import "std/mem"
@@ -45,7 +45,7 @@ public struct ModuleImport {
 
 public struct Module {
     id: ModuleId        // TODO: don't make a separate allocation
-    text: String        // text of modules file
+    text: StringBuffer        // text of modules file
     ast: *ModuleStmt
     symbols: Scope
     currentScope: *Scope
@@ -67,7 +67,7 @@ public const BUILTIN_IMPORT_IDENT = Identifier {
 public const BUILTIN_IMPORT_TOKEN = Token {
     .type = TokenType.STRING,
     .value = Value {
-        .str = StringView {
+        .str = String {
             .buffer = "builtin",
             .length = 7
         }
@@ -78,7 +78,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     BUILTIN_IMPORT_IDENT.str = BUILTIN
     BUILTIN_IMPORT_IDENT.token = BUILTIN_IMPORT_TOKEN
 
-    builtins.text = String{}
+    builtins.text = StringBuffer{}
     builtins.ast = null
     builtins.flags = 0
     builtins.allocator = lita.allocator
@@ -90,9 +90,9 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.typeSpecAllocator.init(lita.allocator)
 
     var filename: [MAX_PATH]char;
-    var pathStr = StringInit(filename, MAX_PATH, 0);
+    var pathStr = StringBufferInit(filename, MAX_PATH, 0);
     pathStr.format("%s/stdlib/std/builtins.lita", lita.options.litaPath)
-    builtins.id.fromFile(lita, StringViewInit("std/builtins"), pathStr.cStr())
+    builtins.id.fromFile(lita, StringInit("std/builtins"), pathStr.cStr())
 
     AddBuiltin(lita, &BOOL_TYPE)
     AddBuiltin(lita, &CHAR_TYPE)
@@ -138,7 +138,7 @@ public func GetBuiltinSymbol(typeid: Typeid) : *Symbol {
 }
 
 public func NewModule(lita: *Lita,
-                      packageName: StringView,
+                      packageName: String,
                       filename: *const char) : *Module {
 
     var mod = new<Module>(lita.allocator)
@@ -148,7 +148,7 @@ public func NewModule(lita: *Lita,
 }
 
 public func (this: *Module) init(lita: *Lita) {
-    this.text = String{}
+    this.text = StringBuffer{}
     this.ast = null
 
     // TODO: Figure out optimal arena size and allocator to pass in
@@ -171,7 +171,7 @@ public func (this: *Module) init(lita: *Lita) {
 }
 
 public func (this: *Module) initIncrementalBuild() {
-    this.text = String{}
+    this.text = StringBuffer{}
     this.ast = null
     this.flags = 0
     this.flags |= ModuleFlags.INCREMENTAL_COMPILATION
@@ -540,19 +540,19 @@ public func (this: *Module) print(header: *const char) {
     printf("}\n")
 }
 
-public func (moduleId: *ModuleId) fromFile(lita: *Lita, packageName: StringView, filename: *const char) {
+public func (moduleId: *ModuleId) fromFile(lita: *Lita, packageName: String, filename: *const char) {
     GetAbsolutePath(CurrentWorkingPath(), filename, moduleId.filename)
     GetFilenameKey(filename, moduleId.filenameKey)
 
     var pkg = ToModuleName(packageName)
     moduleId.packageName = lita.strings.internCopy(pkg.buffer, pkg.length)
 
-    var pathStr = StringViewInit(moduleId.filename);
+    var pathStr = StringInit(moduleId.filename);
     var name = GetModuleName(pathStr)
     moduleId.name = lita.strings.internCopy(name.buffer, name.length)
 }
 
-public func ToModulePath(moduleName: StringView) : StringView {
+public func ToModulePath(moduleName: String) : String {
     @static var modulePath = [MAX_SYMBOL_NAME]char{0}
     var len = 0
     for(var i = 0; i < moduleName.length; i+=1) {
@@ -568,13 +568,13 @@ public func ToModulePath(moduleName: StringView) : StringView {
         len += 1
     }
 
-    return StringView {
+    return String {
         .length = len,
         .buffer = modulePath,
     }
 }
 
-public func ToModuleName(modulePath: StringView) : StringView {
+public func ToModuleName(modulePath: String) : String {
     @static var moduleName = [MAX_SYMBOL_NAME]char{0}
 
     var len = 0
@@ -594,13 +594,13 @@ public func ToModuleName(modulePath: StringView) : StringView {
         }
     }
 
-    return StringView {
+    return String {
         .length = len,
         .buffer = moduleName,
     }
 }
 
-public func GetModuleName(pathStr: StringView) : StringView {
+public func GetModuleName(pathStr: String) : String {
     var endIndex = -1
     var startIndex = -1
     for(var i = pathStr.length - 1; i >= 0; i -= 1) {
@@ -615,13 +615,13 @@ public func GetModuleName(pathStr: StringView) : StringView {
     }
 
     if(endIndex < 0 || startIndex < 0 || startIndex > endIndex) {
-        return StringView {
+        return String {
             .buffer = 0,
             .length = 0
         }
     }
 
-    return StringView {
+    return String {
         .buffer = pathStr.buffer + startIndex,
         .length = endIndex - startIndex
     }

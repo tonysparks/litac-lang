@@ -1,5 +1,5 @@
 import "std/system"
-import "std/string_buffer"
+import "std/string/builder"
 import "std/array"
 import "std/mem"
 
@@ -7,7 +7,7 @@ import "lsp/protocol"
 
 public struct Document {
     filename: [MAX_PATH]char
-    text: StringBuffer
+    text: StringBuilder
 
     lineMap: Array<u32>
 }

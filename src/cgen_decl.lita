@@ -1,6 +1,6 @@
 import "std/assert"
-import "std/string_buffer"
-import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
 import "std/libc"
 import "std/array"
 import "std/map"
@@ -105,7 +105,7 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
 
     var decayArrays = true
     var i = 0
-    var tmp = StringBufferInit(256, this.allocator)
+    var tmp = StringBuilderInit(256, this.allocator)
     for(; i < funcInfo.funcDecl.params.size(); i += 1) {
         if(i > 0) {
             buf.appendStrn(",", 1)
@@ -233,7 +233,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
-        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
+        var vtableNameStr = StringBufferInit(vtableName, MAX_SYMBOL_NAME, 0)
         var escapedName = this.escapeNameStr(decl.sym.name)
         var module = root
 

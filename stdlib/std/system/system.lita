@@ -1,8 +1,8 @@
 
 import "std/libc"
 import "std/assert"
+import "std/string/buffer"
 import "std/string"
-import "std/string_view"
 
 
 @raw("""
@@ -402,9 +402,9 @@ public func Mkdir(dir: *const char) : bool {
 
 public func Mkdirs(dir: *const char) : bool {
     var temp: [MAX_PATH]char;
-    var path = StringInit(temp, MAX_PATH, 0)
+    var path = StringBufferInit(temp, MAX_PATH, 0)
 
-    var workingPath = StringViewInit(dir)
+    var workingPath = StringInit(dir)
     var index = 0
 
     // check Windows C:/ style path
@@ -535,8 +535,8 @@ public func GetFullPathName(filename: *const char, output: [MAX_PATH]char) : *ch
 }*/
 
 public func GetAbsolutePath(pwd: *const char, path: *const char, output: [MAX_PATH]char) : *char {
-    var absStr = StringInit(output, MAX_PATH, 0);
-    var pathStr = StringViewInit(path)
+    var absStr = StringBufferInit(output, MAX_PATH, 0);
+    var pathStr = StringInit(path)
 
     if(pathStr.startsWith(".")) {
         absStr.append("%s/", pwd);
@@ -620,7 +620,7 @@ const uriEscapeChars = [256]*const char {
 }
 
 public func FilePathToUri(path: *const char, output: [MAX_PATH]char) : *char {
-    var outputStr = StringInit(output, MAX_PATH, 0)
+    var outputStr = StringBufferInit(output, MAX_PATH, 0)
 #if OS == "WINDOWS"
     outputStr.append("%s", "file:///")
 #else
@@ -651,7 +651,7 @@ public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
 #end
     }
 
-    var outputStr = StringInit(output, MAX_PATH, 0)
+    var outputStr = StringBufferInit(output, MAX_PATH, 0)
     while(*uri) {
         if(*uri == '%') {
             if(uri[1] == '2') {

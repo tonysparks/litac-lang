@@ -7,9 +7,9 @@ import "std/system"
 import "std/array"
 import "std/map"
 import "std/hash"
+import "std/string/buffer"
 import "std/string"
-import "std/string_view"
-import "std/string_buffer"
+import "std/string/builder"
 import "std/profile"
 import "std/http"
 
@@ -88,7 +88,7 @@ public func RunLitac(options: *LitaOptions) : i32 {
 report:
     var totalTime = SystemTimeMSec() - startTime
 
-    var sb = StringBufferInit(1024)
+    var sb = StringBuilderInit(1024)
     defer sb.free()
 
     if(!lita.result.errors.empty()) {
@@ -192,7 +192,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     if(parser.hasOption("help")) {
         {
-            var sb = StringBufferInit()
+            var sb = StringBuilderInit()
             defer sb.free()
 
             parser.printHelp(sb)
@@ -265,7 +265,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     if(parser.hasOption("maxMemory")) {
         var memoryStr = parser.getOption("maxMemory").value
-        var view = StringViewInit(memoryStr)
+        var view = StringInit(memoryStr)
 
         options.maxMemory = strtol(memoryStr, null, 10)
         if(view.indexOf("GB") > -1 || view.indexOf("GiB") > -1 ||
@@ -342,7 +342,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     }
 
     if(strnlen(options.srcPath, MAX_PATH) == 0) {
-        var path = StringViewInit(options.inputFile, MAX_PATH)
+        var path = StringInit(options.inputFile, MAX_PATH)
         var index = path.lastIndexOfAt("/src/", .len = 5)
         if(index > -1) {
             StringCopy(.src = options.inputFile, .dest = options.srcPath, .size = index + 5)
@@ -385,7 +385,7 @@ terminate:
 
 err_print:
     {
-        var sb = StringBufferInit()
+        var sb = StringBuilderInit()
         defer sb.free()
 
         parser.printHelp(sb)
@@ -467,7 +467,7 @@ func RunPkgInstall(options: *LitaOptions, pm: *PackageManager) : i32 {
     }
 
     var temp: [MAX_PATH]char;
-    var build = StringInit(temp, MAX_PATH, 0)
+    var build = StringBufferInit(temp, MAX_PATH, 0)
     build.format("%s/.build.json", options.projectPath)
 
     var file = File{}

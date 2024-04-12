@@ -3,9 +3,9 @@ import "std/assert"
 import "std/array"
 import "std/map"
 import "std/hash"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 import "std/mem"
 import "std/profile"
 import "std/regex"
@@ -49,7 +49,7 @@ public struct CallContext {
     pp: *Preprocessor
     checker: *TypeChecker
     comp: *CompStmt
-    buffer: StringBuffer
+    buffer: StringBuilder
 
     resolveSymbols: bool
 }
@@ -115,9 +115,9 @@ public func (this: *Preprocessor) free() {
 
 @profile
 public func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
-    var code = StringViewInit(comp.expr.buffer, comp.expr.length)
+    var code = StringInit(comp.expr.buffer, comp.expr.length)
     if(comp.isScriptLoad && comp.expr.length > 2) {
-        var filename = StringView{
+        var filename = String{
             comp.expr.buffer,
             comp.expr.length,
         }

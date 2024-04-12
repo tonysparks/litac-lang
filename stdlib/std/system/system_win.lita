@@ -29,8 +29,8 @@ typedef struct _stat FileStat;
 
 import "std/libc"
 import "std/assert"
+import "std/string/buffer"
 import "std/string"
-import "std/string_view"
 
 import "std/system"
 
@@ -120,12 +120,12 @@ public func _GetFullPathName(fileName: *const char, output: [MAX_PATH]char) : *c
 public func _Mkdir(dir: *const char) : bool {
     CreateDirectoryA(dir, null)
 
-    var view = StringViewInit(dir)
+    var view = StringInit(dir)
     // we have to do this non-sense because tinycc stat doesn't like
     // trailing /
     if(view.endsWith("/")) {
         var path = [MAX_PATH]char{0}
-        var normalized = StringInit(path, MAX_PATH, 0)
+        var normalized = StringBufferInit(path, MAX_PATH, 0)
         normalized.format("%.*s", view.length - 1, view.buffer)
         return FileExists(normalized.cStr())
     }

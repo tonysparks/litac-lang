@@ -1,6 +1,6 @@
-import "std/string_view"
-import "std/string_buffer"
 import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
 import "std/array"
 import "std/mem"
 import "std/json"
@@ -63,20 +63,20 @@ public struct PackageId {
     versionLength: i32
 }
 
-public func (this: *PackageId) repo() : StringView {
-    return StringViewInit(this.id + this.repoOffset, this.repoLength)
+public func (this: *PackageId) repo() : String {
+    return StringInit(this.id + this.repoOffset, this.repoLength)
 }
 
-public func (this: *PackageId) name() : StringView {
-    return StringViewInit(this.id + this.nameOffset, this.nameLength)
+public func (this: *PackageId) name() : String {
+    return StringInit(this.id + this.nameOffset, this.nameLength)
 }
 
-public func (this: *PackageId) version() : StringView {
-    return StringViewInit(this.id + this.versionOffset, this.versionLength)
+public func (this: *PackageId) version() : String {
+    return StringInit(this.id + this.versionOffset, this.versionLength)
 }
 
 public func PackageIdFromString(id: *const char, pkgId: *PackageId) : bool {
-    var view = StringViewInit(id)
+    var view = StringInit(id)
     var nameIndex = view.indexOfAt(SEPARATOR, .len = SEPARATOR_LENGTH, .fromIndex = 0)
     if(nameIndex < 0) {
         goto invalid
@@ -199,7 +199,7 @@ public func ParsePackage(
         for(var i = 0; i < dyLibs.size(); i+=1) {
             var dyLibNode = dyLibs.at(i)
             if(dyLibNode && dyLibNode.isString()) {
-                var path = StringBufferInit(MAX_PATH, pm.allocator)
+                var path = StringBuilderInit(MAX_PATH, pm.allocator)
                 path.append("%s", dyLibNode.asString())
                 pkg.dynamicLibraries.add(path.cStr())
             }
@@ -234,7 +234,7 @@ public func ParsePackageId(
     var nameLen = strlen(name)
     var versionLen = strlen(version)
 
-    var sb = StringBufferInit(repoLen + nameLen + versionLen + (SEPARATOR_LENGTH*2)+1, allocator)
+    var sb = StringBuilderInit(repoLen + nameLen + versionLen + (SEPARATOR_LENGTH*2)+1, allocator)
     defer sb.free()
 
     sb.append("%s%s%s%s%s", repo, SEPARATOR, name, SEPARATOR, version)

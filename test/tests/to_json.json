@@ -18,7 +18,7 @@
                 import "std/json";
                 import "std/json/to_json";
                 import "std/json/from_json";
-                import "std/string_buffer";
+                import "std/string/builder";
                 import "std/array"
                 import "std/io";
                 import "std/libc";
@@ -58,7 +58,7 @@
                 test.another.array.add(1)
                 test.another.array.add(2)
 
-                var sb = StringBufferInit(1024)
+                var sb = StringBuilderInit(1024)
                 test.toJson(&sb)
                 var json = sb.cStr()
                 // printf("Json: %s\n", json)
@@ -71,7 +71,7 @@
                 import "std/json";
                 import "std/json/to_json";
                 import "std/json/from_json";
-                import "std/string_buffer";
+                import "std/string/builder";
                 import "std/array"
                 import "std/io";
                 import "std/libc";
@@ -99,7 +99,7 @@
                 array.add(test1)
                 array.add(test2)
 
-                var sb = StringBufferInit(1024)
+                var sb = StringBuilderInit(1024)
                 array.toJson(&sb)
                 var json = sb.cStr()
                 assert(strcmp(json, """[{"aStr":"Hello World","aInt":42},{"aStr":"Hello World2","aInt":242}]""") == 0);
@@ -111,10 +111,10 @@
                 import "std/json";
                 import "std/json/to_json";
                 import "std/json/from_json";
-                import "std/string_buffer";
+                import "std/string/builder";
                 import "std/map";
                 import "std/hash";
-                import "std/string";
+                import "std/string/buffer";
                 import "std/io";
                 import "std/libc";
 
@@ -138,7 +138,7 @@
                 var map = StrMap<Test>(Test{})
                 map.put("Hi", test)
 
-                var sb = StringBufferInit(1024)
+                var sb = StringBuilderInit(1024)
                 map.toJson(&sb)
                 var json = sb.cStr()
                 //printf("Json: %s\n", json)
@@ -165,7 +165,7 @@
                 import "std/json";
                 import "std/json/to_json";
                 import "std/json/from_json";
-                import "std/string_buffer";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
 
@@ -216,7 +216,7 @@
                     .aBool: true,
                 };
 
-                var sb = StringBufferInit(1024)
+                var sb = StringBuilderInit(1024)
                 test.toJson(&sb)
                 var json = sb.cStr()
                 //printf("Json: %s\n", json)

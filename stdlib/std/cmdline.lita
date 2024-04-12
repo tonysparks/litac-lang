@@ -1,8 +1,8 @@
 import "std/array"
 import "std/io"
 import "std/mem"
-import "std/string_buffer"
-import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
 import "std/libc" as c
 
 const MAX_MESSAGE_SIZE = 256
@@ -146,13 +146,13 @@ public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
     return CmdParserStatus.OK
 }
 
-public func (p: *CmdParser) printHelp(sb: *StringBuffer) {
+public func (p: *CmdParser) printHelp(sb: *StringBuilder) {
     if(p.header) {
         sb.append("%s\n", p.header)
     }
 
     var name: [256]char;
-    var nameStr = StringInit(name, 256, 0);
+    var nameStr = StringBufferInit(name, 256, 0);
 
     for(var i = 0; i < p.options.size(); i += 1) {
         var opt = &p.options.elements[i]

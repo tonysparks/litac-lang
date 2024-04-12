@@ -1,6 +1,6 @@
 import "std/libc"
 import "std/mem"
-import "std/string_buffer"
+import "std/string/builder"
 
 public enum LogLevel {
     TRACE,
@@ -73,7 +73,7 @@ public func Panic(format: *const char, ...) {
 }
 
 
-public func EscapeName(name: *const char, len: i32, sb: *StringBuffer) : *char {
+public func EscapeName(name: *const char, len: i32, sb: *StringBuilder) : *char {
     sb.appendStrn(name, len)
     for(var i = 0; i < sb.length;) {
         var c = sb.buffer[i]

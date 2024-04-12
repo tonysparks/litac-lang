@@ -1,5 +1,5 @@
-import "std/string_view"
 import "std/string"
+import "std/string/buffer"
 import "std/libc"
 import "std/mem"
 
@@ -41,62 +41,62 @@ public struct WebRequest {
 }
 
 
-public func (this: *WebRequest) getBody(): StringView {
-    return StringView {
+public func (this: *WebRequest) getBody(): String {
+    return String {
         .buffer = this.msg.body.ptr,
         .length = this.msg.body.len as (i32),
     }
 }
 
 
-public func (this: *WebRequest) getMethod(): StringView {
-    return StringView {
+public func (this: *WebRequest) getMethod(): String {
+    return String {
         .buffer = this.msg.method.ptr,
         .length = this.msg.method.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getUri(): StringView {
-    return StringView {
+public func (this: *WebRequest) getUri(): String {
+    return String {
         .buffer = this.msg.uri.ptr,
         .length = this.msg.uri.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getQuery(): StringView {
-    return StringView {
+public func (this: *WebRequest) getQuery(): String {
+    return String {
         .buffer = this.msg.query.ptr,
         .length = this.msg.query.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getProto(): StringView {
-    return StringView {
+public func (this: *WebRequest) getProto(): String {
+    return String {
         .buffer = this.msg.proto.ptr,
         .length = this.msg.proto.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getMessage(): StringView {
-    return StringView {
+public func (this: *WebRequest) getMessage(): String {
+    return String {
         .buffer = this.msg.message.ptr,
         .length = this.msg.message.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getHeader(header: *const char): StringView {
+public func (this: *WebRequest) getHeader(header: *const char): String {
     var value = mg_http_get_header(this.msg, header)
     if(!value) {
-        return StringView{}
+        return String{}
     }
 
-    return StringView {
+    return String {
         .buffer = value.ptr,
         .length = value.len as (i32),
     }
 }
 
-public func (this: *WebRequest) getQueryValue(key: *const char, result: *String): bool {
+public func (this: *WebRequest) getQueryValue(key: *const char, result: *StringBuffer): bool {
     var value = mg_http_get_var(&this.msg.query, key, result.buffer, result.remaining())
     if(value < 0) {
         return false
@@ -106,9 +106,9 @@ public func (this: *WebRequest) getQueryValue(key: *const char, result: *String)
     return true
 }
 
-public func (this: *WebRequest) getQueryValueCopy(key: *const char, length: u32 = 128): String {
+public func (this: *WebRequest) getQueryValueCopy(key: *const char, length: u32 = 128): StringBuffer {
     var buffer = this.context.allocator.alloc(sizeof(:char) * length) as (*char)
-    var result = StringInit(buffer, length as (i32), 0)
+    var result = StringBufferInit(buffer, length as (i32), 0)
     this.getQueryValue(key, &result)
     return result
 }

@@ -1,6 +1,6 @@
 
 fn EmitJsonFunctions(sym) {
-   emit("public func (this: *%s) toJson(sb: *StringBuffer) : bool { return false; }\n", sym.name, sym.name)
+   emit("public func (this: *%s) toJson(sb: *StringBuilder) : bool { return false; }\n", sym.name, sym.name)
    emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool { return false; }\n", sym.name, sym.name)
 
    return true

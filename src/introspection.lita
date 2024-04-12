@@ -1,8 +1,8 @@
 import "std/assert"
 import "std/system"
 import "std/libc"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
+import "std/string"
 import "std/array"
 import "std/map"
 import "std/hash"
@@ -32,7 +32,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
 
 
     var filename = [MAX_PATH]char{0}
-    var moduleName = StringViewInit("type")
+    var moduleName = StringInit("type")
     if(!FindModulePath(this.lita, moduleName, filename)) {
         this.lita.result.addError(SrcPos{}, "could not find builtin module 'type' on the system path.")
         return;
@@ -44,8 +44,8 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
         return;
     }
 
-    var sb = StringBufferInit(2048*8, this.lita.allocator)
-    var scratch = StringBufferInit(1024, this.lita.allocator)
+    var sb = StringBuilderInit(2048*8, this.lita.allocator)
+    var scratch = StringBuilderInit(1024, this.lita.allocator)
     var onlyTagged = this.lita.options.typeOption == TypeInfoOption.TAGGED
 
     var maxTypes = NextTypeId()
@@ -168,7 +168,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
             // TEMP: Remove once all types are implemented
             if(!typeInfo) {
                 if(checker.lita.result.hasErrors()) {
-                    var sb = StringBufferInit()
+                    var sb = StringBuilderInit()
                     for(var i = 0; i < checker.lita.result.errors.size(); i+=1) {
                         var error = checker.lita.result.errors.get(i)
                         PrintError(sb, error)
@@ -191,7 +191,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
     }
 }
 
-func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym: *Symbol) {
+func (this: *Introspect) emitFunc(sb: *StringBuilder, scratch: *StringBuilder, sym: *Symbol) {
     var type = sym.type
     assert(type.kind ==  TypeKind.FUNC)
 
@@ -237,7 +237,7 @@ func (this: *Introspect) emitFunc(sb: *StringBuffer, scratch: *StringBuffer, sym
     """, type.typeid, sym.name.length, sym.name.buffer, type.typeid, isVararg ? "true": "false", returnTypeid, scratch.cStr(), numOfParams)
 }
 
-func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym: *Symbol) {
+func (this: *Introspect) emitType(sb: *StringBuilder, scratch: *StringBuilder, sym: *Symbol) {
     scratch.clear()
 
     var type = sym.type
@@ -452,7 +452,7 @@ func (this: *Introspect) emitType(sb: *StringBuffer, scratch: *StringBuffer, sym
 
 }
 
-func (this: *Introspect) emitPrimitiveType(sb: *StringBuffer, type: *TypeInfo) {
+func (this: *Introspect) emitPrimitiveType(sb: *StringBuilder, type: *TypeInfo) {
     switch(type.kind) {
         default: {}
         case TypeKind.BOOL:

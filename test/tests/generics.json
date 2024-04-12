@@ -659,17 +659,17 @@
         {
             "name": "Generic With Typedef Generic",
             "definitions": `
-                import "std/string";
+                import "std/string/buffer";
                 import "std/map";
                 import "std/hash"
 
-                public typedef Map<i32, String> as StringMap
+                public typedef Map<i32, StringBuffer> as XStringMap
 
                 public func (this: *Map<K, V>) exec<K,V>() {
                 }
             `,
             "code": `
-                var test = StrMap<StringMap>(StringMap{})
+                var test = StrMap<XStringMap>(XStringMap{})
                 test.exec()
 
             `,
@@ -677,7 +677,7 @@
         {
             "name": "Generic With Generic",
             "definitions": `
-                import "std/string";
+                import "std/string/buffer";
                 import "std/map";
                 import "std/hash"
 
@@ -685,7 +685,7 @@
                 }
             `,
             "code": `
-                var test = StrMap<Map<i32, String>>(Map<i32, String>{})
+                var test = StrMap<Map<i32, StringBuffer>>(Map<i32, StringBuffer>{})
                 test.exec()
 
             `
@@ -694,17 +694,17 @@
         {
             "name": "Generic With Typedef Generic with alias",
             "definitions": `
-                import "std/string" as str;
+                import "std/string/buffer" as str;
                 import "std/map";
                 import "std/hash"
 
-                public typedef Map<i32, str::String> as StringMap
+                public typedef Map<i32, str::StringBuffer> as XStringMap
 
                 public func (this: *Map<K, V>) exec<K,V>() {
                 }
             `,
             "code": `
-                var test = StrMap<StringMap>(StringMap{})
+                var test = StrMap<XStringMap>(XStringMap{})
                 test.exec()
 
             `,
@@ -712,7 +712,7 @@
         {
             "name": "Generic With Generic with alias",
             "definitions": `
-                import "std/string" as str;
+                import "std/string/buffer" as str;
                 import "std/map";
                 import "std/hash"
 
@@ -720,7 +720,7 @@
                 }
             `,
             "code": `
-                var test = StrMap<Map<i32, str::String>>(Map<i32, str::String>{})
+                var test = StrMap<Map<i32, str::StringBuffer>>(Map<i32, str::StringBuffer>{})
                 test.exec()
 
             `
@@ -729,11 +729,11 @@
         {
             "name": "Generic With Typedef Generic with alias2",
             "definitions": `
-                import "std/string" as str;
+                import "std/string/buffer" as str;
                 import "std/map" as m;
                 import "std/hash"
 
-                public typedef m::Map<i32, str::String> as StringMap
+                public typedef m::Map<i32, str::StringBuffer> as StringMap
 
                 public func (this: *m::Map<K, V>) exec<K,V>() {
                 }
@@ -747,7 +747,7 @@
         {
             "name": "Generic With Generic with alias2",
             "definitions": `
-                import "std/string" as str;
+                import "std/string/buffer" as str;
                 import "std/map" as m;
                 import "std/hash"
 
@@ -755,7 +755,7 @@
                 }
             `,
             "code": `
-                var test = m::StrMap<m::Map<i32, str::String>>(m::Map<i32, str::String>{})
+                var test = m::StrMap<m::Map<i32, str::StringBuffer>>(m::Map<i32, str::StringBuffer>{})
                 test.exec()
 
             `
@@ -788,7 +788,7 @@
         {
             "name": "Generic With Generic with alias2",
             "definitions": `
-                import "std/string" as str;
+                import "std/string/buffer" as str;
                 import "std/map" as m;
                 import "std/hash"
 
@@ -796,7 +796,7 @@
                 }
             `,
             "code": `
-                var test = m::StrMap<m::Map<i32, str::String>>(m::Map<i32, str::String>{})
+                var test = m::StrMap<m::Map<i32, str::StringBuffer>>(m::Map<i32, str::StringBuffer>{})
                 test.exec()
 
             `

@@ -1,4 +1,4 @@
-import "std/string_buffer"
+import "std/string/builder"
 import "std/libc"
 
 import "phase_result"
@@ -109,7 +109,7 @@ public const errorCodeText = []*const char {
 }
 
 
-public func PrintError(sb: *StringBuffer, error: PhaseError) {
+public func PrintError(sb: *StringBuilder, error: PhaseError) {
     if(!error.pos.lineStart) {
         sb.append("%s\n", error.message)
         return;

@@ -19,8 +19,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
-            import "std/string";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -68,8 +68,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
-            import "std/string";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -116,13 +116,109 @@
         `
     },
     {
-        "name": "From Json Array string_buffer Value",
+        "name": "From Json Array string_builder Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string/builder";
+            import "std/string/buffer";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+        `,
+        "code": `
+            var json = """
+            ["1","2","3","4"]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit()
+
+            var test = ArrayInit<StringBuilder>(32)
+            defer test.free()
+            test.fromJson(&context, node)
+
+            assert(test.size() == 4)
+            assert(strcmp(test.getPtr(0).cStr(), "1") == 0)
+            assert(strcmp(test.getPtr(1).cStr(), "2") == 0)
+            assert(strcmp(test.getPtr(2).cStr(), "3") == 0)
+            assert(strcmp(test.getPtr(3).cStr(), "4") == 0)
+
+            for(var i = 0; i < test.size(); i+=1) {
+                test.getPtr(i).free()
+            }
+
+        `
+    },
+    {
+        "name": "From Json Array string_view Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
             import "std/string";
+            import "std/string/buffer";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/array";
+
+        `,
+        "code": `
+            var json = """
+            ["1","2","3","4"]
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit()
+
+            var test = ArrayInit<String>(32)
+            defer test.free()
+            test.fromJson(&context, node)
+
+            assert(test.size() == 4)
+            assert(strcmp(test.get(0).buffer, "1") == 0)
+            assert(strcmp(test.get(1).buffer, "2") == 0)
+            assert(strcmp(test.get(2).buffer, "3") == 0)
+            assert(strcmp(test.get(3).buffer, "4") == 0)
+
+            for(var i = 0; i < test.size(); i+=1) {
+                context.allocator.free(test.getPtr(i).buffer as (*void))
+            }
+
+        `
+    },
+    {
+        "name": "From Json Array string Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -158,102 +254,6 @@
             assert(strcmp(test.getPtr(3).cStr(), "4") == 0)
 
             for(var i = 0; i < test.size(); i+=1) {
-                test.getPtr(i).free()
-            }
-
-        `
-    },
-    {
-        "name": "From Json Array string_view Value",
-        "definitions": `
-            import "std/json";
-            import "std/json/from_json";
-            import "std/json/to_json";
-            import "std/string_view";
-            import "std/string";
-            import "std/io";
-            import "std/libc";
-            import "std/mem";
-            import "std/map";
-            import "std/array";
-
-        `,
-        "code": `
-            var json = """
-            ["1","2","3","4"]
-            """
-
-            var parser = JsonParser{}
-            parser.init()
-            defer parser.free()
-
-            var node = parser.parseJson(json)
-            defer if(node) node.free()
-
-            assert(node != null)
-            assert(!parser.hasError())
-
-            var context = JsonContextInit()
-
-            var test = ArrayInit<StringView>(32)
-            defer test.free()
-            test.fromJson(&context, node)
-
-            assert(test.size() == 4)
-            assert(strcmp(test.get(0).buffer, "1") == 0)
-            assert(strcmp(test.get(1).buffer, "2") == 0)
-            assert(strcmp(test.get(2).buffer, "3") == 0)
-            assert(strcmp(test.get(3).buffer, "4") == 0)
-
-            for(var i = 0; i < test.size(); i+=1) {
-                context.allocator.free(test.getPtr(i).buffer as (*void))
-            }
-
-        `
-    },
-    {
-        "name": "From Json Array string Value",
-        "definitions": `
-            import "std/json";
-            import "std/json/from_json";
-            import "std/json/to_json";
-            import "std/string_buffer";
-            import "std/string";
-            import "std/io";
-            import "std/libc";
-            import "std/mem";
-            import "std/map";
-            import "std/array";
-
-        `,
-        "code": `
-            var json = """
-            ["1","2","3","4"]
-            """
-
-            var parser = JsonParser{}
-            parser.init()
-            defer parser.free()
-
-            var node = parser.parseJson(json)
-            defer if(node) node.free()
-
-            assert(node != null)
-            assert(!parser.hasError())
-
-            var context = JsonContextInit()
-
-            var test = ArrayInit<String>(32)
-            defer test.free()
-            test.fromJson(&context, node)
-
-            assert(test.size() == 4)
-            assert(strcmp(test.getPtr(0).cStr(), "1") == 0)
-            assert(strcmp(test.getPtr(1).cStr(), "2") == 0)
-            assert(strcmp(test.getPtr(2).cStr(), "3") == 0)
-            assert(strcmp(test.getPtr(3).cStr(), "4") == 0)
-
-            for(var i = 0; i < test.size(); i+=1) {
                 context.allocator.free(test.getPtr(i).buffer as (*void))
             }
 
@@ -265,8 +265,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
-            import "std/string";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -312,8 +312,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
-            import "std/string";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -358,8 +358,8 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
-            import "std/string";
+            import "std/string/builder";
+            import "std/string/buffer";
             import "std/io";
             import "std/libc";
             import "std/mem";
@@ -368,7 +368,7 @@
 
             public func TestMaker(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
                 switch(type) {
-                    case typeof(:*Map<*const char, Map<*const char, String>>): {
+                    case typeof(:*Map<*const char, Map<*const char, StringBuffer>>): {
                         printf("Here in Make\n");
                         break;
                     }
@@ -400,7 +400,7 @@
 
             var context = JsonContextInit(.maker = TestMaker)
 
-            var test = StrMap<*Map<*const char, String>>(null)
+            var test = StrMap<*Map<*const char, StringBuffer>>(null)
             defer test.free()
             test.fromJson(&context, node)
 
@@ -415,12 +415,12 @@
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
-            import "std/string";
+            import "std/string/buffer";
 
         `,
         "code": `
@@ -454,33 +454,33 @@
         `
     },
     {
-        "name": "From Json Map String Ptr Value",
+        "name": "From Json Map StringBuffer Ptr Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
+            import "std/string/buffer";
             import "std/string";
-            import "std/string_view";
 
 
             public func TestMakerPtr(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
                 switch(type) {
-                    case typeof(:String): {
+                    case typeof(:StringBuffer): {
                         if(!json.isString()) {
                             return null;
                         }
 
-                        var str = StringViewInit(json.asString())
-                        var buffer = context.allocator.alloc(sizeof(:String) + ((str.length+1) * sizeof(:char)))
-                        var bufferStart = buffer + sizeof(:String)
+                        var str = StringInit(json.asString())
+                        var buffer = context.allocator.alloc(sizeof(:StringBuffer) + ((str.length+1) * sizeof(:char)))
+                        var bufferStart = buffer + sizeof(:StringBuffer)
                         StringCopy(.src = str.buffer, .dest = bufferStart as (*char),  .size = str.length + 1)
 
-                        var result = buffer as (*String)
+                        var result = buffer as (*StringBuffer)
                         result.length = str.length;
                         result.capacity = str.length;
                         result.buffer = bufferStart as (*char)
@@ -511,7 +511,7 @@
 
             var context = JsonContextInit(.makerPtr = TestMakerPtr)
 
-            var test = StrMap<*String>(String{})
+            var test = StrMap<*StringBuffer>(StringBuffer{})
             defer test.free()
             test.fromJson(&context, node)
 
@@ -526,19 +526,68 @@
         `
     },
     {
+        "name": "From Json Map StringBuffer Value",
+        "definitions": `
+            import "std/json";
+            import "std/json/from_json";
+            import "std/json/to_json";
+            import "std/string/builder";
+            import "std/io";
+            import "std/libc";
+            import "std/mem";
+            import "std/map";
+            import "std/string/buffer";
+            import "std/string";
+
+        `,
+        "code": `
+            var json = """
+            {
+
+                "aString": "4",
+                "aStringAgain": "8",
+            }
+            """
+
+            var parser = JsonParser{}
+            parser.init()
+            defer parser.free()
+
+            var node = parser.parseJson(json)
+            defer if(node) node.free()
+
+            assert(node != null)
+            assert(!parser.hasError())
+
+            var context = JsonContextInit()
+
+            var test = StrMap<StringBuffer>(StringBuffer{})
+            defer test.free()
+            test.fromJson(&context, node)
+
+            assert(strcmp(test.get("aString").buffer, "4") == 0)
+            assert(strcmp(test.get("aStringAgain").buffer, "8") == 0)
+
+            for(var it = test.iter(); it.hasNext();) {
+                var entry = it.next()
+                context.allocator.free(entry.value.buffer as (*void))
+            }
+
+        `
+    },
+    {
         "name": "From Json Map String Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
+            import "std/string/buffer";
             import "std/string";
-            import "std/string_view";
-
         `,
         "code": `
             var json = """
@@ -576,67 +625,18 @@
         `
     },
     {
-        "name": "From Json Map StringView Value",
+        "name": "From Json Map StringBuilder Value",
         "definitions": `
             import "std/json";
             import "std/json/from_json";
             import "std/json/to_json";
-            import "std/string_buffer";
+            import "std/string/builder";
             import "std/io";
             import "std/libc";
             import "std/mem";
             import "std/map";
+            import "std/string/buffer";
             import "std/string";
-            import "std/string_view";
-        `,
-        "code": `
-            var json = """
-            {
-
-                "aString": "4",
-                "aStringAgain": "8",
-            }
-            """
-
-            var parser = JsonParser{}
-            parser.init()
-            defer parser.free()
-
-            var node = parser.parseJson(json)
-            defer if(node) node.free()
-
-            assert(node != null)
-            assert(!parser.hasError())
-
-            var context = JsonContextInit()
-
-            var test = StrMap<StringView>(StringView{})
-            defer test.free()
-            test.fromJson(&context, node)
-
-            assert(strcmp(test.get("aString").buffer, "4") == 0)
-            assert(strcmp(test.get("aStringAgain").buffer, "8") == 0)
-
-            for(var it = test.iter(); it.hasNext();) {
-                var entry = it.next()
-                context.allocator.free(entry.value.buffer as (*void))
-            }
-
-        `
-    },
-    {
-        "name": "From Json Map StringBuffer Value",
-        "definitions": `
-            import "std/json";
-            import "std/json/from_json";
-            import "std/json/to_json";
-            import "std/string_buffer";
-            import "std/io";
-            import "std/libc";
-            import "std/mem";
-            import "std/map";
-            import "std/string";
-            import "std/string_view";
 
         `,
         "code": `
@@ -660,7 +660,7 @@
 
             var context = JsonContextInit()
 
-            var test = StrMap<StringBuffer>(StringBuffer{})
+            var test = StrMap<StringBuilder>(StringBuilder{})
             defer test.free()
             test.fromJson(&context, node)
 
@@ -680,7 +680,7 @@
                 import "std/json";
                 import "std/json/from_json";
                 import "std/json/to_json";
-                import "std/string_buffer";
+                import "std/string/builder";
                 import "std/io";
                 import "std/libc";
                 import "std/mem";

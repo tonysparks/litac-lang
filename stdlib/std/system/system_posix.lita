@@ -22,8 +22,8 @@
 
 import "std/libc"
 import "std/assert"
+import "std/string/buffer"
 import "std/string"
-import "std/string_view"
 import "std/system"
 
 
@@ -83,12 +83,12 @@ func mkdir(path: *const char, mode: mode_t) : i32;
 public func _Mkdir(dir: *const char) : bool {
     mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 
-    var view = StringViewInit(dir)
+    var view = StringInit(dir)
     // we have to do this non-sense because tinycc stat doesn't like
     // trailing /
     if(view.endsWith("/")) {
         var path = [MAX_PATH]char{0}
-        var normalized = StringInit(path, MAX_PATH, 0)
+        var normalized = StringBufferInit(path, MAX_PATH, 0)
         normalized.format("%.*s", view.length - 1, view.buffer)
         return FileExists(normalized.cStr())
     }

@@ -4,9 +4,9 @@ import "std/libc"
 import "std/assert"
 import "std/io"
 import "std/system"
-import "std/string"
+import "std/string/buffer"
 import "std/array"
-import "std/string_view"
+import "std/string"
 import "std/fs"
 
 
@@ -145,13 +145,13 @@ public func (this: *ZipFile) zipDir(
     baseName: *const char,
     level: ZipCompressionLevel = ZipCompressionLevel.DEFAULT_LEVEL) : ZipStatus {
 
-    var basePath = StringViewInit(pathToZip, len)
+    var basePath = StringInit(pathToZip, len)
 
     var tempArch:[MAX_PATH]char;
     var tempPath:[MAX_PATH]char;
 
-    var archiveName = StringInit(tempArch, MAX_PATH, 0)
-    var path = StringInit(tempPath, MAX_PATH, 0)
+    var archiveName = StringBufferInit(tempArch, MAX_PATH, 0)
+    var path = StringBufferInit(tempPath, MAX_PATH, 0)
     path.format("%.*s", basePath.length, basePath.buffer)
 
     return this.zipFolder(baseName, &basePath, &archiveName, &path, level)
@@ -159,9 +159,9 @@ public func (this: *ZipFile) zipDir(
 
 func (this: *ZipFile) zipFolder(
     baseName: *const char,
-    basePath: *StringView,
-    archiveName: *String,
-    path: *String,
+    basePath: *String,
+    archiveName: *StringBuffer,
+    path: *StringBuffer,
     level: ZipCompressionLevel) : ZipStatus {
 
     var handle: FileHandle{}
@@ -248,7 +248,7 @@ public func (this: *ZipFile) unzip(
 
     var temp:[MAX_PATH]char;
     var temp2:[MAX_PATH]char;
-    var path = StringInit(temp, MAX_PATH, 0)
+    var path = StringBufferInit(temp, MAX_PATH, 0)
 
     var baseLen = strlen(fileStat.m_filename);
     if( (flags | ZipFlags.INCLUDE_ZIPFILE_NAME_ON_UNZIP) > 0) {
@@ -260,7 +260,7 @@ public func (this: *ZipFile) unzip(
             continue
         }
 
-        var filename = StringInit(fileStat.m_filename + baseLen, MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE - baseLen, -1)
+        var filename = StringBufferInit(fileStat.m_filename + baseLen, MZ_ZIP_MAX_ARCHIVE_FILENAME_SIZE - baseLen, -1)
         path.format("%s/%.*s", dest, filename.length, filename.buffer)
         var cPath = path.cStr()
 

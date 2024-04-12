@@ -1,6 +1,6 @@
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 import "std/mem"
 import "std/array"
 import "std/libc"
@@ -337,7 +337,7 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
         goto err;
     }
     var moduleName = Identifier {
-        .str = p.strings.internStringView(moduleNameStr.value.str),
+        .str = p.strings.internString(moduleNameStr.value.str),
         .token = *moduleNameStr
     }
 
@@ -354,7 +354,7 @@ func (p: *Parser) importDeclaration() : *ImportDecl {
             goto err;
         }
 
-        alias.str = p.strings.internStringView(identifier.value.str)
+        alias.str = p.strings.internString(identifier.value.str)
         alias.token = *identifier
     }
 
@@ -405,7 +405,7 @@ func (p: *Parser) varDeclaration() : *Decl {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 
@@ -466,7 +466,7 @@ func (p: *Parser) funcDeclaration() : *Decl {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 
@@ -561,7 +561,7 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
     }
     if(p.check(TokenType.IDENTIFIER)) {
         var id = p.identifier();
-        name.str = p.strings.internStringView(id.value.str)
+        name.str = p.strings.internString(id.value.str)
         name.token = id
     }
     else {
@@ -619,7 +619,7 @@ func (p: *Parser) enumDeclaration() : *Decl {
         goto err;
     }
     var name = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 
@@ -669,7 +669,7 @@ func (p: *Parser) typedefDeclaration() : *Decl {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 
@@ -696,7 +696,7 @@ func (p: *Parser) noteDeclaration() : *Decl {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 
@@ -744,7 +744,7 @@ func (p: *Parser) paramDeclaration() : *ParameterDecl {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 
@@ -969,7 +969,7 @@ func (p: *Parser) offsetOf() : *Expr {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(fieldName.value.str),
+        .str = p.strings.internString(fieldName.value.str),
         .token = *fieldName
     }
 
@@ -1542,7 +1542,7 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
     defer p.preprocessorLevel -= 1
 
     var type: InternedString = EMPTY_STR
-    var scriptExpr = StringView{};
+    var scriptExpr = String{};
 
     if(p.match(TokenType.IF)) {
         type = IF
@@ -1575,7 +1575,7 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
     if(type.equals(IF) || type.equals(ELSEIF) || type.equals(STATIC_IF)) {
         // read the expression
         var currentLine = pos.lineNumber
-        var script = StringBufferInit(128, p.allocator)
+        var script = StringBuilderInit(128, p.allocator)
 
         var stream = pos.end
         while(*stream) {
@@ -1764,7 +1764,7 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
         return NewCompStmt(pos, p.pos(), type, message.str, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
     }
     else if(type.equals(END)) {
-        return NewCompStmt(pos, p.pos(), type, StringView{}, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
+        return NewCompStmt(pos, p.pos(), type, String{}, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
     }
     else {
         p.errorAtToken(p.peek(), ErrorCode.INVALID_COMP_STMT)
@@ -2092,7 +2092,7 @@ func (p: *Parser) gotoStatement() : *Stmt {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(label.value.str),
+        .str = p.strings.internString(label.value.str),
         .token = *label
     }
 
@@ -2118,7 +2118,7 @@ func (p: *Parser) tryLabelStatement() : *Stmt {
     }
 
     var name = Identifier {
-        .str = p.strings.internStringView(label.value.str),
+        .str = p.strings.internString(label.value.str),
         .token = *label
     }
 
@@ -2208,7 +2208,7 @@ func (p: *Parser) identifierType(disambiguate: bool) : *TypeSpec {
     }
 
     var buffer:[MAX_SYMBOL_NAME]char;
-    var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    var sb = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
     sb.appendStrn(name.str.buffer, name.str.length)
 
     var spec = NewTypeSpec(TypeSpecKind.NAME, pos, p.typeAllocator)
@@ -2233,7 +2233,7 @@ func (p: *Parser) qualifiedIdentifierType(disambiguate: bool) : *TypeSpec {
     }
 
     var buffer:[MAX_SYMBOL_NAME]char;
-    var sb = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    var sb = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
     sb.appendStrn(name.str.buffer, name.str.length)
 
     while(p.match(TokenType.COLON_COLON)) {
@@ -2401,7 +2401,7 @@ func (p: *Parser) structArguments(arguments: *Array<*InitArgExpr>) : bool {
                 goto err;
             }
 
-            fieldName.str = p.strings.internStringView(identifier.value.str)
+            fieldName.str = p.strings.internString(identifier.value.str)
             fieldName.token = *identifier
 
             if(p.check(TokenType.COLON)) {
@@ -2445,7 +2445,7 @@ func (p: *Parser) arguments(arguments: *Array<CallArg>) : bool {
                     goto err;
                 }
 
-                arg.argName.str = p.strings.internStringView(identifier.value.str)
+                arg.argName.str = p.strings.internString(identifier.value.str)
                 arg.argName.token = *identifier
 
                 if(p.check(TokenType.COLON)) {
@@ -2492,7 +2492,7 @@ func (p: *Parser) genericParameters(arguments: *Array<GenericParam>) : bool {
             }
 
             var name = Identifier {
-                .str = p.strings.internStringView(typeName.value.str),
+                .str = p.strings.internString(typeName.value.str),
                 .token = *typeName
             }
 
@@ -2668,7 +2668,7 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
         }
 
         var fieldName = Identifier {
-            .str = p.strings.internStringView(identifier.value.str),
+            .str = p.strings.internString(identifier.value.str),
             .token = *identifier
         }
 
@@ -2706,7 +2706,7 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
                 }
 
                 var fieldName = Identifier {
-                    .str = p.strings.internStringView(identifier.value.str),
+                    .str = p.strings.internString(identifier.value.str),
                     .token = *identifier
                 }
 
@@ -2792,7 +2792,7 @@ func (p: *Parser) noteFieldStatement() : FieldStmt {
     }
 
     var fieldName = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 
@@ -2839,7 +2839,7 @@ func (p: *Parser) enumFieldEntryDecl() : *EnumFieldEntryDecl {
     }
 
     var fieldName = Identifier {
-        .str = p.strings.internStringView(identifier.value.str),
+        .str = p.strings.internString(identifier.value.str),
         .token = *identifier
     }
 

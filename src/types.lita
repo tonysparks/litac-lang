@@ -1,6 +1,6 @@
-import "std/string_view"
-import "std/string_buffer"
 import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
 import "std/array"
 import "std/assert"
 import "std/libc"
@@ -92,7 +92,7 @@ const typeKindText = [TypeKind.MAX_TYPE_KINDS + 1]*const char {
 }
 
 public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
-    var view = StringViewInit(str, len)
+    var view = StringInit(str, len)
     for(var i = TypeKind.BOOL; i < TypeKind.MAX_TYPE_KINDS; i += 1) {
         if(view.equals(typeKindText[i])) {
             return i;
@@ -541,12 +541,12 @@ public func (this: *TypeInfo) getTypeOf() : *TypeInfo {
 }
 
 public func (this: *TypeInfo) toStringDebug() : *const char {
-    var sb = StringBufferInit(256)
+    var sb = StringBuilderInit(256)
     this.toString(sb)
     return sb.cStr()
 }
 
-public func (this: *TypeInfo) toString(sb: *StringBuffer, fullyQualify: bool = false) {
+public func (this: *TypeInfo) toString(sb: *StringBuilder, fullyQualify: bool = false) {
     if(!this) return;
 
     switch(this.kind) {
@@ -1519,7 +1519,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
             var aggInfo = this
 
             var buffer:[MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+            var nameStr = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
 
 
             if(aggInfo.sym && fullyQualify) {
@@ -1671,7 +1671,7 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *I
     return name
 }
 
-public func (this: *TypeInfo) getBaseNameView() : StringView {
+public func (this: *TypeInfo) getBaseNameView() : String {
     var index = this.name.view.indexOf("<", 1)
     if(index > -1) {
         return this.name.view.substring(0, index)
@@ -2111,7 +2111,7 @@ public func (this: *TypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, met
     memset(result, 0, MAX_SYMBOL_NAME)
     this.getBaseName(result, alias);
 
-    var buffer = StringInit(result, MAX_SYMBOL_NAME)
+    var buffer = StringBufferInit(result, MAX_SYMBOL_NAME)
     buffer.appendStrn("_", 1)
     buffer.appendStrn(methodName.buffer, methodName.length)
 

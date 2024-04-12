@@ -2,7 +2,7 @@ import "std/libc"
 import "std/array"
 import "std/map"
 import "std/mem"
-import "std/string"
+import "std/string/buffer"
 import "std/assert"
 import "std/hash"
 
@@ -257,7 +257,7 @@ public func (this: *Scope) importSymbolWithAlias(importSrcPos: SrcPos,
 
     var buffer = [MAX_SYMBOL_NAME]char{};
 
-    var fullName = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    var fullName = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
     fullName.appendStrn(alias.buffer, alias.length)
     fullName.appendStrn("::", 2)
     fullName.appendStrn(name.buffer, name.length)

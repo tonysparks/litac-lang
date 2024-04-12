@@ -1,7 +1,7 @@
 import "std/io"
-import "std/string_buffer"
-import "std/string_view"
+import "std/string/builder"
 import "std/string"
+import "std/string/buffer"
 import "std/libc"
 import "std/array"
 import "std/map"
@@ -25,8 +25,8 @@ import "intern"
 
 public struct CGen {
     lita: using *Lita
-    buf: StringBuffer
-    line: StringBuffer
+    buf: StringBuilder
+    line: StringBuilder
     format: bool
     indent: i32
     aggregateLevel: i32
@@ -377,7 +377,7 @@ func (this: using *CGen) emitTraitDecls() {
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
         var vtableName = [MAX_SYMBOL_NAME]char;
-        var vtableNameStr = StringInit(vtableName, MAX_SYMBOL_NAME, 0)
+        var vtableNameStr = StringBufferInit(vtableName, MAX_SYMBOL_NAME, 0)
         var escapedName = this.escapeNameStr(traitSym.name)
         vtableNameStr.format("%s%.*s__%.*s",
             this.options.cPrefix,
@@ -497,7 +497,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
 }
 
 func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]char) : *const char {
-    var name = StringInit(buffer, MAX_SYMBOL_NAME, 0)
+    var name = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
     name.format("__tmp%d", this.tmpVar)
     this.tmpVar += 1
 
@@ -507,25 +507,25 @@ func (this: using *CGen) allocTemp(type: *TypeInfo, buffer: [MAX_SYMBOL_NAME]cha
     return name.cStr()
 }
 
-public func (this: using *CGen) escapeNameStr(name: InternedString) : StringView {
-    var sb = StringBufferInit(256, this.allocator)
+public func (this: using *CGen) escapeNameStr(name: InternedString) : String {
+    var sb = StringBuilderInit(256, this.allocator)
     EscapeName(name.buffer, name.length, sb)
-    return StringView {
+    return String {
         .buffer = sb.buffer,
         .length = sb.length
     }
 }
 
-func (this: using *CGen) escapeNameChars(name: *const char) : StringView {
-    var sb = StringBufferInit(256, this.allocator)
+func (this: using *CGen) escapeNameChars(name: *const char) : String {
+    var sb = StringBuilderInit(256, this.allocator)
     EscapeName(name, strlen(name), sb)
-    return StringView {
+    return String {
         .buffer = sb.buffer,
         .length = sb.length
     }
 }
 
-func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
+func (this: using *CGen) escapeName(type: *TypeInfo) : String {
     if(IsAggregate(type)) {
         return this.escapeNameStr(type.name)
     }
@@ -543,7 +543,7 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
             }
         }
         // function pointer
-        return StringView {
+        return String {
             .buffer = "_",
             .length = 1
         }
@@ -552,7 +552,7 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : StringView {
     return type.name.view
 }
 
-func (this: using *CGen) baseTypeName(name: StringView) : StringView {
+func (this: using *CGen) baseTypeName(name: String) : String {
     // strip module name
     var index = name.lastIndexOfAt("::")
     if(index >= 0) {
@@ -687,7 +687,7 @@ public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
 public func (this: using *CGen) cType(type: *TypeInfo,
                                       isCast: bool = false,
                                       decay: bool = false) : *const char {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type
@@ -734,8 +734,8 @@ public func (this: using *CGen) cType(type: *TypeInfo,
             var baseInfo = arrayInfo.getBaseType()
             var baseName = this.cType(baseInfo)
 
-            var buf = StringBufferInit(256, this.allocator)
-            var line = StringBufferInit(256, this.allocator)
+            var buf = StringBuilderInit(256, this.allocator)
+            var line = StringBuilderInit(256, this.allocator)
             do {
                 if(arrayInfo.length < 0) {
                     if(arrayInfo.numOfElements) {
@@ -774,7 +774,7 @@ public func (this: using *CGen) cType(type: *TypeInfo,
         }
         case TypeKind.FUNC_PTR: {
             var funcInfo = type
-            var params = StringBufferInit(512, this.allocator)
+            var params = StringBuilderInit(512, this.allocator)
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
             }
@@ -804,7 +804,7 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                                    name: *const char,
                                    decay: bool = false) : *const char {
 
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type
@@ -852,8 +852,8 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             var baseInfo = arrayInfo.getBaseType()
             var baseName = this.cType(baseInfo)
 
-            var buf = StringBufferInit(256, this.allocator)
-            var line = StringBufferInit(256, this.allocator)
+            var buf = StringBuilderInit(256, this.allocator)
+            var line = StringBuilderInit(256, this.allocator)
             do {
                 if(arrayInfo.length == 0) {
                     if(arrayInfo.numOfElements) {
@@ -906,7 +906,7 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
         }
         case TypeKind.FUNC_PTR: {
             var funcInfo = type
-            var params = StringBufferInit(512, this.allocator)
+            var params = StringBuilderInit(512, this.allocator)
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
             }
@@ -932,7 +932,7 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     }
 }
 
-func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : StringView {
+func (this: using *CGen) foreignName(decl: *Decl, defaultName: String) : String {
     if(!decl) {
         return defaultName
     }
@@ -958,7 +958,7 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: StringView) : Str
     Outputs the C name for the symbol
 */
 public func (this: using *CGen) cName(sym: *Symbol) : *const char {
-    var sb = StringBufferInit(256, this.allocator)
+    var sb = StringBuilderInit(256, this.allocator)
 
     var declName = sym.name.view
     if(IsFuncLike(sym.type)) {
@@ -998,14 +998,14 @@ public func (this: using *CGen) cTypeName(type: *TypeInfo) : *const char {
 
     if(!type.sym) {
         var typeName = this.escapeName(type)
-        var sb = StringBufferInit(256, this.allocator)
+        var sb = StringBuilderInit(256, this.allocator)
         return this.prefix(typeName, sb)
     }
 
     return this.cName(type.sym)
 }
 
-public func (this: using *CGen) prefix(name: StringView, sb: *StringBuffer) : *const char {
+public func (this: using *CGen) prefix(name: String, sb: *StringBuilder) : *const char {
     sb.appendStr(this.options.cPrefix)
     sb.appendStrn(name.buffer, name.length)
     return sb.cStrConst()
@@ -1086,7 +1086,7 @@ public func (this: using *CGen) flush() {
     }
 }
 
-public func (this: using *CGen) emitNameStr(name: StringView) {
+public func (this: using *CGen) emitNameStr(name: String) {
     buf.appendStrn(name.buffer, name.length)
 }
 
@@ -1239,7 +1239,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
         var ccOption = CCompilerOption{
             .os = OS.Lita_OSType_OTHER,
             .arch = Arch.Lita_ArchType_UNKNOWN,
-            .options = StringView{},
+            .options = String{},
         }
 
         var temp:[MAX_PATH]char;
@@ -1262,11 +1262,11 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             {
                 var index = value.indexOf("{relativePath}", len)
                 if(index > -1 && note.startPos.filename != null) {
-                    var buffer = StringBufferInit(MAX_PATH, this.lita.allocator)
+                    var buffer = StringBuilderInit(MAX_PATH, this.lita.allocator)
                     buffer.append("%.*s", value.length, value.buffer)
 
                     buffer.replace(index, index + len, FileParent(note.startPos.filename, temp))
-                    value = buffer.asStringView()
+                    value = buffer.asString()
                 }
             }
 
@@ -1334,7 +1334,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(note.type.name.equals(&CFILE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
-        var filenameStr = StringInit(filename, MAX_PATH, 0)
+        var filenameStr = StringBufferInit(filename, MAX_PATH, 0)
         var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
@@ -1389,7 +1389,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     else if(note.type.name.equals(&CINCLUDE)) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
-        var filenameStr = StringInit(filename, MAX_PATH, 0)
+        var filenameStr = StringBufferInit(filename, MAX_PATH, 0)
         var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
@@ -1908,7 +1908,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitNotes(&decl.attributes)
 
             var name: [MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
+            var nameStr = StringBufferInit(name, MAX_SYMBOL_NAME, 0)
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")
@@ -1933,7 +1933,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitNotes(&decl.attributes)
 
             var name: [MAX_SYMBOL_NAME]char;
-            var nameStr = StringInit(name, MAX_SYMBOL_NAME, 0)
+            var nameStr = StringBufferInit(name, MAX_SYMBOL_NAME, 0)
             nameStr.setStrn(decl.name.str.buffer, decl.name.str.length)
 
             var aliasNote = decl.getNote("alias")

@@ -1,6 +1,7 @@
 import "std/mem"
 import "std/mem/linear_allocator"
-import "std/string_buffer"
+import "std/string/builder"
+import "std/string/buffer"
 import "std/string"
 import "std/json"
 import "std/libc"
@@ -24,9 +25,9 @@ public struct LspServer {
 
     lita: *Lita
 
-    message: StringBuffer
-    output: StringBuffer
-    outbound: StringBuffer
+    message: StringBuilder
+    output: StringBuilder
+    outbound: StringBuilder
 
     isInitialized: bool
     isRunning: bool
@@ -50,9 +51,9 @@ public func (this: *LspServer) init(lita: *Lita) {
     this.requestAllocator.init(defaultAllocator.alloc(size), size)
     this.applicationAllocator.init(defaultAllocator.alloc(size), size)
 
-    this.message = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
-    this.output = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
-    this.outbound = StringBufferInit(IN_BUFFER_SIZE, defaultAllocator)
+    this.message = StringBuilderInit(IN_BUFFER_SIZE, defaultAllocator)
+    this.output = StringBuilderInit(IN_BUFFER_SIZE, defaultAllocator)
+    this.outbound = StringBuilderInit(IN_BUFFER_SIZE, defaultAllocator)
 
     this.workspace.init(this, this.appAlloc())
 
@@ -458,7 +459,7 @@ public func (this: *LspServer) writeDiagnostic(docUri: *const char, fullBuild: b
 public func (this: *LspServer) writeErrorResponse(id: i64, code: i32, format: *const char, ...) {
     var args: va_list;
     va_start(args, format);
-    var sb = StringBufferInit(512, this.requestAlloc())
+    var sb = StringBuilderInit(512, this.requestAlloc())
     sb.appendArgs(format, args)
     va_end(args);
 
@@ -478,7 +479,7 @@ public func (this: *LspServer) writeResponse(msg: *JsonNode) {
     this.outbound.clear()
 
     //var header = [256]char{0};
-    //var headerStr = StringInit(header, 256)
+    //var headerStr = StringBufferInit(header, 256)
 
     var jsonStr = msg.print(this.output)
     var length = this.output.length
