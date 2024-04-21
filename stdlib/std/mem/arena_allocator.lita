@@ -17,6 +17,7 @@ public struct ArenaAllocator {
 
     numberOfArenas: u32
     numberOfBytesAllocated: usize
+    numberOfAllocations: u32
 }
 
 struct Arena {
@@ -48,6 +49,8 @@ public func (this: *ArenaAllocator) init(size: usize = PAGE_SIZE,
     this.numberOfArenas = 1
     this.numberOfBytesAllocated = size;
     this.pageSize = size;
+
+    this.numberOfAllocations = 0
 }
 
 public func (this: *ArenaAllocator) free() {
@@ -74,6 +77,7 @@ public func (this: *ArenaAllocator) free() {
 }
 
 public func (this: *ArenaAllocator) clear() {
+    this.numberOfAllocations = 0
     var a = this.arena
 
     while(a != null) {
@@ -107,6 +111,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
         while(a != null) {
             if((a.size - a.current) > size) {
                 a.current += size
+                this.numberOfAllocations+=1
                 return (a.region + (a.current - size)) as (*void)
             }
 
@@ -188,6 +193,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
         while(a != null) {
             if((a.size - a.current) > size) {
                 a.current += size
+                this.numberOfAllocations+=1
                 return (a.region + (a.current - size)) as (*void)
             }
 

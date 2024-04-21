@@ -13,6 +13,73 @@
         }
     `,
     "tests": [
+
+        {
+            "name": "Array Init",
+            "definitions": `
+                import "std/mem"
+                import "std/mem/linear_allocator"
+                import "std/mem/track_allocator"
+                import "std/mem/debug_allocator" as d
+                import "std/array"
+            `,
+            "code": `
+
+            `
+        },
+
+        {
+            "name": "Generic Function With Alias",
+            "definitions": `
+                import "a"
+                import "b" as b
+            `,
+            "modules": [
+                {
+                    "name" : "a",
+                    "program" : `
+                        import "std/array"
+                        public struct TestStruct {
+                            a: i32
+                            aa: A
+                        }
+
+                        public struct A {
+                            array: Array<*TestStruct>
+                        }
+                    `
+                },
+                {
+                    "name" : "b",
+                    "program" : `
+                        import "std/array"
+                        #if (DEBUG)
+                        public struct TestStruct {
+                            a: i32
+                            b: A
+                        }
+                        #else
+                        public struct TestStruct {
+                            a: i32
+                            b: A
+                            filename: [32]char
+                            lineno: i32
+                        }
+                        #end
+
+                        public struct A {
+                            array: Array<*TestStruct>
+                        }
+                    `
+                },
+            ],
+            "code": `
+                var ta = TestStruct{}
+                var tb = b::TestStruct{}
+            `
+        },
+
+
         {
             "name": "Generics Type Inference from Union Generic Type with typedef",
             "definitions": `
@@ -31,16 +98,16 @@
                 assert(test(t) == 4)
             `,
         },
-        /*
+
         {
             "name": "Array Init",
             "definitions": `
-                      import "std/array"
-                  `,
+                import "std/array"
+            `,
             "code": `
-                      var array = ArrayInit<i32>()
-                  `
-          },
+                var array = ArrayInit<i32>()
+            `
+        },
 
 
         {
@@ -409,8 +476,8 @@
                 assert(o.x == 8)
             `,
         },
-*/
-        /*
+
+
         {
             "name" : "Traits With No Impl",
             "definitions": `
@@ -434,7 +501,7 @@
             "code": `
 
             `,
-        },*/
+        },
 
     ]
 }

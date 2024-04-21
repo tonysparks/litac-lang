@@ -18,6 +18,7 @@ public struct TrackAllocator {
     alloc: Allocator
     decorated: *const Allocator
     allocations: Array<*Allocation>
+    totalAllocations: usize
 }
 
 public func (d: *TrackAllocator) init(alloc: *const Allocator = defaultAllocator) {
@@ -50,7 +51,9 @@ public func (d: *TrackAllocator) free() {
         allocation.addr = mem + sizeof(:Allocation)
         allocation.size = size
 
+        d.totalAllocations += allocationSize
         d.allocations.add(allocation)
+
         return allocation.addr;
     }
 
@@ -114,6 +117,7 @@ public func (d: *TrackAllocator) free() {
         allocation.addr = mem + sizeof(:Allocation)
         allocation.size = size
 
+        d.totalAllocations += allocationSize
         d.allocations.add(allocation)
 
         return allocation.addr;
@@ -171,8 +175,9 @@ func TrackFree(alloc: *const Allocator, ptr: *void) {
         var allocation = track.allocations.get(i)
         if(allocation.addr == addr) {
             track.allocations.removeAt(i)
+            track.totalAllocations -= (allocation.size + sizeof(:Allocation))
             track.decorated.free(allocation)
-            c::printf("Here!\n")
+
             found = true
             break
         }
@@ -184,7 +189,6 @@ func TrackFree(alloc: *const Allocator, ptr: *void) {
     if(!found) {
         track.decorated.free(ptr)
     }
-
 }
 
 
