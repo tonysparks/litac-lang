@@ -44,8 +44,8 @@ public struct ModuleImport {
 }
 
 public struct Module {
-    id: ModuleId        // TODO: don't make a separate allocation
-    text: StringBuffer        // text of modules file
+    id: ModuleId          // TODO: don't make a separate allocation
+    text: StringBuffer    // text of modules file
     ast: *ModuleStmt
     symbols: Scope
     currentScope: *Scope

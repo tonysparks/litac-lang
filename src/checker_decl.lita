@@ -669,21 +669,23 @@ func (this: *TypeChecker) checkLabels() {
 }
 
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
-    defer this.references.addTypeReferenceBySymbol(funcDecl.startPos, funcDecl.sym)
+    var sym = funcDecl.sym
+
+    defer this.references.addTypeReferenceBySymbol(funcDecl.startPos, sym)
 
     var errors = this.errors()
 
-    this.enterModule(funcDecl.sym.declared)
+    this.enterModule(sym.declared)
     defer this.leaveModule()
 
     this.pushScope(Scope{})
     defer this.popScope()
 
     // keep track of which function we are currently parsing
-    this.funcDeclStack.add(funcDecl.sym.type)
+    this.funcDeclStack.add(sym.type)
     defer this.funcDeclStack.pop()
 
-    var hasGenerics = funcDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
+    var hasGenerics = sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
     if(hasGenerics) {
         this.genericParamStack.add(funcDecl.genericParams)
     }

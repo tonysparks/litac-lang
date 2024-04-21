@@ -13,7 +13,243 @@
         }
     `,
     "tests": [
-        /*{
+        {
+            "name": "Generics Type Inference from Union Generic Type with typedef",
+            "definitions": `
+                union Test<V> {
+                    a : V
+                }
+
+                typedef Test<V> as Foo<V>
+
+                func test<T>(t:Foo<T>):T {
+                    return t.a
+                }
+            `,
+            "code": `
+                var t = Test<i32> { 4 }
+                assert(test(t) == 4)
+            `,
+        },
+        /*
+        {
+            "name": "Array Init",
+            "definitions": `
+                      import "std/array"
+                  `,
+            "code": `
+                      var array = ArrayInit<i32>()
+                  `
+          },
+
+
+        {
+            "name": "Generic of same type name in different module struct member",
+            "definitions": `
+                import "a";
+                import "b" as b;
+                `,
+            "modules": [
+                {
+                    "name" : "a",
+                    "program" : `
+                        import "std/array"
+                        public struct TestStruct {
+                            a: i32
+                            aa: A
+                        }
+
+                        public struct A {
+                            array: Array<*TestStruct>
+                        }
+                    `
+                },
+                {
+                    "name" : "b",
+                    "program" : `
+                        import "std/array"
+                        public struct TestStruct {
+                            a: i32
+                            b: B
+                        }
+
+                        public struct B {
+                            array: Array<*TestStruct>
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var a = A{}
+                var b = b::B{}
+            `,
+        },
+        {
+            "name": "Generic of same type name in different module member",
+            "definitions": `
+                import "a";
+                import "b" as b;
+                `,
+            "modules": [
+                {
+                    "name" : "a",
+                    "program" : `
+                        import "std/array"
+                        public struct TestStruct {
+                            a: i32
+                        }
+
+                        var array: Array<*TestStruct>
+                    `
+                },
+                {
+                    "name" : "b",
+                    "program" : `
+                        import "std/array"
+                        public struct TestStruct {
+                            a: i32
+                        }
+
+                        var array: Array<*TestStruct>
+                    `
+                }
+            ],
+            "code": `
+                var a = TestStruct{}
+                var b = b::TestStruct{}
+            `,
+        },
+        {
+            "name": "Generic With Generic with alias2",
+            "definitions": `
+                import "std/string/buffer" as str;
+                import "std/map" as m;
+                import "std/hash"
+
+                public func (this: *m::Map<K, V>) exec<K,V>() {
+                }
+            `,
+            "code": `
+                var test = m::StrMap<m::Map<i32, str::StringBuffer>>(m::Map<i32, str::StringBuffer>{})
+                test.exec()
+
+            `
+        },
+        {
+            "name": "Generics with conflicting type names",
+            "definitions": `
+                import "map1" as m1
+                import "map2" as m2
+
+            `,
+            "modules": [
+                {
+                    "name": "map1",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value * 2
+                        }
+                    `
+                },
+                {
+                    "name": "map2",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var k1 = "Hello";
+                var v2 = "Hi"
+                var m1 = m1::Map {
+                    .key = k1,
+                    .value = 32
+                }
+
+                var m2 = m2::Map {
+                    .key = 44,
+                    .value = v2
+                }
+
+                assert(m1.key == k1)
+                assert(m1.value == 32)
+
+                assert(m2.key == 44)
+                assert(m2.value == v2)
+
+                assert(m1.call() == 64)
+                assert(m2.call() == v2)
+
+            `
+        },
+        {
+            "name": "Generics with conflicting type names generic",
+            "definitions": `
+                import "map1" as m1
+                import "map2" as m2
+
+            `,
+            "modules": [
+                {
+                    "name": "map1",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value
+                        }
+                    `
+                },
+                {
+                    "name": "map2",
+                    "program": `
+                        public struct Map<K, V> {
+                            key: K
+                            value: V
+                        }
+
+                        public func (this: *Map<K,V>) call<K,V>() : V {
+                            return this.value
+                        }
+                    `
+                }
+            ],
+            "code": `
+                var k1 = "Hello";
+                var v2 = "Hi"
+                var m1 = m1::Map {
+                    .key = k1,
+                    .value = m2::Map {
+                        .key = 44,
+                        .value = v2
+                    }
+                }
+
+                assert(m1.key == k1)
+                assert(m1.value.key == 44)
+                assert(m1.value.value == v2)
+
+                assert(m1.call().key == 44)
+                assert(m1.value.call() == v2)
+
+            `
+        },
+        {
             "name" : "Generic Type Infer Return Type Simple",
             "definitions": `
 
@@ -80,7 +316,7 @@
                 var o = Other {.x = t }
                 assert(doSomething(o) == 8)
             `,
-        },*/
+        },
         {
             "name" : "Generic Type Infer Return Type With Generic Type",
             "definitions": `
@@ -109,7 +345,7 @@
                 var o = doSomething(t)
                 assert(o.x == 8)
             `,
-            "error" : "unable to infer generic parameters ['T', 'Y'] due to return type of 'Other<Y>' containing a generic argument that can not be inferred"
+            "error" : "unable to infer generic parameters ['T', 'Y'] due to return type of 'lita_test::Other<Y>' containing a generic argument that can not be inferred"
         },
         {
             "name" : "Generic Type Infer Return Type With Generic Type Partial",
@@ -145,79 +381,6 @@
             `,
         },
         {
-            "name": "From Json Map String Ptr Value",
-            "definitions": `
-                import "std/json";
-                import "std/json/from_json";
-                import "std/json/to_json";
-                import "std/string/builder";
-                import "std/io";
-                import "std/libc";
-                import "std/mem";
-                import "std/map";
-                import "std/string/buffer";
-                import "std/string";
-
-
-                public func TestMakerPtr(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
-                    switch(type) {
-                        case typeof(:StringBuffer): {
-                            if(!json.isString()) {
-                                return null;
-                            }
-
-                            var str = StringInit(json.asString())
-                            var buffer = context.allocator.alloc(sizeof(:StringBuffer) + ((str.length+1) * sizeof(:char)))
-                            var bufferStart = buffer + sizeof(:StringBuffer)
-                            StringCopy(.src = str.buffer, .dest = bufferStart as (*char),  .size = str.length + 1)
-
-                            var result = buffer as (*StringBuffer)
-                            result.length = str.length;
-                            result.capacity = str.length;
-                            result.buffer = bufferStart as (*char)
-                            return result
-                        }
-                        default: return null;
-                    }
-                }
-            `,
-            "code": `
-                var json = """
-                {
-
-                    "aString": "4",
-                    "aStringAgain": "8",
-                }
-                """
-
-                var parser = JsonParser{}
-                parser.init()
-                defer parser.free()
-
-                var node = parser.parseJson(json)
-                defer if(node) node.free()
-
-                assert(node != null)
-                assert(!parser.hasError())
-
-                var context = JsonContextInit(.makerPtr = TestMakerPtr)
-
-                var test = StrMap<*StringBuffer>(StringBuffer{})
-                defer test.free()
-                test.fromJson(&context, node)
-
-                assert(strcmp(test.get("aString").cStr(), "4") == 0)
-                assert(strcmp(test.get("aStringAgain").cStr(), "8") == 0)
-
-                for(var it = test.iter(); it.hasNext();) {
-                    var entry = it.next()
-                    context.allocator.free(entry.value as (*void))
-                }
-
-            `
-        },
-        /*
-        {
             "name" : "Generic Type Infer Return Type With Generic Type No Inferrence",
             "definitions": `
 
@@ -245,7 +408,8 @@
                 var o = doSomething<Thing, i32>(t)
                 assert(o.x == 8)
             `,
-        },*/
+        },
+*/
         /*
         {
             "name" : "Traits With No Impl",

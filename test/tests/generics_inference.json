@@ -726,7 +726,7 @@
                 var o = doSomething(t)
                 assert(o.x == 8)
             `,
-            "error" : "unable to infer generic parameters ['T', 'Y'] due to return type of 'Other<Y>' containing a generic argument that can not be inferred"
+            "error" : "unable to infer generic parameters ['T', 'Y'] due to return type of 'lita_test::Other<Y>' containing a generic argument that can not be inferred"
         },
         {
             "name" : "Generic Type Infer Return Type With Generic Type No Inferrence",

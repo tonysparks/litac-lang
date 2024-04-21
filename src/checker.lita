@@ -507,7 +507,12 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         }
         case StmtKind.FUNC_DECL: {
             var funcDecl = decl as (*FuncDecl)
-            if(funcDecl.flags & FuncFlags.IS_METHOD) {
+            var isMethod = funcDecl.flags & FuncFlags.IS_METHOD
+
+            // Methods name must be built using resolved
+            // symbols of the parameter lists, therefore we must
+            // delay adding the symbol to the scope until resolution time
+            if(isMethod) {
                 var buffer = [MAX_SYMBOL_NAME]char;
                 if(!funcDecl.getName(buffer)) {
                     this.result.addError(decl.startPos, "invalid function name or invalid method caller type")
@@ -1062,11 +1067,11 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
             var sym = symbols[index]
             var str = sym.name.view
 
-            var start = str.indexOf("_")
+            var start = str.indexOf("_", 1)
             if(start < 0) {
                 continue
             }
-            var end = str.indexOf("<")
+            var end = str.indexOf("<", 1)
 
             // this atleast has the same name, now check if
             // the function types are compatible

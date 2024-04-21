@@ -1529,11 +1529,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
 
             var baseName = aggInfo.name.view
             if(fullyQualify) {
-                var index = aggInfo.name.view.indexOf("<", 1)
-
-                if(index > -1) {
-                    baseName = aggInfo.name.view.substring(0, index)
-                }
+                baseName = aggInfo.getBaseNameView()
             }
 
             nameStr.append("%.*s", baseName.length, baseName.buffer)
@@ -1625,12 +1621,19 @@ public func (this: *TypeInfo) getEnumFieldIndex(name: InternedString) : i32 {
 }
 
 
-public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *InternedString = null) : *const char {
+public func (this: *TypeInfo) getBaseName(
+    name: [MAX_SYMBOL_NAME]char,
+    includePackage: bool = false,
+    alias: *InternedString = null) : *const char {
+
     assert(this != null)
 
     var index = 0
-    var n = this.name.buffer
-    var len = this.name.length
+
+    var baseName = includePackage ? this.name.view : this.getBaseNameView()
+
+    var n = baseName.buffer
+    var len = baseName.length
 
     var packageName: *InternedString = null;
 
@@ -1672,11 +1675,19 @@ public func (this: *TypeInfo) getBaseName(name: [MAX_SYMBOL_NAME]char, alias: *I
 }
 
 public func (this: *TypeInfo) getBaseNameView() : String {
-    var index = this.name.view.indexOf("<", 1)
+    var baseName = this.name.view
+
+    var index = baseName.indexOf("<", 1)
     if(index > -1) {
-        return this.name.view.substring(0, index)
+        baseName = baseName.substring(0, index)
     }
-    return this.name.view
+
+    index = baseName.lastIndexOfAt("::", 2)
+    if(index > -1) {
+        baseName = baseName.substring(index + 2)
+    }
+
+    return baseName
 }
 
 
@@ -2107,9 +2118,14 @@ public func (this: *TypeInfo) getFieldPathByType(type: *TypeInfo, path: *FieldPa
 Given a method name, this will return the function name equivalent, which is:
 AggregateName_MethodName
 """)
-public func (this: *TypeInfo) getFunctionName(result: [MAX_SYMBOL_NAME]char, methodName: InternedString, alias: *InternedString) : *const char {
+public func (this: *TypeInfo) getFunctionName(
+    result: [MAX_SYMBOL_NAME]char,
+    methodName: InternedString,
+    alias: *InternedString,
+    includePackage:bool = false) : *const char {
+
     memset(result, 0, MAX_SYMBOL_NAME)
-    this.getBaseName(result, alias);
+    this.getBaseName(result, includePackage, alias);
 
     var buffer = StringBufferInit(result, MAX_SYMBOL_NAME)
     buffer.appendStrn("_", 1)
@@ -2133,6 +2149,7 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
 
     var funcNameInterned = strings.internCopy(funcName)
     var methodSym = module.getFuncType(funcNameInterned)
+
     if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
         // look up if this is an aliased type
         var alias = module.getImportAlias(this.sym.declared)
@@ -2148,14 +2165,53 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
             }
         }
         else {
+            // First try with baseName only (example: alias::Map_init)
             this.getFunctionName(funcName, methodName, alias)
 
             funcNameInterned = strings.internCopy(funcName)
             methodSym = module.getFuncType(funcNameInterned)
+
+            // If that wasn't found, now try with full name (example: alias::std::map::Map_init)
+            if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
+                this.getFunctionName(funcName, methodName, alias, .includePackage = true)
+
+                funcNameInterned = strings.internCopy(funcName)
+                methodSym = module.getFuncType(funcNameInterned)
+            }
         }
 
         // check again!
         if(methodSym == null || methodSym.kind != SymbolKind.FUNC) {
+            // if this is an aggregate, we could have using members,
+            // so we should get to see if any of the using members
+            // match a method
+            if(!IsAggregate(this)) {
+                goto not_found;
+            }
+
+            for(var i = 0; i < this.aggDecl.fields.size(); i+=1) {
+                var field = this.aggDecl.fields.getPtr(i)
+                switch(field.kind) {
+                    case StmtKind.VAR_FIELD_DECL: {
+                        var varField = field.varField
+
+                        if(!varField.attributes.isUsing) {
+                            continue
+                        }
+                        if(!varField.type.typeInfo) {
+                            continue
+                        }
+
+                        var result = varField.type.typeInfo.getMethod(strings, module, methodName)
+                        if(result.symbol) {
+                            return result
+                        }
+
+                        break
+                    }
+                }
+            }
+
             goto not_found;
         }
     }
