@@ -36,7 +36,7 @@ public struct Workspace {
     docAllocator: TrackAllocator
 
     lsp: *LspServer
-    rootPath: *const char
+    rootPath: [MAX_PATH]char
     openedDocuments: Map<*const char, *Document>
 }
 
@@ -49,7 +49,8 @@ public func (this: *Workspace) init(lsp: *LspServer, alloc: *const Allocator) {
 }
 
 public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char) {
-    this.rootPath = rootPath
+    StringCopy(rootPath, this.rootPath, MAX_PATH)
+
     var lita = this.lsp.lita
 
     var filepath = [MAX_PATH]char{0};

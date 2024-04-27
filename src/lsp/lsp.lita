@@ -137,13 +137,15 @@ public func (this: *LspServer) readMessage() {
             this.requestAllocator.totalAllocations
         )
 
+#if DEBUG
         var debugAllocator = defaultAllocator as (*d::DebugAllocator)
-        this.log("\tDebugAllocator Allocated: %lu KiB #Of Allocations: %d Freed: %lu KiB\n",
+        this.log("\tDebugAllocator Allocated: %lu KiB #Of Allocations: %d Freed: %lu KiB Currently Allocated: %lu KiB\n",
             debugAllocator.totalBytesAllocated / KiB,
             debugAllocator.totalAllocations,
-            debugAllocator.totalBytesFreed / KiB
+            debugAllocator.totalBytesFreed / KiB,
+            (debugAllocator.totalBytesAllocated - debugAllocator.totalBytesFreed) / KiB
         )
-
+#end
         // free memory
         defer this.requestAllocator.currentOffset = 0
     }
