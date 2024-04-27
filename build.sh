@@ -19,7 +19,7 @@ build_litac() {
 
     cd bootstrap
 
-    ./litacc -disableLine -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB -debug
+    ./litacc -disableLine -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
