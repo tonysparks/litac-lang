@@ -1,5 +1,6 @@
 import "std/mem"
-import "std/mem/linear_allocator"
+//import "std/mem/linear_allocator"
+import "std/mem/bucket_allocator"
 import "std/mem/track_allocator"
 //import "std/mem/debug_allocator" as d
 import "std/string/builder"
@@ -22,8 +23,8 @@ const IN_BUFFER_SIZE = 1024 * 1024 * 2
 const VERSION = "0.12" // TODO: read from a file at compile time; share with lita.main
 
 public struct LspServer {
-    requestAllocator: LinearAllocator
-    applicationAllocator: LinearAllocator
+    requestAllocator: BucketAllocator
+    applicationAllocator: BucketAllocator
 
     lita: *Lita
 
@@ -49,9 +50,12 @@ public func (this: *LspServer) init(lita: *Lita) {
         printf("Couldn't open log file!\n")
     }
 
-    var size: usize = 1024 * 1024 * 100;
-    this.requestAllocator.init(defaultAllocator.alloc(size), size)
-    this.applicationAllocator.init(defaultAllocator.alloc(size), size)
+    //var size: usize = 1024 * 1024 * 100;
+    //this.requestAllocator.init(defaultAllocator.alloc(size), size)
+    //this.applicationAllocator.init(defaultAllocator.alloc(size), size)
+    var size: usize = 1024 * 1024 * 2;
+    this.requestAllocator.init(defaultAllocator, size)
+    this.applicationAllocator.init(defaultAllocator, size)
 
     this.message = StringBuilderInit(IN_BUFFER_SIZE, defaultAllocator)
     this.output = StringBuilderInit(IN_BUFFER_SIZE, defaultAllocator)
@@ -73,12 +77,15 @@ public func (this: *LspServer) appAlloc() : *const Allocator {
 }
 
 public func (this: *LspServer) free() {
-    if(this.applicationAllocator.mem) {
-        defaultAllocator.free(this.applicationAllocator.mem)
-    }
-    if(this.requestAllocator.mem) {
-        defaultAllocator.free(this.requestAllocator.mem)
-    }
+    // if(this.applicationAllocator.mem) {
+    //     defaultAllocator.free(this.applicationAllocator.mem)
+    // }
+    // if(this.requestAllocator.mem) {
+    //     defaultAllocator.free(this.requestAllocator.mem)
+    // }
+    this.applicationAllocator.free()
+    this.requestAllocator.free()
+
     this.message.free()
     this.output.free()
 
