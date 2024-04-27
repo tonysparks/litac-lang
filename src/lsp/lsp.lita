@@ -1,7 +1,7 @@
 import "std/mem"
 import "std/mem/linear_allocator"
 import "std/mem/track_allocator"
-import "std/mem/debug_allocator" as d
+//import "std/mem/debug_allocator" as d
 import "std/string/builder"
 import "std/string/buffer"
 import "std/string"
@@ -136,7 +136,7 @@ public func (this: *LspServer) readMessage() {
             this.requestAllocator.totalBytesAllocated / KiB,
             this.requestAllocator.totalAllocations
         )
-
+/*
 #if DEBUG
         var debugAllocator = defaultAllocator as (*d::DebugAllocator)
         this.log("\tDebugAllocator Allocated: %lu KiB #Of Allocations: %d Freed: %lu KiB Currently Allocated: %lu KiB\n",
@@ -146,6 +146,7 @@ public func (this: *LspServer) readMessage() {
             (debugAllocator.totalBytesAllocated - debugAllocator.totalBytesFreed) / KiB
         )
 #end
+*/
         // free memory
         defer this.requestAllocator.currentOffset = 0
     }
