@@ -3,6 +3,7 @@ import "std/array"
 import "std/map"
 import "std/mem"
 import "std/string/buffer"
+import "std/string/builder"
 import "std/assert"
 import "std/hash"
 
@@ -67,7 +68,10 @@ public const MAX_SYMBOL_NAME = 256;
 
 public struct Symbol {
     kind: SymbolKind
+
     name: InternedString
+    qualifiedName: InternedString
+
     state: SymbolState
     decl: *Decl
     type: *TypeInfo
@@ -436,8 +440,13 @@ public func (this: *Scope) addSymbol(name: InternedString,
             flags |= SymbolFlags.IS_PRIVATE
     }
 
+    var qualifiedName = name
     if(isNewType) {
         flags |= SymbolFlags.IS_TYPE
+
+        if(!(flags & SymbolFlags.IS_BUILTIN)) {
+            qualifiedName = this.createQualifiedName(name)
+        }
     }
 
     var kind = SymbolKind.VAR
@@ -493,6 +502,7 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
     sym.kind = kind
     sym.name = name
+    sym.qualifiedName = qualifiedName
     sym.state = SymbolState.UNRESOLVED
     sym.decl = decl
     sym.declared = module
@@ -504,6 +514,25 @@ public func (this: *Scope) addSymbol(name: InternedString,
         symbolStorage.put(sym.name, sym)
     }
     return sym
+}
+
+public func (this: *Scope) createQualifiedName(name: InternedString) : InternedString {
+    var buffer:[MAX_SYMBOL_NAME]char;
+    var qualifiedNameBuffer = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
+
+    qualifiedNameBuffer.append("%.*s::%.*s",
+        this.module.id.packageName.length,
+        this.module.id.packageName.buffer,
+        name.length,
+        name.buffer
+    )
+
+    var qualifiedName = this.module.lita.strings.internCopy(
+        qualifiedNameBuffer.buffer,
+        qualifiedNameBuffer.length
+    )
+
+    return qualifiedName
 }
 
 // TEMP

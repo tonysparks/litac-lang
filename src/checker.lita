@@ -7,6 +7,7 @@ import "std/libc"
 import "std/system"
 import "std/map"
 import "std/hash"
+import "std/mem"
 
 import "types"
 import "types_new"
@@ -84,20 +85,20 @@ public struct TypeChecker {
     bypassing: bool // if the checker should bypass imported modules and look at all modules
 }
 
-public func (this: *TypeChecker) init(lita: *Lita) {
+public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) {
     this.lita = lita
     this.current = null
-    this.moduleStack.init(64, lita.allocator)
-    this.funcDeclStack.init(64, lita.allocator)
-    this.pendingValues.init(128, lita.allocator)
-    this.symbolTypes.init(256, lita.allocator)
-    this.symbolFuncs.init(256, lita.allocator)
-    this.symbolTraits.init(64, lita.allocator)
-    this.genericParamStack.init(128, lita.allocator)
-    this.genericTemplates.init(64, lita.allocator)
+    this.moduleStack.init(64, allocator)
+    this.funcDeclStack.init(64, allocator)
+    this.pendingValues.init(128, allocator)
+    this.symbolTypes.init(256, allocator)
+    this.symbolFuncs.init(256, allocator)
+    this.symbolTraits.init(64, allocator)
+    this.genericParamStack.init(128, allocator)
+    this.genericTemplates.init(64, allocator)
     this.genericContext.callsite = null
 
-    this.interfaceImpls.init(Array<Typeid>{}, 128, lita.allocator, 0)
+    this.interfaceImpls.init(Array<Typeid>{}, 128, allocator, 0)
 
     this.bypassing = false
 
@@ -507,7 +508,12 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
         }
         case StmtKind.FUNC_DECL: {
             var funcDecl = decl as (*FuncDecl)
-            if(funcDecl.flags & FuncFlags.IS_METHOD) {
+            var isMethod = funcDecl.flags & FuncFlags.IS_METHOD
+
+            // Methods name must be built using resolved
+            // symbols of the parameter lists, therefore we must
+            // delay adding the symbol to the scope until resolution time
+            if(isMethod) {
                 var buffer = [MAX_SYMBOL_NAME]char;
                 if(!funcDecl.getName(buffer)) {
                     this.result.addError(decl.startPos, "invalid function name or invalid method caller type")
@@ -1062,11 +1068,11 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
             var sym = symbols[index]
             var str = sym.name.view
 
-            var start = str.indexOf("_")
+            var start = str.indexOf("_", 1)
             if(start < 0) {
                 continue
             }
-            var end = str.indexOf("<")
+            var end = str.indexOf("<", 1)
 
             // this atleast has the same name, now check if
             // the function types are compatible

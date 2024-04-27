@@ -239,7 +239,7 @@
                 var x = X<i32> {44} as (X<f32>)
 
             `,
-            "error": "'X<i32>' can't be casted to 'X<f32>'"
+            "error": "'lita_test::X<i32>' can't be casted to 'lita_test::X<f32>'"
         },
         {
             "name": "Invalid union Casts",
@@ -253,7 +253,7 @@
                 var x = X<i32> {44} as (X<f32>)
 
             `,
-            "error": "'X<i32>' can't be casted to 'X<f32>'"
+            "error": "'lita_test::X<i32>' can't be casted to 'lita_test::X<f32>'"
         },
 
         {

@@ -1,5 +1,7 @@
 import "std/mem"
 import "std/mem/linear_allocator"
+import "std/mem/track_allocator"
+//import "std/mem/debug_allocator" as d
 import "std/string/builder"
 import "std/string/buffer"
 import "std/string"
@@ -116,9 +118,38 @@ public func (this: *LspServer) readMessage() {
     }
 
     var startTime = SystemTimeMSec()
-    defer this.log(">>> Request Handling Time: %.4fms\n\n", SystemTimeMSec() - startTime)
-    // free memory
-    defer this.requestAllocator.currentOffset = 0
+
+    defer {
+        this.log(">>> Request Handling Time: %.4fms\n\n", SystemTimeMSec() - startTime)
+
+        this.log("Memory stats:\n\tDocAllocator Allocated: %lu KiB #Of Allocations: %d\n",
+            this.workspace.docAllocator.totalAllocations / KiB,
+            this.workspace.docAllocator.allocations.size()
+        )
+
+        this.log("\tAppAllocator Allocated: %lu KiB #Of Allocations: %d\n",
+            this.applicationAllocator.totalBytesAllocated / KiB,
+            this.applicationAllocator.totalAllocations
+        )
+
+        this.log("\tReqAllocator Allocated: %lu KiB #Of Allocations: %d\n",
+            this.requestAllocator.totalBytesAllocated / KiB,
+            this.requestAllocator.totalAllocations
+        )
+/*
+#if DEBUG
+        var debugAllocator = defaultAllocator as (*d::DebugAllocator)
+        this.log("\tDebugAllocator Allocated: %lu KiB #Of Allocations: %d Freed: %lu KiB Currently Allocated: %lu KiB\n",
+            debugAllocator.totalBytesAllocated / KiB,
+            debugAllocator.totalAllocations,
+            debugAllocator.totalBytesFreed / KiB,
+            (debugAllocator.totalBytesAllocated - debugAllocator.totalBytesFreed) / KiB
+        )
+#end
+*/
+        // free memory
+        defer this.requestAllocator.currentOffset = 0
+    }
 
     this.log("Received message size: %d\n", size)
     this.message.reserve(size)
@@ -275,7 +306,10 @@ public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *
     var capabilities = """
     {
         "capabilities": {
-            "textDocumentSync": 2,
+            "textDocumentSync": {
+                "change": 2,
+                "openClose": true
+            },
             "definitionProvider": true,
             "documentSymbolProvider": true,
             "workspaceSymbolProvider": true,
@@ -312,12 +346,14 @@ public func (this: *LspServer) handleTextDocumentOpenMessage(msg: *JsonNode, par
 }
 
 public func (this: *LspServer) handleTextDocumentCloseMessage(msg: *JsonNode, params: *JsonNode) {
+    this.log("Closing doc!!!\n")
     var textDoc = params.getObject("textDocument")
     if(!textDoc) {
         return;
     }
 
     var uri = textDoc.getStr("uri", null)
+    this.log("Closing uri: %s\n", uri)
     this.workspace.closeDocument(uri)
 }
 
@@ -495,9 +531,7 @@ public func (this: *LspServer) writeResponse(msg: *JsonNode) {
 #end
     this.log("Sending: Len: %d %.*s\n", this.outbound.length, this.outbound.length, this.outbound.buffer)
 
-    //fwrite(header as (*const void), sizeof(:char), headerStr.length, stdout)
     fwrite(this.outbound.cStr() as (*const void), sizeof(:char), this.outbound.length, stdout)
-    //printf("%.*s", this.outbound.length, this.outbound.buffer)
     fflush(stdout)
 }
 

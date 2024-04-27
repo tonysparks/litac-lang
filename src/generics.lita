@@ -65,13 +65,17 @@ func GetGenericName(checker: *TypeChecker, typeSpec: *TypeSpec, str: *StringBuff
                     }
 
                     if(typeInfo && !typeInfo.name.empty()) {
-                        if(!IsPrimitive(typeInfo) && fullyQualified && sym) {
-                            var name = sym.declared.id.packageName
-                            str.append("%.*s::", name.length, name.buffer)
+                        if(sym && !isAlias) {
+                            str.appendStrn(sym.qualifiedName.buffer, sym.qualifiedName.length)
                         }
-
-                        var baseName = typeInfo.getBaseNameView()
-                        str.appendStrn(baseName.buffer, baseName.length)
+                        else {
+                            if(!IsPrimitive(typeInfo) && fullyQualified && sym) {
+                                var name = sym.declared.id.packageName
+                                str.append("%.*s::", name.length, name.buffer)
+                            }
+                            var baseName = typeInfo.getBaseNameView()
+                            str.appendStrn(baseName.buffer, baseName.length)
+                        }
                         nameSet = true
                     }
                 }
@@ -98,22 +102,9 @@ func GetGenericName(checker: *TypeChecker, typeSpec: *TypeSpec, str: *StringBuff
             }
 
             if(sym && !nameSet && useSymbolName) {
-                var isGeneric = (sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE));
-                var isBuiltin = (sym.flags & SymbolFlags.IS_BUILTIN)
-                var includePackage = !isGeneric && !isBuiltin && fullyQualified && !IsPrimitive(sym.type);
+                str.appendStrn(sym.qualifiedName.buffer, sym.qualifiedName.length)
+                nameSet = true;
 
-                // include the fully qualified package name if not already included
-                if(includePackage) {
-                    var name = sym.declared.id.packageName
-                    str.append("%.*s::", name.length, name.buffer)
-                }
-
-                // if this isn't a generic type, we want to use the symbol name,
-                // otherwise the TypeSpec name should be used
-                if(!isGeneric && useSymbolName) {
-                    str.append("%.*s", sym.name.length, sym.name.buffer)
-                    nameSet = true;
-                }
             }
 
             if(!nameSet) {
@@ -207,9 +198,6 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             goto err;
         }
 
-
-        genericName.clear()
-        GetGenericName(checker, name, genericName, false)
         var newNameStr = checker.lita.strings.internCopy(genericName.cStrConst(), genericName.length)
 
         genericSym = checker.current.symbols.addSymbol(newNameStr,

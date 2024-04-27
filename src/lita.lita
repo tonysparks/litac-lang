@@ -299,7 +299,7 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
     // Re-type check the module
     {
         var checker = TypeChecker{}
-        checker.init(this)
+        checker.init(this, module.allocator)
 
         checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
 
@@ -385,7 +385,7 @@ public func (this: *Lita) typeCheck(module: *Module, flags: i32 = 0) : bool {
     defer this.endCapture(MetricType.TYPE_CHECKING)
 
     var checker = TypeChecker{}
-    checker.init(this)
+    checker.init(this, this.allocator)
 
     this.programSymbols = checker.typeCheck(module, flags)
 

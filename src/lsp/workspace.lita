@@ -10,6 +10,8 @@ import "std/mem"
 import "std/system"
 import "std/assert"
 import "std/ascii"
+import "std/mem/track_allocator"
+import "std/mem/arena_allocator"
 
 import "lita"
 import "phase_result"
@@ -22,6 +24,7 @@ import "types"
 import "common"
 import "intern"
 
+
 import "lsp/lsp"
 import "lsp/protocol"
 import "lsp/references"
@@ -30,8 +33,10 @@ import "lsp/document"
 
 public struct Workspace {
     allocator: *const Allocator
+    docAllocator: TrackAllocator
+
     lsp: *LspServer
-    rootPath: *const char
+    rootPath: [MAX_PATH]char
     openedDocuments: Map<*const char, *Document>
 }
 
@@ -39,10 +44,13 @@ public func (this: *Workspace) init(lsp: *LspServer, alloc: *const Allocator) {
     this.allocator = alloc
     this.lsp = lsp
     this.openedDocuments = StrMap<*Document>(null, 64, this.allocator)
+
+    this.docAllocator.init(defaultAllocator)
 }
 
 public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char) {
-    this.rootPath = rootPath
+    StringCopy(rootPath, this.rootPath, MAX_PATH)
+
     var lita = this.lsp.lita
 
     var filepath = [MAX_PATH]char{0};
@@ -93,11 +101,14 @@ public func (this: *Workspace) isDocumentOpen(uri: *const char) : bool {
 public func (this: *Workspace) openDocument(uri: *const char, text: *const char) {
     if(!uri) return;
 
+    // TODO: intern these?
     var moduleUri = StringClone(uri, -1, this.allocator)
 
-    var doc = new<Document>(this.allocator)
-    doc.lineMap.init(256, this.allocator)
-    doc.text = StringBuilderInit(strlen(text), this.allocator)
+    var allocator = &this.docAllocator.alloc
+
+    var doc = new<Document>(allocator)
+    doc.lineMap.init(256, allocator)
+    doc.text = StringBuilderInit(strlen(text), allocator)
 
     doc.setText(text)
 
@@ -109,9 +120,12 @@ public func (this: *Workspace) openDocument(uri: *const char, text: *const char)
 public func (this: *Workspace) closeDocument(uri: *const char) {
     if(!uri) return;
 
+    this.lsp.log("Close request for document: %s\n", uri)
     var doc = this.openedDocuments.remove(uri)
-    if(!doc) {
-        // Remove from file cache
+    if(doc) {
+        doc.free()
+        this.allocator.free(doc)
+        this.lsp.log("Closed document: %s\n", uri)
     }
 }
 
@@ -137,8 +151,6 @@ public func (this: *Workspace) changeDocument(change: *TextDocumentDidChange) {
             doc.setText(event.text)
         }
     }
-
-    this.runDiagnostics(change.textDocument.uri)
 }
 
 public func (this: *Workspace) documentSymbols(uri: *const char, alloc: *const Allocator) : *JsonNode {
@@ -895,7 +907,20 @@ public func (this: *Workspace) runDiagnostics(
             lita.addModule(module)
         }
 
+        this.lsp.log("Module memory:\n")
+        var arena = &module.arena
+
+        this.lsp.log("\tNumberOfArenas: %d\n", arena.numberOfArenas);
+        this.lsp.log("\tNumberOfAllocs: %d\n", arena.numberOfAllocations);
+        this.lsp.log("\tNumberOfBytesAllocated: %zu KiB\n", arena.numberOfBytesAllocated / KiB);
+        this.lsp.log("\tNumberOfUnused: %zu KiB\n", arena.unusedBytes() / KiB);
+
         lita.incrementalBuild(module)
+
+        this.lsp.log("\t~NumberOfArenas: %d\n", arena.numberOfArenas);
+        this.lsp.log("\t~NumberOfAllocs: %d\n", arena.numberOfAllocations);
+        this.lsp.log("\t~NumberOfBytesAllocated: %zu KiB\n", arena.numberOfBytesAllocated / KiB);
+        this.lsp.log("\t~NumberOfUnused: %zu KiB\n", arena.unusedBytes() / KiB);
     }
 
     var totalTime = SystemTimeMSec() - startTime

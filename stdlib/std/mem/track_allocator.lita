@@ -1,0 +1,208 @@
+import "std/mem"
+import "std/array"
+import "std/libc" as c
+
+/**
+=========================================================
+// Tracks allocations, can free all allocations at once
+=========================================================
+*/
+const MAX_PATH = 256
+
+public struct Allocation {
+    addr: *void
+    size: usize
+}
+
+public struct TrackAllocator {
+    alloc: Allocator
+    decorated: *const Allocator
+    allocations: Array<*Allocation>
+    totalAllocations: usize
+}
+
+public func (d: *TrackAllocator) init(alloc: *const Allocator = defaultAllocator) {
+    d.alloc = Allocator {
+        .allocFn:   &TrackMalloc,
+        .callocFn:  &TrackCalloc,
+        .reallocFn: &TrackRealloc,
+        .freeFn:    &TrackFree
+    }
+    d.decorated = alloc
+    d.allocations.init(128, alloc)
+}
+
+public func (d: *TrackAllocator) free() {
+    d.allocations.free()
+}
+
+#if (DEBUG)
+    public func (d: *TrackAllocator) malloc(size: usize,
+                                            file: *const char,
+                                            line: usize) : *void {
+
+        var allocationSize = sizeof(:Allocation) + size;
+        var mem = d.decorated.alloc(allocationSize, file, line);
+        if(!mem) {
+            return null;
+        }
+
+        var allocation = mem as (*Allocation)
+        allocation.addr = mem + sizeof(:Allocation)
+        allocation.size = size
+
+        d.totalAllocations += allocationSize
+        d.allocations.add(allocation)
+
+        return allocation.addr;
+    }
+
+
+    func TrackMalloc(alloc: *const Allocator,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: usize = c::__LINE__) : *void {
+        var track = alloc as (*TrackAllocator);
+        return track.malloc(size, file, line);
+    }
+
+    func TrackCalloc(alloc: *const Allocator,
+                     num: usize,
+                     size: usize,
+                     file: *const char = c::__FILE__,
+                     line: usize = c::__LINE__) : *void {
+        var track = alloc as (*TrackAllocator);
+        var result = track.malloc(size * num, file, line);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func TrackRealloc(alloc: *const Allocator,
+                      ptr: *void,
+                      oldSize: usize,
+                      size: usize,
+                      file: *const char = c::__FILE__,
+                      line: usize = c::__LINE__) : *void {
+        if(ptr == null) {
+            return TrackMalloc(alloc, size, file, line)
+        }
+
+        var track = alloc as (*TrackAllocator);
+
+        var result = track.malloc(size, file, line);
+        if(result) {
+            var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+            var len = c::MIN(allocation.size, size)
+
+            c::memcpy(result, ptr, len)
+
+            TrackFree(alloc, ptr)
+        }
+
+        return result
+    }
+
+#else
+    public func (d: *TrackAllocator) malloc(size: usize) : *void {
+        var allocationSize = sizeof(:Allocation) + size;
+        var mem = d.decorated.alloc(allocationSize);
+        if(!mem) {
+            return null;
+        }
+
+        var allocation = mem as (*Allocation)
+        allocation.addr = mem + sizeof(:Allocation)
+        allocation.size = size
+
+        d.totalAllocations += allocationSize
+        d.allocations.add(allocation)
+
+        return allocation.addr;
+    }
+
+    func TrackMalloc(alloc: *const Allocator, size: usize) : *void {
+        var track = alloc as (*TrackAllocator);
+        return track.malloc(size);
+    }
+
+    func TrackCalloc(alloc: *const Allocator, num: usize, size: usize) : *void {
+        var track = alloc as (*TrackAllocator);
+        var result = track.malloc(size * num);
+        if(result) {
+            c::memset(result, 0, size * num)
+        }
+
+        return result
+    }
+
+    func TrackRealloc(alloc: *const Allocator, ptr: *void, oldSize: usize, size: usize) : *void {
+        if(ptr == null) {
+            return TrackMalloc(alloc, size)
+        }
+
+        var track = alloc as (*TrackAllocator);
+
+        var result = track.malloc(size);
+        if(result) {
+            var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+            var len = c::MIN(allocation.size, size)
+
+            c::memcpy(result, ptr, len)
+
+            TrackFree(alloc, ptr)
+        }
+
+        return result
+    }
+
+#end
+
+func TrackFree(alloc: *const Allocator, ptr: *void) {
+    if(ptr == null) {
+        return;
+    }
+
+    var track = alloc as (*TrackAllocator);
+    var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+
+    var addr = ptr;
+
+    var found = false
+    for(var i = 0; i < track.allocations.size();) {
+        var allocation = track.allocations.get(i)
+        if(allocation.addr == addr) {
+            track.allocations.removeAt(i)
+            track.totalAllocations -= (allocation.size + sizeof(:Allocation))
+            track.decorated.free(allocation)
+
+            found = true
+            break
+        }
+        else {
+            i += 1
+        }
+    }
+
+    if(!found) {
+        track.decorated.free(ptr)
+    }
+}
+
+
+
+@test
+func testAllocator() {
+    var track: TrackAllocator;
+    track.init()
+
+    var allocator = &track.alloc
+
+    var a = allocator.alloc(1024)
+    var b = allocator.alloc(256)
+
+    allocator.free(b)
+    allocator.free(a)
+}
