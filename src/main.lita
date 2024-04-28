@@ -1,5 +1,6 @@
 import "std/libc"
 import "std/mem"
+import "std/mem/bucket_allocator"
 import "std/mem/linear_allocator"
 import "std/io"
 import "std/cmdline"
@@ -102,7 +103,7 @@ report:
     }
 
     if(options.showProfileInfo) {
-        var allocator: *LinearAllocator = lita.allocator as (*LinearAllocator)
+        var allocator: *BucketAllocator = lita.allocator as (*BucketAllocator)
 
         printf("\n\n")
         printf("%-30s %-17s %-6s %-14s %-5s\n", "Segment", "Time", "%", "Mem", "#")
