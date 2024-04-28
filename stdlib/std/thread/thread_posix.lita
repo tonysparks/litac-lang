@@ -71,6 +71,8 @@ typedef struct timespec timespec;
 #include <sys/time.h>
 #include <errno.h>
 
+// for stack traces
+#include <execinfo.h>
 """);
 
 /*==============================================================
@@ -228,6 +230,13 @@ func sysconf(name: i32) : i64;
 
 @foreign
 const _SC_NPROCESSORS_ONLN: i32;
+
+@foreign
+func backtrace(buffer: **void, size: i32) : i32;
+
+@foreign
+func backtrace_symbols(buffer: **const void, size: i32) : **char;
+
 
 /*==============================================================
     Public APIs
@@ -546,6 +555,21 @@ public func GetNumberOfSystemThreads() : u32 {
         result = 1
     }
     return result as (u32)
+}
+
+
+
+public func ThreadPrintStackTrace(fd: *FILE) {
+    const SIZE = 256
+    var buffer: [SIZE]*void;
+    var size: i32 = backtrace(buffer, SIZE)
+    var result = backtrace_symbols(buffer, size)
+    defer free(result)
+    if(result) {
+        for(var i = 0; i < size; i+=1) {
+            fprintf(fd, "%s\n", result[i])
+        }
+    }
 }
 
 

@@ -1,5 +1,93 @@
+import "std/string"
+import "std/libc"
+import "std/thread"
+
 @include("assert.h");
 @foreign public func assert(e:bool):void;
+
+// all out of bort license plates!
+func bort() {
+    #if true
+        //ThreadPrintStackTrace(stderr)
+        abort()
+    #end
+}
+
+public func assertStr(
+    expected: *const char,
+    actual: *const char,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__): void {
+
+    if(expected == actual) {
+        return;
+    }
+
+    if(expected == null || actual == null || !StringEqual(expected, actual)) {
+        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%s' to equal actual: '%s'\n", filename, lineNumber, expected, actual)
+        bort()
+    }
+}
+
+public func assertString(
+    expected: String,
+    actual: String,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__): void {
+
+    if(!expected.equalsString(actual)) {
+        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%.*s' to equal actual: '%.*s'\n",
+            filename,
+            lineNumber,
+            expected.length,  expected.buffer,
+            actual.length, actual.buffer
+        )
+        bort()
+    }
+}
+
+public func assertFloat<F>(
+    expected: F,
+    actual: F,
+    tolerance: F = 0.01f64,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__): void {
+
+    const r = ABS(expected - actual)
+    if(r > tolerance) {
+        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%f' to equal actual: '%f'\n",
+            filename,
+            lineNumber,
+            expected,
+            actual
+        )
+        bort()
+    }
+}
+
+@test
+func testAssertEqualsStr() {
+    assertStr("x", "x")
+    assertStr("x", "y")
+}
+
+@test
+func testAssertEqualsString() {
+    assertString(StringInit("x"), StringInit("x"))
+    assertString(StringInit("x"), StringInit("y"))
+}
+
+@test
+func testAssertEqualsF32() {
+    assertFloat(0.1f, 0.1f)
+    assertFloat(0.1f, 0.2f)
+}
+
+@test
+func testAssertEqualsF64() {
+    assertFloat(0.1, 0.1)
+    assertFloat(0.1, 0.2)
+}
 
 /*
 import "std/libc"

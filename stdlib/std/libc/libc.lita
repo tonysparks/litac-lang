@@ -100,7 +100,7 @@ size_t strnlen(const char * s, size_t len) {
 // Math operations
 @foreign public func MAX<T>(a: T, b: T) : T;
 @foreign public func MIN<T>(a: T, b: T) : T;
-@foreign public func ABS(a: f32) : f32;
+@foreign public func ABS<T>(a: T) : T;
 @foreign public func sqrt(v: f64) : f64;
 @foreign public func sqrtf(v: f32) : f32;
 @foreign public func cos(v: f64) : f64;
@@ -136,6 +136,7 @@ size_t strnlen(const char * s, size_t len) {
 // system
 @foreign public func exit(code: i32);
 @foreign public func system(cmd: *const char) : i32;
+@foreign public func abort();
 
 // string operations
 @foreign public func strcat(dest: *char, src: *const char) : *char;
