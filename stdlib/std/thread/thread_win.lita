@@ -242,7 +242,7 @@ static void NTAPI _tinycthread_tss_callback(PVOID h, DWORD dwReason, PVOID pv)
 """);
 
 import "std/libc" as c
-
+import "std/mem"
 
 @generated
 public enum ThreadStatus {
@@ -770,7 +770,7 @@ func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
     var arg = ti.mArg;
 
     /* The thread is responsible for freeing the startup information */
-    ti.allocationr.free(ti as (*void));
+    ti.allocation.free(ti as (*void));
 
     /* Call the actual client thread function */
     var res = fun(arg);
@@ -907,7 +907,7 @@ public func ThreadSleep(duration: *TimeSpec, remaining: *TimeSpec = null) : i32 
 }
 
 public func GetNumberOfSystemThreads() : u32 {
-    sysinfo: SYSTEM_INFO;
+    var sysinfo: SYSTEM_INFO;
     GetSystemInfo(&sysinfo);
     return sysinfo.dwNumberOfProcessors;
 }
