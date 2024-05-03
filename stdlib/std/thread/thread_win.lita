@@ -770,7 +770,7 @@ func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
     var arg = ti.mArg;
 
     /* The thread is responsible for freeing the startup information */
-    ti.allocation.free(ti as (*void));
+    ti.allocator.free(ti as (*void));
 
     /* Call the actual client thread function */
     var res = fun(arg);
@@ -909,5 +909,5 @@ public func ThreadSleep(duration: *TimeSpec, remaining: *TimeSpec = null) : i32 
 public func GetNumberOfSystemThreads() : u32 {
     var sysinfo: SYSTEM_INFO;
     GetSystemInfo(&sysinfo);
-    return sysinfo.dwNumberOfProcessors;
+    return sysinfo.dwNumberOfProcessors as (u32);
 }
