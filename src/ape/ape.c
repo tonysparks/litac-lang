@@ -412,7 +412,7 @@ typedef struct error {
     char message[ERROR_MESSAGE_MAX_LENGTH];
     src_pos_t pos;
     traceback_t *traceback;
-} error_t;
+} error_t; // causes collision with #include <errno.h>
 
 typedef struct errors {
     error_t errors[ERRORS_MAX_COUNT];

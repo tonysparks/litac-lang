@@ -45,7 +45,7 @@
         },
         {
             "name": "Typeof Array Caching",
-            "disabled": true,
+            "disabled": false,
             "definitions": `
                 @raw("""
                 #define MAX_PATH (260)
@@ -85,7 +85,7 @@
         },
         {
             "name": "Typeof Const Caching",
-            "disabled": true,
+            "disabled": false,
             "definitions": `
 
             `,

@@ -13,7 +13,6 @@
         }
     `,
     "tests": [
-
         {
             "name": "Array Init",
             "definitions": `
@@ -502,6 +501,5 @@
 
             `,
         },
-
     ]
 }

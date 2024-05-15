@@ -99,8 +99,9 @@ public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
 
     var entry = ArrayEntry{.arrayOf = arrayOf, .expr = numOfElements, .length = length}
     var type = this.arrayCache.get(entry)
-    if(!type || type.length != length || type.isLengthDefined != isLengthDefined
-      || type.numOfElements != numOfElements /* this was commented out! */) {
+
+    if(!type || type.length != length || length == 0 || type.isLengthDefined != isLengthDefined
+      /*|| type.numOfElements != numOfElements /* this was commented out! */) {
         type = this.newTypeInfo()
         type.kind = TypeKind.ARRAY
         type.arrayOf = arrayOf
