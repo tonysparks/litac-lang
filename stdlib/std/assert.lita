@@ -1,6 +1,6 @@
 import "std/string"
 import "std/libc"
-import "std/thread"
+// import "std/thread"
 
 @include("assert.h");
 @foreign public func assert(e:bool):void;

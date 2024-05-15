@@ -40,7 +40,7 @@
                 var x: [32]char;
                 x = "Brett";
             `,
-            "error": "'*const char' can't be assigned to '[32]char'"
+            "error": "'[32]char' is not assignable as arrays are not mutable lvalues"
         },
         {
             "name": "array invalid assignment with array initializer",
@@ -51,7 +51,7 @@
                 var x: [32]char;
                 x = [32]char{'c', '\0'};
             `,
-            "error": "'[32]char' can't be assigned to '[32]char'"
+            "error": "'[32]char' is not assignable as arrays are not mutable lvalues"
         },
         {
             "name": "array initializer",
@@ -144,7 +144,7 @@
 
                 }
             `,
-            "error": "'[32]char' can't be assigned to '[32]char'"
+            "error": "'[32]char' is not assignable as arrays are not mutable lvalues"
         },
         {
             "name": "array passed to function",
