@@ -281,6 +281,9 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
 
     assert(genericSym != null)
 
+    // check the type constraints
+    CheckTypeConstraints(checker, sym, genericSym, name)
+
     checker.resolveSymbol(genericSym)
     checker.finishResolveSymbol(genericSym)
 
@@ -294,6 +297,53 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
 
 err:
     return null
+}
+
+func CheckTypeConstraints(
+    checker: *TypeChecker,
+    sym: *Symbol,
+    genericSym: *Symbol,
+    name: *TypeSpec) : bool {
+
+    var newDecl = genericSym.decl as (*GenericDecl)
+    var decl = sym.decl as (*GenericDecl)
+    printf("Generic Type: %.*s -> %.*s\n", sym.name.length, sym.name.buffer, genericSym.name.length, genericSym.name.buffer)
+    //printf("Compared: %d vs %d\n", decl.genericParams.size(), genericSym.genericArgs.size())
+
+    // unable to check type constraints
+    if(decl.genericParams.size() != genericSym.genericArgs.size()) {
+        // TODO: Add error message, should this be an assert??
+        goto err;
+    }
+
+    for(var i = 0; i < decl.genericParams.size(); i+=1) {
+        var param = decl.genericParams.getPtr(i)
+
+        if(param.typeConstraint) {
+            var constraintType = checker.resolveTypeSpec(param.typeConstraint)
+            if(!constraintType) {
+                goto err;
+            }
+
+            var suppliedType = genericSym.genericArgs.get(i)
+            if(!suppliedType) {
+                goto err;
+            }
+
+            if(suppliedType.kind == TypeKind.GENERIC_PARAM ||
+               suppliedType.kind == TypeKind.POISON) {
+                continue
+            }
+
+            if(!checker.checkTypeConstraint(name.pos, constraintType, suppliedType, sym, i)) {
+                goto err;
+            }
+        }
+    }
+    return true
+
+err:
+    return false
 }
 
 func CreateDecl(sym: *Symbol,

@@ -143,6 +143,7 @@ public struct Identifier {
 
 public struct GenericParam {
     name: Identifier
+    typeConstraint: *TypeSpec
 }
 
 public enum Visibility {

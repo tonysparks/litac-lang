@@ -2496,8 +2496,14 @@ func (p: *Parser) genericParameters(arguments: *Array<GenericParam>) : bool {
                 .token = *typeName
             }
 
+            var typeConstraint: *TypeSpec = null
+            if(p.match(TokenType.COLON)) {
+                typeConstraint = p.type()
+            }
+
             arguments.add(GenericParam {
-                .name = name
+                .name = name,
+                .typeConstraint = typeConstraint
             })
         }
         while(p.match(TokenType.COMMA))

@@ -14,6 +14,114 @@
     `,
     "tests": [
         {
+            "name": "Generic Constraint Primative With Invalid Type",
+            "definitions": `
+                struct Thing<X: i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4f
+                }
+
+                assert(t.a == 4)
+            `
+        },
+        {
+            "name": "Generic Constraint Primative",
+            "definitions": `
+                struct Thing<X: i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4
+                }
+
+                assert(t.a == 4)
+            `
+        },
+        {
+            "name": "Generic Constraint Double Primative",
+            "definitions": `
+                struct Thing<X: i32, Y: f32> {
+                    a: X
+                    b: Y
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4,
+                    .b = 4f
+                }
+
+                assert(t.a == 4)
+                assert(t.b == 4f)
+            `
+        },
+
+        {
+            "name": "Generic Constraint Double Primative With Alias",
+            "definitions": `
+                struct Thing<X: i32, Y: f32> {
+                    a: X
+                    b: Y
+                }
+
+                func Make<Y: f32>() : Thing<i32, Y> {
+                    return Thing<i32, Y> {
+                        .a = 4,
+                        .b = 4f
+                    }
+                }
+            `,
+            "code": `
+                var t = Make<f32>()
+
+                assert(t.a == 4)
+                assert(t.b == 4f)
+            `
+        },
+
+        {
+            "name": "Generic Constraint Trait",
+            "definitions": `
+                trait Thing {
+                    call: func() : i32
+                }
+                struct Wrapper<X: Thing> {
+                    a: X
+                }
+
+                func (this: *Wrapper<X>) exec<X: Thing>() : i32 {
+                    return this.a.call()
+                }
+
+                struct ThingImpl {
+                    x: i32
+                }
+
+                func (this: *ThingImpl) call() : i32 {
+                    return this.x
+                }
+            `,
+            "code": `
+                var thing = ThingImpl {
+                    .x = 4,
+                }
+
+                var wrapper = Wrapper {
+                    .a = &thing
+                }
+
+                assert(wrapper.exec() == 4)
+            `
+        },
+
+        /*
+        {
             "name": "Array Init",
             "definitions": `
                 import "std/mem"
@@ -500,6 +608,6 @@
             "code": `
 
             `,
-        },
+        },*/
     ]
 }
