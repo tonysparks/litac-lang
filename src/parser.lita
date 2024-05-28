@@ -2519,20 +2519,32 @@ err:
     return false
 }
 
-func (p: *Parser) genericArguments() : Array<*TypeSpec> {
-    var arguments = Array<*TypeSpec>{}
+func (p: *Parser) genericArguments() : Array<GenericArg> {
+    var arguments = Array<GenericArg>{}
     if(!p.check(TokenType.GREATER_THAN)) {
         arguments.init(2, p.allocator)
 
         do {
-            var type = p.type(false)
+            if(p.match(TokenType.COLON)) {
+                var type = p.type(false)
 
-            // we've failed for parse a type
-            if(!type) {
-                return arguments
+                // we've failed for parse a type
+                if(!type) {
+                    return arguments
+                }
+
+                arguments.add(GenericArg {
+                    .kind = GenericArgKind.TYPE,
+                    .type = type
+                })
             }
-
-            arguments.add(type)
+            else {
+                var expr = p.constExpression()
+                arguments.add(GenericArg {
+                    .kind = GenericArgKind.EXPR,
+                    .expr = expr
+                })
+            }
         }
         while(p.match(TokenType.COMMA))
     }
@@ -2541,7 +2553,7 @@ func (p: *Parser) genericArguments() : Array<*TypeSpec> {
     return arguments
 }
 
-func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
+func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<GenericArg> {
     p.tryLevel += 1
     defer p.tryLevel -= 1
 
@@ -2584,15 +2596,6 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
     if(p.tryErrorCounter > numOfErrors || isFailed) {
         p.rewindTo(backtrack, numOfErrors)
         isFailed = true;
-    }
-
-    if(isFailed) {
-        for(var i = 0; i < arguments.size(); i += 1) {
-            var type = arguments.get(i)
-            p.allocator.free(type)
-        }
-        arguments.free()
-        arguments.clear()
     }
 
     return arguments

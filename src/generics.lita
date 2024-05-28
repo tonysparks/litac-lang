@@ -307,7 +307,7 @@ func CheckTypeConstraints(
 
     var newDecl = genericSym.decl as (*GenericDecl)
     var decl = sym.decl as (*GenericDecl)
-    printf("Generic Type: %.*s -> %.*s\n", sym.name.length, sym.name.buffer, genericSym.name.length, genericSym.name.buffer)
+    // printf("Generic Type: %.*s -> %.*s\n", sym.name.length, sym.name.buffer, genericSym.name.length, genericSym.name.buffer)
     //printf("Compared: %d vs %d\n", decl.genericParams.size(), genericSym.genericArgs.size())
 
     // unable to check type constraints

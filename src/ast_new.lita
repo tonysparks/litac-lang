@@ -420,7 +420,7 @@ public func NewFuncCallExpr(startPos: SrcPos,
                             endPos: SrcPos,
                             object: *Expr,
                             arguments: Array<CallArg>,
-                            genericArgs: Array<*TypeSpec>,
+                            genericArgs: Array<GenericArg>,
                             allocator: *const Allocator) : *Expr {
     var expr = new<FuncCallExpr>(allocator)
     expr.kind = StmtKind.FUNC_CALL_EXPR

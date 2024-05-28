@@ -14,6 +14,21 @@
     `,
     "tests": [
         {
+            "name": "Generic Constraint Primative With Lower Type",
+            "definitions": `
+                struct Thing<X: i32> {
+                    a: [X]i32
+                }
+            `,
+            "code": `
+                var t = Thing<1024> {
+                }
+
+                //assert(t.a == 4)
+            `,
+            //"error": "'f32' can't be assigned to 'i32' due to violating type constraint definition:"
+        },/*
+        {
             "name": "Generic Constraint Primative With Invalid Type",
             "definitions": `
                 struct Thing<X: i32> {
@@ -26,7 +41,24 @@
                 }
 
                 assert(t.a == 4)
-            `
+            `,
+            "error": "'f32' can't be assigned to 'i32' due to violating type constraint definition:"
+        },
+        {
+            "name": "Generic Constraint Primative With Lower Type",
+            "definitions": `
+                struct Thing<X: i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4_u16
+                }
+
+                assert(t.a == 4)
+            `,
+            //"error": "'f32' can't be assigned to 'i32' due to violating type constraint definition:"
         },
         {
             "name": "Generic Constraint Primative",
@@ -119,6 +151,10 @@
                 assert(wrapper.exec() == 4)
             `
         },
+
+
+
+
 
         /*
         {
