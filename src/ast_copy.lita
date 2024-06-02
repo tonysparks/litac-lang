@@ -27,6 +27,38 @@ public func NewTokenNameIntern(token: Token, strings: *Strings) : InternedString
     return strings.internCopy(token.value.str.buffer, token.value.str.length)
 }
 
+public func CopyGenericArgs(args: Array<GenericArg>, module: *Module) : Array<GenericArg> {
+    if(args.empty()) {
+        return Array<GenericArg>{}
+    }
+
+    var result = Array<GenericArg>{}
+    result.init(args.size(), module.allocator)
+
+    for(var i = 0; i < args.size(); i += 1) {
+        var arg = args.get(i)
+        if(arg.kind == GenericArgKind.TYPE) {
+            var newArg = GenericArg {
+                .kind = arg.kind,
+                .type = CopyTypeSpec(arg.type, module)
+            }
+            result.add(newArg)
+        }
+        else if(arg.kind == GenericArgKind.EXPR) {
+            var newArg = GenericArg {
+                .kind = arg.kind,
+                .expr = CopyExpr(arg.expr, module)
+            }
+            result.add(newArg)
+        }
+        else {
+            assert(false)
+        }
+    }
+
+    return result
+}
+
 public func CopyTypeSpecs(specs: Array<*TypeSpec>, module: *Module) : Array<*TypeSpec> {
     if(specs.empty()) {
         return Array<*TypeSpec>{
@@ -74,7 +106,7 @@ public func CopyTypeSpec(spec: *TypeSpec, module: *Module) : *TypeSpec {
             var originalName = spec
             var copyName = copy
             copyName.name = originalName.name
-            copyName.genericArgs = CopyTypeSpecs(originalName.genericArgs, module)
+            copyName.genericArgs = CopyGenericArgs(originalName.genericArgs, module)
             return copy
         }
         case TypeSpecKind.FUNC_PTR: {
@@ -251,7 +283,7 @@ public func CopyExpr(expr: *Expr, module: *Module) : *Expr {
                                        original.endPos,
                                        CopyExpr(original.object, module),
                                        CopyCallArgs(original.arguments, module),
-                                       CopyTypeSpecs(original.genericArgs, module),
+                                       CopyGenericArgs(original.genericArgs, module),
                                        module.allocator)
             return copy
         }

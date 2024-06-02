@@ -1372,7 +1372,7 @@ func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
         goto err;
     }
 
-    var genericArgs = Array<*TypeSpec>{}
+    var genericArgs = Array<GenericArg>{}
     if(expr.isIdentifier()) {
         var idExpr = expr as (*IdentifierExpr)
         expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
