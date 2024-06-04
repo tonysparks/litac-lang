@@ -308,7 +308,7 @@ func PrintGenerics(genericParams: *Array<GenericParam>, sb: *StringBuilder) {
     }
 }
 
-func PrintGenericArgs(genericArgs: *Array<*TypeInfo>, sb: *StringBuilder) {
+func PrintGenericArgs(genericArgs: *Array<SymGenericArg>, sb: *StringBuilder) {
     for(var x = 0; x < genericArgs.size(); x += 1) {
         if(x == 0) {
             sb.append("<")
@@ -317,9 +317,9 @@ func PrintGenericArgs(genericArgs: *Array<*TypeInfo>, sb: *StringBuilder) {
             sb.append(", ")
         }
 
-        var type = genericArgs.get(x)
-        assert(type)
-        type.toString(sb, true)
+        var genArg = genericArgs.get(x)
+        assert(genArg.type)
+        genArg.type.toString(sb, true)
     }
     if(genericArgs.size() > 0) {
         sb.append(">")
