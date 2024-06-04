@@ -1,7 +1,7 @@
 #ifndef _LITAC_HEADER_H
 #define _LITAC_HEADER_H
 
-// Generated on Wed May 15 00:56:22 2024
+// Generated on Tue Jun  4 13:19:43 2024
 
 #include <stdint.h>
 #include <stddef.h>
@@ -102,6 +102,138 @@ litaC_usize litaC_std__mem__arena_allocator__PAGE_SIZE = (litaC_usize)4096UL;
 #define litaC_cgen__MAX_COMPILATION_UNITS (256)
 
 #define litaC_pkg_mgr__pkg__SEPARATOR_LENGTH (1)
+
+#include <stdlib.h>
+
+#include <stdio.h>
+#include <time.h>
+
+
+typedef enum Lita_OSType {
+    Lita_OSType_WINDOWS,
+    Lita_OSType_ANDROID,
+    Lita_OSType_LINUX,
+    Lita_OSType_BSD,
+    Lita_OSType_IOS,
+    Lita_OSType_MAC,
+    Lita_OSType_OTHER
+} Lita_OSType;
+
+
+#if defined(_WIN32)
+    // Windows
+    Lita_OSType litaOS = Lita_OSType_WINDOWS;
+    #define LITA_IS_POSIX 0
+#elif defined(_WIN64)
+    // Windows
+    Lita_OSType litaOS = Lita_OSType_WINDOWS;
+    #define LITA_IS_POSIX 0
+#elif defined(__CYGWIN__) && !defined(_WIN32)
+    // Windows (Cygwin POSIX under Microsoft Window)
+    Lita_OSType litaOS = Lita_OSType_WINDOWS;
+    #define LITA_IS_POSIX 1
+#elif defined(__ANDROID__)
+    // Android (implies Linux, so it must come first)
+    Lita_OSType litaOS = Lita_OSType_ANDROID;
+    #define LITA_IS_POSIX 1
+#elif defined(__linux__)
+    // Debian, Ubuntu, Gentoo, Fedora, openSUSE, RedHat, Centos and other
+    Lita_OSType litaOS = Lita_OSType_LINUX;
+    #define LITA_IS_POSIX 1
+#elif defined(__unix__) || !defined(__APPLE__) && defined(__MACH__)
+    #include <sys/param.h>
+    #if defined(BSD)
+        // FreeBSD, NetBSD, OpenBSD, DragonFly BSD
+        Lita_OSType litaOS = Lita_OSType_BSD;
+    #endif
+    #define LITA_IS_POSIX 1
+#elif defined(__hpux)
+    // HP-UX
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+#elif defined(_AIX)
+    // IBM AIX
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+#elif defined(__APPLE__) && defined(__MACH__) // Apple OSX and iOS (Darwin)
+    #include <TargetConditionals.h>
+    #if TARGET_IPHONE_SIMULATOR == 1
+        // Apple iOS
+        Lita_OSType litaOS = Lita_OSType_IOS;
+    #elif TARGET_OS_IPHONE == 1
+        // Apple iOS
+        Lita_OSType litaOS = Lita_OSType_IOS;
+    #elif TARGET_OS_MAC == 1
+        // Apple OSX
+        Lita_OSType litaOS = Lita_OSType_MAC;
+    #endif
+    #define LITA_IS_POSIX 1
+#elif defined(__sun) && defined(__SVR4)
+    // Oracle Solaris, Open Indiana
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+    #define LITA_IS_POSIX 0
+#else
+    Lita_OSType litaOS = Lita_OSType_OTHER;
+    #define LITA_IS_POSIX 0
+#endif
+
+
+typedef struct tm tm;
+
+
+
+typedef enum Lita_ArchType {
+    Lita_ArchType_UNKNOWN,
+    Lita_ArchType_ARM32,
+    Lita_ArchType_ARM64,
+    Lita_ArchType_X86,
+    Lita_ArchType_X86_64,
+    Lita_ArchType_SPARC,
+} Lita_ArchType;
+
+#if defined(_M_IX86) || defined(__i386__) || defined(__i386) || defined(__i486__) || defined(__i486) || defined(i386)
+#define LITA_X86 1
+#else
+#define LITA_X86 0
+#endif
+
+#if defined(_M_X64) || defined(__ia64__) || defined(__x86_64__)
+#define LITA_X64 1
+#else
+#define LITA_X64 0
+#endif
+
+#if defined(__arm__)
+#define LITA_ARM32 1
+#else
+#define LITA_ARM32 0
+#endif
+
+#if defined(__aarch64__)
+#define LITA_ARM64 1
+#else
+#define LITA_ARM64 0
+#endif
+
+#if defined(__sparc__)
+#define LITA_SPARC 1
+#else
+#define LITA_SPARC 0
+#endif
+
+#if LITA_ARM32
+    Lita_ArchType litaArch = Lita_ArchType_ARM32;
+#elif LITA_ARM64
+    Lita_ArchType litaArch = Lita_ArchType_ARM64;
+#elif LITA_X86
+    Lita_ArchType litaArch = Lita_ArchType_X86;
+#elif LITA_X64
+    Lita_ArchType litaArch = Lita_ArchType_X86_64;
+#elif LITA_SPARC
+    Lita_ArchType litaArch = Lita_ArchType_SPARC;
+#else
+    Lita_ArchType litaArch = Lita_ArchType_UNKNOWN;
+#endif
+
+
 
 #define APE_AMALGAMATED
 
@@ -15557,7 +15689,1446 @@ static void ape_free(void *ctx, void *ptr) {
 //FILE_END
 
 
-#include <stdatomic.h>
+#include "assert.h"
+
+#include <curl/curl.h>
+
+
+
+
+
+/*
+ *
+ * Mini regex-module inspired by Rob Pike's regex code described in:
+ *
+ * http://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
+ *
+ *
+ *
+ * Supports:
+ * ---------
+ *   '.'        Dot, matches any character
+ *   '^'        Start anchor, matches beginning of string
+ *   '$'        End anchor, matches end of string
+ *   '*'        Asterisk, match zero or more (greedy)
+ *   '+'        Plus, match one or more (greedy)
+ *   '?'        Question, match zero or one (non-greedy)
+ *   '[abc]'    Character class, match if one of {'a', 'b', 'c'}
+ *   '[^abc]'   Inverted class, match if NOT one of {'a', 'b', 'c'} -- NOTE: feature is currently broken!
+ *   '[a-zA-Z]' Character ranges, the character set of the ranges { a-z | A-Z }
+ *   '\s'       Whitespace, \t \f \r \n \v and spaces
+ *   '\S'       Non-whitespace
+ *   '\w'       Alphanumeric, [a-zA-Z0-9_]
+ *   '\W'       Non-alphanumeric
+ *   '\d'       Digits, [0-9]
+ *   '\D'       Non-digits
+ *
+ *
+ */
+
+
+
+/*
+ *
+ * Mini regex-module inspired by Rob Pike's regex code described in:
+ *
+ * http://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
+ *
+ *
+ *
+ * Supports:
+ * ---------
+ *   '.'        Dot, matches any character
+ *   '^'        Start anchor, matches beginning of string
+ *   '$'        End anchor, matches end of string
+ *   '*'        Asterisk, match zero or more (greedy)
+ *   '+'        Plus, match one or more (greedy)
+ *   '?'        Question, match zero or one (non-greedy)
+ *   '[abc]'    Character class, match if one of {'a', 'b', 'c'}
+ *   '[^abc]'   Inverted class, match if NOT one of {'a', 'b', 'c'} -- NOTE: feature is currently broken!
+ *   '[a-zA-Z]' Character ranges, the character set of the ranges { a-z | A-Z }
+ *   '\s'       Whitespace, \t \f \r \n \v and spaces
+ *   '\S'       Non-whitespace
+ *   '\w'       Alphanumeric, [a-zA-Z0-9_]
+ *   '\W'       Non-alphanumeric
+ *   '\d'       Digits, [0-9]
+ *   '\D'       Non-digits
+ *
+ *
+ */
+
+#ifndef _TINY_REGEX_C
+#define _TINY_REGEX_C
+
+
+#ifndef RE_DOT_MATCHES_NEWLINE
+/* Define to 0 if you DON'T want '.' to match '\r' + '\n' */
+#define RE_DOT_MATCHES_NEWLINE 1
+#endif
+
+#ifdef __cplusplus
+extern "C"{
+#endif
+
+
+
+/* Typedef'd pointer to get abstract datatype. */
+typedef struct regex_t* re_t;
+
+
+/* Compile regex string pattern to a regex_t-array. */
+re_t re_compile(const char* pattern);
+
+
+/* Find matches of the compiled pattern inside text. */
+int  re_matchp(re_t pattern, const char* text, int* matchlength);
+
+
+/* Find matches of the txt pattern inside text (will compile automatically first). */
+int  re_match(const char* pattern, const char* text, int* matchlength);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* ifndef _TINY_REGEX_C */
+
+#include <stdio.h>
+
+/* Definitions: */
+
+#define MAX_REGEXP_OBJECTS      30    /* Max number of regex symbols in expression. */
+#define MAX_CHAR_CLASS_LEN      40    /* Max length of character-class buffer in.   */
+
+
+enum { UNUSED, DOT, BEGIN, END, QUESTIONMARK, STAR, PLUS, RE_CHAR, CHAR_CLASS, INV_CHAR_CLASS, DIGIT, NOT_DIGIT, ALPHA, NOT_ALPHA, WHITESPACE, NOT_WHITESPACE, /* BRANCH */ };
+
+typedef struct regex_t
+{
+  unsigned char  type;   /* CHAR, STAR, etc.                      */
+  union
+  {
+    unsigned char  ch;   /*      the character itself             */
+    unsigned char* ccl;  /*  OR  a pointer to characters in class */
+  };
+} regex_t;
+
+
+
+/* Private function declarations: */
+static int matchpattern(regex_t* pattern, const char* text, int* matchlength);
+static int matchcharclass(char c, const char* str);
+static int matchstar(regex_t p, regex_t* pattern, const char* text, int* matchlength);
+static int matchplus(regex_t p, regex_t* pattern, const char* text, int* matchlength);
+static int matchone(regex_t p, char c);
+static int matchdigit(char c);
+static int matchalpha(char c);
+static int matchwhitespace(char c);
+static int matchmetachar(char c, const char* str);
+static int matchrange(char c, const char* str);
+static int matchdot(char c);
+static int ismetachar(char c);
+
+
+
+/* Public functions: */
+int re_match(const char* pattern, const char* text, int* matchlength)
+{
+  return re_matchp(re_compile(pattern), text, matchlength);
+}
+
+int re_matchp(re_t pattern, const char* text, int* matchlength)
+{
+  *matchlength = 0;
+  if (pattern != 0)
+  {
+    if (pattern[0].type == BEGIN)
+    {
+      return ((matchpattern(&pattern[1], text, matchlength)) ? 0 : -1);
+    }
+    else
+    {
+      int idx = -1;
+
+      do
+      {
+        idx += 1;
+
+        if (matchpattern(pattern, text, matchlength))
+        {
+          if (text[0] == '\0')
+            return -1;
+
+          return idx;
+        }
+      }
+      while (*text++ != '\0');
+    }
+  }
+  return -1;
+}
+
+re_t re_compile(const char* pattern)
+{
+  /* The sizes of the two static arrays below substantiates the static RAM usage of this module.
+     MAX_REGEXP_OBJECTS is the max number of symbols in the expression.
+     MAX_CHAR_CLASS_LEN determines the size of buffer for chars in all char-classes in the expression. */
+  static regex_t re_compiled[MAX_REGEXP_OBJECTS];
+  static unsigned char ccl_buf[MAX_CHAR_CLASS_LEN];
+  int ccl_bufidx = 1;
+
+  char c;     /* current char in pattern   */
+  int i = 0;  /* index into pattern        */
+  int j = 0;  /* index into re_compiled    */
+
+  while (pattern[i] != '\0' && (j+1 < MAX_REGEXP_OBJECTS))
+  {
+    c = pattern[i];
+
+    switch (c)
+    {
+      /* Meta-characters: */
+      case '^': {    re_compiled[j].type = BEGIN;           } break;
+      case '$': {    re_compiled[j].type = END;             } break;
+      case '.': {    re_compiled[j].type = DOT;             } break;
+      case '*': {    re_compiled[j].type = STAR;            } break;
+      case '+': {    re_compiled[j].type = PLUS;            } break;
+      case '?': {    re_compiled[j].type = QUESTIONMARK;    } break;
+/*    case '|': {    re_compiled[j].type = BRANCH;          } break; <-- not working properly */
+
+      /* Escaped character-classes (\s \w ...): */
+      case '\\':
+      {
+        if (pattern[i+1] != '\0')
+        {
+          /* Skip the escape-char '\\' */
+          i += 1;
+          /* ... and check the next */
+          switch (pattern[i])
+          {
+            /* Meta-character: */
+            case 'd': {    re_compiled[j].type = DIGIT;            } break;
+            case 'D': {    re_compiled[j].type = NOT_DIGIT;        } break;
+            case 'w': {    re_compiled[j].type = ALPHA;            } break;
+            case 'W': {    re_compiled[j].type = NOT_ALPHA;        } break;
+            case 's': {    re_compiled[j].type = WHITESPACE;       } break;
+            case 'S': {    re_compiled[j].type = NOT_WHITESPACE;   } break;
+
+            /* Escaped character, e.g. '.' or '$' */
+            default:
+            {
+              re_compiled[j].type = RE_CHAR;
+              re_compiled[j].ch = pattern[i];
+            } break;
+          }
+        }
+        /* '\\' as last char in pattern -> invalid regular expression. */
+/*
+        else
+        {
+          re_compiled[j].type = CHAR;
+          re_compiled[j].ch = pattern[i];
+        }
+*/
+      } break;
+
+      /* Character class: */
+      case '[':
+      {
+        /* Remember where the char-buffer starts. */
+        int buf_begin = ccl_bufidx;
+
+        /* Look-ahead to determine if negated */
+        if (pattern[i+1] == '^')
+        {
+          re_compiled[j].type = INV_CHAR_CLASS;
+          i += 1; /* Increment i to avoid including '^' in the char-buffer */
+          if (pattern[i+1] == 0) /* incomplete pattern, missing non-zero char after '^' */
+          {
+            return 0;
+          }
+        }
+        else
+        {
+          re_compiled[j].type = CHAR_CLASS;
+        }
+
+        /* Copy characters inside [..] to buffer */
+        while (    (pattern[++i] != ']')
+                && (pattern[i]   != '\0')) /* Missing ] */
+        {
+          if (pattern[i] == '\\')
+          {
+            if (ccl_bufidx >= MAX_CHAR_CLASS_LEN - 1)
+            {
+              //fputs("exceeded internal buffer!\n", stderr);
+              return 0;
+            }
+            if (pattern[i+1] == 0) /* incomplete pattern, missing non-zero char after '\\' */
+            {
+              return 0;
+            }
+            ccl_buf[ccl_bufidx++] = pattern[i++];
+          }
+          else if (ccl_bufidx >= MAX_CHAR_CLASS_LEN)
+          {
+              //fputs("exceeded internal buffer!\n", stderr);
+              return 0;
+          }
+          ccl_buf[ccl_bufidx++] = pattern[i];
+        }
+        if (ccl_bufidx >= MAX_CHAR_CLASS_LEN)
+        {
+            /* Catches cases such as [00000000000000000000000000000000000000][ */
+            //fputs("exceeded internal buffer!\n", stderr);
+            return 0;
+        }
+        /* Null-terminate string end */
+        ccl_buf[ccl_bufidx++] = 0;
+        re_compiled[j].ccl = &ccl_buf[buf_begin];
+      } break;
+
+      /* Other characters: */
+      default:
+      {
+        re_compiled[j].type = RE_CHAR;
+        re_compiled[j].ch = c;
+      } break;
+    }
+    /* no buffer-out-of-bounds access on invalid patterns - see https://github.com/kokke/tiny-regex-c/commit/1a279e04014b70b0695fba559a7c05d55e6ee90b */
+    if (pattern[i] == 0)
+    {
+      return 0;
+    }
+
+    i += 1;
+    j += 1;
+  }
+  /* 'UNUSED' is a sentinel used to indicate end-of-pattern */
+  re_compiled[j].type = UNUSED;
+
+  return (re_t) re_compiled;
+}
+
+void re_print(regex_t* pattern)
+{
+  const char* types[] = { "UNUSED", "DOT", "BEGIN", "END", "QUESTIONMARK", "STAR", "PLUS", "CHAR", "CHAR_CLASS", "INV_CHAR_CLASS", "DIGIT", "NOT_DIGIT", "ALPHA", "NOT_ALPHA", "WHITESPACE", "NOT_WHITESPACE", "BRANCH" };
+
+  int i;
+  int j;
+  char c;
+  for (i = 0; i < MAX_REGEXP_OBJECTS; ++i)
+  {
+    if (pattern[i].type == UNUSED)
+    {
+      break;
+    }
+
+    printf("type: %s", types[pattern[i].type]);
+    if (pattern[i].type == CHAR_CLASS || pattern[i].type == INV_CHAR_CLASS)
+    {
+      printf(" [");
+      for (j = 0; j < MAX_CHAR_CLASS_LEN; ++j)
+      {
+        c = pattern[i].ccl[j];
+        if ((c == '\0') || (c == ']'))
+        {
+          break;
+        }
+        printf("%c", c);
+      }
+      printf("]");
+    }
+    else if (pattern[i].type == RE_CHAR)
+    {
+      printf(" '%c'", pattern[i].ch);
+    }
+    printf("\n");
+  }
+}
+
+
+
+/* Private functions: */
+static int matchdigit(char c)
+{
+  return ((c >= '0') && (c <= '9'));
+}
+static int matchalpha(char c)
+{
+  return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z'));
+}
+static int matchwhitespace(char c)
+{
+  return ((c == ' ') || (c == '\t') || (c == '\n') || (c == '\r') || (c == '\f') || (c == '\v'));
+}
+static int matchalphanum(char c)
+{
+  return ((c == '_') || matchalpha(c) || matchdigit(c));
+}
+static int matchrange(char c, const char* str)
+{
+  return (    (c != '-')
+           && (str[0] != '\0')
+           && (str[0] != '-')
+           && (str[1] == '-')
+           && (str[2] != '\0')
+           && (    (c >= str[0])
+                && (c <= str[2])));
+}
+static int matchdot(char c)
+{
+#if defined(RE_DOT_MATCHES_NEWLINE) && (RE_DOT_MATCHES_NEWLINE == 1)
+  (void)c;
+  return 1;
+#else
+  return c != '\n' && c != '\r';
+#endif
+}
+static int ismetachar(char c)
+{
+  return ((c == 's') || (c == 'S') || (c == 'w') || (c == 'W') || (c == 'd') || (c == 'D'));
+}
+
+static int matchmetachar(char c, const char* str)
+{
+  switch (str[0])
+  {
+    case 'd': return  matchdigit(c);
+    case 'D': return !matchdigit(c);
+    case 'w': return  matchalphanum(c);
+    case 'W': return !matchalphanum(c);
+    case 's': return  matchwhitespace(c);
+    case 'S': return !matchwhitespace(c);
+    default:  return (c == str[0]);
+  }
+}
+
+static int matchcharclass(char c, const char* str)
+{
+  do
+  {
+    if (matchrange(c, str))
+    {
+      return 1;
+    }
+    else if (str[0] == '\\')
+    {
+      /* Escape-char: increment str-ptr and match on next char */
+      str += 1;
+      if (matchmetachar(c, str))
+      {
+        return 1;
+      }
+      else if ((c == str[0]) && !ismetachar(c))
+      {
+        return 1;
+      }
+    }
+    else if (c == str[0])
+    {
+      if (c == '-')
+      {
+        return ((str[-1] == '\0') || (str[1] == '\0'));
+      }
+      else
+      {
+        return 1;
+      }
+    }
+  }
+  while (*str++ != '\0');
+
+  return 0;
+}
+
+static int matchone(regex_t p, char c)
+{
+  switch (p.type)
+  {
+    case DOT:            return matchdot(c);
+    case CHAR_CLASS:     return  matchcharclass(c, (const char*)p.ccl);
+    case INV_CHAR_CLASS: return !matchcharclass(c, (const char*)p.ccl);
+    case DIGIT:          return  matchdigit(c);
+    case NOT_DIGIT:      return !matchdigit(c);
+    case ALPHA:          return  matchalphanum(c);
+    case NOT_ALPHA:      return !matchalphanum(c);
+    case WHITESPACE:     return  matchwhitespace(c);
+    case NOT_WHITESPACE: return !matchwhitespace(c);
+    default:             return  (p.ch == c);
+  }
+}
+
+static int matchstar(regex_t p, regex_t* pattern, const char* text, int* matchlength)
+{
+  int prelen = *matchlength;
+  const char* prepoint = text;
+  while ((text[0] != '\0') && matchone(p, *text))
+  {
+    text++;
+    (*matchlength)++;
+  }
+  while (text >= prepoint)
+  {
+    if (matchpattern(pattern, text--, matchlength))
+      return 1;
+    (*matchlength)--;
+  }
+
+  *matchlength = prelen;
+  return 0;
+}
+
+static int matchplus(regex_t p, regex_t* pattern, const char* text, int* matchlength)
+{
+  const char* prepoint = text;
+  while ((text[0] != '\0') && matchone(p, *text))
+  {
+    text++;
+    (*matchlength)++;
+  }
+  while (text > prepoint)
+  {
+    if (matchpattern(pattern, text--, matchlength))
+      return 1;
+    (*matchlength)--;
+  }
+
+  return 0;
+}
+
+static int matchquestion(regex_t p, regex_t* pattern, const char* text, int* matchlength)
+{
+  if (p.type == UNUSED)
+    return 1;
+  if (matchpattern(pattern, text, matchlength))
+      return 1;
+  if (*text && matchone(p, *text++))
+  {
+    if (matchpattern(pattern, text, matchlength))
+    {
+      (*matchlength)++;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+#if 0
+
+/* Recursive matching */
+static int matchpattern(regex_t* pattern, const char* text, int *matchlength)
+{
+  int pre = *matchlength;
+  if ((pattern[0].type == UNUSED) || (pattern[1].type == QUESTIONMARK))
+  {
+    return matchquestion(pattern[1], &pattern[2], text, matchlength);
+  }
+  else if (pattern[1].type == STAR)
+  {
+    return matchstar(pattern[0], &pattern[2], text, matchlength);
+  }
+  else if (pattern[1].type == PLUS)
+  {
+    return matchplus(pattern[0], &pattern[2], text, matchlength);
+  }
+  else if ((pattern[0].type == END) && pattern[1].type == UNUSED)
+  {
+    return text[0] == '\0';
+  }
+  else if ((text[0] != '\0') && matchone(pattern[0], text[0]))
+  {
+    (*matchlength)++;
+    return matchpattern(&pattern[1], text+1);
+  }
+  else
+  {
+    *matchlength = pre;
+    return 0;
+  }
+}
+
+#else
+
+/* Iterative matching */
+static int matchpattern(regex_t* pattern, const char* text, int* matchlength)
+{
+  int pre = *matchlength;
+  do
+  {
+    if ((pattern[0].type == UNUSED) || (pattern[1].type == QUESTIONMARK))
+    {
+      return matchquestion(pattern[0], &pattern[2], text, matchlength);
+    }
+    else if (pattern[1].type == STAR)
+    {
+      return matchstar(pattern[0], &pattern[2], text, matchlength);
+    }
+    else if (pattern[1].type == PLUS)
+    {
+      return matchplus(pattern[0], &pattern[2], text, matchlength);
+    }
+    else if ((pattern[0].type == END) && pattern[1].type == UNUSED)
+    {
+      return (text[0] == '\0');
+    }
+/*  Branching is not working properly
+    else if (pattern[1].type == BRANCH)
+    {
+      return (matchpattern(pattern, text) || matchpattern(&pattern[2], text));
+    }
+*/
+  (*matchlength)++;
+  }
+  while ((text[0] != '\0') && matchone(*pattern++, *text++));
+
+  *matchlength = pre;
+  return 0;
+}
+
+#endif
+
+
+/*
+Copyright (c) 2013-2021, tinydir authors:
+- Cong Xu
+- Lautis Sun
+- Baudouin Feildel
+- Andargor <andargor@yahoo.com>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+#ifndef TINYDIR_H
+#define TINYDIR_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if ((defined _UNICODE) && !(defined UNICODE))
+#define UNICODE
+#endif
+
+#if ((defined UNICODE) && !(defined _UNICODE))
+#define _UNICODE
+#endif
+
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef _MSC_VER
+# ifndef WIN32_LEAN_AND_MEAN
+#  define WIN32_LEAN_AND_MEAN
+# endif
+# include <windows.h>
+# include <tchar.h>
+# pragma warning(push)
+# pragma warning (disable : 4996)
+#else
+# include <dirent.h>
+# include <libgen.h>
+# include <sys/stat.h>
+# include <stddef.h>
+#endif
+#ifdef __MINGW32__
+# include <tchar.h>
+#endif
+
+
+/* types */
+
+/* Windows UNICODE wide character support */
+#if defined _MSC_VER || defined __MINGW32__
+# define _tinydir_char_t TCHAR
+# define TINYDIR_STRING(s) _TEXT(s)
+# define _tinydir_strlen _tcslen
+# define _tinydir_strcpy _tcscpy
+# define _tinydir_strcat _tcscat
+# define _tinydir_strcmp _tcscmp
+# define _tinydir_strrchr _tcsrchr
+# define _tinydir_strncmp _tcsncmp
+#else
+# define _tinydir_char_t char
+# define TINYDIR_STRING(s) s
+# define _tinydir_strlen strlen
+# define _tinydir_strcpy strcpy
+# define _tinydir_strcat strcat
+# define _tinydir_strcmp strcmp
+# define _tinydir_strrchr strrchr
+# define _tinydir_strncmp strncmp
+#endif
+
+#if (defined _MSC_VER || defined __MINGW32__)
+# include <windows.h>
+# define _TINYDIR_PATH_MAX MAX_PATH
+#elif defined  __linux__
+# include <limits.h>
+# ifdef PATH_MAX
+#  define _TINYDIR_PATH_MAX PATH_MAX
+# endif
+#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+# include <sys/param.h>
+# if defined(BSD)
+#  include <limits.h>
+#  ifdef PATH_MAX
+#   define _TINYDIR_PATH_MAX PATH_MAX
+#  endif
+# endif
+#endif
+
+#ifndef _TINYDIR_PATH_MAX
+#define _TINYDIR_PATH_MAX 4096
+#endif
+
+#ifdef _MSC_VER
+/* extra chars for the "\\*" mask */
+# define _TINYDIR_PATH_EXTRA 2
+#else
+# define _TINYDIR_PATH_EXTRA 0
+#endif
+
+#define _TINYDIR_FILENAME_MAX 256
+
+#if (defined _MSC_VER || defined __MINGW32__)
+#define _TINYDIR_DRIVE_MAX 3
+#endif
+
+#ifdef _MSC_VER
+# define _TINYDIR_FUNC static __inline
+#elif !defined __STDC_VERSION__ || __STDC_VERSION__ < 199901L
+# define _TINYDIR_FUNC static __inline__
+#elif defined(__cplusplus)
+# define _TINYDIR_FUNC static inline
+#elif defined(__GNUC__)
+/* Suppress unused function warning */
+# define _TINYDIR_FUNC __attribute__((unused)) static
+#else
+# define _TINYDIR_FUNC static
+#endif
+
+/* readdir_r usage; define TINYDIR_USE_READDIR_R to use it (if supported) */
+#ifdef TINYDIR_USE_READDIR_R
+
+/* readdir_r is a POSIX-only function, and may not be available under various
+ * environments/settings, e.g. MinGW. Use readdir fallback */
+#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _BSD_SOURCE || _SVID_SOURCE ||\
+	_POSIX_SOURCE
+# define _TINYDIR_HAS_READDIR_R
+#endif
+#if _POSIX_C_SOURCE >= 200112L
+# define _TINYDIR_HAS_FPATHCONF
+# include <unistd.h>
+#endif
+#if _BSD_SOURCE || _SVID_SOURCE || \
+	(_POSIX_C_SOURCE >= 200809L || _XOPEN_SOURCE >= 700)
+# define _TINYDIR_HAS_DIRFD
+# include <sys/types.h>
+#endif
+#if defined _TINYDIR_HAS_FPATHCONF && defined _TINYDIR_HAS_DIRFD &&\
+	defined _PC_NAME_MAX
+# define _TINYDIR_USE_FPATHCONF
+#endif
+#if defined __MINGW32__ || !defined _TINYDIR_HAS_READDIR_R ||\
+	!(defined _TINYDIR_USE_FPATHCONF || defined NAME_MAX)
+# define _TINYDIR_USE_READDIR
+#endif
+
+/* Use readdir by default */
+#else
+# define _TINYDIR_USE_READDIR
+#endif
+
+/* MINGW32 has two versions of dirent, ASCII and UNICODE*/
+#ifndef _MSC_VER
+#if (defined __MINGW32__) && (defined _UNICODE)
+#define _TINYDIR_DIR _WDIR
+#define _tinydir_dirent _wdirent
+#define _tinydir_opendir _wopendir
+#define _tinydir_readdir _wreaddir
+#define _tinydir_closedir _wclosedir
+#else
+#define _TINYDIR_DIR DIR
+#define _tinydir_dirent dirent
+#define _tinydir_opendir opendir
+#define _tinydir_readdir readdir
+#define _tinydir_closedir closedir
+#endif
+#endif
+
+/* Allow user to use a custom allocator by defining _TINYDIR_MALLOC and _TINYDIR_FREE. */
+#if    defined(_TINYDIR_MALLOC) &&  defined(_TINYDIR_FREE)
+#elif !defined(_TINYDIR_MALLOC) && !defined(_TINYDIR_FREE)
+#else
+#error "Either define both alloc and free or none of them!"
+#endif
+
+#if !defined(_TINYDIR_MALLOC)
+	#define _TINYDIR_MALLOC(_size) malloc(_size)
+	#define _TINYDIR_FREE(_ptr)    free(_ptr)
+#endif /* !defined(_TINYDIR_MALLOC) */
+
+typedef struct tinydir_file
+{
+	_tinydir_char_t path[_TINYDIR_PATH_MAX];
+	_tinydir_char_t name[_TINYDIR_FILENAME_MAX];
+	_tinydir_char_t *extension;
+	int is_dir;
+	int is_reg;
+
+#ifndef _MSC_VER
+#ifdef __MINGW32__
+	struct _stat _s;
+#else
+	struct stat _s;
+#endif
+#endif
+} tinydir_file;
+
+typedef struct tinydir_dir
+{
+	_tinydir_char_t path[_TINYDIR_PATH_MAX];
+	int has_next;
+	size_t n_files;
+
+	tinydir_file *_files;
+#ifdef _MSC_VER
+	HANDLE _h;
+	WIN32_FIND_DATA _f;
+#else
+	_TINYDIR_DIR *_d;
+	struct _tinydir_dirent *_e;
+#ifndef _TINYDIR_USE_READDIR
+	struct _tinydir_dirent *_ep;
+#endif
+#endif
+} tinydir_dir;
+
+
+/* declarations */
+
+_TINYDIR_FUNC
+int tinydir_open(tinydir_dir *dir, const _tinydir_char_t *path);
+_TINYDIR_FUNC
+int tinydir_open_sorted(tinydir_dir *dir, const _tinydir_char_t *path);
+_TINYDIR_FUNC
+void tinydir_close(tinydir_dir *dir);
+
+_TINYDIR_FUNC
+int tinydir_next(tinydir_dir *dir);
+_TINYDIR_FUNC
+int tinydir_readfile(const tinydir_dir *dir, tinydir_file *file);
+_TINYDIR_FUNC
+int tinydir_readfile_n(const tinydir_dir *dir, tinydir_file *file, size_t i);
+_TINYDIR_FUNC
+int tinydir_open_subdir_n(tinydir_dir *dir, size_t i);
+
+_TINYDIR_FUNC
+int tinydir_file_open(tinydir_file *file, const _tinydir_char_t *path);
+_TINYDIR_FUNC
+void _tinydir_get_ext(tinydir_file *file);
+_TINYDIR_FUNC
+int _tinydir_file_cmp(const void *a, const void *b);
+#ifndef _MSC_VER
+#ifndef _TINYDIR_USE_READDIR
+_TINYDIR_FUNC
+size_t _tinydir_dirent_buf_size(_TINYDIR_DIR *dirp);
+#endif
+#endif
+
+
+/* definitions*/
+
+_TINYDIR_FUNC
+int tinydir_open(tinydir_dir *dir, const _tinydir_char_t *path)
+{
+#ifndef _MSC_VER
+#ifndef _TINYDIR_USE_READDIR
+	int error;
+	int size;	/* using int size */
+#endif
+#else
+	_tinydir_char_t path_buf[_TINYDIR_PATH_MAX];
+#endif
+	_tinydir_char_t *pathp;
+
+	if (dir == NULL || path == NULL || _tinydir_strlen(path) == 0)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+	if (_tinydir_strlen(path) + _TINYDIR_PATH_EXTRA >= _TINYDIR_PATH_MAX)
+	{
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	/* initialise dir */
+	dir->_files = NULL;
+#ifdef _MSC_VER
+	dir->_h = INVALID_HANDLE_VALUE;
+#else
+	dir->_d = NULL;
+#ifndef _TINYDIR_USE_READDIR
+	dir->_ep = NULL;
+#endif
+#endif
+	tinydir_close(dir);
+
+	_tinydir_strcpy(dir->path, path);
+	/* Remove trailing slashes */
+	pathp = &dir->path[_tinydir_strlen(dir->path) - 1];
+	while (pathp != dir->path && (*pathp == TINYDIR_STRING('\\') || *pathp == TINYDIR_STRING('/')))
+	{
+		*pathp = TINYDIR_STRING('\0');
+		pathp++;
+	}
+#ifdef _MSC_VER
+	_tinydir_strcpy(path_buf, dir->path);
+	_tinydir_strcat(path_buf, TINYDIR_STRING("\\*"));
+#if (defined WINAPI_FAMILY) && (WINAPI_FAMILY != WINAPI_FAMILY_DESKTOP_APP)
+	dir->_h = FindFirstFileEx(path_buf, FindExInfoStandard, &dir->_f, FindExSearchNameMatch, NULL, 0);
+#else
+	dir->_h = FindFirstFile(path_buf, &dir->_f);
+#endif
+	if (dir->_h == INVALID_HANDLE_VALUE)
+	{
+		errno = ENOENT;
+#else
+	dir->_d = _tinydir_opendir(path);
+	if (dir->_d == NULL)
+	{
+#endif
+		goto bail;
+	}
+
+	/* read first file */
+	dir->has_next = 1;
+#ifndef _MSC_VER
+#ifdef _TINYDIR_USE_READDIR
+	dir->_e = _tinydir_readdir(dir->_d);
+#else
+	/* allocate dirent buffer for readdir_r */
+	size = _tinydir_dirent_buf_size(dir->_d); /* conversion to int */
+	if (size == -1) return -1;
+	dir->_ep = (struct _tinydir_dirent*)_TINYDIR_MALLOC(size);
+	if (dir->_ep == NULL) return -1;
+
+	error = readdir_r(dir->_d, dir->_ep, &dir->_e);
+	if (error != 0) return -1;
+#endif
+	if (dir->_e == NULL)
+	{
+		dir->has_next = 0;
+	}
+#endif
+
+	return 0;
+
+bail:
+	tinydir_close(dir);
+	return -1;
+}
+
+_TINYDIR_FUNC
+int tinydir_open_sorted(tinydir_dir *dir, const _tinydir_char_t *path)
+{
+	/* Count the number of files first, to pre-allocate the files array */
+	size_t n_files = 0;
+	if (tinydir_open(dir, path) == -1)
+	{
+		return -1;
+	}
+	while (dir->has_next)
+	{
+		n_files++;
+		if (tinydir_next(dir) == -1)
+		{
+			goto bail;
+		}
+	}
+	tinydir_close(dir);
+
+	if (n_files == 0 || tinydir_open(dir, path) == -1)
+	{
+		return -1;
+	}
+
+	dir->n_files = 0;
+	dir->_files = (tinydir_file *)_TINYDIR_MALLOC(sizeof *dir->_files * n_files);
+	if (dir->_files == NULL)
+	{
+		goto bail;
+	}
+	while (dir->has_next)
+	{
+		tinydir_file *p_file;
+		dir->n_files++;
+
+		p_file = &dir->_files[dir->n_files - 1];
+		if (tinydir_readfile(dir, p_file) == -1)
+		{
+			goto bail;
+		}
+
+		if (tinydir_next(dir) == -1)
+		{
+			goto bail;
+		}
+
+		/* Just in case the number of files has changed between the first and
+		second reads, terminate without writing into unallocated memory */
+		if (dir->n_files == n_files)
+		{
+			break;
+		}
+	}
+
+	qsort(dir->_files, dir->n_files, sizeof(tinydir_file), _tinydir_file_cmp);
+
+	return 0;
+
+bail:
+	tinydir_close(dir);
+	return -1;
+}
+
+_TINYDIR_FUNC
+void tinydir_close(tinydir_dir *dir)
+{
+	if (dir == NULL)
+	{
+		return;
+	}
+
+	memset(dir->path, 0, sizeof(dir->path));
+	dir->has_next = 0;
+	dir->n_files = 0;
+	_TINYDIR_FREE(dir->_files);
+	dir->_files = NULL;
+#ifdef _MSC_VER
+	if (dir->_h != INVALID_HANDLE_VALUE)
+	{
+		FindClose(dir->_h);
+	}
+	dir->_h = INVALID_HANDLE_VALUE;
+#else
+	if (dir->_d)
+	{
+		_tinydir_closedir(dir->_d);
+	}
+	dir->_d = NULL;
+	dir->_e = NULL;
+#ifndef _TINYDIR_USE_READDIR
+	_TINYDIR_FREE(dir->_ep);
+	dir->_ep = NULL;
+#endif
+#endif
+}
+
+_TINYDIR_FUNC
+int tinydir_next(tinydir_dir *dir)
+{
+	if (dir == NULL)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+	if (!dir->has_next)
+	{
+		errno = ENOENT;
+		return -1;
+	}
+
+#ifdef _MSC_VER
+	if (FindNextFile(dir->_h, &dir->_f) == 0)
+#else
+#ifdef _TINYDIR_USE_READDIR
+	dir->_e = _tinydir_readdir(dir->_d);
+#else
+	if (dir->_ep == NULL)
+	{
+		return -1;
+	}
+	if (readdir_r(dir->_d, dir->_ep, &dir->_e) != 0)
+	{
+		return -1;
+	}
+#endif
+	if (dir->_e == NULL)
+#endif
+	{
+		dir->has_next = 0;
+#ifdef _MSC_VER
+		if (GetLastError() != ERROR_SUCCESS &&
+			GetLastError() != ERROR_NO_MORE_FILES)
+		{
+			tinydir_close(dir);
+			errno = EIO;
+			return -1;
+		}
+#endif
+	}
+
+	return 0;
+}
+
+_TINYDIR_FUNC
+int tinydir_readfile(const tinydir_dir *dir, tinydir_file *file)
+{
+	const _tinydir_char_t *filename;
+	if (dir == NULL || file == NULL)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+#ifdef _MSC_VER
+	if (dir->_h == INVALID_HANDLE_VALUE)
+#else
+	if (dir->_e == NULL)
+#endif
+	{
+		errno = ENOENT;
+		return -1;
+	}
+	filename =
+#ifdef _MSC_VER
+		dir->_f.cFileName;
+#else
+		dir->_e->d_name;
+#endif
+	if (_tinydir_strlen(dir->path) +
+		_tinydir_strlen(filename) + 1 + _TINYDIR_PATH_EXTRA >=
+		_TINYDIR_PATH_MAX)
+	{
+		/* the path for the file will be too long */
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	if (_tinydir_strlen(filename) >= _TINYDIR_FILENAME_MAX)
+	{
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	_tinydir_strcpy(file->path, dir->path);
+	if (_tinydir_strcmp(dir->path, TINYDIR_STRING("/")) != 0)
+		_tinydir_strcat(file->path, TINYDIR_STRING("/"));
+	_tinydir_strcpy(file->name, filename);
+	_tinydir_strcat(file->path, filename);
+#ifndef _MSC_VER
+#ifdef __MINGW32__
+	if (_tstat(
+#elif (defined _BSD_SOURCE) || (defined _DEFAULT_SOURCE)	\
+	|| ((defined _XOPEN_SOURCE) && (_XOPEN_SOURCE >= 500))	\
+	|| ((defined _POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200112L)) \
+	|| ((defined __APPLE__) && (defined __MACH__)) \
+	|| (defined BSD)
+	if (lstat(
+#else
+	if (stat(
+#endif
+		file->path, &file->_s) == -1)
+	{
+		return -1;
+	}
+#endif
+	_tinydir_get_ext(file);
+
+	file->is_dir =
+#ifdef _MSC_VER
+		!!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+#else
+		S_ISDIR(file->_s.st_mode);
+#endif
+	file->is_reg =
+#ifdef _MSC_VER
+		!!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_NORMAL) ||
+		(
+			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) &&
+			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) &&
+#ifdef FILE_ATTRIBUTE_INTEGRITY_STREAM
+			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_INTEGRITY_STREAM) &&
+#endif
+#ifdef FILE_ATTRIBUTE_NO_SCRUB_DATA
+			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_NO_SCRUB_DATA) &&
+#endif
+			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) &&
+			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY));
+#else
+		S_ISREG(file->_s.st_mode);
+#endif
+
+	return 0;
+}
+
+_TINYDIR_FUNC
+int tinydir_readfile_n(const tinydir_dir *dir, tinydir_file *file, size_t i)
+{
+	if (dir == NULL || file == NULL)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+	if (i >= dir->n_files)
+	{
+		errno = ENOENT;
+		return -1;
+	}
+
+	memcpy(file, &dir->_files[i], sizeof(tinydir_file));
+	_tinydir_get_ext(file);
+
+	return 0;
+}
+
+_TINYDIR_FUNC
+int tinydir_open_subdir_n(tinydir_dir *dir, size_t i)
+{
+	_tinydir_char_t path[_TINYDIR_PATH_MAX];
+	if (dir == NULL)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+	if (i >= dir->n_files || !dir->_files[i].is_dir)
+	{
+		errno = ENOENT;
+		return -1;
+	}
+
+	_tinydir_strcpy(path, dir->_files[i].path);
+	tinydir_close(dir);
+	if (tinydir_open_sorted(dir, path) == -1)
+	{
+		return -1;
+	}
+
+	return 0;
+}
+
+/* Open a single file given its path */
+_TINYDIR_FUNC
+int tinydir_file_open(tinydir_file *file, const _tinydir_char_t *path)
+{
+	tinydir_dir dir;
+	int result = 0;
+	int found = 0;
+	_tinydir_char_t dir_name_buf[_TINYDIR_PATH_MAX];
+	_tinydir_char_t file_name_buf[_TINYDIR_FILENAME_MAX];
+	_tinydir_char_t *dir_name;
+	_tinydir_char_t *base_name;
+#if (defined _MSC_VER || defined __MINGW32__)
+	_tinydir_char_t drive_buf[_TINYDIR_PATH_MAX];
+	_tinydir_char_t ext_buf[_TINYDIR_FILENAME_MAX];
+#endif
+
+	if (file == NULL || path == NULL || _tinydir_strlen(path) == 0)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+	if (_tinydir_strlen(path) + _TINYDIR_PATH_EXTRA >= _TINYDIR_PATH_MAX)
+	{
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	/* Get the parent path */
+#if (defined _MSC_VER || defined __MINGW32__)
+#if ((defined _MSC_VER) && (_MSC_VER >= 1400))
+	errno = _tsplitpath_s(
+		path,
+		drive_buf, _TINYDIR_DRIVE_MAX,
+		dir_name_buf, _TINYDIR_FILENAME_MAX,
+		file_name_buf, _TINYDIR_FILENAME_MAX,
+		ext_buf, _TINYDIR_FILENAME_MAX);
+#else
+	_tsplitpath(
+		path,
+		drive_buf,
+		dir_name_buf,
+		file_name_buf,
+		ext_buf);
+#endif
+
+	if (errno)
+	{
+		return -1;
+	}
+
+/* _splitpath_s not work fine with only filename and widechar support */
+#ifdef _UNICODE
+	if (drive_buf[0] == L'\xFEFE')
+		drive_buf[0] = '\0';
+	if (dir_name_buf[0] == L'\xFEFE')
+		dir_name_buf[0] = '\0';
+#endif
+
+	/* Emulate the behavior of dirname by returning "." for dir name if it's
+	empty */
+	if (drive_buf[0] == '\0' && dir_name_buf[0] == '\0')
+	{
+		_tinydir_strcpy(dir_name_buf, TINYDIR_STRING("."));
+	}
+	/* Concatenate the drive letter and dir name to form full dir name */
+	_tinydir_strcat(drive_buf, dir_name_buf);
+	dir_name = drive_buf;
+	/* Concatenate the file name and extension to form base name */
+	_tinydir_strcat(file_name_buf, ext_buf);
+	base_name = file_name_buf;
+#else
+	_tinydir_strcpy(dir_name_buf, path);
+	dir_name = dirname(dir_name_buf);
+	_tinydir_strcpy(file_name_buf, path);
+	base_name = basename(file_name_buf);
+#endif
+
+	/* Special case: if the path is a root dir, open the parent dir as the file */
+#if (defined _MSC_VER || defined __MINGW32__)
+	if (_tinydir_strlen(base_name) == 0)
+#else
+	if ((_tinydir_strcmp(base_name, TINYDIR_STRING("/"))) == 0)
+#endif
+	{
+		memset(file, 0, sizeof * file);
+		file->is_dir = 1;
+		file->is_reg = 0;
+		_tinydir_strcpy(file->path, dir_name);
+		file->extension = file->path + _tinydir_strlen(file->path);
+		return 0;
+	}
+
+	/* Open the parent directory */
+	if (tinydir_open(&dir, dir_name) == -1)
+	{
+		return -1;
+	}
+
+	/* Read through the parent directory and look for the file */
+	while (dir.has_next)
+	{
+		if (tinydir_readfile(&dir, file) == -1)
+		{
+			result = -1;
+			goto bail;
+		}
+		if (_tinydir_strcmp(file->name, base_name) == 0)
+		{
+			/* File found */
+			found = 1;
+			break;
+		}
+		tinydir_next(&dir);
+	}
+	if (!found)
+	{
+		result = -1;
+		errno = ENOENT;
+	}
+
+bail:
+	tinydir_close(&dir);
+	return result;
+}
+
+_TINYDIR_FUNC
+void _tinydir_get_ext(tinydir_file *file)
+{
+	_tinydir_char_t *period = _tinydir_strrchr(file->name, TINYDIR_STRING('.'));
+	if (period == NULL)
+	{
+		file->extension = &(file->name[_tinydir_strlen(file->name)]);
+	}
+	else
+	{
+		file->extension = period + 1;
+	}
+}
+
+_TINYDIR_FUNC
+int _tinydir_file_cmp(const void *a, const void *b)
+{
+	const tinydir_file *fa = (const tinydir_file *)a;
+	const tinydir_file *fb = (const tinydir_file *)b;
+	if (fa->is_dir != fb->is_dir)
+	{
+		return -(fa->is_dir - fb->is_dir);
+	}
+	return _tinydir_strncmp(fa->name, fb->name, _TINYDIR_FILENAME_MAX);
+}
+
+#ifndef _MSC_VER
+#ifndef _TINYDIR_USE_READDIR
+/*
+The following authored by Ben Hutchings <ben@decadent.org.uk>
+from https://womble.decadent.org.uk/readdir_r-advisory.html
+*/
+/* Calculate the required buffer size (in bytes) for directory      *
+* entries read from the given directory handle.  Return -1 if this  *
+* this cannot be done.                                              *
+*                                                                   *
+* This code does not trust values of NAME_MAX that are less than    *
+* 255, since some systems (including at least HP-UX) incorrectly    *
+* define it to be a smaller value.                                  */
+_TINYDIR_FUNC
+size_t _tinydir_dirent_buf_size(_TINYDIR_DIR *dirp)
+{
+	long name_max;
+	size_t name_end;
+	/* parameter may be unused */
+	(void)dirp;
+
+#if defined _TINYDIR_USE_FPATHCONF
+	name_max = fpathconf(dirfd(dirp), _PC_NAME_MAX);
+	if (name_max == -1)
+#if defined(NAME_MAX)
+		name_max = (NAME_MAX > 255) ? NAME_MAX : 255;
+#else
+		return (size_t)(-1);
+#endif
+#elif defined(NAME_MAX)
+ 	name_max = (NAME_MAX > 255) ? NAME_MAX : 255;
+#else
+#error "buffer size for readdir_r cannot be determined"
+#endif
+	name_end = (size_t)offsetof(struct _tinydir_dirent, d_name) + name_max + 1;
+	return (name_end > sizeof(struct _tinydir_dirent) ?
+		name_end : sizeof(struct _tinydir_dirent));
+}
+#endif
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+# if defined (_MSC_VER)
+# pragma warning(pop)
+# endif
+
+#endif
 
 
 #ifndef LIBTCC_H
@@ -15676,137 +17247,7 @@ LIBTCCAPI void *tcc_get_symbol(TCCState *s, const char *name);
 #define LIBTCC_AVAILABLE 0
 #endif
 
-
-#include <stdlib.h>
-
-#include <stdio.h>
-#include <time.h>
-
-
-typedef enum Lita_OSType {
-    Lita_OSType_WINDOWS,
-    Lita_OSType_ANDROID,
-    Lita_OSType_LINUX,
-    Lita_OSType_BSD,
-    Lita_OSType_IOS,
-    Lita_OSType_MAC,
-    Lita_OSType_OTHER
-} Lita_OSType;
-
-
-#if defined(_WIN32)
-    // Windows
-    Lita_OSType litaOS = Lita_OSType_WINDOWS;
-    #define LITA_IS_POSIX 0
-#elif defined(_WIN64)
-    // Windows
-    Lita_OSType litaOS = Lita_OSType_WINDOWS;
-    #define LITA_IS_POSIX 0
-#elif defined(__CYGWIN__) && !defined(_WIN32)
-    // Windows (Cygwin POSIX under Microsoft Window)
-    Lita_OSType litaOS = Lita_OSType_WINDOWS;
-    #define LITA_IS_POSIX 1
-#elif defined(__ANDROID__)
-    // Android (implies Linux, so it must come first)
-    Lita_OSType litaOS = Lita_OSType_ANDROID;
-    #define LITA_IS_POSIX 1
-#elif defined(__linux__)
-    // Debian, Ubuntu, Gentoo, Fedora, openSUSE, RedHat, Centos and other
-    Lita_OSType litaOS = Lita_OSType_LINUX;
-    #define LITA_IS_POSIX 1
-#elif defined(__unix__) || !defined(__APPLE__) && defined(__MACH__)
-    #include <sys/param.h>
-    #if defined(BSD)
-        // FreeBSD, NetBSD, OpenBSD, DragonFly BSD
-        Lita_OSType litaOS = Lita_OSType_BSD;
-    #endif
-    #define LITA_IS_POSIX 1
-#elif defined(__hpux)
-    // HP-UX
-    Lita_OSType litaOS = Lita_OSType_OTHER;
-#elif defined(_AIX)
-    // IBM AIX
-    Lita_OSType litaOS = Lita_OSType_OTHER;
-#elif defined(__APPLE__) && defined(__MACH__) // Apple OSX and iOS (Darwin)
-    #include <TargetConditionals.h>
-    #if TARGET_IPHONE_SIMULATOR == 1
-        // Apple iOS
-        Lita_OSType litaOS = Lita_OSType_IOS;
-    #elif TARGET_OS_IPHONE == 1
-        // Apple iOS
-        Lita_OSType litaOS = Lita_OSType_IOS;
-    #elif TARGET_OS_MAC == 1
-        // Apple OSX
-        Lita_OSType litaOS = Lita_OSType_MAC;
-    #endif
-    #define LITA_IS_POSIX 1
-#elif defined(__sun) && defined(__SVR4)
-    // Oracle Solaris, Open Indiana
-    Lita_OSType litaOS = Lita_OSType_OTHER;
-    #define LITA_IS_POSIX 0
-#else
-    Lita_OSType litaOS = Lita_OSType_OTHER;
-    #define LITA_IS_POSIX 0
-#endif
-
-
-typedef struct tm tm;
-
-
-
-typedef enum Lita_ArchType {
-    Lita_ArchType_UNKNOWN,
-    Lita_ArchType_ARM32,
-    Lita_ArchType_ARM64,
-    Lita_ArchType_X86,
-    Lita_ArchType_X86_64,
-    Lita_ArchType_SPARC,
-} Lita_ArchType;
-
-#if defined(_M_IX86) || defined(__i386__) || defined(__i386) || defined(__i486__) || defined(__i486) || defined(i386)
-#define LITA_X86 1
-#else
-#define LITA_X86 0
-#endif
-
-#if defined(_M_X64) || defined(__ia64__) || defined(__x86_64__)
-#define LITA_X64 1
-#else
-#define LITA_X64 0
-#endif
-
-#if defined(__arm__)
-#define LITA_ARM32 1
-#else
-#define LITA_ARM32 0
-#endif
-
-#if defined(__aarch64__)
-#define LITA_ARM64 1
-#else
-#define LITA_ARM64 0
-#endif
-
-#if defined(__sparc__)
-#define LITA_SPARC 1
-#else
-#define LITA_SPARC 0
-#endif
-
-#if LITA_ARM32
-    Lita_ArchType litaArch = Lita_ArchType_ARM32;
-#elif LITA_ARM64
-    Lita_ArchType litaArch = Lita_ArchType_ARM64;
-#elif LITA_X86
-    Lita_ArchType litaArch = Lita_ArchType_X86;
-#elif LITA_X64
-    Lita_ArchType litaArch = Lita_ArchType_X86_64;
-#elif LITA_SPARC
-    Lita_ArchType litaArch = Lita_ArchType_SPARC;
-#else
-    Lita_ArchType litaArch = Lita_ArchType_UNKNOWN;
-#endif
-
+#include <stdatomic.h>
 
 #ifndef MINIZ_EXPORT
 #define MINIZ_EXPORT
@@ -25095,605 +26536,6 @@ mz_bool mz_zip_end(mz_zip_archive *pZip)
 
 #define LITAC_DEFAULT_ALIGNMENT (2*sizeof(void*))
 
-/*
- *
- * Mini regex-module inspired by Rob Pike's regex code described in:
- *
- * http://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
- *
- *
- *
- * Supports:
- * ---------
- *   '.'        Dot, matches any character
- *   '^'        Start anchor, matches beginning of string
- *   '$'        End anchor, matches end of string
- *   '*'        Asterisk, match zero or more (greedy)
- *   '+'        Plus, match one or more (greedy)
- *   '?'        Question, match zero or one (non-greedy)
- *   '[abc]'    Character class, match if one of {'a', 'b', 'c'}
- *   '[^abc]'   Inverted class, match if NOT one of {'a', 'b', 'c'} -- NOTE: feature is currently broken!
- *   '[a-zA-Z]' Character ranges, the character set of the ranges { a-z | A-Z }
- *   '\s'       Whitespace, \t \f \r \n \v and spaces
- *   '\S'       Non-whitespace
- *   '\w'       Alphanumeric, [a-zA-Z0-9_]
- *   '\W'       Non-alphanumeric
- *   '\d'       Digits, [0-9]
- *   '\D'       Non-digits
- *
- *
- */
-
-
-
-/*
- *
- * Mini regex-module inspired by Rob Pike's regex code described in:
- *
- * http://www.cs.princeton.edu/courses/archive/spr09/cos333/beautiful.html
- *
- *
- *
- * Supports:
- * ---------
- *   '.'        Dot, matches any character
- *   '^'        Start anchor, matches beginning of string
- *   '$'        End anchor, matches end of string
- *   '*'        Asterisk, match zero or more (greedy)
- *   '+'        Plus, match one or more (greedy)
- *   '?'        Question, match zero or one (non-greedy)
- *   '[abc]'    Character class, match if one of {'a', 'b', 'c'}
- *   '[^abc]'   Inverted class, match if NOT one of {'a', 'b', 'c'} -- NOTE: feature is currently broken!
- *   '[a-zA-Z]' Character ranges, the character set of the ranges { a-z | A-Z }
- *   '\s'       Whitespace, \t \f \r \n \v and spaces
- *   '\S'       Non-whitespace
- *   '\w'       Alphanumeric, [a-zA-Z0-9_]
- *   '\W'       Non-alphanumeric
- *   '\d'       Digits, [0-9]
- *   '\D'       Non-digits
- *
- *
- */
-
-#ifndef _TINY_REGEX_C
-#define _TINY_REGEX_C
-
-
-#ifndef RE_DOT_MATCHES_NEWLINE
-/* Define to 0 if you DON'T want '.' to match '\r' + '\n' */
-#define RE_DOT_MATCHES_NEWLINE 1
-#endif
-
-#ifdef __cplusplus
-extern "C"{
-#endif
-
-
-
-/* Typedef'd pointer to get abstract datatype. */
-typedef struct regex_t* re_t;
-
-
-/* Compile regex string pattern to a regex_t-array. */
-re_t re_compile(const char* pattern);
-
-
-/* Find matches of the compiled pattern inside text. */
-int  re_matchp(re_t pattern, const char* text, int* matchlength);
-
-
-/* Find matches of the txt pattern inside text (will compile automatically first). */
-int  re_match(const char* pattern, const char* text, int* matchlength);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* ifndef _TINY_REGEX_C */
-
-#include <stdio.h>
-
-/* Definitions: */
-
-#define MAX_REGEXP_OBJECTS      30    /* Max number of regex symbols in expression. */
-#define MAX_CHAR_CLASS_LEN      40    /* Max length of character-class buffer in.   */
-
-
-enum { UNUSED, DOT, BEGIN, END, QUESTIONMARK, STAR, PLUS, RE_CHAR, CHAR_CLASS, INV_CHAR_CLASS, DIGIT, NOT_DIGIT, ALPHA, NOT_ALPHA, WHITESPACE, NOT_WHITESPACE, /* BRANCH */ };
-
-typedef struct regex_t
-{
-  unsigned char  type;   /* CHAR, STAR, etc.                      */
-  union
-  {
-    unsigned char  ch;   /*      the character itself             */
-    unsigned char* ccl;  /*  OR  a pointer to characters in class */
-  };
-} regex_t;
-
-
-
-/* Private function declarations: */
-static int matchpattern(regex_t* pattern, const char* text, int* matchlength);
-static int matchcharclass(char c, const char* str);
-static int matchstar(regex_t p, regex_t* pattern, const char* text, int* matchlength);
-static int matchplus(regex_t p, regex_t* pattern, const char* text, int* matchlength);
-static int matchone(regex_t p, char c);
-static int matchdigit(char c);
-static int matchalpha(char c);
-static int matchwhitespace(char c);
-static int matchmetachar(char c, const char* str);
-static int matchrange(char c, const char* str);
-static int matchdot(char c);
-static int ismetachar(char c);
-
-
-
-/* Public functions: */
-int re_match(const char* pattern, const char* text, int* matchlength)
-{
-  return re_matchp(re_compile(pattern), text, matchlength);
-}
-
-int re_matchp(re_t pattern, const char* text, int* matchlength)
-{
-  *matchlength = 0;
-  if (pattern != 0)
-  {
-    if (pattern[0].type == BEGIN)
-    {
-      return ((matchpattern(&pattern[1], text, matchlength)) ? 0 : -1);
-    }
-    else
-    {
-      int idx = -1;
-
-      do
-      {
-        idx += 1;
-
-        if (matchpattern(pattern, text, matchlength))
-        {
-          if (text[0] == '\0')
-            return -1;
-
-          return idx;
-        }
-      }
-      while (*text++ != '\0');
-    }
-  }
-  return -1;
-}
-
-re_t re_compile(const char* pattern)
-{
-  /* The sizes of the two static arrays below substantiates the static RAM usage of this module.
-     MAX_REGEXP_OBJECTS is the max number of symbols in the expression.
-     MAX_CHAR_CLASS_LEN determines the size of buffer for chars in all char-classes in the expression. */
-  static regex_t re_compiled[MAX_REGEXP_OBJECTS];
-  static unsigned char ccl_buf[MAX_CHAR_CLASS_LEN];
-  int ccl_bufidx = 1;
-
-  char c;     /* current char in pattern   */
-  int i = 0;  /* index into pattern        */
-  int j = 0;  /* index into re_compiled    */
-
-  while (pattern[i] != '\0' && (j+1 < MAX_REGEXP_OBJECTS))
-  {
-    c = pattern[i];
-
-    switch (c)
-    {
-      /* Meta-characters: */
-      case '^': {    re_compiled[j].type = BEGIN;           } break;
-      case '$': {    re_compiled[j].type = END;             } break;
-      case '.': {    re_compiled[j].type = DOT;             } break;
-      case '*': {    re_compiled[j].type = STAR;            } break;
-      case '+': {    re_compiled[j].type = PLUS;            } break;
-      case '?': {    re_compiled[j].type = QUESTIONMARK;    } break;
-/*    case '|': {    re_compiled[j].type = BRANCH;          } break; <-- not working properly */
-
-      /* Escaped character-classes (\s \w ...): */
-      case '\\':
-      {
-        if (pattern[i+1] != '\0')
-        {
-          /* Skip the escape-char '\\' */
-          i += 1;
-          /* ... and check the next */
-          switch (pattern[i])
-          {
-            /* Meta-character: */
-            case 'd': {    re_compiled[j].type = DIGIT;            } break;
-            case 'D': {    re_compiled[j].type = NOT_DIGIT;        } break;
-            case 'w': {    re_compiled[j].type = ALPHA;            } break;
-            case 'W': {    re_compiled[j].type = NOT_ALPHA;        } break;
-            case 's': {    re_compiled[j].type = WHITESPACE;       } break;
-            case 'S': {    re_compiled[j].type = NOT_WHITESPACE;   } break;
-
-            /* Escaped character, e.g. '.' or '$' */
-            default:
-            {
-              re_compiled[j].type = RE_CHAR;
-              re_compiled[j].ch = pattern[i];
-            } break;
-          }
-        }
-        /* '\\' as last char in pattern -> invalid regular expression. */
-/*
-        else
-        {
-          re_compiled[j].type = CHAR;
-          re_compiled[j].ch = pattern[i];
-        }
-*/
-      } break;
-
-      /* Character class: */
-      case '[':
-      {
-        /* Remember where the char-buffer starts. */
-        int buf_begin = ccl_bufidx;
-
-        /* Look-ahead to determine if negated */
-        if (pattern[i+1] == '^')
-        {
-          re_compiled[j].type = INV_CHAR_CLASS;
-          i += 1; /* Increment i to avoid including '^' in the char-buffer */
-          if (pattern[i+1] == 0) /* incomplete pattern, missing non-zero char after '^' */
-          {
-            return 0;
-          }
-        }
-        else
-        {
-          re_compiled[j].type = CHAR_CLASS;
-        }
-
-        /* Copy characters inside [..] to buffer */
-        while (    (pattern[++i] != ']')
-                && (pattern[i]   != '\0')) /* Missing ] */
-        {
-          if (pattern[i] == '\\')
-          {
-            if (ccl_bufidx >= MAX_CHAR_CLASS_LEN - 1)
-            {
-              //fputs("exceeded internal buffer!\n", stderr);
-              return 0;
-            }
-            if (pattern[i+1] == 0) /* incomplete pattern, missing non-zero char after '\\' */
-            {
-              return 0;
-            }
-            ccl_buf[ccl_bufidx++] = pattern[i++];
-          }
-          else if (ccl_bufidx >= MAX_CHAR_CLASS_LEN)
-          {
-              //fputs("exceeded internal buffer!\n", stderr);
-              return 0;
-          }
-          ccl_buf[ccl_bufidx++] = pattern[i];
-        }
-        if (ccl_bufidx >= MAX_CHAR_CLASS_LEN)
-        {
-            /* Catches cases such as [00000000000000000000000000000000000000][ */
-            //fputs("exceeded internal buffer!\n", stderr);
-            return 0;
-        }
-        /* Null-terminate string end */
-        ccl_buf[ccl_bufidx++] = 0;
-        re_compiled[j].ccl = &ccl_buf[buf_begin];
-      } break;
-
-      /* Other characters: */
-      default:
-      {
-        re_compiled[j].type = RE_CHAR;
-        re_compiled[j].ch = c;
-      } break;
-    }
-    /* no buffer-out-of-bounds access on invalid patterns - see https://github.com/kokke/tiny-regex-c/commit/1a279e04014b70b0695fba559a7c05d55e6ee90b */
-    if (pattern[i] == 0)
-    {
-      return 0;
-    }
-
-    i += 1;
-    j += 1;
-  }
-  /* 'UNUSED' is a sentinel used to indicate end-of-pattern */
-  re_compiled[j].type = UNUSED;
-
-  return (re_t) re_compiled;
-}
-
-void re_print(regex_t* pattern)
-{
-  const char* types[] = { "UNUSED", "DOT", "BEGIN", "END", "QUESTIONMARK", "STAR", "PLUS", "CHAR", "CHAR_CLASS", "INV_CHAR_CLASS", "DIGIT", "NOT_DIGIT", "ALPHA", "NOT_ALPHA", "WHITESPACE", "NOT_WHITESPACE", "BRANCH" };
-
-  int i;
-  int j;
-  char c;
-  for (i = 0; i < MAX_REGEXP_OBJECTS; ++i)
-  {
-    if (pattern[i].type == UNUSED)
-    {
-      break;
-    }
-
-    printf("type: %s", types[pattern[i].type]);
-    if (pattern[i].type == CHAR_CLASS || pattern[i].type == INV_CHAR_CLASS)
-    {
-      printf(" [");
-      for (j = 0; j < MAX_CHAR_CLASS_LEN; ++j)
-      {
-        c = pattern[i].ccl[j];
-        if ((c == '\0') || (c == ']'))
-        {
-          break;
-        }
-        printf("%c", c);
-      }
-      printf("]");
-    }
-    else if (pattern[i].type == RE_CHAR)
-    {
-      printf(" '%c'", pattern[i].ch);
-    }
-    printf("\n");
-  }
-}
-
-
-
-/* Private functions: */
-static int matchdigit(char c)
-{
-  return ((c >= '0') && (c <= '9'));
-}
-static int matchalpha(char c)
-{
-  return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z'));
-}
-static int matchwhitespace(char c)
-{
-  return ((c == ' ') || (c == '\t') || (c == '\n') || (c == '\r') || (c == '\f') || (c == '\v'));
-}
-static int matchalphanum(char c)
-{
-  return ((c == '_') || matchalpha(c) || matchdigit(c));
-}
-static int matchrange(char c, const char* str)
-{
-  return (    (c != '-')
-           && (str[0] != '\0')
-           && (str[0] != '-')
-           && (str[1] == '-')
-           && (str[2] != '\0')
-           && (    (c >= str[0])
-                && (c <= str[2])));
-}
-static int matchdot(char c)
-{
-#if defined(RE_DOT_MATCHES_NEWLINE) && (RE_DOT_MATCHES_NEWLINE == 1)
-  (void)c;
-  return 1;
-#else
-  return c != '\n' && c != '\r';
-#endif
-}
-static int ismetachar(char c)
-{
-  return ((c == 's') || (c == 'S') || (c == 'w') || (c == 'W') || (c == 'd') || (c == 'D'));
-}
-
-static int matchmetachar(char c, const char* str)
-{
-  switch (str[0])
-  {
-    case 'd': return  matchdigit(c);
-    case 'D': return !matchdigit(c);
-    case 'w': return  matchalphanum(c);
-    case 'W': return !matchalphanum(c);
-    case 's': return  matchwhitespace(c);
-    case 'S': return !matchwhitespace(c);
-    default:  return (c == str[0]);
-  }
-}
-
-static int matchcharclass(char c, const char* str)
-{
-  do
-  {
-    if (matchrange(c, str))
-    {
-      return 1;
-    }
-    else if (str[0] == '\\')
-    {
-      /* Escape-char: increment str-ptr and match on next char */
-      str += 1;
-      if (matchmetachar(c, str))
-      {
-        return 1;
-      }
-      else if ((c == str[0]) && !ismetachar(c))
-      {
-        return 1;
-      }
-    }
-    else if (c == str[0])
-    {
-      if (c == '-')
-      {
-        return ((str[-1] == '\0') || (str[1] == '\0'));
-      }
-      else
-      {
-        return 1;
-      }
-    }
-  }
-  while (*str++ != '\0');
-
-  return 0;
-}
-
-static int matchone(regex_t p, char c)
-{
-  switch (p.type)
-  {
-    case DOT:            return matchdot(c);
-    case CHAR_CLASS:     return  matchcharclass(c, (const char*)p.ccl);
-    case INV_CHAR_CLASS: return !matchcharclass(c, (const char*)p.ccl);
-    case DIGIT:          return  matchdigit(c);
-    case NOT_DIGIT:      return !matchdigit(c);
-    case ALPHA:          return  matchalphanum(c);
-    case NOT_ALPHA:      return !matchalphanum(c);
-    case WHITESPACE:     return  matchwhitespace(c);
-    case NOT_WHITESPACE: return !matchwhitespace(c);
-    default:             return  (p.ch == c);
-  }
-}
-
-static int matchstar(regex_t p, regex_t* pattern, const char* text, int* matchlength)
-{
-  int prelen = *matchlength;
-  const char* prepoint = text;
-  while ((text[0] != '\0') && matchone(p, *text))
-  {
-    text++;
-    (*matchlength)++;
-  }
-  while (text >= prepoint)
-  {
-    if (matchpattern(pattern, text--, matchlength))
-      return 1;
-    (*matchlength)--;
-  }
-
-  *matchlength = prelen;
-  return 0;
-}
-
-static int matchplus(regex_t p, regex_t* pattern, const char* text, int* matchlength)
-{
-  const char* prepoint = text;
-  while ((text[0] != '\0') && matchone(p, *text))
-  {
-    text++;
-    (*matchlength)++;
-  }
-  while (text > prepoint)
-  {
-    if (matchpattern(pattern, text--, matchlength))
-      return 1;
-    (*matchlength)--;
-  }
-
-  return 0;
-}
-
-static int matchquestion(regex_t p, regex_t* pattern, const char* text, int* matchlength)
-{
-  if (p.type == UNUSED)
-    return 1;
-  if (matchpattern(pattern, text, matchlength))
-      return 1;
-  if (*text && matchone(p, *text++))
-  {
-    if (matchpattern(pattern, text, matchlength))
-    {
-      (*matchlength)++;
-      return 1;
-    }
-  }
-  return 0;
-}
-
-
-#if 0
-
-/* Recursive matching */
-static int matchpattern(regex_t* pattern, const char* text, int *matchlength)
-{
-  int pre = *matchlength;
-  if ((pattern[0].type == UNUSED) || (pattern[1].type == QUESTIONMARK))
-  {
-    return matchquestion(pattern[1], &pattern[2], text, matchlength);
-  }
-  else if (pattern[1].type == STAR)
-  {
-    return matchstar(pattern[0], &pattern[2], text, matchlength);
-  }
-  else if (pattern[1].type == PLUS)
-  {
-    return matchplus(pattern[0], &pattern[2], text, matchlength);
-  }
-  else if ((pattern[0].type == END) && pattern[1].type == UNUSED)
-  {
-    return text[0] == '\0';
-  }
-  else if ((text[0] != '\0') && matchone(pattern[0], text[0]))
-  {
-    (*matchlength)++;
-    return matchpattern(&pattern[1], text+1);
-  }
-  else
-  {
-    *matchlength = pre;
-    return 0;
-  }
-}
-
-#else
-
-/* Iterative matching */
-static int matchpattern(regex_t* pattern, const char* text, int* matchlength)
-{
-  int pre = *matchlength;
-  do
-  {
-    if ((pattern[0].type == UNUSED) || (pattern[1].type == QUESTIONMARK))
-    {
-      return matchquestion(pattern[0], &pattern[2], text, matchlength);
-    }
-    else if (pattern[1].type == STAR)
-    {
-      return matchstar(pattern[0], &pattern[2], text, matchlength);
-    }
-    else if (pattern[1].type == PLUS)
-    {
-      return matchplus(pattern[0], &pattern[2], text, matchlength);
-    }
-    else if ((pattern[0].type == END) && pattern[1].type == UNUSED)
-    {
-      return (text[0] == '\0');
-    }
-/*  Branching is not working properly
-    else if (pattern[1].type == BRANCH)
-    {
-      return (matchpattern(pattern, text) || matchpattern(&pattern[2], text));
-    }
-*/
-  (*matchlength)++;
-  }
-  while ((text[0] != '\0') && matchone(*pattern++, *text++));
-
-  *matchlength = pre;
-  return 0;
-}
-
-#endif
-
-
-#include <curl/curl.h>
-
-
-
-
 
 
 #if !defined(_WIN32) && !defined(_WIN64) && !defined(__CYGWIN__)
@@ -25710,848 +26552,6 @@ static int matchpattern(regex_t* pattern, const char* text, int* matchlength)
 #define PATH_MAX 256
 #endif
 
-
-/*
-Copyright (c) 2013-2021, tinydir authors:
-- Cong Xu
-- Lautis Sun
-- Baudouin Feildel
-- Andargor <andargor@yahoo.com>
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-#ifndef TINYDIR_H
-#define TINYDIR_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if ((defined _UNICODE) && !(defined UNICODE))
-#define UNICODE
-#endif
-
-#if ((defined UNICODE) && !(defined _UNICODE))
-#define _UNICODE
-#endif
-
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#ifdef _MSC_VER
-# ifndef WIN32_LEAN_AND_MEAN
-#  define WIN32_LEAN_AND_MEAN
-# endif
-# include <windows.h>
-# include <tchar.h>
-# pragma warning(push)
-# pragma warning (disable : 4996)
-#else
-# include <dirent.h>
-# include <libgen.h>
-# include <sys/stat.h>
-# include <stddef.h>
-#endif
-#ifdef __MINGW32__
-# include <tchar.h>
-#endif
-
-
-/* types */
-
-/* Windows UNICODE wide character support */
-#if defined _MSC_VER || defined __MINGW32__
-# define _tinydir_char_t TCHAR
-# define TINYDIR_STRING(s) _TEXT(s)
-# define _tinydir_strlen _tcslen
-# define _tinydir_strcpy _tcscpy
-# define _tinydir_strcat _tcscat
-# define _tinydir_strcmp _tcscmp
-# define _tinydir_strrchr _tcsrchr
-# define _tinydir_strncmp _tcsncmp
-#else
-# define _tinydir_char_t char
-# define TINYDIR_STRING(s) s
-# define _tinydir_strlen strlen
-# define _tinydir_strcpy strcpy
-# define _tinydir_strcat strcat
-# define _tinydir_strcmp strcmp
-# define _tinydir_strrchr strrchr
-# define _tinydir_strncmp strncmp
-#endif
-
-#if (defined _MSC_VER || defined __MINGW32__)
-# include <windows.h>
-# define _TINYDIR_PATH_MAX MAX_PATH
-#elif defined  __linux__
-# include <limits.h>
-# ifdef PATH_MAX
-#  define _TINYDIR_PATH_MAX PATH_MAX
-# endif
-#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-# include <sys/param.h>
-# if defined(BSD)
-#  include <limits.h>
-#  ifdef PATH_MAX
-#   define _TINYDIR_PATH_MAX PATH_MAX
-#  endif
-# endif
-#endif
-
-#ifndef _TINYDIR_PATH_MAX
-#define _TINYDIR_PATH_MAX 4096
-#endif
-
-#ifdef _MSC_VER
-/* extra chars for the "\\*" mask */
-# define _TINYDIR_PATH_EXTRA 2
-#else
-# define _TINYDIR_PATH_EXTRA 0
-#endif
-
-#define _TINYDIR_FILENAME_MAX 256
-
-#if (defined _MSC_VER || defined __MINGW32__)
-#define _TINYDIR_DRIVE_MAX 3
-#endif
-
-#ifdef _MSC_VER
-# define _TINYDIR_FUNC static __inline
-#elif !defined __STDC_VERSION__ || __STDC_VERSION__ < 199901L
-# define _TINYDIR_FUNC static __inline__
-#elif defined(__cplusplus)
-# define _TINYDIR_FUNC static inline
-#elif defined(__GNUC__)
-/* Suppress unused function warning */
-# define _TINYDIR_FUNC __attribute__((unused)) static
-#else
-# define _TINYDIR_FUNC static
-#endif
-
-/* readdir_r usage; define TINYDIR_USE_READDIR_R to use it (if supported) */
-#ifdef TINYDIR_USE_READDIR_R
-
-/* readdir_r is a POSIX-only function, and may not be available under various
- * environments/settings, e.g. MinGW. Use readdir fallback */
-#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _BSD_SOURCE || _SVID_SOURCE ||\
-	_POSIX_SOURCE
-# define _TINYDIR_HAS_READDIR_R
-#endif
-#if _POSIX_C_SOURCE >= 200112L
-# define _TINYDIR_HAS_FPATHCONF
-# include <unistd.h>
-#endif
-#if _BSD_SOURCE || _SVID_SOURCE || \
-	(_POSIX_C_SOURCE >= 200809L || _XOPEN_SOURCE >= 700)
-# define _TINYDIR_HAS_DIRFD
-# include <sys/types.h>
-#endif
-#if defined _TINYDIR_HAS_FPATHCONF && defined _TINYDIR_HAS_DIRFD &&\
-	defined _PC_NAME_MAX
-# define _TINYDIR_USE_FPATHCONF
-#endif
-#if defined __MINGW32__ || !defined _TINYDIR_HAS_READDIR_R ||\
-	!(defined _TINYDIR_USE_FPATHCONF || defined NAME_MAX)
-# define _TINYDIR_USE_READDIR
-#endif
-
-/* Use readdir by default */
-#else
-# define _TINYDIR_USE_READDIR
-#endif
-
-/* MINGW32 has two versions of dirent, ASCII and UNICODE*/
-#ifndef _MSC_VER
-#if (defined __MINGW32__) && (defined _UNICODE)
-#define _TINYDIR_DIR _WDIR
-#define _tinydir_dirent _wdirent
-#define _tinydir_opendir _wopendir
-#define _tinydir_readdir _wreaddir
-#define _tinydir_closedir _wclosedir
-#else
-#define _TINYDIR_DIR DIR
-#define _tinydir_dirent dirent
-#define _tinydir_opendir opendir
-#define _tinydir_readdir readdir
-#define _tinydir_closedir closedir
-#endif
-#endif
-
-/* Allow user to use a custom allocator by defining _TINYDIR_MALLOC and _TINYDIR_FREE. */
-#if    defined(_TINYDIR_MALLOC) &&  defined(_TINYDIR_FREE)
-#elif !defined(_TINYDIR_MALLOC) && !defined(_TINYDIR_FREE)
-#else
-#error "Either define both alloc and free or none of them!"
-#endif
-
-#if !defined(_TINYDIR_MALLOC)
-	#define _TINYDIR_MALLOC(_size) malloc(_size)
-	#define _TINYDIR_FREE(_ptr)    free(_ptr)
-#endif /* !defined(_TINYDIR_MALLOC) */
-
-typedef struct tinydir_file
-{
-	_tinydir_char_t path[_TINYDIR_PATH_MAX];
-	_tinydir_char_t name[_TINYDIR_FILENAME_MAX];
-	_tinydir_char_t *extension;
-	int is_dir;
-	int is_reg;
-
-#ifndef _MSC_VER
-#ifdef __MINGW32__
-	struct _stat _s;
-#else
-	struct stat _s;
-#endif
-#endif
-} tinydir_file;
-
-typedef struct tinydir_dir
-{
-	_tinydir_char_t path[_TINYDIR_PATH_MAX];
-	int has_next;
-	size_t n_files;
-
-	tinydir_file *_files;
-#ifdef _MSC_VER
-	HANDLE _h;
-	WIN32_FIND_DATA _f;
-#else
-	_TINYDIR_DIR *_d;
-	struct _tinydir_dirent *_e;
-#ifndef _TINYDIR_USE_READDIR
-	struct _tinydir_dirent *_ep;
-#endif
-#endif
-} tinydir_dir;
-
-
-/* declarations */
-
-_TINYDIR_FUNC
-int tinydir_open(tinydir_dir *dir, const _tinydir_char_t *path);
-_TINYDIR_FUNC
-int tinydir_open_sorted(tinydir_dir *dir, const _tinydir_char_t *path);
-_TINYDIR_FUNC
-void tinydir_close(tinydir_dir *dir);
-
-_TINYDIR_FUNC
-int tinydir_next(tinydir_dir *dir);
-_TINYDIR_FUNC
-int tinydir_readfile(const tinydir_dir *dir, tinydir_file *file);
-_TINYDIR_FUNC
-int tinydir_readfile_n(const tinydir_dir *dir, tinydir_file *file, size_t i);
-_TINYDIR_FUNC
-int tinydir_open_subdir_n(tinydir_dir *dir, size_t i);
-
-_TINYDIR_FUNC
-int tinydir_file_open(tinydir_file *file, const _tinydir_char_t *path);
-_TINYDIR_FUNC
-void _tinydir_get_ext(tinydir_file *file);
-_TINYDIR_FUNC
-int _tinydir_file_cmp(const void *a, const void *b);
-#ifndef _MSC_VER
-#ifndef _TINYDIR_USE_READDIR
-_TINYDIR_FUNC
-size_t _tinydir_dirent_buf_size(_TINYDIR_DIR *dirp);
-#endif
-#endif
-
-
-/* definitions*/
-
-_TINYDIR_FUNC
-int tinydir_open(tinydir_dir *dir, const _tinydir_char_t *path)
-{
-#ifndef _MSC_VER
-#ifndef _TINYDIR_USE_READDIR
-	int error;
-	int size;	/* using int size */
-#endif
-#else
-	_tinydir_char_t path_buf[_TINYDIR_PATH_MAX];
-#endif
-	_tinydir_char_t *pathp;
-
-	if (dir == NULL || path == NULL || _tinydir_strlen(path) == 0)
-	{
-		errno = EINVAL;
-		return -1;
-	}
-	if (_tinydir_strlen(path) + _TINYDIR_PATH_EXTRA >= _TINYDIR_PATH_MAX)
-	{
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-
-	/* initialise dir */
-	dir->_files = NULL;
-#ifdef _MSC_VER
-	dir->_h = INVALID_HANDLE_VALUE;
-#else
-	dir->_d = NULL;
-#ifndef _TINYDIR_USE_READDIR
-	dir->_ep = NULL;
-#endif
-#endif
-	tinydir_close(dir);
-
-	_tinydir_strcpy(dir->path, path);
-	/* Remove trailing slashes */
-	pathp = &dir->path[_tinydir_strlen(dir->path) - 1];
-	while (pathp != dir->path && (*pathp == TINYDIR_STRING('\\') || *pathp == TINYDIR_STRING('/')))
-	{
-		*pathp = TINYDIR_STRING('\0');
-		pathp++;
-	}
-#ifdef _MSC_VER
-	_tinydir_strcpy(path_buf, dir->path);
-	_tinydir_strcat(path_buf, TINYDIR_STRING("\\*"));
-#if (defined WINAPI_FAMILY) && (WINAPI_FAMILY != WINAPI_FAMILY_DESKTOP_APP)
-	dir->_h = FindFirstFileEx(path_buf, FindExInfoStandard, &dir->_f, FindExSearchNameMatch, NULL, 0);
-#else
-	dir->_h = FindFirstFile(path_buf, &dir->_f);
-#endif
-	if (dir->_h == INVALID_HANDLE_VALUE)
-	{
-		errno = ENOENT;
-#else
-	dir->_d = _tinydir_opendir(path);
-	if (dir->_d == NULL)
-	{
-#endif
-		goto bail;
-	}
-
-	/* read first file */
-	dir->has_next = 1;
-#ifndef _MSC_VER
-#ifdef _TINYDIR_USE_READDIR
-	dir->_e = _tinydir_readdir(dir->_d);
-#else
-	/* allocate dirent buffer for readdir_r */
-	size = _tinydir_dirent_buf_size(dir->_d); /* conversion to int */
-	if (size == -1) return -1;
-	dir->_ep = (struct _tinydir_dirent*)_TINYDIR_MALLOC(size);
-	if (dir->_ep == NULL) return -1;
-
-	error = readdir_r(dir->_d, dir->_ep, &dir->_e);
-	if (error != 0) return -1;
-#endif
-	if (dir->_e == NULL)
-	{
-		dir->has_next = 0;
-	}
-#endif
-
-	return 0;
-
-bail:
-	tinydir_close(dir);
-	return -1;
-}
-
-_TINYDIR_FUNC
-int tinydir_open_sorted(tinydir_dir *dir, const _tinydir_char_t *path)
-{
-	/* Count the number of files first, to pre-allocate the files array */
-	size_t n_files = 0;
-	if (tinydir_open(dir, path) == -1)
-	{
-		return -1;
-	}
-	while (dir->has_next)
-	{
-		n_files++;
-		if (tinydir_next(dir) == -1)
-		{
-			goto bail;
-		}
-	}
-	tinydir_close(dir);
-
-	if (n_files == 0 || tinydir_open(dir, path) == -1)
-	{
-		return -1;
-	}
-
-	dir->n_files = 0;
-	dir->_files = (tinydir_file *)_TINYDIR_MALLOC(sizeof *dir->_files * n_files);
-	if (dir->_files == NULL)
-	{
-		goto bail;
-	}
-	while (dir->has_next)
-	{
-		tinydir_file *p_file;
-		dir->n_files++;
-
-		p_file = &dir->_files[dir->n_files - 1];
-		if (tinydir_readfile(dir, p_file) == -1)
-		{
-			goto bail;
-		}
-
-		if (tinydir_next(dir) == -1)
-		{
-			goto bail;
-		}
-
-		/* Just in case the number of files has changed between the first and
-		second reads, terminate without writing into unallocated memory */
-		if (dir->n_files == n_files)
-		{
-			break;
-		}
-	}
-
-	qsort(dir->_files, dir->n_files, sizeof(tinydir_file), _tinydir_file_cmp);
-
-	return 0;
-
-bail:
-	tinydir_close(dir);
-	return -1;
-}
-
-_TINYDIR_FUNC
-void tinydir_close(tinydir_dir *dir)
-{
-	if (dir == NULL)
-	{
-		return;
-	}
-
-	memset(dir->path, 0, sizeof(dir->path));
-	dir->has_next = 0;
-	dir->n_files = 0;
-	_TINYDIR_FREE(dir->_files);
-	dir->_files = NULL;
-#ifdef _MSC_VER
-	if (dir->_h != INVALID_HANDLE_VALUE)
-	{
-		FindClose(dir->_h);
-	}
-	dir->_h = INVALID_HANDLE_VALUE;
-#else
-	if (dir->_d)
-	{
-		_tinydir_closedir(dir->_d);
-	}
-	dir->_d = NULL;
-	dir->_e = NULL;
-#ifndef _TINYDIR_USE_READDIR
-	_TINYDIR_FREE(dir->_ep);
-	dir->_ep = NULL;
-#endif
-#endif
-}
-
-_TINYDIR_FUNC
-int tinydir_next(tinydir_dir *dir)
-{
-	if (dir == NULL)
-	{
-		errno = EINVAL;
-		return -1;
-	}
-	if (!dir->has_next)
-	{
-		errno = ENOENT;
-		return -1;
-	}
-
-#ifdef _MSC_VER
-	if (FindNextFile(dir->_h, &dir->_f) == 0)
-#else
-#ifdef _TINYDIR_USE_READDIR
-	dir->_e = _tinydir_readdir(dir->_d);
-#else
-	if (dir->_ep == NULL)
-	{
-		return -1;
-	}
-	if (readdir_r(dir->_d, dir->_ep, &dir->_e) != 0)
-	{
-		return -1;
-	}
-#endif
-	if (dir->_e == NULL)
-#endif
-	{
-		dir->has_next = 0;
-#ifdef _MSC_VER
-		if (GetLastError() != ERROR_SUCCESS &&
-			GetLastError() != ERROR_NO_MORE_FILES)
-		{
-			tinydir_close(dir);
-			errno = EIO;
-			return -1;
-		}
-#endif
-	}
-
-	return 0;
-}
-
-_TINYDIR_FUNC
-int tinydir_readfile(const tinydir_dir *dir, tinydir_file *file)
-{
-	const _tinydir_char_t *filename;
-	if (dir == NULL || file == NULL)
-	{
-		errno = EINVAL;
-		return -1;
-	}
-#ifdef _MSC_VER
-	if (dir->_h == INVALID_HANDLE_VALUE)
-#else
-	if (dir->_e == NULL)
-#endif
-	{
-		errno = ENOENT;
-		return -1;
-	}
-	filename =
-#ifdef _MSC_VER
-		dir->_f.cFileName;
-#else
-		dir->_e->d_name;
-#endif
-	if (_tinydir_strlen(dir->path) +
-		_tinydir_strlen(filename) + 1 + _TINYDIR_PATH_EXTRA >=
-		_TINYDIR_PATH_MAX)
-	{
-		/* the path for the file will be too long */
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-	if (_tinydir_strlen(filename) >= _TINYDIR_FILENAME_MAX)
-	{
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-
-	_tinydir_strcpy(file->path, dir->path);
-	if (_tinydir_strcmp(dir->path, TINYDIR_STRING("/")) != 0)
-		_tinydir_strcat(file->path, TINYDIR_STRING("/"));
-	_tinydir_strcpy(file->name, filename);
-	_tinydir_strcat(file->path, filename);
-#ifndef _MSC_VER
-#ifdef __MINGW32__
-	if (_tstat(
-#elif (defined _BSD_SOURCE) || (defined _DEFAULT_SOURCE)	\
-	|| ((defined _XOPEN_SOURCE) && (_XOPEN_SOURCE >= 500))	\
-	|| ((defined _POSIX_C_SOURCE) && (_POSIX_C_SOURCE >= 200112L)) \
-	|| ((defined __APPLE__) && (defined __MACH__)) \
-	|| (defined BSD)
-	if (lstat(
-#else
-	if (stat(
-#endif
-		file->path, &file->_s) == -1)
-	{
-		return -1;
-	}
-#endif
-	_tinydir_get_ext(file);
-
-	file->is_dir =
-#ifdef _MSC_VER
-		!!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
-#else
-		S_ISDIR(file->_s.st_mode);
-#endif
-	file->is_reg =
-#ifdef _MSC_VER
-		!!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_NORMAL) ||
-		(
-			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) &&
-			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) &&
-#ifdef FILE_ATTRIBUTE_INTEGRITY_STREAM
-			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_INTEGRITY_STREAM) &&
-#endif
-#ifdef FILE_ATTRIBUTE_NO_SCRUB_DATA
-			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_NO_SCRUB_DATA) &&
-#endif
-			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) &&
-			!(dir->_f.dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY));
-#else
-		S_ISREG(file->_s.st_mode);
-#endif
-
-	return 0;
-}
-
-_TINYDIR_FUNC
-int tinydir_readfile_n(const tinydir_dir *dir, tinydir_file *file, size_t i)
-{
-	if (dir == NULL || file == NULL)
-	{
-		errno = EINVAL;
-		return -1;
-	}
-	if (i >= dir->n_files)
-	{
-		errno = ENOENT;
-		return -1;
-	}
-
-	memcpy(file, &dir->_files[i], sizeof(tinydir_file));
-	_tinydir_get_ext(file);
-
-	return 0;
-}
-
-_TINYDIR_FUNC
-int tinydir_open_subdir_n(tinydir_dir *dir, size_t i)
-{
-	_tinydir_char_t path[_TINYDIR_PATH_MAX];
-	if (dir == NULL)
-	{
-		errno = EINVAL;
-		return -1;
-	}
-	if (i >= dir->n_files || !dir->_files[i].is_dir)
-	{
-		errno = ENOENT;
-		return -1;
-	}
-
-	_tinydir_strcpy(path, dir->_files[i].path);
-	tinydir_close(dir);
-	if (tinydir_open_sorted(dir, path) == -1)
-	{
-		return -1;
-	}
-
-	return 0;
-}
-
-/* Open a single file given its path */
-_TINYDIR_FUNC
-int tinydir_file_open(tinydir_file *file, const _tinydir_char_t *path)
-{
-	tinydir_dir dir;
-	int result = 0;
-	int found = 0;
-	_tinydir_char_t dir_name_buf[_TINYDIR_PATH_MAX];
-	_tinydir_char_t file_name_buf[_TINYDIR_FILENAME_MAX];
-	_tinydir_char_t *dir_name;
-	_tinydir_char_t *base_name;
-#if (defined _MSC_VER || defined __MINGW32__)
-	_tinydir_char_t drive_buf[_TINYDIR_PATH_MAX];
-	_tinydir_char_t ext_buf[_TINYDIR_FILENAME_MAX];
-#endif
-
-	if (file == NULL || path == NULL || _tinydir_strlen(path) == 0)
-	{
-		errno = EINVAL;
-		return -1;
-	}
-	if (_tinydir_strlen(path) + _TINYDIR_PATH_EXTRA >= _TINYDIR_PATH_MAX)
-	{
-		errno = ENAMETOOLONG;
-		return -1;
-	}
-
-	/* Get the parent path */
-#if (defined _MSC_VER || defined __MINGW32__)
-#if ((defined _MSC_VER) && (_MSC_VER >= 1400))
-	errno = _tsplitpath_s(
-		path,
-		drive_buf, _TINYDIR_DRIVE_MAX,
-		dir_name_buf, _TINYDIR_FILENAME_MAX,
-		file_name_buf, _TINYDIR_FILENAME_MAX,
-		ext_buf, _TINYDIR_FILENAME_MAX);
-#else
-	_tsplitpath(
-		path,
-		drive_buf,
-		dir_name_buf,
-		file_name_buf,
-		ext_buf);
-#endif
-
-	if (errno)
-	{
-		return -1;
-	}
-
-/* _splitpath_s not work fine with only filename and widechar support */
-#ifdef _UNICODE
-	if (drive_buf[0] == L'\xFEFE')
-		drive_buf[0] = '\0';
-	if (dir_name_buf[0] == L'\xFEFE')
-		dir_name_buf[0] = '\0';
-#endif
-
-	/* Emulate the behavior of dirname by returning "." for dir name if it's
-	empty */
-	if (drive_buf[0] == '\0' && dir_name_buf[0] == '\0')
-	{
-		_tinydir_strcpy(dir_name_buf, TINYDIR_STRING("."));
-	}
-	/* Concatenate the drive letter and dir name to form full dir name */
-	_tinydir_strcat(drive_buf, dir_name_buf);
-	dir_name = drive_buf;
-	/* Concatenate the file name and extension to form base name */
-	_tinydir_strcat(file_name_buf, ext_buf);
-	base_name = file_name_buf;
-#else
-	_tinydir_strcpy(dir_name_buf, path);
-	dir_name = dirname(dir_name_buf);
-	_tinydir_strcpy(file_name_buf, path);
-	base_name = basename(file_name_buf);
-#endif
-
-	/* Special case: if the path is a root dir, open the parent dir as the file */
-#if (defined _MSC_VER || defined __MINGW32__)
-	if (_tinydir_strlen(base_name) == 0)
-#else
-	if ((_tinydir_strcmp(base_name, TINYDIR_STRING("/"))) == 0)
-#endif
-	{
-		memset(file, 0, sizeof * file);
-		file->is_dir = 1;
-		file->is_reg = 0;
-		_tinydir_strcpy(file->path, dir_name);
-		file->extension = file->path + _tinydir_strlen(file->path);
-		return 0;
-	}
-
-	/* Open the parent directory */
-	if (tinydir_open(&dir, dir_name) == -1)
-	{
-		return -1;
-	}
-
-	/* Read through the parent directory and look for the file */
-	while (dir.has_next)
-	{
-		if (tinydir_readfile(&dir, file) == -1)
-		{
-			result = -1;
-			goto bail;
-		}
-		if (_tinydir_strcmp(file->name, base_name) == 0)
-		{
-			/* File found */
-			found = 1;
-			break;
-		}
-		tinydir_next(&dir);
-	}
-	if (!found)
-	{
-		result = -1;
-		errno = ENOENT;
-	}
-
-bail:
-	tinydir_close(&dir);
-	return result;
-}
-
-_TINYDIR_FUNC
-void _tinydir_get_ext(tinydir_file *file)
-{
-	_tinydir_char_t *period = _tinydir_strrchr(file->name, TINYDIR_STRING('.'));
-	if (period == NULL)
-	{
-		file->extension = &(file->name[_tinydir_strlen(file->name)]);
-	}
-	else
-	{
-		file->extension = period + 1;
-	}
-}
-
-_TINYDIR_FUNC
-int _tinydir_file_cmp(const void *a, const void *b)
-{
-	const tinydir_file *fa = (const tinydir_file *)a;
-	const tinydir_file *fb = (const tinydir_file *)b;
-	if (fa->is_dir != fb->is_dir)
-	{
-		return -(fa->is_dir - fb->is_dir);
-	}
-	return _tinydir_strncmp(fa->name, fb->name, _TINYDIR_FILENAME_MAX);
-}
-
-#ifndef _MSC_VER
-#ifndef _TINYDIR_USE_READDIR
-/*
-The following authored by Ben Hutchings <ben@decadent.org.uk>
-from https://womble.decadent.org.uk/readdir_r-advisory.html
-*/
-/* Calculate the required buffer size (in bytes) for directory      *
-* entries read from the given directory handle.  Return -1 if this  *
-* this cannot be done.                                              *
-*                                                                   *
-* This code does not trust values of NAME_MAX that are less than    *
-* 255, since some systems (including at least HP-UX) incorrectly    *
-* define it to be a smaller value.                                  */
-_TINYDIR_FUNC
-size_t _tinydir_dirent_buf_size(_TINYDIR_DIR *dirp)
-{
-	long name_max;
-	size_t name_end;
-	/* parameter may be unused */
-	(void)dirp;
-
-#if defined _TINYDIR_USE_FPATHCONF
-	name_max = fpathconf(dirfd(dirp), _PC_NAME_MAX);
-	if (name_max == -1)
-#if defined(NAME_MAX)
-		name_max = (NAME_MAX > 255) ? NAME_MAX : 255;
-#else
-		return (size_t)(-1);
-#endif
-#elif defined(NAME_MAX)
- 	name_max = (NAME_MAX > 255) ? NAME_MAX : 255;
-#else
-#error "buffer size for readdir_r cannot be determined"
-#endif
-	name_end = (size_t)offsetof(struct _tinydir_dirent, d_name) + name_max + 1;
-	return (name_end > sizeof(struct _tinydir_dirent) ?
-		name_end : sizeof(struct _tinydir_dirent));
-}
-#endif
-#endif
-
-#ifdef __cplusplus
-}
-#endif
-
-# if defined (_MSC_VER)
-# pragma warning(pop)
-# endif
-
-#endif
-
-
-#include "assert.h"
 
 
 
@@ -30820,6 +30820,72 @@ litaC_void litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+struct litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__GenericParam* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__json__JsonEntry* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__string__buffer__StringBuffer {
+    litaC_char* buffer;
+    litaC_i32 length;
+    litaC_i32 capacity;
+    
+};
+
+struct litaC_std__mem__arena_allocator__Arena {
+    litaC_usize size;
+    litaC_usize current;
+    litaC_std__mem__arena_allocator__Arena* next;
+    litaC_u8* region;
+    
+};
+
+struct litaC_std__http__HttpOptions {
+    const litaC_char* proxy;
+    
+};
+
+union litaC_std__json__JsonValue {
+    litaC_bool boolValue;
+    litaC_f64 doubleValue;
+    litaC_i64 intValue;
+    const litaC_char* strValue;
+    litaC_std__json__JsonObject* objValue;
+    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
+    
+};
+
+struct litaC_pkg_mgr__PackageBuildOptions {
+    litaC_bool isRelease;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__json__JsonNode** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lex__SrcPos* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
 
 struct litaC_std__map__std__map__Key_cb__ptr_const_char_ce_ {
     const litaC_char* key;
@@ -30835,12 +30901,22 @@ struct litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ {
     
 };
 
-
 struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_module__Module_ce_ {
     litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_* m;
     litaC_i32 it;
     litaC_i32 prevIt;
     litaC_i32 count;
+    
+};
+
+struct litaC_pkg_mgr__pkg__PackageId {
+    litaC_char id[PATH_MAX];
+    litaC_i32 repoOffset;
+    litaC_i32 repoLength;
+    litaC_i32 nameOffset;
+    litaC_i32 nameLength;
+    litaC_i32 versionOffset;
+    litaC_i32 versionLength;
     
 };
 
@@ -30885,17 +30961,10 @@ struct litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ {
     
 };
 
-struct litaC_lita__PkgOptions {
-    litaC_lita__PkgCommand pkgCmd;
-    const litaC_char* pkgRunCmdArg;
-    litaC_bool forceClean;
-    litaC_bool isRelease;
-    const litaC_char* pkgName;
-    
-};
-
-struct litaC_checker__GenericContext {
-    litaC_module__Module* callsite;
+struct litaC_module__ModuleImport {
+    litaC_module__Module* module;
+    litaC_intern__InternedString* alias;
+    litaC_bool isUsing;
     
 };
 
@@ -30910,12 +30979,39 @@ struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Do
     
 };
 
-struct litaC_std__builtins__any {
-    litaC_void* value;
-    litaC_u64 id;
+struct litaC_std__mem__Allocator {
+    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
+    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
+    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
+    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
     
 };
 
+struct litaC_std__http__Http {
+    litaC_std__http__HttpOptions options;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__json__JsonNode {
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__json__JsonType type;
+    litaC_std__json__JsonValue value;
+    
+};
+
+
+struct litaC_lsp__protocol__TextDocument {
+    const litaC_char* uri;
+    litaC_u32 version;
+    
+};
+
+struct litaC_pkg_mgr__PackageInstallOptions {
+    litaC_bool fullSync;
+    litaC_std__http__HttpOptions httpOptions;
+    
+};
 
 struct litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ {
     litaC_i32 length;
@@ -30932,7 +31028,6 @@ struct litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ {
     
 };
 
-
 struct litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -30941,29 +31036,6 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ {
     
 };
 
-struct litaC_std__mem__bucket_allocator__Bucket {
-    litaC_std__mem__bucket_allocator__Bucket* prev;
-    litaC_u8* mem;
-    litaC_usize size;
-    litaC_void* padding;
-    
-};
-
-struct litaC_std__json__JsonIterator {
-    litaC_i32 index;
-    litaC_std__json__JsonNode* json;
-    
-};
-
-struct litaC_std__cmdline__Option {
-    const litaC_char* name;
-    litaC_char shortName;
-    const litaC_char* description;
-    const litaC_char* value;
-    const litaC_char* defaultValue;
-    litaC_i32 flags;
-    
-};
 
 struct litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ {
     litaC_i32 length;
@@ -30982,6 +31054,197 @@ struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_
 };
 
 
+
+struct litaC_std__map__std__map__Key_cb_usize_ce_ {
+    litaC_usize key;
+    litaC_std__map__KeyState state;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__ParameterDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_ {
+    litaC_symbols__Symbol* key;
+    litaC_std__map__KeyState state;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    const litaC_char* key;
+    litaC_module__ModuleImport value;
+    litaC_module__ModuleImport* valuePtr;
+    
+};
+
+struct litaC_lita__PkgOptions {
+    litaC_lita__PkgCommand pkgCmd;
+    const litaC_char* pkgRunCmdArg;
+    litaC_bool forceClean;
+    litaC_bool isRelease;
+    const litaC_char* pkgName;
+    
+};
+
+struct litaC_checker__GenericContext {
+    litaC_module__Module* callsite;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__NoteStmt** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__builtins__any {
+    litaC_void* value;
+    litaC_u64 id;
+    
+};
+
+
+struct litaC_ast__Attributes {
+    litaC_ast__Visibility visibility;
+    litaC_bool isGlobal;
+    litaC_bool isUsing;
+    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
+    
+};
+
+struct litaC_std__map__std__map__Key_cb_i64_ce_ {
+    litaC_i64 key;
+    litaC_std__map__KeyState state;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_module__Module** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lsp__references__FieldReference* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+
+struct litaC_std__mem__bucket_allocator__Bucket {
+    litaC_std__mem__bucket_allocator__Bucket* prev;
+    litaC_u8* mem;
+    litaC_usize size;
+    litaC_void* padding;
+    
+};
+
+struct litaC_std__json__JsonIterator {
+    litaC_i32 index;
+    litaC_std__json__JsonNode* json;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__cmdline__Option {
+    const litaC_char* name;
+    litaC_char shortName;
+    const litaC_char* description;
+    const litaC_char* value;
+    const litaC_char* defaultValue;
+    litaC_i32 flags;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__TypeSpec** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_symbols__Symbol** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__string__builder__StringBuilder {
+    litaC_std__string__buffer__StringBuffer asBuffer;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__ImportDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__mem__track_allocator__Allocation** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
 
 struct litaC_std__io__File {
     FILE* file;
@@ -31030,17 +31293,23 @@ struct litaC_dependency_graph__Dependency {
     
 };
 
-struct litaC_std__map__std__map__Key_cb_usize_ce_ {
-    litaC_usize key;
-    litaC_std__map__KeyState state;
+struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 bucketSize;
+    litaC_usize length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* buckets;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* top;
     
 };
 
-struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    litaC_pkg_mgr__pkg__PackageDef** values;
+    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
+    const litaC_char* emptyKey;
     
 };
 
@@ -31051,33 +31320,20 @@ struct litaC_types_new__ArrayEntry {
     
 };
 
-struct litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__ParameterDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_ {
-    litaC_symbols__Symbol* key;
-    litaC_std__map__KeyState state;
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    const litaC_char* key;
+    litaC_pkg_mgr__pkg__PackageDef* value;
+    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
     
 };
 
 
-struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__NoteStmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_symbols__Symbol* key;
-    litaC_dependency_graph__Dependency value;
-    litaC_dependency_graph__Dependency* valuePtr;
+struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 bucketSize;
+    litaC_usize length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* buckets;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* top;
     
 };
 
@@ -31086,25 +31342,58 @@ struct litaC_introspection__Introspect {
     
 };
 
-struct litaC_std__map__std__map__Key_cb_i64_ce_ {
+struct litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
     litaC_i64 key;
-    litaC_std__map__KeyState state;
+    litaC_std__array__std__array__Array_cb_i64_ce_ value;
+    litaC_std__array__std__array__Array_cb_i64_ce_* valuePtr;
     
 };
 
-struct litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ {
+struct litaC_std__mem__bucket_allocator__BucketAllocator {
+    litaC_std__mem__Allocator allocator;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__mem__bucket_allocator__Bucket* buckets;
+    litaC_std__mem__bucket_allocator__Bucket* head;
+    litaC_usize bucketSize;
+    litaC_usize currentOffset;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    litaC_usize totalGrossBytesAllocated;
+    litaC_u32 totalBuckets;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_module__Module** elements;
+    litaC_std__cmdline__Option* elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_lsp__references__FieldReference* elements;
     const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    litaC_i32* values;
+    litaC_i32 emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__SwitchCaseStmt** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_usize key;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
     
 };
 
@@ -31116,17 +31405,25 @@ struct litaC_std__profile__ProfileEntry {
     
 };
 
-struct litaC_std__map__std__map__MapIterator_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
 struct litaC_preprocessor__CheckerContext {
     litaC_module__Module* module;
     litaC_ast__CompStmt* stmt;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__FieldStmt* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_phase_result__PhaseError* elements;
+    const litaC_std__mem__Allocator* alloc;
     
 };
 
@@ -31157,262 +31454,6 @@ struct litaC_pkg_mgr__PackageOptions {
     
 };
 
-struct litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__TypeSpec** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_symbols__Symbol** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__ImportDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_types_new__ArrayEntry_ce_* keys;
-    litaC_types__TypeInfo** values;
-    litaC_types__TypeInfo* emptyValue;
-    litaC_types_new__ArrayEntry emptyKey;
-    
-};
-
-struct litaC_std__system__Process {
-    FILE* pipe;
-    
-};
-
-struct litaC_std__regex__Regex {
-    re_t reg;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__mem__track_allocator__Allocation** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-
-struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 bucketSize;
-    litaC_usize length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* buckets;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* top;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    litaC_pkg_mgr__pkg__PackageDef** values;
-    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_checker_expr__ParamInfo {
-    litaC_ast__TypeSpec* spec;
-    litaC_types__TypeInfo* typeInfo;
-    
-};
-
-struct litaC_pkg_mgr__pkg_build__CommandArgs {
-    litaC_i32 n;
-    litaC_char** args;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    const litaC_char* key;
-    litaC_pkg_mgr__pkg__PackageDef* value;
-    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
-    
-};
-
-struct litaC_std__string__String {
-    const litaC_char* buffer;
-    litaC_i32 length;
-    
-};
-
-struct litaC_cgen__CompilationUnit {
-    litaC_module__Module* module;
-    litaC_char filename[PATH_MAX];
-    FILE* file;
-    
-};
-
-struct litaC_std__fs__FileHandle {
-    tinydir_dir dir;
-    tinydir_file file;
-    
-};
-
-struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 bucketSize;
-    litaC_usize length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* buckets;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* top;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_i64 key;
-    litaC_std__array__std__array__Array_cb_i64_ce_ value;
-    litaC_std__array__std__array__Array_cb_i64_ce_* valuePtr;
-    
-};
-
-struct litaC_std__mem__linear_allocator__ExpandInfo {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__mem__linear_allocator__ExpandStrategy strategy;
-    
-};
-
-struct litaC_std__json__JsonContext {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_void (*maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*);
-    litaC_void* (*makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*);
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__cmdline__Option* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    litaC_i32* values;
-    litaC_i32 emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_lex__SrcPos {
-    const litaC_char* filename;
-    const litaC_char* lineStart;
-    const litaC_char* start;
-    const litaC_char* end;
-    litaC_i32 lineNumber;
-    litaC_i32 position;
-    
-};
-
-struct litaC_preprocessor__DeclContext {
-    litaC_checker__TypeChecker* checker;
-    litaC_ast__CompStmt* comp;
-    litaC_bool resolveSymbols;
-    
-};
-
-struct litaC_std__mem__track_allocator__Allocation {
-    litaC_void* addr;
-    litaC_usize size;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__SwitchCaseStmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_intern__X {
-    litaC_i32 v[litaC_intern__MAX_SOMETHING];
-    
-};
-
-struct litaC_std__json__SrcPos {
-    const litaC_char* name;
-    litaC_i32 line;
-    
-};
-
-struct litaC_lsp__protocol__Range {
-    litaC_lsp__protocol__Position start;
-    litaC_lsp__protocol__Position end;
-    
-};
-
-struct litaC_pkg_mgr__PackageInitOptions {
-    const litaC_char* name;
-    const litaC_char* version;
-    const litaC_char* type;
-    const litaC_char* repo;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__FieldStmt* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_phase_result__PhaseError* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
 struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -31421,10 +31462,20 @@ struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericP
     
 };
 
-struct litaC_lsp__references__FieldReference {
-    litaC_i64 parent;
-    litaC_i32 offset;
-    litaC_lex__SrcPos pos;
+struct litaC_ast_new__TypeSpecAllocator {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ typeSpecs;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb_usize_ce_* keys;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* values;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
+    litaC_usize emptyKey;
     
 };
 
@@ -31436,12 +31487,6 @@ struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__
     
 };
 
-
-struct litaC_generics__Template {
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
-    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_* genericArgs;
-    
-};
 
 struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_const_char_ce_ {
     litaC_i32 length;
@@ -31470,24 +31515,26 @@ struct litaC_std__map__std__map__MapIterator_cb_i64_c_std__array__Array_cb_i64_c
     
 };
 
-struct litaC_intern__Strings {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__string__String* keys;
-    litaC_intern__InternedString* values;
+struct litaC_std__system__Process {
+    FILE* pipe;
     
 };
 
-struct litaC_preprocessor__api__ScriptRuntime {
-    ape_t* ape;
+struct litaC_std__regex__Regex {
+    re_t reg;
     
 };
 
 
-struct litaC_types__FieldPositionResult {
-    litaC_types__TypeInfo* aggInfo;
-    litaC_i32 position;
+struct litaC_checker_expr__ParamInfo {
+    litaC_ast__TypeSpec* spec;
+    litaC_types__TypeInfo* typeInfo;
+    
+};
+
+struct litaC_pkg_mgr__pkg_build__CommandArgs {
+    litaC_i32 n;
+    litaC_char** args;
     
 };
 
@@ -31513,6 +31560,25 @@ struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ {
     
 };
 
+struct litaC_std__string__String {
+    const litaC_char* buffer;
+    litaC_i32 length;
+    
+};
+
+struct litaC_cgen__CompilationUnit {
+    litaC_module__Module* module;
+    litaC_char filename[PATH_MAX];
+    FILE* file;
+    
+};
+
+struct litaC_std__fs__FileHandle {
+    tinydir_dir dir;
+    tinydir_file file;
+    
+};
+
 struct litaC_std__map__std__map__MapIterator_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
     litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* m;
     litaC_i32 it;
@@ -31529,37 +31595,6 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ {
     
 };
 
-struct litaC_std__string__buffer__StringBuffer {
-    litaC_char* buffer;
-    litaC_i32 length;
-    litaC_i32 capacity;
-    
-};
-
-union litaC_lex__Value {
-    litaC_f64 floatValue;
-    litaC_i64 intValue;
-    litaC_u64 uintValue;
-    litaC_std__string__String str;
-    
-};
-
-struct litaC_std__mem__arena_allocator__Arena {
-    litaC_usize size;
-    litaC_usize current;
-    litaC_std__mem__arena_allocator__Arena* next;
-    litaC_u8* region;
-    
-};
-
-struct litaC_preprocessor__ScriptDecl {
-    litaC_preprocessor__DeclContext ctx;
-    litaC_module__Module* module;
-    litaC_ast__ModuleStmt* declarations;
-    litaC_bool replacement;
-    
-};
-
 struct litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -31568,36 +31603,16 @@ struct litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeE
     
 };
 
-struct litaC_std__http__HttpOptions {
-    const litaC_char* proxy;
+struct litaC_std__mem__linear_allocator__ExpandInfo {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__mem__linear_allocator__ExpandStrategy strategy;
     
 };
 
-struct litaC_lita__CCompilerOption {
-    Lita_OSType os;
-    Lita_ArchType arch;
-    litaC_std__string__String options;
-    
-};
-
-union litaC_std__json__JsonValue {
-    litaC_bool boolValue;
-    litaC_f64 doubleValue;
-    litaC_i64 intValue;
-    const litaC_char* strValue;
-    litaC_std__json__JsonObject* objValue;
-    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
-    
-};
-
-struct litaC_lsp__protocol__Location {
-    const litaC_char* uri;
-    litaC_lsp__protocol__Range range;
-    
-};
-
-struct litaC_pkg_mgr__PackageBuildOptions {
-    litaC_bool isRelease;
+struct litaC_std__json__JsonContext {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_void (*maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*);
+    litaC_void* (*makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*);
     
 };
 
@@ -31605,6 +31620,40 @@ struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_ {
     litaC_i32 length;
     litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* next;
     litaC_ast__TypeSpec* elements;
+    
+};
+
+struct litaC_lex__SrcPos {
+    const litaC_char* filename;
+    const litaC_char* lineStart;
+    const litaC_char* start;
+    const litaC_char* end;
+    litaC_i32 lineNumber;
+    litaC_i32 position;
+    
+};
+
+struct litaC_std__mem__arena_allocator__ArenaAllocator {
+    litaC_std__mem__Allocator allocator;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__mem__arena_allocator__Arena* arena;
+    litaC_usize pageSize;
+    litaC_u32 numberOfArenas;
+    litaC_usize numberOfBytesAllocated;
+    litaC_u32 numberOfAllocations;
+    
+};
+
+struct litaC_preprocessor__DeclContext {
+    litaC_checker__TypeChecker* checker;
+    litaC_ast__CompStmt* comp;
+    litaC_bool resolveSymbols;
+    
+};
+
+struct litaC_std__mem__track_allocator__Allocation {
+    litaC_void* addr;
+    litaC_usize size;
     
 };
 
@@ -31616,10 +31665,43 @@ struct litaC_std__array__std__array__Array_cb_preprocessor__CheckerContext_ce_ {
     
 };
 
-struct litaC_phase_result__PhaseError {
-    litaC_phase_result__ErrorType type;
-    const litaC_char* message;
-    litaC_lex__SrcPos pos;
+struct litaC_std__http__HttpResponse {
+    litaC_i32 statusCode;
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_const_char_ce_ headers;
+    litaC_std__string__builder__StringBuilder body;
+    litaC_void* userdata;
+    litaC_usize (*bodyFn)(litaC_void*,litaC_usize,litaC_usize,litaC_void*);
+    
+};
+
+struct litaC_intern__X {
+    litaC_i32 v[litaC_intern__MAX_SOMETHING];
+    
+};
+
+struct litaC_std__json__JsonObject {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
+    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
+    
+};
+
+struct litaC_std__json__SrcPos {
+    const litaC_char* name;
+    litaC_i32 line;
+    
+};
+
+struct litaC_lsp__protocol__Range {
+    litaC_lsp__protocol__Position start;
+    litaC_lsp__protocol__Position end;
+    
+};
+
+struct litaC_pkg_mgr__PackageInitOptions {
+    const litaC_char* name;
+    const litaC_char* version;
+    const litaC_char* type;
+    const litaC_char* repo;
     
 };
 
@@ -31644,17 +31726,10 @@ struct litaC_std__array__std__array__Array_cb_lex__Token_ce_ {
     
 };
 
-struct litaC_ast__FieldStmt {
-    litaC_ast__StmtKind kind;
-    litaC_types__TypeInfo* typeInfo;
-    union  {
-        litaC_ast__EnumDecl* enumField;
-        litaC_ast__AggregateDecl* aggregateField;
-        litaC_ast__VarFieldDecl* varField;
-        litaC_ast__TraitFieldDecl* traitField;
-        litaC_ast__Expr* poisonField;
-        
-    };
+struct litaC_lsp__references__FieldReference {
+    litaC_i64 parent;
+    litaC_i32 offset;
+    litaC_lex__SrcPos pos;
     
 };
 
@@ -31674,25 +31749,10 @@ struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ {
     
 };
 
-struct litaC_build__BuildFile {
-    const litaC_std__mem__Allocator* allocator;
-    const litaC_char* compileCmdTemplate;
-    const litaC_char* projectSrcDir;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
-    
-};
 
-struct litaC_pkg_mgr__pkg__PackageId {
-    litaC_char id[PATH_MAX];
-    litaC_i32 repoOffset;
-    litaC_i32 repoLength;
-    litaC_i32 nameOffset;
-    litaC_i32 nameLength;
-    litaC_i32 versionOffset;
-    litaC_i32 versionLength;
+struct litaC_generics__Template {
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
+    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_* genericArgs;
     
 };
 
@@ -31701,6 +31761,85 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ {
     litaC_i32 capacity;
     litaC_ast__Expr** elements;
     const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_intern__Strings {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__string__String* keys;
+    litaC_intern__InternedString* values;
+    
+};
+
+struct litaC_preprocessor__api__ScriptRuntime {
+    ape_t* ape;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lita__CCompilerOption* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__EnumFieldEntryDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    litaC_module__ModuleImport* values;
+    litaC_module__ModuleImport emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    litaC_module__Module** values;
+    litaC_module__Module* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_types__FieldPositionResult {
+    litaC_types__TypeInfo* aggInfo;
+    litaC_i32 position;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
+    const litaC_char* key;
+    litaC_module__Module* value;
+    litaC_module__Module** valuePtr;
+    
+};
+
+struct litaC_ast__Node {
+    litaC_ast__StmtKind kind;
+    litaC_ast__Node* parent;
+    litaC_lex__SrcPos startPos;
+    litaC_lex__SrcPos endPos;
+    
+};
+
+struct litaC_ast__Stmt {
+    litaC_ast__Node node;
     
 };
 
@@ -31719,156 +31858,11 @@ union litaC_intern__InternedString {
     
 };
 
-struct litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lita__CCompilerOption* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__EnumFieldEntryDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    litaC_module__Module** values;
-    litaC_module__Module* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_module__ModuleImport {
-    litaC_module__Module* module;
-    litaC_intern__InternedString* alias;
-    litaC_bool isUsing;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    const litaC_char* key;
-    litaC_module__Module* value;
-    litaC_module__Module** valuePtr;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__GenericParam* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__json__JsonEntry* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__mem__Allocator {
-    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
-    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
-    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
-    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
-    
-};
-
-struct litaC_std__http__Http {
-    litaC_std__http__HttpOptions options;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_checker__LabelInfo {
-    litaC_intern__InternedString name;
-    litaC_bool defined;
-    litaC_ast__Stmt* stmt;
-    
-};
-
-struct litaC_std__json__JsonNode {
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__json__JsonType type;
-    litaC_std__json__JsonValue value;
-    
-};
-
-
-struct litaC_lsp__protocol__TextDocument {
-    const litaC_char* uri;
-    litaC_u32 version;
-    
-};
-
-struct litaC_pkg_mgr__PackageInstallOptions {
-    litaC_bool fullSync;
-    litaC_std__http__HttpOptions httpOptions;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_* keys;
-    litaC_dependency_graph__Dependency* values;
-    litaC_dependency_graph__Dependency emptyValue;
-    litaC_symbols__Symbol* emptyKey;
-    
-};
-
-struct litaC_phase_result__PhaseResult {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ errors;
-    litaC_bool enabled;
-    litaC_bool isReadable;
-    
-};
-
-struct litaC_std__map__std__map__Key_cb_intern__InternedString_ce_ {
-    litaC_intern__InternedString key;
-    litaC_std__map__KeyState state;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__json__JsonNode** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lex__SrcPos* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_ast__Node {
-    litaC_ast__StmtKind kind;
-    litaC_ast__Node* parent;
-    litaC_lex__SrcPos startPos;
-    litaC_lex__SrcPos endPos;
-    
-};
-
-struct litaC_ast__Stmt {
-    litaC_ast__Node node;
+union litaC_lex__Value {
+    litaC_f64 floatValue;
+    litaC_i64 intValue;
+    litaC_u64 uintValue;
+    litaC_std__string__String str;
     
 };
 
@@ -31887,14 +31881,6 @@ struct litaC_ast__Identifier {
     
 };
 
-struct litaC_ast__Attributes {
-    litaC_ast__Visibility visibility;
-    litaC_bool isGlobal;
-    litaC_bool isUsing;
-    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
-    
-};
-
 struct litaC_ast__Decl {
     litaC_ast__Stmt stmt;
     litaC_symbols__Symbol* sym;
@@ -31903,18 +31889,9 @@ struct litaC_ast__Decl {
     
 };
 
-struct litaC_ast__GenericDecl {
-    litaC_ast__Decl declaration;
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
-    
-};
-
-struct litaC_ast__FuncDecl {
-    litaC_ast__GenericDecl decl;
-    litaC_ast__ParametersStmt* params;
-    litaC_ast__Stmt* body;
-    litaC_ast__TypeSpec* returnType;
-    litaC_i32 flags;
+struct litaC_ast__NativeDecl {
+    litaC_ast__Decl decl;
+    litaC_types__TypeInfo* typeInfo;
     
 };
 
@@ -31933,20 +31910,427 @@ struct litaC_ast__Expr {
     
 };
 
+struct litaC_ast__FuncCallExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* object;
+    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ genericArgs;
+    litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ arguments;
+    
+};
+
+struct litaC_module__ModuleId {
+    litaC_char filename[PATH_MAX];
+    litaC_char filenameKey[PATH_MAX];
+    litaC_intern__InternedString packageName;
+    litaC_intern__InternedString name;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_* keys;
+    litaC_dependency_graph__Dependency* values;
+    litaC_dependency_graph__Dependency emptyValue;
+    litaC_symbols__Symbol* emptyKey;
+    
+};
+
+struct litaC_ast__ContinueStmt {
+    litaC_ast__Stmt stmt;
+    
+};
+
+struct litaC_preprocessor__ScriptDecl {
+    litaC_preprocessor__DeclContext ctx;
+    litaC_module__Module* module;
+    litaC_ast__ModuleStmt* declarations;
+    litaC_bool replacement;
+    
+};
+
+struct litaC_std__mem__track_allocator__TrackAllocator {
+    litaC_std__mem__Allocator alloc;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
+    litaC_usize totalAllocations;
+    
+};
+
+
+
+struct litaC_ast__TypeSpec {
+    litaC_ast__TypeSpecKind kind;
+    litaC_lex__SrcPos pos;
+    litaC_ast__TypeSpec* base;
+    litaC_types__TypeInfo* typeInfo;
+    union  {
+        struct  {
+            litaC_intern__InternedString name;
+            litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ genericArgs;
+            
+        };
+        struct  {
+            litaC_ast__Expr* numElements;
+            
+        };
+        struct  {
+            litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ args;
+            litaC_ast__TypeSpec* ret;
+            litaC_bool hasVarargs;
+            litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
+            
+        };
+        
+    };
+    
+};
+
+struct litaC_ast__InitExpr {
+    litaC_ast__Expr expr;
+    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ genericArgs;
+    litaC_ast__TypeSpec* type;
+    litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ arguments;
+    
+};
+
+struct litaC_lita__CCompilerOption {
+    Lita_OSType os;
+    Lita_ArchType arch;
+    litaC_std__string__String options;
+    
+};
+
+struct litaC_std__json__Token {
+    litaC_std__json__TokenKind kind;
+    litaC_std__json__SrcPos pos;
+    const litaC_char* start;
+    const litaC_char* end;
+    union  {
+        litaC_i64 intNumValue;
+        litaC_f64 realNumValue;
+        const litaC_char* strValue;
+        const litaC_char* name;
+        
+    };
+    
+};
+
+struct litaC_lsp__protocol__Location {
+    const litaC_char* uri;
+    litaC_lsp__protocol__Range range;
+    
+};
+
+struct litaC_ast__FuncBodyStmt {
+    litaC_ast__Stmt stmt;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ stmts;
+    
+};
+
+struct litaC_std__map__std__map__Key_cb_intern__InternedString_ce_ {
+    litaC_intern__InternedString key;
+    litaC_std__map__KeyState state;
+    
+};
+
+
+
+struct litaC_types__TypeInfo {
+    litaC_types__TypeKind kind;
+    litaC_i64 typeid;
+    litaC_intern__InternedString name;
+    litaC_symbols__Symbol* sym;
+    litaC_i64 genericTypeid;
+    litaC_types__TypeInfo* returnType;
+    union  {
+        struct  {
+            litaC_ast__FuncDecl* funcDecl;
+            
+        };
+        struct  {
+            litaC_types__TypeInfo* constOf;
+            
+        };
+        struct  {
+            litaC_types__TypeInfo* ptrOf;
+            
+        };
+        struct  {
+            litaC_types__TypeInfo* arrayOf;
+            litaC_usize length;
+            litaC_ast__Expr* numOfElements;
+            litaC_bool isLengthDefined;
+            
+        };
+        struct  {
+            litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
+            litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ paramDecls;
+            litaC_bool hasVarargs;
+            litaC_bool isTrait;
+            
+        };
+        struct  {
+            litaC_ast__EnumDecl* enumDecl;
+            
+        };
+        struct  {
+            litaC_ast__AggregateDecl* aggDecl;
+            
+        };
+        
+    };
+    
+};
+
+struct litaC_ast__GenericParam {
+    litaC_ast__Identifier name;
+    
+};
+
+struct litaC_ast__StringExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__Token string;
+    
+};
+
+struct litaC_ast__ParametersStmt {
+    litaC_ast__Stmt stmt;
+    litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ params;
+    litaC_bool isVararg;
+    
+};
+
+struct litaC_phase_result__PhaseError {
+    litaC_phase_result__ErrorType type;
+    const litaC_char* message;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_lsp__references__ReferenceDatabase {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
+    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
+    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
+    
+};
+
+struct litaC_ast__UnaryExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* unaryExpr;
+    
+};
+
+struct litaC_ast__FieldStmt {
+    litaC_ast__StmtKind kind;
+    litaC_types__TypeInfo* typeInfo;
+    union  {
+        litaC_ast__EnumDecl* enumField;
+        litaC_ast__AggregateDecl* aggregateField;
+        litaC_ast__VarFieldDecl* varField;
+        litaC_ast__TraitFieldDecl* traitField;
+        litaC_ast__Expr* poisonField;
+        
+    };
+    
+};
+
+struct litaC_ast__ParameterDecl {
+    litaC_ast__Decl decl;
+    litaC_ast__TypeSpec* type;
+    litaC_ast__Expr* defaultExpr;
+    litaC_types__TypeInfo* typeInfo;
+    
+};
+
+struct litaC_build__BuildFile {
+    const litaC_std__mem__Allocator* allocator;
+    const litaC_char* compileCmdTemplate;
+    const litaC_char* projectSrcDir;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
+    
+};
+
+struct litaC_ast__BinaryExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* left;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* right;
+    
+};
+
+struct litaC_ast__NotesDecl {
+    litaC_ast__Decl decl;
+    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb_intern__InternedString_ce_* keys;
+    litaC_types__TypeInfo** values;
+    litaC_types__TypeInfo* emptyValue;
+    litaC_intern__InternedString emptyKey;
+    
+};
+
+struct litaC_std__mem__linear_allocator__LinearAllocator {
+    litaC_std__mem__Allocator allocator;
+    litaC_void* mem;
+    litaC_usize size;
+    litaC_usize currentOffset;
+    litaC_usize alignment;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    litaC_std__mem__linear_allocator__ExpandInfo expandInfo;
+    
+};
+
+struct litaC_ast__DeferStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Stmt* deferedStmt;
+    
+};
+
+struct litaC_lsp__document__Document {
+    litaC_char filename[PATH_MAX];
+    litaC_std__string__builder__StringBuilder text;
+    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
+    
+};
+
+struct litaC_ast__NullExpr {
+    litaC_ast__Expr expr;
+    
+};
+
+struct litaC_checker__LabelInfo {
+    litaC_intern__InternedString name;
+    litaC_bool defined;
+    litaC_ast__Stmt* stmt;
+    
+};
+
+
+struct litaC_dependency_graph__DependencyGraph {
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
+    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
+    litaC_lita__Lita* lita;
+    
+};
+
+
+struct litaC_lex__Lexer {
+    const litaC_std__mem__Allocator* allocator;
+    const litaC_char* filename;
+    litaC_lex__Token token;
+    const litaC_char* stream;
+    litaC_i64 length;
+    const litaC_char* lineStart;
+    litaC_i32 lineNumber;
+    litaC_i32 position;
+    const litaC_char* errorMsg;
+    
+};
+
+struct litaC_ast__GotoStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Identifier label;
+    
+};
+
+struct litaC_ast__SubscriptGetExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* object;
+    litaC_ast__Expr* index;
+    
+};
+
+struct litaC_ast__ReturnStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* expr;
+    
+};
+
+struct litaC_phase_result__PhaseResult {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ errors;
+    litaC_bool enabled;
+    litaC_bool isReadable;
+    
+};
+
+struct litaC_ast__PoisonExpr {
+    litaC_ast__Expr expr;
+    
+};
+
+struct litaC_cgen__CGen {
+    litaC_lita__Lita* lita;
+    litaC_std__string__builder__StringBuilder buf;
+    litaC_std__string__builder__StringBuilder line;
+    litaC_bool format;
+    litaC_i32 indent;
+    litaC_i32 aggregateLevel;
+    litaC_i32 currentLine;
+    const litaC_char* currentFile;
+    litaC_bool bufferFlush;
+    litaC_i32 funcIndex;
+    litaC_i32 tmpVar;
+    litaC_i32 deferStack;
+    litaC_bool inTextBlock;
+    litaC_types__TypeInfo* currentFunc;
+    litaC_cgen__CGenScope* currentScope;
+    litaC_std__io__File* output;
+    
+};
+
+struct litaC_ast__GenericDecl {
+    litaC_ast__Decl declaration;
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
+    
+};
+
+struct litaC_ast__FuncDecl {
+    litaC_ast__GenericDecl decl;
+    litaC_ast__ParametersStmt* params;
+    litaC_ast__Stmt* body;
+    litaC_ast__TypeSpec* returnType;
+    litaC_i32 flags;
+    
+};
+
 struct litaC_ast__BooleanExpr {
     litaC_ast__Expr expr;
     litaC_bool boolean;
     
 };
 
-struct litaC_ast__PoisonDecl {
-    litaC_ast__Decl decl;
+struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb_intern__InternedString_ce_* keys;
+    litaC_module__Module** values;
+    litaC_module__Module* emptyValue;
+    litaC_intern__InternedString emptyKey;
     
 };
 
-struct litaC_std__string__builder__StringBuilder {
-    litaC_std__string__buffer__StringBuffer asBuffer;
-    const litaC_std__mem__Allocator* alloc;
+struct litaC_ast__PoisonDecl {
+    litaC_ast__Decl decl;
     
 };
 
@@ -31977,14 +32361,6 @@ struct litaC_ast__GetExpr {
     
 };
 
-struct litaC_module__ModuleId {
-    litaC_char filename[PATH_MAX];
-    litaC_char filenameKey[PATH_MAX];
-    litaC_intern__InternedString packageName;
-    litaC_intern__InternedString name;
-    
-};
-
 struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -32008,45 +32384,6 @@ struct litaC_symbols__Scope {
     
 };
 
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    litaC_module__ModuleImport* values;
-    litaC_module__ModuleImport emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_intern__InternedString_ce_* keys;
-    litaC_module__Module** values;
-    litaC_module__Module* emptyValue;
-    litaC_intern__InternedString emptyKey;
-    
-};
-
-struct litaC_ast_new__TypeSpecAllocator {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ typeSpecs;
-    
-};
-
-struct litaC_std__mem__arena_allocator__ArenaAllocator {
-    litaC_std__mem__Allocator allocator;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__mem__arena_allocator__Arena* arena;
-    litaC_usize pageSize;
-    litaC_u32 numberOfArenas;
-    litaC_usize numberOfBytesAllocated;
-    litaC_u32 numberOfAllocations;
-    
-};
-
 struct litaC_module__Module {
     litaC_module__ModuleId id;
     litaC_std__string__buffer__StringBuffer text;
@@ -32064,20 +32401,6 @@ struct litaC_module__Module {
     
 };
 
-struct litaC_std__mem__bucket_allocator__BucketAllocator {
-    litaC_std__mem__Allocator allocator;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__mem__bucket_allocator__Bucket* buckets;
-    litaC_std__mem__bucket_allocator__Bucket* head;
-    litaC_usize bucketSize;
-    litaC_usize currentOffset;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    litaC_usize totalGrossBytesAllocated;
-    litaC_u32 totalBuckets;
-    
-};
-
 struct litaC_symbols__ProgramSymbols {
     litaC_module__Module* root;
     litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ values;
@@ -32088,14 +32411,14 @@ struct litaC_symbols__ProgramSymbols {
     
 };
 
-struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
+struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
     const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_intern__InternedString_ce_* keys;
+    litaC_std__map__std__map__Key_cb_types_new__ArrayEntry_ce_* keys;
     litaC_types__TypeInfo** values;
     litaC_types__TypeInfo* emptyValue;
-    litaC_intern__InternedString emptyKey;
+    litaC_types_new__ArrayEntry emptyKey;
     
 };
 
@@ -32106,25 +32429,6 @@ struct litaC_types_new__TypeCache {
     litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ ptrCache;
     litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ arrayCache;
     litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ genericCache;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_usize_ce_* keys;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* values;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
-    litaC_usize emptyKey;
-    
-};
-
-struct litaC_lsp__references__ReferenceDatabase {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
-    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
-    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
     
 };
 
@@ -32149,6 +32453,13 @@ struct litaC_lita__Lita {
     litaC_intern__Strings strings;
     litaC_lsp__references__ReferenceDatabase references;
     litaC_lsp__workspace__Workspace* workspace;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_types_new__ArrayEntry key;
+    litaC_types__TypeInfo* value;
+    litaC_types__TypeInfo** valuePtr;
     
 };
 
@@ -32183,6 +32494,12 @@ struct litaC_parser__Parser {
     
 };
 
+struct litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_intern__InternedString key;
+    litaC_symbols__Symbol* value;
+    litaC_symbols__Symbol** valuePtr;
+    
+};
 
 struct litaC_ast__NumberExpr {
     litaC_ast__Expr expr;
@@ -32204,6 +32521,13 @@ struct litaC_ast__IfStmt {
     
 };
 
+struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_symbols__Symbol* key;
+    litaC_dependency_graph__Dependency value;
+    litaC_dependency_graph__Dependency* valuePtr;
+    
+};
+
 struct litaC_ast__SubscriptSetExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* object;
@@ -32217,6 +32541,12 @@ struct litaC_ast__SwitchCaseStmt {
     litaC_ast__Stmt stmt;
     litaC_ast__Expr* cond;
     litaC_ast__Stmt* body;
+    
+};
+
+struct litaC_std__map__std__map__Key_cb_std__string__String_ce_ {
+    litaC_std__string__String key;
+    litaC_std__map__KeyState state;
     
 };
 
@@ -32331,30 +32661,9 @@ struct litaC_pkg_mgr__PackageManager {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_types_new__ArrayEntry key;
-    litaC_types__TypeInfo* value;
-    litaC_types__TypeInfo** valuePtr;
-    
-};
-
 struct litaC_ast__LabelStmt {
     litaC_ast__Stmt stmt;
     litaC_ast__Identifier label;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_intern__InternedString key;
-    litaC_symbols__Symbol* value;
-    litaC_symbols__Symbol** valuePtr;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    const litaC_char* key;
-    litaC_module__ModuleImport value;
-    litaC_module__ModuleImport* valuePtr;
     
 };
 
@@ -32371,12 +32680,6 @@ struct litaC_ast__SwitchStmt {
     litaC_ast__Expr* cond;
     litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ cases;
     litaC_ast__Stmt* defaultStmt;
-    
-};
-
-struct litaC_std__map__std__map__Key_cb_std__string__String_ce_ {
-    litaC_std__string__String key;
-    litaC_std__map__KeyState state;
     
 };
 
@@ -32427,7 +32730,6 @@ struct litaC_ast__EnumFieldEntryDecl {
     
 };
 
-
 struct litaC_ast__SetExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* object;
@@ -32461,21 +32763,6 @@ struct litaC_checker__TypeChecker {
     
 };
 
-struct litaC_std__json__Token {
-    litaC_std__json__TokenKind kind;
-    litaC_std__json__SrcPos pos;
-    const litaC_char* start;
-    const litaC_char* end;
-    union  {
-        litaC_i64 intNumValue;
-        litaC_f64 realNumValue;
-        const litaC_char* strValue;
-        const litaC_char* name;
-        
-    };
-    
-};
-
 struct litaC_std__json__JsonParser {
     const litaC_std__mem__Allocator* alloc;
     litaC_std__json__JsonParserStatus status;
@@ -32498,14 +32785,6 @@ struct litaC_ast__ModuleStmt {
 struct litaC_lsp__references__Reference {
     litaC_i64 type;
     litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_std__mem__track_allocator__TrackAllocator {
-    litaC_std__mem__Allocator alloc;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
-    litaC_usize totalAllocations;
     
 };
 
@@ -32611,22 +32890,6 @@ struct litaC_ast__CompStmt {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_usize key;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
-    
-};
-
-struct litaC_std__http__HttpResponse {
-    litaC_i32 statusCode;
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_const_char_ce_ headers;
-    litaC_std__string__builder__StringBuilder body;
-    litaC_void* userdata;
-    litaC_usize (*bodyFn)(litaC_void*,litaC_usize,litaC_usize,litaC_void*);
-    
-};
-
 struct litaC_types__MethodResult {
     litaC_symbols__Symbol* symbol;
     litaC_intern__InternedString name;
@@ -32638,12 +32901,6 @@ struct litaC_ast__InitArgExpr {
     litaC_ast__Identifier fieldName;
     litaC_i32 argPosition;
     litaC_ast__Expr* value;
-    
-};
-
-struct litaC_std__json__JsonObject {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
-    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
     
 };
 
@@ -32693,263 +32950,6 @@ struct litaC_ast__ArrayInitExpr {
     litaC_ast__Expr expr;
     litaC_ast__TypeSpec* type;
     litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ values;
-    
-};
-
-struct litaC_ast__NativeDecl {
-    litaC_ast__Decl decl;
-    litaC_types__TypeInfo* typeInfo;
-    
-};
-
-struct litaC_ast__FuncCallExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ genericArgs;
-    litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ arguments;
-    
-};
-
-struct litaC_ast__ContinueStmt {
-    litaC_ast__Stmt stmt;
-    
-};
-
-
-struct litaC_ast__TypeSpec {
-    litaC_ast__TypeSpecKind kind;
-    litaC_lex__SrcPos pos;
-    litaC_ast__TypeSpec* base;
-    litaC_types__TypeInfo* typeInfo;
-    union  {
-        struct  {
-            litaC_intern__InternedString name;
-            litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ genericArgs;
-            
-        };
-        struct  {
-            litaC_ast__Expr* numElements;
-            
-        };
-        struct  {
-            litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ args;
-            litaC_ast__TypeSpec* ret;
-            litaC_bool hasVarargs;
-            litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
-            
-        };
-        
-    };
-    
-};
-
-struct litaC_ast__InitExpr {
-    litaC_ast__Expr expr;
-    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ genericArgs;
-    litaC_ast__TypeSpec* type;
-    litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ arguments;
-    
-};
-
-struct litaC_ast__FuncBodyStmt {
-    litaC_ast__Stmt stmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ stmts;
-    
-};
-
-
-
-struct litaC_types__TypeInfo {
-    litaC_types__TypeKind kind;
-    litaC_i64 typeid;
-    litaC_intern__InternedString name;
-    litaC_symbols__Symbol* sym;
-    litaC_i64 genericTypeid;
-    litaC_types__TypeInfo* returnType;
-    union  {
-        struct  {
-            litaC_ast__FuncDecl* funcDecl;
-            
-        };
-        struct  {
-            litaC_types__TypeInfo* constOf;
-            
-        };
-        struct  {
-            litaC_types__TypeInfo* ptrOf;
-            
-        };
-        struct  {
-            litaC_types__TypeInfo* arrayOf;
-            litaC_usize length;
-            litaC_ast__Expr* numOfElements;
-            litaC_bool isLengthDefined;
-            
-        };
-        struct  {
-            litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
-            litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ paramDecls;
-            litaC_bool hasVarargs;
-            litaC_bool isTrait;
-            
-        };
-        struct  {
-            litaC_ast__EnumDecl* enumDecl;
-            
-        };
-        struct  {
-            litaC_ast__AggregateDecl* aggDecl;
-            
-        };
-        
-    };
-    
-};
-
-struct litaC_ast__GenericParam {
-    litaC_ast__Identifier name;
-    
-};
-
-struct litaC_ast__StringExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__Token string;
-    
-};
-
-struct litaC_ast__ParametersStmt {
-    litaC_ast__Stmt stmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ params;
-    litaC_bool isVararg;
-    
-};
-
-struct litaC_ast__UnaryExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* unaryExpr;
-    
-};
-
-struct litaC_ast__ParameterDecl {
-    litaC_ast__Decl decl;
-    litaC_ast__TypeSpec* type;
-    litaC_ast__Expr* defaultExpr;
-    litaC_types__TypeInfo* typeInfo;
-    
-};
-
-struct litaC_ast__BinaryExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* left;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* right;
-    
-};
-
-struct litaC_ast__NotesDecl {
-    litaC_ast__Decl decl;
-    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
-    
-};
-
-struct litaC_std__mem__linear_allocator__LinearAllocator {
-    litaC_std__mem__Allocator allocator;
-    litaC_void* mem;
-    litaC_usize size;
-    litaC_usize currentOffset;
-    litaC_usize alignment;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    litaC_std__mem__linear_allocator__ExpandInfo expandInfo;
-    
-};
-
-struct litaC_ast__DeferStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Stmt* deferedStmt;
-    
-};
-
-struct litaC_lsp__document__Document {
-    litaC_char filename[PATH_MAX];
-    litaC_std__string__builder__StringBuilder text;
-    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
-    
-};
-
-struct litaC_ast__NullExpr {
-    litaC_ast__Expr expr;
-    
-};
-
-
-struct litaC_dependency_graph__DependencyGraph {
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
-    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
-    litaC_lita__Lita* lita;
-    
-};
-
-
-struct litaC_lex__Lexer {
-    const litaC_std__mem__Allocator* allocator;
-    const litaC_char* filename;
-    litaC_lex__Token token;
-    const litaC_char* stream;
-    litaC_i64 length;
-    const litaC_char* lineStart;
-    litaC_i32 lineNumber;
-    litaC_i32 position;
-    const litaC_char* errorMsg;
-    
-};
-
-struct litaC_ast__GotoStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Identifier label;
-    
-};
-
-struct litaC_ast__SubscriptGetExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__Expr* index;
-    
-};
-
-struct litaC_ast__ReturnStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* expr;
-    
-};
-
-struct litaC_ast__PoisonExpr {
-    litaC_ast__Expr expr;
-    
-};
-
-struct litaC_cgen__CGen {
-    litaC_lita__Lita* lita;
-    litaC_std__string__builder__StringBuilder buf;
-    litaC_std__string__builder__StringBuilder line;
-    litaC_bool format;
-    litaC_i32 indent;
-    litaC_i32 aggregateLevel;
-    litaC_i32 currentLine;
-    const litaC_char* currentFile;
-    litaC_bool bufferFlush;
-    litaC_i32 funcIndex;
-    litaC_i32 tmpVar;
-    litaC_i32 deferStack;
-    litaC_bool inTextBlock;
-    litaC_types__TypeInfo* currentFunc;
-    litaC_cgen__CGenScope* currentScope;
-    litaC_std__io__File* output;
     
 };
 
@@ -45787,6 +45787,14 @@ litaC_types__MethodResult litaC_types__TypeInfo_getMethod(litaC_types__TypeInfo*
                                         } 
                                         
                                         break;
+                                        
+                                        
+                                    }
+                                    
+                                    
+                                }
+                                default: {
+                                    {
                                         
                                         
                                     }

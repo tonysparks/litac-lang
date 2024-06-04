@@ -2209,6 +2209,7 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
 
                         break
                     }
+                    default: {}
                 }
             }
 
