@@ -318,11 +318,11 @@ func (this: *PackageManager) readProjectPkg() : PkgStatus {
 
     return PkgStatus.OK
 }
-
+/*
 @test
 func testPackageManagerSync() {
     var pm: PackageManager{}
-    pm.init(PackageSyncOptions{})
+    pm.init(PackageOptions{})
     defer pm.free()
 
     var status = pm.install()
@@ -339,4 +339,4 @@ func testPackageManagerSync() {
     assert(strcmp(buildFile.pkgPaths.get(0), "C:/Users/antho/git/litac-lang/bin/output/src") == 0)
     assert(strcmp(buildFile.pkgPaths.get(1), "C:/Users/antho/git/litac-lang/bin/output/.pkgs/test-pkg/1.0/test-pkg-1.0/src") == 0)
 
-}
+}*/

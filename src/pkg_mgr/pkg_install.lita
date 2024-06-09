@@ -554,7 +554,7 @@ func testDownloadPackage() {
     PackageIdFromString("https://github.com/tonysparks|seventh|v0.4.1-beta", &pkg.id)
 
     var pm = PackageManager {
-        .options = PackageSyncOptions {
+        .options = PackageOptions {
             .pkgDir = "./.pkgs",
             .httpOptions = HttpOptions {
             }

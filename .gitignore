@@ -47,5 +47,7 @@ bootstrap/output/litac_tests.pdb
 bootstrap/output/**
 /.pkgs
 .build.json
+*.dSYM*
+.DS_Store
 
 bin/profile.data.txt

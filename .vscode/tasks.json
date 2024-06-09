@@ -77,6 +77,7 @@
             "type": "shell",
             "command": "litac",
             "args": [
+                "-colors",
                 "-pkg-build",
                 "-run",
                 "-testFile",
