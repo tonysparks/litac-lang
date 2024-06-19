@@ -1232,7 +1232,14 @@ func (l: *Lexer) scanString() : Token {
                 continue
             }
             else if(c == 'x') {
-                assert(false) // not done yet
+                for(var i = 0; i < 2; i+=1) {
+                    c = l.nextChar()
+                    if(!IsHex(c)) {
+                        l.error("Illegal hex character, character out of byte range (hex value): '%x'", c)
+                        isValid = false
+                        continue
+                    }
+                }
             }
             else {
                 if(c >= 256) {

@@ -1,33 +1,61 @@
 {
-    "repo" : "https://github.com/tonysparks",
-    "name" : "litac-lang",
-    "version" : "0.1.2-alpha",
+    "repo": "https://github.com/tonysparks",
+    "name": "litac-lang",
+    "version": "0.1.2-alpha",
     "type": "executable",
-
     "dynamic_libraries": [
         "libcrypto-1_1-x64.dll",
         "libcurl-x64.dll",
         "libssl-1_1-x64.dll",
     ],
-
-    "dependencies": [
-    ],
-
+    "dependencies": [],
     "build_command": {
         "debug": {
-            "linux": {
+            "mac": {
                 "default": {
                     "cc": "gcc",
                     "cc_options": [
-                        "-std=gnu11", "-g", "%input%", "-o", "%output%", "-D_CRT_SECURE_NO_WARNINGS"
+                        "-std=gnu11",
+                        "-g",
+                        "%input%",
+                        "-o",
+                        "%output%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
                         "-cFormat",
                         "-disableLine",
                         "-verbose",
-                        "-maxMemory", "1GiB",
-                        "-outputDir", "./bin/debug/",
-                        "-output", "litac"
+                        "-maxMemory",
+                        "1GiB",
+                        "-outputDir",
+                        "./bin/debug/",
+                        "-output",
+                        "litac"
+                    ]
+                }
+            },
+            "linux": {
+                "default": {
+                    "cc": "gcc",
+                    "cc_options": [
+                        "-std=gnu11",
+                        "-g",
+                        "%input%",
+                        "-o",
+                        "%output%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
+                        "-cFormat",
+                        "-disableLine",
+                        "-verbose",
+                        "-maxMemory",
+                        "1GiB",
+                        "-outputDir",
+                        "./bin/debug/",
+                        "-output",
+                        "litac"
                     ]
                 }
             },
@@ -35,32 +63,75 @@
                 "default": {
                     "cc": "clang",
                     "cc_options": [
-                        "-std=c11", "-g", "%%input%%", "-o", "%%output%%", "-D_CRT_SECURE_NO_WARNINGS"
+                        "-std=c11",
+                        "-g",
+                        "%%input%%",
+                        "-o",
+                        "%%output%%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
                         "-cFormat",
                         "-disableLine",
                         "-verbose",
-                        "-maxMemory", "1GiB",
-                        "-outputDir", "./bin/debug/",
-                        "-output", "litac"
+                        "-maxMemory",
+                        "1GiB",
+                        "-outputDir",
+                        "./bin/debug/",
+                        "-output",
+                        "litac"
                     ]
                 }
             }
         },
         "release": {
-            "linux": {
+            "mac": {
                 "default": {
                     "cc": "gcc",
                     "cc_options": [
-                        "-std=gnu11", "-O3", "-march=native", "-mtune=native", "%input%", "-o", "%output%", "-D_CRT_SECURE_NO_WARNINGS"
+                        "-std=gnu11",
+                        "-O3",
+                        "-march=native",
+                        "-mtune=native",
+                        "%input%",
+                        "-o",
+                        "%output%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
                         "-cFormat",
                         "-disableLine",
-                        "-maxMemory", "1GiB",
-                        "-outputDir", "./bin/release/",
-                        "-output", "litac"
+                        "-maxMemory",
+                        "1GiB",
+                        "-outputDir",
+                        "./bin/release/",
+                        "-output",
+                        "litac"
+                    ]
+                }
+            },
+            "linux": {
+                "default": {
+                    "cc": "gcc",
+                    "cc_options": [
+                        "-std=gnu11",
+                        "-O3",
+                        "-march=native",
+                        "-mtune=native",
+                        "%input%",
+                        "-o",
+                        "%output%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
+                        "-cFormat",
+                        "-disableLine",
+                        "-maxMemory",
+                        "1GiB",
+                        "-outputDir",
+                        "./bin/release/",
+                        "-output",
+                        "litac"
                     ]
                 }
             },
@@ -68,20 +139,29 @@
                 "default": {
                     "cc": "clang",
                     "cc_options": [
-                        "-std=c11", "-O3", "-march=native", "-mtune=native", "%%input%%", "-o", "%%output%%", "-D_CRT_SECURE_NO_WARNINGS"
+                        "-std=c11",
+                        "-O3",
+                        "-march=native",
+                        "-mtune=native",
+                        "%%input%%",
+                        "-o",
+                        "%%output%%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
                         "-cFormat",
                         "-disableLine",
-                        "-maxMemory", "1GiB",
-                        "-outputDir", "./bin/release/",
-                        "-output", "litac"
+                        "-maxMemory",
+                        "1GiB",
+                        "-outputDir",
+                        "./bin/release/",
+                        "-output",
+                        "litac"
                     ]
                 }
             }
         }
     },
-
     "commands": {
         "windows": {
             "build": "build.bat",

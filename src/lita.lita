@@ -139,6 +139,7 @@ public struct LitaOptions {
     isDebug: bool                  // if we are in debug mode
     instrument: bool               // if we have profiling instrumentation enabled
     isVerbose: bool                // if we are in verbose mode, output logging detail information
+    isColoredOutput: bool          // if we should use colors in output
 
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include

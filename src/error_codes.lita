@@ -108,14 +108,82 @@ public const errorCodeText = []*const char {
     [ErrorCode.MAX_NUM_ERROR_CODES] = ""
 }
 
+/*
+colors: windows
+0=black
+1=blue
+2=green
 
-public func PrintError(sb: *StringBuilder, error: PhaseError) {
+colors: ansci
+0=black
+1=red
+2=green
+3=yellow
+4=blue
+5=magenta
+6=cyan
+7=white
+
+38;5;c  // standard color foreground
+38;2;r;g;b  // rgb color foreground
+
+48;5;c  // background
+48;2;r;g;b
+*/
+@asStr
+public enum ConsoleColors {
+    @asStr("\x1b[0m")
+    CLEAR,
+
+    @asStr("\x1b[38;5;0m")
+    BLACK,
+
+    @asStr("\x1b[38;5;1m")
+    RED,
+
+    @asStr("\x1b[38;5;2m")
+    GREEN,
+
+    @asStr("\x1b[38;5;3m")
+    YELLOW,
+
+    @asStr("\x1b[38;5;4m")
+    BLUE,
+
+    @asStr("\x1b[38;5;5m")
+    MAGENTA,
+
+    @asStr("\x1b[38;5;6m")
+    CYAN,
+
+    @asStr("\x1b[38;5;7m")
+    WHITE,
+}
+
+public func PrintError(useColors: bool, sb: *StringBuilder, error: PhaseError) {
     if(!error.pos.lineStart) {
         sb.append("%s\n", error.message)
         return;
     }
 
-    sb.append("%s:%d:%d error: %s\n", error.pos.filename, error.pos.lineNumber, error.pos.position, error.message)
+    if(useColors) {
+        sb.append("%s:%d:%d %serror%s: %s\n",
+            error.pos.filename,
+            error.pos.lineNumber,
+            error.pos.position,
+            ConsoleColorsAsStr(ConsoleColors.RED),
+            ConsoleColorsAsStr(ConsoleColors.CLEAR),
+            error.message
+        )
+    }
+    else {
+        sb.append("%s:%d:%d error: %s\n",
+            error.pos.filename,
+            error.pos.lineNumber,
+            error.pos.position,
+            error.message
+        )
+    }
 
     const len = error.pos.getLineLength()
     const maxLength = MIN(len, 255)
@@ -153,4 +221,43 @@ public func PrintError(sb: *StringBuilder, error: PhaseError) {
         sb.append(" ")
     }
     sb.append("^\n*** %s\n", error.message)
+}
+
+@test
+func TestPrintError() {
+    var sb = StringBuilderInit()
+    var line = "Blah Blah"
+    var error = PhaseError {
+        .type = ErrorType.ERROR,
+        .message = "Blah Blah",
+        .pos = SrcPos {
+            .filename = "/path/to/nothing",
+            .lineNumber = 1,
+            .position = 1,
+            .lineStart = line,
+            .start = &line[2],
+            .end = &line[7]
+        }
+    }
+    PrintError(true, sb, error)
+    printf("%s\n", sb.cStr())
+}
+
+
+@test
+func testConsoleColors() {
+    //printf("\x1b[38;2;150;160;207;4mHello Colorful World\x1b[0m\n")
+
+    //printf("%serror\x1b[0m: %s\n", "\x1b[38;5;1;1m", "This works!")
+    //printf("Hello\n")
+
+    printf("%sBlack\n", ConsoleColorsAsStr(ConsoleColors.BLACK))
+    printf("%sRed\n", ConsoleColorsAsStr(ConsoleColors.RED))
+    printf("%sGreen\n", ConsoleColorsAsStr(ConsoleColors.GREEN))
+    printf("%sYellow\n", ConsoleColorsAsStr(ConsoleColors.YELLOW))
+    printf("%sBlue\n", ConsoleColorsAsStr(ConsoleColors.BLUE))
+    printf("%sMagenta\n", ConsoleColorsAsStr(ConsoleColors.MAGENTA))
+    printf("%sCyan\n", ConsoleColorsAsStr(ConsoleColors.CYAN))
+    printf("%sWhite\n", ConsoleColorsAsStr(ConsoleColors.WHITE))
+    printf("%sClear\n", ConsoleColorsAsStr(ConsoleColors.CLEAR))
 }

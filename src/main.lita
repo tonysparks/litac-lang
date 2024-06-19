@@ -94,7 +94,7 @@ report:
 
     if(!lita.result.errors.empty()) {
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
-            PrintError(sb, lita.result.errors.get(i))
+            PrintError(lita.options.isColoredOutput, sb, lita.result.errors.get(i))
 
             printf("%s\n", sb.cStr())
             sb.clear()
@@ -155,6 +155,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     parser.addOption("disableLine",    '\0', "Disables #line dorective in C output", 0, null);
     parser.addOption("debug",          '\0', "Enables debug mode", 0, null);
     parser.addOption("verbose",        '\0', "Enables verbose output", 0, null);
+    parser.addOption("colors",         '\0', "Enables console colors for output", 0, null);
     parser.addOption("instrument",     '\0', "Enables profile instrumentation of @profile annotated functions", 0, null);
     parser.addOption("srcDir",         '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("doc",            '\0', "Generates document output", 0, null);
@@ -189,6 +190,10 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     if(parser.hasOption("version")) {
         printf("Version: %s\n", LITA_VERSION)
         goto terminate;
+    }
+
+    if(parser.hasOption("colors")) {
+        options.isColoredOutput = true
     }
 
     if(parser.hasOption("help")) {

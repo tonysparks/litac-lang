@@ -1,7 +1,7 @@
 #ifndef _LITAC_HEADER_H
 #define _LITAC_HEADER_H
 
-// Generated on Wed May 15 00:56:30 2024
+// Generated on Wed Jun 12 00:41:48 2024
 
 #include <stdint.h>
 #include <stddef.h>
@@ -28839,6 +28839,18 @@ typedef enum litaC_error_codes__ErrorCode {
     litaC_error_codes__ErrorCode_TOO_MANY_ERRORS,
     litaC_error_codes__ErrorCode_MAX_NUM_ERROR_CODES
 } litaC_error_codes__ErrorCode;
+
+typedef enum litaC_error_codes__ConsoleColors {
+    litaC_error_codes__ConsoleColors_CLEAR,
+    litaC_error_codes__ConsoleColors_BLACK,
+    litaC_error_codes__ConsoleColors_RED,
+    litaC_error_codes__ConsoleColors_GREEN,
+    litaC_error_codes__ConsoleColors_YELLOW,
+    litaC_error_codes__ConsoleColors_BLUE,
+    litaC_error_codes__ConsoleColors_MAGENTA,
+    litaC_error_codes__ConsoleColors_CYAN,
+    litaC_error_codes__ConsoleColors_WHITE
+} litaC_error_codes__ConsoleColors;
 typedef struct litaC_lsp__references__Reference litaC_lsp__references__Reference;
 typedef struct litaC_lsp__references__FieldReference litaC_lsp__references__FieldReference;
 typedef struct litaC_lsp__references__ReferenceDatabase litaC_lsp__references__ReferenceDatabase;
@@ -29821,7 +29833,7 @@ litaC_bool litaC_checker_expr__TypeChecker_checkConstant(litaC_checker__TypeChec
 litaC_bool litaC_checker_expr__TypeChecker_checkTruthyness(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr,litaC_types__TypeInfo* litaC_type);
 litaC_bool litaC_checker_expr__TypeChecker_checkRightValue(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr);
 litaC_bool litaC_checker_expr__TypeChecker_resolveIdentiferExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__IdentifierExpr* litaC_expr);
-litaC_void litaC_error_codes__PrintError(litaC_std__string__builder__StringBuilder* litaC_sb,litaC_phase_result__PhaseError litaC_error);
+litaC_void litaC_error_codes__PrintError(litaC_bool litaC_useColors,litaC_std__string__builder__StringBuilder* litaC_sb,litaC_phase_result__PhaseError litaC_error);
 litaC_void litaC_lsp__references__ReferenceDatabase_init(litaC_lsp__references__ReferenceDatabase* litaC_this,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_void litaC_lsp__references__ReferenceDatabase_addSymbolReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_symbols__Symbol* litaC_symbol,litaC_lex__SrcPos litaC_pos);
 litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_ast__TypeSpec* litaC_type);
@@ -30283,6 +30295,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_init__PackageInit(litaC_pkg_mgr__Pac
 const litaC_char* litaC_pkg_mgr__PkgStatusAsStr(litaC_pkg_mgr__PkgStatus litaC_enumType);
 const litaC_char* litaC_lsp__protocol__SymbolInfoKindAsStr(litaC_lsp__protocol__SymbolInfoKind litaC_enumType);
 const litaC_char* litaC_std__json__JsonTypeAsStr(litaC_std__json__JsonType litaC_enumType);
+const litaC_char* litaC_error_codes__ConsoleColorsAsStr(litaC_error_codes__ConsoleColors litaC_enumType);
 const litaC_char* litaC_lita__TypeInfoOptionAsStr(litaC_lita__TypeInfoOption litaC_enumType);
 const litaC_char* litaC_lita__MetricTypeAsStr(litaC_lita__MetricType litaC_enumType);
 const litaC_char* litaC_symbols__SymbolStateAsStr(litaC_symbols__SymbolState litaC_enumType);
@@ -30820,14 +30833,112 @@ litaC_void litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-struct litaC_pkg_mgr__pkg__PackageId {
-    litaC_char id[PATH_MAX];
-    litaC_i32 repoOffset;
-    litaC_i32 repoLength;
-    litaC_i32 nameOffset;
-    litaC_i32 nameLength;
-    litaC_i32 versionOffset;
-    litaC_i32 versionLength;
+struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb_i32_ce_* keys;
+    litaC_i32* values;
+    litaC_i32 emptyValue;
+    litaC_i32 emptyKey;
+    
+};
+
+struct litaC_preprocessor__api__ScriptRuntime {
+    ape_t* ape;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Decl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lsp__protocol__TextDocumentChangeEvent* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_ {
+    litaC_i32 length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* next;
+    litaC_ast__TypeSpec* elements;
+    
+};
+
+struct litaC_module__ModuleImport {
+    litaC_module__Module* module;
+    litaC_intern__InternedString* alias;
+    litaC_bool isUsing;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_preprocessor__CheckerContext_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_preprocessor__CheckerContext* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__mem__Allocator {
+    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
+    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
+    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
+    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
+    
+};
+
+union litaC_std__json__JsonValue {
+    litaC_bool boolValue;
+    litaC_f64 doubleValue;
+    litaC_i64 intValue;
+    const litaC_char* strValue;
+    litaC_std__json__JsonObject* objValue;
+    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
+    
+};
+
+struct litaC_pkg_mgr__PackageBuildOptions {
+    litaC_bool isRelease;
+    
+};
+
+struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* next;
+    litaC_types__TypeInfo* elements;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lex__Token_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lex__Token* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_char** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_pkg_mgr__pkg__PackageId* elements;
+    const litaC_std__mem__Allocator* alloc;
     
 };
 
@@ -30839,6 +30950,7 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ {
     
 };
 
+
 struct litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -30847,11 +30959,23 @@ struct litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ {
     
 };
 
+
 struct litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
     litaC_ast__EnumFieldEntryDecl** elements;
     const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    litaC_module__ModuleImport* values;
+    litaC_module__ModuleImport emptyValue;
+    const litaC_char* emptyKey;
     
 };
 
@@ -30866,19 +30990,28 @@ struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce
     
 };
 
-struct litaC_module__ModuleImport {
-    litaC_module__Module* module;
-    litaC_intern__InternedString* alias;
-    litaC_bool isUsing;
+struct litaC_build__BuildFile {
+    const litaC_std__mem__Allocator* allocator;
+    const litaC_char* compileCmdTemplate;
+    const litaC_char* projectSrcDir;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    const litaC_char* key;
-    litaC_module__Module* value;
-    litaC_module__Module** valuePtr;
+struct litaC_pkg_mgr__pkg__PackageId {
+    litaC_char id[PATH_MAX];
+    litaC_i32 repoOffset;
+    litaC_i32 repoLength;
+    litaC_i32 nameOffset;
+    litaC_i32 nameLength;
+    litaC_i32 versionOffset;
+    litaC_i32 versionLength;
     
 };
+
 
 struct litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ {
     litaC_i32 length;
@@ -30896,11 +31029,46 @@ struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ {
     
 };
 
-struct litaC_std__mem__Allocator {
-    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
-    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
-    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
-    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
+struct litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_i64 key;
+    litaC_types__TypeInfo* value;
+    litaC_types__TypeInfo** valuePtr;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    const litaC_char* key;
+    litaC_pkg_mgr__pkg__PackageDef* value;
+    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
+    
+};
+
+struct litaC_lita__PkgOptions {
+    litaC_lita__PkgCommand pkgCmd;
+    const litaC_char* pkgRunCmdArg;
+    litaC_bool forceClean;
+    litaC_bool isRelease;
+    const litaC_char* pkgName;
+    
+};
+
+struct litaC_checker__GenericContext {
+    litaC_module__Module* callsite;
+    
+};
+
+struct litaC_std__json__JsonNode {
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__json__JsonType type;
+    litaC_std__json__JsonValue value;
     
 };
 
@@ -30910,7 +31078,6 @@ struct litaC_lsp__protocol__TextDocument {
     litaC_u32 version;
     
 };
-
 
 struct litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_ {
     litaC_i32 length;
@@ -30925,6 +31092,12 @@ struct litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ {
     litaC_i32 capacity;
     litaC_lex__SrcPos* elements;
     const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__builtins__any {
+    litaC_void* value;
+    litaC_u64 id;
     
 };
 
@@ -30944,11 +31117,18 @@ struct litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ {
 };
 
 
-struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
+struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_usize key;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
+    
+};
+
+struct litaC_std__mem__bucket_allocator__Bucket {
+    litaC_std__mem__bucket_allocator__Bucket* prev;
+    litaC_u8* mem;
+    litaC_usize size;
+    litaC_void* padding;
     
 };
 
@@ -30974,6 +31154,24 @@ struct litaC_std__map__std__map__Key_cb_i32_ce_ {
     
 };
 
+struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__cmdline__Option {
+    const litaC_char* name;
+    litaC_char shortName;
+    const litaC_char* description;
+    const litaC_char* value;
+    const litaC_char* defaultValue;
+    litaC_i32 flags;
+    
+};
+
 struct litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -30981,6 +31179,14 @@ struct litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ {
     const litaC_std__mem__Allocator* alloc;
     
 };
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    const litaC_char* key;
+    litaC_module__ModuleImport value;
+    litaC_module__ModuleImport* valuePtr;
+    
+};
+
 
 struct litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ {
     litaC_i32 length;
@@ -30990,20 +31196,6 @@ struct litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ {
     litaC_types__TypeInfo** values;
     litaC_types__TypeInfo* emptyValue;
     litaC_i64 emptyKey;
-    
-};
-
-struct litaC_lita__PkgOptions {
-    litaC_lita__PkgCommand pkgCmd;
-    const litaC_char* pkgRunCmdArg;
-    litaC_bool forceClean;
-    litaC_bool isRelease;
-    const litaC_char* pkgName;
-    
-};
-
-struct litaC_checker__GenericContext {
-    litaC_module__Module* callsite;
     
 };
 
@@ -31018,12 +31210,21 @@ struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Do
     
 };
 
-struct litaC_std__builtins__any {
-    litaC_void* value;
-    litaC_u64 id;
+struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
     
 };
 
+struct litaC_std__map__std__map__MapIterator_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
 
 struct litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ {
     litaC_i32 length;
@@ -31032,64 +31233,6 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ {
     const litaC_std__mem__Allocator* alloc;
     
 };
-
-struct litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_i64 key;
-    litaC_types__TypeInfo* value;
-    litaC_types__TypeInfo** valuePtr;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Stmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__mem__bucket_allocator__Bucket {
-    litaC_std__mem__bucket_allocator__Bucket* prev;
-    litaC_u8* mem;
-    litaC_usize size;
-    litaC_void* padding;
-    
-};
-
-struct litaC_std__json__JsonIterator {
-    litaC_i32 index;
-    litaC_std__json__JsonNode* json;
-    
-};
-
-struct litaC_std__cmdline__Option {
-    const litaC_char* name;
-    litaC_char shortName;
-    const litaC_char* description;
-    const litaC_char* value;
-    const litaC_char* defaultValue;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_types__TypeInfo** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_dependency_graph__Dependency** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-
 
 struct litaC_std__io__File {
     FILE* file;
@@ -31117,6 +31260,7 @@ struct litaC_lita__LitaOptions {
     litaC_bool isDebug;
     litaC_bool instrument;
     litaC_bool isVerbose;
+    litaC_bool isColoredOutput;
     litaC_bool testsOnly;
     const litaC_char* testsRegex;
     litaC_bool testFileOnly;
@@ -31131,24 +31275,9 @@ struct litaC_lita__LitaOptions {
     
 };
 
-struct litaC_dependency_graph__Dependency {
-    litaC_dependency_graph__State state;
-    litaC_symbols__Symbol* sym;
-    litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ dependsOn;
-    
-};
-
-struct litaC_std__map__std__map__Key_cb_usize_ce_ {
-    litaC_usize key;
-    litaC_std__map__KeyState state;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
+struct litaC_lsp__protocol__TextDocumentDidChange {
+    litaC_lsp__protocol__TextDocument textDocument;
+    litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ contentChanges;
     
 };
 
@@ -31159,89 +31288,11 @@ struct litaC_types_new__ArrayEntry {
     
 };
 
-struct litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ {
+struct litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__ParameterDecl** elements;
+    litaC_ast__Stmt** elements;
     const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_ {
-    litaC_symbols__Symbol* key;
-    litaC_std__map__KeyState state;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    const litaC_char* key;
-    litaC_module__ModuleImport value;
-    litaC_module__ModuleImport* valuePtr;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__NoteStmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_symbols__Symbol* key;
-    litaC_dependency_graph__Dependency value;
-    litaC_dependency_graph__Dependency* valuePtr;
-    
-};
-
-struct litaC_introspection__Introspect {
-    litaC_lita__Lita* lita;
-    
-};
-
-struct litaC_std__map__std__map__Key_cb_i64_ce_ {
-    litaC_i64 key;
-    litaC_std__map__KeyState state;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_module__Module** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__mem__bucket_allocator__BucketAllocator {
-    litaC_std__mem__Allocator allocator;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__mem__bucket_allocator__Bucket* buckets;
-    litaC_std__mem__bucket_allocator__Bucket* head;
-    litaC_usize bucketSize;
-    litaC_usize currentOffset;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    litaC_usize totalGrossBytesAllocated;
-    litaC_u32 totalBuckets;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lsp__references__FieldReference* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__profile__ProfileEntry {
-    const litaC_char* functionName;
-    litaC_u64 count;
-    litaC_f64 startTime;
-    litaC_f64 totalTime;
     
 };
 
@@ -31253,52 +31304,42 @@ struct litaC_std__map__std__map__MapIterator_cb_types_new__ArrayEntry_c__ptr_typ
     
 };
 
-struct litaC_preprocessor__CheckerContext {
-    litaC_module__Module* module;
-    litaC_ast__CompStmt* stmt;
+
+struct litaC_std__map__std__map__MapIterator_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
     
 };
 
-struct litaC_lita__Metric {
-    litaC_usize bytesAllocated;
-    litaC_u32 allocationCount;
-    litaC_f64 executionTime;
-    litaC_f64 startTime;
-    
-};
-
-struct litaC_std__json__JsonEntry {
-    const litaC_char* key;
-    litaC_std__json__JsonNode* value;
-    
-};
-
-struct litaC_lsp__protocol__Position {
-    litaC_i32 line;
-    litaC_i32 character;
-    
-};
-
-struct litaC_pkg_mgr__PackageOptions {
-    const litaC_char* projectPath;
-    const litaC_char* pkgDir;
-    litaC_lita__LitaOptions* litaOptions;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ {
+struct litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__TypeSpec** elements;
+    litaC_types__TypeInfo** elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ {
+struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_symbols__Symbol** elements;
+    litaC_dependency_graph__Dependency** elements;
     const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_introspection__Introspect {
+    litaC_lita__Lita* lita;
+    
+};
+
+struct litaC_cgen__CGenScope {
+    litaC_cgen__CGenScope* parent;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ defers;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ constDefs;
+    litaC_bool isLoop;
+    litaC_bool isSwitch;
     
 };
 
@@ -31318,23 +31359,81 @@ struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c_module__Module
     
 };
 
+struct litaC_std__mem__bucket_allocator__BucketAllocator {
+    litaC_std__mem__Allocator allocator;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__mem__bucket_allocator__Bucket* buckets;
+    litaC_std__mem__bucket_allocator__Bucket* head;
+    litaC_usize bucketSize;
+    litaC_usize currentOffset;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    litaC_usize totalGrossBytesAllocated;
+    litaC_u32 totalBuckets;
+    
+};
 
-struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
+struct litaC_std__json__JsonIterator {
+    litaC_i32 index;
+    litaC_std__json__JsonNode* json;
+    
+};
+
+struct litaC_std__profile__ProfileEntry {
+    const litaC_char* functionName;
+    litaC_u64 count;
+    litaC_f64 startTime;
+    litaC_f64 totalTime;
+    
+};
+
+struct litaC_preprocessor__CheckerContext {
+    litaC_module__Module* module;
+    litaC_ast__CompStmt* stmt;
+    
+};
+
+struct litaC_std__map__std__map__Key_cb_usize_ce_ {
+    litaC_usize key;
+    litaC_std__map__KeyState state;
+    
+};
+
+struct litaC_lita__Metric {
+    litaC_usize bytesAllocated;
+    litaC_u32 allocationCount;
+    litaC_f64 executionTime;
+    litaC_f64 startTime;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__ImportDecl** elements;
+    litaC_ast__ParameterDecl** elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+struct litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_ {
+    litaC_symbols__Symbol* key;
+    litaC_std__map__KeyState state;
+    
+};
+
+struct litaC_dependency_graph__Dependency {
+    litaC_dependency_graph__State state;
+    litaC_symbols__Symbol* sym;
+    litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ dependsOn;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
+    litaC_ast__NoteStmt** elements;
     const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_types_new__ArrayEntry_ce_* keys;
-    litaC_types__TypeInfo** values;
-    litaC_types__TypeInfo* emptyValue;
-    litaC_types_new__ArrayEntry emptyKey;
     
 };
 
@@ -31348,40 +31447,26 @@ struct litaC_std__regex__Regex {
     
 };
 
-struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
+struct litaC_std__map__std__map__Key_cb_i64_ce_ {
+    litaC_i64 key;
+    litaC_std__map__KeyState state;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_std__mem__track_allocator__Allocation** elements;
+    litaC_module__Module** elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
 
-
-struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 bucketSize;
-    litaC_usize length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* buckets;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* top;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
+    litaC_lsp__references__FieldReference* elements;
     const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    litaC_pkg_mgr__pkg__PackageDef** values;
-    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
-    const litaC_char* emptyKey;
     
 };
 
@@ -31391,16 +31476,10 @@ struct litaC_checker_expr__ParamInfo {
     
 };
 
-struct litaC_pkg_mgr__pkg_build__CommandArgs {
-    litaC_i32 n;
-    litaC_char** args;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
     const litaC_char* key;
-    litaC_pkg_mgr__pkg__PackageDef* value;
-    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
+    litaC_module__Module* value;
+    litaC_module__Module** valuePtr;
     
 };
 
@@ -31410,64 +31489,25 @@ struct litaC_std__string__String {
     
 };
 
-struct litaC_cgen__CompilationUnit {
-    litaC_module__Module* module;
-    litaC_char filename[PATH_MAX];
-    FILE* file;
+struct litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__TypeSpec** elements;
+    const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__fs__FileHandle {
-    tinydir_dir dir;
-    tinydir_file file;
-    
-};
-
-struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 bucketSize;
-    litaC_usize length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* buckets;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* top;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_i64 key;
-    litaC_std__array__std__array__Array_cb_i64_ce_ value;
-    litaC_std__array__std__array__Array_cb_i64_ce_* valuePtr;
+struct litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_symbols__Symbol** elements;
+    const litaC_std__mem__Allocator* alloc;
     
 };
 
 struct litaC_std__mem__linear_allocator__ExpandInfo {
     const litaC_std__mem__Allocator* allocator;
     litaC_std__mem__linear_allocator__ExpandStrategy strategy;
-    
-};
-
-struct litaC_std__json__JsonContext {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_void (*maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*);
-    litaC_void* (*makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*);
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__cmdline__Option* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    litaC_i32* values;
-    litaC_i32 emptyValue;
-    const litaC_char* emptyKey;
     
 };
 
@@ -31499,9 +31539,167 @@ struct litaC_preprocessor__DeclContext {
     
 };
 
-struct litaC_std__mem__track_allocator__Allocation {
-    litaC_void* addr;
-    litaC_usize size;
+struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__ImportDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb_types_new__ArrayEntry_ce_* keys;
+    litaC_types__TypeInfo** values;
+    litaC_types__TypeInfo* emptyValue;
+    litaC_types_new__ArrayEntry emptyKey;
+    
+};
+
+struct litaC_intern__X {
+    litaC_i32 v[litaC_intern__MAX_SOMETHING];
+    
+};
+
+struct litaC_std__json__JsonEntry {
+    const litaC_char* key;
+    litaC_std__json__JsonNode* value;
+    
+};
+
+struct litaC_lsp__protocol__Position {
+    litaC_i32 line;
+    litaC_i32 character;
+    
+};
+
+struct litaC_pkg_mgr__PackageOptions {
+    const litaC_char* projectPath;
+    const litaC_char* pkgDir;
+    litaC_lita__LitaOptions* litaOptions;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__mem__track_allocator__Allocation** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 bucketSize;
+    litaC_usize length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* buckets;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* top;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    litaC_pkg_mgr__pkg__PackageDef** values;
+    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_lsp__references__Reference {
+    litaC_i64 type;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_module__Module_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+
+struct litaC_generics__Template {
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
+    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_* genericArgs;
+    
+};
+
+struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 bucketSize;
+    litaC_usize length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* buckets;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* top;
+    
+};
+
+struct litaC_intern__Strings {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__string__String* keys;
+    litaC_intern__InternedString* values;
+    
+};
+
+struct litaC_pkg_mgr__pkg_build__CommandArgs {
+    litaC_i32 n;
+    litaC_char** args;
+    
+};
+
+struct litaC_cgen__CompilationUnit {
+    litaC_module__Module* module;
+    litaC_char filename[PATH_MAX];
+    FILE* file;
+    
+};
+
+struct litaC_pkg_mgr__pkg__PackageDef {
+    litaC_pkg_mgr__pkg__PackageId id;
+    litaC_char path[PATH_MAX];
+    litaC_pkg_mgr__pkg__PackageType type;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ dynamicLibraries;
+    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ dependencies;
+    litaC_std__json__JsonNode* json;
+    
+};
+
+struct litaC_std__fs__FileHandle {
+    tinydir_dir dir;
+    tinydir_file file;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__cmdline__Option* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    litaC_i32* values;
+    litaC_i32 emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_types__FieldPositionResult {
+    litaC_types__TypeInfo* aggInfo;
+    litaC_i32 position;
     
 };
 
@@ -31513,41 +31711,10 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_usize key;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
-    
-};
-
-struct litaC_intern__X {
-    litaC_i32 v[litaC_intern__MAX_SOMETHING];
-    
-};
-
-struct litaC_std__json__JsonObject {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
-    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
-    
-};
-
-struct litaC_std__json__SrcPos {
-    const litaC_char* name;
-    litaC_i32 line;
-    
-};
-
-struct litaC_lsp__protocol__Range {
-    litaC_lsp__protocol__Position start;
-    litaC_lsp__protocol__Position end;
-    
-};
-
-struct litaC_pkg_mgr__PackageInitOptions {
-    const litaC_char* name;
-    const litaC_char* version;
-    const litaC_char* type;
-    const litaC_char* repo;
+struct litaC_std__json__JsonContext {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_void (*maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*);
+    litaC_void* (*makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*);
     
 };
 
@@ -31563,133 +31730,6 @@ struct litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
     litaC_phase_result__PhaseError* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_lsp__references__FieldReference {
-    litaC_i64 parent;
-    litaC_i32 offset;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_usize_ce_* keys;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* values;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
-    litaC_usize emptyKey;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-
-struct litaC_generics__Template {
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
-    litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_* genericArgs;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_const_char_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    const litaC_char** values;
-    const litaC_char* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_u32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_intern__Strings {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__string__String* keys;
-    litaC_intern__InternedString* values;
-    
-};
-
-struct litaC_preprocessor__api__ScriptRuntime {
-    ape_t* ape;
-    
-};
-
-
-struct litaC_types__FieldPositionResult {
-    litaC_types__TypeInfo* aggInfo;
-    litaC_i32 position;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_i64_ce_* keys;
-    litaC_std__array__std__array__Array_cb_i64_ce_* values;
-    litaC_std__array__std__array__Array_cb_i64_ce_ emptyValue;
-    litaC_i64 emptyKey;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb_i32_ce_* keys;
-    litaC_i32* values;
-    litaC_i32 emptyValue;
-    litaC_i32 emptyKey;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Decl** elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
@@ -31725,18 +31765,16 @@ struct litaC_preprocessor__ScriptDecl {
     
 };
 
-struct litaC_std__mem__track_allocator__TrackAllocator {
-    litaC_std__mem__Allocator alloc;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
-    litaC_usize totalAllocations;
+struct litaC_std__mem__track_allocator__Allocation {
+    litaC_void* addr;
+    litaC_usize size;
     
 };
 
-struct litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ {
+struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_lsp__protocol__TextDocumentChangeEvent* elements;
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
@@ -31753,120 +31791,58 @@ struct litaC_lita__CCompilerOption {
     
 };
 
-union litaC_std__json__JsonValue {
-    litaC_bool boolValue;
-    litaC_f64 doubleValue;
-    litaC_i64 intValue;
-    const litaC_char* strValue;
-    litaC_std__json__JsonObject* objValue;
-    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
+struct litaC_std__json__JsonObject {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
+    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
     
 };
 
-struct litaC_std__json__Token {
-    litaC_std__json__TokenKind kind;
-    litaC_std__json__SrcPos pos;
-    const litaC_char* start;
-    const litaC_char* end;
-    union  {
-        litaC_i64 intNumValue;
-        litaC_f64 realNumValue;
-        const litaC_char* strValue;
-        const litaC_char* name;
-        
-    };
+struct litaC_std__json__SrcPos {
+    const litaC_char* name;
+    litaC_i32 line;
     
 };
 
-struct litaC_lsp__protocol__Location {
-    const litaC_char* uri;
-    litaC_lsp__protocol__Range range;
+struct litaC_lsp__protocol__Range {
+    litaC_lsp__protocol__Position start;
+    litaC_lsp__protocol__Position end;
     
 };
 
-struct litaC_pkg_mgr__PackageBuildOptions {
-    litaC_bool isRelease;
+struct litaC_pkg_mgr__PackageInitOptions {
+    const litaC_char* name;
+    const litaC_char* version;
+    const litaC_char* type;
+    const litaC_char* repo;
     
 };
 
-struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_ {
-    litaC_i32 length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* next;
-    litaC_ast__TypeSpec* elements;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_preprocessor__CheckerContext_ce_ {
+struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_preprocessor__CheckerContext* elements;
     const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb_usize_ce_* keys;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* values;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
+    litaC_usize emptyKey;
     
 };
 
-struct litaC_phase_result__PhaseError {
-    litaC_phase_result__ErrorType type;
-    const litaC_char* message;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_lsp__references__ReferenceDatabase {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
-    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
-    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
-    
-};
-
-struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* next;
-    litaC_types__TypeInfo* elements;
-    
-};
-
-struct litaC_std__map__std__map__Key_cb_types_new__ArrayEntry_ce_ {
-    litaC_types_new__ArrayEntry key;
-    litaC_std__map__KeyState state;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb_lex__Token_ce_ {
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_const_char_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_lex__Token* elements;
     const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
+    const litaC_char** values;
+    const litaC_char* emptyValue;
+    const litaC_char* emptyKey;
     
 };
 
-struct litaC_ast__FieldStmt {
-    litaC_ast__StmtKind kind;
-    litaC_types__TypeInfo* typeInfo;
-    union  {
-        litaC_ast__EnumDecl* enumField;
-        litaC_ast__AggregateDecl* aggregateField;
-        litaC_ast__VarFieldDecl* varField;
-        litaC_ast__TraitFieldDecl* traitField;
-        litaC_ast__Expr* poisonField;
-        
-    };
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ {
+struct litaC_std__array__std__array__Array_cb_u32_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    const litaC_char** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_pkg_mgr__pkg__PackageId* elements;
+    litaC_u32* elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
@@ -31881,6 +31857,75 @@ struct litaC_ast__Node {
 
 struct litaC_ast__Stmt {
     litaC_ast__Node node;
+    
+};
+
+struct litaC_ast__ParametersStmt {
+    litaC_ast__Stmt stmt;
+    litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ params;
+    litaC_bool isVararg;
+    
+};
+
+struct litaC_phase_result__PhaseError {
+    litaC_phase_result__ErrorType type;
+    const litaC_char* message;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_lsp__references__FieldReference {
+    litaC_i64 parent;
+    litaC_i32 offset;
+    litaC_lex__SrcPos pos;
+    
+};
+
+
+struct litaC_ast__Operand {
+    litaC_types__TypeInfo* typeInfo;
+    litaC_bool isRightValue;
+    litaC_bool isConst;
+    litaC_lex__Value val;
+    
+};
+
+struct litaC_ast__Expr {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Operand operand;
+    litaC_types__TypeInfo* expectedType;
+    
+};
+
+struct litaC_ast__UnaryExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* unaryExpr;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb_i64_ce_* keys;
+    litaC_std__array__std__array__Array_cb_i64_ce_* values;
+    litaC_std__array__std__array__Array_cb_i64_ce_ emptyValue;
+    litaC_i64 emptyKey;
+    
+};
+
+struct litaC_ast__FieldStmt {
+    litaC_ast__StmtKind kind;
+    litaC_types__TypeInfo* typeInfo;
+    union  {
+        litaC_ast__EnumDecl* enumField;
+        litaC_ast__AggregateDecl* aggregateField;
+        litaC_ast__VarFieldDecl* varField;
+        litaC_ast__TraitFieldDecl* traitField;
+        litaC_ast__Expr* poisonField;
+        
+    };
     
 };
 
@@ -31938,32 +31983,6 @@ struct litaC_ast__ParameterDecl {
     
 };
 
-struct litaC_build__BuildFile {
-    const litaC_std__mem__Allocator* allocator;
-    const litaC_char* compileCmdTemplate;
-    const litaC_char* projectSrcDir;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
-    
-};
-
-struct litaC_ast__Operand {
-    litaC_types__TypeInfo* typeInfo;
-    litaC_bool isRightValue;
-    litaC_bool isConst;
-    litaC_lex__Value val;
-    
-};
-
-struct litaC_ast__Expr {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Operand operand;
-    litaC_types__TypeInfo* expectedType;
-    
-};
-
 struct litaC_ast__BinaryExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* left;
@@ -31975,17 +31994,6 @@ struct litaC_ast__BinaryExpr {
 struct litaC_ast__NotesDecl {
     litaC_ast__Decl decl;
     litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_const_char_ce_* keys;
-    litaC_module__ModuleImport* values;
-    litaC_module__ModuleImport emptyValue;
-    const litaC_char* emptyKey;
     
 };
 
@@ -32007,16 +32015,18 @@ struct litaC_ast__DeferStmt {
     
 };
 
-struct litaC_std__string__builder__StringBuilder {
-    litaC_std__string__buffer__StringBuffer asBuffer;
-    const litaC_std__mem__Allocator* alloc;
+struct litaC_std__mem__track_allocator__TrackAllocator {
+    litaC_std__mem__Allocator alloc;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
+    litaC_usize totalAllocations;
     
 };
 
-struct litaC_lsp__document__Document {
-    litaC_char filename[PATH_MAX];
-    litaC_std__string__builder__StringBuilder text;
-    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
+struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_symbols__Symbol* key;
+    litaC_dependency_graph__Dependency value;
+    litaC_dependency_graph__Dependency* valuePtr;
     
 };
 
@@ -32025,6 +32035,7 @@ struct litaC_std__http__Http {
     const litaC_std__mem__Allocator* alloc;
     
 };
+
 
 
 
@@ -32040,40 +32051,30 @@ struct litaC_checker__LabelInfo {
     
 };
 
-struct litaC_std__json__JsonNode {
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__json__JsonType type;
-    litaC_std__json__JsonValue value;
+struct litaC_std__json__Token {
+    litaC_std__json__TokenKind kind;
+    litaC_std__json__SrcPos pos;
+    const litaC_char* start;
+    const litaC_char* end;
+    union  {
+        litaC_i64 intNumValue;
+        litaC_f64 realNumValue;
+        const litaC_char* strValue;
+        const litaC_char* name;
+        
+    };
     
 };
 
-struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_* keys;
-    litaC_dependency_graph__Dependency* values;
-    litaC_dependency_graph__Dependency emptyValue;
-    litaC_symbols__Symbol* emptyKey;
+struct litaC_lsp__protocol__Location {
+    const litaC_char* uri;
+    litaC_lsp__protocol__Range range;
     
 };
 
-
-struct litaC_dependency_graph__DependencyGraph {
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
-    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
-    litaC_lita__Lita* lita;
-    
-};
-
-
-struct litaC_pkg_mgr__PackageInstallOptions {
-    litaC_bool fullSync;
-    litaC_std__http__HttpOptions httpOptions;
+struct litaC_std__map__std__map__Key_cb_types_new__ArrayEntry_ce_ {
+    litaC_types_new__ArrayEntry key;
+    litaC_std__map__KeyState state;
     
 };
 
@@ -32118,34 +32119,16 @@ struct litaC_phase_result__PhaseResult {
     
 };
 
-struct litaC_std__map__std__map__Key_cb_intern__InternedString_ce_ {
-    litaC_intern__InternedString key;
-    litaC_std__map__KeyState state;
+struct litaC_lsp__references__ReferenceDatabase {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
+    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
+    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
     
 };
 
 struct litaC_ast__PoisonExpr {
     litaC_ast__Expr expr;
-    
-};
-
-struct litaC_cgen__CGen {
-    litaC_lita__Lita* lita;
-    litaC_std__string__builder__StringBuilder buf;
-    litaC_std__string__builder__StringBuilder line;
-    litaC_bool format;
-    litaC_i32 indent;
-    litaC_i32 aggregateLevel;
-    litaC_i32 currentLine;
-    const litaC_char* currentFile;
-    litaC_bool bufferFlush;
-    litaC_i32 funcIndex;
-    litaC_i32 tmpVar;
-    litaC_i32 deferStack;
-    litaC_bool inTextBlock;
-    litaC_types__TypeInfo* currentFunc;
-    litaC_cgen__CGenScope* currentScope;
-    litaC_std__io__File* output;
     
 };
 
@@ -32175,6 +32158,12 @@ struct litaC_ast__PoisonDecl {
     
 };
 
+struct litaC_std__string__builder__StringBuilder {
+    litaC_std__string__buffer__StringBuffer asBuffer;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
 struct litaC_preprocessor__CallContext {
     litaC_preprocessor__Preprocessor* pp;
     litaC_checker__TypeChecker* checker;
@@ -32191,6 +32180,17 @@ struct litaC_preprocessor__Preprocessor {
     litaC_std__array__std__array__Array_cb_preprocessor__CheckerContext_ce_ preCheckers;
     litaC_std__array__std__array__Array_cb_preprocessor__CheckerContext_ce_ postCheckers;
     litaC_std__array__std__array__Array_cb_preprocessor__ScriptDecl_ce_ declQueue;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__map__std__map__Key_cb__ptr_symbols__Symbol_ce_* keys;
+    litaC_dependency_graph__Dependency* values;
+    litaC_dependency_graph__Dependency emptyValue;
+    litaC_symbols__Symbol* emptyKey;
     
 };
 
@@ -32329,27 +32329,10 @@ struct litaC_ast__DoWhileStmt {
     
 };
 
-struct litaC_parser__Parser {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_ast_new__TypeSpecAllocator* typeAllocator;
-    litaC_module__Module* module;
-    litaC_phase_result__PhaseResult* result;
-    litaC_lita__Lita* lita;
-    litaC_intern__Strings* strings;
-    const litaC_char* filename;
-    litaC_i32 totalLines;
-    litaC_std__array__std__array__Array_cb_lex__Token_ce_ tokens;
-    litaC_i32 current;
-    litaC_lex__SrcPos currentPos;
-    litaC_i32 breakLevel;
-    litaC_i32 loopLevel;
-    litaC_i32 switchLevel;
-    litaC_i32 funcLevel;
-    litaC_i32 aggregateLevel;
-    litaC_u32 tryLevel;
-    litaC_u64 tryErrorCounter;
-    litaC_bool panicMode;
-    litaC_i32 preprocessorLevel;
+struct litaC_lsp__document__Document {
+    litaC_char filename[PATH_MAX];
+    litaC_std__string__builder__StringBuilder text;
+    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
     
 };
 
@@ -32359,9 +32342,28 @@ struct litaC_ast__NumberExpr {
     
 };
 
-struct litaC_lsp__protocol__TextDocumentDidChange {
-    litaC_lsp__protocol__TextDocument textDocument;
-    litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ contentChanges;
+
+struct litaC_dependency_graph__DependencyGraph {
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
+    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
+    litaC_lita__Lita* lita;
+    
+};
+
+
+struct litaC_pkg_mgr__PackageInstallOptions {
+    litaC_bool fullSync;
+    litaC_std__http__HttpOptions httpOptions;
+    
+};
+
+struct litaC_std__map__std__map__Key_cb_intern__InternedString_ce_ {
+    litaC_intern__InternedString key;
+    litaC_std__map__KeyState state;
     
 };
 
@@ -32382,6 +32384,13 @@ struct litaC_ast__SubscriptSetExpr {
     
 };
 
+struct litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_i64 key;
+    litaC_std__array__std__array__Array_cb_i64_ce_ value;
+    litaC_std__array__std__array__Array_cb_i64_ce_* valuePtr;
+    
+};
+
 struct litaC_ast__SwitchCaseStmt {
     litaC_ast__Stmt stmt;
     litaC_ast__Expr* cond;
@@ -32389,12 +32398,23 @@ struct litaC_ast__SwitchCaseStmt {
     
 };
 
-struct litaC_cgen__CGenScope {
-    litaC_cgen__CGenScope* parent;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ defers;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ constDefs;
-    litaC_bool isLoop;
-    litaC_bool isSwitch;
+struct litaC_cgen__CGen {
+    litaC_lita__Lita* lita;
+    litaC_std__string__builder__StringBuilder buf;
+    litaC_std__string__builder__StringBuilder line;
+    litaC_bool format;
+    litaC_i32 indent;
+    litaC_i32 aggregateLevel;
+    litaC_i32 currentLine;
+    const litaC_char* currentFile;
+    litaC_bool bufferFlush;
+    litaC_i32 funcIndex;
+    litaC_i32 tmpVar;
+    litaC_i32 deferStack;
+    litaC_bool inTextBlock;
+    litaC_types__TypeInfo* currentFunc;
+    litaC_cgen__CGenScope* currentScope;
+    litaC_std__io__File* output;
     
 };
 
@@ -32405,6 +32425,13 @@ struct litaC_ast__WhileStmt {
     
 };
 
+struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_types_new__ArrayEntry key;
+    litaC_types__TypeInfo* value;
+    litaC_types__TypeInfo** valuePtr;
+    
+};
+
 struct litaC_ast__AggregateDecl {
     litaC_ast__GenericDecl decl;
     litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ fields;
@@ -32412,24 +32439,10 @@ struct litaC_ast__AggregateDecl {
     
 };
 
-
-struct litaC_lsp__util__SourceLocation {
-    litaC_lsp__util__SourceLocationKind kind;
-    litaC_module__Module* module;
-    litaC_lsp__protocol__Location location;
-    union  {
-        litaC_ast__Node* node;
-        litaC_ast__TypeSpec* type;
-        
-    };
-    
-};
-
-
-struct litaC_lsp__util__SourceLookup {
-    litaC_lsp__lsp__LspServer* lsp;
-    litaC_lsp__protocol__Position lookupPos;
-    litaC_lsp__util__SourceLocation result;
+struct litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_intern__InternedString key;
+    litaC_symbols__Symbol* value;
+    litaC_symbols__Symbol** valuePtr;
     
 };
 
@@ -32475,6 +32488,30 @@ struct litaC_symbols__Symbol {
     
 };
 
+struct litaC_parser__Parser {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_ast_new__TypeSpecAllocator* typeAllocator;
+    litaC_module__Module* module;
+    litaC_phase_result__PhaseResult* result;
+    litaC_lita__Lita* lita;
+    litaC_intern__Strings* strings;
+    const litaC_char* filename;
+    litaC_i32 totalLines;
+    litaC_std__array__std__array__Array_cb_lex__Token_ce_ tokens;
+    litaC_i32 current;
+    litaC_lex__SrcPos currentPos;
+    litaC_i32 breakLevel;
+    litaC_i32 loopLevel;
+    litaC_i32 switchLevel;
+    litaC_i32 funcLevel;
+    litaC_i32 aggregateLevel;
+    litaC_u32 tryLevel;
+    litaC_u64 tryErrorCounter;
+    litaC_bool panicMode;
+    litaC_i32 preprocessorLevel;
+    
+};
+
 struct litaC_ast__OffsetOfExpr {
     litaC_ast__Expr expr;
     litaC_ast__TypeSpec* type;
@@ -32482,41 +32519,9 @@ struct litaC_ast__OffsetOfExpr {
     
 };
 
-struct litaC_lsp__protocol__TextDocumentChangeEvent {
-    litaC_bool hasRange;
-    litaC_lsp__protocol__Range range;
-    litaC_u32 rangeLength;
-    const litaC_char* text;
-    
-};
-
-struct litaC_pkg_mgr__PackageManager {
-    litaC_pkg_mgr__PackageOptions options;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ packages;
-    litaC_pkg_mgr__pkg__PackageDef* pkg;
-    litaC_std__string__builder__StringBuilder errors;
-    litaC_std__string__builder__StringBuilder warnings;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_types_new__ArrayEntry key;
-    litaC_types__TypeInfo* value;
-    litaC_types__TypeInfo** valuePtr;
-    
-};
-
 struct litaC_ast__LabelStmt {
     litaC_ast__Stmt stmt;
     litaC_ast__Identifier label;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_intern__InternedString key;
-    litaC_symbols__Symbol* value;
-    litaC_symbols__Symbol** valuePtr;
     
 };
 
@@ -32536,12 +32541,6 @@ struct litaC_ast__SwitchStmt {
     
 };
 
-struct litaC_std__map__std__map__Key_cb_std__string__String_ce_ {
-    litaC_std__string__String key;
-    litaC_std__map__KeyState state;
-    
-};
-
 struct litaC_std__cmdline__CmdParser {
     litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ options;
     litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ args;
@@ -32554,6 +32553,27 @@ struct litaC_std__cmdline__CmdParser {
 struct litaC_ast__EnumDecl {
     litaC_ast__Decl decl;
     litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ fields;
+    
+};
+
+
+struct litaC_lsp__util__SourceLocation {
+    litaC_lsp__util__SourceLocationKind kind;
+    litaC_module__Module* module;
+    litaC_lsp__protocol__Location location;
+    union  {
+        litaC_ast__Node* node;
+        litaC_ast__TypeSpec* type;
+        
+    };
+    
+};
+
+
+struct litaC_lsp__util__SourceLookup {
+    litaC_lsp__lsp__LspServer* lsp;
+    litaC_lsp__protocol__Position lookupPos;
+    litaC_lsp__util__SourceLocation result;
     
 };
 
@@ -32622,14 +32642,21 @@ struct litaC_checker__TypeChecker {
     
 };
 
-struct litaC_std__json__JsonParser {
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__json__JsonParserStatus status;
-    litaC_char errorMsg[256];
-    litaC_std__json__Token token;
-    litaC_std__string__builder__StringBuilder buffer;
-    const litaC_char* stream;
-    const litaC_char* lineStart;
+struct litaC_lsp__protocol__TextDocumentChangeEvent {
+    litaC_bool hasRange;
+    litaC_lsp__protocol__Range range;
+    litaC_u32 rangeLength;
+    const litaC_char* text;
+    
+};
+
+struct litaC_pkg_mgr__PackageManager {
+    litaC_pkg_mgr__PackageOptions options;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ packages;
+    litaC_pkg_mgr__pkg__PackageDef* pkg;
+    litaC_std__string__builder__StringBuilder errors;
+    litaC_std__string__builder__StringBuilder warnings;
     
 };
 
@@ -32641,40 +32668,17 @@ struct litaC_ast__ModuleStmt {
     
 };
 
-struct litaC_lsp__references__Reference {
-    litaC_i64 type;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_lsp__workspace__Workspace {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__mem__track_allocator__TrackAllocator docAllocator;
-    litaC_lsp__lsp__LspServer* lsp;
-    litaC_char rootPath[PATH_MAX];
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ openedDocuments;
-    
-};
-
-struct litaC_lsp__lsp__LspServer {
-    litaC_std__mem__bucket_allocator__BucketAllocator requestAllocator;
-    litaC_std__mem__bucket_allocator__BucketAllocator applicationAllocator;
-    litaC_lita__Lita* lita;
-    litaC_std__string__builder__StringBuilder message;
-    litaC_std__string__builder__StringBuilder output;
-    litaC_std__string__builder__StringBuilder outbound;
-    litaC_bool isInitialized;
-    litaC_bool isRunning;
-    litaC_lsp__workspace__Workspace workspace;
-    FILE* logFile;
-    
-};
-
 struct litaC_ast__TypeIdentifierExpr {
     litaC_ast__Expr expr;
     litaC_ast__TypeSpec* type;
     litaC_symbols__Symbol* sym;
     litaC_bool isBased;
+    
+};
+
+struct litaC_std__map__std__map__Key_cb_std__string__String_ce_ {
+    litaC_std__string__String key;
+    litaC_std__map__KeyState state;
     
 };
 
@@ -32685,28 +32689,11 @@ struct litaC_ast__VarFieldDecl {
     
 };
 
-struct litaC_std__zip__ZipFile {
-    mz_zip_archive archive;
-    litaC_std__zip__ZipOpen type;
-    const litaC_std__mem__Allocator* allocator;
-    
-};
-
 struct litaC_ast__ImportDecl {
     litaC_ast__Decl decl;
     litaC_ast__Identifier alias;
     litaC_bool isUsing;
     litaC_module__ModuleId* moduleId;
-    
-};
-
-struct litaC_pkg_mgr__pkg__PackageDef {
-    litaC_pkg_mgr__pkg__PackageId id;
-    litaC_char path[PATH_MAX];
-    litaC_pkg_mgr__pkg__PackageType type;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ dynamicLibraries;
-    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ dependencies;
-    litaC_std__json__JsonNode* json;
     
 };
 
@@ -32787,10 +32774,44 @@ struct litaC_ast__SizeOfExpr {
     
 };
 
+struct litaC_std__json__JsonParser {
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__json__JsonParserStatus status;
+    litaC_char errorMsg[256];
+    litaC_std__json__Token token;
+    litaC_std__string__builder__StringBuilder buffer;
+    const litaC_char* stream;
+    const litaC_char* lineStart;
+    
+};
+
 struct litaC_ast__NoteStmt {
     litaC_ast__Stmt stmt;
     litaC_ast__TypeSpec* type;
     litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ arguments;
+    
+};
+
+struct litaC_lsp__workspace__Workspace {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__mem__track_allocator__TrackAllocator docAllocator;
+    litaC_lsp__lsp__LspServer* lsp;
+    litaC_char rootPath[PATH_MAX];
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ openedDocuments;
+    
+};
+
+struct litaC_lsp__lsp__LspServer {
+    litaC_std__mem__bucket_allocator__BucketAllocator requestAllocator;
+    litaC_std__mem__bucket_allocator__BucketAllocator applicationAllocator;
+    litaC_lita__Lita* lita;
+    litaC_std__string__builder__StringBuilder message;
+    litaC_std__string__builder__StringBuilder output;
+    litaC_std__string__builder__StringBuilder outbound;
+    litaC_bool isInitialized;
+    litaC_bool isRunning;
+    litaC_lsp__workspace__Workspace workspace;
+    FILE* logFile;
     
 };
 
@@ -32804,6 +32825,13 @@ struct litaC_ast__TypeOfExpr {
 struct litaC_ast__TraitFieldDecl {
     litaC_ast__Decl decl;
     litaC_ast__TypeSpec* type;
+    
+};
+
+struct litaC_std__zip__ZipFile {
+    mz_zip_archive archive;
+    litaC_std__zip__ZipOpen type;
+    const litaC_std__mem__Allocator* allocator;
     
 };
 
@@ -32936,20 +32964,6 @@ struct litaC_ast__GenericParam {
 struct litaC_ast__StringExpr {
     litaC_ast__Expr expr;
     litaC_lex__Token string;
-    
-};
-
-struct litaC_ast__ParametersStmt {
-    litaC_ast__Stmt stmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ params;
-    litaC_bool isVararg;
-    
-};
-
-struct litaC_ast__UnaryExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* unaryExpr;
     
 };
 
@@ -33908,7 +33922,7 @@ litaC_i32 litaC_main__RunLitac(litaC_lita__LitaOptions* litaC_options) {
         {
             for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_phase_result__PhaseError_ce_(&((litaC_lita.result.errors)));litaC_i += 1) {
                 {
-                    litaC_error_codes__PrintError(&((litaC_sb)), litaC_std__array__std__array__Array_get_cb_phase_result__PhaseError_ce_(&((litaC_lita.result.errors)), litaC_i));
+                    litaC_error_codes__PrintError(litaC_lita.options->isColoredOutput, &((litaC_sb)), litaC_std__array__std__array__Array_get_cb_phase_result__PhaseError_ce_(&((litaC_lita.result.errors)), litaC_i));
                     printf("%s\n", litaC_std__string__builder__StringBuilder_cStr(&((litaC_sb))));
                     litaC_std__string__builder__StringBuilder_clear(&((litaC_sb)));
                     
@@ -33992,6 +34006,7 @@ litaC_main__ParseStatus litaC_main__ParseArgs(litaC_i32 litaC_n,litaC_char** lit
     litaC_std__cmdline__CmdParser_addOption(&((litaC_parser)), "disableLine", '\0', "Disables #line dorective in C output", 0, NULL);
     litaC_std__cmdline__CmdParser_addOption(&((litaC_parser)), "debug", '\0', "Enables debug mode", 0, NULL);
     litaC_std__cmdline__CmdParser_addOption(&((litaC_parser)), "verbose", '\0', "Enables verbose output", 0, NULL);
+    litaC_std__cmdline__CmdParser_addOption(&((litaC_parser)), "colors", '\0', "Enables console colors for output", 0, NULL);
     litaC_std__cmdline__CmdParser_addOption(&((litaC_parser)), "instrument", '\0', "Enables profile instrumentation of @profile annotated functions", 0, NULL);
     litaC_std__cmdline__CmdParser_addOption(&((litaC_parser)), "srcDir", '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", litaC_std__cmdline__OptionFlag_HAS_ARGUMENT, NULL);
     litaC_std__cmdline__CmdParser_addOption(&((litaC_parser)), "doc", '\0', "Generates document output", 0, NULL);
@@ -34031,6 +34046,15 @@ litaC_main__ParseStatus litaC_main__ParseArgs(litaC_i32 litaC_n,litaC_char** lit
             printf("Version: %s\n", litaC_lita__LITA_VERSION);
             goto terminate;
             
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_std__cmdline__CmdParser_hasOption(&((litaC_parser)), "colors")) {
+        {
+            litaC_options->isColoredOutput = litaC_true;
             
             
         }
@@ -40294,7 +40318,24 @@ litaC_lex__Token litaC_lex__Lexer_scanString(litaC_lex__Lexer* litaC_l) {
                     } else {
                         if(litaC_c == 'x') {
                             {
-                                assert(litaC_false);
+                                for(litaC_i32 litaC_i = 0;litaC_i < 2;litaC_i += 1) {
+                                    {
+                                        litaC_c = litaC_lex__Lexer_nextChar(litaC_l);
+                                        if(!(litaC_lex__IsHex(litaC_c))) {
+                                            {
+                                                litaC_lex__Lexer_error(litaC_l, "Illegal hex character, character out of byte range (hex value): '%x'", litaC_c);
+                                                litaC_isValid = litaC_false;
+                                                continue;
+                                                
+                                                
+                                            }
+                                            
+                                        } 
+                                        
+                                        
+                                        
+                                    }
+                                }
                                 
                                 
                             }
@@ -45787,6 +45828,14 @@ litaC_types__MethodResult litaC_types__TypeInfo_getMethod(litaC_types__TypeInfo*
                                         } 
                                         
                                         break;
+                                        
+                                        
+                                    }
+                                    
+                                    
+                                }
+                                default: {
+                                    {
                                         
                                         
                                     }
@@ -59985,7 +60034,7 @@ litaC_void litaC_introspection__Introspect_generate(litaC_introspection__Introsp
                                 for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_phase_result__PhaseError_ce_(&((litaC_checker->lita->result.errors)));litaC_i += 1) {
                                     {
                                         litaC_phase_result__PhaseError litaC_error = litaC_std__array__std__array__Array_get_cb_phase_result__PhaseError_ce_(&((litaC_checker->lita->result.errors)), litaC_i);
-                                        litaC_error_codes__PrintError(&((litaC_sb)), litaC_error);
+                                        litaC_error_codes__PrintError(litaC_this->lita->options->isColoredOutput, &((litaC_sb)), litaC_error);
                                         
                                         
                                     }
@@ -67180,7 +67229,7 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveIdentiferExpr(litaC_checker__T
     
 }
 
-litaC_void litaC_error_codes__PrintError(litaC_std__string__builder__StringBuilder* litaC_sb,litaC_phase_result__PhaseError litaC_error) {
+litaC_void litaC_error_codes__PrintError(litaC_bool litaC_useColors,litaC_std__string__builder__StringBuilder* litaC_sb,litaC_phase_result__PhaseError litaC_error) {
     if(!(litaC_error.pos.lineStart)) {
         {
             litaC_std__string__builder__StringBuilder_append(litaC_sb, "%s\n", litaC_error.message);
@@ -67192,7 +67241,21 @@ litaC_void litaC_error_codes__PrintError(litaC_std__string__builder__StringBuild
         
     } 
     
-    litaC_std__string__builder__StringBuilder_append(litaC_sb, "%s:%d:%d error: %s\n", litaC_error.pos.filename, litaC_error.pos.lineNumber, litaC_error.pos.position, litaC_error.message);
+    if(litaC_useColors) {
+        {
+            litaC_std__string__builder__StringBuilder_append(litaC_sb, "%s:%d:%d %serror%s: %s\n", litaC_error.pos.filename, litaC_error.pos.lineNumber, litaC_error.pos.position, litaC_error_codes__ConsoleColorsAsStr(litaC_error_codes__ConsoleColors_RED), litaC_error_codes__ConsoleColorsAsStr(litaC_error_codes__ConsoleColors_CLEAR), litaC_error.message);
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_std__string__builder__StringBuilder_append(litaC_sb, "%s:%d:%d error: %s\n", litaC_error.pos.filename, litaC_error.pos.lineNumber, litaC_error.pos.position, litaC_error.message);
+            
+            
+        }
+    } 
+    
     litaC_i32 litaC_len = litaC_lex__SrcPos_getLineLength(&((litaC_error.pos)));
     litaC_i32 litaC_maxLength = MIN(litaC_len, 255);
     litaC_i32 litaC_spaceCount = 0;
@@ -90202,8 +90265,8 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_build__PackageBuild(litaC_pkg_mgr__P
     } 
     
     litaC_lita__LitaOptions* litaC_litaOptions = litaC_std__mem__std__mem__new_cb_lita__LitaOptions_ce_(litaC_std__mem__defaultAllocator);
-    memset(litaC_litaOptions, 0, sizeof(litaC_lita__LitaOptions));
     
+    memcpy(litaC_litaOptions, litaC_pm->options.litaOptions, sizeof(litaC_lita__LitaOptions));
     litaC_pkg_mgr__pkg_build__CommandArgs litaC_args =  {
         
     };
@@ -91264,6 +91327,72 @@ const litaC_char* litaC_std__json__JsonTypeAsStr(litaC_std__json__JsonType litaC
         }
         case litaC_std__json__JsonType_ARRAY: {
             return "ARRAY";
+            
+            
+            
+        }
+        default: {
+            return NULL;
+            
+            
+            
+        }
+    }
+    
+}
+
+const litaC_char* litaC_error_codes__ConsoleColorsAsStr(litaC_error_codes__ConsoleColors litaC_enumType) {
+    switch(litaC_enumType) {
+        case litaC_error_codes__ConsoleColors_CLEAR: {
+            return "CLEAR";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_BLACK: {
+            return "BLACK";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_RED: {
+            return "RED";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_GREEN: {
+            return "GREEN";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_YELLOW: {
+            return "YELLOW";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_BLUE: {
+            return "BLUE";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_MAGENTA: {
+            return "MAGENTA";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_CYAN: {
+            return "CYAN";
+            
+            
+            
+        }
+        case litaC_error_codes__ConsoleColors_WHITE: {
+            return "WHITE";
             
             
             

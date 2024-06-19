@@ -283,7 +283,7 @@ func testParsePackage() {
     }
 
     var pm = PackageManager {}
-    pm.init(PackageSyncOptions{})
+    pm.init(PackageOptions{})
     defer pm.free()
 
     var pkg: *PackageDef;

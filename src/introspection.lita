@@ -171,7 +171,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
                     var sb = StringBuilderInit()
                     for(var i = 0; i < checker.lita.result.errors.size(); i+=1) {
                         var error = checker.lita.result.errors.get(i)
-                        PrintError(sb, error)
+                        PrintError(this.lita.options.isColoredOutput, sb, error)
                     }
 
                     printf("ERRORS: \n%s\n", sb.cStr())

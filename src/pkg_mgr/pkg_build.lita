@@ -32,8 +32,12 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
     }
 
     var litaOptions = new<LitaOptions>()
-    memset(litaOptions, 0, sizeof(:LitaOptions))
     defer defaultAllocator.free(litaOptions)
+
+    // copy over all other command line options to
+    // this execution
+    memcpy(litaOptions, pm.options.litaOptions, sizeof(:LitaOptions))
+
 
     var args = CommandArgs{}
     var result = pm.buildCommandArgs(buildCommand, options, &args)
