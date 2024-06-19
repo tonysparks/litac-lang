@@ -460,6 +460,7 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
         }
         case TypeSpecKind.ARRAY: {
             type.base = this.replaceTypeSpec(type.base)
+            ReplaceTypes(this, type.numElements)
             return type
         }
         case TypeSpecKind.CONST: {
