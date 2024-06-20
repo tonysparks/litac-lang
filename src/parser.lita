@@ -2525,26 +2525,18 @@ func (p: *Parser) genericArguments() : Array<GenericArg> {
         arguments.init(2, p.allocator)
 
         do {
-            if(p.match(TokenType.COLON)) {
-                var type = p.type(false)
+            var type = p.type(false)
 
-                // we've failed for parse a type
-                if(!type) {
-                    return arguments
-                }
+            // we've failed for parse a type
+            if(!type) {
+                return arguments
+            }
 
-                arguments.add(GenericArg {
-                    .kind = GenericArgKind.TYPE,
-                    .type = type
-                })
-            }
-            else {
-                var expr = p.constExpression()
-                arguments.add(GenericArg {
-                    .kind = GenericArgKind.EXPR,
-                    .expr = expr
-                })
-            }
+            arguments.add(GenericArg {
+                .kind = GenericArgKind.TYPE,
+                .type = type
+            })
+
         }
         while(p.match(TokenType.COMMA))
     }

@@ -148,14 +148,14 @@ public struct GenericParam {
 
 public enum GenericArgKind {
     TYPE,
-    EXPR,
 }
 
 public struct GenericArg {
     kind: GenericArgKind
+
+    // Will we want to expand to Expressions?
     union {
         type: *TypeSpec
-        expr: *Expr
     }
 }
 

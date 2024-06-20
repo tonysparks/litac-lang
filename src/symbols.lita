@@ -67,7 +67,6 @@ public enum SymbolFlags {
 public struct SymGenericArg {
     kind: GenericArgKind
     type: *TypeInfo
-    value: Value
 }
 
 public const MAX_SYMBOL_NAME = 256;

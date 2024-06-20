@@ -398,7 +398,9 @@ public func (this: *TypeChecker) checkTypeConstraint(src: SrcPos, a: *TypeInfo, 
     if(!a.isDeclarable(b, this)) {
         var sb = StringBuilderInit(256, this.allocator)
 
-        if(this.checkTrait(sb, a, b, "' can't be assigned to '")) {
+        var baseA = a.getBaseType()
+        var baseB = b.getBaseType()
+        if(this.checkTrait(sb, baseA, baseB, "' can't be assigned to '")) {
             this.result.addErrorStr(src, sb)
             return false
         }

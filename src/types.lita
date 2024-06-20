@@ -1550,10 +1550,6 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
                         }
                         args.add(newArg)
                     }
-                    else if(param.kind == GenericArgKind.EXPR) {
-                        assert(false) // TODO: SymGenericArg.value convert to Expr???
-                        continue
-                    }
                     else {
                         assert(false)
                     }

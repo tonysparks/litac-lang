@@ -44,13 +44,6 @@ public func CopyGenericArgs(args: Array<GenericArg>, module: *Module) : Array<Ge
             }
             result.add(newArg)
         }
-        else if(arg.kind == GenericArgKind.EXPR) {
-            var newArg = GenericArg {
-                .kind = arg.kind,
-                .expr = CopyExpr(arg.expr, module)
-            }
-            result.add(newArg)
-        }
         else {
             assert(false)
         }

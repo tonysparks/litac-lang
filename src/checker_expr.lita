@@ -1380,9 +1380,9 @@ func (this: *TypeChecker) inferInitExpr(expr: *InitExpr, aggInfo: *TypeInfo) : *
                 var isGenericType = (inferredType.sym && (inferredType.sym.flags & (SymbolFlags.IS_FROM_GENERIC_TEMPLATE|SymbolFlags.IS_GENERIC_TEMPLATE)))
                 var genType = inferredType.asTypeSpec(this.current, isGenericType)
                 expr.type.genericArgs.add(GenericArg {
-                        .kind = GenericArgKind.TYPE,
-                        .type = genType,
-                    })
+                    .kind = GenericArgKind.TYPE,
+                    .type = genType,
+                })
                 break
             }
         }

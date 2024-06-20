@@ -123,7 +123,12 @@ func GetGenericName(checker: *TypeChecker, typeSpec: *TypeSpec, str: *StringBuff
                     str.append(",")
                 }
                 var arg = name.genericArgs.get(i)
-                GetGenericName(checker, arg, str, fullyQualified)
+                if(arg.kind == GenericArgKind.TYPE) {
+                    GetGenericName(checker, arg.type, str, fullyQualified)
+                }
+                else {
+                    assert(false)
+                }
             }
             str.append(">")
             return;
@@ -253,26 +258,19 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
             var arg = name.genericArgs.get(i)
 
             var typeInfo: *TypeInfo = null
-            var value = Value{.intValue = 0}
             if(arg.kind == GenericArgKind.TYPE) {
                 typeInfo = checker.resolveTypeSpec(arg.type)
                 if(!typeInfo || typeInfo.kind == TypeKind.POISON) {
                     isValidArgs = false
                 }
             }
-            else if(arg.kind == GenericArgKind.EXPR) {
-                if(!checker.resolveExpr(arg.expr)) {
-                    goto err;
-                }
-
-                typeInfo = arg.expr.operand.typeInfo
-                value = arg.expr.operand.val
+            else {
+                assert(false)
             }
 
             genericSym.genericArgs.add(SymGenericArg {
                 .kind = arg.kind,
                 .type = typeInfo,
-                .value = value,
             })
         }
 
@@ -511,9 +509,6 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
                         .type = this.replaceTypeSpec(arg.type)
                     }
                     name.genericArgs.set(i, newArg)
-                }
-                else if(arg.kind == GenericArgKind.EXPR) {
-                    continue
                 }
                 else {
                     assert(false)
@@ -809,9 +804,6 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                     }
                     expr.genericArgs.set(i, arg)
                 }
-                else if(arg.kind == GenericArgKind.EXPR) {
-                    ReplaceTypes(template, arg.expr as (*Node))
-                }
                 else {
                     assert(false)
                 }
@@ -855,9 +847,6 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                         .type = template.replaceTypeSpec(arg.type)
                     }
                     expr.genericArgs.set(i, arg)
-                }
-                else if(arg.kind == GenericArgKind.EXPR) {
-                    ReplaceTypes(template, arg.expr as (*Node))
                 }
                 else {
                     assert(false)
@@ -958,6 +947,9 @@ func HasGenericParam(checker: *TypeChecker, genericArgs: *Array<GenericArg>) : b
                     return true
                 }
             }
+        }
+        else {
+            assert(false)
         }
     }
 

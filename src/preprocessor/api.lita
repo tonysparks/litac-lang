@@ -115,6 +115,11 @@ func litaMalloc(ctx: *void, len: usize) : *void {
 
 func ApeGetTypeKind(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
+    assert(context)
+    assert(context.checker)
+    assert(context.checker.current)
+    assert(context.checker.current.currentScope)
+
     if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING)) {
         context.logErrors()
         return ape_object_make_null()
@@ -670,6 +675,9 @@ func ApeReplaceDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_objec
 
 func QueueDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t, replacement: bool) : ape_object_t {
     var context = data as (*CallContext)
+    assert(context)
+    assert(context.checker)
+
     if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
         context.logErrors()
         return ape_object_make_null()
