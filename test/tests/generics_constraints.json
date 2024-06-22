@@ -12,6 +12,26 @@
     `,
     "tests": [
         {
+            "name": "Generic Constraint Array Struct Type Multiple Generic",
+            "definitions": `
+                struct Person<T> {
+                    age: T
+                }
+                struct Thing<X: []Person<i32>> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]Person<i32>> {
+                }
+                var x = Thing<[512]Person<i32>> {
+                }
+
+                assert(sizeof(:[1024]Person<i32>) == sizeof(t))
+                assert(sizeof(:[512]Person<i32>) == sizeof(x))
+            `,
+        },
+        {
             "name": "Generic Constraint Array Struct Type",
             "definitions": `
                 struct Person {
@@ -26,6 +46,71 @@
                 }
 
                 assert(sizeof(:[1024]Person) == sizeof(t))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Multiple",
+            "definitions": `
+                struct Person {
+                    age: i32
+                }
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]Person> {
+                }
+                var x = Thing<[512]Person> {
+                }
+
+                assert(sizeof(:[1024]Person) == sizeof(t))
+                assert(sizeof(:[512]Person) == sizeof(x))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Multiple With Constants",
+            "definitions": `
+                const BIG = 1024
+                const SMALL = 512
+                struct Person {
+                    age: i32
+                }
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[BIG]Person> {
+                }
+                var x = Thing<[SMALL]Person> {
+                }
+
+                assert(sizeof(:[BIG]Person) == sizeof(t))
+                assert(sizeof(:[SMALL]Person) == sizeof(x))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Multiple With Constants Expression",
+            "disabled": true,
+            "definitions": `
+                const BIG = 1024
+                const SMALL = 256 + 256 // FIXME: Constant expressions don't compress yet!!
+                struct Person {
+                    age: i32
+                }
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[BIG]Person> {
+                }
+                var x = Thing<[SMALL]Person> {
+                }
+
+                assert(sizeof(:[BIG]Person) == sizeof(t))
+                assert(sizeof(:[SMALL]Person) == sizeof(x))
             `,
         },
         {

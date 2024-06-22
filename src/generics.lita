@@ -28,7 +28,20 @@ func GetGenericName(checker: *TypeChecker, typeSpec: *TypeSpec, str: *StringBuff
 
     switch(typeSpec.kind) {
         case TypeSpecKind.ARRAY: {
-            str.append("[]")
+            var typeInfo = checker.resolveTypeSpec(typeSpec)
+            if(typeInfo.kind == TypeKind.ARRAY) {
+                if(typeInfo.isLengthDefined) {
+                    str.append("[%d]", typeInfo.length)
+                }
+                else {
+                    str.append("[]")
+                }
+            } else if(typeSpec.numElements) {
+                str.append("[%d]", typeSpec.numElements.operand.val.intValue)
+            }
+            else {
+                str.append("[]")
+            }
             GetGenericName(checker, typeSpec.base, str, fullyQualified)
             return;
         }
@@ -324,8 +337,6 @@ func CheckTypeConstraints(
 
     var newDecl = genericSym.decl as (*GenericDecl)
     var decl = sym.decl as (*GenericDecl)
-    // printf("Generic Type: %.*s -> %.*s\n", sym.name.length, sym.name.buffer, genericSym.name.length, genericSym.name.buffer)
-    //printf("Compared: %d vs %d\n", decl.genericParams.size(), genericSym.genericArgs.size())
 
     // unable to check type constraints
     if(decl.genericParams.size() != genericSym.genericArgs.size()) {
