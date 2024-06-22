@@ -1372,7 +1372,7 @@ func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
         goto err;
     }
 
-    var genericArgs = Array<*TypeSpec>{}
+    var genericArgs = Array<GenericArg>{}
     if(expr.isIdentifier()) {
         var idExpr = expr as (*IdentifierExpr)
         expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR
@@ -2496,8 +2496,14 @@ func (p: *Parser) genericParameters(arguments: *Array<GenericParam>) : bool {
                 .token = *typeName
             }
 
+            var typeConstraint: *TypeSpec = null
+            if(p.match(TokenType.COLON)) {
+                typeConstraint = p.type()
+            }
+
             arguments.add(GenericParam {
-                .name = name
+                .name = name,
+                .typeConstraint = typeConstraint
             })
         }
         while(p.match(TokenType.COMMA))
@@ -2513,8 +2519,8 @@ err:
     return false
 }
 
-func (p: *Parser) genericArguments() : Array<*TypeSpec> {
-    var arguments = Array<*TypeSpec>{}
+func (p: *Parser) genericArguments() : Array<GenericArg> {
+    var arguments = Array<GenericArg>{}
     if(!p.check(TokenType.GREATER_THAN)) {
         arguments.init(2, p.allocator)
 
@@ -2526,7 +2532,11 @@ func (p: *Parser) genericArguments() : Array<*TypeSpec> {
                 return arguments
             }
 
-            arguments.add(type)
+            arguments.add(GenericArg {
+                .kind = GenericArgKind.TYPE,
+                .type = type
+            })
+
         }
         while(p.match(TokenType.COMMA))
     }
@@ -2535,7 +2545,7 @@ func (p: *Parser) genericArguments() : Array<*TypeSpec> {
     return arguments
 }
 
-func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
+func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<GenericArg> {
     p.tryLevel += 1
     defer p.tryLevel -= 1
 
@@ -2578,15 +2588,6 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<*TypeSpec> {
     if(p.tryErrorCounter > numOfErrors || isFailed) {
         p.rewindTo(backtrack, numOfErrors)
         isFailed = true;
-    }
-
-    if(isFailed) {
-        for(var i = 0; i < arguments.size(); i += 1) {
-            var type = arguments.get(i)
-            p.allocator.free(type)
-        }
-        arguments.free()
-        arguments.clear()
     }
 
     return arguments

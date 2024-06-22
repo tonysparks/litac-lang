@@ -64,6 +64,11 @@ public enum SymbolFlags {
 
 }
 
+public struct SymGenericArg {
+    kind: GenericArgKind
+    type: *TypeInfo
+}
+
 public const MAX_SYMBOL_NAME = 256;
 
 public struct Symbol {
@@ -84,7 +89,7 @@ public struct Symbol {
 
     // TODO: put in struct
     genericCallsiteModule: *Module
-    genericArgs: Array<*TypeInfo>
+    genericArgs: Array<SymGenericArg>
     genericParams: Array<GenericParam>
 }
 

@@ -7,12 +7,14 @@ import "std/array"
 import "std/string"
 
 import "symbols"
+import "lex"
 import "ast"
 import "ast_copy"
 import "types"
 import "lita"
 import "module"
 import "checker"
+import "checker_expr"
 import "common"
 import "ast_print"
 import "intern"
@@ -26,7 +28,20 @@ func GetGenericName(checker: *TypeChecker, typeSpec: *TypeSpec, str: *StringBuff
 
     switch(typeSpec.kind) {
         case TypeSpecKind.ARRAY: {
-            str.append("[]")
+            var typeInfo = checker.resolveTypeSpec(typeSpec)
+            if(typeInfo.kind == TypeKind.ARRAY) {
+                if(typeInfo.isLengthDefined) {
+                    str.append("[%d]", typeInfo.length)
+                }
+                else {
+                    str.append("[]")
+                }
+            } else if(typeSpec.numElements) {
+                str.append("[%d]", typeSpec.numElements.operand.val.intValue)
+            }
+            else {
+                str.append("[]")
+            }
             GetGenericName(checker, typeSpec.base, str, fullyQualified)
             return;
         }
@@ -121,7 +136,12 @@ func GetGenericName(checker: *TypeChecker, typeSpec: *TypeSpec, str: *StringBuff
                     str.append(",")
                 }
                 var arg = name.genericArgs.get(i)
-                GetGenericName(checker, arg, str, fullyQualified)
+                if(arg.kind == GenericArgKind.TYPE) {
+                    GetGenericName(checker, arg.type, str, fullyQualified)
+                }
+                else {
+                    assert(false)
+                }
             }
             str.append(">")
             return;
@@ -249,12 +269,22 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         var isValidArgs = true
         for(var i = 0; i < numOfGenericArgs; i+=1) {
             var arg = name.genericArgs.get(i)
-            var typeInfo = checker.resolveTypeSpec(arg)
-            if(!typeInfo || typeInfo.kind == TypeKind.POISON) {
-                isValidArgs = false
+
+            var typeInfo: *TypeInfo = null
+            if(arg.kind == GenericArgKind.TYPE) {
+                typeInfo = checker.resolveTypeSpec(arg.type)
+                if(!typeInfo || typeInfo.kind == TypeKind.POISON) {
+                    isValidArgs = false
+                }
+            }
+            else {
+                assert(false)
             }
 
-            genericSym.genericArgs.add(arg.typeInfo)
+            genericSym.genericArgs.add(SymGenericArg {
+                .kind = arg.kind,
+                .type = typeInfo,
+            })
         }
 
         if(!isValidArgs) {
@@ -281,6 +311,9 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
 
     assert(genericSym != null)
 
+    // check the type constraints
+    CheckTypeConstraints(checker, sym, genericSym, name)
+
     checker.resolveSymbol(genericSym)
     checker.finishResolveSymbol(genericSym)
 
@@ -296,8 +329,55 @@ err:
     return null
 }
 
+func CheckTypeConstraints(
+    checker: *TypeChecker,
+    sym: *Symbol,
+    genericSym: *Symbol,
+    name: *TypeSpec) : bool {
+
+    var newDecl = genericSym.decl as (*GenericDecl)
+    var decl = sym.decl as (*GenericDecl)
+
+    // unable to check type constraints
+    if(decl.genericParams.size() != genericSym.genericArgs.size()) {
+        // TODO: Add error message, should this be an assert??
+        goto err;
+    }
+
+    for(var i = 0; i < decl.genericParams.size(); i+=1) {
+        var param = decl.genericParams.getPtr(i)
+
+        if(param.typeConstraint) {
+            var constraintType = checker.resolveTypeSpec(param.typeConstraint)
+            if(!constraintType) {
+                goto err;
+            }
+
+            var arg = genericSym.genericArgs.get(i)
+
+            var suppliedType = arg.type
+            if(!suppliedType) {
+                goto err;
+            }
+
+            if(suppliedType.kind == TypeKind.GENERIC_PARAM ||
+               suppliedType.kind == TypeKind.POISON) {
+                continue
+            }
+
+            if(!checker.checkTypeConstraint(name.pos, constraintType, suppliedType, sym, i)) {
+                goto err;
+            }
+        }
+    }
+    return true
+
+err:
+    return false
+}
+
 func CreateDecl(sym: *Symbol,
-                genericArgs: *Array<*TypeSpec>,
+                genericArgs: *Array<GenericArg>,
                 module: *Module) : *GenericDecl {
 
     var genericDecl: *GenericDecl = null;
@@ -326,7 +406,7 @@ func CreateDecl(sym: *Symbol,
 }
 
 func CreateAggregateDecl(aggDecl: *AggregateDecl,
-                         genericArgs: *Array<*TypeSpec>,
+                         genericArgs: *Array<GenericArg>,
                          module: *Module) : *GenericDecl {
     var copy = CopyAggregateDecl(aggDecl, module)
 
@@ -342,7 +422,7 @@ func CreateAggregateDecl(aggDecl: *AggregateDecl,
 
 
 func CreateFuncDecl(funcDecl: *FuncDecl,
-                    genericArgs: *Array<*TypeSpec>,
+                    genericArgs: *Array<GenericArg>,
                     module: *Module) : *GenericDecl {
 
     var copy = CopyFuncDecl(funcDecl, module)
@@ -358,7 +438,7 @@ func CreateFuncDecl(funcDecl: *FuncDecl,
 }
 
 func CreateTypedefDecl(typedefDecl: *TypedefDecl,
-                       genericArgs: *Array<*TypeSpec>,
+                       genericArgs: *Array<GenericArg>,
                        module: *Module) : *GenericDecl {
     var copy = CopyTypedefDecl(typedefDecl, module)
 
@@ -375,7 +455,7 @@ func CreateTypedefDecl(typedefDecl: *TypedefDecl,
 
 struct Template {
     genericParams: *Array<GenericParam>
-    genericArgs: *Array<*TypeSpec>
+    genericArgs: *Array<GenericArg>
 }
 
 func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
@@ -389,6 +469,7 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
         }
         case TypeSpecKind.ARRAY: {
             type.base = this.replaceTypeSpec(type.base)
+            ReplaceTypes(this, type.numElements)
             return type
         }
         case TypeSpecKind.CONST: {
@@ -432,7 +513,17 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
             var name = type
 
             for(var i = 0; i < name.genericArgs.size(); i+=1) {
-                name.genericArgs.set(i, this.replaceTypeSpec(name.genericArgs.get(i)))
+                var arg = name.genericArgs.get(i)
+                if(arg.kind == GenericArgKind.TYPE) {
+                    var newArg = GenericArg {
+                        .kind = arg.kind,
+                        .type = this.replaceTypeSpec(arg.type)
+                    }
+                    name.genericArgs.set(i, newArg)
+                }
+                else {
+                    assert(false)
+                }
             }
 
             for(var i = 0; i < this.genericParams.size(); i+=1) {
@@ -717,8 +808,16 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             ReplaceTypes(template, expr.object)
             for(var i = 0; i < expr.genericArgs.size(); i += 1) {
                 var arg = expr.genericArgs.get(i)
-                arg = template.replaceTypeSpec(arg)
-                expr.genericArgs.set(i, arg)
+                if(arg.kind == GenericArgKind.TYPE) {
+                    var newArg = GenericArg {
+                        .kind = arg.kind,
+                        .type = template.replaceTypeSpec(arg.type)
+                    }
+                    expr.genericArgs.set(i, arg)
+                }
+                else {
+                    assert(false)
+                }
             }
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
@@ -753,8 +852,16 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
 
             for(var i = 0; i < expr.genericArgs.size(); i += 1) {
                 var arg = expr.genericArgs.get(i)
-                arg = template.replaceTypeSpec(arg)
-                expr.genericArgs.set(i, arg)
+                if(arg.kind == GenericArgKind.TYPE) {
+                    var newArg = GenericArg {
+                        .kind = arg.kind,
+                        .type = template.replaceTypeSpec(arg.type)
+                    }
+                    expr.genericArgs.set(i, arg)
+                }
+                else {
+                    assert(false)
+                }
             }
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
@@ -841,14 +948,19 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
     return true
 }
 
-func HasGenericParam(checker: *TypeChecker, genericArgs: *Array<*TypeSpec>) : bool {
+func HasGenericParam(checker: *TypeChecker, genericArgs: *Array<GenericArg>) : bool {
     for(var i = 0; i < genericArgs.size(); i += 1) {
         var arg = genericArgs.get(i)
-        var name = arg.getBaseType()
-        if(name && name.kind == TypeSpecKind.NAME) {
-            if(checker.isGenericParamType(name)) {
-                return true
+        if(arg.kind == GenericArgKind.TYPE) {
+            var name = arg.type.getBaseType()
+            if(name && name.kind == TypeSpecKind.NAME) {
+                if(checker.isGenericParamType(name)) {
+                    return true
+                }
             }
+        }
+        else {
+            assert(false)
         }
     }
 

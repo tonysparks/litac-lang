@@ -1,0 +1,388 @@
+{
+    "description": "Tests Generic Constraints",
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name": "Generic Multiple Constraint Primative With Invalid Type Counts",
+            "definitions": `
+                struct Thing<X: i32, Y: f64> {
+                    a: X
+                    b: Y
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4,
+                    .b = 64f
+                }
+
+                assert(t.a == 4)
+                assert(t.b == 64f)
+            `,
+        },
+        {
+            "name": "Generic Multiple Constraint Primative With Invalid Type Counts",
+            "definitions": `
+                struct Thing<X: i32, Y: f64> {
+                    a: X
+                    b: Y
+                }
+            `,
+            "code": `
+                var t = Thing<i32> {
+                }
+            `,
+            "error": "'Thing' is missing generic arguments ['X','Y']"
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Multiple Generic",
+            "definitions": `
+                struct Person<T> {
+                    age: T
+                }
+                struct Thing<X: []Person<i32>> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]Person<i32>> {
+                }
+                var x = Thing<[512]Person<i32>> {
+                }
+
+                assert(sizeof(:[1024]Person<i32>) == sizeof(t))
+                assert(sizeof(:[512]Person<i32>) == sizeof(x))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type",
+            "definitions": `
+                struct Person {
+                    age: i32
+                }
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]Person> {
+                }
+
+                assert(sizeof(:[1024]Person) == sizeof(t))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Multiple",
+            "definitions": `
+                struct Person {
+                    age: i32
+                }
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]Person> {
+                }
+                var x = Thing<[512]Person> {
+                }
+
+                assert(sizeof(:[1024]Person) == sizeof(t))
+                assert(sizeof(:[512]Person) == sizeof(x))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Multiple With Constants",
+            "definitions": `
+                const BIG = 1024
+                const SMALL = 512
+                struct Person {
+                    age: i32
+                }
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[BIG]Person> {
+                }
+                var x = Thing<[SMALL]Person> {
+                }
+
+                assert(sizeof(:[BIG]Person) == sizeof(t))
+                assert(sizeof(:[SMALL]Person) == sizeof(x))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Multiple With Constants Expression",
+            "disabled": true,
+            "definitions": `
+                const BIG = 1024
+                const SMALL = 256 + 256 // FIXME: Constant expressions don't compress yet!!
+                struct Person {
+                    age: i32
+                }
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[BIG]Person> {
+                }
+                var x = Thing<[SMALL]Person> {
+                }
+
+                assert(sizeof(:[BIG]Person) == sizeof(t))
+                assert(sizeof(:[SMALL]Person) == sizeof(x))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Struct Type Invalid",
+            "definitions": `
+                struct Person {
+                    age: i32
+                }
+                struct Monster {
+                    age: i32
+                }
+
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]Monster> {
+                }
+            `,
+            "error": "'[1024]Monster' can't be assigned to '[]Person' due to violating type constraint definition:"
+        },
+        {
+            "name": "Generic Constraint Array Trait Type",
+            "definitions": `
+                struct Guy {
+                    age: i32
+                }
+
+                func (this: *Guy) getAge() : i32 {
+                    return this.age
+                }
+
+                trait Person {
+                    getAge: func() : i32
+                }
+
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]*Guy> {
+                }
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Trait Type Non Pointer Trait",
+            "definitions": `
+                struct Guy {
+                    age: i32
+                }
+
+                func (this: *Guy) getAge() : i32 {
+                    return this.age
+                }
+
+                trait Person {
+                    getAge: func() : i32
+                }
+
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]Guy> {
+                }
+            `,
+            "error": "'Guy' can't be assigned to 'Person'; assigned trait implementations must be pointers: e.g. '*Guy'"
+        },
+        {
+            "name": "Generic Constraint Array Trait Type Invalid",
+            "definitions": `
+                struct Guy {
+                    age: i32
+                }
+
+                trait Person {
+                    getAge: func() : i32
+                }
+
+                struct Thing<X: []Person> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]*Guy> {
+                }
+            `,
+            "error": "'*Guy' can't be assigned to 'Person'; '*Guy' doesn't implement all of 'Person' trait methods"
+        },
+        {
+            "name": "Generic Constraint Array Primative Type",
+            "definitions": `
+                struct Thing<X: []i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]i32> {
+                }
+
+                assert(sizeof(:[1024]i32) == sizeof(t))
+            `,
+        },
+        {
+            "name": "Generic Constraint Array Primative With Mismatched Type",
+            "definitions": `
+                struct Thing<X: []i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing<[1024]f32> {
+                }
+            `,
+            "error": "'[1024]f32' can't be assigned to '[]i32' due to violating type constraint definition:"
+        },
+        {
+            "name": "Generic Constraint Primative With Invalid Type",
+            "definitions": `
+                struct Thing<X: i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4f
+                }
+
+                assert(t.a == 4)
+            `,
+            "error": "'f32' can't be assigned to 'i32' due to violating type constraint definition:"
+        },
+        {
+            "name": "Generic Constraint Primative With Lower Type",
+            "definitions": `
+                struct Thing<X: i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4_u16
+                }
+
+                assert(t.a == 4)
+            `,
+        },
+        {
+            "name": "Generic Constraint Primative",
+            "definitions": `
+                struct Thing<X: i32> {
+                    a: X
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4
+                }
+
+                assert(t.a == 4)
+            `
+        },
+        {
+            "name": "Generic Constraint Double Primative",
+            "definitions": `
+                struct Thing<X: i32, Y: f32> {
+                    a: X
+                    b: Y
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4,
+                    .b = 4f
+                }
+
+                assert(t.a == 4)
+                assert(t.b == 4f)
+            `
+        },
+
+        {
+            "name": "Generic Constraint Double Primative With Alias",
+            "definitions": `
+                struct Thing<X: i32, Y: f32> {
+                    a: X
+                    b: Y
+                }
+
+                func Make<Y: f32>() : Thing<i32, Y> {
+                    return Thing<i32, Y> {
+                        .a = 4,
+                        .b = 4f
+                    }
+                }
+            `,
+            "code": `
+                var t = Make<f32>()
+
+                assert(t.a == 4)
+                assert(t.b == 4f)
+            `
+        },
+
+        {
+            "name": "Generic Constraint Trait",
+            "definitions": `
+                trait Thing {
+                    call: func() : i32
+                }
+                struct Wrapper<X: Thing> {
+                    a: X
+                }
+
+                func (this: *Wrapper<X>) exec<X: Thing>() : i32 {
+                    return this.a.call()
+                }
+
+                struct ThingImpl {
+                    x: i32
+                }
+
+                func (this: *ThingImpl) call() : i32 {
+                    return this.x
+                }
+            `,
+            "code": `
+                var thing = ThingImpl {
+                    .x = 4,
+                }
+
+                var wrapper = Wrapper {
+                    .a = &thing
+                }
+
+                assert(wrapper.exec() == 4)
+            `
+        },
+    ]
+}

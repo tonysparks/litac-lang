@@ -492,7 +492,13 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                             var parentGenericParam = aggDecl.sym.genericParams.get(j)
 
                             if(parentGenericParam.name.str.equals(genericParam.name.str)) {
-                                nameSpec.genericArgs.add(aggDecl.sym.genericArgs.get(j).asTypeSpec(module))
+                                var genArg = aggDecl.sym.genericArgs.get(j)
+                                assert(genArg.type != null)
+
+                                nameSpec.genericArgs.add(GenericArg {
+                                    .kind = GenericArgKind.TYPE,
+                                    .type = genArg.type.asTypeSpec(module),
+                                })
                                 break
                             }
                         }

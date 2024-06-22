@@ -390,6 +390,37 @@ public func (this: *TypeChecker) checkTypeCompatibility(src: SrcPos, a: *TypeInf
     return true
 }
 
+public func (this: *TypeChecker) checkTypeConstraint(src: SrcPos, a: *TypeInfo, b: *TypeInfo, sym: *Symbol, index: i32) : bool {
+    if(a == null || b == null) {
+        return false
+    }
+
+    if(!a.isDeclarable(b, this)) {
+        var sb = StringBuilderInit(256, this.allocator)
+
+        var baseA = a.getBaseType()
+        var baseB = b.getBaseType()
+        if(this.checkTrait(sb, baseA, baseB, "' can't be assigned to '")) {
+            this.result.addErrorStr(src, sb)
+            return false
+        }
+
+        sb.appendStrn("'", 1)
+        b.toString(sb)
+        sb.appendStr("' can't be assigned to '")
+        a.toString(sb)
+        sb.appendStrn("'", 1)
+
+        // TODO: Make this include the generic constraint arguments
+        sb.append(" due to violating type constraint definition: %.*s", sym.name.length, sym.name.buffer)
+
+        this.result.addErrorStr(src, sb)
+        return false
+    }
+
+    return true
+}
+
 func (this: *TypeChecker) checkNote(src: SrcPos, a: *TypeInfo) : bool {
     if(a == null) {
         return false

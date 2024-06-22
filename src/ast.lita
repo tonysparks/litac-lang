@@ -119,7 +119,7 @@ public struct TypeSpec {
         // NamedTypeSpec
         struct {
             name: InternedString
-            genericArgs: Array<*TypeSpec>
+            genericArgs: Array<GenericArg>
         }
         // ArrayTypeSpec
         struct {
@@ -143,6 +143,20 @@ public struct Identifier {
 
 public struct GenericParam {
     name: Identifier
+    typeConstraint: *TypeSpec
+}
+
+public enum GenericArgKind {
+    TYPE,
+}
+
+public struct GenericArg {
+    kind: GenericArgKind
+
+    // Will we want to expand to Expressions?
+    union {
+        type: *TypeSpec
+    }
 }
 
 public enum Visibility {
@@ -473,7 +487,7 @@ public struct CallArg {
 public struct FuncCallExpr {
     expr: using Expr
     object: *Expr
-    genericArgs: Array<*TypeSpec>
+    genericArgs: Array<GenericArg>
     arguments: Array<CallArg>
 }
 
@@ -513,7 +527,7 @@ public struct InitArgExpr {
 
 public struct InitExpr {
     expr: using Expr
-    genericArgs: Array<*TypeSpec>
+    genericArgs: Array<GenericArg>
     type: *TypeSpec
     arguments: Array<*InitArgExpr>
 }

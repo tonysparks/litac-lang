@@ -234,6 +234,8 @@ public func (this: *Preprocessor) evaluateForFunction(
     this.callContext.checker = checker
     this.callContext.comp = comp
 
+    assert(checker)
+
     if(comp.type.equals(IF)     ||
        comp.type.equals(ELSEIF) ||
        comp.type.equals(ELSE)) {
@@ -265,6 +267,8 @@ public func (this: *Preprocessor) evaluateForFunction(
 }
 
 public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker, isIncrementalBuild: bool) {
+    assert(checker)
+
     this.callContext.checker = checker
     this.callContext.resolveSymbols = false
 
@@ -287,6 +291,8 @@ public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker, isInc
 }
 
 public func (this: *Preprocessor) postResolveSymbols(checker: *TypeChecker, isIncrementalBuild: bool) {
+    assert(checker)
+
     this.callContext.checker = checker
     this.callContext.resolveSymbols = true
 

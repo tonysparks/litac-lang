@@ -1534,7 +1534,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
 
             nameStr.append("%.*s", baseName.length, baseName.buffer)
 
-            var args = Array<*TypeSpec>{}
+            var args = Array<GenericArg>{}
 
             // try to use resolve symbol information, which has much more context
             // of the type information
@@ -1543,7 +1543,16 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
                 for(var i = 0; i < aggInfo.sym.genericArgs.size(); i += 1) {
                     var param = aggInfo.sym.genericArgs.get(i)
 
-                    args.add(param.asTypeSpec(module, fullyQualify))
+                    if(param.kind == GenericArgKind.TYPE) {
+                        var newArg = GenericArg {
+                            .kind = param.kind,
+                            .type = param.type.asTypeSpec(module, fullyQualify)
+                        }
+                        args.add(newArg)
+                    }
+                    else {
+                        assert(false)
+                    }
                 }
             }
             else {
@@ -1552,7 +1561,11 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
                     var param = aggInfo.aggDecl.genericParams.get(i)
                     var name = param.name.str
 
-                    args.add(NewNameTypeSpecIntern(pos, name, allocator))
+                    var newArg = GenericArg {
+                        .kind = GenericArgKind.TYPE,
+                        .type = NewNameTypeSpecIntern(pos, name, allocator)
+                    }
+                    args.add(newArg)
                 }
             }
 
