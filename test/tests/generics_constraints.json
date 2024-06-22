@@ -12,6 +12,38 @@
     `,
     "tests": [
         {
+            "name": "Generic Multiple Constraint Primative With Invalid Type Counts",
+            "definitions": `
+                struct Thing<X: i32, Y: f64> {
+                    a: X
+                    b: Y
+                }
+            `,
+            "code": `
+                var t = Thing {
+                    .a = 4,
+                    .b = 64f
+                }
+
+                assert(t.a == 4)
+                assert(t.b == 64f)
+            `,
+        },
+        {
+            "name": "Generic Multiple Constraint Primative With Invalid Type Counts",
+            "definitions": `
+                struct Thing<X: i32, Y: f64> {
+                    a: X
+                    b: Y
+                }
+            `,
+            "code": `
+                var t = Thing<i32> {
+                }
+            `,
+            "error": "'Thing' is missing generic arguments ['X','Y']"
+        },
+        {
             "name": "Generic Constraint Array Struct Type Multiple Generic",
             "definitions": `
                 struct Person<T> {
