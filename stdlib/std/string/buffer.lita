@@ -84,7 +84,20 @@ public func (s: *StringBuffer) format(format: *const char, ...) : i32{
         return len
     }
 
-    s.length = len
+    s.length = MIN(len, s.capacity)
+    return len
+}
+
+public func (s: *StringBuffer) formatv(format: *const char, args: va_list) : i32{
+    // have to call vsnprintf at least once - might as well use a small
+    // fixed-size buffer just in case the final string fits in it
+    var len = vsnprintf(s.buffer, s.capacity, format, args);
+
+    if(len < 0) {
+        return len
+    }
+
+    s.length = MIN(len, s.capacity)
     return len
 }
 
@@ -103,6 +116,26 @@ public func (s: *StringBuffer) append(format: *const char, ...) : i32 {
     }
 
     s.length += len
+    if(s.length > s.capacity) {
+        s.length = s.capacity
+    }
+    return len
+}
+
+public func (s: *StringBuffer) appendv(format: *const char, args: va_list) : i32 {
+    // have to call vsnprintf at least once - might as well use a small
+    // fixed-size buffer just in case the final string fits in it
+    var len = vsnprintf(s.buffer + s.length, s.capacity - s.length, format, args);
+
+    if(len < 0) {
+        return len
+    }
+
+    s.length += len
+
+    if(s.length > s.capacity) {
+        s.length = s.capacity
+    }
     return len
 }
 
