@@ -84,11 +84,16 @@ func test() {
     "repo" : "%s",
 
     "build_command" : {
+        // TARGET (debug|release|default)
         "default" : {
+            // OS (linux|mac|windows|default)
             "default" : {
-                "cc" : "clang",
-                "cc_options" : "-std=c99 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
-                "lita_options" : ""
+                // ARCH (x86|x64|arm32|arm64|default)
+                "default" : {
+                    "cc" : "clang",
+                    "cc_options" : "-std=c99 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
+                    "lita_options" : ""
+                }
             }
         }
     },

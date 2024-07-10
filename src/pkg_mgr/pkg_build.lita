@@ -3,6 +3,7 @@ import "std/system" as sys
 import "std/mem"
 import "std/string/buffer"
 import "std/string/builder"
+import "std/string"
 import "std/array"
 import "std/json"
 import "std/libc"
@@ -125,12 +126,18 @@ func (this: *PackageManager) buildCommandArgs(
         if(litaOptions) {
 
             if(litaOptions.isString()) {
-                programArgs.add(litaOptions.asString())
+                var arg = litaOptions.asString()
+                if(!arg.empty()) {
+                    programArgs.add(arg)
+                }
             }
             else if(litaOptions.isArray()) {
                 for(var i = 0; i < litaOptions.size(); i+=1) {
                     var n = litaOptions.at(i)
-                    programArgs.add(n.asString())
+                    var arg = n.asString()
+                    if(!arg.empty()) {
+                        programArgs.add(arg)
+                    }
                 }
             }
         }

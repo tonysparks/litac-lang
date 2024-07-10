@@ -363,7 +363,14 @@ public func (str: *const char) equals(other: *const char) : bool {
     return strcmp(str, other) == 0
 }
 
+public func (str: *const char) length() : i32 {
+    return strlen(str)
+}
 
+
+public func (str: *const char) empty() : bool {
+    return strlen(str) == 0
+}
 
 
 
