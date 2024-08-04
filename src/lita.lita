@@ -9,6 +9,7 @@ import "std/system"
 import "std/string/builder"
 import "std/string"
 import "std/string/buffer"
+import "std/process" as sub
 
 import "symbols"
 import "preprocessor"
@@ -140,6 +141,9 @@ public struct LitaOptions {
     instrument: bool               // if we have profiling instrumentation enabled
     isVerbose: bool                // if we are in verbose mode, output logging detail information
     isColoredOutput: bool          // if we should use colors in output
+
+    args: **char                   // command line arguments to be passed to the compiled program
+    nargs: i32                     // number of command line arguments
 
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include
@@ -630,19 +634,23 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
 }
 
 public func (this: *Lita) run() : i32 {
-    var sb = StringBuilderInit(256, this.allocator)
-    defer sb.free()
+    var args = ArrayInit<*const char>(this.options.nargs + 2, this.allocator)
+    args.add(this.binaryFilename)
+    for(var i = 0; i < this.options.nargs; i+=1) {
+        args.add(this.options.args[i])
+    }
+    args.add(null) // end marker
 
-    var path: [MAX_PATH]char;
-    FilePath(this.binaryFilename, path)
+    var process = sub::Process{}
+    process.create(
+        args.elements,
+        sub::ProcessOption.COMBINE_STDOUT_STDERR|sub::ProcessOption.INHERIT_IO
+    )
+    defer process.destroy()
 
-    var len = strlen(path)
-    sb.appendStrn("cd ", 3)
-    sb.appendStrn(path, len)
-    sb.append(" && .%s", PATH_SEPARATOR)
-    sb.appendStr(&this.binaryFilename[len + 1])
-
-    return system(sb.cStr())
+    var result = 0
+    process.join(&result)
+    return result
 }
 
 
