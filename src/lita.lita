@@ -635,7 +635,9 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
 
 public func (this: *Lita) run() : i32 {
     var args = ArrayInit<*const char>(this.options.nargs + 2, this.allocator)
-    args.add(this.binaryFilename)
+    var nativePath:[MAX_PATH]char;
+    args.add(PathNative(this.binaryFilename, nativePath))
+
     for(var i = 0; i < this.options.nargs; i+=1) {
         args.add(this.options.args[i])
     }
