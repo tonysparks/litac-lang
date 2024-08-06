@@ -635,10 +635,20 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
 
 public func (this: *Lita) run() : i32 {
     var args = ArrayInit<*const char>(this.options.nargs + 2, this.allocator)
-    var nativePath:[MAX_PATH]char;
-    args.add(PathNative(this.binaryFilename, nativePath))
 
-printf("Running command: '%s'\n", args.last())
+    var path: [MAX_PATH]char;
+    FilePath(this.binaryFilename, path)
+
+    var len = strlen(path)
+    if(len > 0) {
+        len += 1
+    }
+
+    var filename:[MAX_PATH]char;
+    var sb = StringBufferInit(filename, MAX_PATH, 0)
+    sb.format(".%s%s", PATH_SEPARATOR, &this.binaryFilename[len])
+    args.add(sb.cStr())
+
     for(var i = 0; i < this.options.nargs; i+=1) {
         args.add(this.options.args[i])
     }
@@ -647,6 +657,7 @@ printf("Running command: '%s'\n", args.last())
     var process = sub::Process{}
     process.create(
         args.elements,
+        path,
         sub::ProcessOption.COMBINE_STDOUT_STDERR|sub::ProcessOption.INHERIT_IO
     )
     defer process.destroy()

@@ -14,6 +14,7 @@ public struct Process {
 }
 
 public func (this: *Process) create(commandLine: **const char,
+                                    cwd: *const char,
                                     options: i32) : i32 {
     var subOptions = 0
     if(options & ProcessOption.COMBINE_STDOUT_STDERR) {
@@ -27,7 +28,13 @@ public func (this: *Process) create(commandLine: **const char,
     }
 
     this.options = options
-    return subprocess_create(commandLine, subOptions, &this.sub)
+    return subprocess_create_ex(
+        commandLine,
+        subOptions,
+        null,
+        cwd,
+        &this.sub
+    )
 }
 
 public func (this: *Process) destroy() : i32 {
