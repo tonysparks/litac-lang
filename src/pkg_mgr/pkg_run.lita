@@ -5,6 +5,7 @@ import "std/string/builder"
 import "std/array"
 import "std/json"
 import "std/libc"
+import "std/process" as sub
 
 public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
     if(!pm.pkg) {
@@ -22,9 +23,9 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
 
     const BUFFER_SIZE = 16
     var buffer = [BUFFER_SIZE]char{0};
-    var bufferStr = StringBufferInit(buffer, BUFFER_SIZE, 0)
-    bufferStr.format("%s", OSAsStr(GetOS()))
-    bufferStr.toLower()
+    var osStr = StringBufferInit(buffer, BUFFER_SIZE, 0)
+    osStr.format("%s", OSAsStr(GetOS()))
+    osStr.toLower()
 
     var cmdScript: *const char = null
 
@@ -32,7 +33,7 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
         cmdScript = commands.getStr(cmd)
     }
 
-    var osCommands = commands.get(bufferStr.cStr())
+    var osCommands = commands.get(osStr.cStr())
     if(osCommands && osCommands.contains(cmd)) {
         cmdScript = osCommands.getStr(cmd)
     }
@@ -41,7 +42,42 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
         return PkgStatus.ERROR_COMMAND_NOT_DEFINED
     }
 
-    var process = SystemExec(cmdScript)
+    var options = pm.options.litaOptions
+    // var args = ArrayInit<*const char>(options.nargs + 2, pm.allocator)
+    // args.add(cmdScript)
+
+    // for(var i = 0; i < options.nargs; i+=1) {
+    //     args.add(options.args[i])
+    // }
+    // args.add(null)
+
+    // var process = sub::Process{}
+    // if(process.create(
+    //     args.elements,
+    //     sub::ProcessOption.COMBINE_STDOUT_STDERR|
+    //     sub::ProcessOption.INHERIT_IO|
+    //     sub::ProcessOption.INHERIT_ENVIRONMENT
+    // )) {
+    //     return PkgStatus.ERROR_RUNNING_COMMAND
+    // }
+
+    // defer process.destroy()
+
+    // var result = 0
+    // process.join(&result)
+
+    // if(result != 0) {
+    //     return PkgStatus.ERROR_RUNNING_COMMAND
+    // }
+
+    var scriptStr = StringBuilderInit(1024, pm.allocator)
+    scriptStr.append("%s", cmdScript)
+
+    for(var i = 0; i < options.nargs; i+=1) {
+        scriptStr.append(" \"%s\"", options.args[i])
+    }
+
+    var process = SystemExec(scriptStr.cStr())
     if(!process.pipe) {
         return PkgStatus.ERROR_RUNNING_COMMAND
     }
@@ -49,7 +85,8 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
 
     var bytesRead = -1_i64
     while((bytesRead = process.readOutput(buffer, BUFFER_SIZE)) > 0) {
-        printf("%.*s", bytesRead as (i32), buffer)
+        fwrite(buffer, sizeof(:char), bytesRead as (i32), stdout)
+        fflush(stdout)
     }
 
     return PkgStatus.OK

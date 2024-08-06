@@ -169,11 +169,9 @@
             "bootstrap": "build_bootstrap.bat",
             "full": "build_bootstrap_full.bat"
         },
-        "linux": {
-            "build": "./build.sh",
-            "test": "./build_test.sh",
-            "bootstrap": "./build_bootstrap.sh",
-            "full": "./build_bootstrap_full.sh"
-        }
+        "build": "./build.sh",
+        "test": "./build_test.sh",
+        "bootstrap": "./build_bootstrap.sh",
+        "full": "./build_bootstrap_full.sh"
     }
 }

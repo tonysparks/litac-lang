@@ -180,7 +180,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     parser.addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null);
     parser.addOption("tcc",            '\0', "Use tcc to compile.  This ignores buildCmd/strictBuildCmd", 0, null);
     parser.addOption("maxMemory",      '\0', "The max amount of memory allowed for allocation. NOTE: This is a temporary option", OptionFlag.HAS_ARGUMENT, null);
-
+    parser.addOption("--",             '\0', "Signals any arguments after are to be passed to the compile program when -run is set", 0, null)
 
     if(parser.parse(n, args) != CmdParserStatus.OK) {
         goto err_print;
@@ -230,9 +230,10 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     options.languageServer = parser.hasOption("languageServer")
     if(!options.languageServer) {
+        var pkgCmd = options.pkgOptions.pkgCmd
 
         // if we are not running a pkg* command, we must have an input file
-        if(options.pkgOptions.pkgCmd == PkgCommand.PKG_NONE) {
+        if(pkgCmd == PkgCommand.PKG_NONE) {
             if(parser.args.size() < 2) {
                 printf("Missing input file\n")
                 goto err;
@@ -242,7 +243,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         }
         else {
             // we optionally can provide an input file for pkg* commands
-            if(parser.args.size() > 1) {
+            if(parser.args.size() > 1 && pkgCmd != PkgCommand.PKG_RUN) {
                 GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
                 if(!FileExists(options.inputFile)) {
                     printf("Could not find '%s'\n", options.inputFile)
@@ -384,6 +385,19 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     TrimPath(options.litaPath)
     TrimPath(options.testPath)
 
+    // determine if we need to collect arguments
+    if(options.run || options.pkgOptions.pkgCmd == PkgCommand.PKG_RUN) {
+        for(var i = 0; i < n; i+=1) {
+            var arg = args[i]
+            if("--".equals(arg)) {
+                i += 1
+                options.args = (args + i)
+                options.nargs = n - i
+                break;
+            }
+        }
+    }
+
     return ParseStatus.OK
 
 terminate:
@@ -493,8 +507,11 @@ func RunPkgInstall(options: *LitaOptions, pm: *PackageManager) : i32 {
 func RunPkgCommand(options: *LitaOptions, pm: *PackageManager) : i32 {
     var status = pm.runCommand(options.pkgOptions.pkgRunCmdArg)
     if(status != PkgStatus.OK) {
-        printf("Error running pkg command:\nErrorCode: %s - %s\n",
-            PkgStatusAsStr(status), pm.errors.cStr())
+        printf("Error running pkg command: '%s'\nErrorCode: %s %s\n",
+            options.pkgOptions.pkgRunCmdArg,
+            PkgStatusAsStr(status),
+            pm.errors.cStr()
+        )
         return 1;
     }
     return 0;

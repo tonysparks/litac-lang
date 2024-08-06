@@ -5,7 +5,7 @@ set -e
 unameOut="$(uname -s)"
 case "${unameOut}" in
     Darwin*)
-        LIBS="-lm -lpthread";
+        LIBS="-lpthread";
     ;;
     *)
         LIBS="-lm -lrt -lpthread";
