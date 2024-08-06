@@ -823,6 +823,7 @@ int subprocess_create_ex(const char *const commandLine[], int options,
     return -1;
   }
 
+#ifdef __APPLE__
   // Set working directory
   if (process_cwd) {
     if (0 != posix_spawn_file_actions_addchdir_np(&actions, process_cwd)) {
@@ -830,6 +831,7 @@ int subprocess_create_ex(const char *const commandLine[], int options,
       return -1;
     }
   }
+#endif
 
   // Close the stdin write end
   if (0 != posix_spawn_file_actions_addclose(&actions, stdinfd[1])) {
