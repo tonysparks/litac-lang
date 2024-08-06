@@ -7,11 +7,18 @@ cd bin
 
 REM set BUILD_CMD="clang.exe -std=c99 -g -fsanitize=undefined,address %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -llibtcc"
 set BUILD_CMD="clang.exe -std=c99 %%input%% -o %%output%%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib"
-litac -buildCmd %BUILD_CMD% -cFormat -profile -run -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
+litac -buildCmd %BUILD_CMD% -cFormat -profile -srcDir "../src" -outputDir "./" -output "litac_tests" "../test/test_suite.lita" -types "none" -debug -maxMemory 1GiB
 
 if errorlevel 1 (
     goto error_tests
 )
+
+echo "Running litaC tests..."
+litac_tests
+if errorlevel 1 (
+    goto error_tests
+)
+
 goto end
 
 :error_exit
