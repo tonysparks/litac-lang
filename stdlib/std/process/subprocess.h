@@ -825,7 +825,6 @@ int subprocess_create_ex(const char *const commandLine[], int options,
 
   // Set working directory
   if (process_cwd) {
-    printf("Adding chdir: '%s'\n", process_cwd);
     if (0 != posix_spawn_file_actions_addchdir_np(&actions, process_cwd)) {
       posix_spawn_file_actions_destroy(&actions);
       return -1;
