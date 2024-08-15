@@ -1,5 +1,6 @@
 import "std/http/libcurl"
 import "std/string/builder"
+import "std/string"
 import "std/mem"
 import "std/map"
 import "std/libc"
@@ -111,7 +112,7 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     var curlRes = curl_easy_perform(curl)
     if(curlRes) {
         var body = curl_easy_strerror(curlRes)
-        HttpWriteCallback(body as (*void), strlen(body), 1, resp)
+        HttpWriteCallback(body as (*void), body.length(), 1, resp)
 
         resp.statusCode = -1;
         return false;

@@ -58,7 +58,6 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
     }
 
     // TODO: Recursively build dependencies too...
-
     RunLitac(litaOptions)
     return PkgStatus.OK
 }
@@ -187,7 +186,7 @@ func (this: *PackageManager) buildCommandArgs(
         }
     }
 
-    if(strlen(this.options.litaOptions.inputFile) > 0) {
+    if(!this.options.litaOptions.inputFile.empty()) {
         mainFile = this.options.litaOptions.inputFile as (*const char)
     }
 
@@ -202,7 +201,7 @@ func (this: *PackageManager) buildCommandArgs(
 func ContainsOption(option: *const char, programArgs: *Array<*const char>) : bool {
     for(var i = 0; i < programArgs.size(); i+=1) {
         var arg = programArgs.get(i)
-        if(strcmp(arg, option) == 0) {
+        if(arg.equals(option)) {
             return true
         }
     }

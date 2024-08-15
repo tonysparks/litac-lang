@@ -48,7 +48,7 @@ public func (b: *StringBuilder) appendStr(str: *const char) {
     if(str == null) {
         return;
     }
-    var len = strlen(str)
+    var len = str.length()
     b.appendStrn(str, len)
 }
 

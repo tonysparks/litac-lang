@@ -3,6 +3,7 @@ import "std/io"
 import "std/mem"
 import "std/string/builder"
 import "std/string/buffer"
+import "std/string"
 import "std/libc" as c
 
 const MAX_MESSAGE_SIZE = 256
@@ -75,7 +76,7 @@ public func (p: *CmdParser) addOption(longName: *const char,
 public func (p: *CmdParser) getOption(longName: *const char) : *Option {
     for(var i = 0; i < p.options.size(); i += 1) {
         var opt = &p.options.elements[i]
-        if(c::strcmp(opt.name, longName) == 0) {
+        if(opt.name.equals(longName)) {
             return opt
         }
     }
@@ -116,7 +117,7 @@ public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
     // TODO: Account for required arguments
     for(var i = 0; i < argc; i+=1) {
         var arg = argv[i]
-        var len = c::strlen(arg)
+        var len = arg.length()
 
         var opt: *Option = null;
         if(len && arg[0] == '-') {

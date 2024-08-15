@@ -20,7 +20,7 @@ public func CString(str: *char, len: i32 = -1) : StringBuffer {
     }
 
     if(len < 0) {
-        len = strlen(str)
+        len = str.length()
     }
 
     return StringBuffer {
@@ -40,7 +40,7 @@ public func StringBufferInit(str: *char, capacity: i32, len: i32 = -1) : StringB
     }
 
     if(len < 0) {
-        len = strlen(str)
+        len = str.length()
     }
 
     if(len > capacity) {
@@ -143,7 +143,7 @@ public func (b: *StringBuffer) appendStr(str: *const char) {
     if(str == null) {
         return;
     }
-    var len = strlen(str)
+    var len = str.length()
     b.appendStrn(str, len)
 }
 

@@ -304,7 +304,7 @@ func sanitizeFilename(filename: *const char, out: [MAX_PATH]char) : *char {
         goto end;
     }
 
-    var len = strlen(filename)
+    var len = filename.length()
     len = MIN(len, MAX_PATH)
 
     var i = 0
@@ -483,7 +483,7 @@ func dealWithGithubBS(
     var destPath = StringBufferInit(temp2, MAX_PATH, 0)
 
     var root = extractedFiles.get(0)
-    var rootLength = strlen(root)
+    var rootLength = root.length()
 
 
     srcPath.format("%s/%s", pkgPath, root)
@@ -520,7 +520,7 @@ func zipLocalPackage(
         return PkgStatus.ERROR_OPENING_LOCAL_FILE_PKG
     }
 
-    const len = strlen("file://")
+    const len = "file://".length()
     var basePath = pkgId.repo().substring(len)
 
     if(zip.zipDir(basePath.buffer, basePath.length, "pkg") != ZipStatus.OK) {
@@ -544,7 +544,7 @@ func testSanitizeFilename() {
     sanitizeFilename(pkgDirectory.cStr(), pkgDirectory.cStr())
 
     // printf("Path: '%s'\n", pkgDirectory.cStr())
-    assert(strncmp(pkgDirectory.cStr(), "http_//root/name-complex/1.0.3", MAX_PATH) == 0)
+    assert(StringEqualLen(pkgDirectory.cStr(), "http_//root/name-complex/1.0.3", MAX_PATH))
 }
 
 /*

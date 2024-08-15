@@ -78,7 +78,7 @@ public func (d: *DebugAllocator) free() {
         allocation.addr = mem + sizeof(:Allocation)
         allocation.size = size
         allocation.line = line
-        c::strncpy(allocation.filename, file, MAX_PATH)
+        StringCopy(file, allocation.filename, MAX_PATH)
 
         d.allocations.add(allocation)
         d.totalBytesAllocated += size
@@ -90,7 +90,7 @@ public func (d: *DebugAllocator) free() {
             allocation.addr = mem
             allocation.size = size
             allocation.line = line
-            c::strncpy(allocation.filename, file, MAX_PATH)
+            StringCopy(file, allocation.filename, MAX_PATH)
 
             d.allocations.add(allocation)
             d.totalBytesAllocated += size

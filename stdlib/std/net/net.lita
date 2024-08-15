@@ -184,7 +184,7 @@ public func testGenerated() {
                 printf("Received '%.*s'\n", bytesReceived as (i32), buffer)
 
                 var echo = "Server says: ";
-                clientSocket.write(echo as (*void), strlen(echo))
+                clientSocket.write(echo as (*void), echo.length())
                 clientSocket.write(buffer, bytesReceived)
             }
         }

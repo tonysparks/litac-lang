@@ -400,18 +400,19 @@ public func (this: *Lita) transpile(module: *Module) : bool {
         return false
     }
 
-    memset(this.binaryFilename, 0, MAX_PATH)
-    memset(this.sourceFilename, 0, MAX_PATH)
+    var binaryBuffer = StringBufferInit(this.binaryFilename, MAX_PATH, 0)
+    var sourceBuffer = StringBufferInit(this.sourceFilename, MAX_PATH, 0)
 
-    strcat(this.sourceFilename, this.options.outputPath)
-    strcat(this.sourceFilename, this.options.outputFile)
+    sourceBuffer.append("%s%s", this.options.outputPath, this.options.outputFile)
+    binaryBuffer.append("%s", sourceBuffer.cStr())
 
-    strcpy(this.binaryFilename, this.sourceFilename)
-
-#if OS == "WINDOWS"
-    strcat(this.binaryFilename, ".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
+#static_if defined(_WIN32) || defined(_WIN64)
+    binaryBuffer.append(".exe") // TODO: This should take what the command specifies, otherwise default to OS extension
 #end
-    strcat(this.sourceFilename, ".c")
+    sourceBuffer.append(".c")
+
+    sourceBuffer.cStr()
+    binaryBuffer.cStr()
 
     if(this.options.cOutputOnly) {
         if(!this.emitC(module, this.sourceFilename)) {
@@ -555,12 +556,12 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
 
     var index = commandStr.indexOf("%output%")
     if(index > -1) {
-        commandStr.replace(index, index+strlen("%output%"), binaryFilename)
+        commandStr.replace(index, index+"%output%".length(), binaryFilename)
     }
 
     index = commandStr.indexOf("%input%")
     if(index > -1) {
-        commandStr.replace(index, index+strlen("%input%"), sourceFilename)
+        commandStr.replace(index, index+"%input%".length(), sourceFilename)
     }
 
     this.applyCompilerOptions(commandStr)
@@ -622,7 +623,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
     if(this.options.isStrict) {
         var index = commandStr.indexOf("%options%")
         if(index >= 0) {
-            commandStr.replace(index, index+strlen("%options%"), buffer.cStr())
+            commandStr.replace(index, index+"%options%".length(), buffer.cStr())
         }
 
         buffer.free()
@@ -636,7 +637,7 @@ public func (this: *Lita) run() : i32 {
     var path: [MAX_PATH]char;
     FilePath(this.binaryFilename, path)
 
-    var len = strlen(path)
+    var len = path.length()
     sb.appendStrn("cd ", 3)
     sb.appendStrn(path, len)
     sb.append(" && .%s", PATH_SEPARATOR)
@@ -755,7 +756,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         var status = ReadFile(module.id.filename, &module.text.buffer, &length, lita.allocator)
         if(status == FileStatus.FileNotFoundError) {
             var additionalMsg = "";
-            if(strcmp(module.id.filename, "/stdlib/std/builtins.lita") == 0) {
+            if(module.id.filename.equals("/stdlib/std/builtins.lita")) {
                 additionalMsg = "\nNOTE: Make sure the LITAC_HOME environment variable is set to the litac home directory"
             }
             lita.result.addError(pos, "Could not open file '%s'%s\n", module.id.filename, additionalMsg)
@@ -817,7 +818,7 @@ public func GetPackageName(srcPath: *const char, inputFile: *const char) : Strin
         var inputFileView = StringInit(inputFile)
         var index = inputFileView.indexOf(srcPath)
         if(index > -1) {
-            inputFile = &inputFile[index + strlen(srcPath)]
+            inputFile = &inputFile[index + srcPath.length()]
         }
     }
 
@@ -831,7 +832,7 @@ public func GetPackageName(srcPath: *const char, inputFile: *const char) : Strin
         inputFile  += 1
     }
 
-    var inputLen = strlen(inputFile)
+    var inputLen = inputFile.length()
     var endCount = 0
     for(var i = inputLen; i >= 0; i-=1) {
         var c = inputFile[i]

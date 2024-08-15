@@ -262,14 +262,14 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
     programText.append("%s\n", suite.programTemplate)
 
     const defsTemplate = "%definitions%"
-    var defsLen = strlen(defsTemplate)
+    var defsLen = defsTemplate.length()
     var defsIndex = programText.indexOf(defsTemplate)
     if(defsIndex > -1) {
         programText.replace(defsIndex, defsIndex + defsLen, testNode.getStr("definitions", ""))
     }
 
     const codeTemplate = "%code%"
-    var codeLen = strlen(codeTemplate)
+    var codeLen = codeTemplate.length()
     var codeIndex = programText.indexOf(codeTemplate)
     if(codeIndex > -1) {
         programText.replace(codeIndex, codeIndex + codeLen, testNode.getStr("code", ""))
@@ -330,7 +330,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
         moduleFilenameStr.format("test_output/%s.lita", m.name)
 
 
-        if(WriteFile(moduleFilenameStr.cStr(), m.code, strlen(m.code)) != FileStatus.Ok) {
+        if(WriteFile(moduleFilenameStr.cStr(), m.code, m.code.length()) != FileStatus.Ok) {
             return TestResult.LOADING_ERROR
         }
     }
@@ -358,18 +358,19 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     }
 
 
-    strncpy(options.inputFile, tmpSrcFile, MAX_PATH)
-    strncpy(options.litaPath, GetEnv("LITAC_HOME"), MAX_PATH)
+    StringCopy(tmpSrcFile, options.inputFile, MAX_PATH)
+    StringCopy(GetEnv("LITAC_HOME"), options.litaPath, MAX_PATH)
 
     var outputFile = "test"
-    strncpy(options.outputFile, outputFile, MAX_PATH)
+    StringCopy(outputFile, options.outputFile, MAX_PATH)
 
     var outputPath = "test_output"
-    strncpy(options.outputPath, outputPath, MAX_PATH)
-    var len = strlen(options.outputPath)
+    var outputPathBuffer = StringBufferInit(options.outputPath, MAX_PATH, 0)
+    outputPathBuffer.format("%s", outputPath)
+    var len = options.outputPath.length()
     if(len > 0) {
         if(options.outputPath[len-1] != '/') {
-            strcat(options.outputPath, "/")
+            outputPathBuffer.append("/")
         }
     }
 
@@ -399,7 +400,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     lita.runCaptureOutput(testHarness.buffer)
 
     if(test.expectedOutput) {
-        if(strcmp(test.expectedOutput, testHarness.buffer.cStr())  != 0) {
+        if(!test.expectedOutput.equals(testHarness.buffer.cStr())) {
             goto err
         }
     }
@@ -453,7 +454,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
     var path: [MAX_PATH]char;
     FilePath(this.binaryFilename, path)
 
-    var len = strlen(path)
+    var len = path.length()
     sb.appendStrn("cd ", 3)
     sb.appendStrn(path, len)
     sb.append(" && .%s%s 2>&1", PATH_SEPARATOR, &this.binaryFilename[len + 1])

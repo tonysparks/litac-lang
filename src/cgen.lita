@@ -251,7 +251,7 @@ typedef size_t    %s%s;
     this.options.cPrefix, "usize"
     );
 
-    if(strlen(this.options.cPrefix) > 0) {
+    if(this.options.cPrefix.length() > 0) {
         buf.append("typedef int8_t %s%s;\n", this.options.cPrefix, "bool")
         buf.append("#define %s%s (1)\n", this.options.cPrefix, "true")
         buf.append("#define %s%s (0)\n", this.options.cPrefix, "false")
@@ -518,7 +518,7 @@ public func (this: using *CGen) escapeNameStr(name: InternedString) : String {
 
 func (this: using *CGen) escapeNameChars(name: *const char) : String {
     var sb = StringBuilderInit(256, this.allocator)
-    EscapeName(name, strlen(name), sb)
+    EscapeName(name, name.length(), sb)
     return String {
         .buffer = sb.buffer,
         .length = sb.length
@@ -661,7 +661,7 @@ public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
         if(this.currentFile) {
             this.emit("\n#line %d \"", this.currentLine)
 
-            var len = strlen(this.currentFile)
+            var len = this.currentFile.length()
             for(var i = 0; i < len; i += 1) {
                 var c:char = this.currentFile[i]
                 var escaped = escapeStrings[c as (u32)]
@@ -1148,7 +1148,7 @@ public func (this: using *CGen) emit(strFormat: *const char, ...) {
 }
 
 public func (this: using *CGen) emitStr(str: *const char) {
-    var len = strlen(str)
+    var len = str.length()
     this.emitStrn(str, len)
 }
 
@@ -1243,7 +1243,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
         }
 
         var temp:[MAX_PATH]char;
-        // this constant is strlen("{relativePath}")
+        // this constant is "{relativePath}"..length()
         const len = 14
 
         for(var i = 0; i < note.arguments.size(); i += 1) {

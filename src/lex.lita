@@ -728,7 +728,7 @@ func (l: *Lexer) checkKeyword() : bool {
             var keyword = keywords[i]
             if(!keyword) break;
 
-            if(strncmp(l.token.str.buffer, keyword, len) == 0) {
+            if(StringEqualLen(l.token.str.buffer, keyword, len)) {
                 l.token.type = keywordCacheIndex[len][i]
                 return true
             }
@@ -1352,7 +1352,7 @@ func (l: *Lexer) scanSymbol() : Token {
         }
         case '@': {
             l.token.type = TokenType.AT
-            if(strncmp(l.stream, "note", 4) == 0) {
+            if(StringEqualLen(l.stream, "note", 4)) {
                 l.token.type = TokenType.NOTE
                 l.stream   += 4
                 l.position += 4

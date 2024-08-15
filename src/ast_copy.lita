@@ -21,7 +21,7 @@ import "intern"
 public func NewTokenNameIntern(token: Token, strings: *Strings) : InternedString {
     if(token.type != TokenType.IDENTIFIER && token.type != TokenType.STRING) {
         var text = tokenText[token.type]
-        return strings.internCopy(text, strlen(text))
+        return strings.internCopy(text, text.length())
     }
 
     return strings.internCopy(token.value.str.buffer, token.value.str.length)
@@ -767,7 +767,7 @@ public func CopyTypedefDecl(decl: *TypedefDecl, module: *Module) : *TypedefDecl 
 
 public func AstInsertText(node: *Node, text: *const char, index: i32, module: *Module, lita: *Lita) {
     // TODO: Support incremental compilation
-    var parser = ParserInit(node.startPos.filename, text, strlen(text), module, lita)
+    var parser = ParserInit(node.startPos.filename, text, text.length(), module, lita)
     var stmt = parser.statement()
 
     AstInsert(node, stmt, index, module, lita)
@@ -835,8 +835,8 @@ public func AstAddImport(lita: *Lita,
             continue
         }
 
-        if(strncmp(importStmt.moduleId.filename,
-                   importModule.id.filename, MAX_PATH) == 0) {
+        if(StringEqualLen(importStmt.moduleId.filename,
+                          importModule.id.filename, MAX_PATH)) {
             if(importStmt.alias.token.type == TokenType.IDENTIFIER) {
                 return importStmt.alias.token.asString()
             }

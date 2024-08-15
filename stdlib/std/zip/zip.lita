@@ -323,7 +323,7 @@ func testZipDir() {
     //assert(zip.addFile("pkg/src/test.txt", "C:/Users/antho/git/c2litacx/src/test.txt") == ZipStatus.OK)
 
     var path = "/home/tony/projects/libio_uring"
-    var len = strlen(path)
+    var len = path.length()
     assert(zip.zipDir(path, len, "pkg") == ZipStatus.OK)
     assert(zip.finalize() == ZipStatus.OK)
 }

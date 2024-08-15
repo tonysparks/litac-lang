@@ -1,3 +1,5 @@
+import "std/string"
+
 @raw("""
 
 #define __PRFCHWINTRIN_H
@@ -137,7 +139,7 @@ func testCmp() {
     printf("Count: %d %d\n", count, pcount)
 }*/
 
-    var len = strlen(str)
+    var len = str.length()
 
     var needle = "*/1234567890123456"
     const match = _mm_loadu_si128(needle as (*__m128i))
@@ -210,7 +212,7 @@ func testIntrinsics() {
     var slash = _mm_set1_epi8('/');
 
     var data = str
-    var len = strlen(str)
+    var len = str.length()
     var end = len - 16
     var count = 0
     while(count < end) {
@@ -285,7 +287,7 @@ func testSlowTimed() {
     var str = "/* this is a comment in whichx*x/want to find the end ofxx */start of new"
     //var str = "/* this is a comment in whichyyyy*/x"
 
-    var len = strlen(str)
+    var len = str.length()
 
     var startTime = _rdtsc()
     var data: *const char = null
@@ -312,7 +314,7 @@ func testIntrinsicsTimed() {
     var str = "/* this is a comment in whichx*x/want to find the end ofxx */start of new"
     //var str = "/* this is a comment in whichyyyy*/x"
 
-    var len = strlen(str)
+    var len = str.length()
 
     var startTime = _rdtsc()
     var slash = _mm_set1_epi8('/');

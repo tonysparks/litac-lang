@@ -701,7 +701,7 @@ public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
 
     for(var i = 0; i < d.attributes.notes.size(); i += 1) {
         var note = d.attributes.notes.get(i)
-        if(strncmp(note.type.name.buffer, name, note.type.name.length) == 0) {
+        if(StringEqualLen(note.type.name.buffer, name, note.type.name.length)) {
             return note;
         }
     }

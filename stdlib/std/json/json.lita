@@ -222,7 +222,7 @@ public func CreateJsonString(str: *const char, len: i32 = -1,
     }
 
     if(len < 0) {
-        len = strlen(str);
+        len = str.length();
     }
 
     var sb = StringBuilderInit(len + 1, alloc)
@@ -343,7 +343,7 @@ public func (node: *JsonNode) put(key: *const char, n: *JsonNode) {
         n = JSON_NULL
     }
 
-    var copy = StringClone(key, strlen(key), node.alloc)
+    var copy = StringClone(key, key.length(), node.alloc)
     var entry = JsonEntry {
         .key = copy,
         .value = n
@@ -513,8 +513,8 @@ public func (node: *JsonNode) getStrCopy(key: *const char, str: *char, len: i32)
         return str;
     }
 
-    var srcLen = strlen(n.strValue)
-    strncpy(str, n.strValue, MIN(srcLen, len));
+    var srcLen = n.strValue.length()
+    StringCopy(n.strValue, str, MIN(srcLen, len) + 1);
 
     return str;
 }
@@ -665,7 +665,7 @@ public func (node: *JsonNode) equals(other: *JsonNode) : bool {
             return otherCount == thisCount
         }
         case JsonType.STRING: {
-            return strcmp(node.strValue, other.strValue) == 0
+            return node.strValue.equals(other.strValue)
 
         }
         case JsonType.NULL: {

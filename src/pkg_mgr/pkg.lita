@@ -230,9 +230,9 @@ public func ParsePackageId(
     var version = json.getStr("version")
     if(!version) return PkgStatus.ERROR_PARSING_PKG_JSON
 
-    var repoLen = strlen(repo)
-    var nameLen = strlen(name)
-    var versionLen = strlen(version)
+    var repoLen = repo.length()
+    var nameLen = name.length()
+    var versionLen = version.length()
 
     var sb = StringBuilderInit(repoLen + nameLen + versionLen + (SEPARATOR_LENGTH*2)+1, allocator)
     defer sb.free()
@@ -303,14 +303,14 @@ func testParsePackage() {
     printf("Version: %.*s\n", version.length, version.buffer)
 */
 
-    assert(strcmp(pkg.id.id, "https://github.com/tonysparks|litac-lang|0.1.2-alpha") == 0)
+    assert(pkg.id.id.equals("https://github.com/tonysparks|litac-lang|0.1.2-alpha"))
     assert(repo.equals("https://github.com/tonysparks"))
     assert(name.equals("litac-lang"))
     assert(version.equals("0.1.2-alpha"))
     assert(pkg.dependencies.size() == 0)
     assert(pkg.dynamicLibraries.size() == 2)
-    assert(strcmp(pkg.dynamicLibraries.get(0), "a") == 0)
-    assert(strcmp(pkg.dynamicLibraries.get(1), "b") == 0)
+    assert(pkg.dynamicLibraries.get(0).equals("a"))
+    assert(pkg.dynamicLibraries.get(1).equals("b"))
 }
 
 
