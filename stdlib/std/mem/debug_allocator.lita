@@ -1,6 +1,7 @@
 import "std/mem"
 import "std/array"
 import "std/libc" as c
+import "std/string"
 
 /**
 =========================================================
