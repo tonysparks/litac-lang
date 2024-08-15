@@ -490,14 +490,38 @@ public func PathNormalize(filename: *const char, out:[MAX_PATH]char) : *char {
         goto end;
     }
 
-    var len = filename.length()
-
     var i = 0
-    for(; i < len; i += 1) {
+    for(; filename[i]; i += 1) {
         var c = filename[i]
         if(c == '\\') {
            c = '/'
         }
+        out[i] = c
+    }
+
+
+end:
+    out[i] = '\0'
+    return out
+}
+
+public func PathNative(filename: *const char, out:[MAX_PATH]char) : *char {
+    if(!filename) {
+        goto end;
+    }
+
+    var i = 0
+    for(; filename[i]; i += 1) {
+        var c = filename[i]
+#static_if defined(_WIN32) || defined(_WIN64)
+        if(c == '/') {
+           c = '\\'
+        }
+#else
+        if(c == '\\') {
+           c = '/'
+        }
+#end
         out[i] = c
     }
 

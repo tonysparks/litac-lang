@@ -1,0 +1,119 @@
+import "std/process/subprocess"
+import "std/libc"
+
+public enum ProcessOption {
+    COMBINE_STDOUT_STDERR = (1<<1),
+    INHERIT_ENVIRONMENT = (1<<2),
+    ENABLE_ASYNC = (1<<3),
+    INHERIT_IO = (1<<4)
+}
+
+public struct Process {
+    sub: subprocess_s
+    options: i32
+}
+
+public func (this: *Process) create(commandLine: **const char,
+                                    cwd: *const char,
+                                    options: i32) : i32 {
+    var subOptions = 0
+    if(options & ProcessOption.COMBINE_STDOUT_STDERR) {
+        subOptions |= subprocess_option_e.subprocess_option_combined_stdout_stderr
+    }
+    if(options & ProcessOption.INHERIT_ENVIRONMENT) {
+        subOptions |= subprocess_option_e.subprocess_option_inherit_environment
+    }
+    if(options & ProcessOption.ENABLE_ASYNC || options & ProcessOption.INHERIT_IO) {
+        subOptions |= subprocess_option_e.subprocess_option_enable_async
+    }
+
+    this.options = options
+    return subprocess_create_ex(
+        commandLine,
+        subOptions,
+        null,
+        cwd,
+        &this.sub
+    )
+}
+
+public func (this: *Process) destroy() : i32 {
+    return subprocess_destroy(&this.sub)
+}
+
+public func (this: *Process) terminate() : i32 {
+    return subprocess_terminate(&this.sub)
+}
+
+public func (this: *Process) stdin() : *FILE {
+    return subprocess_stdin(&this.sub)
+}
+
+public func (this: *Process) stdout() : *FILE {
+    return subprocess_stdout(&this.sub)
+}
+
+public func (this: *Process) stderr() : *FILE {
+    return subprocess_stderr(&this.sub)
+}
+
+public func (this: *Process) join(result:  *i32) : i32 {
+    if(this.options & ProcessOption.INHERIT_IO) {
+        var buffer: [1024]char;
+        while(true) {
+            var len = this.readStdout(buffer, 1024)
+            if(len < 1) {
+                break
+            }
+            fwrite(buffer, sizeof(:char), len, stdout)
+            fflush(stdout)
+        }
+
+        if(!(this.options & ProcessOption.COMBINE_STDOUT_STDERR)) {
+            while(true) {
+                var len = this.readStderr(buffer, 1024)
+                if(len < 1) {
+                    break
+                }
+                fwrite(buffer, sizeof(:char), len, stderr)
+                fflush(stderr)
+            }
+        }
+    }
+    return subprocess_join(&this.sub, result)
+}
+
+public func (this: *Process) readStdout(buffer: *char, size: u32) : u32 {
+    return subprocess_read_stdout(&this.sub, buffer, size)
+}
+
+
+public func (this: *Process) readStderr(buffer: *char, size: u32) : u32 {
+    return subprocess_read_stderr(&this.sub, buffer, size)
+}
+
+import "std/array"
+import "std/assert"
+@test
+func test() {
+    var args = ArrayInit<*const char>(8)
+    args.add("litac")
+    //args.add("Hello World")
+    //args.add("&&")
+    args.add("ls")
+    args.add(null) // end marker
+
+    var process = Process{}
+    if(process.create(
+        args.elements,
+        ProcessOption.COMBINE_STDOUT_STDERR|ProcessOption.INHERIT_IO|ProcessOption.INHERIT_ENVIRONMENT
+    )) {
+        assert(false)
+    }
+
+    defer process.destroy()
+
+    var result = 0
+    process.join(&result)
+    printf("Result: %d\n", result)
+}
