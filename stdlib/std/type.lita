@@ -144,7 +144,7 @@ public func getFieldValue(agg: any, fieldName: *const char) : any {
 
     for(var i = 0; i < typeInfo.aggType.numOfFields; i += 1) {
         var field = typeInfo.aggType.fields[i]
-        if(strcmp(fieldName, field.name) == 0) {
+        if(fieldName.equals(field.name)) {
             return any {
                     .value = (agg.value as (usize) + field.offset) as (*void),
                     .id = field.type

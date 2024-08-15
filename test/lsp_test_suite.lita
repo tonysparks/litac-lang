@@ -137,7 +137,7 @@ func RunTest(sb: *StringBuilder, test: *TestCase) {
         printf("Running test: %-20s...", req.name)
 
         // make request
-        var contentLen = strlen(req.request)
+        var contentLen = req.request.length()
         sb.append("Content-Length: %d\r\n\r\n", contentLen)
         fwrite(sb.cStr(), sizeof(:char), sb.length, input)
         fflush(input)
@@ -161,7 +161,7 @@ func RunTest(sb: *StringBuilder, test: *TestCase) {
 
         if(bytesRead > 0) {
             sscanf(buffer, "%16s %d\r\n\r\n", contentLength, &size)
-            if(strncmp(contentLength, "Content-Length:", 16) != 0) {
+            if(!StringEqualLen(contentLength, "Content-Length:", 16)) {
                 if(!req.response) {
                     continue
                 }

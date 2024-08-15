@@ -792,7 +792,7 @@ func ApeAstInsert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
     var module = context.checker.current
 
     // TODO: Memory leak with incremental compilation...
-    var parser = ParserInit(astNode.startPos.filename, code, strlen(code), module, context.pp.lita)
+    var parser = ParserInit(astNode.startPos.filename, code, code.length(), module, context.pp.lita)
     var stmt = parser.statement()
 
     AstInsert(astNode, stmt, index, module, context.pp.lita)
@@ -829,7 +829,7 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
     }
 
     // don't import to yourself
-    if(strcmp(moduleName, moduleToImport) == 0) {
+    if(moduleName.equals(moduleToImport)) {
         return ape_object_make_null()
     }
 
@@ -908,7 +908,7 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
 
     // if we are testing by regex, test each function with @test attribute
     if(context.pp.lita.options.testsRegex) {
-        var all = strcmp(context.pp.lita.options.testsRegex, ".*") == 0
+        var all = context.pp.lita.options.testsRegex.equals(".*")
         var pattern = RegexCompile(context.pp.lita.options.testsRegex)
 
         for(var i = 0; i < context.checker.symbolFuncs.size(); i += 1) {

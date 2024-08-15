@@ -1,6 +1,7 @@
 import "std/fs/tinydir"
 import "std/system" // TODO: move the FS stuff into here!!
 import "std/string/buffer"
+import "std/string"
 import "std/libc"
 
 public struct FileHandle {
@@ -53,11 +54,11 @@ public func (this: *FileHandle) next() : bool {
         }
 
         nextFileFound = true
-        if(strncmp(this.file.name, "..", MAX_PATH) == 0) {
+        if(StringEqualLen(this.file.name, "..", MAX_PATH)) {
             nextFileFound = false;
         }
 
-        if(strncmp(this.file.name, ".", MAX_PATH) == 0) {
+        if(StringEqualLen(this.file.name, ".", MAX_PATH)) {
             nextFileFound = false;
         }
 

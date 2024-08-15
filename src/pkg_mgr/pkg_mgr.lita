@@ -263,7 +263,7 @@ public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : Pkg
     buildFile.init(this.allocator)
 
     var temp:[MAX_PATH]char;
-    var len = this.options.projectPath != null ? strlen(this.options.projectPath) : 0;
+    var len = this.options.projectPath != null ? this.options.projectPath.length() : 0;
 
     for(var it = this.packages.iter(); it.hasNext();) {
         var entry = it.next()

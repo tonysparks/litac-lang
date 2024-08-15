@@ -108,7 +108,7 @@ public func (this: *Workspace) openDocument(uri: *const char, text: *const char)
 
     var doc = new<Document>(allocator)
     doc.lineMap.init(256, allocator)
-    doc.text = StringBuilderInit(strlen(text), allocator)
+    doc.text = StringBuilderInit(text.length(), allocator)
 
     doc.setText(text)
 
@@ -770,7 +770,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
     var isMethodLookUp = false
     if(context) {
         var trigger = context.getStr("triggerCharacter")
-        if(trigger && strncmp(".", trigger, 1)) {
+        if(trigger && StringEqualLen(".", trigger, 1)) {
             isMethodLookUp = true
         }
     }

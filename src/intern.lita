@@ -220,7 +220,7 @@ public func (this: *Strings) internCopy(string: *const char, length: i32 = -1) :
 
     var view = String {
         .buffer = string,
-        .length = (length < 0) ? strlen(string) : length
+        .length = (length < 0) ? string.length() : length
     }
 
     length = view.length
@@ -255,7 +255,7 @@ public func (this: *Strings) put(key: String, value: InternedString) {
             this.values[i] = value;
             return;
         }
-        else if(k.length == key.length && strncmp(key.buffer, k.buffer, key.length) == 0) {
+        else if(k.length == key.length && StringEqualLen(key.buffer, k.buffer, key.length)) {
             this.values[i] = value;
             return;
         }
@@ -280,7 +280,7 @@ func (this: *Strings) get(key: *String) : InternedString {
         i &= this.capacity - 1;
 
         var k = this.keys[i]
-        if(k.length == key.length && strncmp(key.buffer, k.buffer, key.length) == 0) {
+        if(k.length == key.length && StringEqualLen(key.buffer, k.buffer, key.length)) {
             return this.values[i];
         }
         else if(k.length == 0) {
@@ -318,11 +318,11 @@ func (this: *Strings) grow(newlength: i32) {
 
 @inline
 public func (this: *InternedString) equalsStr(other: *const char) : bool {
-    var otherLen = strlen(other)
+    var otherLen = other.length()
     if(otherLen != this.length) {
         return false
     }
-    return strncmp(this.buffer, other, this.length) == 0
+    return StringEqualLen(this.buffer, other, this.length)
 }
 
 @inline
@@ -369,7 +369,7 @@ func testInterns() {
     assert(j.equals(i))
 
     var x = [64]char;
-    strcpy(x, buffer)
+    StringCopy(buffer, x, 64)
     var v = strings.internCopy(x)
     assert(j.equals(v))
     assert(i.equals(v))

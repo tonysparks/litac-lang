@@ -21,7 +21,7 @@ public func StringInit(str: *const char, len: i32 = -1) : String {
 
     return String {
         .buffer = str,
-        .length = (len < 0) ? strlen(str) : len
+        .length = (len < 0) ? str.length() : len
     }
 }
 
@@ -56,7 +56,7 @@ public func (b: String) startsWith(prefix: *const char, len: i32 = -1, fromIndex
     var to = fromIndex;
     var pa = prefix;
     var po = 0;
-    var pc = (len < 0) ? strlen(prefix) : len;
+    var pc = (len < 0) ? prefix.length() : len;
 
     if ((fromIndex < 0) || (fromIndex > b.length - pc)) {
         return false;
@@ -75,7 +75,7 @@ public func (b: String) startsWith(prefix: *const char, len: i32 = -1, fromIndex
 public func (b: String) endsWith(suffix: *const char, len: i32 = -1) : bool {
     if(!suffix) return false;
 
-    len = (len < 0) ? strlen(suffix) : len;
+    len = (len < 0) ? suffix.length() : len;
     return b.startsWith(suffix, len, b.length - len)
 }
 
@@ -84,7 +84,7 @@ public func (b: String) equals(str: *const char, len: i32 = -1) : bool {
         return b.buffer == null;
     }
 
-    len = (len < 0) ? strlen(str) : len;
+    len = (len < 0) ? str.length() : len;
     if(b.length != len) {
         return false;
     }
@@ -103,7 +103,7 @@ public func (b: String) equalsIgnoreCase(str: *const char, len: i32 = -1) : bool
         return b.buffer == null;
     }
 
-    len = (len < 0) ? strlen(str) : len;
+    len = (len < 0) ? str.length() : len;
     if(b.length != len) {
         return false;
     }
@@ -132,7 +132,7 @@ public func (b: String) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i3
 
     var targetCount = len
     if(len < 0) {
-        targetCount = strlen(str);
+        targetCount = str.length();
     }
 
     var max = sourceOffset + (b.length - targetCount);
@@ -165,7 +165,7 @@ public func (b: String) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i3
 
 public func (b: String) lastIndexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = -1) : i32 {
     var sourceCount = b.length
-    var targetCount = len < 0 ? strlen(str) : len
+    var targetCount = len < 0 ? str.length() : len
 
     var targetOffset = 0
     var sourceOffset = 0
@@ -287,7 +287,7 @@ public func StringClone(original: *const char, len: i32 = -1, allocator: *const 
     }
 
     if(len < 0) {
-        len = strlen(original)
+        len = original.length()
     }
 
     var copiedStr: *char = null
@@ -369,7 +369,7 @@ public func (str: *const char) length() : i32 {
 
 
 public func (str: *const char) empty() : bool {
-    return strlen(str) == 0
+    return str[0] == '\0'
 }
 
 

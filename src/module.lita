@@ -177,6 +177,7 @@ public func (this: *Module) initIncrementalBuild() {
     this.flags |= ModuleFlags.INCREMENTAL_COMPILATION
 
     this.arena.clear()
+    this.importAliases.clear()
     this.typeSpecAllocator.init(this.allocator)
 
     this.symbols.initIncrementalBuild()

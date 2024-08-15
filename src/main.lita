@@ -295,10 +295,10 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     options.typeOption = TypeInfoOption.NONE
     if(parser.hasOption("types")) {
         var opt = parser.getOption("types").value
-        if(strcmp(opt, "all") == 0) {
+        if(opt.equals("all")) {
             options.typeOption = TypeInfoOption.ALL
         }
-        else if(strcmp(opt, "tagged") == 0) {
+        else if(opt.equals("tagged")) {
             options.typeOption = TypeInfoOption.TAGGED
         }
     }
@@ -333,7 +333,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : OUTPUT_DIR_DEFAULT
     StringCopy(.src = outputPath, .dest = options.outputPath, .size = MAX_PATH)
 
-    var len = strlen(options.outputPath)
+    var len = options.outputPath.length()
     if(len > 0) {
         if(options.outputPath[len-1] != '/') {
             strcat(options.outputPath, "/")
@@ -348,7 +348,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         StringCopy(.src = parser.getOption("srcDir").value, .dest = options.srcPath, .size = MAX_PATH)
     }
 
-    if(strnlen(options.srcPath, MAX_PATH) == 0) {
+    if(options.srcPath.empty()) {
         var path = StringInit(options.inputFile, MAX_PATH)
         var index = path.lastIndexOfAt("/src/", .len = 5)
         if(index > -1) {
@@ -367,14 +367,14 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     }
 
     // if there is no source path
-    if(strnlen(options.srcPath, MAX_PATH) > 0) {
-        FileParent(options.srcPath, options.projectPath)
-    }
-    else {
+    if(options.srcPath.empty()) {
         StringCopy(.src = CurrentWorkingPath(), .dest = options.projectPath, .size = MAX_PATH)
     }
+    else {
+        FileParent(options.srcPath, options.projectPath)
+    }
 
-    if(strlen(options.projectPath) == 0) {
+    if(options.projectPath.empty()) {
         StringCopy(.src = ".", .dest = options.projectPath, .size = 2)
     }
 
@@ -416,7 +416,7 @@ err:
 }
 
 func TrimPath(path: [MAX_PATH]char) {
-    var len = strlen(path)
+    var len = path.length()
     if(len < 1) {
         return;
     }

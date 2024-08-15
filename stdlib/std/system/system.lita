@@ -437,7 +437,7 @@ public func FilePath(filename: *const char, out:[MAX_PATH]char) : *char {
         goto end;
     }
 
-    var len = strlen(filename)
+    var len = filename.length()
     if(len > 0) {
         for(index = len-1; index >= 0; index -= 1) {
             var c = filename[index]
@@ -461,7 +461,7 @@ public func FileParent(filename: *const char, out:[MAX_PATH]char, length: *i32 =
         goto end;
     }
 
-    var len = strlen(filename)
+    var len = filename.length()
     if(len > 0) {
         index = len - 1
         if(filename[len-1] == '/') {
@@ -667,7 +667,7 @@ public func FilePathToUri(path: *const char, output: [MAX_PATH]char) : *char {
 }
 
 public func UriToFilePath(uri: *const char, output: [MAX_PATH]char) : *char {
-    if(strncmp(uri, "file:///", 8) == 0) {
+    if(StringEqualLen(uri, "file:///", 8)) {
 #if OS == "WINDOWS"
         uri = &uri[8]
 #else
@@ -859,10 +859,10 @@ public func (this: *Process) close() {
 @test
 func testAbsolutePath() {
     var path = [MAX_PATH]char{0}
-    assert(strcmp(GetAbsolutePath("C:/litac", "../src/main.lita", path), "C:/src/main.lita") == 0)
-    assert(strcmp(GetAbsolutePath("C:/litac", "./../src/main.lita", path), "C:/src/main.lita") == 0)
-    assert(strcmp(GetAbsolutePath("C:/litac", "./..\\src/main.lita", path), "C:/src/main.lita") == 0)
-    assert(strcmp(GetAbsolutePath("C:/litac", "../../src/main.lita", path), "src/main.lita") == 0)
+    assert(GetAbsolutePath("C:/litac", "../src/main.lita", path).equals("C:/src/main.lita"))
+    assert(GetAbsolutePath("C:/litac", "./../src/main.lita", path).equals("C:/src/main.lita"))
+    assert(GetAbsolutePath("C:/litac", "./..\\src/main.lita", path).equals("C:/src/main.lita"))
+    assert(GetAbsolutePath("C:/litac", "../../src/main.lita", path).equals("src/main.lita"))
 }
 
 @test

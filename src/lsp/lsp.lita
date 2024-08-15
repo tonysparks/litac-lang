@@ -221,7 +221,7 @@ func (this: *LspServer) readHeader() : i32 {
 
     this.log("'\nRead header: '%s'\n", header)
 
-    if(strncmp(header, "Content-Length: ", sizeIndex) != 0) {
+    if(!StringEqualLen(header, "Content-Length: ", sizeIndex)) {
         this.log("Invalid header: '%s'\n", header)
         return -1
     }
@@ -244,7 +244,7 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
 
     // we have been requested to shutdown...
     if(!this.isRunning) {
-        if(strcmp(method, "exit") == 0) {
+        if(method.equals("exit")) {
             exit(0)
         }
         else {
@@ -254,43 +254,43 @@ public func (this: *LspServer) handleMessage(msg: *JsonNode) {
     }
 
     var params = msg.getObject("params")
-    if(strcmp(method, "initialize") == 0) {
+    if(method.equals("initialize")) {
         this.handleInitializeMessage(msg, params)
     }
-    else if(strcmp(method, "initialized") == 0) {
+    else if(method.equals("initialized")) {
         this.isInitialized = true
     }
     else if(!this.isInitialized) {
         this.writeErrorResponse(0, ErrorCodes.ServerNotInitialized, "not yet properly initialized")
     }
-    else if(strcmp(method, "textDocument/didOpen") == 0) {
+    else if(method.equals("textDocument/didOpen")) {
         this.handleTextDocumentOpenMessage(msg, params)
     }
-    else if(strcmp(method, "textDocument/didClose") == 0) {
+    else if(method.equals("textDocument/didClose")) {
         this.handleTextDocumentCloseMessage(msg, params)
     }
-    else if(strcmp(method, "textDocument/didSave") == 0) {
+    else if(method.equals("textDocument/didSave")) {
         this.handleTextDocumentSaveMessage(msg, params)
     }
-    else if(strcmp(method, "textDocument/documentSymbol") == 0) {
+    else if(method.equals("textDocument/documentSymbol")) {
         this.handleTextDocumentSymbolMessage(msg, params)
     }
-    else if(strcmp(method, "textDocument/didChange") == 0) {
+    else if(method.equals("textDocument/didChange")) {
         this.handleTextDocumentChangeMessage(msg, params)
     }
-    else if(strcmp(method, "textDocument/references") == 0) {
+    else if(method.equals("textDocument/references")) {
         this.handleTextDocumentReferencesMessage(msg, params)
     }
-    else if(strcmp(method, "textDocument/definition") == 0) {
+    else if(method.equals("textDocument/definition")) {
         this.handleTextDocumentDefinitionMessage(msg, params)
     }
-    else if(strcmp(method, "textDocument/completion") == 0) {
+    else if(method.equals("textDocument/completion")) {
         this.handleTextDocumentCompletionMessage(msg, params)
     }
-    else if(strcmp(method, "$/cancelRequest") == 0) {
+    else if(method.equals("$/cancelRequest")) {
         // do nothing for right now
     }
-    else if(strcmp(method, "shutdown") == 0) {
+    else if(method.equals("shutdown")) {
         this.isRunning = false
     }
     else {
@@ -481,7 +481,7 @@ public func (this: *LspServer) writeDiagnostic(docUri: *const char, fullBuild: b
             //this.log("Comparing path: '%s' vs '%s'\n", path, filename)
 
             // TODO: should we be only sending over errors in this file?
-            if(strcmp(modulePathOfError, openedDocFilename) != 0) {
+            if(!modulePathOfError.equals(openedDocFilename)) {
                 continue
             }
 

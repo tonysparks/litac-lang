@@ -185,7 +185,7 @@ func utf8codepoint(str: *const void, out_codepoint: *i32) : *void;
         var x = []u8 { 0xe2_u8, 0xb5_u8, 0x9a_u8, 0_u8 }
 
         var r: rune = 0
-        var len = Utf8Decode(x, strlen(x as (*const char)), &r)
+        var len = Utf8Decode(x, (x as (*const char)).length(), &r)
         var width = Utf8CharWidth(r)
         printf("Hello '%s' Rune: %d Len: %d Width: %d ⵓ ⵙ\n", x, r, len, width)
 
