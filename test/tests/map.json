@@ -84,8 +84,7 @@
                 t.sprites.free()
                 assert(t.sprites.length == 0)
                 assert(t.sprites.capacity == 0)
-                assert(t.sprites.keys == null)
-                assert(t.sprites.values == null)
+                assert(t.sprites.entries == null)
 
             `,
         },
@@ -158,8 +157,7 @@
                 t.sprites.free()
                 assert(t.sprites.length == 0)
                 assert(t.sprites.capacity == 0)
-                assert(t.sprites.keys == null)
-                assert(t.sprites.values == null)
+                assert(t.sprites.entries == null)
 
             `,
         },
