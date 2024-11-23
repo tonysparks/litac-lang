@@ -333,16 +333,11 @@ public func (this: *Scope) removeSymbol(symbol: *Symbol) {
     }
 
     // TODO: Performance!
-    // TODO: We're piercing into the details of Map implementation
-    //       TERRIBLE!!!
-    for(var i = 0; i < symbolStorage.capacity; i += 1) {
-        var value = symbolStorage.values[i]
-        if(!value) {
-            continue
-        }
-        if(value == symbol) {
-            var key = symbolStorage.keys[i].key
-            symbolStorage.remove(key)
+    for(var it = symbolStorage.iter(); it.hasNext();) {
+        var entry = it.next()
+
+        if(entry.value == symbol) {
+            symbolStorage.remove(entry.key)
             return;
         }
     }
