@@ -2954,6 +2954,10 @@ func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
             var unaryExpr = expr as (*UnaryExpr)
             return p.checkConstExpr(unaryExpr.unaryExpr)
         }
+        case StmtKind.CAST_EXPR: {
+            var castExpr = expr as (*CastExpr)
+            return p.checkConstExpr(castExpr.exprToCast)
+        }
         case StmtKind.TYPE_OF_EXPR:
         case StmtKind.SIZE_OF_EXPR:
             return true;

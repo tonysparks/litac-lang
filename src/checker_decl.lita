@@ -523,7 +523,6 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     return false
                 }
 
-                //sym.flags |= SymbolFlags.IS_INCOMPLETE
                 this.resolveSymbol(sym)
                 this.finishResolveSymbol(sym)
 
