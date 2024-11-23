@@ -504,6 +504,7 @@ public func (this: *TypeInfo) getBaseType() : *TypeInfo {
             if(info.arrayOf.kind == TypeKind.ARRAY) {
                 return info.arrayOf.getBaseType()
             }
+
             return info.arrayOf
         }
         case TypeKind.STR: {
@@ -1976,11 +1977,10 @@ public func (this: *TypeInfo) getFieldWithUsing(name: InternedString) : FieldStm
                     continue;
                 }
 
-                if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
+                var baseType = field.typeInfo.getBaseType()
+                if(!IsAggregate(baseType)) {
                     continue;
                 }
-
-                var baseType = field.typeInfo.getBaseType()
                 assert(baseType.kind == TypeKind.STRUCT || baseType.kind == TypeKind.UNION)
 
                 fieldStmt = baseType.getFieldWithUsing(name)
