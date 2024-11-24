@@ -1090,17 +1090,17 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
     var numOfMethods = this.current.getMethodsForType(agg, symbols)
 
     var numOfTraitFns = iface.aggDecl.fields.size()
-
-    if(numOfMethods < numOfTraitFns) {
-        return false
-    }
-
     var matchedCount = 0
 
     for(var i = 0; i < numOfTraitFns; i += 1) {
         var field = iface.aggDecl.fields.get(i)
 
         assert(field.typeInfo)
+        if (field.typeInfo.kind != TypeKind.FUNC_PTR) {
+            numOfTraitFns -= 1
+            continue
+        }
+
         assert(field.typeInfo.kind == TypeKind.FUNC_PTR)
         assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
@@ -1427,6 +1427,10 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
     return success
 }
 
+func (this: *TypeChecker) isBoolExpr(expr: *Expr) : bool {
+    return this.checkTruthyness(expr, expr.operand.typeInfo)
+}
+
 public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
     if(!stmt) return true;
 
@@ -1524,6 +1528,10 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 return false
             }
 
+            if(!this.isBoolExpr(whileStmt.cond)) {
+                return false
+            }
+
             return true
         }
         case StmtKind.EMPTY_STMT: {
@@ -1537,8 +1545,13 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             if(forStmt.init && !this.resolveStmt(forStmt.init)) {
                 return false
             }
-            if(forStmt.cond && !this.resolveExpr(forStmt.cond)) {
-                return false
+            if(forStmt.cond) {
+                if(!this.resolveExpr(forStmt.cond)) {
+                    return false
+                }
+                if(!this.isBoolExpr(forStmt.cond)) {
+                    return false
+                }
             }
             if(forStmt.post && !this.resolveStmt(forStmt.post)) {
                 return false
@@ -1590,6 +1603,9 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.IF_STMT: {
             var ifStmt = stmt as (*IfStmt)
             if(!this.resolveExpr(ifStmt.cond)) {
+                return false
+            }
+            if(!this.isBoolExpr(ifStmt.cond)) {
                 return false
             }
 
@@ -1746,6 +1762,9 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.WHILE_STMT: {
             var whileStmt = stmt as (*WhileStmt)
             if(!this.resolveExpr(whileStmt.cond)) {
+                return false
+            }
+            if(!this.isBoolExpr(whileStmt.cond)) {
                 return false
             }
 

@@ -2219,7 +2219,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
                 var field = aggInfo.getField(expr.field.type.name)
 
-                if(baseInfo.kind == TypeKind.TRAIT) {
+                if(field.kind == StmtKind.TRAIT_FIELD_DECL) {
                     this.emit("__vtable->")
                 }
 

@@ -409,7 +409,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     return false
                 }
 
-                if(isTrait) {
+                if(isTrait && !varField.attributes.isGenerated) {
                     this.errorInvalidMemberForTrait(aggDecl, varField.name.str, varField.startPos)
                     return false
                 }

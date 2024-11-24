@@ -246,7 +246,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
 
         this.emit("%s__VirtualTable* __vtable;\n", vtableNameStr.cStr())
 
-        this.emitStrn("void* __this;", 13)
+
     }
     // address bugs that don't allow empty structs/unions
     else if(decl.fields.empty()) {

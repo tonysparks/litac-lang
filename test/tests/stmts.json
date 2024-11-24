@@ -317,6 +317,104 @@
             "code": `
                 test()
             `,
-        }
+        },
+        {
+            "name": "If Truthness",
+            "definitions": `
+                trait Tester {
+                    handle: func() : i32
+                }
+                struct TesterImpl {
+                    a: i32
+                }
+
+                func (this: *TesterImpl) handle() : i32 {
+                    return this.a
+                }
+            `,
+            "code": `
+                var impl = TesterImpl { .a = 4 }
+                var t: Tester = &impl
+
+                if (t) {
+                    assert(false)
+                }
+                assert(false)
+            `,
+            "error": "'Tester' can't be coerced to boolean"
+        },
+        {
+            "name": "While Truthness",
+            "definitions": `
+                trait Tester {
+                    handle: func() : i32
+                }
+                struct TesterImpl {
+                    a: i32
+                }
+
+                func (this: *TesterImpl) handle() : i32 {
+                    return this.a
+                }
+            `,
+            "code": `
+                var impl = TesterImpl { .a = 4 }
+                var t: Tester = &impl
+
+                while (t) {
+                    assert(false)
+                }
+                assert(false)
+            `,
+            "error": "'Tester' can't be coerced to boolean"
+        },
+        {
+            "name": "Do/While Truthness",
+            "definitions": `
+                trait Tester {
+                    handle: func() : i32
+                }
+                struct TesterImpl {
+                    a: i32
+                }
+
+                func (this: *TesterImpl) handle() : i32 {
+                    return this.a
+                }
+            `,
+            "code": `
+                var impl = TesterImpl { .a = 4 }
+                var t: Tester = &impl
+
+                do {
+                    assert(false)
+                } while (t)
+                assert(false)
+            `,
+            "error": "'Tester' can't be coerced to boolean"
+        },
+        {
+            "name": "Expr Truthness",
+            "definitions": `
+                trait Tester {
+                    handle: func() : i32
+                }
+                struct TesterImpl {
+                    a: i32
+                }
+
+                func (this: *TesterImpl) handle() : i32 {
+                    return this.a
+                }
+            `,
+            "code": `
+                var impl = TesterImpl { .a = 4 }
+                var t: Tester = &impl
+
+                var x: bool = t || t
+                assert(false)
+            `,
+            "error": "'Tester' can't be coerced to boolean"
+        },
     ]
 }

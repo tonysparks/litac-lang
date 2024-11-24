@@ -602,6 +602,29 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
         if(!p.consume(TokenType.RIGHT_BRACE, ErrorCode.MISSING_RIGHT_BRACE)) {
             goto err;
         }
+
+        // Traits have two added fields, 'this' and 'vtable'
+        // the 'this' pointer needs to be exposed to user space
+        // so that we can do null checks i.e., if (someTrait.this) ..
+        if (kind == StmtKind.TRAIT_DECL) {
+            var thisIdentifier = NewIdentifier("__this", pos, p.strings)
+            var voidType = NewTypeSpec(TypeSpecKind.PTR, pos, p.typeAllocator)
+            voidType.base = NewVoidTypeSpec(pos, p.typeAllocator)
+
+            var thisField = NewVarFieldDecl(
+                pos,
+                pos,
+                thisIdentifier,
+                voidType,
+                Attributes{.isGenerated = true},
+                null,
+                p.allocator
+            )
+            fields.add(FieldStmt {
+                .kind = StmtKind.VAR_FIELD_DECL,
+                .varField = thisField as (*VarFieldDecl)
+            })
+        }
     }
     p.aggregateLevel -= 1;
 

@@ -113,6 +113,25 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, typeAllocator: *TypeSpe
     return null
 }
 
+public func NewIdentifier(
+    name: *const char,
+    pos: SrcPos,
+    strings: *Strings) : Identifier {
+
+    var str = strings.intern(name, name.length())
+    var identifier = Identifier {
+        .str = str,
+        .token = Token {
+            .type = TokenType.IDENTIFIER,
+            .pos = pos,
+            .value = Value {
+                .str = str.view
+            }
+        }
+    }
+    return identifier
+}
+
 public func NewImportDecl(startPos: SrcPos,
                           endPos: SrcPos,
                           name: Identifier,

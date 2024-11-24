@@ -1783,7 +1783,9 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
 
             // if this is a trait method reference (i.e., not a function call), we must convert this to
             // a trait function pointer
-            if(aggInfo.kind == TypeKind.TRAIT && expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+            if(field.kind == StmtKind.TRAIT_FIELD_DECL &&
+               aggInfo.kind == TypeKind.TRAIT &&
+               expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
                 var funcPtr = AsTraitFuncPtr(field.typeInfo, expr.field.type.name, this.typeCache) as (*TypeInfo)
                 expr.field.operand.typeInfo = funcPtr
                 expr.operand.typeInfo = funcPtr
@@ -1807,7 +1809,9 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
 
             // if this is a trait method reference (i.e., not a function call), we must convert this to
             // a trait function pointer
-            if(fieldResult.aggInfo.kind == TypeKind.TRAIT && expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+            if(field.kind == StmtKind.TRAIT_FIELD_DECL &&
+               fieldResult.aggInfo.kind == TypeKind.TRAIT &&
+               expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
                 var funcPtr = AsTraitFuncPtr(field.typeInfo, expr.field.type.name, this.typeCache) as (*TypeInfo)
                 expr.field.operand.typeInfo = funcPtr
                 expr.operand.typeInfo = funcPtr
@@ -2408,7 +2412,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     return true
 }
 
-func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) : bool {
+internal func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) : bool {
     assert(expr != null)
     assert(type != null)
 

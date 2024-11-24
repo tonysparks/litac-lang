@@ -147,6 +147,10 @@ func GenerateVTable(
 
     for(var j = 0; j < traitDecl.fields.size(); j += 1) {
         var field = traitDecl.fields.get(j)
+        if (field.kind != StmtKind.TRAIT_FIELD_DECL) {
+            continue
+        }
+
         assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
         assert(field.typeInfo != null && field.typeInfo.kind == TypeKind.FUNC_PTR)
 
@@ -198,6 +202,10 @@ func GenerateWrapperFunctions(
 
         for(var j = 0; j < traitDecl.fields.size(); j += 1) {
             var field = traitDecl.fields.get(j)
+            if (field.kind != StmtKind.TRAIT_FIELD_DECL) {
+                continue
+            }
+
             assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
             assert(field.typeInfo && field.typeInfo.kind == TypeKind.FUNC_PTR)
 
@@ -278,6 +286,10 @@ func GenerateVTableEntries(
         {
             for(var j = 0; j < traitDecl.fields.size(); j += 1) {
                 var field = traitDecl.fields.get(j)
+                if (field.kind != StmtKind.TRAIT_FIELD_DECL) {
+                    continue
+                }
+
                 assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
 
                 sb.append("        .%.*s = __%.*s_%.*s_wrapper",
