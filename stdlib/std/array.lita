@@ -120,6 +120,20 @@ public func (a: *Array<T>) pop<T>() : T {
     return r
 }
 
+public func (a: *Array<T>) reserve<T>(newSize: i32)  {
+    if(newSize <= a.capacity) {
+        return;
+    }
+
+    var n = newSize
+    var newlength = (sizeof(:T) * n as (usize));
+    var oldlength = (sizeof(:T) * a.capacity as(usize));
+    a.elements = a.alloc.realloc(a.elements as (*void), oldlength, newlength) as (*T)
+    assert(a.elements)
+
+    a.capacity = n;
+}
+
 public func (a: *Array<T>) swap<T>(aIndex: i32, bIndex: i32) {
     assert(aIndex > -1 && aIndex < a.length && bIndex > -1 && bIndex < a.length)
 

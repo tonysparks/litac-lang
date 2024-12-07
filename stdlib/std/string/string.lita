@@ -3,9 +3,6 @@ import "std/mem" as mem
 import "std/assert"
 
 
-@foreign
-func strncasecmp(a: *const char, b: *const char, n: usize) : i32;
-
 public struct String {
     buffer: *const char
     length: i32
@@ -108,7 +105,23 @@ public func (b: String) equalsIgnoreCase(str: *const char, len: i32 = -1) : bool
         return false;
     }
 
-    return strncasecmp(b.buffer, str, len) == 0
+    while(len) {
+        var c1 = tolower(*b.buffer)
+        var c2 = tolower(*str)
+
+        if(c1 != c2) {
+            return false
+        }
+
+        if(c1 == '\0') {
+            return true
+        }
+
+        b.buffer += 1
+        str += 1
+        len -= 1
+    }
+    return true
 }
 
 public func (b: String) contains(str: *const char, len: i32 = -1) : bool {

@@ -326,6 +326,11 @@ public func (b: *StringBuilder) forEach(fn : func(char) : bool) {
 }
 
 @inline
+public func (b: *StringBuilder) remaining() : i32 {
+    return b.capacity - b.length
+}
+
+@inline
 public func (b: *StringBuilder) empty() : bool {
     return b.length == 0
 }

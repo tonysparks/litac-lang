@@ -2249,6 +2249,7 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
     if(methodSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
         var thisGenericType = this
         var baseGenericType = base
+
         if(thisGenericType.genericTypeid == baseGenericType.genericTypeid) {
             return MethodResult {
                 .symbol = methodSym,
