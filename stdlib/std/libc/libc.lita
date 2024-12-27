@@ -155,6 +155,7 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func strtod(str: *const char, end: **char) : f64;
 @foreign public func sscanf(str: *const char, format: *const char, ...) : i32;
 @foreign public func isdigit(arg: i32) : i32;
+@foreign public func isxdigit(arg: i32) : i32;
 @foreign public func tolower(arg: i32) : i32;
 @foreign public func toupper(arg: i32) : i32;
 @foreign public func isalnum(arg: i32) : i32;

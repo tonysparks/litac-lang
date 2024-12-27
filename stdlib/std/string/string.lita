@@ -128,6 +128,17 @@ public func (b: String) contains(str: *const char, len: i32 = -1) : bool {
     return b.indexOf(str, len) > -1;
 }
 
+public func (b: String) endIndexOf(str: *const char, len: i32 = -1) : i32 {
+    return b.endIndexOfAt(str, len, 0)
+}
+
+public func (b: String) endIndexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
+    if(len < 0) len = str.length()
+    var index = b.indexOfAt(str, len, fromIndex)
+    if(index < 0) return -1
+    return index + len
+}
+
 public func (b: String) indexOf(str: *const char, len: i32 = -1) : i32 {
     return b.indexOfAt(str, len, 0)
 }

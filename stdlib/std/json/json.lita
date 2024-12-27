@@ -227,7 +227,7 @@ public func CreateJsonString(str: *const char, len: i32 = -1,
 
     var sb = StringBuilderInit(len + 1, alloc)
     //sb.appendStrn(str, len)
-    EscapeString(sb, str, len)
+    JsonEscapeString(sb, str, len)
 
     return CreateJsonStringNoDup(sb.cStr(), alloc)
 }
@@ -256,7 +256,7 @@ const escapeChars = [256]*const char {
     ['\0'] = "\\0",
 }
 
-func EscapeString(buf: *StringBuilder, string: *const char, length: i32) {
+public func JsonEscapeString(buf: *StringBuilder, string: *const char, length: i32) {
     for(var i = 0; i < length; i += 1) {
         var c:char = string[i]
         var escaped = escapeStrings[c as (u32)]
