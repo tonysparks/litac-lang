@@ -178,4 +178,5 @@ public func (this: *Socket) handle() : i32 {
 @generated
 public func (this: *Socket) close() {
     close(this.socket)
+    this.socket = -1
 }

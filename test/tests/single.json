@@ -14,6 +14,68 @@
     `,
     "tests": [
         {
+            "name" : "Trait in other module with Generics",
+            "modules": [
+                {
+                    "name": "pool",
+                    "program": `
+                    public trait Counter<T> {
+                        count: func(*T) : void
+                    }
+
+                    public struct Pool<T> {
+                        counter: Counter<T>
+                    }
+
+                    public func (this: *Pool<T>) init<T>(x: Counter<T>) {
+                        this.counter = x
+                    }
+
+                    // public func (this: *Pool<T>) count<T>(x: *T) {
+                    //     this.counter.count(x)
+                    // }
+                    `
+                },
+                {
+                    "name": "engine",
+                    "program": `
+                    import "pool"
+                    import "std/assert"
+
+                    internal struct Engine {
+                        pool: Pool<Result>
+                    }
+
+                    struct Result {
+                        x: i32
+                    }
+
+                    internal func (this: *Engine) init() {
+                        this.pool.init(this)
+                    }
+
+                    func (this: *Engine) other(r: *Result) {
+
+                    }
+
+                    public func (this: *Engine) count(r: *Result) {
+                        assert(r != null)
+                    }
+                    `
+                }
+            ],
+            "definitions": `
+                import using "engine"
+
+            `,
+            "code": `
+                var engine = Engine{}
+                engine.init()
+            `,
+        },
+
+        /*
+        {
             "name": "Array Init",
             "definitions": `
                 import "std/mem"
@@ -500,6 +562,6 @@
             "code": `
 
             `,
-        },
+        },*/
     ]
 }

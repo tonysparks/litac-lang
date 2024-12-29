@@ -1,5 +1,6 @@
 import "std/mem"
 import "std/libc"
+import "std/string"
 
 @cFile("utf8.h");
 

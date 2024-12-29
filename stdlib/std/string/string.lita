@@ -239,6 +239,49 @@ startSearchForLastChar:
 
 }
 
+public struct SplitIter {
+    str: String
+    split: String
+
+    lastIndex: i32
+    currentIndex: i32
+}
+
+public func (this: *SplitIter) hasNext() : bool {
+    this.currentIndex = this.str.endIndexOfAt(this.split.buffer, this.split.length, this.lastIndex)
+    return this.currentIndex > -1 || this.lastIndex < this.str.length
+}
+
+public func (this: *SplitIter) next() : String {
+    var result = this.str.substring(this.lastIndex, this.currentIndex - this.split.length)
+
+    this.lastIndex = this.currentIndex
+    if(this.lastIndex < 0) this.lastIndex = this.str.length
+
+    return result
+}
+
+public func (this: *SplitIter) remaining() : String {
+    if(this.currentIndex < 0 || this.currentIndex >= this.str.length) {
+        return String{}
+    }
+
+    var offset = (&this.str.buffer[this.currentIndex] - this.str.buffer) as (i32);
+    return String {
+        .buffer = this.str.buffer + this.currentIndex,
+        .length = this.str.length - offset
+    }
+}
+
+public func (this: String) split(str: *const char, len: i32): SplitIter {
+    return SplitIter {
+        .str = this,
+        .split = StringInit(str, len),
+        .lastIndex = 0,
+        .currentIndex = 0,
+    }
+}
+
 public func (b: String) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
     if(!buf || len == 0) return 0;
 
@@ -488,4 +531,123 @@ func testLastIndexOf() {
     assert(a.lastIndexOfAt("z") == -1)
 
     assert(e.lastIndexOfAt("World") == -1)
+}
+
+@test("splitSingle")
+func testSplitSingle() {
+    var str = StringInit("a=xxx&b=yyy")
+    var it = str.split("&", 1)
+
+    var count = 0
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals("a=xxx"))
+        count += 1
+    }
+
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals("b=yyy"))
+        count += 1
+    }
+
+    assert(it.hasNext() == false)
+
+    assert(count == 2)
+}
+
+@test("splitMulti")
+func testSplitMulti() {
+    var str = StringInit("a=xxx&&b=yyy")
+    var it = str.split("&&", 2)
+
+    var count = 0
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals("a=xxx"))
+        count += 1
+    }
+
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals("b=yyy"))
+        count += 1
+    }
+
+    assert(it.hasNext() == false)
+
+    assert(count == 2)
+}
+
+
+@test("splitOne")
+func testSplitOne() {
+    var str = StringInit("a=xxx")
+    var it = str.split("&&", 2)
+
+    var count = 0
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals("a=xxx"))
+        count += 1
+    }
+
+    assert(it.hasNext() == false)
+
+    assert(count == 1)
+}
+
+@test("splitOneFirst")
+func testSplitOneFirst() {
+    var str = StringInit("&&a=xxx")
+    var it = str.split("&&", 2)
+
+    var count = 0
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals(""))
+        count += 1
+    }
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals("a=xxx"))
+        count += 1
+    }
+
+    assert(it.hasNext() == false)
+
+    assert(count == 2)
+}
+
+@test("splitOneLast")
+func testSplitOneLast() {
+    var str = StringInit("a=xxx&&")
+    var it = str.split("&&", 2)
+
+    var count = 0
+    {
+        assert(it.hasNext())
+        var n1 = it.next()
+        printf("N='%.*s'\n", n1.length, n1.buffer)
+        assert(n1.equals("a=xxx"))
+        count += 1
+    }
+
+    assert(it.hasNext() == false)
+
+    assert(count == 1)
 }

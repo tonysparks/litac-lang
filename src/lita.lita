@@ -635,6 +635,23 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
 }
 
 public func (this: *Lita) run() : i32 {
+    // TODO: Fix this -- the process library doesn't support specifying the command
+    // path on Linux based systems, for now we will do this horrible hack work around
+#static_if defined(__linux__)
+    var sb = StringBuilderInit(256, this.allocator)
+    defer sb.free()
+
+    var path: [MAX_PATH]char;
+    FilePath(this.binaryFilename, path)
+
+    var len = strlen(path)
+    sb.appendStrn("cd ", 3)
+    sb.appendStrn(path, len)
+    sb.append(" && .%s", PATH_SEPARATOR)
+    sb.appendStr(&this.binaryFilename[len + 1])
+
+    return system(sb.cStr())
+#else
     var args = ArrayInit<*const char>(this.options.nargs + 2, this.allocator)
 
     var path: [MAX_PATH]char;
@@ -666,6 +683,7 @@ public func (this: *Lita) run() : i32 {
     var result = 0
     process.join(&result)
     return result
+#end
 }
 
 
