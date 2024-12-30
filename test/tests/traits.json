@@ -16,6 +16,37 @@
     `,
     "tests": [
         {
+            "name" : "Trait assignment to struct member",
+            "definitions": `
+                trait Stream {
+                    get: func(): i32
+                }
+
+                struct Container {
+                    stream: Stream
+                }
+
+                struct Impl {
+                    a: i32
+                }
+
+                func (this: *Impl) get() : i32 {
+                    return this.a
+                }
+
+            `,
+            "code": `
+                var c = Container{}
+                var impl = Impl{.a = 4}
+
+                var stream: Stream;
+                stream = &impl
+                c.stream = &impl
+                assert(c.stream.get() == 4)
+                assert(stream.get() == 4)
+            `,
+        },
+        {
             "name" : "Traits",
             "definitions": `
 

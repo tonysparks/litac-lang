@@ -25,6 +25,7 @@ public enum FileStatus {
     Ok = 0,
     FileNotFoundError,
     IOError,
+    EndOfFile,
 }
 
 public enum FileOpenOp {
@@ -154,9 +155,10 @@ public func (this: *File) readBytes(
 
     if(bytesRead > 0) {
         this._position += bytesRead as (i64)
+        return FileStatus.Ok;
     }
 
-    return FileStatus.Ok;
+    return FileStatus.EndOfFile
 }
 
 

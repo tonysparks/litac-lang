@@ -1508,6 +1508,9 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
     expr.field.operand.typeInfo = field.typeInfo
     expr.operand.typeInfo = field.typeInfo
 
+    // allow for trait casting of object.field = impl
+    expr.value.expectedType = field.typeInfo
+
     // don't allow for trait casting on rvalues (i.e., prevents &4)
     if(IsTrait(field.typeInfo) && expr.value.operand.isRightValue) {
         this.errorRvalueAssignmentToTrait(expr.value, expr.value.operand.typeInfo, field.typeInfo)
@@ -2053,6 +2056,9 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
         case TokenType.EQUALS: {
             expr.right = this.coerceTypeWithUsing(expr.right, rightType, leftType)
             rightType = expr.right.operand.typeInfo
+
+            // allow for trait casting for s = &impl
+            expr.right.expectedType = leftType
 
             this.checkConstant(expr.left)
             this.checkAssignability(expr.right.startPos, leftType, rightType)

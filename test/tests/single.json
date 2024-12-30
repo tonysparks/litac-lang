@@ -73,8 +73,6 @@
                 engine.init()
             `,
         },
-
-        /*
         {
             "name": "Array Init",
             "definitions": `
@@ -562,6 +560,6 @@
             "code": `
 
             `,
-        },*/
+        },
     ]
 }

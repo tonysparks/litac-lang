@@ -2016,7 +2016,9 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitStrn(" ", 1)
             this.emitStr(tokenText[expr.operator])
             this.emitStrn(" ", 1)
-            this.emitStmt(expr.right)
+            if(!this.emitTraitCast(expr.right)) {
+                this.emitStmt(expr.right)
+            }
             break;
         }
         case StmtKind.BOOLEAN_EXPR: {
@@ -2286,6 +2288,8 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             var requiresCast = false
             if(expr.parent) {
                 requiresCast = expr.parent.kind == StmtKind.RETURN_STMT ||
+                               expr.parent.kind == StmtKind.BINARY_EXPR ||
+                               expr.parent.kind == StmtKind.SET_EXPR ||
                                expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
             }
 
@@ -2454,7 +2458,9 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 buf.appendStrn(" ", 1)
             }
 
-            this.emitStmt(expr.value)
+            if(!this.emitTraitCast(expr.value)) {
+                this.emitStmt(expr.value)
+            }
             return;
         }
         case StmtKind.SIZE_OF_EXPR: {
