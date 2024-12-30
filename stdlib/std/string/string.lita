@@ -282,6 +282,35 @@ public func (this: String) split(str: *const char, len: i32): SplitIter {
     }
 }
 
+public func (this: String) leftTrim(): String {
+    var i = 0
+    while(i < this.length) {
+        var c = this.buffer[i]
+        if(!isspace(c)) {
+            break
+        }
+        i+=1
+    }
+    return this.substring(i)
+}
+
+public func (this: String) rightTrim(): String {
+    var i = this.length - 1
+    while(i >= 0) {
+        var c = this.buffer[i]
+        if(!isspace(c)) {
+            break
+        }
+        i -= 1
+    }
+    return this.substring(0, i + 1)
+}
+
+public func (this: String) trim(): String {
+    var left = this.leftTrim()
+    return left.rightTrim()
+}
+
 public func (b: String) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
     if(!buf || len == 0) return 0;
 
@@ -650,4 +679,49 @@ func testSplitOneLast() {
     assert(it.hasNext() == false)
 
     assert(count == 1)
+}
+
+@test("leftTrim")
+func testLeftTrim() {
+    var str = StringInit("  x yz")
+    assert(str.leftTrim().equals("x yz"))
+
+    str = StringInit("\n\tx yz")
+    assert(str.leftTrim().equals("x yz"))
+
+    str = StringInit("")
+    assert(str.leftTrim().equals(""))
+
+    str = StringInit("x ")
+    assert(str.leftTrim().equals("x "))
+}
+
+@test("rightTrim")
+func testRightTrim() {
+    var str = StringInit("xy z  ")
+    assert(str.rightTrim().equals("xy z"))
+
+    str = StringInit("xy z\n\t")
+    assert(str.rightTrim().equals("xy z"))
+
+    str = StringInit("")
+    assert(str.rightTrim().equals(""))
+
+    str = StringInit(" x")
+    assert(str.rightTrim().equals(" x"))
+}
+
+@test("trim")
+func testTrim() {
+    var str = StringInit("  xy z  ")
+    assert(str.trim().equals("xy z"))
+
+    str = StringInit("\n\txy z\n\t")
+    assert(str.trim().equals("xy z"))
+
+    str = StringInit("")
+    assert(str.trim().equals(""))
+
+    str = StringInit("x")
+    assert(str.trim().equals("x"))
 }

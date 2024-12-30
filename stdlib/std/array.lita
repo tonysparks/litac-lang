@@ -28,6 +28,10 @@ public func (a: *Array<T>) init<T>(initialSize: i32 = 16,
     var length = (sizeof(:T) * initialSize as (u64));
     if(initialSize > 0) {
         a.elements = alloc.alloc(length) as (*T)
+        if(!a.elements) {
+            a.length = 0
+            a.capacity = 0
+        }
     }
     else {
         a.elements = null
@@ -43,9 +47,11 @@ public func (a: *Array<T>) free<T>() {
     }
 }
 
-public func (a: *Array<T>) add<T>(element: T) {
+public func (a: *Array<T>) add<T>(element: T) : i32 {
     if(a.length + 1 > a.capacity) {
-        ArrayGrow<T>(a, 1)
+        if(!ArrayGrow<T>(a, 1)) {
+            return -1
+        }
     }
 
     assert(a.length < a.capacity)
@@ -59,10 +65,11 @@ public func (a: *Array<T>) add<T>(element: T) {
     #end
 
     a.length += 1
+    return 1
 }
 
-public func (a: *Array<T>) push<T>(element: T) {
-    a.add<T>(element)
+public func (a: *Array<T>) push<T>(element: T) : i32 {
+    return a.add<T>(element)
 }
 
 public func (a: *Array<T>) get<T>(index: i32) : T {
@@ -120,18 +127,22 @@ public func (a: *Array<T>) pop<T>() : T {
     return r
 }
 
-public func (a: *Array<T>) reserve<T>(newSize: i32)  {
+public func (a: *Array<T>) reserve<T>(newSize: i32) : i32 {
     if(newSize <= a.capacity) {
-        return;
+        return 0;
     }
 
     var n = newSize
     var newlength = (sizeof(:T) * n as (usize));
     var oldlength = (sizeof(:T) * a.capacity as(usize));
-    a.elements = a.alloc.realloc(a.elements as (*void), oldlength, newlength) as (*T)
-    assert(a.elements)
+    var newArray = a.alloc.realloc(a.elements as (*void), oldlength, newlength) as (*T)
+    if(!newArray) {
+        return -1
+    }
 
+    a.elements = newArray
     a.capacity = n;
+    return n
 }
 
 public func (a: *Array<T>) swap<T>(aIndex: i32, bIndex: i32) {
@@ -157,41 +168,46 @@ public func (a: *Array<T>) removeAt<T>(index: i32) : T {
     return r
 }
 
-public func (a: *Array<T>) insertAt<T>(index: i32, element: T) {
+public func (a: *Array<T>) insertAt<T>(index: i32, element: T) : i32 {
     assert(index >= 0 && index <= a.length)
 
     if(index == a.length) {
-        a.add(element)
-        return;
+        return a.add(element)
+    }
+
+    // not optimal at all -- potential repeated mem moves
+    if(a.length + 1 >= a.capacity) {
+        if(!ArrayGrow<T>(a, 1)) {
+            return -1
+        }
     }
 
     a.length += 1
-
-    // not optimal at all -- potential repeated mem moves
-    if(a.length + 1 > a.capacity) {
-        ArrayGrow<T>(a, 1)
-    }
 
     memmove((&a.elements[index + 1]) as (*void),
             (&a.elements[index]) as (*const void),
             (a.length - index) * sizeof(:T))
 
     a.set<T>(index, element)
+    return 1
 }
 
-public func (a: *Array<T>) addAll<T>(other: *Array<T>) {
+public func (a: *Array<T>) addAll<T>(other: *Array<T>) : i32 {
     if(!other || other.length == 0) {
-        return;
+        return 0;
     }
 
     if(a.length + other.length > a.capacity) {
-        ArrayGrow<T>(a, other.length)
+        if(!ArrayGrow<T>(a, other.length)) {
+            return -1
+        }
     }
 
     memcpy((&a.elements[a.length]) as (*void),
            (&other.elements[0]) as (*const void),
             other.length * sizeof(:T))
     a.length += other.length
+    return other.length
 }
 
 public func (a: *Array<T>) forEach<T>(fn : func<T>(T) : bool) {
@@ -231,7 +247,7 @@ public func (a: *Array<T>) copy<T>(allocator: *const mem::Allocator = null) : Ar
     return copy
 }
 
-func ArrayGrow<T>(a: *Array<T>, increment: i32) {
+func ArrayGrow<T>(a: *Array<T>, increment: i32) : bool {
     var doubleCurrent = a.capacity * 2
     var minReq = a.length + increment
     var n = minReq
@@ -242,10 +258,15 @@ func ArrayGrow<T>(a: *Array<T>, increment: i32) {
 
     var newlength = (sizeof(:T) * n as (usize));
     var oldlength = (sizeof(:T) * a.capacity as(usize));
-    a.elements = a.alloc.realloc(a.elements as (*void), oldlength, newlength) as (*T)
-    assert(a.elements)
+    var newArray = a.alloc.realloc(a.elements as (*void), oldlength, newlength) as (*T)
+    if(!newArray) {
+        return false
+    }
 
+    a.elements = newArray
     a.capacity = n;
+    return true
+
 }
 
 

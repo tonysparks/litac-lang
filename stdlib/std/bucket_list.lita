@@ -45,6 +45,9 @@ public func (this: *BucketList<T>) init<T>(bucketSize: i32 = 16,
 
 func (this: *BucketList<T>) allocBucket<T>() : *Bucket<T> {
     var mem: *void = this.allocator.alloc(sizeof(:Bucket<T>) + (sizeof(:T) * this.bucketSize));
+    if(!mem) {
+        return null
+    }
 
     var bucket = mem as (*Bucket<T>)
     bucket.length = 0
@@ -82,11 +85,18 @@ public func (this: *BucketList<T>) clear<T>() {
     this.top = this.buckets
 }
 
-public func (this: *BucketList<T>) add<T>(element: T) {
+public func (this: *BucketList<T>) add<T>(element: T) : i32 {
+    if(!this.top) {
+        return -1
+    }
 
     if(this.top.length + 1 > this.bucketSize) {
         if(!this.top.next) {
             var next = this.allocBucket<T>()
+            if(!next) {
+                return -1
+            }
+
             this.top.next = next
             this.top = next
         }
@@ -103,6 +113,7 @@ public func (this: *BucketList<T>) add<T>(element: T) {
 
     this.top.length += 1
     this.length += 1
+    return 1
 }
 
 func (this: *BucketList<T>) getBucketAt<T>(index: usize, iterations: *i32) : *Bucket<T> {
@@ -132,8 +143,8 @@ func (this: *BucketList<T>) getBucketAt<T>(index: usize, iterations: *i32) : *Bu
     return this.top
 }
 
-public func (this: *BucketList<T>) push<T>(element: T) {
-    this.add<T>(element)
+public func (this: *BucketList<T>) push<T>(element: T) : i32 {
+    return this.add<T>(element)
 }
 
 public func (this: *BucketList<T>) get<T>(index: usize) : T {

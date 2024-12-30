@@ -33,6 +33,10 @@ public func (b: *StringBuilder) init(initialSize: i32 = 16,
 
     var length = initialSize //(sizeof(:char) * initialSize as (u64));
     b.buffer = alloc.calloc(length, sizeof(:char)) as (*char)
+    if(!b.buffer) {
+        b.capacity = 0
+        b.length = 0
+    }
 }
 
 public func (b: *StringBuilder) free() {
@@ -44,28 +48,31 @@ public func (b: *StringBuilder) free() {
     }
 }
 
-public func (b: *StringBuilder) appendStr(str: *const char) {
+public func (b: *StringBuilder) appendStr(str: *const char) : i32 {
     if(str == null) {
-        return;
+        return 0;
     }
     var len = str.length()
-    b.appendStrn(str, len)
+    return b.appendStrn(str, len)
 }
 
 
-public func (b: *StringBuilder) appendStrn(str: *const char, len: i32) {
+public func (b: *StringBuilder) appendStrn(str: *const char, len: i32) : i32 {
     if(str == null || len < 1) {
-        return;
+        return 0;
     }
 
     if(b.length + len > b.capacity) {
-        BufferGrow(b, len)
+        if(!BufferGrow(b, len)) {
+            return -1
+        }
     }
 
     memcpy((&b.buffer[b.length]) as (*void),
              str as (*const void),
              len * sizeof(:char))
     b.length += len
+    return len
 }
 
 
@@ -92,7 +99,9 @@ public func (b: *StringBuilder) appendU64(i: u64) : i32 {
 public func (b: *StringBuilder) appendChar(c: char) : i32 {
     // ensure we have enough of a buffer initially
     if(b.length + 1 >= b.capacity) {
-        BufferGrow(b, 1)
+        if(!BufferGrow(b, 1)) {
+            return -1
+        }
     }
 
     b.buffer[b.length] = c
@@ -108,7 +117,9 @@ public func (b: *StringBuilder) append(format: *const char, ...) : i32 {
     var len = _vscprintf(format, args1)
     if(b.length + len >= b.capacity) {
         var growBy = (b.length + len + 1) - b.capacity;
-        BufferGrow(b, growBy);
+        if(!BufferGrow(b, growBy)) {
+            return -1
+        }
     }
 
     len = vsnprintf(&b.buffer[b.length], len + 1, format, args1);
@@ -128,7 +139,9 @@ public func (b: *StringBuilder) appendArgs(format: *const char, args: va_list) :
 
     var len = _vscprintf(format, copyArgs)
     if(b.length + len >= b.capacity) {
-        BufferGrow(b, (len + 1) - b.capacity);
+        if(!BufferGrow(b, (len + 1) - b.capacity)) {
+            return -1
+        }
     }
 
     len = vsnprintf(&b.buffer[b.length], len + 1, format, copyArgs);
@@ -225,7 +238,6 @@ public func (b: *StringBuilder) replace(start: i32, end: i32, str: *const char) 
 }
 
 public func (b: *StringBuilder) insert(index: i32, format: *const char, ...) : i32 {
-
     if(index < 0) {
         index = 0
     }
@@ -239,22 +251,17 @@ public func (b: *StringBuilder) insert(index: i32, format: *const char, ...) : i
     var args:va_list;
     va_start(args, format);
 
-    // need to copy the args even though we won't know if we
-    // need them until after we use the first set
-    //var args2: va_list;
-    //va_copy(args2, args1);
-
     // get the length
     var len = _vscprintf(format, args)
-    //va_end(args1);
-
     if(len < 0) {
         return len
     }
 
     var required = b.length + len + 1
     if(required >= b.capacity) {
-        BufferGrow(b, required - b.capacity);
+        if(!BufferGrow(b, required - b.capacity)) {
+            return -1
+        }
     }
 
     var startChar = b.buffer[index]
@@ -352,7 +359,10 @@ public func (b: *StringBuilder) cStrConst() : *const char {
 
 public func (b: *StringBuilder) cStr() : *char {
     if(b.length + 1 > b.capacity) {
-        BufferGrow(b, 1)
+        if(!BufferGrow(b, 1)) {
+            // Not sure if this is a good idea or not
+            return null
+        }
     }
 
     b.buffer[b.length] = '\0'
@@ -372,16 +382,16 @@ public func (b: *StringBuilder) get(index: i32) : char {
     return b.buffer[index]
 }
 
-public func (b: *StringBuilder) reserve(length: i32) {
+public func (b: *StringBuilder) reserve(length: i32) : bool {
     var available = b.capacity - b.length
     if(available >= length) {
-        return;
+        return true;
     }
 
-    BufferGrow(b, length - available)
+    return BufferGrow(b, length - available)
 }
 
-func BufferGrow(b: *StringBuilder, increment: i32) {
+func BufferGrow(b: *StringBuilder, increment: i32) : bool {
     var doubleCurrent = b.capacity * 2
     var minReq = b.capacity + increment
     var n = minReq
@@ -392,8 +402,11 @@ func BufferGrow(b: *StringBuilder, increment: i32) {
     var newlength = (sizeof(:char) * n as (u64));
     var oldlength = (sizeof(:char) * b.capacity as (u64));
     var newBuffer = b.alloc.realloc(b.buffer as (*void), oldlength, newlength) as (*char)
-    assert(newBuffer)
+    if(!newBuffer) {
+        return false
+    }
 
     b.buffer = newBuffer
     b.capacity = n;
+    return true
 }

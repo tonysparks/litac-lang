@@ -85,7 +85,9 @@ public func (m: *Map<K, V>) free<K, V>() {
     if(m) {
         m.capacity = 0;
         m.length = 0;
-        m.alloc.free(m.entries as (*void));
+        if(m.entries) {
+            m.alloc.free(m.entries as (*void));
+        }
 
         m.entries = null;
     }
@@ -101,10 +103,12 @@ public func (m: *Map<K, V>) empty<K, V>() : bool {
 }
 
 
-public func (m: *Map<K, V>) put<K, V>(key: K, value: V) {
+public func (m: *Map<K, V>) put<K, V>(key: K, value: V) : i32 {
 
     if(2 * m.length >= m.capacity) {
-        MapGrow<K, V>(m, 2 * m.capacity);
+        if(!MapGrow<K, V>(m, 2 * m.capacity)) {
+            return -1
+        }
     }
 
     var hash = key.hash() + 2;
@@ -118,17 +122,19 @@ public func (m: *Map<K, V>) put<K, V>(key: K, value: V) {
             k.key = key
             k.value = value
             k.hash = hash
-            return;
+            return 1;
         }
         if(k.hash == hash && k.key.equals(key)) {
             k.key = key
             k.value = value
             k.hash = hash
-            return;
+            return 0;
         }
 
         i += 1;
     }
+
+    return 0
 
 }
 
@@ -250,15 +256,20 @@ public func (m: *Map<K, V>) contains<K, V>(key: K) : bool {
     return false;
 }
 
-func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) {
+func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) : bool {
     if(newlength < 16) {
         newlength = 16;
+    }
+
+    var newEntries = m.alloc.calloc(newlength, sizeof(:Entry<K, V>)) as (*Entry<K, V>)
+    if(!newEntries) {
+        return false
     }
 
     var newMap = Map<K, V> {
         .length: 0,
         .capacity: newlength,
-        .entries: m.alloc.calloc(newlength, sizeof(:Entry<K, V>)) as (*Entry<K, V>),
+        .entries: newEntries,
         .emptyValue = m.emptyValue,
         .emptyKey = m.emptyKey,
         .alloc: m.alloc
@@ -276,6 +287,7 @@ func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) {
     m.free<K,V>();
 
     *m = newMap;
+    return true
 }
 
 
