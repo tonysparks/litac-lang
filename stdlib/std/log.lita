@@ -1,0 +1,84 @@
+import "std/libc"
+import "std/mem"
+import "std/thread"
+
+@asStr
+public enum LogLevel {
+    TRACE,
+    INFO,
+    DEBUG,
+    WARN,
+    ERROR,
+    FATAL
+}
+
+var outputFile: *FILE = null
+var mtx: Mutex;
+
+public func LogInit(outputFileName: *const char) {
+    if(outputFileName) {
+        outputFile = fopen(outputFileName, "w")
+    }
+
+    if(!outputFile) {
+        outputFile = stdout
+    }
+
+    mtx.init()
+}
+
+public func Log(level: LogLevel, format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    Logv(level, format, args)
+    va_end(args)
+}
+
+public func Logv(level: LogLevel, format: *const char, args: va_list) {
+    if(!outputFile) return;
+
+    mtx.lock()
+        fprintf(outputFile, "[%s] [%s] ", LogLevelAsStr(level), "TIME_TODO")
+        vfprintf(outputFile, format, args);
+        fflush(outputFile)
+    mtx.unlock()
+
+    if(level == LogLevel.FATAL) {
+        exit(2);
+    }
+}
+
+public func Info(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    Logv(LogLevel.INFO, format, args)
+    va_end(args)
+}
+
+public func Debug(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    Logv(LogLevel.DEBUG, format, args)
+    va_end(args)
+}
+
+public func Warn(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    Logv(LogLevel.WARN, format, args)
+    va_end(args)
+}
+
+public func Error(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    Logv(LogLevel.ERROR, format, args)
+    va_end(args)
+}
+
+public func Panic(format: *const char, ...) {
+    var args: va_list;
+    va_start(args, format);
+    Logv(LogLevel.FATAL, format, args)
+    va_end(args)
+}
