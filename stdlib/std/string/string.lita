@@ -8,8 +8,8 @@ public struct String {
     length: i32
 }
 
-public func StringInit(str: *const char, len: i32 = -1) : String {
-    if(str == null) {
+public func StringInit(buffer: *const char, length: i32 = -1) : String {
+    if(buffer == null) {
         return String {
             .buffer = null,
             .length = 0
@@ -17,8 +17,8 @@ public func StringInit(str: *const char, len: i32 = -1) : String {
     }
 
     return String {
-        .buffer = str,
-        .length = (len < 0) ? str.length() : len
+        .buffer = buffer,
+        .length = (length < 0) ? buffer.length() : length
     }
 }
 
@@ -468,6 +468,12 @@ public func (str: *const char) empty() : bool {
     return str[0] == '\0'
 }
 
+public func (str: *const char) toString() : String {
+    return String {
+        .buffer = str,
+        .length = strlen(str)
+    }
+}
 
 
 @test("equals")

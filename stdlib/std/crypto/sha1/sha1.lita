@@ -1,0 +1,17 @@
+
+@cFile("sha1.h", "sha1.c");
+
+@foreign
+public const SHA1_BLOCK_SIZE: i32;
+
+@foreign("SHA1_CTX")
+public struct sha1_ctx;
+
+@foreign
+public func sha1_init(ctx: *sha1_ctx);
+
+@foreign
+public func sha1_update(ctx: *sha1_ctx, data: []const u8, len: usize);
+
+@foreign
+public func sha1_final(ctx: *sha1_ctx, hash: []u8);
