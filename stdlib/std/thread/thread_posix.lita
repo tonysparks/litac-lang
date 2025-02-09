@@ -182,7 +182,8 @@ func pthread_cond_wait(cond: *pthread_cond_t, mtx: *pthread_mutex_t) : i32;
 @foreign
 func pthread_cond_timedwait(cond: *pthread_cond_t, mtx: *pthread_mutex_t, ts: *const timespec) : i32;
 
-
+@foreign
+func gettid(): i32;
 
 @foreign
 typedef u64 as pthread_t;
@@ -412,6 +413,8 @@ func _thrd_wrapper_function(aArg: *void): *void {
     var fun = ti.mFunction;
     var arg = ti.mArg;
 
+    ti.thread.threadId = gettid() as (i32)
+
     /* The thread is responsible for freeing the startup information */
     ti.allocator.free(ti as (*void));
 
@@ -424,6 +427,7 @@ func _thrd_wrapper_function(aArg: *void): *void {
 public typedef func(*void) : i32 as ThreadStartFn;
 public struct Thread {
     thrd: pthread_t
+    threadId: i32
 }
 
 
@@ -432,6 +436,7 @@ struct ThreadStartInfo {
     mFunction: ThreadStartFn; // < Pointer to the function to be executed.
     mArg: *void;              // < Function argument for the thread function.
     allocator: *const Allocator;
+    thread: *Thread
 }
 
 
@@ -449,12 +454,13 @@ public func (this: *Thread) create(
     ti.mFunction = fun;
     ti.mArg = arg;
     ti.allocator = allocator;
-
+    ti.thread = this
+/*
     // var attr: pthread_attr_t;
     // pthread_attr_init(&attr);
     // defer pthread_attr_destroy(&attr)
     // pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-
+*/
     if(pthread_create(&this.thrd, null, _thrd_wrapper_function, ti as (*void)) != 0) {
         this.thrd = 0;
     }
@@ -484,7 +490,7 @@ public func (this: Thread) detach() : ThreadStatus {
 }
 
 public func (this: Thread) id() : i32 {
-    return this.thrd as (i32)
+    return this.threadId
 }
 
 public func (this: Thread) equal(other: Thread) : bool {
@@ -513,7 +519,10 @@ public func (this: Thread) yield() {
 
 public func ThreadCurrent() : Thread {
     var thrd = pthread_self();
-    return Thread{thrd}
+    return Thread{
+        thrd,
+        gettid()
+    }
 }
 
 @raw("TTHREAD_NORETURN ")
