@@ -278,6 +278,15 @@ public func (s: StringBuffer) cStrConst() : *const char {
     return s.buffer as (*const char)
 }
 
+// for naming consistency
+@inline
+public func (s: StringBuffer) toString() : String {
+    return String {
+        .buffer = s.buffer,
+        .length = s.length
+    }
+}
+
 @inline
 public func (b: *StringBuffer) asString() : String {
     return String {

@@ -559,6 +559,8 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             // delay adding the symbol to the scope until resolution time
             if(isMethod) {
                 var buffer = [MAX_SYMBOL_NAME]char;
+
+                // TODO: Fix bug with aliased types function names not resolving correctly
                 if(!funcDecl.getName(buffer)) {
                     this.result.addError(decl.startPos, "invalid function name or invalid method caller type")
                     goto err;

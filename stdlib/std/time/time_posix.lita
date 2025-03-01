@@ -1,0 +1,137 @@
+import "std/string"
+import "std/string/buffer"
+import "std/time"
+
+
+@raw("""
+#include <time.h>
+
+typedef struct tm tm;
+""");
+
+@cFile("strptime.c");
+
+@foreign
+struct tm {
+    tm_sec: i32   // Seconds (0-60, allows leap seconds)
+    tm_min: i32   // Minutes (0-59)
+    tm_hour: i32  // Hours (0-23)
+    tm_mday: i32  // Day of the month (1-31)
+    tm_mon: i32   // Month (0-11, where 0 = January)
+
+    tm_year: i32  // Year since 1900 (e.g., 2024 is stored as 124)
+    tm_wday: i32  // Day of the week (0-6, where 0 = Sunday)
+    tm_yday: i32  // Day of the year (0-365, where 0 = Jan 1)
+    tm_isdst: i32 // Daylight Saving Time flag (>0 if DST is in effect, 0 if not, <0 if unknown)
+}
+
+@foreign
+typedef i64 as time_t;
+
+@foreign
+func gmtime_r(time: *time_t, result: *tm) : *tm;
+
+@foreign
+func time(sec: *time_t) : time_t;
+
+@foreign
+func timegm(tm: *tm) : time_t;
+
+@foreign
+func strftime(s: *char, max: usize, format: *const char, tm: *const tm) : usize;
+
+@foreign
+func strptime(s: *const char, format: *const char, tm: *const tm) : *char;
+
+internal func ToDateTime(epoch: EpochTime) : DateTime {
+    var tm = tm{}
+    gmtime_r(&epoch, &tm)
+
+    return FromTM(&tm)
+}
+
+@inline
+internal func FromTM(tm: *tm) : DateTime {
+    return DateTime {
+        .time = Time {
+            .sec = tm.tm_sec as (u8),
+            .min = tm.tm_min as (u8),
+            .hour = tm.tm_hour as (u8),
+        },
+        .date = Date {
+            .day = tm.tm_mday as (u8),
+            .month = (tm.tm_mon + 1)  as (u8),
+            .year = tm.tm_year + 1900,
+        }
+    }
+}
+
+@inline
+internal func ToTM(dateTime: *DateTime, tm: *tm) : *tm {
+    tm.tm_sec = dateTime.sec
+    tm.tm_min = dateTime.min
+    tm.tm_hour = dateTime.hour
+    tm.tm_mday = dateTime.day
+    tm.tm_mon = dateTime.month - 1
+    tm.tm_year = dateTime.year - 1900
+    return tm
+}
+
+internal func ToEpochTime(dateTime: *DateTime) : EpochTime {
+    var tm = tm {}
+
+    var epoch = timegm(ToTM(dateTime, &tm))
+    return epoch as (EpochTime)
+}
+
+internal func _Now() : EpochTime {
+    var time = time(null)
+    return time as (EpochTime)
+}
+
+internal func _DateTimeNow() : DateTime {
+    var epoch = _Now()
+    return ToDateTime(epoch)
+}
+
+internal func DateTimeFormat(
+    dateTime: *DateTime,
+    format: String,
+    buffer: *StringBuffer) : DateTimeStatus {
+    if (!dateTime) {
+        return DateTimeStatus.OK
+    }
+
+    var resultStr = [64]char{}
+
+    var formatStr  = [32]char{}
+    format.copyTo(formatStr, 31)
+
+    var tm = tm {}
+    var len = strftime(
+        resultStr, sizeof(resultStr),
+        formatStr,
+        ToTM(dateTime, &tm)
+    )
+
+    if(len == 0) {
+        return DateTimeStatus.INVALID_INPUT_FORMAT
+    }
+
+    buffer.appendStrn(resultStr, len as (i32))
+    return DateTimeStatus.OK
+}
+
+internal func _DateTimeFrom(format: String, value: String) : DateTime {
+
+    var formatStr  = [32]char{}
+    format.copyTo(formatStr, 31)
+
+    var valueStr = [64]char{}
+    value.copyTo(valueStr, 63)
+
+    var tm = tm {}
+    strptime(valueStr, formatStr, &tm)
+
+    return FromTM(&tm)
+}

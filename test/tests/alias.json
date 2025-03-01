@@ -12,6 +12,26 @@
         }
     `,
     "tests": [
+        // TODO: Currently fails due to bug in ast.lita @
+        // func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool
+        // doesn't get the unaliased type name of the first parameter...
+        {
+            "name": "Typedef primitive with method",
+            "definitions": `
+                typedef i64 as EpochTime;
+                func (this: EpochTime) doSomething() : i64 {
+                    return this * 4i64;
+                }
+
+
+            `,
+            "code": `
+                var x: EpochTime = 4i64;
+                assert(x.doSomething() == 16i64)
+            `,
+            "disabled": true
+        },
+
 
         {
             "name": "Struct Aliased",

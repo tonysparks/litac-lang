@@ -1,0 +1,171 @@
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+
+#if (OS == "WINDOWS")
+    import using "std/time/time_win" as os
+#else
+    import using "std/time/time_posix" as os
+#end
+
+public const ISO_8601_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+// Unix timestamp - timezone is UTC
+public typedef i64 as EpochTime
+
+// Time between time units
+public typedef i64 as Duration
+
+// Time stamp, only to second percision
+public struct Time {
+    sec: u8
+    min: u8
+    hour: u8
+}
+
+public struct Date {
+    year: i32
+    month: u8
+    day: u8
+}
+
+// Time and Date components
+public struct DateTime {
+    date: using Date
+    time: using Time
+}
+
+public struct Offset {
+    min: u8
+    hr: u8
+}
+
+// Time, Date and timezone offset components
+public struct OffsetDateTime {
+    dateTime: using DateTime
+    offset: Offset
+}
+
+public enum Weekday {
+    Sunday = 0,
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+}
+
+public enum Month {
+    January = 1,
+    February,
+    March,
+    April,
+    May,
+    June,
+    July,
+    August,
+    September,
+    October,
+    November,
+    December,
+}
+
+public enum DateTimeStatus {
+    OK,
+    INVALID_INPUT_FORMAT,
+}
+
+// TODO: Fix compiler bug with aliased function names
+public func (this: i64/*EpochTime*/) toDateTime() : DateTime {
+    return os::ToDateTime(this)
+}
+
+public func (this: *DateTime) toOffsetDateTime(offset: *Offset = null) : OffsetDateTime {
+    return OffsetDateTime {
+        .dateTime = (*this),
+        .offset = offset != null ? (*offset) : Offset{}
+    }
+}
+
+public func (this: *DateTime) toEpochTime() : EpochTime {
+    return os::ToEpochTime(this)
+}
+
+public func (this: *DateTime) format(format: String, output: *StringBuilder) : DateTimeStatus {
+    return os::DateTimeFormat(
+        this,
+        format,
+        output
+    )
+}
+
+public func (this: *DateTime) compare(other: *DateTime) : i32 {
+    return (this.toEpochTime() - other.toEpochTime()) as (i32)
+}
+
+public func (this: *DateTime) isoFormat(output: *StringBuilder) : DateTimeStatus {
+    return os::DateTimeFormat(
+        this,
+        ISO_8601_DATE_FORMAT.toString(),
+        output
+    )
+}
+
+public func Now() : EpochTime {
+    return os::_Now()
+}
+
+public func DateTimeNow() : DateTime {
+    return os::_DateTimeNow()
+}
+
+public func DateTimeFrom(format: String, value: String) : DateTime {
+    return os::_DateTimeFrom(
+        format,
+        value
+    )
+}
+
+public func DateTimeFromIso(value: String) : DateTime {
+    return os::_DateTimeFrom(
+        ISO_8601_DATE_FORMAT.toString(),
+        value
+    )
+}
+
+import "std/assert"
+import "std/libc"
+@test
+func testDateTime() {
+    var now = Now()
+    var dateTime = now.toDateTime()
+
+    var sb = StringBuilderInit(1024)
+    dateTime.isoFormat(sb)
+    printf("DateTime: %.*s\n", sb.length, sb.buffer)
+    printf("Now: %lu\n", now)
+    printf("Converted: %lu\n", dateTime.toEpochTime())
+
+    assert(dateTime.toEpochTime() == now)
+
+    var result = DateTimeFromIso(
+        sb.toString()
+    )
+    assert(result.toEpochTime() == dateTime.toEpochTime())
+    assert(result.compare(dateTime) == 0)
+    result.day += 2_u8
+    assert(result.compare(dateTime) > 0)
+
+    var birthday = DateTimeFromIso(
+        "1967-02-20T13:23:22".toString()
+    )
+    assert(birthday.year == 1967)
+    assert(birthday.month == 2)
+    assert(birthday.day == 20)
+    assert(birthday.hour == 13)
+    assert(birthday.min == 23)
+    assert(birthday.sec == 22)
+
+
+}
