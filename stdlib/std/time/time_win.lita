@@ -1,0 +1,34 @@
+import "std/string"
+import "std/string/buffer"
+import "std/time"
+
+//~~~~~~~~~~~~~~~~~
+// TODO
+//~~~~~~~~~~~~~~~~~
+
+internal func ToDateTime(epoch: EpochTime) : DateTime {
+    return DateTime{}
+}
+
+internal func ToEpochTime(dateTime: *DateTime) : EpochTime {
+    return 0i64
+}
+
+internal func _Now() : EpochTime {
+    return 0i64
+}
+
+internal func _DateTimeNow() : DateTime {
+    return DateTime{}
+}
+
+internal func DateTimeFormat(
+    dateTime: *DateTime,
+    format: String,
+    buffer: *StringBuffer) : DateTimeStatus {
+    return DateTimeStatus.INVALID_INPUT_FORMAT
+}
+
+internal func _DateTimeFrom(format: String, value: String) : DateTime {
+    return DateTime{}
+}

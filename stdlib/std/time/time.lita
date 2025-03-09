@@ -92,7 +92,7 @@ public func (this: *DateTime) toEpochTime() : EpochTime {
     return os::ToEpochTime(this)
 }
 
-public func (this: *DateTime) format(format: String, output: *StringBuilder) : DateTimeStatus {
+public func (this: *DateTime) format(format: String, output: *StringBuffer) : DateTimeStatus {
     return os::DateTimeFormat(
         this,
         format,
@@ -104,7 +104,7 @@ public func (this: *DateTime) compare(other: *DateTime) : i32 {
     return (this.toEpochTime() - other.toEpochTime()) as (i32)
 }
 
-public func (this: *DateTime) isoFormat(output: *StringBuilder) : DateTimeStatus {
+public func (this: *DateTime) isoFormat(output: *StringBuffer) : DateTimeStatus {
     return os::DateTimeFormat(
         this,
         ISO_8601_DATE_FORMAT.toString(),

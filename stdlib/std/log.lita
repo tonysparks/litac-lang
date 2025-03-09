@@ -1,6 +1,8 @@
 import "std/libc"
 import "std/mem"
 import "std/thread"
+import "std/time"
+import "std/string/buffer"
 
 @asStr
 public enum LogLevel {
@@ -38,7 +40,13 @@ public func Logv(level: LogLevel, format: *const char, args: va_list) {
     if(!outputFile) return;
 
     mtx.lock()
-        fprintf(outputFile, "[%s] [%s] ", LogLevelAsStr(level), "TIME_TODO")
+        var buffer:[64]char;
+        var sb = StringBufferInit(buffer, 64, 0)
+
+        var now = DateTimeNow()
+        now.isoFormat(sb)
+
+        fprintf(outputFile, "[%s] [%s] ", LogLevelAsStr(level), sb.cStr())
         vfprintf(outputFile, format, args);
         fflush(outputFile)
     mtx.unlock()
