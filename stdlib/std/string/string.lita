@@ -3,10 +3,11 @@ import "std/mem" as mem
 import "std/assert"
 
 
-public struct String {
-    buffer: *const char
-    length: i32
-}
+// Defined in builtin.lita
+// public struct String {
+//     buffer: *const char
+//     length: i32
+// }
 
 public func StringInit(buffer: *const char, length: i32 = -1) : String {
     if(buffer == null) {

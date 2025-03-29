@@ -65,6 +65,23 @@ public func assertFloat<F>(
     }
 }
 
+public func assertEq<N>(
+    expected: N,
+    actual: N,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__): void {
+
+    if(expected != actual) {
+        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%d' to equal actual: '%d'\n",
+            filename,
+            lineNumber,
+            expected,
+            actual
+        )
+        bort()
+    }
+}
+
 @test
 func testAssertEqualsStr() {
     assertStr("x", "x")

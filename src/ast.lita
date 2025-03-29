@@ -75,6 +75,7 @@ public enum StmtKind {
     SET_EXPR,
     SIZE_OF_EXPR,
     STRING_EXPR,
+    NATIVE_STRING_EXPR,
     SUBSCRIPT_GET_EXPR,
     SUBSCRIPT_SET_EXPR,
     TERNARY_EXPR,
@@ -648,6 +649,7 @@ public func IsExpr(node: *Node) : bool {
         case StmtKind.SET_EXPR:
         case StmtKind.SIZE_OF_EXPR:
         case StmtKind.STRING_EXPR:
+        case StmtKind.NATIVE_STRING_EXPR:
         case StmtKind.SUBSCRIPT_GET_EXPR:
         case StmtKind.SUBSCRIPT_SET_EXPR:
         case StmtKind.TERNARY_EXPR:
@@ -863,6 +865,7 @@ public func (expr: *Expr) isConstExpr() : bool {
         case StmtKind.CHAR_EXPR:
         case StmtKind.IDENTIFIER_EXPR:
         case StmtKind.STRING_EXPR:
+        case StmtKind.NATIVE_STRING_EXPR:
         case StmtKind.GET_EXPR: {
             return true
         }

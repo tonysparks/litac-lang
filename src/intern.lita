@@ -83,6 +83,9 @@ public const ASSTR = InternedString{};
 public const TOSTR = InternedString{};
 public const COMPILER_OPTION = InternedString{};
 
+// built-ins
+public const STRING_TYPE = InternedString{};
+public const ANY_TYPE = InternedString{};
 
 public func InternMap<V>(emptyValue: V,
                          initialSize: i32 = 16,
@@ -170,6 +173,10 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("asStr", 5, &ASSTR)
     this.internConstant("toStr", 5, &TOSTR)
     this.internConstant("compiler_option", 15, &COMPILER_OPTION)
+
+    // built-in types
+    this.internConstant("String", 6, &STRING_TYPE)
+    this.internConstant("any", 3, &ANY_TYPE)
 
 }
 

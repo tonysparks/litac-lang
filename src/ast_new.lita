@@ -643,6 +643,17 @@ public func NewStringExpr(startPos: SrcPos,
     return expr as (*Expr)
 }
 
+public func NewNativeStringExpr(startPos: SrcPos,
+                          endPos: SrcPos,
+                          string: Token,
+                          allocator: *const Allocator) : *Expr {
+    var expr = new<StringExpr>(allocator)
+    expr.kind = StmtKind.NATIVE_STRING_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.string = string
+    return expr as (*Expr)
+}
 
 public func NewCharExpr(startPos: SrcPos,
                           endPos: SrcPos,

@@ -377,6 +377,7 @@ public func CopyExpr(expr: *Expr, module: *Module) : *Expr {
                                      module.allocator)
             return copy
         }
+        case StmtKind.NATIVE_STRING_EXPR:
         case StmtKind.STRING_EXPR: {
             return expr // nothing to copy
         }

@@ -471,6 +471,10 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
 
     module.flags |= ModuleFlags.TYPE_IMPORTED
 
+    if(module.flags & ModuleFlags.IS_BUILTIN) {
+        AssignBuiltinSymbols(module)
+    }
+
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var imp = module.ast.imports.get(i)
         this.createImportSymbols(imp)
@@ -1800,6 +1804,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.SET_EXPR:
         case StmtKind.SIZE_OF_EXPR:
         case StmtKind.STRING_EXPR:
+        case StmtKind.NATIVE_STRING_EXPR:
         case StmtKind.SUBSCRIPT_GET_EXPR:
         case StmtKind.SUBSCRIPT_SET_EXPR:
         case StmtKind.TERNARY_EXPR:

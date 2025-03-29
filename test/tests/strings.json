@@ -19,13 +19,234 @@
     `,
     "tests": [
         {
+            "name" : "Native Strings",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var s = $"Hello World"
+                assert(s.buffer.equals("Hello World"))
+                assert(s.equals($"Hello World"))
+                assert(s.length == s.buffer.length())
+            `,
+        },
+        {
+            "name" : "Native Strings With Escapes",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var s = $"Hello\"World"
+                assert(s.buffer.equals("Hello\"World"))
+                assert(s.equals($"Hello\"World"))
+                assert(s.length == s.buffer.length())
+            `,
+        },
+        {
+            "name" : "Native Strings Verbatim",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var s = $"""Hello World
+"""
+                assert(s.equals($"Hello World\n"))
+                assert(s.buffer.equals("Hello World\n"))
+                assert(s.length == s.buffer.length())
+            `,
+        },
+        {
+            "name" : "Native Strings Pass",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var s = String { .buffer = "H", .length = 1 }.length
+                assert(s == 1)
+                var sx = String { .buffer = "H", .length = 1 }.buffer
+                assert(sx.equals("H"))
+                var str = String { .buffer = "H", .length = 1 }
+                assert(str.equals(String { .buffer = "H", .length = 1 }))
+            `,
+        },
+        {
+            "name" : "Native Strings Pass using syntax",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var s = $"H".length
+                assert(s == 1)
+                var sx = $"H".buffer
+                assert(sx.equals("H"))
+                var str = $"H"
+                assert(str.equals(String { .buffer = "H", .length = 1 }))
+                assert(str.equals($"H"))
+                assert($"H".equals($"H"))
+            `,
+        },
+        {
+            "name" : "Native Strings Index",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var s = $"H"[0]
+            `,
+            "error": "invalid index into 'String'"
+        },
+        {
+            "name" : "Native Strings With Invalid Start",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var s = $ "Hello\"World"
+                assert(s.equals("Hello\"World"))
+            `,
+            "error": "Unexpected token"
+        },
+        {
+            "name" : "Native Strings With Default Args Constructor",
+            "definitions": `
+                import "std/string"
+
+                struct X {
+                    s: String = $"Hello"
+                }
+            `,
+            "code": `
+                var x = X{}
+                assert(x.s.equals($"Hello"))
+            `,
+        },
+        {
+            "name" : "Native Strings With Default Args Function",
+            "definitions": `
+                import "std/string"
+
+                func TestX(s: String = $"Hello") : String {
+                    return s
+                }
+            `,
+            "code": `
+                var x = TestX()
+                assert(x.equals($"Hello"))
+
+                var y = TestX($"World")
+                assert(y.equals($"World"))
+            `,
+        },
+        {
+            "name" : "Native Strings Function Returns",
+            "definitions": `
+                import "std/string"
+
+                func TestX(s: String = $"Hello") : String {
+                    return s
+                }
+
+                func TestY() : String {
+                    return $"Hello"
+                }
+            `,
+            "code": `
+                var x = TestX().buffer
+                assert(x.equals("Hello"))
+
+                var y = TestX($"World").length
+                assert(y == 5)
+
+                var z = TestY()
+                assert(z.equals($"Hello"))
+
+                var w = TestY().buffer
+                assert(w.equals("Hello"))
+            `,
+        },
+        {
+            "name" : "Native Strings Assignment",
+            "definitions": `
+                import "std/string"
+
+            `,
+            "code": `
+                var x: String = $"H"
+                var y = x
+                y = $"W"
+
+                assert(x.equals($"H"))
+                assert(y.equals($"W"))
+            `,
+        },
+        {
+            "name" : "Native Strings Generics",
+            "definitions": `
+                import "std/string"
+
+                struct X<T> {
+                    s: String
+                    x: T
+                }
+            `,
+            "code": `
+                var x = X {
+                    .s = $"H",
+                    .x = $"W"
+                }
+
+                assert(x.s.equals($"H"))
+                assert(x.x.equals($"W"))
+            `,
+        },
+        {
+            "name" : "Native Strings Array",
+            "definitions": `
+                import "std/string"
+
+            `,
+            "code": `
+                var x = []String {
+                    $"H", $"W"
+                }
+
+                assert(x[0].equals($"H"))
+                assert(x[1].equals($"W"))
+            `,
+        },
+        {
+            "name" : "Native Strings Length",
+            "definitions": `
+                import "std/string"
+
+            `,
+            "code": `
+                var x = $"\r\n\""
+
+                assert(x.length == 3)
+                assert(x.length == x.buffer.length())
+            `,
+        },
+        {
+            "name" : "Native Strings Length Emoji",
+            "definitions": `
+                import "std/string"
+            `,
+            "code": `
+                var x = $"✅"
+
+                assert(x.length == 3)
+                assert(x.length == x.buffer.length())
+            `,
+        },
+        {
             "name": "Verbatim String with escape chars",
             "definitions": `
 
             `,
             "code": `
                 var str = """this\nis\there"from"""
-                assert(strcmp("this\\nis\\there\"from", str) == 0)
+                assert(strcmp("this\\\nis\\\there\"from", str) == 0)
             `,
         },
         {
