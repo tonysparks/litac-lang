@@ -14,7 +14,7 @@ import "std/system"
 import "pkg_mgr/pkg_mgr"
 import "pkg_mgr/pkg_install"
 
-public const SEPARATOR = $"|"
+public var SEPARATOR = $"|"
 
 public enum PackageType {
     EXECUTABLE,
