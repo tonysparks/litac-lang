@@ -1340,6 +1340,9 @@ func (p: *Parser) primary() : *Expr {
     }
 
     if(p.match(TokenType.STRING)) {
+        if(token.mod & Mod.NATIVE_STRING) {
+            return NewNativeStringExpr(pos, p.pos(), token, p.allocator)
+        }
         return NewStringExpr(pos, p.pos(), token, p.allocator)
     }
 
@@ -2948,6 +2951,7 @@ func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
         case StmtKind.NUMBER_EXPR:
         case StmtKind.BOOLEAN_EXPR:
         case StmtKind.STRING_EXPR:
+        case StmtKind.NATIVE_STRING_EXPR:
         case StmtKind.CHAR_EXPR:
         case StmtKind.NULL_EXPR:
         case StmtKind.IDENTIFIER_EXPR:

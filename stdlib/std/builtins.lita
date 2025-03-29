@@ -5,6 +5,11 @@ public struct any {
     id: typeid
 }
 
+public struct String {
+    buffer: *const char
+    length: i32
+}
+
 /**
 ========================================================================
 Note declarations

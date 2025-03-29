@@ -102,6 +102,9 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.STRING_EXPR: {
             return this.resolveStringExpr(expr as (*StringExpr))
         }
+        case StmtKind.NATIVE_STRING_EXPR: {
+            return this.resolveNativeStringExpr(expr as (*StringExpr))
+        }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
             return this.resolveSubscriptGetExpr(expr as (*SubscriptGetExpr))
         }
@@ -1044,6 +1047,15 @@ func (this: *TypeChecker) resolveNumberExpr(expr: *NumberExpr) : bool {
 func (this: *TypeChecker) resolveStringExpr(expr: *StringExpr) : bool {
     assert(expr != null)
     expr.operand.typeInfo = &STR_TYPE
+    expr.operand.isConst = true
+    expr.operand.isRightValue = true
+    expr.operand.val = expr.string.value
+    return true
+}
+
+func (this: *TypeChecker) resolveNativeStringExpr(expr: *StringExpr) : bool {
+    assert(expr != null)
+    expr.operand.typeInfo = stringBuiltin.type
     expr.operand.isConst = true
     expr.operand.isRightValue = true
     expr.operand.val = expr.string.value

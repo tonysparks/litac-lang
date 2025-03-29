@@ -859,6 +859,7 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
         case StmtKind.NULL_EXPR:
         case StmtKind.NUMBER_EXPR:
         case StmtKind.STRING_EXPR:
+        case StmtKind.NATIVE_STRING_EXPR:
         case StmtKind.CHAR_EXPR:
         case StmtKind.BOOLEAN_EXPR:
         case StmtKind.POISON_EXPR: {

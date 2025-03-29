@@ -897,6 +897,9 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             ReplaceTypes(template, expr.sizeOfExpr)
             break;
         }
+        case StmtKind.NATIVE_STRING_EXPR: {
+            break;
+        }
         case StmtKind.STRING_EXPR: {
             break;
         }

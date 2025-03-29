@@ -2470,13 +2470,27 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitStrn(")", 1)
             return;
         }
+        case StmtKind.NATIVE_STRING_EXPR:
+            // fallthru
         case StmtKind.STRING_EXPR: {
             var expr = s as (*StringExpr)
 
-            if(expr.string.mod == Mod.MULTISTR) {
+            var length = 0
+            var start = 0
+            var end = 0
+
+            if(expr.string.mod & Mod.NATIVE_STRING) {
+                this.emitStrn("(", 1)
+                this.emitSymbol(expr.operand.typeInfo.sym)
+                this.emitStrn(")", 1)
+                this.emitStr(" { .buffer = ")
+            }
+
+            if(expr.string.mod & Mod.MULTISTR) {
                 var str = expr.string.str
 
                 this.buf.appendChar('"') // "
+                start = this.buf.length
                 for(var i = 0; i < str.length;) {
                     var byte = str.buffer[i] as (u8)
 
@@ -2527,12 +2541,29 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                         i += len
                     }
                 }
+                end = this.buf.length
+
                 this.buf.appendChar('"') // "
             }
             else {
                 this.buf.appendStrn("\"", 1)
+                start = this.buf.length
+
                 this.buf.appendStrn(expr.string.str.buffer, expr.string.str.length)
+
+                end = this.buf.length
                 this.buf.appendStrn("\"", 1)
+            }
+
+            if(expr.string.mod & Mod.NATIVE_STRING) {
+                while(start < end) {
+                    var c = this.buf.buffer[start]
+                    if(c != '\\') {
+                        length += 1
+                    }
+                    start+=1
+                }
+                this.emit(", .length = %d }", length)
             }
             return;
         }

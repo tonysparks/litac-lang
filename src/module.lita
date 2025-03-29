@@ -8,6 +8,7 @@ import "std/system"
 import "std/libc"
 import "std/mem"
 import "std/mem/arena_allocator"
+import "std/assert"
 
 import "phase_result"
 import "symbols"
@@ -25,6 +26,7 @@ public enum ModuleFlags {
     TYPE_IMPORTED = (1<<2),
 
     INCREMENTAL_COMPILATION = (1<<3),
+    IS_BUILTIN    = (1<<4),
 }
 
 public struct ModuleId {
@@ -73,6 +75,10 @@ public const BUILTIN_IMPORT_TOKEN = Token {
         }
     }
 }
+
+public var anyBuiltin: *Symbol = null
+public var stringBuiltin: *Symbol = null
+
 public const builtins = Module{}
 public func BuiltinsInit(lita: *Lita) : *Module {
     BUILTIN_IMPORT_IDENT.str = BUILTIN
@@ -80,7 +86,7 @@ public func BuiltinsInit(lita: *Lita) : *Module {
 
     builtins.text = StringBuffer{}
     builtins.ast = null
-    builtins.flags = 0
+    builtins.flags = ModuleFlags.IS_BUILTIN
     builtins.allocator = lita.allocator
     builtins.importedBy = StrMap<ModuleImport>(ModuleImport{}, 512, lita.allocator)
     builtins.symbols.init(ScopeKind.MODULE, null, lita.result, &builtins, lita.allocator)
@@ -111,6 +117,16 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     AddBuiltin(lita, &VOID_TYPE)
 
     return &builtins
+}
+
+public func AssignBuiltinSymbols(module: *Module) {
+    assert(module != null)
+
+    stringBuiltin = module.getType(STRING_TYPE)
+    assert(stringBuiltin != null)
+
+    anyBuiltin = module.getType(ANY_TYPE)
+    assert(anyBuiltin != null)
 }
 
 func AddBuiltin(lita: *Lita, type: *TypeInfo) {

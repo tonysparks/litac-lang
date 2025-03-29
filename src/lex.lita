@@ -85,6 +85,7 @@ public enum TokenType {
     COLON,
     COLON_COLON,
     DOUBLE_QUOTE,
+    DOLLAR_QUOTE,
 
     LESS_THAN,
     LESS_EQUALS,
@@ -209,6 +210,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.COLON] = ":",
     [TokenType.COLON_COLON] = "::",
     [TokenType.DOUBLE_QUOTE] = "\"",
+    [TokenType.DOLLAR_QUOTE] = "$\"",
 
     [TokenType.LESS_THAN] = "<",
     [TokenType.LESS_EQUALS] = "<=",
@@ -451,8 +453,9 @@ public union Value {
 }
 
 public enum Mod {
-    NONE = 0,
-    MULTISTR,
+    NONE            = 0,
+    MULTISTR        = (1<<1),
+    NATIVE_STRING   = (1<<2),
 }
 
 public struct Token {
@@ -1166,7 +1169,7 @@ func (l: *Lexer) validateCodepoint(str: *const char, len: i32) : bool {
     return true
 }
 
-func (l: *Lexer) scanString() : Token {
+func (l: *Lexer) scanString(isNative: bool) : Token {
     var isVerbatim = false
     var isValid = true
     var startPos: *const char = null
@@ -1275,13 +1278,13 @@ func (l: *Lexer) scanString() : Token {
 
     l.token.type = TokenType.STRING
     l.token.pos.end = l.stream
+    l.token.mod = isNative ? Mod.NATIVE_STRING : Mod.NONE
     if(isVerbatim) {
         l.token.value.str.length = ((l.stream - startPos) - 3) as (i32)
-        l.token.mod = Mod.MULTISTR
+        l.token.mod |= Mod.MULTISTR
     }
     else {
         l.token.value.str.length = ((l.stream - startPos) - 1) as (i32)
-        l.token.mod = Mod.NONE
     }
 
     return isValid ? l.token : l.errorToken()
@@ -1333,6 +1336,10 @@ func (l: *Lexer) scanSymbol() : Token {
         }
         case '$': {
             l.token.type = TokenType.DOLLAR
+            if(l.stream[0] == '"') {
+                l.nextChar()
+                l.token.type = TokenType.DOLLAR_QUOTE
+            }
             break;
         }
         case '#': {
@@ -1543,7 +1550,14 @@ repeat:
             goto repeat;
         }
         case '"': { // "
-            return l.scanString()
+            return l.scanString(.isNative = false)
+        }
+        case '$': {
+            if(l.stream[1] != '"') {
+                return l.scanSymbol()
+            }
+            l.nextChar() // eat the $
+            return l.scanString(.isNative = true)
         }
         case '\'': {
             return l.scanChar()
