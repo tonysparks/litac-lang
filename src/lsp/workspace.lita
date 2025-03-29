@@ -831,7 +831,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
                 name = StringInit(symbol.decl.name.str.buffer, symbol.decl.name.str.length)
             }
 
-            if(name.startsWith(prefix.buffer, prefix.length)) {
+            if(name.startsWith(prefix)) {
                 var item = SymbolToCompletionItem(symbol, alloc)
                 results.add(item)
             }

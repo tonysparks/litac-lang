@@ -14,8 +14,7 @@ import "std/system"
 import "pkg_mgr/pkg_mgr"
 import "pkg_mgr/pkg_install"
 
-public const SEPARATOR = "|"
-public const SEPARATOR_LENGTH = 1  /* we need better const support! */
+public const SEPARATOR = $"|"
 
 public enum PackageType {
     EXECUTABLE,
@@ -77,11 +76,11 @@ public func (this: *PackageId) version() : String {
 
 public func PackageIdFromString(id: *const char, pkgId: *PackageId) : bool {
     var view = StringInit(id)
-    var nameIndex = view.indexOfAt(SEPARATOR, .len = SEPARATOR_LENGTH, .fromIndex = 0)
+    var nameIndex = view.indexOfAt(SEPARATOR, .fromIndex = 0)
     if(nameIndex < 0) {
         goto invalid
     }
-    var versionIndex = view.indexOfAt(SEPARATOR, .len = SEPARATOR_LENGTH, .fromIndex = nameIndex + 1)
+    var versionIndex = view.indexOfAt(SEPARATOR, .fromIndex = nameIndex + 1)
     if(versionIndex < 0) {
         goto invalid
     }
@@ -234,10 +233,16 @@ public func ParsePackageId(
     var nameLen = name.length()
     var versionLen = version.length()
 
-    var sb = StringBuilderInit(repoLen + nameLen + versionLen + (SEPARATOR_LENGTH*2)+1, allocator)
+    var sb = StringBuilderInit(repoLen + nameLen + versionLen + (SEPARATOR.length*2)+1, allocator)
     defer sb.free()
 
-    sb.append("%s%s%s%s%s", repo, SEPARATOR, name, SEPARATOR, version)
+    sb.append("%s%.*s%s%.*s%s",
+        repo,
+        SEPARATOR.length, SEPARATOR.buffer,
+        name,
+        SEPARATOR.length, SEPARATOR.buffer,
+        version
+    )
 
     var id = sb.cStr();
     PackageIdFromString(sb.cStr(), pkgId)

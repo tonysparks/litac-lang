@@ -89,7 +89,7 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
         var pkgFile = StringBufferInit(pkgPath, MAX_PATH)
         pkgFile.appendStr("/pkg.zip")
 
-        if(pkgId.repo().startsWith("file://")) {
+        if(pkgId.repo().startsWith($"file://")) {
             status = zipLocalPackage(pm, pkgId, pkgFile.cStr())
         }
         else {
@@ -290,7 +290,7 @@ func getRepoTemplate(pkgId: *PackageId) : *const char {
 
     var repo = pkgId.repo()
 
-    if(repo.startsWith("https://github.com")) {
+    if(repo.startsWith($"https://github.com")) {
         // Example: https://github.com/tonysparks/seventh/archive/refs/tags/v0.4.1-beta.zip
         return "%.*s/archive/refs/tags/%.*s.zip"
     }

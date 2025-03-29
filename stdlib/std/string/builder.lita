@@ -229,7 +229,7 @@ public func (b: *StringBuilder) indexOf(str: *const char, len: i32 = -1) : i32 {
 
 public func (b: *StringBuilder) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
     var view = b.asString()
-    return view.indexOfAt(str, len, fromIndex)
+    return view.indexOfAt(str.toString(), fromIndex)
 }
 
 public func (b: *StringBuilder) replace(start: i32, end: i32, str: *const char) : i32 {

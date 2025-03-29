@@ -1691,12 +1691,12 @@ public func (this: *TypeInfo) getBaseName(
 public func (this: *TypeInfo) getBaseNameView() : String {
     var baseName = this.name.view
 
-    var index = baseName.indexOf("<", 1)
+    var index = baseName.indexOf($"<")
     if(index > -1) {
         baseName = baseName.substring(0, index)
     }
 
-    index = baseName.lastIndexOfAt("::", 2)
+    index = baseName.lastIndexOfAt($"::")
     if(index > -1) {
         baseName = baseName.substring(index + 2)
     }

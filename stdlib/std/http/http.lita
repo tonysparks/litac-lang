@@ -184,7 +184,7 @@ func HttpHeadersCallback(data: *void, size: usize, n: usize, userdata: *void) : 
 
     var buffer = builder.toString()
     if(resp.headers.capacity > 0) {
-        var index = buffer.indexOf(":", 1)
+        var index = buffer.indexOf($":")
         var key = buffer.substring(0, index).trim()
         var value = buffer.substring(index + 1).trim()
         resp.headers.put(key, value)

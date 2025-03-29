@@ -467,6 +467,9 @@ public func (str: *const char) equalsString(other: String) : bool {
 }
 
 public func (str: *const char) length() : i32 {
+    if(str == null) {
+        return 0
+    }
     return strlen(str)
 }
 
@@ -476,6 +479,10 @@ public func (str: *const char) empty() : bool {
 }
 
 public func (str: *const char) toString() : String {
+    if(str == null) {
+        return String{}
+    }
+
     return String {
         .buffer = str,
         .length = strlen(str)
