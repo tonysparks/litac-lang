@@ -19,7 +19,7 @@ struct Entry<K, V> {
 public struct Map<K, V> {
     length: i32
     capacity: i32
-    alloc: *const mem::Allocator
+    allocator: *const mem::Allocator
 
     entries: *Entry<K, V>
 
@@ -44,19 +44,19 @@ public struct MapEntry<K, V> {
 
 public func StrMap<V>(emptyValue: V,
                       initialSize: i32 = 16,
-                      alloc: *const mem::Allocator = null) : Map<*const char, V> {
+                      allocator: *const mem::Allocator = null) : Map<*const char, V> {
 
     var m = Map<*const char, V>{};
-    m.init<*const char, V>(emptyValue, initialSize, alloc);
+    m.init<*const char, V>(emptyValue, initialSize, allocator);
     return m;
 }
 
 public func StringMap<V>(emptyValue: V,
                              initialSize: i32 = 16,
-                             alloc: *const mem::Allocator = null) : Map<String, V> {
+                             allocator: *const mem::Allocator = null) : Map<String, V> {
 
     var m = Map<String, V>{};
-    m.init<String, V>(emptyValue, initialSize, alloc, String{.buffer = 0, .length = 0});
+    m.init<String, V>(emptyValue, initialSize, allocator, String{.buffer = 0, .length = 0});
     return m;
 }
 
@@ -64,16 +64,16 @@ public func StringMap<V>(emptyValue: V,
 
 public func (m: *Map<K, V>) init<K, V>(emptyValue: V,
                                        initialSize: i32,
-                                       alloc: *const mem::Allocator = null,
+                                       allocator: *const mem::Allocator = null,
                                        emptyKey: K = 0) {
-    if(!alloc) {
-        alloc = mem::defaultAllocator
+    if(!allocator) {
+        allocator = mem::defaultAllocator
     }
 
     m.length = 0;
     m.capacity = 0;
     m.entries = 0
-    m.alloc = alloc;
+    m.allocator = allocator;
     m.emptyValue = emptyValue;
     m.emptyKey = emptyKey;
 
@@ -86,7 +86,7 @@ public func (m: *Map<K, V>) free<K, V>() {
         m.capacity = 0;
         m.length = 0;
         if(m.entries) {
-            m.alloc.free(m.entries as (*void));
+            m.allocator.free(m.entries as (*void));
         }
 
         m.entries = null;
@@ -261,7 +261,7 @@ func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) : bool {
         newlength = 16;
     }
 
-    var newEntries = m.alloc.calloc(newlength, sizeof(:Entry<K, V>)) as (*Entry<K, V>)
+    var newEntries = m.allocator.calloc(newlength, sizeof(:Entry<K, V>)) as (*Entry<K, V>)
     if(!newEntries) {
         return false
     }
@@ -272,7 +272,7 @@ func MapGrow<K, V>(m: *Map<K, V>, newlength: i32) : bool {
         .entries: newEntries,
         .emptyValue = m.emptyValue,
         .emptyKey = m.emptyKey,
-        .alloc: m.alloc
+        .allocator: m.allocator
     }
 
     for(var i = 0; i < m.capacity; i+=1) {
@@ -391,7 +391,7 @@ func testRemove() {
     map.init(
         .emptyValue = 0,
         .initialSize = 4,
-        .alloc = mem::defaultAllocator
+        .allocator = mem::defaultAllocator
         //.emptyKey = 0
     )
     defer map.free()
@@ -433,7 +433,7 @@ func performanceTest() {
         map.init(
             .emptyValue = 0,
             .initialSize = 4,
-            .alloc = mem::defaultAllocator
+            .allocator = mem::defaultAllocator
             //.emptyKey = 0
         )
         defer map.free()

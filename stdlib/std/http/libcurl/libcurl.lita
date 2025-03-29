@@ -20,6 +20,9 @@
     .options = "-lcurl"
 );
 
+@raw("""
+typedef struct curl_slist curl_slist;
+""");
 
 /*
 @raw("""
@@ -110,6 +113,9 @@ typedef struct tagBITMAPINFOHEADER {
 public struct CURL;
 
 @foreign
+public struct curl_slist;
+
+@foreign
 public func curl_global_init(flags: i32) : CURLcode;
 
 @foreign
@@ -132,6 +138,12 @@ public func curl_easy_getinfo(curl: *CURL, option: CURLinfo, value: *void) : CUR
 
 @foreign
 public func curl_easy_strerror(code: CURLcode) : *const char;
+
+@foreign
+public func curl_slist_append(list: *curl_slist, str: *const char) : *curl_slist;
+
+@foreign
+public func curl_slist_free_all(list: *curl_slist) : void;
 
 
 @foreign
@@ -156,6 +168,9 @@ public enum CURLoption {
     CURLOPT_CAINFO,
     CURLOPT_FOLLOWLOCATION,
     CURLOPT_MAXREDIRS,
+    CURLOPT_HTTPHEADER,
+    CURLOPT_HEADERFUNCTION,
+    CURLOPT_HEADERDATA,
 }
 
 @foreign

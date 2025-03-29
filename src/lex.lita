@@ -468,7 +468,7 @@ public func (token: *Token) nameEquals(str: *const char) : bool {
         return false
     }
 
-    return token.str.equals(str)
+    return token.str.equalsString(str)
 }
 
 public func (p: *SrcPos) getLineLength() : i32 {

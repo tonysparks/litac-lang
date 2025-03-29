@@ -46,6 +46,15 @@ public func (b: String) substring(start: i32, end: i32 = -1) : String {
     }
 }
 
+public func (b: String) substringOf(str: *const char, len: i32 = -1) : String {
+    var index = b.indexOf(str, len)
+    if(index < 0) {
+        return String{}
+    }
+
+    return b.substring(0, index)
+}
+
 public func (b: String) startsWith(prefix: *const char, len: i32 = -1, fromIndex: i32 = 0) : bool {
     if(!prefix) return false;
 
@@ -76,7 +85,7 @@ public func (b: String) endsWith(suffix: *const char, len: i32 = -1) : bool {
     return b.startsWith(suffix, len, b.length - len)
 }
 
-public func (b: String) equals(str: *const char, len: i32 = -1) : bool {
+public func (b: String) equalsString(str: *const char, len: i32 = -1) : bool {
     if(!str) {
         return b.buffer == null;
     }
@@ -89,11 +98,9 @@ public func (b: String) equals(str: *const char, len: i32 = -1) : bool {
     return strncmp(b.buffer, str, len) == 0
 }
 
-public func (b: String) equalsString(other: String) : bool {
-    return b.equals(other.buffer, other.length)
+public func (b: String) equals(other: String) : bool {
+    return b.equalsString(other.buffer, other.length)
 }
-
-
 
 public func (b: String) equalsIgnoreCase(str: *const char, len: i32 = -1) : bool {
     if(!str) {
@@ -459,6 +466,10 @@ public func (str: *const char) equals(other: *const char) : bool {
     return strcmp(str, other) == 0
 }
 
+public func (str: *const char) equalsString(other: String) : bool {
+    return StringEqualLen(str, other.buffer, other.length)
+}
+
 public func (str: *const char) length() : i32 {
     return strlen(str)
 }
@@ -484,13 +495,13 @@ func testEquals() {
     var d = StringInit("HelloWorld")
     var e = StringInit(null)
 
-    assert(a.equals(c.buffer, c.length) == true)
-    assert(a.equals("Hell") == false)
-    assert(a.equals("Hello World") == true)
-    assert(a.equals(b.buffer, b.length) == false)
-    assert(a.equals(d.buffer, d.length) == false)
-    assert(e.equals(d.buffer, d.length) == false)
-    assert(a.equals(e.buffer, e.length) == false)
+    assert(a.equalsString(c.buffer, c.length) == true)
+    assert(a.equalsString("Hell") == false)
+    assert(a.equalsString("Hello World") == true)
+    assert(a.equalsString(b.buffer, b.length) == false)
+    assert(a.equalsString(d.buffer, d.length) == false)
+    assert(e.equalsString(d.buffer, d.length) == false)
+    assert(a.equalsString(e.buffer, e.length) == false)
 }
 
 
@@ -578,7 +589,7 @@ func testSplitSingle() {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals("a=xxx"))
+        assert(n1.equalsString("a=xxx"))
         count += 1
     }
 
@@ -586,7 +597,7 @@ func testSplitSingle() {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals("b=yyy"))
+        assert(n1.equalsString("b=yyy"))
         count += 1
     }
 
@@ -605,7 +616,7 @@ func testSplitMulti() {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals("a=xxx"))
+        assert(n1.equalsString("a=xxx"))
         count += 1
     }
 
@@ -613,7 +624,7 @@ func testSplitMulti() {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals("b=yyy"))
+        assert(n1.equalsString("b=yyy"))
         count += 1
     }
 
@@ -633,7 +644,7 @@ func testSplitOne() {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals("a=xxx"))
+        assert(n1.equalsString("a=xxx"))
         count += 1
     }
 
@@ -652,14 +663,14 @@ func testSplitOneFirst() {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals(""))
+        assert(n1.equalsString(""))
         count += 1
     }
     {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals("a=xxx"))
+        assert(n1.equalsString("a=xxx"))
         count += 1
     }
 
@@ -678,7 +689,7 @@ func testSplitOneLast() {
         assert(it.hasNext())
         var n1 = it.next()
         printf("N='%.*s'\n", n1.length, n1.buffer)
-        assert(n1.equals("a=xxx"))
+        assert(n1.equalsString("a=xxx"))
         count += 1
     }
 
@@ -690,44 +701,44 @@ func testSplitOneLast() {
 @test("leftTrim")
 func testLeftTrim() {
     var str = StringInit("  x yz")
-    assert(str.leftTrim().equals("x yz"))
+    assert(str.leftTrim().equalsString("x yz"))
 
     str = StringInit("\n\tx yz")
-    assert(str.leftTrim().equals("x yz"))
+    assert(str.leftTrim().equalsString("x yz"))
 
     str = StringInit("")
-    assert(str.leftTrim().equals(""))
+    assert(str.leftTrim().equalsString(""))
 
     str = StringInit("x ")
-    assert(str.leftTrim().equals("x "))
+    assert(str.leftTrim().equalsString("x "))
 }
 
 @test("rightTrim")
 func testRightTrim() {
     var str = StringInit("xy z  ")
-    assert(str.rightTrim().equals("xy z"))
+    assert(str.rightTrim().equalsString("xy z"))
 
     str = StringInit("xy z\n\t")
-    assert(str.rightTrim().equals("xy z"))
+    assert(str.rightTrim().equalsString("xy z"))
 
     str = StringInit("")
-    assert(str.rightTrim().equals(""))
+    assert(str.rightTrim().equalsString(""))
 
     str = StringInit(" x")
-    assert(str.rightTrim().equals(" x"))
+    assert(str.rightTrim().equalsString(" x"))
 }
 
 @test("trim")
 func testTrim() {
     var str = StringInit("  xy z  ")
-    assert(str.trim().equals("xy z"))
+    assert(str.trim().equalsString("xy z"))
 
     str = StringInit("\n\txy z\n\t")
-    assert(str.trim().equals("xy z"))
+    assert(str.trim().equalsString("xy z"))
 
     str = StringInit("")
-    assert(str.trim().equals(""))
+    assert(str.trim().equalsString(""))
 
     str = StringInit("x")
-    assert(str.trim().equals("x"))
+    assert(str.trim().equalsString("x"))
 }

@@ -92,7 +92,8 @@ public const MSG_OOB:i32
 @foreign
 public const MSG_FASTOPEN:i32
 
-
+@foreign
+public func strerror(errnum: i32) : *const char;
 
 @foreign
 public func socket(domain: i32, type: i32, protocol: i32) : i32;

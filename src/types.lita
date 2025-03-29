@@ -94,7 +94,7 @@ const typeKindText = [TypeKind.MAX_TYPE_KINDS + 1]*const char {
 public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
     var view = StringInit(str, len)
     for(var i = TypeKind.BOOL; i < TypeKind.MAX_TYPE_KINDS; i += 1) {
-        if(view.equals(typeKindText[i])) {
+        if(view.equalsString(typeKindText[i])) {
             return i;
         }
     }

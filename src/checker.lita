@@ -1122,7 +1122,7 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
 
             // this atleast has the same name, now check if
             // the function types are compatible
-            if(str.substring(start + 1, end).equals(functionName)) {
+            if(str.substring(start + 1, end).equalsString(functionName)) {
                 if(IsFuncImpl(traitFn, sym.type, this)) {
                     matchedCount += 1
                     break;

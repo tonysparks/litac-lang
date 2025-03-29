@@ -1,4 +1,5 @@
 import "std/libc"
+import "std/string"
 
 #if OS == "WINDOWS"
     import using "std/net/net_win"

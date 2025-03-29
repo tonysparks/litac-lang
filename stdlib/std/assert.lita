@@ -35,7 +35,7 @@ public func assertString(
     filename: *const char = __FILE__,
     lineNumber: usize = __LINE__): void {
 
-    if(!expected.equalsString(actual)) {
+    if(!expected.equals(actual)) {
         fprintf(stderr, "%s:%zu: Assertion failed: expected: '%.*s' to equal actual: '%.*s'\n",
             filename,
             lineNumber,

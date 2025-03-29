@@ -1,20 +1,61 @@
 import "std/libc"
 
-public const MAX_I8:i32  =  (1<<7)
-public const MIN_I8:i32  = ~(1<<7)
+public const MAX_I8:i32  =  ((1<<7) - 1)
+public const MIN_I8:i32  =  (-128_i32)
 
-public const MAX_I16:i32 =  (1<<15)
-public const MIN_I16:i32 = ~(1<<15)
+public const MAX_I16:i32 =  ((1<<15) - 1)
+public const MIN_I16:i32 =  (-32_768_i32)
 
-public const MAX_I32:i32 =  (1<<31)
-public const MIN_I32:i32 = ~(1<<31)
+public const MAX_I32:i32 =  (0x7FFFFFFF)
+public const MIN_I32:i32 =  (-2_147_483_648_u32) as (i32)
 
-public const MAX_I64:i64 =  (1_i64<<63_i64)
-public const MIN_I64:i64 = ~(1_i64<<63_i64)
+public const MAX_I64:i64 =  (0x7FFF_FFFF_FFFF_FFFF)
+public const MIN_I64:i64 =  ((1_i64<<63_i64))
 
 
-public const MAX_U8:u32  =  (1<<8)  - 1
-public const MAX_U16:u32 =  (1<<16) - 1
-public const MAX_U32:u64 =  (1_i64<<32_i64) - 1_i64
-// TODO
-//public const MAX_U64:u64 =  0xFFFF_FFFF_FFFF_FFFF
+public const MAX_U8:u32  =  ((1<<8)  - 1)
+public const MAX_U16:u32 =  ((1<<16) - 1)
+public const MAX_U32:u64 =  ((1_i64<<32_i64) - 1_i64)
+public const MAX_U64:u64 =  0xFFFF_FFFF_FFFF_FFFF
+
+import "std/assert"
+
+@test
+func testLimits() {
+    assert(MAX_I8  == 0x7F)
+    assert(MAX_I8  == 127)
+
+    assert(MAX_I16 == 0x7FFF)
+    assert(MAX_I16 == 32_767)
+
+    assert(MAX_I32 == 0x7FFF_FFFF)
+    assert(MAX_I32 == 2_147_483_647)
+
+    assert(MAX_I64 == 0x7FFF_FFFF_FFFF_FFFF)
+    assert(MAX_I64 == 9_223_372_036_854_775_807)
+
+
+    assert(MIN_I8  == -0x80_u8)
+    assert(MIN_I8  == -128_u32)
+
+    assert(MIN_I16 == -0x8000)
+    assert(MIN_I16 == -32_768_u16)
+
+    assert(MIN_I32 == -0x8000_0000)
+    assert(MIN_I32 == -2_147_483_648_u32)
+
+    assert(MIN_I64 == -0x8000_0000_0000_0000)
+    assert(MIN_I64 == -9_223_372_036_854_775_808_u64)
+
+    assert(MAX_U8 == 255)
+    assert(MAX_U8 == 0xFF)
+
+    assert(MAX_U16 == 65_535)
+    assert(MAX_U16 == 0xFFFF)
+
+    assert(MAX_U32 == 4_294_967_295)
+    assert(MAX_U32 == 0xFFFF_FFFF)
+
+    assert(MAX_U64 == 18_446_744_073_709_551_615_u64)
+    assert(MAX_U64 == 0xFFFF_FFFF_FFFF_FFFF)
+}

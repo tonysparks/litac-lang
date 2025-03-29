@@ -14,6 +14,11 @@ public enum LogLevel {
     FATAL
 }
 
+// TODO
+// public struct LogOptions {
+//     outputFile: *const char
+// }
+
 var outputFile: *FILE = null
 var mtx: Mutex;
 

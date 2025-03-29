@@ -474,7 +474,7 @@ func (this: *TypeChecker) inferredType(
             var aggBaseName = aggInfo.getBaseNameView()
             var expectedBaseName = expectedAggInfo.getBaseNameView()
 
-            if(aggBaseName.equalsString(expectedBaseName)) {
+            if(aggBaseName.equals(expectedBaseName)) {
                 var sym = expectedAggInfo.sym; // expectedAggInfo.decl.genericParams?
                 var pSize = sym.genericParams.size()
                 if(pSize) {

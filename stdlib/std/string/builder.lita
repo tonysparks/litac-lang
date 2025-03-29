@@ -282,7 +282,7 @@ public func (b: *StringBuilder) insert(index: i32, format: *const char, ...) : i
     return len
 }
 
-public func (b: *StringBuilder) trim() {
+public func (b: *StringBuilder) trim() : *StringBuilder {
     var start = 0
     var end = 0
 
@@ -302,8 +302,8 @@ public func (b: *StringBuilder) trim() {
     }
 
     // Delete the right side
-    start = b.length - 1;
-    end = b.length - 1;
+    start = b.length;
+    end = b.length;
     for(var i = b.length - 1; i >= 0; i-=1) {
         var c = b.buffer[i]
         if(c.isWhitespace()) {
@@ -317,6 +317,8 @@ public func (b: *StringBuilder) trim() {
     if(end > start) {
         b.delete(start, end)
     }
+
+    return b
 }
 
 public func (b: *StringBuilder) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
@@ -409,4 +411,24 @@ func BufferGrow(b: *StringBuilder, increment: i32) : bool {
     b.buffer = newBuffer
     b.capacity = n;
     return true
+}
+
+
+@test("trim")
+func testTrim() {
+    var str = StringBuilderInit(256)
+    str.append("  xy z  ")
+    assert(str.trim().cStr().equals("xy z"))
+
+    str = StringBuilderInit(256)
+    str.append("\n\txy z\n\t")
+    assert(str.trim().cStr().equals("xy z"))
+
+    str = StringBuilderInit(256)
+    str.append("")
+    assert(str.trim().cStr().equals(""))
+
+    str = StringBuilderInit(256)
+    str.append("x")
+    assert(str.trim().cStr().equals("x"))
 }

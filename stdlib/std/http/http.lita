@@ -1,5 +1,6 @@
 import "std/http/libcurl"
 import "std/string/builder"
+import "std/string/buffer"
 import "std/string"
 import "std/mem"
 import "std/map"
@@ -14,16 +15,23 @@ public enum HttpRequestType {
 
 public typedef func(/*data:*/ *void, /*size: */ usize, /*n: */ usize, /*userdata: */ *void) : usize as HttpResponseCallback;
 
+public typedef Map<String, String> as Headers;
+public func HeadersInit(initialSize: i32 = 16, allocator: *const Allocator = defaultAllocator) : Headers {
+    var headers = Headers{}
+    headers.init(String{}, initialSize, allocator, String{})
+    return headers
+}
+
 public struct HttpRequest {
     url: *const char
-    headers: Map<*const char, *const char>
+    headers: Headers
     type: HttpRequestType
     body: *char
 }
 
 public struct HttpResponse {
     statusCode: i32
-    headers: Map<*const char, *const char>
+    headers: Headers
 
     body: StringBuilder
 
@@ -37,14 +45,17 @@ public struct HttpOptions {
 
 public struct Http {
     options: HttpOptions
-    alloc: *const Allocator
+    allocator: *const Allocator
 }
 
 public func (this: *Http) init(
     options: *HttpOptions,
-    allocator: *const Allocator = defaultAllocator) : bool {
+    allocator: *const Allocator = defaultAllocator
+) : bool {
 
     this.options = *options
+    this.allocator = allocator
+
     if(curl_global_init(CURLflags.CURL_GLOBAL_ALL) != CURLcode.CURLE_OK) {
         // TODO: Expose error states... via curl_easy_strerror
         return false
@@ -103,10 +114,36 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_WRITEFUNCTION, (&HttpWriteCallback) as (*void));
     curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_WRITEDATA, resp);
 
+    curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_HEADERFUNCTION, (&HttpHeadersCallback) as (*void));
+    curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_HEADERDATA, resp);
+
     if(req.type == HttpRequestType.POST) {
         // TODO: https://curl.se/libcurl/c/CURLOPT_POST.html
         // curl_easy_setopt(curl, CURLoption.CURLOPT_POST, 1_i64);
         // curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+    }
+
+    if(!req.headers.empty()) {
+        //var buffer: [1024]char;
+        //var sb = StringBufferInit(buffer, 1024, 0)
+        var sb = StringBuilderInit(1024, this.allocator)
+        defer sb.free()
+
+        var headers: *curl_slist = null
+
+        var iter = req.headers.iter()
+        while(iter.hasNext()) {
+            var header = iter.next()
+
+            sb.append("%.*s: %.*s",
+                header.key.length, header.key.buffer,
+                header.value.length, header.value.buffer
+            )
+            headers = curl_slist_append(headers, sb.cStr())
+            sb.clear()
+        }
+
+        curl_easy_setopt<*curl_slist>(curl, CURLoption.CURLOPT_HTTPHEADER, headers)
     }
 
     var curlRes = curl_easy_perform(curl)
@@ -136,6 +173,24 @@ func HttpWriteCallback(data: *void, size: usize, n: usize, userdata: *void) : us
     return totalSize
 }
 
+func HttpHeadersCallback(data: *void, size: usize, n: usize, userdata: *void) : usize {
+    var totalSize = size * n
+    var resp = userdata as (*HttpResponse)
+
+    // TODO: This is terrible, instead write to a buffer and create
+    // a struct to re-parse them
+    var builder = StringBuilderInit(totalSize as (i32), resp.headers.allocator)
+    builder.appendStrn(data as (*const char), totalSize as (i32))
+
+    var buffer = builder.toString()
+    if(resp.headers.capacity > 0) {
+        var index = buffer.indexOf(":", 1)
+        var key = buffer.substring(0, index).trim()
+        var value = buffer.substring(index + 1).trim()
+        resp.headers.put(key, value)
+    }
+    return totalSize
+}
 
 @test
 func testFileDownload() {
