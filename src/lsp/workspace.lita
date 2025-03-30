@@ -780,7 +780,7 @@ public func (this: *Workspace) autoComplete(uri: *const char,
     var lineStart = doc.getLineStart(lineNumber)
     var offset = lineStart + (character-1)
 
-    if(offset >= doc.text.length) {
+    if(offset >= doc.text.length as (u32)) {
         return JSON_NULL;
     }
 

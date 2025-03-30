@@ -173,6 +173,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
         this.emitMain(this.lita.programSymbols.mainEntry)
     }
 
+    this.emitln()
     this.flush()
 }
 
@@ -1999,6 +2000,10 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
 
                 this.emitStrn(" {", 2)
+                if(expr.values.empty()) {
+                    buf.appendStrn("0", 1)
+                }
+
                 for(var i = 0; i < expr.values.size(); i+=1) {
                     if(i > 0) {
                         this.emitStrn(",\n", 2)
@@ -2299,6 +2304,10 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 this.emitStrn(")", 1)
             }
             this.emitStrn(" {", 2)
+            if(expr.arguments.empty()) {
+                this.emitStrn("0", 1)
+            }
+
             for(var i = 0; i < expr.arguments.size(); i += 1) {
                 if(i > 0) {
                     this.emitStrn(",\n", 2)

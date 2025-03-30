@@ -74,6 +74,12 @@
 		},
 		{
 			"include": "#multistrings"
+		},
+		{
+			"include": "#native_strings"
+		},
+		{
+			"include": "#native_multistrings"
 		}
 	],
 	"repository": {
@@ -91,6 +97,28 @@
 		"multistrings": {
 			"name": "string.quoted.double.litac",
 			"begin": "\"\"\"",
+			"end": "\"\"\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.litac",
+					"match": "\\\\."
+				}
+			]
+		},
+        "native_strings": {
+			"name": "string.quoted.double.litac",
+			"begin": "\\$\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.litac",
+					"match": "\\\\."
+				}
+			]
+		},
+		"native_multistrings": {
+			"name": "string.quoted.double.litac",
+			"begin": "\\$\"\"\"",
 			"end": "\"\"\"",
 			"patterns": [
 				{

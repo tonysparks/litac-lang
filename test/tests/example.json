@@ -20,5 +20,6 @@
         assert(x == 1)
         assert(y == 7.4f)
         assert(z == true)
-    `
+    `,
+    "x": -1
 }

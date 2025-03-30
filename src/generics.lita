@@ -335,7 +335,6 @@ func CheckTypeConstraints(
     genericSym: *Symbol,
     name: *TypeSpec) : bool {
 
-    var newDecl = genericSym.decl as (*GenericDecl)
     var decl = sym.decl as (*GenericDecl)
 
     // unable to check type constraints
@@ -813,7 +812,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                         .kind = arg.kind,
                         .type = template.replaceTypeSpec(arg.type)
                     }
-                    expr.genericArgs.set(i, arg)
+                    expr.genericArgs.set(i, newArg)
                 }
                 else {
                     assert(false)
@@ -857,7 +856,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                         .kind = arg.kind,
                         .type = template.replaceTypeSpec(arg.type)
                     }
-                    expr.genericArgs.set(i, arg)
+                    expr.genericArgs.set(i, newArg)
                 }
                 else {
                     assert(false)

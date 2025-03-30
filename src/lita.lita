@@ -164,9 +164,9 @@ public struct LitaOptions {
 
 
 public func (this: *Lita) init(options: *LitaOptions) {
+/*
     var size: usize = options.maxMemory > 0 ? options.maxMemory : 1024 * 1024 * 1024;
 
-/*
     this.linearAllocator.init(
         defaultAllocator.alloc(size),
         size,

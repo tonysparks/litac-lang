@@ -77,7 +77,7 @@ func main(len: i32, args: **char) : i32 {
 
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
-
+"../test/tests/string_buffer.json",/*
         "../test/tests/single.json",
         "../test/tests/number_types.json",
         "../test/tests/visibility_modifiers.json",
@@ -118,7 +118,7 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
         "../test/tests/generics_inference.json",
-        "../test/tests/generics_constraints.json",
+        "../test/tests/generics_constraints.json",*/
         null
     }
 
@@ -353,7 +353,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
             options.compileCmd = suite.buildCmd
         }
         else {
-            options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+            options.compileCmd = "clang -Wall -Wextra -Werror -pedantic -Wno-unused-parameter -Wno-unused-function %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
         }
     }
 

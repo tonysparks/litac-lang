@@ -1,7 +1,7 @@
 #ifndef _LITAC_HEADER_H
 #define _LITAC_HEADER_H
 
-// Generated on Sat Mar 29 18:19:13 2025
+// Generated on Sat Mar 29 21:36:05 2025
 
 #include <stdint.h>
 #include <stddef.h>
@@ -109,8 +109,6 @@ litaC_usize litaC_std__mem__arena_allocator__PAGE_SIZE = (litaC_usize)4096UL;
 #define litaC_checker__MAX_LABELS (256)
 
 #define litaC_checker__MAX_LABEL_NAME (32)
-
-#define litaC_intern__MAX_SOMETHING (0)
 
 #define litaC_generics__MAX_GENERIC_NAME (1024)
 
@@ -30055,7 +30053,6 @@ typedef struct litaC_intern__anon_14 litaC_intern__anon_14;
 typedef struct litaC_intern__anon_15 litaC_intern__anon_15;
 typedef union litaC_intern__InternedString litaC_intern__InternedString;
 typedef struct litaC_intern__Strings litaC_intern__Strings;
-typedef struct litaC_intern__X litaC_intern__X;
 typedef struct litaC_generics__Template litaC_generics__Template;
 typedef struct litaC_checker_expr__ParamInfo litaC_checker_expr__ParamInfo;
 typedef enum litaC_error_codes__ErrorCode {
@@ -30425,7 +30422,7 @@ LITAC_INLINE
 litaC_void* litaC_std__mem__Allocator_realloc(const litaC_std__mem__Allocator* litaC_a,litaC_void* litaC_ptr,litaC_usize litaC_oldsize,litaC_usize litaC_newsize);
 LITAC_INLINE 
 litaC_void litaC_std__mem__Allocator_free(const litaC_std__mem__Allocator* litaC_a,litaC_void* litaC_ptr);
-litaC_void litaC_std__assert__bort();
+litaC_void litaC_std__assert__bort(void);
 litaC_void litaC_std__assert__assertStr(const litaC_char* litaC_expected,const litaC_char* litaC_actual,const litaC_char* litaC_filename,litaC_usize litaC_lineNumber);
 litaC_void litaC_std__assert__assertString(litaC_std__builtins__String litaC_expected,litaC_std__builtins__String litaC_actual,const litaC_char* litaC_filename,litaC_usize litaC_lineNumber);
 litaC_std__builtins__String litaC_std__string__StringInit(const litaC_char* litaC_buffer,litaC_i32 litaC_length);
@@ -30455,7 +30452,6 @@ litaC_std__builtins__String litaC_std__string__String_copy(litaC_std__builtins__
 litaC_void litaC_std__string__String_forEach(litaC_std__builtins__String litaC_b,litaC_bool (*litaC_fn)(litaC_char));
 litaC_bool litaC_std__string__String_empty(litaC_std__builtins__String litaC_b);
 litaC_i32 litaC_std__string__String_size(litaC_std__builtins__String litaC_b);
-litaC_void litaC_std__string__String_clear(litaC_std__builtins__String litaC_b);
 litaC_char litaC_std__string__String_get(litaC_std__builtins__String litaC_b,litaC_i32 litaC_index);
 litaC_char* litaC_std__string__StringClone(const litaC_char* litaC_original,litaC_i32 litaC_len,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_char* litaC_std__string__StringCopy(const litaC_char* litaC_src,litaC_char* litaC_dest,litaC_usize litaC_size);
@@ -30502,6 +30498,7 @@ litaC_std__io__FileStatus litaC_std__io__WriteFile(const litaC_char* litaC_fileN
 litaC_std__string__builder__StringBuilder litaC_std__string__builder__StringBuilderInit(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
 litaC_void litaC_std__string__builder__StringBuilder_init(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
 litaC_void litaC_std__string__builder__StringBuilder_free(litaC_std__string__builder__StringBuilder* litaC_b);
+litaC_i32 litaC_std__string__builder__StringBuilder_appendString(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str);
 litaC_i32 litaC_std__string__builder__StringBuilder_appendStr(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str);
 litaC_i32 litaC_std__string__builder__StringBuilder_appendStrn(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str,litaC_i32 litaC_len);
 litaC_i32 litaC_std__string__builder__StringBuilder_appendFloat(litaC_std__string__builder__StringBuilder* litaC_b,litaC_f64 litaC_f);
@@ -30513,10 +30510,10 @@ litaC_i32 litaC_std__string__builder__StringBuilder_appendChar(litaC_std__string
 litaC_i32 litaC_std__string__builder__StringBuilder_append(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_format,...);
 litaC_i32 litaC_std__string__builder__StringBuilder_appendArgs(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_format,va_list litaC_args);
 litaC_void litaC_std__string__builder__StringBuilder_delete(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_start,litaC_i32 litaC_end);
-litaC_bool litaC_std__string__builder__StringBuilder_contains(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str,litaC_i32 litaC_len);
-litaC_i32 litaC_std__string__builder__StringBuilder_indexOf(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str,litaC_i32 litaC_len);
-litaC_i32 litaC_std__string__builder__StringBuilder_indexOfAt(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str,litaC_i32 litaC_len,litaC_i32 litaC_fromIndex);
-litaC_i32 litaC_std__string__builder__StringBuilder_replace(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_start,litaC_i32 litaC_end,const litaC_char* litaC_str);
+litaC_bool litaC_std__string__builder__StringBuilder_contains(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str);
+litaC_i32 litaC_std__string__builder__StringBuilder_indexOf(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str);
+litaC_i32 litaC_std__string__builder__StringBuilder_indexOfAt(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str,litaC_i32 litaC_fromIndex);
+litaC_i32 litaC_std__string__builder__StringBuilder_replace(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_start,litaC_i32 litaC_end,litaC_std__builtins__String litaC_str);
 litaC_i32 litaC_std__string__builder__StringBuilder_insert(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_index,const litaC_char* litaC_format,...);
 litaC_std__string__builder__StringBuilder* litaC_std__string__builder__StringBuilder_trim(litaC_std__string__builder__StringBuilder* litaC_b);
 litaC_i32 litaC_std__string__builder__StringBuilder_copyTo(litaC_std__string__builder__StringBuilder* litaC_b,litaC_char* litaC_buf,litaC_i32 litaC_len,litaC_bool litaC_addZero);
@@ -30532,7 +30529,7 @@ litaC_std__string__builder__StringBuilder* litaC_std__string__builder__StringBui
 const litaC_char* litaC_std__string__builder__StringBuilder_cStrConst(litaC_std__string__builder__StringBuilder* litaC_b);
 litaC_char* litaC_std__string__builder__StringBuilder_cStr(litaC_std__string__builder__StringBuilder* litaC_b);
 LITAC_INLINE 
-litaC_std__string__buffer__StringBuffer litaC_std__string__builder__StringBuilder_asStringBuffer(litaC_std__string__builder__StringBuilder* litaC_b);
+litaC_std__string__buffer__StringBuffer litaC_std__string__builder__StringBuilder_toBuffer(litaC_std__string__builder__StringBuilder* litaC_b);
 litaC_char litaC_std__string__builder__StringBuilder_get(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_index);
 litaC_bool litaC_std__string__builder__StringBuilder_reserve(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_length);
 litaC_bool litaC_std__string__builder__BufferGrow(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_increment);
@@ -30562,8 +30559,6 @@ litaC_char* litaC_std__string__buffer__StringBuffer_cStr(litaC_std__string__buff
 const litaC_char* litaC_std__string__buffer__StringBuffer_cStrConst(litaC_std__string__buffer__StringBuffer litaC_s);
 LITAC_INLINE 
 litaC_std__builtins__String litaC_std__string__buffer__StringBuffer_toString(litaC_std__string__buffer__StringBuffer litaC_s);
-LITAC_INLINE 
-litaC_std__builtins__String litaC_std__string__buffer__StringBuffer_asString(litaC_std__string__buffer__StringBuffer* litaC_b);
 litaC_bool litaC_std__ascii__char_isWhitespace(litaC_char litaC_this);
 litaC_bool litaC_std__ascii__char_isNumeric(litaC_char litaC_this);
 litaC_bool litaC_std__ascii__char_isAlphabetic(litaC_char litaC_this);
@@ -30584,11 +30579,11 @@ const litaC_char* litaC_std__system__OSAsStr(Lita_OSType litaC_type);
 Lita_OSType litaC_std__system__OSFromStr(const litaC_char* litaC_str,litaC_usize litaC_len);
 
 
-litaC_bool litaC_std__system__SystemInit();
-Lita_OSType litaC_std__system__GetOS();
-Lita_ArchType litaC_std__system__GetArch();
+litaC_bool litaC_std__system__SystemInit(void);
+Lita_OSType litaC_std__system__GetOS(void);
+Lita_ArchType litaC_std__system__GetArch(void);
 litaC_char* litaC_std__system__GetEnv(const litaC_char* litaC_varName);
-const litaC_char* litaC_std__system__CurrentWorkingPath();
+const litaC_char* litaC_std__system__CurrentWorkingPath(void);
 litaC_bool litaC_std__system__FileTruncate(const litaC_char* litaC_filename,litaC_usize litaC_newLength);
 litaC_bool litaC_std__system__FileTruncateFile(FILE* litaC_file,litaC_usize litaC_newLength);
 litaC_bool litaC_std__system__FileDelete(const litaC_char* litaC_filename);
@@ -30607,15 +30602,15 @@ litaC_bool litaC_std__system__PathEquals(const litaC_char* litaC_a,const litaC_c
 litaC_char* litaC_std__system__FilePathToUri(const litaC_char* litaC_path,litaC_char* litaC_output);
 litaC_char* litaC_std__system__UriToFilePath(const litaC_char* litaC_uri,litaC_char* litaC_output);
 
-litaC_f64 litaC_std__system__SystemTimeMSec();
-const litaC_char* litaC_std__system__CurrentDateTime();
+litaC_f64 litaC_std__system__SystemTimeMSec(void);
+const litaC_char* litaC_std__system__CurrentDateTime(void);
 litaC_std__system__Process litaC_std__system__SystemExec(const litaC_char* litaC_command);
 litaC_i64 litaC_std__system__Process_readOutput(litaC_std__system__Process* litaC_this,litaC_char* litaC_buffer,litaC_usize litaC_length);
 litaC_i64 litaC_std__system__Process_writeInput(litaC_std__system__Process* litaC_this,litaC_char* litaC_buffer,litaC_usize litaC_length);
 litaC_void litaC_std__system__Process_close(litaC_std__system__Process* litaC_this);
 
-litaC_bool litaC_std__system__system_posix___SystemInit();
-const litaC_char* litaC_std__system__system_posix___CurrentWorkingPath();
+litaC_bool litaC_std__system__system_posix___SystemInit(void);
+const litaC_char* litaC_std__system__system_posix___CurrentWorkingPath(void);
 litaC_bool litaC_std__system__system_posix___Mkdir(const litaC_char* litaC_dir);
 litaC_bool litaC_std__system__system_posix___FileIsDir(const litaC_char* litaC_filename);
 LITAC_INLINE 
@@ -30625,12 +30620,12 @@ litaC_bool litaC_std__system__system_posix___FileTruncateFile(FILE* litaC_file,l
 LITAC_INLINE 
 litaC_bool litaC_std__system__system_posix___FileDelete(const litaC_char* litaC_filename);
 
-litaC_f64 litaC_std__system__system_posix___SystemTimeMSec();
+litaC_f64 litaC_std__system__system_posix___SystemTimeMSec(void);
 litaC_u32 litaC_std__map__nextPowerOf2(litaC_u32 litaC_v);
 litaC_u32 litaC_std__map__i32_hash(litaC_i32 litaC_this);
 litaC_bool litaC_std__map__i32_equals(litaC_i32 litaC_this,litaC_i32 litaC_b);
 litaC_void litaC_std__map__Print(litaC_std__map__std__map__Map_cb_i32_c_i32_ce_* litaC_m);
-litaC_void litaC_std__map__testRemove();
+litaC_void litaC_std__map__testRemove(void);
 litaC_u32 litaC_std__hash__i8_hash(litaC_i8 litaC_this);
 litaC_bool litaC_std__hash__i8_equals(litaC_i8 litaC_this,litaC_i8 litaC_other);
 litaC_u32 litaC_std__hash__u8_hash(litaC_u8 litaC_this);
@@ -30760,7 +30755,7 @@ litaC_bool litaC_types__TypeInfo_getFieldPathByType(litaC_types__TypeInfo* litaC
 const litaC_char* litaC_types__TypeInfo_getFunctionName(litaC_types__TypeInfo* litaC_this,litaC_char* litaC_result,litaC_intern__InternedString litaC_methodName,litaC_intern__InternedString* litaC_alias,litaC_bool litaC_includePackage);
 litaC_types__MethodResult litaC_types__TypeInfo_getMethod(litaC_types__TypeInfo* litaC_this,litaC_intern__Strings* litaC_strings,litaC_module__Module* litaC_module,litaC_intern__InternedString litaC_methodName);
 litaC_bool litaC_types__TypeInfo_implementsTrait(litaC_types__TypeInfo* litaC_this,litaC_types__TypeInfo* litaC_iface,litaC_checker__TypeChecker* litaC_checker);
-litaC_i64 litaC_types__NextTypeId();
+litaC_i64 litaC_types__NextTypeId(void);
 
 litaC_void litaC_types__TypesInit(litaC_intern__Strings* litaC_strings);
 litaC_void litaC_ast_new__TypeSpecAllocator_init(litaC_ast_new__TypeSpecAllocator* litaC_this,const litaC_std__mem__Allocator* litaC_allocator);
@@ -31542,7 +31537,7 @@ litaC_bool litaC_build__BuildFileFromFile(const litaC_char* litaC_filename,litaC
 litaC_bool litaC_build__BuildFileFromJson(litaC_std__json__JsonNode* litaC_json,litaC_build__BuildFile* litaC_buildFile,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_void litaC_build__AddStrings(litaC_std__json__JsonNode* litaC_json,const litaC_char* litaC_key,litaC_std__array__std__array__Array_cb__ptr_const_char_ce_* litaC_array,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_std__json__JsonNode* litaC_build__CreateArray(litaC_std__array__std__array__Array_cb__ptr_const_char_ce_* litaC_array,const litaC_std__mem__Allocator* litaC_allocator);
-litaC_bool litaC_tcc__libtcc__IsLibtccAvailable();
+litaC_bool litaC_tcc__libtcc__IsLibtccAvailable(void);
 litaC_void litaC_pkg_mgr__PackageManager_init(litaC_pkg_mgr__PackageManager* litaC_this,litaC_pkg_mgr__PackageOptions litaC_options,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_void litaC_pkg_mgr__PackageManager_free(litaC_pkg_mgr__PackageManager* litaC_this);
 litaC_void litaC_pkg_mgr__PackageManager_printMessages(litaC_pkg_mgr__PackageManager* litaC_this);
@@ -32178,98 +32173,16 @@ litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-union litaC_std__json__JsonValue {
-    litaC_bool boolValue;
-    litaC_f64 doubleValue;
-    litaC_i64 intValue;
-    const litaC_char* strValue;
-    litaC_std__json__JsonObject* objValue;
-    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
-    
-};
-
-
-struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    litaC_u32 hash;
-    const litaC_char* key;
-    litaC_pkg_mgr__pkg__PackageDef* value;
-    
-};
-
-struct litaC_preprocessor__CheckerContext {
-    litaC_module__Module* module;
-    litaC_ast__CompStmt* stmt;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lex__SrcPos* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__builtins__any {
-    litaC_void* value;
-    litaC_u64 id;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Expr** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_module__ModuleImport {
-    litaC_module__Module* module;
-    litaC_intern__InternedString* alias;
-    litaC_bool isUsing;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ {
-    litaC_u32 hash;
-    const litaC_char* key;
-    litaC_lsp__document__Document* value;
-    
-};
-
 struct litaC_symbols__SymGenericArg {
     litaC_ast__GenericArgKind kind;
     litaC_types__TypeInfo* type;
     
 };
 
-struct litaC_intern__X {
-    litaC_i32 v[litaC_intern__MAX_SOMETHING];
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__EnumFieldEntryDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_preprocessor__ScriptDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_preprocessor__ScriptDecl* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lsp__references__Reference* elements;
-    const litaC_std__mem__Allocator* alloc;
+struct litaC_pkg_mgr__PackageOptions {
+    const litaC_char* projectPath;
+    const litaC_char* pkgDir;
+    litaC_lita__LitaOptions* litaOptions;
     
 };
 
@@ -32281,6 +32194,23 @@ struct litaC_lita__Metric {
     
 };
 
+struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ {
+    litaC_u32 hash;
+    const litaC_char* key;
+    litaC_lsp__document__Document* value;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lsp__references__Reference* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+
+
 struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_ {
     litaC_u32 hash;
     const litaC_char* key;
@@ -32288,68 +32218,21 @@ struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ {
+struct litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_types__TypeInfo** elements;
+    litaC_ast__ParameterDecl** elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ {
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
     const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_i64_c__ptr_types__TypeInfo_ce_* entries;
-    litaC_types__TypeInfo* emptyValue;
-    litaC_i64 emptyKey;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    const litaC_char* key;
-    litaC_pkg_mgr__pkg__PackageDef* value;
-    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
-    
-};
-
-
-struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_char** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    const litaC_char* key;
-    litaC_module__ModuleImport value;
-    litaC_module__ModuleImport* valuePtr;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_module__Module_ce_* entries;
+    litaC_module__Module* emptyValue;
+    const litaC_char* emptyKey;
     
 };
 
@@ -32362,33 +32245,44 @@ struct litaC_intern__Strings {
     
 };
 
-struct litaC_std__json__JsonNode {
+struct litaC_std__map__std__map__Entry_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_u32 hash;
+    litaC_i64 key;
+    litaC_types__TypeInfo* value;
+    
+};
+
+struct litaC_cgen__CompilationUnit {
+    litaC_module__Module* module;
+    litaC_char filename[PATH_MAX];
+    FILE* file;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__NoteStmt** elements;
     const litaC_std__mem__Allocator* alloc;
-    litaC_std__json__JsonType type;
-    litaC_std__json__JsonValue value;
     
 };
 
 
-struct litaC_lsp__protocol__TextDocument {
-    const litaC_char* uri;
-    litaC_u32 version;
+struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
     
 };
 
-struct litaC_introspection__Introspect {
-    litaC_lita__Lita* lita;
+struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
     
 };
-
-struct litaC_std__mem__Allocator {
-    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
-    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
-    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
-    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
-    
-};
-
 
 struct litaC_std__http__HttpOptions {
     const litaC_char* proxy;
@@ -32402,25 +32296,25 @@ struct litaC_preprocessor__DeclContext {
     
 };
 
-struct litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__CallArg* elements;
-    const litaC_std__mem__Allocator* alloc;
+struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 bucketSize;
+    litaC_usize length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* buckets;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* top;
     
 };
 
-struct litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_phase_result__PhaseError* elements;
-    const litaC_std__mem__Allocator* alloc;
+struct litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_i64 key;
+    litaC_types__TypeInfo* value;
+    litaC_types__TypeInfo** valuePtr;
     
 };
 
-struct litaC_std__builtins__String {
-    const litaC_char* buffer;
-    litaC_i32 length;
+struct litaC_std__builtins__any {
+    litaC_void* value;
+    litaC_u64 id;
     
 };
 
@@ -32430,61 +32324,114 @@ struct litaC_std__mem__linear_allocator__ExpandInfo {
     
 };
 
-struct litaC_std__mem__arena_allocator__ArenaAllocator {
-    litaC_std__mem__Allocator allocator;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__mem__arena_allocator__Arena* arena;
-    litaC_usize pageSize;
-    litaC_u32 numberOfArenas;
-    litaC_usize numberOfBytesAllocated;
-    litaC_u32 numberOfAllocations;
-    
-};
-
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_ {
+struct litaC_std__array__std__array__Array_cb_i64_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_std__json__JsonNode** elements;
+    litaC_i64* elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_generics__Template {
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
-    litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_* genericArgs;
+struct litaC_pkg_mgr__PackageInitOptions {
+    const litaC_char* name;
+    const litaC_char* version;
+    const litaC_char* type;
+    const litaC_char* repo;
     
 };
 
-struct litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_u32 hash;
-    litaC_usize key;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
+struct litaC_std__map__std__map__MapIterator_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
     
 };
 
-struct litaC_pkg_mgr__pkg_build__CommandArgs {
-    litaC_i32 n;
-    litaC_char** args;
-    
-};
 
-struct litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ {
+struct litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__GenericArg* elements;
+    litaC_ast__TypeSpec** elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ {
+struct litaC_std__array__std__array__Array_cb_symbols__SymGenericArg_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__InitArgExpr** elements;
+    litaC_symbols__SymGenericArg* elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
+
+struct litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_i64 key;
+    litaC_std__array__std__array__Array_cb_i64_ce_ value;
+    litaC_std__array__std__array__Array_cb_i64_ce_* valuePtr;
+    
+};
+
+
+struct litaC_std__json__JsonEntry {
+    const litaC_char* key;
+    litaC_std__json__JsonNode* value;
+    
+};
+
+struct litaC_lsp__protocol__Position {
+    litaC_i32 line;
+    litaC_i32 character;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__ImportDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_preprocessor__api__ScriptRuntime {
+    ape_t* ape;
+    
+};
+
+struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_ {
+    litaC_i32 length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* next;
+    litaC_ast__TypeSpec* elements;
+    
+};
+
+struct litaC_pkg_mgr__pkg__PackageId {
+    litaC_char id[PATH_MAX];
+    litaC_i32 repoOffset;
+    litaC_i32 repoLength;
+    litaC_i32 nameOffset;
+    litaC_i32 nameLength;
+    litaC_i32 versionOffset;
+    litaC_i32 versionLength;
+    
+};
+
+struct litaC_std__mem__Allocator {
+    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
+    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
+    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
+    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
+    
+};
+
 
 struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ {
     litaC_i32 length;
@@ -32494,53 +32441,11 @@ struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_
     
 };
 
-struct litaC_std__string__SplitIter {
-    litaC_std__builtins__String str;
-    litaC_std__builtins__String split;
-    litaC_i32 lastIndex;
-    litaC_i32 currentIndex;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_* entries;
-    litaC_i32 emptyValue;
-    litaC_i32 emptyKey;
-    
-};
-
-struct litaC_std__string__buffer__StringBuffer {
-    litaC_char* buffer;
-    litaC_i32 length;
-    litaC_i32 capacity;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Stmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_module__Module** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lsp__references__FieldReference* elements;
-    const litaC_std__mem__Allocator* alloc;
+struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
     
 };
 
@@ -32558,9 +32463,26 @@ struct litaC_preprocessor__ScriptDecl {
     
 };
 
-struct litaC_checker_expr__ParamInfo {
-    litaC_ast__TypeSpec* spec;
-    litaC_types__TypeInfo* typeInfo;
+struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_* entries;
+    litaC_i32 emptyValue;
+    litaC_i32 emptyKey;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    const litaC_char* key;
+    litaC_pkg_mgr__pkg__PackageDef* value;
+    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
+    
+};
+
+struct litaC_std__builtins__String {
+    const litaC_char* buffer;
+    litaC_i32 length;
     
 };
 
@@ -32569,12 +32491,32 @@ struct litaC_std__system__Process {
     
 };
 
-struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 bucketSize;
-    litaC_usize length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* buckets;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* top;
+struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lsp__references__FieldReference* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__mem__arena_allocator__Arena {
+    litaC_usize size;
+    litaC_usize current;
+    litaC_std__mem__arena_allocator__Arena* next;
+    litaC_u8* region;
+    
+};
+
+struct litaC_pkg_mgr__PackageBuildOptions {
+    litaC_bool isRelease;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__SwitchCaseStmt** elements;
+    const litaC_std__mem__Allocator* alloc;
     
 };
 
@@ -32591,35 +32533,6 @@ struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ {
     litaC_i32 capacity;
     litaC_pkg_mgr__pkg__PackageId* elements;
     const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__json__JsonIterator {
-    litaC_i32 index;
-    litaC_std__json__JsonNode* json;
-    
-};
-
-struct litaC_std__mem__arena_allocator__Arena {
-    litaC_usize size;
-    litaC_usize current;
-    litaC_std__mem__arena_allocator__Arena* next;
-    litaC_u8* region;
-    
-};
-
-struct litaC_pkg_mgr__PackageOptions {
-    const litaC_char* projectPath;
-    const litaC_char* pkgDir;
-    litaC_lita__LitaOptions* litaOptions;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
     
 };
 
@@ -32645,352 +32558,6 @@ struct litaC_types_new__ArrayEntry {
     litaC_types__TypeInfo* arrayOf;
     litaC_ast__Expr* expr;
     litaC_usize length;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_i64 key;
-    litaC_types__TypeInfo* value;
-    litaC_types__TypeInfo** valuePtr;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_std__builtins__String_c_std__builtins__String_ce_* entries;
-    litaC_std__builtins__String emptyValue;
-    litaC_std__builtins__String emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__mem__track_allocator__Allocation** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-
-struct litaC_std__profile__ProfileEntry {
-    const litaC_char* functionName;
-    litaC_u64 count;
-    litaC_f64 startTime;
-    litaC_f64 totalTime;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__ParameterDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_module__Module_ce_* entries;
-    litaC_module__Module* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__json__JsonEntry* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_u32 hash;
-    litaC_i64 key;
-    litaC_types__TypeInfo* value;
-    
-};
-
-
-struct litaC_cgen__CompilationUnit {
-    litaC_module__Module* module;
-    litaC_char filename[PATH_MAX];
-    FILE* file;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__NoteStmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 bucketSize;
-    litaC_usize length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* buckets;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* top;
-    
-};
-
-struct litaC_std__mem__linear_allocator__LinearAllocator {
-    litaC_std__mem__Allocator allocator;
-    litaC_void* mem;
-    litaC_usize size;
-    litaC_usize currentOffset;
-    litaC_usize alignment;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    litaC_std__mem__linear_allocator__ExpandInfo expandInfo;
-    
-};
-
-struct litaC_ast_new__TypeSpecAllocator {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ typeSpecs;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_i64_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_i64* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_pkg_mgr__PackageInitOptions {
-    const litaC_char* name;
-    const litaC_char* version;
-    const litaC_char* type;
-    const litaC_char* repo;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_std__builtins__String_c_std__builtins__String_ce_ {
-    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__TypeSpec** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_symbols__SymGenericArg_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_symbols__SymGenericArg* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* entries;
-    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__String_ce_ {
-    litaC_std__builtins__String key;
-    litaC_std__builtins__String value;
-    litaC_std__builtins__String* valuePtr;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    const litaC_char* key;
-    litaC_module__Module* value;
-    litaC_module__Module** valuePtr;
-    
-};
-
-struct litaC_std__json__JsonEntry {
-    const litaC_char* key;
-    litaC_std__json__JsonNode* value;
-    
-};
-
-struct litaC_lsp__protocol__Position {
-    litaC_i32 line;
-    litaC_i32 character;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__ImportDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_* entries;
-    litaC_module__ModuleImport emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* entries;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
-    litaC_usize emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_u32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_phase_result__PhaseResult {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ errors;
-    litaC_bool enabled;
-    litaC_bool isReadable;
-    
-};
-
-struct litaC_preprocessor__api__ScriptRuntime {
-    ape_t* ape;
-    
-};
-
-struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_ {
-    litaC_i32 length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* next;
-    litaC_ast__TypeSpec* elements;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_* entries;
-    litaC_lsp__document__Document* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__string__builder__StringBuilder {
-    litaC_std__string__buffer__StringBuffer asBuffer;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_pkg_mgr__pkg__PackageId {
-    litaC_char id[PATH_MAX];
-    litaC_i32 repoOffset;
-    litaC_i32 repoLength;
-    litaC_i32 nameOffset;
-    litaC_i32 nameLength;
-    litaC_i32 versionOffset;
-    litaC_i32 versionLength;
-    
-};
-
-struct litaC_lex__SrcPos {
-    const litaC_char* filename;
-    const litaC_char* lineStart;
-    const litaC_char* start;
-    const litaC_char* end;
-    litaC_i32 lineNumber;
-    litaC_i32 position;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_* entries;
-    litaC_i32 emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lsp__protocol__TextDocumentChangeEvent* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_ {
-    litaC_u32 hash;
-    litaC_i32 key;
-    litaC_i32 value;
-    
-};
-
-
-struct litaC_pkg_mgr__PackageBuildOptions {
-    litaC_bool isRelease;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__SwitchCaseStmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-
-
-struct litaC_lita__PkgOptions {
-    litaC_lita__PkgCommand pkgCmd;
-    const litaC_char* pkgRunCmdArg;
-    litaC_bool forceClean;
-    litaC_bool isRelease;
-    const litaC_char* pkgName;
     
 };
 
@@ -33031,19 +32598,6 @@ struct litaC_std__array__std__array__Array_cb_preprocessor__CheckerContext_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_usize key;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
-    
-};
-
-struct litaC_std__json__JsonObject {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
-    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
-    
-};
-
 struct litaC_std__json__SrcPos {
     const litaC_char* name;
     litaC_i32 line;
@@ -33056,23 +32610,11 @@ struct litaC_lsp__protocol__Range {
     
 };
 
-struct litaC_types__FieldPositionResult {
-    litaC_types__TypeInfo* aggInfo;
-    litaC_i32 position;
-    
-};
-
-struct litaC_ast__FieldStmt {
-    litaC_ast__StmtKind kind;
-    litaC_types__TypeInfo* typeInfo;
-    union  {
-        litaC_ast__EnumDecl* enumField;
-        litaC_ast__AggregateDecl* aggregateField;
-        litaC_ast__VarFieldDecl* varField;
-        litaC_ast__TraitFieldDecl* traitField;
-        litaC_ast__Expr* poisonField;
-        
-    };
+struct litaC_std__profile__ProfileEntry {
+    const litaC_char* functionName;
+    litaC_u64 count;
+    litaC_f64 startTime;
+    litaC_f64 totalTime;
     
 };
 
@@ -33091,11 +32633,11 @@ struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_ {
     
 };
 
-struct litaC_std__mem__bucket_allocator__Bucket {
-    litaC_std__mem__bucket_allocator__Bucket* prev;
-    litaC_u8* mem;
-    litaC_usize size;
-    litaC_void* padding;
+struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__mem__track_allocator__Allocation** elements;
+    const litaC_std__mem__Allocator* alloc;
     
 };
 
@@ -33113,40 +32655,14 @@ struct litaC_std__map__std__map__Entry_cb_i64_c_std__array__Array_cb_i64_ce__ce_
     
 };
 
-struct litaC_std__http__HttpRequest {
-    const litaC_char* url;
-    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
-    litaC_std__http__HttpRequestType type;
-    litaC_char* body;
+struct litaC_std__string__SplitIter {
+    litaC_std__builtins__String str;
+    litaC_std__builtins__String split;
+    litaC_i32 lastIndex;
+    litaC_i32 currentIndex;
     
 };
 
-struct litaC_preprocessor__CallContext {
-    litaC_preprocessor__Preprocessor* pp;
-    litaC_checker__TypeChecker* checker;
-    litaC_ast__CompStmt* comp;
-    litaC_std__string__builder__StringBuilder buffer;
-    litaC_bool resolveSymbols;
-    
-};
-
-struct litaC_lsp__references__FieldReference {
-    litaC_i64 parent;
-    litaC_i32 offset;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_build__BuildFile {
-    const litaC_std__mem__Allocator* allocator;
-    const litaC_char* compileCmdTemplate;
-    const litaC_char* projectSrcDir;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
-    
-};
 
 struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
     litaC_i32 length;
@@ -33156,11 +32672,18 @@ struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
     
 };
 
-union litaC_lex__Value {
-    litaC_f64 floatValue;
-    litaC_i64 intValue;
-    litaC_u64 uintValue;
-    litaC_std__builtins__String str;
+struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__json__JsonEntry* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__string__buffer__StringBuffer {
+    litaC_char* buffer;
+    litaC_i32 length;
+    litaC_i32 capacity;
     
 };
 
@@ -33168,14 +32691,6 @@ struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_module__Module_
     litaC_u32 hash;
     const litaC_char* key;
     litaC_module__Module* value;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
     
 };
 
@@ -33205,6 +32720,76 @@ struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__Type
     
 };
 
+struct litaC_std__mem__linear_allocator__LinearAllocator {
+    litaC_std__mem__Allocator allocator;
+    litaC_void* mem;
+    litaC_usize size;
+    litaC_usize currentOffset;
+    litaC_usize alignment;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    litaC_std__mem__linear_allocator__ExpandInfo expandInfo;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Decl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_pkg_mgr__PackageInstallOptions {
+    litaC_bool fullSync;
+    litaC_std__http__HttpOptions httpOptions;
+    
+};
+
+
+struct litaC_std__mem__track_allocator__TrackAllocator {
+    litaC_std__mem__Allocator alloc;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
+    litaC_usize totalAllocations;
+    
+};
+
+union litaC_std__json__JsonValue {
+    litaC_bool boolValue;
+    litaC_f64 doubleValue;
+    litaC_i64 intValue;
+    const litaC_char* strValue;
+    litaC_std__json__JsonObject* objValue;
+    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
+    
+};
+
+struct litaC_lsp__protocol__Location {
+    const litaC_char* uri;
+    litaC_lsp__protocol__Range range;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* entries;
+    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_std__builtins__String_c_std__builtins__String_ce_ {
+    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
 struct litaC_std__map__std__map__MapIterator_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
     litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_* m;
     litaC_i32 it;
@@ -33213,10 +32798,229 @@ struct litaC_std__map__std__map__MapIterator_cb_types_new__ArrayEntry_c__ptr_typ
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_i64 key;
-    litaC_std__array__std__array__Array_cb_i64_ce_ value;
-    litaC_std__array__std__array__Array_cb_i64_ce_* valuePtr;
+struct litaC_std__array__std__array__Array_cb_u32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__String_ce_ {
+    litaC_std__builtins__String key;
+    litaC_std__builtins__String value;
+    litaC_std__builtins__String* valuePtr;
+    
+};
+
+struct litaC_std__string__builder__StringBuilder {
+    litaC_std__string__buffer__StringBuffer asBuffer;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_lex__SrcPos {
+    const litaC_char* filename;
+    const litaC_char* lineStart;
+    const litaC_char* start;
+    const litaC_char* end;
+    litaC_i32 lineNumber;
+    litaC_i32 position;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Expr** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_* entries;
+    litaC_lsp__document__Document* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_types_new__ArrayEntry key;
+    litaC_types__TypeInfo* value;
+    litaC_types__TypeInfo** valuePtr;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__EnumFieldEntryDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_preprocessor__ScriptDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_preprocessor__ScriptDecl* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_* entries;
+    litaC_i32 emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_types__TypeInfo** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_i64_c__ptr_types__TypeInfo_ce_* entries;
+    litaC_types__TypeInfo* emptyValue;
+    litaC_i64 emptyKey;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lsp__protocol__TextDocumentChangeEvent* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_ {
+    litaC_u32 hash;
+    litaC_i32 key;
+    litaC_i32 value;
+    
+};
+
+
+
+struct litaC_lita__PkgOptions {
+    litaC_lita__PkgCommand pkgCmd;
+    const litaC_char* pkgRunCmdArg;
+    litaC_bool forceClean;
+    litaC_bool isRelease;
+    const litaC_char* pkgName;
+    
+};
+
+struct litaC_lsp__document__Document {
+    litaC_char filename[PATH_MAX];
+    litaC_std__string__builder__StringBuilder text;
+    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_char** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__json__JsonNode {
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__json__JsonType type;
+    litaC_std__json__JsonValue value;
+    
+};
+
+
+struct litaC_lsp__protocol__TextDocument {
+    const litaC_char* uri;
+    litaC_u32 version;
+    
+};
+
+struct litaC_types__FieldPositionResult {
+    litaC_types__TypeInfo* aggInfo;
+    litaC_i32 position;
+    
+};
+
+struct litaC_introspection__Introspect {
+    litaC_lita__Lita* lita;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_i64_c_std__array__Array_cb_i64_ce__ce_* entries;
+    litaC_std__array__std__array__Array_cb_i64_ce_ emptyValue;
+    litaC_i64 emptyKey;
+    
+};
+
+struct litaC_std__mem__bucket_allocator__Bucket {
+    litaC_std__mem__bucket_allocator__Bucket* prev;
+    litaC_u8* mem;
+    litaC_usize size;
+    litaC_void* padding;
+    
+};
+
+struct litaC_preprocessor__CallContext {
+    litaC_preprocessor__Preprocessor* pp;
+    litaC_checker__TypeChecker* checker;
+    litaC_ast__CompStmt* comp;
+    litaC_std__string__builder__StringBuilder buffer;
+    litaC_bool resolveSymbols;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__CallArg* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_phase_result__PhaseError* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+union litaC_lex__Value {
+    litaC_f64 floatValue;
+    litaC_i64 intValue;
+    litaC_u64 uintValue;
+    litaC_std__builtins__String str;
     
 };
 
@@ -33232,39 +33036,33 @@ struct litaC_checker__GenericContext {
 };
 
 
-struct litaC_std__map__std__map__MapIterator_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Decl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
 struct litaC_std__io__File {
     FILE* file;
     litaC_i64 _position;
     
 };
 
-struct litaC_pkg_mgr__PackageInstallOptions {
-    litaC_bool fullSync;
-    litaC_std__http__HttpOptions httpOptions;
+struct litaC_dependency_graph__Dependency {
+    litaC_dependency_graph__State state;
+    litaC_symbols__Symbol* sym;
+    litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ dependsOn;
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+struct litaC_pkg_mgr__PackageManager {
+    litaC_pkg_mgr__PackageOptions options;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ packages;
+    litaC_pkg_mgr__pkg__PackageDef* pkg;
+    litaC_std__string__builder__StringBuilder errors;
+    litaC_std__string__builder__StringBuilder warnings;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_u32 hash;
     litaC_types_new__ArrayEntry key;
     litaC_types__TypeInfo* value;
-    litaC_types__TypeInfo** valuePtr;
     
 };
 
@@ -33305,91 +33103,126 @@ struct litaC_lita__LitaOptions {
     
 };
 
-struct litaC_ast__Node {
-    litaC_ast__StmtKind kind;
-    litaC_ast__Node* parent;
-    litaC_lex__SrcPos startPos;
-    litaC_lex__SrcPos endPos;
+struct litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__json__JsonNode** elements;
+    const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_ast__Stmt {
-    litaC_ast__Node node;
+struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* entries;
+    litaC_dependency_graph__Dependency emptyValue;
+    litaC_symbols__Symbol* emptyKey;
     
 };
 
-struct litaC_ast__ReturnStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* expr;
+struct litaC_generics__Template {
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
+    litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_* genericArgs;
     
 };
 
-struct litaC_std__mem__track_allocator__TrackAllocator {
-    litaC_std__mem__Allocator alloc;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
-    litaC_usize totalAllocations;
-    
-};
-
-struct litaC_ast__Operand {
-    litaC_types__TypeInfo* typeInfo;
-    litaC_bool isRightValue;
-    litaC_bool isConst;
-    litaC_lex__Value val;
-    
-};
-
-struct litaC_ast__Expr {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Operand operand;
-    litaC_types__TypeInfo* expectedType;
-    
-};
-
-struct litaC_ast__PoisonExpr {
-    litaC_ast__Expr expr;
-    
-};
-
-struct litaC_std__json__Token {
-    litaC_std__json__TokenKind kind;
-    litaC_std__json__SrcPos pos;
-    const litaC_char* start;
-    const litaC_char* end;
-    union  {
-        litaC_i64 intNumValue;
-        litaC_f64 realNumValue;
-        const litaC_char* strValue;
-        const litaC_char* name;
-        
-    };
-    
-};
-
-struct litaC_lsp__protocol__Location {
-    const litaC_char* uri;
-    litaC_lsp__protocol__Range range;
-    
-};
-
-struct litaC_cgen__CGen {
+struct litaC_parser__Parser {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_ast_new__TypeSpecAllocator* typeAllocator;
+    litaC_module__Module* module;
+    litaC_phase_result__PhaseResult* result;
     litaC_lita__Lita* lita;
-    litaC_std__string__builder__StringBuilder buf;
-    litaC_std__string__builder__StringBuilder line;
-    litaC_bool format;
-    litaC_i32 indent;
+    litaC_intern__Strings* strings;
+    const litaC_char* filename;
+    litaC_i32 totalLines;
+    litaC_std__array__std__array__Array_cb_lex__Token_ce_ tokens;
+    litaC_i32 current;
+    litaC_lex__SrcPos currentPos;
+    litaC_i32 breakLevel;
+    litaC_i32 loopLevel;
+    litaC_i32 switchLevel;
+    litaC_i32 funcLevel;
     litaC_i32 aggregateLevel;
-    litaC_i32 currentLine;
-    const litaC_char* currentFile;
-    litaC_bool bufferFlush;
-    litaC_i32 funcIndex;
-    litaC_i32 tmpVar;
-    litaC_i32 deferStack;
-    litaC_bool inTextBlock;
-    litaC_types__TypeInfo* currentFunc;
-    litaC_cgen__CGenScope* currentScope;
-    litaC_std__io__File* output;
+    litaC_u32 tryLevel;
+    litaC_u64 tryErrorCounter;
+    litaC_bool panicMode;
+    litaC_i32 preprocessorLevel;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_module__Module_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_lsp__protocol__TextDocumentDidChange {
+    litaC_lsp__protocol__TextDocument textDocument;
+    litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ contentChanges;
+    
+};
+
+struct litaC_std__zip__ZipFile {
+    mz_zip_archive archive;
+    litaC_std__zip__ZipOpen type;
+    const litaC_std__mem__Allocator* allocator;
+    
+};
+
+struct litaC_pkg_mgr__pkg_build__CommandArgs {
+    litaC_i32 n;
+    litaC_char** args;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__GenericArg* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__InitArgExpr** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
+    const litaC_char* key;
+    litaC_module__Module* value;
+    litaC_module__Module** valuePtr;
+    
+};
+
+
+struct litaC_pkg_mgr__pkg__PackageDef {
+    litaC_pkg_mgr__pkg__PackageId id;
+    litaC_char path[PATH_MAX];
+    litaC_pkg_mgr__pkg__PackageType type;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ dynamicLibraries;
+    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ dependencies;
+    litaC_std__json__JsonNode* json;
+    
+};
+
+struct litaC_std__fs__FileHandle {
+    tinydir_dir dir;
+    tinydir_file file;
     
 };
 
@@ -33422,100 +33255,77 @@ union litaC_intern__InternedString {
     
 };
 
+struct litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Stmt** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_module__Module** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_preprocessor__CheckerContext {
+    litaC_module__Module* module;
+    litaC_ast__CompStmt* stmt;
+    
+};
+
+struct litaC_checker_expr__ParamInfo {
+    litaC_ast__TypeSpec* spec;
+    litaC_types__TypeInfo* typeInfo;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_u32 hash;
+    const litaC_char* key;
+    litaC_pkg_mgr__pkg__PackageDef* value;
+    
+};
+
+struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 bucketSize;
+    litaC_usize length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* buckets;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* top;
+    
+};
+
+struct litaC_module__ModuleImport {
+    litaC_module__Module* module;
+    litaC_intern__InternedString* alias;
+    litaC_bool isUsing;
+    
+};
+
+struct litaC_std__json__JsonIterator {
+    litaC_i32 index;
+    litaC_std__json__JsonNode* json;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lex__SrcPos* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
 struct litaC_lex__Token {
     litaC_lex__TokenType type;
     litaC_lex__Mod mod;
     litaC_types__TypeInfo* typeInfo;
     litaC_lex__SrcPos pos;
     litaC_lex__Value value;
-    
-};
-
-struct litaC_ast__Identifier {
-    litaC_intern__InternedString str;
-    litaC_lex__Token token;
-    
-};
-
-struct litaC_ast__Attributes {
-    litaC_ast__Visibility visibility;
-    litaC_bool isGlobal;
-    litaC_bool isUsing;
-    litaC_bool isGenerated;
-    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
-    
-};
-
-struct litaC_ast__Decl {
-    litaC_ast__Stmt stmt;
-    litaC_symbols__Symbol* sym;
-    litaC_ast__Identifier name;
-    litaC_ast__Attributes attributes;
-    
-};
-
-struct litaC_ast__GenericDecl {
-    litaC_ast__Decl declaration;
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
-    
-};
-
-struct litaC_ast__FuncDecl {
-    litaC_ast__GenericDecl decl;
-    litaC_ast__ParametersStmt* params;
-    litaC_ast__Stmt* body;
-    litaC_ast__TypeSpec* returnType;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_std__http__HttpResponse {
-    litaC_i32 statusCode;
-    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
-    litaC_std__string__builder__StringBuilder body;
-    litaC_void* userdata;
-    litaC_usize (*bodyFn)(litaC_void*,litaC_usize,litaC_usize,litaC_void*);
-    
-};
-
-struct litaC_ast__BooleanExpr {
-    litaC_ast__Expr expr;
-    litaC_bool boolean;
-    
-};
-
-struct litaC_lsp__references__ReferenceDatabase {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
-    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
-    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_u32 hash;
-    const litaC_char* key;
-    litaC_module__ModuleImport value;
-    
-};
-
-struct litaC_ast__PoisonDecl {
-    litaC_ast__Decl decl;
-    
-};
-
-struct litaC_ast__GetExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__IdentifierExpr* field;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
-    litaC_u32 hash;
-    litaC_intern__InternedString key;
-    litaC_types__TypeInfo* value;
     
 };
 
@@ -33532,6 +33342,19 @@ struct litaC_lex__Lexer {
     
 };
 
+struct litaC_ast__Node {
+    litaC_ast__StmtKind kind;
+    litaC_ast__Node* parent;
+    litaC_lex__SrcPos startPos;
+    litaC_lex__SrcPos endPos;
+    
+};
+
+struct litaC_ast__Stmt {
+    litaC_ast__Node node;
+    
+};
+
 struct litaC_ast__DoWhileStmt {
     litaC_ast__Stmt stmt;
     litaC_ast__Expr* cond;
@@ -33539,6 +33362,58 @@ struct litaC_ast__DoWhileStmt {
     
 };
 
+
+struct litaC_lsp__util__SourceLocation {
+    litaC_lsp__util__SourceLocationKind kind;
+    litaC_module__Module* module;
+    litaC_lsp__protocol__Location location;
+    union  {
+        litaC_ast__Node* node;
+        litaC_ast__TypeSpec* type;
+        
+    };
+    
+};
+
+
+struct litaC_lsp__util__SourceLookup {
+    litaC_lsp__lsp__LspServer* lsp;
+    litaC_lsp__protocol__Position lookupPos;
+    litaC_lsp__util__SourceLocation result;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_* entries;
+    litaC_module__Module* emptyValue;
+    litaC_intern__InternedString emptyKey;
+    
+};
+
+
+struct litaC_ast__Identifier {
+    litaC_intern__InternedString str;
+    litaC_lex__Token token;
+    
+};
+
+struct litaC_ast__Operand {
+    litaC_types__TypeInfo* typeInfo;
+    litaC_bool isRightValue;
+    litaC_bool isConst;
+    litaC_lex__Value val;
+    
+};
+
+struct litaC_ast__Expr {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Operand operand;
+    litaC_types__TypeInfo* expectedType;
+    
+};
 
 struct litaC_ast__NumberExpr {
     litaC_ast__Expr expr;
@@ -33559,26 +33434,31 @@ struct litaC_ast__IfStmt {
     
 };
 
+struct litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_std__builtins__String_c_std__builtins__String_ce_* entries;
+    litaC_std__builtins__String emptyValue;
+    litaC_std__builtins__String emptyKey;
+    
+};
+
+struct litaC_ast__Attributes {
+    litaC_ast__Visibility visibility;
+    litaC_bool isGlobal;
+    litaC_bool isUsing;
+    litaC_bool isGenerated;
+    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
+    
+};
+
 struct litaC_ast__SubscriptSetExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* object;
     litaC_ast__Expr* index;
     litaC_lex__TokenType operator;
     litaC_ast__Expr* value;
-    
-};
-
-struct litaC_dependency_graph__Dependency {
-    litaC_dependency_graph__State state;
-    litaC_symbols__Symbol* sym;
-    litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ dependsOn;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_symbols__Symbol* key;
-    litaC_dependency_graph__Dependency value;
-    litaC_dependency_graph__Dependency* valuePtr;
     
 };
 
@@ -33589,10 +33469,19 @@ struct litaC_ast__SwitchCaseStmt {
     
 };
 
-struct litaC_lsp__document__Document {
-    litaC_char filename[PATH_MAX];
-    litaC_std__string__builder__StringBuilder text;
-    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
+struct litaC_ast__Decl {
+    litaC_ast__Stmt stmt;
+    litaC_symbols__Symbol* sym;
+    litaC_ast__Identifier name;
+    litaC_ast__Attributes attributes;
+    
+};
+
+struct litaC_lsp__protocol__TextDocumentChangeEvent {
+    litaC_bool hasRange;
+    litaC_lsp__protocol__Range range;
+    litaC_u32 rangeLength;
+    const litaC_char* text;
     
 };
 
@@ -33603,22 +33492,9 @@ struct litaC_ast__WhileStmt {
     
 };
 
-struct litaC_cgen__CGenScope {
-    litaC_cgen__CGenScope* parent;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ defers;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ constDefs;
-    litaC_bool isLoop;
-    litaC_bool isSwitch;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_i64_c_std__array__Array_cb_i64_ce__ce_* entries;
-    litaC_std__array__std__array__Array_cb_i64_ce_ emptyValue;
-    litaC_i64 emptyKey;
+struct litaC_ast__GenericDecl {
+    litaC_ast__Decl declaration;
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
     
 };
 
@@ -33633,6 +33509,13 @@ struct litaC_ast__CastExpr {
     litaC_ast__Expr expr;
     litaC_ast__TypeSpec* castTo;
     litaC_ast__Expr* exprToCast;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    const litaC_char* key;
+    litaC_module__ModuleImport value;
+    litaC_module__ModuleImport* valuePtr;
     
 };
 
@@ -33707,13 +33590,30 @@ struct litaC_symbols__Scope {
     
 };
 
-struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ {
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
     const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_* entries;
-    litaC_module__Module* emptyValue;
-    litaC_intern__InternedString emptyKey;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_* entries;
+    litaC_module__ModuleImport emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_ast_new__TypeSpecAllocator {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ typeSpecs;
+    
+};
+
+struct litaC_std__mem__arena_allocator__ArenaAllocator {
+    litaC_std__mem__Allocator allocator;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__mem__arena_allocator__Arena* arena;
+    litaC_usize pageSize;
+    litaC_u32 numberOfArenas;
+    litaC_usize numberOfBytesAllocated;
+    litaC_u32 numberOfAllocations;
     
 };
 
@@ -33808,20 +33708,10 @@ struct litaC_ast__LabelStmt {
     
 };
 
-struct litaC_pkg_mgr__PackageManager {
-    litaC_pkg_mgr__PackageOptions options;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ packages;
-    litaC_pkg_mgr__pkg__PackageDef* pkg;
-    litaC_std__string__builder__StringBuilder errors;
-    litaC_std__string__builder__StringBuilder warnings;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
     litaC_u32 hash;
-    litaC_types_new__ArrayEntry key;
-    litaC_types__TypeInfo* value;
+    litaC_intern__InternedString key;
+    litaC_symbols__Symbol* value;
     
 };
 
@@ -33841,27 +33731,65 @@ struct litaC_ast__SwitchStmt {
     
 };
 
-struct litaC_parser__Parser {
+struct litaC_std__json__Token {
+    litaC_std__json__TokenKind kind;
+    litaC_std__json__SrcPos pos;
+    const litaC_char* start;
+    const litaC_char* end;
+    union  {
+        litaC_i64 intNumValue;
+        litaC_f64 realNumValue;
+        const litaC_char* strValue;
+        const litaC_char* name;
+        
+    };
+    
+};
+
+struct litaC_std__json__JsonParser {
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__json__JsonParserStatus status;
+    litaC_char errorMsg[256];
+    litaC_std__json__Token token;
+    litaC_std__string__builder__StringBuilder buffer;
+    const litaC_char* stream;
+    const litaC_char* lineStart;
+    
+};
+
+struct litaC_lsp__references__Reference {
+    litaC_i64 type;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_lsp__workspace__Workspace {
     const litaC_std__mem__Allocator* allocator;
-    litaC_ast_new__TypeSpecAllocator* typeAllocator;
-    litaC_module__Module* module;
-    litaC_phase_result__PhaseResult* result;
+    litaC_std__mem__track_allocator__TrackAllocator docAllocator;
+    litaC_lsp__lsp__LspServer* lsp;
+    litaC_char rootPath[PATH_MAX];
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ openedDocuments;
+    
+};
+
+struct litaC_lsp__lsp__LspServer {
+    litaC_std__mem__bucket_allocator__BucketAllocator requestAllocator;
+    litaC_std__mem__bucket_allocator__BucketAllocator applicationAllocator;
     litaC_lita__Lita* lita;
-    litaC_intern__Strings* strings;
-    const litaC_char* filename;
-    litaC_i32 totalLines;
-    litaC_std__array__std__array__Array_cb_lex__Token_ce_ tokens;
-    litaC_i32 current;
-    litaC_lex__SrcPos currentPos;
-    litaC_i32 breakLevel;
-    litaC_i32 loopLevel;
-    litaC_i32 switchLevel;
-    litaC_i32 funcLevel;
-    litaC_i32 aggregateLevel;
-    litaC_u32 tryLevel;
-    litaC_u64 tryErrorCounter;
-    litaC_bool panicMode;
-    litaC_i32 preprocessorLevel;
+    litaC_std__string__builder__StringBuilder message;
+    litaC_std__string__builder__StringBuilder output;
+    litaC_std__string__builder__StringBuilder outbound;
+    litaC_bool isInitialized;
+    litaC_bool isRunning;
+    litaC_lsp__workspace__Workspace workspace;
+    FILE* logFile;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_u32 hash;
+    litaC_usize key;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
     
 };
 
@@ -33869,35 +33797,6 @@ struct litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_dependency_grap
     litaC_u32 hash;
     litaC_symbols__Symbol* key;
     litaC_dependency_graph__Dependency value;
-    
-};
-
-struct litaC_lsp__protocol__TextDocumentDidChange {
-    litaC_lsp__protocol__TextDocument textDocument;
-    litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ contentChanges;
-    
-};
-
-struct litaC_std__zip__ZipFile {
-    mz_zip_archive archive;
-    litaC_std__zip__ZipOpen type;
-    const litaC_std__mem__Allocator* allocator;
-    
-};
-
-struct litaC_pkg_mgr__pkg__PackageDef {
-    litaC_pkg_mgr__pkg__PackageId id;
-    litaC_char path[PATH_MAX];
-    litaC_pkg_mgr__pkg__PackageType type;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ dynamicLibraries;
-    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ dependencies;
-    litaC_std__json__JsonNode* json;
-    
-};
-
-struct litaC_std__fs__FileHandle {
-    tinydir_dir dir;
-    tinydir_file file;
     
 };
 
@@ -33949,27 +33848,6 @@ struct litaC_symbols__Symbol {
     
 };
 
-
-struct litaC_lsp__util__SourceLocation {
-    litaC_lsp__util__SourceLocationKind kind;
-    litaC_module__Module* module;
-    litaC_lsp__protocol__Location location;
-    union  {
-        litaC_ast__Node* node;
-        litaC_ast__TypeSpec* type;
-        
-    };
-    
-};
-
-
-struct litaC_lsp__util__SourceLookup {
-    litaC_lsp__lsp__LspServer* lsp;
-    litaC_lsp__protocol__Position lookupPos;
-    litaC_lsp__util__SourceLocation result;
-    
-};
-
 struct litaC_ast__SetExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* object;
@@ -33988,11 +33866,31 @@ struct litaC_ast__ModuleStmt {
     
 };
 
+struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_usize key;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
+    
+};
+
 struct litaC_ast__TypeIdentifierExpr {
     litaC_ast__Expr expr;
     litaC_ast__TypeSpec* type;
     litaC_symbols__Symbol* sym;
     litaC_bool isBased;
+    
+};
+
+struct litaC_std__json__JsonObject {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
+    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_ {
+    litaC_u32 hash;
+    litaC_intern__InternedString key;
+    litaC_module__Module* value;
     
 };
 
@@ -34018,18 +33916,28 @@ struct litaC_ast__ImportDecl {
     
 };
 
-struct litaC_lsp__protocol__TextDocumentChangeEvent {
-    litaC_bool hasRange;
-    litaC_lsp__protocol__Range range;
-    litaC_u32 rangeLength;
-    const litaC_char* text;
-    
-};
-
 struct litaC_ast__ArrayDesignationExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* index;
     litaC_ast__Expr* value;
+    
+};
+
+struct litaC_lsp__references__FieldReference {
+    litaC_i64 parent;
+    litaC_i32 offset;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_build__BuildFile {
+    const litaC_std__mem__Allocator* allocator;
+    const litaC_char* compileCmdTemplate;
+    const litaC_char* projectSrcDir;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
     
 };
 
@@ -34076,6 +33984,19 @@ struct litaC_ast__ForStmt {
     
 };
 
+
+struct litaC_dependency_graph__DependencyGraph {
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
+    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
+    litaC_lita__Lita* lita;
+    
+};
+
+
 struct litaC_std__cmdline__CmdParser {
     litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ options;
     litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ args;
@@ -34117,13 +34038,6 @@ struct litaC_symbols__ProgramSymbols {
     
 };
 
-struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_u32 hash;
-    litaC_intern__InternedString key;
-    litaC_symbols__Symbol* value;
-    
-};
-
 struct litaC_ast__TypeOfExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* typeOfExpr;
@@ -34137,6 +34051,34 @@ struct litaC_ast__TraitFieldDecl {
     
 };
 
+struct litaC_phase_result__PhaseResult {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ errors;
+    litaC_bool enabled;
+    litaC_bool isReadable;
+    
+};
+
+struct litaC_cgen__CGen {
+    litaC_lita__Lita* lita;
+    litaC_std__string__builder__StringBuilder buf;
+    litaC_std__string__builder__StringBuilder line;
+    litaC_bool format;
+    litaC_i32 indent;
+    litaC_i32 aggregateLevel;
+    litaC_i32 currentLine;
+    const litaC_char* currentFile;
+    litaC_bool bufferFlush;
+    litaC_i32 funcIndex;
+    litaC_i32 tmpVar;
+    litaC_i32 deferStack;
+    litaC_bool inTextBlock;
+    litaC_types__TypeInfo* currentFunc;
+    litaC_cgen__CGenScope* currentScope;
+    litaC_std__io__File* output;
+    
+};
+
 struct litaC_ast__VarDecl {
     litaC_ast__Decl decl;
     litaC_ast__TypeSpec* typeSpec;
@@ -34144,14 +34086,27 @@ struct litaC_ast__VarDecl {
     
 };
 
-struct litaC_std__json__JsonParser {
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__json__JsonParserStatus status;
-    litaC_char errorMsg[256];
-    litaC_std__json__Token token;
-    litaC_std__string__builder__StringBuilder buffer;
-    const litaC_char* stream;
-    const litaC_char* lineStart;
+struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* entries;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
+    litaC_usize emptyKey;
+    
+};
+
+struct litaC_ast__FieldStmt {
+    litaC_ast__StmtKind kind;
+    litaC_types__TypeInfo* typeInfo;
+    union  {
+        litaC_ast__EnumDecl* enumField;
+        litaC_ast__AggregateDecl* aggregateField;
+        litaC_ast__VarFieldDecl* varField;
+        litaC_ast__TraitFieldDecl* traitField;
+        litaC_ast__Expr* poisonField;
+        
+    };
     
 };
 
@@ -34178,32 +34133,18 @@ struct litaC_preprocessor__Preprocessor {
     
 };
 
-struct litaC_lsp__references__Reference {
-    litaC_i64 type;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_lsp__workspace__Workspace {
+struct litaC_lsp__references__ReferenceDatabase {
     const litaC_std__mem__Allocator* allocator;
-    litaC_std__mem__track_allocator__TrackAllocator docAllocator;
-    litaC_lsp__lsp__LspServer* lsp;
-    litaC_char rootPath[PATH_MAX];
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ openedDocuments;
+    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
+    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
+    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
     
 };
 
-struct litaC_lsp__lsp__LspServer {
-    litaC_std__mem__bucket_allocator__BucketAllocator requestAllocator;
-    litaC_std__mem__bucket_allocator__BucketAllocator applicationAllocator;
-    litaC_lita__Lita* lita;
-    litaC_std__string__builder__StringBuilder message;
-    litaC_std__string__builder__StringBuilder output;
-    litaC_std__string__builder__StringBuilder outbound;
-    litaC_bool isInitialized;
-    litaC_bool isRunning;
-    litaC_lsp__workspace__Workspace workspace;
-    FILE* logFile;
+struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_u32 hash;
+    const litaC_char* key;
+    litaC_module__ModuleImport value;
     
 };
 
@@ -34227,8 +34168,22 @@ struct litaC_ast__FuncCallExpr {
     
 };
 
+struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
+    litaC_u32 hash;
+    litaC_intern__InternedString key;
+    litaC_types__TypeInfo* value;
+    
+};
+
 struct litaC_ast__ContinueStmt {
     litaC_ast__Stmt stmt;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_symbols__Symbol* key;
+    litaC_dependency_graph__Dependency value;
+    litaC_dependency_graph__Dependency* valuePtr;
     
 };
 
@@ -34290,10 +34245,12 @@ struct litaC_ast__UnaryExpr {
     
 };
 
-struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_ {
-    litaC_u32 hash;
-    litaC_intern__InternedString key;
-    litaC_module__Module* value;
+struct litaC_cgen__CGenScope {
+    litaC_cgen__CGenScope* parent;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ defers;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ constDefs;
+    litaC_bool isLoop;
+    litaC_bool isSwitch;
     
 };
 
@@ -34302,6 +34259,14 @@ struct litaC_ast__ParameterDecl {
     litaC_ast__TypeSpec* type;
     litaC_ast__Expr* defaultExpr;
     litaC_types__TypeInfo* typeInfo;
+    
+};
+
+struct litaC_std__http__HttpRequest {
+    const litaC_char* url;
+    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
+    litaC_std__http__HttpRequestType type;
+    litaC_char* body;
     
 };
 
@@ -34377,13 +34342,27 @@ struct litaC_ast__NullExpr {
     
 };
 
-struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* entries;
-    litaC_dependency_graph__Dependency emptyValue;
-    litaC_symbols__Symbol* emptyKey;
+struct litaC_ast__GotoStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Identifier label;
+    
+};
+
+struct litaC_ast__SubscriptGetExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* object;
+    litaC_ast__Expr* index;
+    
+};
+
+struct litaC_ast__ReturnStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* expr;
+    
+};
+
+struct litaC_ast__PoisonExpr {
+    litaC_ast__Expr expr;
     
 };
 
@@ -34394,29 +34373,40 @@ struct litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbo
     
 };
 
-struct litaC_ast__GotoStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Identifier label;
+struct litaC_ast__FuncDecl {
+    litaC_ast__GenericDecl decl;
+    litaC_ast__ParametersStmt* params;
+    litaC_ast__Stmt* body;
+    litaC_ast__TypeSpec* returnType;
+    litaC_i32 flags;
     
 };
 
-
-struct litaC_dependency_graph__DependencyGraph {
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
-    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
-    litaC_lita__Lita* lita;
+struct litaC_std__http__HttpResponse {
+    litaC_i32 statusCode;
+    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
+    litaC_std__string__builder__StringBuilder body;
+    litaC_void* userdata;
+    litaC_usize (*bodyFn)(litaC_void*,litaC_usize,litaC_usize,litaC_void*);
     
 };
 
+struct litaC_ast__BooleanExpr {
+    litaC_ast__Expr expr;
+    litaC_bool boolean;
+    
+};
 
-struct litaC_ast__SubscriptGetExpr {
+struct litaC_ast__PoisonDecl {
+    litaC_ast__Decl decl;
+    
+};
+
+struct litaC_ast__GetExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* object;
-    litaC_ast__Expr* index;
+    litaC_ast__IdentifierExpr* field;
+    litaC_i32 flags;
     
 };
 
@@ -34475,7 +34465,7 @@ litaC_char litaC_std__system__system_posix__pwd[PATH_MAX] =  {
 };
 
 litaC_std__profile__ProfileEntry litaC_std__profile__profileEntries[1] =  {
-    
+    0
 };
 const litaC_char* litaC_lex__tokenText[litaC_lex__TokenType_MAX_TOKEN_TYPES] =  {
     [litaC_lex__TokenType_IMPORT] = "import",
@@ -34913,7 +34903,7 @@ litaC_types__TypeInfo* litaC_types__BUILTIN_TYPES[litaC_types__TypeKind_MAX_TYPE
     [litaC_types__TypeKind_POISON] = &(litaC_types__POISON_TYPE)
 };
 litaC_ast__Identifier litaC_module__BUILTIN_IMPORT_IDENT =  {
-    
+    0
 };
 litaC_lex__Token litaC_module__BUILTIN_IMPORT_TOKEN =  {
     .type = litaC_lex__TokenType_STRING,
@@ -34927,7 +34917,7 @@ litaC_lex__Token litaC_module__BUILTIN_IMPORT_TOKEN =  {
 litaC_symbols__Symbol* litaC_module__anyBuiltin = NULL;
 litaC_symbols__Symbol* litaC_module__stringBuiltin = NULL;
 litaC_module__Module litaC_module__builtins =  {
-    
+    0
 };
 FILE* litaC_common__outputFile = NULL;
 
@@ -34939,166 +34929,166 @@ litaC_intern__InternedString litaC_intern__EMPTY_STR =  {
     .length = 0
 };
 litaC_intern__InternedString litaC_intern__VOID =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__NULL =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__BOOL =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__CHAR =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__I8 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__U8 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__I16 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__U16 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__I32 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__U32 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__I64 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__U64 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__F32 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__F64 =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__USIZE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__CONST =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__STRING =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__GENERIC_PARAM =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__POISON =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__BUILTIN =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__MAIN =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__NUM_OF_TYPE_INFOS =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__TYPE_INFOS =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__PROFILE_TAG =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__PROFILE_ENTRIES =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__IF =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__STATIC_IF =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__ELSE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__ELSEIF =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__PRECHECK =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__POSTCHECK =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__POSTPARSE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__END =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__ELSE_ERROR =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__INCLUDE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__RAW =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__INLINE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__NOINLINE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__STATIC =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__ATOMIC =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__REGISTER =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__THREADLOCAL =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__EXPORT =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__PACKED =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__CC =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__CFILE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__CINCLUDE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__FOREIGN =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__ALIAS =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__ASSTR =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__TOSTR =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__COMPILER_OPTION =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__STRING_TYPE =  {
-    
+    0
 };
 litaC_intern__InternedString litaC_intern__ANY_TYPE =  {
-    
+    0
 };
 const litaC_char* litaC_error_codes__errorCodeText[43] =  {
     [litaC_error_codes__ErrorCode_INVALID_ASSIGNMENT] = "Invalid assignment statement",
@@ -35305,14 +35295,14 @@ litaC_std__builtins__String litaC_pkg_mgr__pkg__SEPARATOR = (litaC_std__builtins
 litaC_i32 litaC_main__RunLitac(litaC_lita__LitaOptions* litaC_options) {
     litaC_f64 litaC_startTime = litaC_std__system__SystemTimeMSec();
     litaC_lita__Lita litaC_lita =  {
-        
+        0
     };
     litaC_lita__Lita_init(&((litaC_lita)), litaC_options);
     
     if(litaC_options->languageServer) {
         {
             litaC_lsp__lsp__LspServer litaC_server =  {
-                
+                0
             };
             litaC_lsp__lsp__LspServer_init(&((litaC_server)), &(litaC_lita));
             
@@ -35976,12 +35966,12 @@ litaC_void litaC_main__TrimPath(litaC_char* litaC_path) {
 litaC_i32 litaC_main__HandlePkgCommand(litaC_lita__LitaOptions* litaC_options) {
     litaC_usize litaC_size = (litaC_options->maxMemory > 0) ? litaC_options->maxMemory : 1024 * 1024 * 1024;
     litaC_std__mem__linear_allocator__LinearAllocator litaC_linearAllocator =  {
-        
+        0
     };
     litaC_std__mem__linear_allocator__LinearAllocator_init(&((litaC_linearAllocator)), litaC_std__mem__Allocator_alloc(litaC_std__mem__defaultAllocator, litaC_size), litaC_size, LITAC_DEFAULT_ALIGNMENT, litaC_std__mem__linear_allocator__DEFAULT_EXPAND_INFO);
     
     litaC_pkg_mgr__PackageManager litaC_pm =  {
-        
+        0
     };
     litaC_pkg_mgr__PackageManager_init(&((litaC_pm)), (litaC_pkg_mgr__PackageOptions) {
         .projectPath = litaC_options->projectPath,
@@ -36099,7 +36089,7 @@ litaC_i32 litaC_main__RunPkgInstall(litaC_lita__LitaOptions* litaC_options,litaC
     } 
     
     litaC_build__BuildFile litaC_buildFile =  {
-        
+        0
     };
     
     litaC_status = litaC_pkg_mgr__PackageManager_createBuildFile(litaC_pm, &(litaC_buildFile));
@@ -36123,7 +36113,7 @@ litaC_i32 litaC_main__RunPkgInstall(litaC_lita__LitaOptions* litaC_options,litaC
     litaC_std__string__buffer__StringBuffer litaC_build = litaC_std__string__buffer__StringBufferInit(litaC_temp, PATH_MAX, 0);
     litaC_std__string__buffer__StringBuffer_format(&((litaC_build)), "%s/.build.json", litaC_options->projectPath);
     litaC_std__io__File litaC_file =  {
-        
+        0
     };
     litaC_std__io__File_open(&((litaC_file)), litaC_std__string__buffer__StringBuffer_cStr(litaC_build), litaC_std__io__FileOpenOp_WRITE);
     
@@ -36290,7 +36280,7 @@ litaC_void litaC_std__mem__Allocator_free(const litaC_std__mem__Allocator* litaC
     
 }
 
-litaC_void litaC_std__assert__bort() {
+litaC_void litaC_std__assert__bort(void) {
     {
         abort();
         
@@ -36401,7 +36391,7 @@ litaC_std__builtins__String litaC_std__string__String_substringOf(litaC_std__bui
     if(litaC_index < 0) {
         {
             return (litaC_std__builtins__String) {
-                
+                0
             };
             
             
@@ -36772,7 +36762,7 @@ litaC_std__builtins__String litaC_std__string__SplitIter_remaining(litaC_std__st
     if(litaC_this->currentIndex < 0 || litaC_this->currentIndex >= litaC_this->str.length) {
         {
             return (litaC_std__builtins__String) {
-                
+                0
             };
             
             
@@ -36940,11 +36930,6 @@ litaC_i32 litaC_std__string__String_size(litaC_std__builtins__String litaC_b) {
     
 }
 
-litaC_void litaC_std__string__String_clear(litaC_std__builtins__String litaC_b) {
-    litaC_b.length = 0;
-    
-}
-
 litaC_char litaC_std__string__String_get(litaC_std__builtins__String litaC_b,litaC_i32 litaC_index) {
     if(litaC_index < 0 || litaC_index >= litaC_b.length) {
         {
@@ -37034,7 +37019,7 @@ litaC_char* litaC_std__string__StringCopy(const litaC_char* litaC_src,litaC_char
 
 litaC_u32 litaC_std__string__StringHashLen(const litaC_char* litaC_str,litaC_usize litaC_size) {
     litaC_u32 litaC_hash = 5381U;
-    litaC_i32 litaC_index = 0;
+    litaC_usize litaC_index = 0;
     while(litaC_index < litaC_size) {
         {
             litaC_hash = ((litaC_hash << 5U) + litaC_hash) ^ ((litaC_u32)(*(litaC_str)));
@@ -37170,8 +37155,7 @@ litaC_void* litaC_std__mem__libc_allocator__cRealloc(const litaC_std__mem__Alloc
 }
 
 litaC_void litaC_std__mem__libc_allocator__cFree(const litaC_std__mem__Allocator* litaC_a,litaC_void* litaC_ptr) {
-    return free(litaC_ptr);
-    
+    free(litaC_ptr);
     
 }
 
@@ -37985,7 +37969,7 @@ litaC_std__io__FileStatus litaC_std__io__WriteFile(const litaC_char* litaC_fileN
 
 litaC_std__string__builder__StringBuilder litaC_std__string__builder__StringBuilderInit(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__string__builder__StringBuilder litaC_sb =  {
-        
+        0
     };
     litaC_std__string__builder__StringBuilder_init(&((litaC_sb)), litaC_initialSize, litaC_alloc);
     return litaC_sb;
@@ -38033,6 +38017,12 @@ litaC_void litaC_std__string__builder__StringBuilder_free(litaC_std__string__bui
         }
         
     } 
+    
+    
+}
+
+litaC_i32 litaC_std__string__builder__StringBuilder_appendString(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str) {
+    return litaC_std__string__builder__StringBuilder_appendStrn(litaC_b, litaC_str.buffer, litaC_str.length);
     
     
 }
@@ -38271,28 +38261,28 @@ litaC_void litaC_std__string__builder__StringBuilder_delete(litaC_std__string__b
     
 }
 
-litaC_bool litaC_std__string__builder__StringBuilder_contains(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str,litaC_i32 litaC_len) {
-    return litaC_std__string__builder__StringBuilder_indexOf(litaC_b, litaC_str, litaC_len) > -(1);
+litaC_bool litaC_std__string__builder__StringBuilder_contains(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str) {
+    return litaC_std__string__builder__StringBuilder_indexOf(litaC_b, litaC_str) > -(1);
     
     
 }
 
-litaC_i32 litaC_std__string__builder__StringBuilder_indexOf(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str,litaC_i32 litaC_len) {
-    return litaC_std__string__builder__StringBuilder_indexOfAt(litaC_b, litaC_str, litaC_len, 0);
+litaC_i32 litaC_std__string__builder__StringBuilder_indexOf(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str) {
+    return litaC_std__string__builder__StringBuilder_indexOfAt(litaC_b, litaC_str, 0);
     
     
 }
 
-litaC_i32 litaC_std__string__builder__StringBuilder_indexOfAt(litaC_std__string__builder__StringBuilder* litaC_b,const litaC_char* litaC_str,litaC_i32 litaC_len,litaC_i32 litaC_fromIndex) {
-    litaC_std__builtins__String litaC_view = litaC_std__string__buffer__StringBuffer_asString(&((litaC_b->asBuffer)));
-    return litaC_std__string__String_indexOfAt(litaC_view, litaC_std__string__char_toString(litaC_str), litaC_fromIndex);
+litaC_i32 litaC_std__string__builder__StringBuilder_indexOfAt(litaC_std__string__builder__StringBuilder* litaC_b,litaC_std__builtins__String litaC_str,litaC_i32 litaC_fromIndex) {
+    litaC_std__builtins__String litaC_view = litaC_std__string__buffer__StringBuffer_toString(litaC_b->asBuffer);
+    return litaC_std__string__String_indexOfAt(litaC_view, litaC_str, litaC_fromIndex);
     
     
 }
 
-litaC_i32 litaC_std__string__builder__StringBuilder_replace(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_start,litaC_i32 litaC_end,const litaC_char* litaC_str) {
+litaC_i32 litaC_std__string__builder__StringBuilder_replace(litaC_std__string__builder__StringBuilder* litaC_b,litaC_i32 litaC_start,litaC_i32 litaC_end,litaC_std__builtins__String litaC_str) {
     litaC_std__string__builder__StringBuilder_delete(litaC_b, litaC_start, litaC_end);
-    return litaC_std__string__builder__StringBuilder_insert(litaC_b, litaC_start, "%s", litaC_str);
+    return litaC_std__string__builder__StringBuilder_insert(litaC_b, litaC_start, "%.*s", litaC_str.length, litaC_str.buffer);
     
     
 }
@@ -38443,7 +38433,7 @@ litaC_std__string__builder__StringBuilder* litaC_std__string__builder__StringBui
 }
 
 litaC_i32 litaC_std__string__builder__StringBuilder_copyTo(litaC_std__string__builder__StringBuilder* litaC_b,litaC_char* litaC_buf,litaC_i32 litaC_len,litaC_bool litaC_addZero) {
-    litaC_std__builtins__String litaC_view = litaC_std__string__buffer__StringBuffer_asString(&((litaC_b->asBuffer)));
+    litaC_std__builtins__String litaC_view = litaC_std__string__buffer__StringBuffer_toString(litaC_b->asBuffer);
     return litaC_std__string__String_copyTo(litaC_view, litaC_buf, litaC_len, litaC_addZero);
     
     
@@ -38529,7 +38519,7 @@ litaC_char* litaC_std__string__builder__StringBuilder_cStr(litaC_std__string__bu
 }
 
 LITAC_INLINE 
-litaC_std__string__buffer__StringBuffer litaC_std__string__builder__StringBuilder_asStringBuffer(litaC_std__string__builder__StringBuilder* litaC_b) {
+litaC_std__string__buffer__StringBuffer litaC_std__string__builder__StringBuilder_toBuffer(litaC_std__string__builder__StringBuilder* litaC_b) {
     return litaC_b->asBuffer;
     
     
@@ -39038,16 +39028,6 @@ litaC_std__builtins__String litaC_std__string__buffer__StringBuffer_toString(lit
     
 }
 
-LITAC_INLINE 
-litaC_std__builtins__String litaC_std__string__buffer__StringBuffer_asString(litaC_std__string__buffer__StringBuffer* litaC_b) {
-    return (litaC_std__builtins__String) {
-        .buffer = litaC_b->buffer,
-        .length = litaC_b->length
-    };
-    
-    
-}
-
 litaC_bool litaC_std__ascii__char_isWhitespace(litaC_char litaC_this) {
     return litaC_std__ascii__WHITESPACE[litaC_this & 0xFF];
     
@@ -39074,7 +39054,7 @@ litaC_bool litaC_std__ascii__char_isAlphanumeric(litaC_char litaC_this) {
 
 litaC_std__cmdline__CmdParser litaC_std__cmdline__CmdParserInit(const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__cmdline__CmdParser litaC_parser =  {
-        
+        0
     };
     litaC_std__cmdline__CmdParser_init(&((litaC_parser)), litaC_allocator);
     return litaC_parser;
@@ -39597,19 +39577,19 @@ Lita_OSType litaC_std__system__OSFromStr(const litaC_char* litaC_str,litaC_usize
 
 
 
-litaC_bool litaC_std__system__SystemInit() {
+litaC_bool litaC_std__system__SystemInit(void) {
     return litaC_std__system__system_posix___SystemInit();
     
     
 }
 
-Lita_OSType litaC_std__system__GetOS() {
+Lita_OSType litaC_std__system__GetOS(void) {
     return litaOS;
     
     
 }
 
-Lita_ArchType litaC_std__system__GetArch() {
+Lita_ArchType litaC_std__system__GetArch(void) {
     return litaArch;
     
     
@@ -39621,7 +39601,7 @@ litaC_char* litaC_std__system__GetEnv(const litaC_char* litaC_varName) {
     
 }
 
-const litaC_char* litaC_std__system__CurrentWorkingPath() {
+const litaC_char* litaC_std__system__CurrentWorkingPath(void) {
     return litaC_std__system__system_posix___CurrentWorkingPath();
     
     
@@ -39947,7 +39927,7 @@ litaC_i32 litaC_std__system__strcicmp(const litaC_char* litaC_a,const litaC_char
         
     } 
     
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
+    for(litaC_usize litaC_i = 0;litaC_i < litaC_size;litaC_i += 1) {
         {
             litaC_char litaC_ac = *(litaC_a);
             litaC_char litaC_bc = *(litaC_b);
@@ -40469,13 +40449,13 @@ litaC_char* litaC_std__system__UriToFilePath(const litaC_char* litaC_uri,litaC_c
 }
 
 
-litaC_f64 litaC_std__system__SystemTimeMSec() {
+litaC_f64 litaC_std__system__SystemTimeMSec(void) {
     return litaC_std__system__system_posix___SystemTimeMSec();
     
     
 }
 
-const litaC_char* litaC_std__system__CurrentDateTime() {
+const litaC_char* litaC_std__system__CurrentDateTime(void) {
     time_t litaC_rawtime = {0};
     tm* litaC_timeinfo = NULL;
     time(&(litaC_rawtime));
@@ -40536,13 +40516,13 @@ litaC_void litaC_std__system__Process_close(litaC_std__system__Process* litaC_th
 }
 
 
-litaC_bool litaC_std__system__system_posix___SystemInit() {
+litaC_bool litaC_std__system__system_posix___SystemInit(void) {
     return litaC_true;
     
     
 }
 
-const litaC_char* litaC_std__system__system_posix___CurrentWorkingPath() {
+const litaC_char* litaC_std__system__system_posix___CurrentWorkingPath(void) {
     static 
     litaC_char litaC_path[PATH_MAX] = {0};
     if(litaC_std__system__system_posix__pwd[0] == 0) {
@@ -40652,7 +40632,7 @@ litaC_bool litaC_std__system__system_posix___FileDelete(const litaC_char* litaC_
 }
 
 
-litaC_f64 litaC_std__system__system_posix___SystemTimeMSec() {
+litaC_f64 litaC_std__system__system_posix___SystemTimeMSec(void) {
     timeval litaC_t0 = {0};
     gettimeofday(&(litaC_t0), NULL);
     litaC_f64 litaC_time = (((litaC_f64)litaC_t0.tv_sec * 1000.0) + ((litaC_f64)litaC_t0.tv_usec / 1000.0));
@@ -40710,9 +40690,9 @@ litaC_void litaC_std__map__Print(litaC_std__map__std__map__Map_cb_i32_c_i32_ce_*
     
 }
 
-litaC_void litaC_std__map__testRemove() {
+litaC_void litaC_std__map__testRemove(void) {
     litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ litaC_map =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb_i32_c_i32_ce_(&((litaC_map)), 0, 4, litaC_std__mem__defaultAllocator, 0);
     
@@ -40916,12 +40896,12 @@ litaC_void litaC_std__profile__ExportTimings(const litaC_char* litaC_filename) {
 
 litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ litaC_std__http__HeadersInit(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ litaC_headers =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb_std__builtins__String_c_std__builtins__String_ce_(&((litaC_headers)), (litaC_std__builtins__String) {
-        
+        0
     }, litaC_initialSize, litaC_allocator, (litaC_std__builtins__String) {
-        
+        0
     });
     return litaC_headers;
     
@@ -41526,7 +41506,7 @@ litaC_void litaC_lex__Lexer_scanInt(litaC_lex__Lexer* litaC_l,litaC_char* litaC_
         
     } 
     
-    litaC_i64 litaC_val = 0;
+    litaC_u64 litaC_val = 0;
     for(;;) {
         {
             litaC_i32 litaC_digit = litaC_lex__charToDigit[(litaC_i32)(*(litaC_stream))];
@@ -41593,7 +41573,7 @@ litaC_void litaC_lex__Lexer_scanInt(litaC_lex__Lexer* litaC_l,litaC_char* litaC_
     } 
     
     litaC_l->token.type = litaC_lex__TokenType_INT_NUMBER;
-    litaC_l->token.value.intValue = litaC_val;
+    litaC_l->token.value.uintValue = litaC_val;
     
 }
 
@@ -41702,7 +41682,7 @@ litaC_void litaC_lex__Lexer_scanTypeInfo(litaC_lex__Lexer* litaC_l) {
                 {
                     litaC_len += 1;
                     litaC_lex__Lexer_nextChar(litaC_l);
-                    if(!(litaC_lex__VALID_TYPE_INFO_CHAR[*(litaC_l->stream)])) {
+                    if(!(litaC_lex__VALID_TYPE_INFO_CHAR[(litaC_i32)(*(litaC_l->stream))])) {
                         {
                             break;
                             
@@ -43242,7 +43222,7 @@ litaC_i32 litaC_std__unicode__utf8__Utf8Decode(const litaC_u8* litaC_str,litaC_i
 
 litaC_i32 litaC_std__unicode__utf8__Utf8HexDecode(const litaC_char* litaC_str,litaC_i32 litaC_len) {
     litaC_char litaC_buffer[9] =  {
-        
+        0
     };
     litaC_len = (litaC_len == 4) ? 4 : 8;
     for(litaC_i32 litaC_i = 0;litaC_i < litaC_len;litaC_i += 1) {
@@ -46499,7 +46479,7 @@ litaC_bool litaC_types__IsFuncImpl(litaC_types__TypeInfo* litaC_traitFn,litaC_ty
 
 litaC_ast__TypeSpec* litaC_types__TypeInfo_asTypeSpec(litaC_types__TypeInfo* litaC_this,litaC_module__Module* litaC_module,litaC_bool litaC_fullyQualify) {
     litaC_lex__SrcPos litaC_pos = ((litaC_this->sym)) ? litaC_this->sym->decl->stmt.node.startPos : (litaC_lex__SrcPos) {
-        
+        0
     };
     litaC_ast_new__TypeSpecAllocator* litaC_allocator = &(litaC_module->typeSpecAllocator);
     switch(litaC_this->kind) {
@@ -46722,7 +46702,7 @@ litaC_ast__TypeSpec* litaC_types__TypeInfo_asTypeSpec(litaC_types__TypeInfo* lit
             {
                 litaC_types__TypeInfo* litaC_funcInfo = litaC_this;
                 litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ litaC_args =  {
-                    
+                    0
                 };
                 litaC_std__array__std__array__Array_init_cb__ptr_ast__TypeSpec_ce_(&((litaC_args)), litaC_std__array__std__array__Array_size_cb__ptr_types__TypeInfo_ce_(&((litaC_funcInfo->paramDecls))), litaC_module->allocator);
                 for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_types__TypeInfo_ce_(&((litaC_funcInfo->paramDecls)));litaC_i += 1) {
@@ -46775,7 +46755,7 @@ litaC_ast__TypeSpec* litaC_types__TypeInfo_asTypeSpec(litaC_types__TypeInfo* lit
                 
                 litaC_std__string__buffer__StringBuffer_append(&((litaC_nameStr)), "%.*s", litaC_baseName.length, litaC_baseName.buffer);
                 litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_args =  {
-                    
+                    0
                 };
                 if(litaC_aggInfo->sym) {
                     {
@@ -47374,7 +47354,7 @@ litaC_i32 litaC_types__TypeInfo_getFieldIndex(litaC_types__TypeInfo* litaC_this,
 
 litaC_types__FieldPositionResult litaC_types__TypeInfo_getFieldPosition(litaC_types__TypeInfo* litaC_this,litaC_intern__InternedString litaC_name) {
     litaC_types__FieldPath litaC_path =  {
-        
+        0
     };
     if(litaC_types__TypeInfo_getFieldPath(litaC_this, litaC_name, &(litaC_path))) {
         {
@@ -48123,7 +48103,7 @@ litaC_bool litaC_types__TypeInfo_implementsTrait(litaC_types__TypeInfo* litaC_th
     
 }
 
-litaC_i64 litaC_types__NextTypeId() {
+litaC_i64 litaC_types__NextTypeId(void) {
     litaC_types__idGen += 1;
     return litaC_types__idGen;
     
@@ -48171,7 +48151,7 @@ litaC_void litaC_ast_new__TypeSpecAllocator_clear(litaC_ast_new__TypeSpecAllocat
 
 litaC_ast__TypeSpec* litaC_ast_new__TypeSpecAllocator_alloc(litaC_ast_new__TypeSpecAllocator* litaC_this) {
     litaC_std__bucket_list__std__bucket_list__BucketList_add_cb_ast__TypeSpec_ce_(&((litaC_this->typeSpecs)), (litaC_ast__TypeSpec) {
-        
+        0
     });
     return litaC_std__bucket_list__std__bucket_list__BucketList_lastPtr_cb_ast__TypeSpec_ce_(&((litaC_this->typeSpecs)));
     
@@ -48493,7 +48473,7 @@ litaC_ast__Decl* litaC_ast_new__NewTypedefDecl(litaC_lex__SrcPos litaC_startPos,
 
 litaC_ast__Decl* litaC_ast_new__NewNoteDecl(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Identifier litaC_name,litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ litaC_fields,const litaC_std__mem__Allocator* litaC_allocator) {
     return litaC_ast_new__NewAggregateDecl(litaC_startPos, litaC_endPos, litaC_ast__StmtKind_NOTE_DECL, litaC_name, (litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_) {
-        
+        0
     }, litaC_fields, 0, litaC_allocator);
     
     
@@ -49826,10 +49806,10 @@ litaC_void litaC_symbols__Scope_init(litaC_symbols__Scope* litaC_scope,litaC_sym
     } else {
         {
             litaC_scope->symbolFuncs = (litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_) {
-                
+                0
             };
             litaC_scope->symbolNotes = (litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_) {
-                
+                0
             };
             
             
@@ -49953,7 +49933,7 @@ litaC_symbols__Symbol* litaC_symbols__Scope_lookup(litaC_symbols__Scope* litaC_s
 
 litaC_void litaC_symbols__Scope_importSymbolWithAlias(litaC_symbols__Scope* litaC_this,litaC_lex__SrcPos litaC_importSrcPos,litaC_intern__InternedString litaC_name,litaC_intern__InternedString litaC_alias,litaC_symbols__Symbol* litaC_symbol) {
     litaC_char litaC_buffer[256] =  {
-        
+        0
     };
     litaC_std__string__buffer__StringBuffer litaC_fullName = litaC_std__string__buffer__StringBufferInit(litaC_buffer, litaC_symbols__MAX_SYMBOL_NAME, 0);
     litaC_std__string__buffer__StringBuffer_appendStrn(&((litaC_fullName)), litaC_alias.buffer, litaC_alias.length);
@@ -50512,13 +50492,13 @@ litaC_module__Module* litaC_module__BuiltinsInit(litaC_lita__Lita* litaC_lita) {
     litaC_module__BUILTIN_IMPORT_IDENT.str = litaC_intern__BUILTIN;
     litaC_module__BUILTIN_IMPORT_IDENT.token = litaC_module__BUILTIN_IMPORT_TOKEN;
     litaC_module__builtins.text = (litaC_std__string__buffer__StringBuffer) {
-        
+        0
     };
     litaC_module__builtins.ast = NULL;
     litaC_module__builtins.flags = litaC_module__ModuleFlags_IS_BUILTIN;
     litaC_module__builtins.allocator = litaC_lita->allocator;
     litaC_module__builtins.importedBy = litaC_std__map__std__map__StrMap_cb_module__ModuleImport_ce_((litaC_module__ModuleImport) {
-        
+        0
     }, 512, litaC_lita->allocator);
     litaC_symbols__Scope_init(&((litaC_module__builtins.symbols)), litaC_symbols__ScopeKind_MODULE, NULL, &((litaC_lita->result)), &(litaC_module__builtins), litaC_lita->allocator);
     litaC_module__builtins.importAliases = litaC_intern__intern__InternMap_cb__ptr_module__Module_ce_(NULL, 16, litaC_lita->allocator);
@@ -50560,9 +50540,9 @@ litaC_void litaC_module__AssignBuiltinSymbols(litaC_module__Module* litaC_module
 
 litaC_void litaC_module__AddBuiltin(litaC_lita__Lita* litaC_lita,litaC_types__TypeInfo* litaC_type) {
     litaC_symbols__Symbol* litaC_sym = litaC_symbols__Scope_addSymbol(&((litaC_module__builtins.symbols)), litaC_type->name, &(litaC_module__builtins), litaC_ast_new__NewBuiltinDecl((litaC_lex__SrcPos) {
-        
+        0
     }, (litaC_lex__SrcPos) {
-        
+        0
     }, litaC_type, litaC_lita->allocator), litaC_symbols__SymbolFlags_IS_BUILTIN | litaC_symbols__SymbolFlags_IS_TYPE | litaC_symbols__SymbolFlags_IS_FOREIGN);
     litaC_sym->state = litaC_symbols__SymbolState_RESOLVED;
     litaC_sym->type = litaC_type;
@@ -50608,7 +50588,7 @@ litaC_module__Module* litaC_module__NewModule(litaC_lita__Lita* litaC_lita,litaC
 
 litaC_void litaC_module__Module_init(litaC_module__Module* litaC_this,litaC_lita__Lita* litaC_lita) {
     litaC_this->text = (litaC_std__string__buffer__StringBuffer) {
-        
+        0
     };
     litaC_this->ast = NULL;
     litaC_std__mem__arena_allocator__ArenaAllocator_init(&((litaC_this->arena)), 1024 * litaC_std__mem__KiB, litaC_lita->allocator);
@@ -50616,7 +50596,7 @@ litaC_void litaC_module__Module_init(litaC_module__Module* litaC_this,litaC_lita
     litaC_ast_new__TypeSpecAllocator_init(&((litaC_this->typeSpecAllocator)), litaC_this->allocator);
     litaC_this->importAliases = litaC_intern__intern__InternMap_cb__ptr_module__Module_ce_(NULL, 16, litaC_this->allocator);
     litaC_this->importedBy = litaC_std__map__std__map__StrMap_cb_module__ModuleImport_ce_((litaC_module__ModuleImport) {
-        
+        0
     }, 64, litaC_lita->allocator);
     litaC_symbols__Scope_init(&((litaC_this->symbols)), litaC_symbols__ScopeKind_MODULE, &(litaC_module__builtins.symbols), &(litaC_lita->result), litaC_this, litaC_lita->allocator);
     litaC_this->flags = 0;
@@ -50628,7 +50608,7 @@ litaC_void litaC_module__Module_init(litaC_module__Module* litaC_this,litaC_lita
 
 litaC_void litaC_module__Module_initIncrementalBuild(litaC_module__Module* litaC_this) {
     litaC_this->text = (litaC_std__string__buffer__StringBuffer) {
-        
+        0
     };
     litaC_this->ast = NULL;
     litaC_this->flags = 0;
@@ -51357,7 +51337,7 @@ litaC_void litaC_std__mem__arena_allocator__ArenaAllocator_init(litaC_std__mem__
     litaC_this->arena->size = litaC_size;
     litaC_this->arena->current = 0;
     litaC_this->arena->next = NULL;
-    litaC_this->arena->region = (litaC_u8*)(litaC_mem + sizeof(litaC_std__mem__arena_allocator__Arena));
+    litaC_this->arena->region = (litaC_u8*)((litaC_char*)litaC_mem + sizeof(litaC_std__mem__arena_allocator__Arena));
     litaC_this->numberOfArenas = 1;
     litaC_this->numberOfBytesAllocated = litaC_size;
     litaC_this->pageSize = litaC_size;
@@ -51456,7 +51436,7 @@ litaC_void* litaC_std__mem__arena_allocator__ArenaAllocator_malloc(litaC_std__me
     litaC_next->size = litaC_asize;
     litaC_next->current = 0;
     litaC_next->next = NULL;
-    litaC_next->region = (litaC_u8*)(litaC_mem + sizeof(litaC_std__mem__arena_allocator__Arena));
+    litaC_next->region = (litaC_u8*)((litaC_char*)litaC_mem + sizeof(litaC_std__mem__arena_allocator__Arena));
     litaC_last->next = litaC_next;
     litaC_next->current += litaC_size;
     litaC_this->numberOfArenas += 1;
@@ -51670,70 +51650,70 @@ litaC_char* litaC_common__EscapeName(const litaC_char* litaC_name,litaC_i32 lita
             litaC_char litaC_c = litaC_sb->asBuffer.buffer[litaC_i];
             switch(litaC_c) {
                 case '*': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_ptr_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_ptr_", .length = 5 });
                     litaC_i += 5;
                     break;
                     
                     
                 }
                 case '<': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_cb_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_cb_", .length = 4 });
                     litaC_i += 4;
                     break;
                     
                     
                 }
                 case '>': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_ce_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_ce_", .length = 4 });
                     litaC_i += 4;
                     break;
                     
                     
                 }
                 case '[': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_bb_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_bb_", .length = 4 });
                     litaC_i += 4;
                     break;
                     
                     
                 }
                 case ']': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_be_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_be_", .length = 4 });
                     litaC_i += 4;
                     break;
                     
                     
                 }
                 case '(': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_pb_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_pb_", .length = 4 });
                     litaC_i += 4;
                     break;
                     
                     
                 }
                 case ')': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_pe_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_pe_", .length = 4 });
                     litaC_i += 4;
                     break;
                     
                     
                 }
                 case ',': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_c_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_c_", .length = 3 });
                     litaC_i += 3;
                     break;
                     
                     
                 }
                 case ' ': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_", .length = 1 });
                     litaC_i += 1;
                     break;
                     
                     
                 }
                 case '-': {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_m_");
+                    litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_m_", .length = 3 });
                     litaC_i += 3;
                     break;
                     
@@ -51747,7 +51727,7 @@ litaC_char* litaC_common__EscapeName(const litaC_char* litaC_name,litaC_i32 lita
                                 litaC_char litaC_nc = litaC_sb->asBuffer.buffer[litaC_n];
                                 if(litaC_nc == ':') {
                                     {
-                                        litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 2, "__");
+                                        litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 2, (litaC_std__builtins__String) { .buffer = "__", .length = 2 });
                                         litaC_i += 2;
                                         break;
                                         
@@ -51762,7 +51742,7 @@ litaC_char* litaC_common__EscapeName(const litaC_char* litaC_name,litaC_i32 lita
                             
                         } 
                         
-                        litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, "_r_");
+                        litaC_std__string__builder__StringBuilder_replace(litaC_sb, litaC_i, litaC_i + 1, (litaC_std__builtins__String) { .buffer = "_r_", .length = 3 });
                         litaC_i += 3;
                         break;
                         
@@ -51792,7 +51772,6 @@ litaC_char* litaC_common__EscapeName(const litaC_char* litaC_name,litaC_i32 lita
 }
 
 litaC_void litaC_lita__Lita_init(litaC_lita__Lita* litaC_this,litaC_lita__LitaOptions* litaC_options) {
-    litaC_usize litaC_size = (litaC_options->maxMemory > 0) ? litaC_options->maxMemory : 1024 * 1024 * 1024;
     litaC_std__mem__bucket_allocator__BucketAllocator_init(&((litaC_this->globalAllocator)), litaC_std__mem__defaultAllocator, 100 * litaC_std__mem__MiB);
     litaC_this->allocator = &(litaC_this->globalAllocator.allocator);
     litaC_this->options = litaC_options;
@@ -51893,7 +51872,7 @@ litaC_void litaC_lita__Lita_incrementalBuild(litaC_lita__Lita* litaC_this,litaC_
     
     {
         if(!(litaC_lita__ParseModule(litaC_this, litaC_module, (litaC_lex__SrcPos) {
-            
+            0
         }))) {
             {
                 litaC_module__Module_postIncrementalBuild(litaC_module);
@@ -51906,9 +51885,9 @@ litaC_void litaC_lita__Lita_incrementalBuild(litaC_lita__Lita* litaC_this,litaC_
         } 
         
         litaC_ast__ImportDecl* litaC_builtinImport = (litaC_ast__ImportDecl*)litaC_ast_new__NewImportDecl((litaC_lex__SrcPos) {
-            
+            0
         }, (litaC_lex__SrcPos) {
-            
+            0
         }, litaC_module__BUILTIN_IMPORT_IDENT, (litaC_ast__Identifier) {
             .str = litaC_intern__EMPTY_STR,
             .token =  {
@@ -51922,7 +51901,7 @@ litaC_void litaC_lita__Lita_incrementalBuild(litaC_lita__Lita* litaC_this,litaC_
     }
     {
         litaC_checker__TypeChecker litaC_checker =  {
-            
+            0
         };
         litaC_checker__TypeChecker_init(&((litaC_checker)), litaC_this, litaC_module->allocator);
         litaC_checker__TypeChecker_typeCheck(&((litaC_checker)), litaC_module, litaC_checker__TypeCheckerFlags_DISABLE_TRAIT_WRAPPERS);
@@ -51983,11 +51962,11 @@ litaC_module__Module* litaC_lita__Lita_parse(litaC_lita__Lita* litaC_this) {
     litaC_module__Module* litaC_builtin = litaC_module__BuiltinsInit(litaC_this);
     litaC_lita__Lita_addModule(litaC_this, litaC_builtin);
     if(!(litaC_lita__ParseModule(litaC_this, litaC_builtin, (litaC_lex__SrcPos) {
-        
+        0
     }))) {
         {
             litaC_phase_result__PhaseResult_addError(&((litaC_this->result)), (litaC_lex__SrcPos) {
-                
+                0
             }, "unable to parse builtins.lita");
             {
                 litaC_module__Module* ___result = NULL;
@@ -52010,7 +51989,7 @@ litaC_module__Module* litaC_lita__Lita_parse(litaC_lita__Lita* litaC_this) {
     if(!(litaC_std__system__FileExists(litaC_absolutePath))) {
         {
             litaC_phase_result__PhaseResult_addError(&((litaC_this->result)), (litaC_lex__SrcPos) {
-                
+                0
             }, "unable to parse '%s' because it was not found", litaC_absolutePath);
             {
                 litaC_module__Module* ___result = NULL;
@@ -52029,7 +52008,7 @@ litaC_module__Module* litaC_lita__Lita_parse(litaC_lita__Lita* litaC_this) {
     litaC_module__Module* litaC_root = litaC_module__NewModule(litaC_this, litaC_packageName, litaC_this->options->inputFile);
     litaC_lita__Lita_addModule(litaC_this, litaC_root);
     if(!(litaC_lita__ParseModule(litaC_this, litaC_root, (litaC_lex__SrcPos) {
-        
+        0
     }))) {
         {
             {
@@ -52046,9 +52025,9 @@ litaC_module__Module* litaC_lita__Lita_parse(litaC_lita__Lita* litaC_this) {
     } 
     
     litaC_ast__ImportDecl* litaC_builtinImport = (litaC_ast__ImportDecl*)litaC_ast_new__NewImportDecl((litaC_lex__SrcPos) {
-        
+        0
     }, (litaC_lex__SrcPos) {
-        
+        0
     }, litaC_module__BUILTIN_IMPORT_IDENT, (litaC_ast__Identifier) {
         .str = litaC_intern__EMPTY_STR,
         .token =  {
@@ -52072,7 +52051,7 @@ litaC_bool litaC_lita__Lita_typeCheck(litaC_lita__Lita* litaC_this,litaC_module_
     litaC_lita__Lita_startCapture(litaC_this, litaC_lita__MetricType_TYPE_CHECKING);
     
     litaC_checker__TypeChecker litaC_checker =  {
-        
+        0
     };
     litaC_checker__TypeChecker_init(&((litaC_checker)), litaC_this, litaC_this->allocator);
     litaC_this->programSymbols = litaC_checker__TypeChecker_typeCheck(&((litaC_checker)), litaC_module, litaC_flags);
@@ -52208,7 +52187,7 @@ litaC_bool litaC_lita__Lita_compileWithLibtcc(litaC_lita__Lita* litaC_this,litaC
     #if LIBTCC_AVAILABLE
     litaC_lita__Lita_startCapture(litaC_this, litaC_lita__MetricType_CGEN);
     litaC_cgen__CGen litaC_cgen =  {
-        
+        0
     };
     litaC_cgen__CGen_init(&((litaC_cgen)), litaC_this, NULL);
     litaC_cgen__CGen_emitProgram(&((litaC_cgen)), litaC_module);
@@ -52359,7 +52338,7 @@ litaC_bool litaC_lita__Lita_emitC(litaC_lita__Lita* litaC_this,litaC_module__Mod
     
     
     litaC_cgen__CGen litaC_cgen =  {
-        
+        0
     };
     litaC_cgen__CGen_init(&((litaC_cgen)), litaC_this, &((litaC_file)));
     litaC_cgen__CGen_emitProgram(&((litaC_cgen)), litaC_module);
@@ -52381,20 +52360,20 @@ litaC_bool litaC_lita__Lita_compileC(litaC_lita__Lita* litaC_this,litaC_module__
     litaC_std__string__builder__StringBuilder litaC_commandStr = litaC_std__string__builder__StringBuilderInit(1024, NULL);
     
     litaC_std__string__builder__StringBuilder_appendStr(&((litaC_commandStr)), litaC_this->options->compileCmd);
-    litaC_i32 litaC_index = litaC_std__string__builder__StringBuilder_indexOf(&((litaC_commandStr)), "%output%", -(1));
+    litaC_i32 litaC_index = litaC_std__string__builder__StringBuilder_indexOf(&((litaC_commandStr)), (litaC_std__builtins__String) { .buffer = "%output%", .length = 8 });
     if(litaC_index > -(1)) {
         {
-            litaC_std__string__builder__StringBuilder_replace(&((litaC_commandStr)), litaC_index, litaC_index + litaC_std__string__char_length("%output%"), litaC_binaryFilename);
+            litaC_std__string__builder__StringBuilder_replace(&((litaC_commandStr)), litaC_index, litaC_index + litaC_std__string__char_length("%output%"), litaC_std__string__char_toString(litaC_binaryFilename));
             
             
         }
         
     } 
     
-    litaC_index = litaC_std__string__builder__StringBuilder_indexOf(&((litaC_commandStr)), "%input%", -(1));
+    litaC_index = litaC_std__string__builder__StringBuilder_indexOf(&((litaC_commandStr)), (litaC_std__builtins__String) { .buffer = "%input%", .length = 7 });
     if(litaC_index > -(1)) {
         {
-            litaC_std__string__builder__StringBuilder_replace(&((litaC_commandStr)), litaC_index, litaC_index + litaC_std__string__char_length("%input%"), litaC_sourceFilename);
+            litaC_std__string__builder__StringBuilder_replace(&((litaC_commandStr)), litaC_index, litaC_index + litaC_std__string__char_length("%input%"), litaC_std__string__char_toString(litaC_sourceFilename));
             
             
         }
@@ -52510,10 +52489,10 @@ litaC_void litaC_lita__Lita_applyCompilerOptions(litaC_lita__Lita* litaC_this,li
     }
     if(litaC_this->options->isStrict) {
         {
-            litaC_i32 litaC_index = litaC_std__string__builder__StringBuilder_indexOf(litaC_commandStr, "%options%", -(1));
+            litaC_i32 litaC_index = litaC_std__string__builder__StringBuilder_indexOf(litaC_commandStr, (litaC_std__builtins__String) { .buffer = "%options%", .length = 9 });
             if(litaC_index >= 0) {
                 {
-                    litaC_std__string__builder__StringBuilder_replace(litaC_commandStr, litaC_index, litaC_index + litaC_std__string__char_length("%options%"), litaC_std__string__builder__StringBuilder_cStr(litaC_buffer));
+                    litaC_std__string__builder__StringBuilder_replace(litaC_commandStr, litaC_index, litaC_index + litaC_std__string__char_length("%options%"), litaC_std__string__buffer__StringBuffer_toString(litaC_buffer->asBuffer));
                     
                     
                 }
@@ -52578,7 +52557,7 @@ litaC_i32 litaC_lita__Lita_run(litaC_lita__Lita* litaC_this) {
     }
     litaC_std__array__std__array__Array_add_cb__ptr_const_char_ce_(&((litaC_args)), NULL);
     litaC_std__process__Process litaC_process =  {
-        
+        0
     };
     litaC_std__process__Process_create(&((litaC_process)), litaC_args.elements, litaC_path, litaC_std__process__ProcessOption_COMBINE_STDOUT_STDERR | litaC_std__process__ProcessOption_INHERIT_IO);
     
@@ -52973,7 +52952,7 @@ litaC_std__builtins__String litaC_lita__GetPackageName(const litaC_char* litaC_s
     if(!(litaC_inputFile)) {
         {
             return (litaC_std__builtins__String) {
-                
+                0
             };
             
             
@@ -53184,7 +53163,7 @@ litaC_u32 litaC_std__process__Process_readStderr(litaC_std__process__Process* li
 
 litaC_preprocessor__Preprocessor litaC_preprocessor__PreprocessorInit(litaC_lita__Lita* litaC_lita) {
     litaC_preprocessor__Preprocessor litaC_pp =  {
-        
+        0
     };
     litaC_preprocessor__Preprocessor_init(&((litaC_pp)), litaC_lita);
     return litaC_pp;
@@ -53836,7 +53815,7 @@ litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_ast_copy__CopyG
     if(litaC_std__array__std__array__Array_empty_cb_ast__GenericArg_ce_(&((litaC_args)))) {
         {
             return (litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_) {
-                
+                0
             };
             
             
@@ -53846,7 +53825,7 @@ litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_ast_copy__CopyG
     } 
     
     litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_result =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_ast__GenericArg_ce_(&((litaC_result)), litaC_std__array__std__array__Array_size_cb_ast__GenericArg_ce_(&((litaC_args))), litaC_module->allocator);
     for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_ast__GenericArg_ce_(&((litaC_args)));litaC_i += 1) {
@@ -53894,7 +53873,7 @@ litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ litaC_ast_copy__Co
     } 
     
     litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ litaC_result =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__TypeSpec_ce_(&((litaC_result)), litaC_std__array__std__array__Array_size_cb__ptr_ast__TypeSpec_ce_(&((litaC_specs))), litaC_module->allocator);
     for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__TypeSpec_ce_(&((litaC_specs)));litaC_i += 1) {
@@ -54138,7 +54117,7 @@ litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ litaC_ast_copy__CopyCall
     if(litaC_std__array__std__array__Array_empty_cb_ast__CallArg_ce_(litaC_args)) {
         {
             return (litaC_std__array__std__array__Array_cb_ast__CallArg_ce_) {
-                
+                0
             };
             
             
@@ -54170,7 +54149,7 @@ litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ litaC_ast_copy__CopyEx
     if(litaC_std__array__std__array__Array_empty_cb__ptr_ast__Expr_ce_(litaC_exprs)) {
         {
             return (litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_) {
-                
+                0
             };
             
             
@@ -54197,7 +54176,7 @@ litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_ast_copy__CopySt
     if(litaC_std__array__std__array__Array_empty_cb__ptr_ast__Stmt_ce_(litaC_stmts)) {
         {
             return (litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_) {
-                
+                0
             };
             
             
@@ -54373,7 +54352,7 @@ litaC_ast__Expr* litaC_ast_copy__CopyExpr(litaC_ast__Expr* litaC_expr,litaC_modu
             {
                 litaC_ast__InitExpr* litaC_original = (litaC_ast__InitExpr*)litaC_expr;
                 litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ litaC_arguments =  {
-                    
+                    0
                 };
                 if(!(litaC_std__array__std__array__Array_empty_cb__ptr_ast__InitArgExpr_ce_(&((litaC_original->arguments))))) {
                     {
@@ -54741,7 +54720,7 @@ litaC_ast__Stmt* litaC_ast_copy__CopyStmt(litaC_ast__Stmt* litaC_stmt,litaC_modu
             {
                 litaC_ast__ParametersStmt* litaC_original = (litaC_ast__ParametersStmt*)litaC_stmt;
                 litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ litaC_params =  {
-                    
+                    0
                 };
                 if(!(litaC_std__array__std__array__Array_empty_cb__ptr_ast__ParameterDecl_ce_(&((litaC_original->params))))) {
                     {
@@ -54797,7 +54776,7 @@ litaC_ast__Stmt* litaC_ast_copy__CopyStmt(litaC_ast__Stmt* litaC_stmt,litaC_modu
             {
                 litaC_ast__SwitchStmt* litaC_original = (litaC_ast__SwitchStmt*)litaC_stmt;
                 litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ litaC_cases =  {
-                    
+                    0
                 };
                 if(!(litaC_std__array__std__array__Array_empty_cb__ptr_ast__SwitchCaseStmt_ce_(&((litaC_original->cases))))) {
                     {
@@ -54888,7 +54867,7 @@ litaC_ast__Stmt* litaC_ast_copy__CopyStmt(litaC_ast__Stmt* litaC_stmt,litaC_modu
 
 litaC_ast__AggregateDecl* litaC_ast_copy__CopyAggregateDecl(litaC_ast__AggregateDecl* litaC_decl,litaC_module__Module* litaC_module) {
     litaC_ast__AggregateDecl* litaC_copy = (litaC_ast__AggregateDecl*)litaC_ast_new__NewAggregateDecl(litaC_decl->decl.declaration.stmt.node.startPos, litaC_decl->decl.declaration.stmt.node.endPos, litaC_decl->decl.declaration.stmt.node.kind, litaC_decl->decl.declaration.name, litaC_std__array__std__array__Array_copy_cb_ast__GenericParam_ce_(&((litaC_decl->decl.genericParams)), litaC_module->allocator), (litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_) {
-        
+        0
     }, litaC_decl->flags, litaC_module->allocator);
     litaC_copy->decl.declaration.attributes = litaC_decl->decl.declaration.attributes;
     litaC_copy->fields = litaC_std__array__std__array__ArrayInit_cb_ast__FieldStmt_ce_(litaC_std__array__std__array__Array_size_cb_ast__FieldStmt_ce_(&((litaC_decl->fields))), litaC_module->allocator);
@@ -55000,7 +54979,7 @@ litaC_ast__FuncDecl* litaC_ast_copy__CopyFuncDecl(litaC_ast__FuncDecl* litaC_dec
 
 litaC_ast__ParametersStmt* litaC_ast_copy__CopyParameters(litaC_ast__ParametersStmt litaC_params,litaC_module__Module* litaC_module) {
     litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ litaC_paramDecls =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__ParameterDecl_ce_(&((litaC_paramDecls)), litaC_std__array__std__array__Array_size_cb__ptr_ast__ParameterDecl_ce_(&((litaC_params.params))), litaC_module->allocator);
     for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__ParameterDecl_ce_(&((litaC_params.params)));litaC_i += 1) {
@@ -55206,7 +55185,7 @@ litaC_void litaC_checker__TypeChecker_init(litaC_checker__TypeChecker* litaC_thi
     litaC_std__array__std__array__Array_init_cb__ptr_symbols__Symbol_ce_(&((litaC_this->genericTemplates)), 64, litaC_allocator);
     litaC_this->genericContext.callsite = NULL;
     litaC_std__map__std__map__Map_init_cb_i64_c_std__array__Array_cb_i64_ce__ce_(&((litaC_this->interfaceImpls)), (litaC_std__array__std__array__Array_cb_i64_ce_) {
-        
+        0
     }, 128, litaC_allocator, 0);
     litaC_this->bypassing = litaC_false;
     litaC_this->typeCache = &(litaC_lita->typeCache);
@@ -55826,7 +55805,7 @@ litaC_symbols__Symbol* litaC_checker__TypeChecker_createDeclSymbol(litaC_checker
     } else {
         {
             litaC_char litaC_buffer[256] =  {
-                
+                0
             };
             litaC_std__string__buffer__StringBuffer litaC_nameStr = litaC_std__string__buffer__StringBufferInit(litaC_buffer, litaC_symbols__MAX_SYMBOL_NAME, 0);
             litaC_std__string__buffer__StringBuffer_format(&((litaC_nameStr)), "anon_%d", litaC_this->randomNameIndex);
@@ -55923,7 +55902,7 @@ litaC_symbols__Symbol* litaC_checker__TypeChecker_createDeclSymbol(litaC_checker
                 if(litaC_isMethod) {
                     {
                         litaC_char litaC_buffer[256] =  {
-                            
+                            0
                         };
                         if(!(litaC_ast__FuncDecl_getName(litaC_funcDecl, litaC_buffer))) {
                             {
@@ -56936,7 +56915,7 @@ litaC_bool litaC_checker__TypeChecker_implementsTrait(litaC_checker__TypeChecker
     } 
     
     litaC_symbols__Symbol* litaC_symbols[2048] =  {
-        
+        0
     };
     litaC_i32 litaC_numOfMethods = litaC_module__Module_getMethodsForType(litaC_this->current, litaC_agg, litaC_symbols);
     litaC_i32 litaC_numOfTraitFns = litaC_std__array__std__array__Array_size_cb_ast__FieldStmt_ce_(&((litaC_iface->aggDecl->fields)));
@@ -57314,7 +57293,7 @@ litaC_types__TypeInfo* litaC_checker__TypeChecker_resolveTypeSpec(litaC_checker_
             {
                 litaC_ast__TypeSpec* litaC_funcPtrSpec = litaC_spec;
                 litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ litaC_paramDecls =  {
-                    
+                    0
                 };
                 if(!(litaC_std__array__std__array__Array_empty_cb__ptr_ast__TypeSpec_ce_(&((litaC_funcPtrSpec->args))))) {
                     {
@@ -57600,7 +57579,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
             {
                 litaC_ast__BlockStmt* litaC_body = (litaC_ast__BlockStmt*)litaC_stmt;
                 litaC_checker__TypeChecker_pushScope(litaC_this, &((litaC_symbols__Scope) {
-                    
+                    0
                 }));
                 
                 for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__Stmt_ce_(&((litaC_body->stmts)));litaC_i += 1) {
@@ -57673,7 +57652,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
                             }
                         }
                         litaC_checker__TypeChecker_pushScope(litaC_this, &((litaC_symbols__Scope) {
-                            
+                            0
                         }));
                         
                         if(litaC_compStmt->end && !(litaC_checker__TypeChecker_resolveStmt(litaC_this, &((litaC_compStmt->end->stmt))))) {
@@ -57760,7 +57739,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
                 litaC_ast__DoWhileStmt* litaC_whileStmt = (litaC_ast__DoWhileStmt*)litaC_stmt;
                 {
                     litaC_checker__TypeChecker_pushScope(litaC_this, &((litaC_symbols__Scope) {
-                        
+                        0
                     }));
                     
                     if(!(litaC_checker__TypeChecker_resolveStmt(litaC_this, litaC_whileStmt->body))) {
@@ -57824,7 +57803,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
             {
                 litaC_ast__ForStmt* litaC_forStmt = (litaC_ast__ForStmt*)litaC_stmt;
                 litaC_checker__TypeChecker_pushScope(litaC_this, &((litaC_symbols__Scope) {
-                    
+                    0
                 }));
                 
                 if(litaC_forStmt->init && !(litaC_checker__TypeChecker_resolveStmt(litaC_this, litaC_forStmt->init))) {
@@ -58022,7 +58001,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
                 
                 {
                     litaC_checker__TypeChecker_pushScope(litaC_this, &((litaC_symbols__Scope) {
-                        
+                        0
                     }));
                     
                     if(!(litaC_checker__TypeChecker_resolveStmt(litaC_this, litaC_ifStmt->then))) {
@@ -58047,7 +58026,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
                 if(litaC_ifStmt->elseStmt) {
                     {
                         litaC_checker__TypeChecker_pushScope(litaC_this, &((litaC_symbols__Scope) {
-                            
+                            0
                         }));
                         
                         if(!(litaC_checker__TypeChecker_resolveStmt(litaC_this, litaC_ifStmt->elseStmt))) {
@@ -58411,7 +58390,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
                 } 
                 
                 litaC_checker__TypeChecker_pushScope(litaC_this, &((litaC_symbols__Scope) {
-                    
+                    0
                 }));
                 
                 if(!(litaC_checker__TypeChecker_resolveStmt(litaC_this, litaC_whileStmt->body))) {
@@ -58563,7 +58542,7 @@ litaC_void litaC_types_new__TypeCache_init(litaC_types_new__TypeCache* litaC_thi
 
 litaC_types__TypeInfo* litaC_types_new__TypeCache_newTypeInfo(litaC_types_new__TypeCache* litaC_this) {
     litaC_std__bucket_list__std__bucket_list__BucketList_add_cb_types__TypeInfo_ce_(&((litaC_this->typeInfos)), (litaC_types__TypeInfo) {
-        
+        0
     });
     litaC_types__TypeInfo* litaC_type = litaC_std__bucket_list__std__bucket_list__BucketList_lastPtr_cb_types__TypeInfo_ce_(&((litaC_this->typeInfos)));
     litaC_type->typeid = litaC_types__NextTypeId();
@@ -63685,7 +63664,7 @@ litaC_ast__Expr* litaC_checker_expr__TypeChecker_coerceTypeWithUsing(litaC_check
     } 
     
     litaC_types__FieldPath litaC_path =  {
-        
+        0
     };
     if(!(litaC_types__TypeInfo_getFieldPathByType(litaC_source, litaC_target, &(litaC_path)))) {
         {
@@ -65430,7 +65409,7 @@ litaC_bool litaC_checker_expr__TypeChecker_addDefaultArguments(litaC_checker__Ty
     assert(litaC_types__IsAggregate(litaC_type));
     litaC_types__TypeInfo* litaC_aggInfo = litaC_type;
     litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ litaC_defaultArgs =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__InitArgExpr_ce_(&((litaC_defaultArgs)), litaC_std__array__std__array__Array_size_cb_ast__FieldStmt_ce_(&((litaC_aggInfo->aggDecl->fields))), litaC_this->lita->allocator);
     for(litaC_i32 litaC_position = 0;litaC_position < litaC_std__array__std__array__Array_size_cb_ast__FieldStmt_ce_(&((litaC_aggInfo->aggDecl->fields)));litaC_position += 1) {
@@ -67721,7 +67700,7 @@ litaC_void litaC_lsp__references__ReferenceDatabase_init(litaC_lsp__references__
     litaC_std__array__std__array__Array_init_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), litaC_INITIAL_SIZE, litaC_allocator);
     litaC_std__array__std__array__Array_init_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)), litaC_INITIAL_SIZE, litaC_allocator);
     litaC_std__map__std__map__Map_init_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
-        
+        0
     }, litaC_INITIAL_SIZE, litaC_allocator, 0);
     #undef litaC_INITIAL_SIZE
     
@@ -67835,7 +67814,7 @@ litaC_void litaC_lsp__references__ReferenceDatabase_addFieldReference(litaC_lsp_
 litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_lsp__references__ReferenceDatabase_getSymbolReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_symbols__Symbol* litaC_symbol) {
     if(!(litaC_symbol)) {
         return (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
-            
+            0
         };
         
         
@@ -67854,7 +67833,7 @@ litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_lsp__references__Re
     } 
     
     return (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
-        
+        0
     };
     
     
@@ -67939,7 +67918,7 @@ litaC_void litaC_std__json__DefaultMakeFn(litaC_u64 litaC_type,litaC_std__json__
 
 litaC_std__json__JsonContext litaC_std__json__JsonContextInit(litaC_void (*litaC_maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*),litaC_void* (*litaC_makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*),const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__json__JsonContext litaC_context =  {
-        
+        0
     };
     litaC_std__json__JsonContext_init(&((litaC_context)), litaC_maker, litaC_makerPtr, litaC_allocator);
     return litaC_context;
@@ -69009,7 +68988,7 @@ litaC_void litaC_std__json__JsonNode_free(litaC_std__json__JsonNode* litaC_node)
 
 litaC_std__json__JsonParser litaC_std__json__JsonParserInit(const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__json__JsonParser litaC_parser =  {
-        
+        0
     };
     litaC_std__json__JsonParser_init(&((litaC_parser)), litaC_alloc);
     return litaC_parser;
@@ -70276,15 +70255,15 @@ litaC_parser__Parser litaC_parser__ParserInit(const litaC_char* litaC_filename,c
 litaC_ast__ModuleStmt* litaC_parser__Parser_parseModule(litaC_parser__Parser* litaC_p) {
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_pos(litaC_p);
     litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ litaC_imports =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__ImportDecl_ce_(&((litaC_imports)), 16, litaC_p->allocator);
     litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ litaC_notes =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__NoteStmt_ce_(&((litaC_notes)), 2, litaC_p->allocator);
     litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ litaC_declarations =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__Decl_ce_(&((litaC_declarations)), 16, litaC_p->allocator);
     litaC_ast__ModuleStmt* litaC_moduleStmt = (litaC_ast__ModuleStmt*)litaC_ast_new__NewModuleStmt(litaC_pos, litaC_pos, litaC_imports, litaC_notes, litaC_declarations, litaC_p->allocator);
@@ -70361,7 +70340,7 @@ litaC_void litaC_parser__Parser_parseModuleDeclaration(litaC_parser__Parser* lit
         } else {
             {
                 litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ litaC_notes =  {
-                    
+                    0
                 };
                 if(!(litaC_parser__Parser_notes(litaC_p, &(litaC_notes)))) {
                     {
@@ -70557,7 +70536,7 @@ litaC_ast__Stmt* litaC_parser__Parser_parseCompileTimeBody(litaC_parser__Parser*
         {
             litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_pos(litaC_p);
             litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ litaC_notes =  {
-                
+                0
             };
             if(!(litaC_parser__Parser_notes(litaC_p, &(litaC_notes)))) {
                 {
@@ -70805,7 +70784,7 @@ litaC_bool litaC_parser__Parser_notes(litaC_parser__Parser* litaC_p,litaC_std__a
             } 
             
             litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ litaC_args =  {
-                
+                0
             };
             litaC_std__array__std__array__Array_init_cb_ast__CallArg_ce_(&((litaC_args)), 0, litaC_p->allocator);
             if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_LEFT_PAREN)) {
@@ -70978,7 +70957,7 @@ litaC_ast__Decl* litaC_parser__Parser_funcDeclaration(litaC_parser__Parser* lita
         .token = *(litaC_identifier)
     };
     litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ litaC_genericParams =  {
-        
+        0
     };
     if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_LESS_THAN)) {
         {
@@ -71161,7 +71140,7 @@ litaC_ast__Decl* litaC_parser__Parser_aggregateDeclaration(litaC_parser__Parser*
     } 
     
     litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ litaC_genericParams =  {
-        
+        0
     };
     if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_LESS_THAN)) {
         {
@@ -71182,7 +71161,7 @@ litaC_ast__Decl* litaC_parser__Parser_aggregateDeclaration(litaC_parser__Parser*
     } 
     
     litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ litaC_fields =  {
-        
+        0
     };
     litaC_p->aggregateLevel += 1;
     if(!(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_SEMICOLON))) {
@@ -71300,7 +71279,7 @@ litaC_ast__Decl* litaC_parser__Parser_enumDeclaration(litaC_parser__Parser* lita
     } 
     
     litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ litaC_fields =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__EnumFieldEntryDecl_ce_(&((litaC_fields)), 16, litaC_p->allocator);
     do {
@@ -71380,7 +71359,7 @@ litaC_ast__Decl* litaC_parser__Parser_typedefDeclaration(litaC_parser__Parser* l
         .token = *(litaC_identifier)
     };
     litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ litaC_genericParams =  {
-        
+        0
     };
     if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_LESS_THAN)) {
         {
@@ -71427,7 +71406,7 @@ litaC_ast__Decl* litaC_parser__Parser_noteDeclaration(litaC_parser__Parser* lita
         .token = *(litaC_identifier)
     };
     litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ litaC_fields =  {
-        
+        0
     };
     if(!(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_SEMICOLON))) {
         {
@@ -71635,7 +71614,7 @@ litaC_ast__Expr* litaC_parser__Parser_arrayInit(litaC_parser__Parser* litaC_p) {
     } 
     
     litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ litaC_values =  {
-        
+        0
     };
     if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_LEFT_BRACE)) {
         {
@@ -71667,7 +71646,7 @@ litaC_ast__Expr* litaC_parser__Parser_arrayInit(litaC_parser__Parser* litaC_p) {
 litaC_ast__Expr* litaC_parser__Parser_aggregateInit(litaC_parser__Parser* litaC_p) {
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_prevPos(litaC_p);
     litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ litaC_arguments =  {
-        
+        0
     };
     litaC_parser__Parser_structArguments(litaC_p, &(litaC_arguments));
     return litaC_ast_new__NewInitExpr(litaC_pos, litaC_parser__Parser_pos(litaC_p), NULL, litaC_arguments, litaC_p->allocator);
@@ -72299,7 +72278,7 @@ litaC_ast__Expr* litaC_parser__Parser_functionCall(litaC_parser__Parser* litaC_p
                         litaC_parser__Parser_advance(litaC_p);
                         litaC_ast__IdentifierExpr* litaC_idExpr = (litaC_ast__IdentifierExpr*)litaC_expr;
                         litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ litaC_arguments =  {
-                            
+                            0
                         };
                         if(!(litaC_parser__Parser_structArguments(litaC_p, &(litaC_arguments)))) {
                             {
@@ -72566,7 +72545,7 @@ litaC_ast__Expr* litaC_parser__Parser_primary(litaC_parser__Parser* litaC_p) {
 litaC_ast__Expr* litaC_parser__Parser_finishFunctionCall(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr) {
     litaC_lex__SrcPos litaC_pos = litaC_expr->stmt.node.startPos;
     litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ litaC_arguments =  {
-        
+        0
     };
     if(!(litaC_parser__Parser_arguments(litaC_p, &(litaC_arguments)))) {
         {
@@ -72579,7 +72558,7 @@ litaC_ast__Expr* litaC_parser__Parser_finishFunctionCall(litaC_parser__Parser* l
     } 
     
     litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_genericArgs =  {
-        
+        0
     };
     if(litaC_ast__Expr_isIdentifier(litaC_expr)) {
         {
@@ -72709,7 +72688,7 @@ litaC_ast__Stmt* litaC_parser__Parser_tryStatement(litaC_parser__Parser* litaC_p
     if(litaC_parser__Parser_check(litaC_p, litaC_lex__TokenType_AT)) {
         {
             litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ litaC_notes =  {
-                
+                0
             };
             if(!(litaC_parser__Parser_notes(litaC_p, &(litaC_notes)))) {
                 {
@@ -72933,7 +72912,7 @@ litaC_ast__Stmt* litaC_parser__Parser_compStatement(litaC_parser__Parser* litaC_
     
     litaC_intern__InternedString litaC_type = litaC_intern__EMPTY_STR;
     litaC_std__builtins__String litaC_scriptExpr =  {
-        
+        0
     };
     if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_IF)) {
         {
@@ -73231,7 +73210,7 @@ litaC_ast__Stmt* litaC_parser__Parser_compStatement(litaC_parser__Parser* litaC_
                 } 
                 
                 litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_body =  {
-                    
+                    0
                 };
                 {
                     litaC_ast__Stmt* ___result = litaC_ast_new__NewCompStmt(litaC_pos, litaC_parser__Parser_pos(litaC_p), litaC_type, litaC_scriptExpr, litaC_body, (litaC_ast__CompStmt*)litaC_end, litaC_isScriptLoad, litaC_false, litaC_p->allocator);
@@ -73342,7 +73321,7 @@ litaC_ast__Stmt* litaC_parser__Parser_compStatement(litaC_parser__Parser* litaC_
                         
                         {
                             litaC_ast__Stmt* ___result = litaC_ast_new__NewCompStmt(litaC_pos, litaC_parser__Parser_pos(litaC_p), litaC_type, litaC_message->value.str, (litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_) {
-                                
+                                0
                             }, NULL, litaC_false, litaC_isStaticIf, litaC_p->allocator);
                             litaC_p->preprocessorLevel -= 1;
                             return ___result;
@@ -73358,9 +73337,9 @@ litaC_ast__Stmt* litaC_parser__Parser_compStatement(litaC_parser__Parser* litaC_
                         {
                             {
                                 litaC_ast__Stmt* ___result = litaC_ast_new__NewCompStmt(litaC_pos, litaC_parser__Parser_pos(litaC_p), litaC_type, (litaC_std__builtins__String) {
-                                    
+                                    0
                                 }, (litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_) {
-                                    
+                                    0
                                 }, NULL, litaC_false, litaC_isStaticIf, litaC_p->allocator);
                                 litaC_p->preprocessorLevel -= 1;
                                 return ___result;
@@ -73414,7 +73393,7 @@ litaC_ast__Stmt* litaC_parser__Parser_blockStatement(litaC_parser__Parser* litaC
     
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_prevPos(litaC_p);
     litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_stmts =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__Stmt_ce_(&((litaC_stmts)), 16, litaC_p->allocator);
     do {
@@ -73652,7 +73631,7 @@ litaC_ast__Stmt* litaC_parser__Parser_switchCaseStatement(litaC_parser__Parser* 
     
     litaC_lex__SrcPos litaC_bodyPos = litaC_parser__Parser_pos(litaC_p);
     litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_stmts =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__Stmt_ce_(&((litaC_stmts)), 8, litaC_p->allocator);
     while(!(litaC_parser__Parser_atEnd(litaC_p))) {
@@ -73698,7 +73677,7 @@ litaC_ast__Stmt* litaC_parser__Parser_switchDefaultStatement(litaC_parser__Parse
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_prevPos(litaC_p);
     litaC_i32 litaC_breakCount = litaC_p->breakLevel;
     litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_stmts =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__Stmt_ce_(&((litaC_stmts)), 8, litaC_p->allocator);
     while(!(litaC_parser__Parser_atEnd(litaC_p))) {
@@ -73761,7 +73740,7 @@ litaC_ast__Stmt* litaC_parser__Parser_switchStatement(litaC_parser__Parser* lita
     
     litaC_bool litaC_startBrace = litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_LEFT_BRACE);
     litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ litaC_cases =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__SwitchCaseStmt_ce_(&((litaC_cases)), 8, litaC_p->allocator);
     litaC_ast__Stmt* litaC_defaultStmt = NULL;
@@ -74371,7 +74350,7 @@ litaC_ast__TypeSpec* litaC_parser__Parser_funcPtrType(litaC_parser__Parser* lita
 litaC_ast__ParametersStmt* litaC_parser__Parser_parametersStatement(litaC_parser__Parser* litaC_p) {
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_pos(litaC_p);
     litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ litaC_params =  {
-        
+        0
     };
     litaC_bool litaC_isVarargs = litaC_false;
     if(!(litaC_parser__Parser_consume(litaC_p, litaC_lex__TokenType_LEFT_PAREN, litaC_error_codes__ErrorCode_MISSING_LEFT_PAREN))) {
@@ -74719,7 +74698,7 @@ litaC_bool litaC_parser__Parser_genericParameters(litaC_parser__Parser* litaC_p,
 
 litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_parser__Parser_genericArguments(litaC_parser__Parser* litaC_p) {
     litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_arguments =  {
-        
+        0
     };
     if(!(litaC_parser__Parser_check(litaC_p, litaC_lex__TokenType_GREATER_THAN))) {
         {
@@ -74956,7 +74935,7 @@ litaC_ast__Expr* litaC_parser__Parser_tryArrayDesignationExpr(litaC_parser__Pars
 litaC_ast__FieldStmt litaC_parser__Parser_fieldStatement(litaC_parser__Parser* litaC_p,litaC_ast__StmtKind litaC_aggKind) {
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_pos(litaC_p);
     litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ litaC_notes =  {
-        
+        0
     };
     if(!(litaC_parser__Parser_notes(litaC_p, &(litaC_notes)))) {
         {
@@ -75259,7 +75238,7 @@ litaC_ast__FieldStmt litaC_parser__Parser_noteFieldStatement(litaC_parser__Parse
 litaC_ast__EnumFieldEntryDecl* litaC_parser__Parser_enumFieldEntryDecl(litaC_parser__Parser* litaC_p) {
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_pos(litaC_p);
     litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ litaC_notes =  {
-        
+        0
     };
     if(!(litaC_parser__Parser_notes(litaC_p, &(litaC_notes)))) {
         {
@@ -78712,7 +78691,7 @@ litaC_lsp__protocol__TextDocumentDidChange* litaC_lsp__protocol__JsonNodeToTextD
         {
             litaC_std__json__JsonNode* litaC_content = litaC_std__json__JsonNode_at(litaC_contentArray, litaC_i);
             litaC_lsp__protocol__TextDocumentChangeEvent litaC_change =  {
-                
+                0
             };
             litaC_change.hasRange = litaC_false;
             litaC_change.text = litaC_std__json__JsonNode_getStr(litaC_content, "text", NULL);
@@ -78821,7 +78800,7 @@ litaC_lsp__util__SourceLocation litaC_lsp__util__SourceLookup_findAstNodeByPosit
     if(!(litaC_moduleAst)) {
         {
             return (litaC_lsp__util__SourceLocation) {
-                
+                0
             };
             
             
@@ -80866,7 +80845,7 @@ litaC_u32 litaC_lsp__document__Document_getLineStart(litaC_lsp__document__Docume
 litaC_void litaC_lsp__document__Document_insert(litaC_lsp__document__Document* litaC_this,litaC_lsp__protocol__Range litaC_range,const litaC_char* litaC_text) {
     litaC_i32 litaC_fromIndex = (litaC_i32)(litaC_lsp__document__Document_getLineStart(litaC_this, litaC_range.start.line) + litaC_range.start.character);
     litaC_i32 litaC_toIndex = (litaC_i32)(litaC_lsp__document__Document_getLineStart(litaC_this, litaC_range.end.line) + litaC_range.end.character);
-    litaC_std__string__builder__StringBuilder_replace(&((litaC_this->text)), litaC_fromIndex, litaC_toIndex, litaC_text);
+    litaC_std__string__builder__StringBuilder_replace(&((litaC_this->text)), litaC_fromIndex, litaC_toIndex, litaC_std__string__char_toString(litaC_text));
     litaC_lsp__document__Document_refreshLineMap(litaC_this);
     
 }
@@ -80896,7 +80875,7 @@ litaC_void litaC_introspection__Introspect_generate(litaC_introspection__Introsp
     if(!(litaC_lita__FindModulePath(litaC_this->lita, litaC_moduleName, litaC_filename))) {
         {
             litaC_phase_result__PhaseResult_addError(&((litaC_this->lita->result)), (litaC_lex__SrcPos) {
-                
+                0
             }, "could not find builtin module 'type' on the system path.");
             return;
             
@@ -83102,7 +83081,7 @@ litaC_bool litaC_checker_decl__TypeChecker_resolveFuncDecl(litaC_checker__TypeCh
     litaC_checker__TypeChecker_enterModule(litaC_this, litaC_sym->declared);
     
     litaC_checker__TypeChecker_pushScope(litaC_this, &(((litaC_symbols__Scope) {
-        
+        0
     })));
     
     litaC_std__array__std__array__Array_add_cb__ptr_types__TypeInfo_ce_(&((litaC_this->funcDeclStack)), litaC_sym->type);
@@ -83376,7 +83355,7 @@ litaC_void litaC_instrument__Instrument(litaC_lita__Lita* litaC_lita,litaC_check
     if(!(litaC_lita__FindModulePath(litaC_lita, litaC_moduleName, litaC_filename))) {
         {
             litaC_phase_result__PhaseResult_addError(&((litaC_lita->result)), (litaC_lex__SrcPos) {
-                
+                0
             }, "could not find module 'profile' on the system path.");
             return;
             
@@ -84294,7 +84273,7 @@ litaC_bool litaC_preprocessor__api__CallContext_logErrors(litaC_preprocessor__Ca
     } 
     
     litaC_lex__SrcPos litaC_pos =  {
-        
+        0
     };
     for(litaC_i32 litaC_i = 0;litaC_i < ape_errors_count(litaC_this->pp->runtime.ape);litaC_i += 1) {
         {
@@ -85599,7 +85578,7 @@ litaC_void litaC_cgen__CGen_emitProgram(litaC_cgen__CGen* litaC_this,litaC_modul
     litaC_std__string__builder__StringBuilder_appendStr(&((litaC_this->buf)), "\n\n");
     litaC_this->bufferFlush = litaC_false;
     litaC_dependency_graph__DependencyGraph litaC_graph =  {
-        
+        0
     };
     litaC_dependency_graph__DependencyGraph_init(&((litaC_graph)), litaC_this->lita);
     litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ litaC_declarations = litaC_dependency_graph__DependencyGraph_sort(&((litaC_graph)));
@@ -85671,6 +85650,7 @@ litaC_void litaC_cgen__CGen_emitProgram(litaC_cgen__CGen* litaC_this,litaC_modul
         
     } 
     
+    litaC_cgen__CGen_emitln(litaC_this);
     litaC_cgen__CGen_flush(litaC_this);
     
 }
@@ -85856,7 +85836,7 @@ litaC_void litaC_cgen__CGen_emitTraitDecls(litaC_cgen__CGen* litaC_this) {
             const litaC_char* litaC_traitName = litaC_cgen__CGen_cTypeName(litaC_this, litaC_traitSym->type);
             litaC_module__Module* litaC_module = litaC_root;
             litaC_char litaC_vtableName[256] =  {
-                
+                0
             };
             litaC_std__string__buffer__StringBuffer litaC_vtableNameStr = litaC_std__string__buffer__StringBufferInit(litaC_vtableName, litaC_symbols__MAX_SYMBOL_NAME, 0);
             litaC_std__builtins__String litaC_escapedName = litaC_cgen__CGen_escapeNameStr(litaC_this, litaC_traitSym->name);
@@ -87487,7 +87467,7 @@ litaC_void litaC_cgen__CGen_emitPreludeNote(litaC_cgen__CGen* litaC_this,litaC_a
                         .os = Lita_OSType_OTHER,
                         .arch = Lita_ArchType_UNKNOWN,
                         .options =  {
-                            
+                            0
                         }
                     };
                     litaC_char litaC_temp[PATH_MAX] = {0};
@@ -87511,8 +87491,8 @@ litaC_void litaC_cgen__CGen_emitPreludeNote(litaC_cgen__CGen* litaC_this,litaC_a
                                     {
                                         litaC_std__string__builder__StringBuilder litaC_buffer = litaC_std__string__builder__StringBuilderInit(PATH_MAX, litaC_this->lita->allocator);
                                         litaC_std__string__builder__StringBuilder_append(&((litaC_buffer)), "%.*s", litaC_value.length, litaC_value.buffer);
-                                        litaC_std__string__builder__StringBuilder_replace(&((litaC_buffer)), litaC_index, litaC_index + litaC_relativePath.length, litaC_std__system__FileParent(litaC_note->stmt.node.startPos.filename, litaC_temp, NULL));
-                                        litaC_value = litaC_std__string__buffer__StringBuffer_asString(&((litaC_buffer.asBuffer)));
+                                        litaC_std__string__builder__StringBuilder_replace(&((litaC_buffer)), litaC_index, litaC_index + litaC_relativePath.length, litaC_std__string__char_toString(litaC_std__system__FileParent(litaC_note->stmt.node.startPos.filename, litaC_temp, NULL)));
+                                        litaC_value = litaC_std__string__buffer__StringBuffer_toString(litaC_buffer.asBuffer);
                                         
                                         
                                     }
@@ -87947,7 +87927,7 @@ litaC_void litaC_cgen__CGen_emitSymbol(litaC_cgen__CGen* litaC_this,litaC_symbol
     litaC_types__TypeInfo* litaC_aggType = litaC_types__TypeInfo_getBaseType(litaC_paramInfo->type);
     litaC_cgen__CGen_emitStr(litaC_this, litaC_cgen__CGen_cName(litaC_this, litaC_paramInfo));
     litaC_types__FieldPath litaC_path =  {
-        
+        0
     };
     litaC_bool litaC_isFound = litaC_types__TypeInfo_getFieldPath(litaC_aggType, litaC_sym->name, &(litaC_path));
     assert(litaC_isFound);
@@ -88173,7 +88153,7 @@ litaC_void litaC_cgen__CGen_emitStaticCompStmt(litaC_cgen__CGen* litaC_this,lita
     
     {
         litaC_cgen__CGen_pushScope(litaC_this, &((litaC_cgen__CGenScope) {
-            
+            0
         }));
         
         litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_stmts = litaC_s->body;
@@ -88335,7 +88315,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                 litaC_cgen__CGen_emitStrn(litaC_this, "{", 1);
                 {
                     litaC_cgen__CGen_pushScope(litaC_this, &((litaC_cgen__CGenScope) {
-                        
+                        0
                     }));
                     
                     for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__Stmt_ce_(&((litaC_stmt->stmts)));litaC_i += 1) {
@@ -88596,7 +88576,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
             {
                 litaC_ast__FuncBodyStmt* litaC_stmt = (litaC_ast__FuncBodyStmt*)litaC_s;
                 litaC_cgen__CGen_pushScope(litaC_this, &((litaC_cgen__CGenScope) {
-                    
+                    0
                 }));
                 
                 for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__Stmt_ce_(&((litaC_stmt->stmts)));litaC_i += 1) {
@@ -88654,7 +88634,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                 litaC_cgen__CGen_emitStrn(litaC_this, ") {", 3);
                 {
                     litaC_cgen__CGen_pushScope(litaC_this, &((litaC_cgen__CGenScope) {
-                        
+                        0
                     }));
                     
                     litaC_cgen__CGen_emitStmt(litaC_this, litaC_stmt->then);
@@ -88678,7 +88658,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                         litaC_cgen__CGen_emitStrn(litaC_this, "else {", 6);
                         {
                             litaC_cgen__CGen_pushScope(litaC_this, &((litaC_cgen__CGenScope) {
-                                
+                                0
                             }));
                             
                             litaC_cgen__CGen_emitStmt(litaC_this, litaC_stmt->elseStmt);
@@ -89035,6 +89015,15 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                         } 
                         
                         litaC_cgen__CGen_emitStrn(litaC_this, " {", 2);
+                        if(litaC_std__array__std__array__Array_empty_cb__ptr_ast__Expr_ce_(&((litaC_expr->values)))) {
+                            {
+                                litaC_std__string__builder__StringBuilder_appendStrn(&((litaC_this->buf)), "0", 1);
+                                
+                                
+                            }
+                            
+                        } 
+                        
                         for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__Expr_ce_(&((litaC_expr->values)));litaC_i += 1) {
                             {
                                 if(litaC_i > 0) {
@@ -89411,7 +89400,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                 if(litaC_expr->flags & litaC_ast__GetExprFlags_IS_USING) {
                     {
                         litaC_types__FieldPath litaC_path =  {
-                            
+                            0
                         };
                         litaC_bool litaC_isFound = litaC_types__TypeInfo_getFieldPath(litaC_aggInfo, litaC_expr->field->type->name, &(litaC_path));
                         assert(litaC_isFound);
@@ -89605,6 +89594,15 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                 } 
                 
                 litaC_cgen__CGen_emitStrn(litaC_this, " {", 2);
+                if(litaC_std__array__std__array__Array_empty_cb__ptr_ast__InitArgExpr_ce_(&((litaC_expr->arguments)))) {
+                    {
+                        litaC_cgen__CGen_emitStrn(litaC_this, "0", 1);
+                        
+                        
+                    }
+                    
+                } 
+                
                 for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__InitArgExpr_ce_(&((litaC_expr->arguments)));litaC_i += 1) {
                     {
                         if(litaC_i > 0) {
@@ -89886,7 +89884,7 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
                         assert(litaC_baseInfo->kind == litaC_types__TypeKind_STRUCT || litaC_baseInfo->kind == litaC_types__TypeKind_UNION);
                         litaC_types__TypeInfo* litaC_aggInfo = litaC_baseInfo;
                         litaC_types__FieldPath litaC_path =  {
-                            
+                            0
                         };
                         litaC_bool litaC_isFound = litaC_types__TypeInfo_getFieldPath(litaC_aggInfo, litaC_expr->field->type->name, &(litaC_path));
                         assert(litaC_isFound);
@@ -90499,7 +90497,7 @@ litaC_dependency_graph__Dependency* litaC_dependency_graph__DependencyGraph_reso
 
 litaC_void litaC_dependency_graph__DependencyGraph_sortAggregates(litaC_dependency_graph__DependencyGraph* litaC_this) {
     litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ litaC_pending =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_dependency_graph__Dependency_ce_(&((litaC_pending)), litaC_std__map__std__map__Map_size_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_(&((litaC_this->dependencies))), litaC_this->lita->allocator);
     for(litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ litaC_it = litaC_std__map__std__map__Map_iter_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_(&((litaC_this->dependencies)));litaC_std__map__std__map__MapIterator_hasNext_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_(&((litaC_it)));) {
@@ -90542,7 +90540,7 @@ litaC_void litaC_dependency_graph__DependencyGraph_sortAggregates(litaC_dependen
 
 litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ litaC_dependency_graph__DependencyGraph_sortAggregatesDependencies(litaC_dependency_graph__DependencyGraph* litaC_this,litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_* litaC_deps) {
     litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ litaC_pending =  {
-        
+        0
     };
     litaC_bool litaC_isInit = litaC_false;
     for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_dependency_graph__Dependency_ce_(litaC_deps);litaC_i += 1) {
@@ -90756,6 +90754,15 @@ litaC_void litaC_cgen_decl__CGen_emitFuncDeclSignature(litaC_cgen__CGen* litaC_t
     litaC_bool litaC_decayArrays = litaC_true;
     litaC_i32 litaC_i = 0;
     litaC_std__string__builder__StringBuilder litaC_tmp = litaC_std__string__builder__StringBuilderInit(256, litaC_this->lita->allocator);
+    if(litaC_std__array__std__array__Array_empty_cb__ptr_ast__ParameterDecl_ce_(&((litaC_funcInfo->funcDecl->params->params)))) {
+        {
+            litaC_std__string__builder__StringBuilder_appendStrn(&((litaC_this->buf)), "void", 4);
+            
+            
+        }
+        
+    } 
+    
     for(;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__ParameterDecl_ce_(&((litaC_funcInfo->funcDecl->params->params)));litaC_i += 1) {
         {
             if(litaC_i > 0) {
@@ -90975,7 +90982,7 @@ litaC_void litaC_cgen_decl__CGen_emitAggregateDecl(litaC_cgen__CGen* litaC_this,
             litaC_module__Module* litaC_root = litaC_this->lita->programSymbols.root;
             assert(litaC_root != NULL);
             litaC_char litaC_vtableName[256] =  {
-                
+                0
             };
             litaC_std__string__buffer__StringBuffer litaC_vtableNameStr = litaC_std__string__buffer__StringBufferInit(litaC_vtableName, litaC_symbols__MAX_SYMBOL_NAME, 0);
             litaC_std__builtins__String litaC_escapedName = litaC_cgen__CGen_escapeNameStr(litaC_this, litaC_decl->decl.declaration.sym->name);
@@ -91160,7 +91167,7 @@ litaC_bool litaC_build__BuildFile_writeTo(litaC_build__BuildFile* litaC_this,lit
 
 litaC_bool litaC_build__BuildFileFromFile(const litaC_char* litaC_filename,litaC_build__BuildFile* litaC_buildFile,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__json__JsonParser litaC_parser =  {
-        
+        0
     };
     litaC_std__json__JsonParser_init(&((litaC_parser)), litaC_allocator);
     
@@ -91311,7 +91318,7 @@ litaC_std__json__JsonNode* litaC_build__CreateArray(litaC_std__array__std__array
     
 }
 
-litaC_bool litaC_tcc__libtcc__IsLibtccAvailable() {
+litaC_bool litaC_tcc__libtcc__IsLibtccAvailable(void) {
     
     #if LITA_X86 || LITA_X64
     return litaC_true;
@@ -91640,7 +91647,7 @@ litaC_bool litaC_pkg_mgr__pkg__PackageIdFromString(const litaC_char* litaC_id,li
 
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackageFile(litaC_pkg_mgr__PackageManager* litaC_pm,const litaC_char* litaC_pkgFile,litaC_pkg_mgr__pkg__PackageDef** litaC_result) {
     litaC_std__json__JsonParser litaC_parser =  {
-        
+        0
     };
     litaC_std__json__JsonParser_init(&((litaC_parser)), litaC_pm->allocator);
     
@@ -91732,7 +91739,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackage(litaC_pkg_mgr__Package
     } 
     
     litaC_pkg_mgr__pkg__PackageId litaC_pkgId =  {
-        
+        0
     };
     litaC_pkg_mgr__PkgStatus litaC_code = litaC_pkg_mgr__pkg__ParsePackageId(litaC_json, &(litaC_pkgId), litaC_pm->allocator);
     if(litaC_code != litaC_pkg_mgr__PkgStatus_OK) {
@@ -91770,7 +91777,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackage(litaC_pkg_mgr__Package
                 {
                     litaC_std__json__JsonNode* litaC_depNode = litaC_std__json__JsonNode_at(litaC_deps, litaC_i);
                     litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkg->dependencies)), (litaC_pkg_mgr__pkg__PackageId) {
-                        
+                        0
                     });
                     litaC_pkg_mgr__pkg__PackageId* litaC_pkgId = litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkg->dependencies)), litaC_i);
                     litaC_pkg_mgr__PkgStatus litaC_code = litaC_pkg_mgr__pkg__ParsePackageId(litaC_depNode, litaC_pkgId, litaC_pm->allocator);
@@ -91953,7 +91960,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
     } 
     
     litaC_std__http__Http litaC_http =  {
-        
+        0
     };
     litaC_std__http__Http_init(&((litaC_http)), &((litaC_options.httpOptions)), litaC_std__mem__defaultAllocator);
     
@@ -92591,7 +92598,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__installPackage(litaC_pkg_mg
         litaC_std__string__buffer__StringBuffer litaC_pkgLck = litaC_std__string__buffer__StringBufferInit(litaC_pkgPath, PATH_MAX, -(1));
         litaC_std__string__buffer__StringBuffer_append(&((litaC_pkgLck)), "/%s", litaC_pkg_mgr__pkg_install__INSTALL_COMPLETED_FILE);
         litaC_std__io__File litaC_lockFile =  {
-            
+            0
         };
         litaC_std__io__File_open(&((litaC_lockFile)), litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgLck), litaC_std__io__FileOpenOp_WRITE);
         litaC_std__io__File_close(&((litaC_lockFile)));
@@ -93287,7 +93294,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_build__PackageBuild(litaC_pkg_mgr__P
     
     memcpy(litaC_litaOptions, litaC_pm->options.litaOptions, sizeof(litaC_lita__LitaOptions));
     litaC_pkg_mgr__pkg_build__CommandArgs litaC_args =  {
-        
+        0
     };
     litaC_pkg_mgr__PkgStatus litaC_result = litaC_pkg_mgr__pkg_build__PackageManager_buildCommandArgs(litaC_pm, litaC_buildCommand, litaC_options, &(litaC_args));
     if(litaC_result != litaC_pkg_mgr__PkgStatus_OK) {
@@ -93897,7 +93904,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_init__PackageInit(litaC_pkg_mgr__Pac
     
 #define litaC_MAX_BUFFER (1024)
     litaC_char litaC_buffer[1024] =  {
-        
+        0
     };
     litaC_std__string__buffer__StringBuffer litaC_path = litaC_std__string__buffer__StringBufferInit(litaC_buffer, litaC_MAX_BUFFER, 0);
     litaC_std__string__buffer__StringBuffer_format(&((litaC_path)), "%s/bin", litaC_pm->options.projectPath);
@@ -96027,7 +96034,7 @@ litaC_void* litaC_std__mem__std__mem__GenericRealloc_cb_std__mem__bucket_allocat
 
 litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ litaC_std__array__std__array__ArrayInit_cb_std__cmdline__Option_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_std__cmdline__Option_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -96070,7 +96077,7 @@ litaC_void litaC_std__array__std__array__Array_init_cb_std__cmdline__Option_ce_(
 
 litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ litaC_std__array__std__array__ArrayInit_cb__ptr_const_char_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_const_char_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -96759,7 +96766,7 @@ litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__Str
     }
     {
         litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__String_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__String_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -96772,7 +96779,7 @@ litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__Str
 
 litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ litaC_std__array__std__array__ArrayInit_cb__ptr_types__TypeInfo_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_types__TypeInfo_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -97149,7 +97156,7 @@ litaC_bool litaC_std__array__std__array__ArrayGrow_cb_ast__GenericArg_ce_(litaC_
 
 litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ litaC_std__array__std__array__ArrayInit_cb_ast__GenericParam_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_ast__GenericParam_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -98295,7 +98302,7 @@ litaC_symbols__Scope* litaC_std__mem__std__mem__new_cb_symbols__Scope_ce_(const 
 
 litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ litaC_intern__intern__InternMap_cb__ptr_symbols__Symbol_ce_(litaC_symbols__Symbol* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ litaC_map =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_(&((litaC_map)), litaC_emptyValue, litaC_initialSize, litaC_allocator, litaC_intern__EMPTY_STR);
     return litaC_map;
@@ -98609,7 +98616,7 @@ litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Sym
     }
     {
         litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -98743,7 +98750,7 @@ litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_
     }
     {
         litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -98756,7 +98763,7 @@ litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_
 
 litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ litaC_std__map__std__map__StrMap_cb_module__ModuleImport_ce_(litaC_module__ModuleImport litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ litaC_m =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb__ptr_const_char_c_module__ModuleImport_ce_(&((litaC_m)), litaC_emptyValue, litaC_initialSize, litaC_allocator, 0);
     return litaC_m;
@@ -98926,7 +98933,7 @@ litaC_void litaC_std__map__std__map__Map_free_cb__ptr_const_char_c_module__Modul
 
 litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ litaC_intern__intern__InternMap_cb__ptr_module__Module_ce_(litaC_module__Module* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ litaC_map =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb_intern__InternedString_c__ptr_module__Module_ce_(&((litaC_map)), litaC_emptyValue, litaC_initialSize, litaC_allocator, litaC_intern__EMPTY_STR);
     return litaC_map;
@@ -99317,7 +99324,7 @@ litaC_void litaC_std__array__std__array__Array_clear_cb_phase_result__PhaseError
 
 litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ litaC_std__map__std__map__StrMap_cb__ptr_module__Module_ce_(litaC_module__Module* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ litaC_m =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb__ptr_const_char_c__ptr_module__Module_ce_(&((litaC_m)), litaC_emptyValue, litaC_initialSize, litaC_allocator, 0);
     return litaC_m;
@@ -100352,7 +100359,7 @@ litaC_i32 litaC_std__array__std__array__Array_add_cb_ast__GenericParam_ce_(litaC
 
 litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ litaC_std__array__std__array__ArrayInit_cb_ast__CallArg_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_ast__CallArg_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -100461,7 +100468,7 @@ litaC_bool litaC_std__array__std__array__ArrayGrow_cb_ast__CallArg_ce_(litaC_std
 
 litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ litaC_std__array__std__array__ArrayInit_cb__ptr_ast__Expr_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__Expr_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -100577,7 +100584,7 @@ litaC_bool litaC_std__array__std__array__Array_empty_cb__ptr_ast__Stmt_ce_(litaC
 
 litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_std__array__std__array__ArrayInit_cb__ptr_ast__Stmt_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb__ptr_ast__Stmt_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -101006,7 +101013,7 @@ litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ litaC_std__array__s
 
 litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ litaC_std__array__std__array__ArrayInit_cb_ast__FieldStmt_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_ast__FieldStmt_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -101725,7 +101732,7 @@ litaC_i64 litaC_std__array__std__array__Array_get_cb_i64_ce_(litaC_std__array__s
 
 litaC_std__array__std__array__Array_cb_i64_ce_ litaC_std__array__std__array__ArrayInit_cb_i64_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb_i64_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_i64_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -102191,7 +102198,7 @@ litaC_void litaC_std__map__std__map__Map_free_cb_types_new__ArrayEntry_c__ptr_ty
 
 litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ litaC_intern__intern__InternMap_cb__ptr_types__TypeInfo_ce_(litaC_types__TypeInfo* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ litaC_map =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_(&((litaC_map)), litaC_emptyValue, litaC_initialSize, litaC_allocator, litaC_intern__EMPTY_STR);
     return litaC_map;
@@ -102859,10 +102866,10 @@ litaC_void litaC_std__array__std__array__Array_sort_cb_ast__CallArg_ce_(litaC_st
 
 litaC_void litaC_std__array__std__array__QuickSort_cb_ast__CallArg_ce_(litaC_std__array__std__array__Array_cb_ast__CallArg_ce_* litaC_array,litaC_i32 (*litaC_comp)(litaC_ast__CallArg,litaC_ast__CallArg)) {
     litaC_i32 litaC_beg[300] =  {
-        
+        0
     };
     litaC_i32 litaC_end[300] =  {
-        
+        0
     };
     litaC_i32 litaC_i = 0;
     litaC_i32 litaC_L = 0;
@@ -103231,7 +103238,7 @@ litaC_bool litaC_std__map__std__map__Map_contains_cb_usize_c_std__array__Array_c
 
 litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_std__array__std__array__ArrayInit_cb_lex__SrcPos_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_lex__SrcPos_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
@@ -103616,7 +103623,7 @@ litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_c
     }
     {
         litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ ___result = (litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -104575,7 +104582,7 @@ litaC_i32 litaC_std__array__std__array__Array_size_cb_lex__Token_ce_(litaC_std__
 
 litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ litaC_std__map__std__map__StrMap_cb__ptr_lsp__document__Document_ce_(litaC_lsp__document__Document* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ litaC_m =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_(&((litaC_m)), litaC_emptyValue, litaC_initialSize, litaC_allocator, 0);
     return litaC_m;
@@ -105317,7 +105324,7 @@ litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeIn
     }
     {
         litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -105380,7 +105387,7 @@ litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ litaC_std__
     }
     {
         litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -105518,7 +105525,7 @@ litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ 
     }
     {
         litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -105581,7 +105588,7 @@ litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ lit
     }
     {
         litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ ___result = (litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -106016,7 +106023,7 @@ litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__D
     }
     {
         litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -106142,7 +106149,7 @@ litaC_bool litaC_std__array__std__array__Array_empty_cb__ptr_const_char_ce_(lita
 
 litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ litaC_std__map__std__map__StrMap_cb__ptr_pkg_mgr__pkg__PackageDef_ce_(litaC_pkg_mgr__pkg__PackageDef* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ litaC_m =  {
-        
+        0
     };
     litaC_std__map__std__map__Map_init_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_(&((litaC_m)), litaC_emptyValue, litaC_initialSize, litaC_allocator, 0);
     return litaC_m;
@@ -106362,7 +106369,7 @@ litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__Packa
     }
     {
         litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ ___result = (litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_) {
-            
+            0
         };
         litaC_iter->it = litaC_i + 1;
         return ___result;
@@ -106619,7 +106626,7 @@ litaC_pkg_mgr__pkg__PackageId* litaC_std__array__std__array__Array_getPtr_cb_pkg
 
 litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ litaC_std__array__std__array__ArrayInit_cb_pkg_mgr__pkg__PackageId_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ litaC_array =  {
-        
+        0
     };
     litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;

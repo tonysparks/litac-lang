@@ -59,7 +59,7 @@ public const cAllocator : *const Allocator = (&Allocator {
     }
 
     public func cFree(a: *const Allocator, ptr: *void) {
-        return c::free(ptr)
+        c::free(ptr)
     }
 
 #end

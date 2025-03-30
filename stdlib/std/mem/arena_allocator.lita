@@ -44,7 +44,7 @@ public func (this: *ArenaAllocator) init(size: usize = PAGE_SIZE,
     this.arena.size = size
     this.arena.current = 0
     this.arena.next = null
-    this.arena.region = (mem + sizeof(:Arena)) as (*u8)
+    this.arena.region = (mem as (*char) + sizeof(:Arena)) as (*u8)
 
     this.numberOfArenas = 1
     this.numberOfBytesAllocated = size;
@@ -126,7 +126,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
         next.size = asize
         next.current = 0
         next.next = null
-        next.region = (mem + sizeof(:Arena)) as (*u8)
+        next.region = (mem as (*char) + sizeof(:Arena)) as (*u8)
 
         last.next = next
         next.current += size
@@ -208,7 +208,7 @@ public func (this: *ArenaAllocator) unusedBytes() : usize {
         next.size = asize
         next.current = 0
         next.next = null
-        next.region = (mem + sizeof(:Arena)) as (*u8)
+        next.region = (mem as (*char) + sizeof(:Arena)) as (*u8)
 
 
         last.next = next

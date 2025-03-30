@@ -413,8 +413,8 @@ func testInterns() {
 }
 
 //@foreign
-public const MAX_SOMETHING: i32 = 0;
+// public const MAX_SOMETHING: i32 = 0;
 
-public struct X {
-    v: [MAX_SOMETHING]i32
-}
+// public struct X {
+//     v: [MAX_SOMETHING]i32
+// }

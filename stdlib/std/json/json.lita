@@ -8,6 +8,7 @@ import "std/hash";
 import "std/array";
 import "std/libc";
 import "std/unicode/utf8"
+import "std/limits"
 
 import "std/io"
 
@@ -1119,7 +1120,7 @@ func (p: using *JsonParser) scanInt() {
             p.error("Digit '%c' out of range for base %d", *stream, base);
             digit = 0;
         }
-        if (val > (ULLONG_MAX - digit)/base) {
+        if (val > (MAX_I64 - digit)/base) {
             p.error("Integer literal overflow");
             while (isdigit(*stream)) {
                 stream += 1;
@@ -1368,6 +1369,13 @@ repeat:
                 p.scanFloat();
             }
             break;
+        case '-':
+            if (isdigit(stream[1])) {
+                stream += 1
+                p.scanInt()
+                token.intNumValue *= -1
+            }
+            break;
         case '0':
         case '1':
         case '2':
@@ -1507,6 +1515,8 @@ public func testParser() {
     else {
         var def = node.getStr("definitions")
         printf("%s\n", def)
+        var x = node.getInt("x")
+        assert(x == -1)
     }
 
     return;

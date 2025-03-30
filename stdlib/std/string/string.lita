@@ -366,10 +366,6 @@ public func (b: String) size() : i32 {
     return b.length
 }
 
-public func (b: String) clear() {
-    b.length = 0
-}
-
 public func (b: String) get(index: i32) : char {
     if(index < 0 || index >= b.length) {
         return '\0'
@@ -418,7 +414,7 @@ public func StringCopy(src: *const char, dest: *char, size: usize) : *char {
 public func StringHashLen(str: *const char, size: usize) : u32 {
     var hash = 5381_u32;
 
-    var index = 0
+    var index = 0_usize
     while (index < size) {
         hash = ((hash << 5_u32) + hash) ^ ((*str) as (u32));
         str   += 1;

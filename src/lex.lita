@@ -780,7 +780,7 @@ func (l: *Lexer) scanInt(stream: *char) {
             start_digits = stream;
         }
     }
-    var val: i64 = 0;
+    var val: u64 = 0;
     for (;;) {
         var digit = charToDigit[(*stream) as (i32)];
         if (digit == 0 && *stream != '0') {
@@ -810,7 +810,7 @@ func (l: *Lexer) scanInt(stream: *char) {
     }
 
     l.token.type = TokenType.INT_NUMBER;
-    l.token.value.intValue = val
+    l.token.value.uintValue = val
 }
 
 func (l: *Lexer) scanFloat(stream: *char) {
@@ -882,7 +882,7 @@ func (l: *Lexer) scanTypeInfo() {
             len += 1
             l.nextChar()
 
-            if(!VALID_TYPE_INFO_CHAR[*l.stream]) {
+            if(!VALID_TYPE_INFO_CHAR[(*l.stream) as (i32)]) {
                 break;
             }
         } while(!l.eof())
