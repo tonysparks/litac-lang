@@ -251,7 +251,6 @@ func GenerateWrapperFunctions(
 
                 sb.append("(")
                 for(var p = 0; p < fn.paramDecls.size(); p += 1) {
-                    var param = fn.paramDecls.get(p)
                     if(p > 0) {
                         sb.append(", ")
                     }

@@ -237,7 +237,7 @@ func downloadPackage(
     var uri = StringBufferInit(temp, MAX_PATH, 0)
 
     var repo = pkgId.repo()
-    var name = pkgId.name()
+    // var name = pkgId.name()
     var version = pkgId.version()
 
     uri.format(uriTemplate,
@@ -420,8 +420,8 @@ func readPackage(
     resultPkg: **PackageDef,
     pkgsToInstall: *Array<PackageId>) : PkgStatus {
 
-    var name = pkgId.name()
-    var version = pkgId.version()
+    // var name = pkgId.name()
+    // var version = pkgId.version()
 
     var temp:[MAX_PATH]char;
     var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
@@ -483,8 +483,6 @@ func dealWithGithubBS(
     var destPath = StringBufferInit(temp2, MAX_PATH, 0)
 
     var root = extractedFiles.get(0)
-    var rootLength = root.length()
-
 
     srcPath.format("%s/%s", pkgPath, root)
     destPath.format("%s/pkg", pkgPath)

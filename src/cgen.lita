@@ -336,7 +336,6 @@ func (this: using *CGen) emitTraitForwardDecls() {
         assert(traitSym)
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
-        var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = this.cTypeName(traitSym.type)
 
         this.emit("// Generated code %s\n", traitName)
@@ -371,7 +370,6 @@ func (this: using *CGen) emitTraitDecls() {
         assert(traitSym)
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
-        var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = this.cTypeName(traitSym.type)
         var module = root
 
@@ -738,7 +736,7 @@ public func (this: using *CGen) cType(type: *TypeInfo,
             var buf = StringBuilderInit(256, this.allocator)
             var line = StringBuilderInit(256, this.allocator)
             do {
-                if(arrayInfo.length < 0) {
+                if(arrayInfo.length < 1) {
                     if(arrayInfo.numOfElements) {
                         buf.appendStrn("[", 1)
                         var cgen = CGen {
@@ -1391,7 +1389,6 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
         const BUFFER_SIZE = 1024*10;
         var filename = [MAX_PATH]char {0};
         var filenameStr = StringBufferInit(filename, MAX_PATH, 0)
-        var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
             var arg = note.arguments.get(i)
@@ -1479,8 +1476,9 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
 func (this: using *CGen) emitTraitFuncCall(expr: *FuncCallExpr) {
     switch(expr.object.kind) {
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            var idExpr = expr.object as (*IdentifierExpr)
+            // var idExpr = expr.object as (*IdentifierExpr)
             this.emit("/* something here */")
+            assert(false)
             break
         }
         case StmtKind.GET_EXPR: {

@@ -1279,7 +1279,8 @@ public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, searchType: Se
                 }
 
                 if(isLengthDefined) {
-                    length = expr.operand.val.intValue // TODO: fix: usize != i64
+                    // TODO: fix: usize != i64
+                    length = expr.operand.val.intValue as (usize)
                 }
             }
             spec.typeInfo = this.typeCache.newArrayTypeInfo(arrayOf, length, arraySpec.numElements, isLengthDefined) as (*TypeInfo)

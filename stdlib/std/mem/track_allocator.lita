@@ -48,7 +48,7 @@ public func (d: *TrackAllocator) free() {
         }
 
         var allocation = mem as (*Allocation)
-        allocation.addr = mem + sizeof(:Allocation)
+        allocation.addr = mem as (*char) + sizeof(:Allocation)
         allocation.size = size
 
         d.totalAllocations += allocationSize
@@ -94,7 +94,7 @@ public func (d: *TrackAllocator) free() {
 
         var result = track.malloc(size, file, line);
         if(result) {
-            var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+            var allocation = (ptr as (*char) - sizeof(:Allocation)) as (*Allocation)
             var len = c::MIN(allocation.size, size)
 
             c::memcpy(result, ptr, len)
@@ -114,7 +114,7 @@ public func (d: *TrackAllocator) free() {
         }
 
         var allocation = mem as (*Allocation)
-        allocation.addr = mem + sizeof(:Allocation)
+        allocation.addr = mem as (*char) + sizeof(:Allocation)
         allocation.size = size
 
         d.totalAllocations += allocationSize
@@ -147,7 +147,7 @@ public func (d: *TrackAllocator) free() {
 
         var result = track.malloc(size);
         if(result) {
-            var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
+            var allocation = (ptr as (*char) - sizeof(:Allocation)) as (*Allocation)
             var len = c::MIN(allocation.size, size)
 
             c::memcpy(result, ptr, len)
@@ -166,8 +166,6 @@ func TrackFree(alloc: *const Allocator, ptr: *void) {
     }
 
     var track = alloc as (*TrackAllocator);
-    var allocation = (ptr - sizeof(:Allocation)) as (*Allocation)
-
     var addr = ptr;
 
     var found = false

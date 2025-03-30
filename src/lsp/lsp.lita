@@ -162,7 +162,7 @@ public func (this: *LspServer) readMessage() {
     this.message.reserve(size)
 
     // Read content-size
-    var bytesRead = fread(this.message.buffer, 1, size, stdin)
+    var bytesRead = fread(this.message.buffer, 1, size, stdin) as (i32)
     this.log("Received %d bytes from fread\n", bytesRead)
 
     if(bytesRead != size) {
@@ -524,7 +524,7 @@ public func (this: *LspServer) writeResponse(msg: *JsonNode) {
     //var header = [256]char{0};
     //var headerStr = StringBufferInit(header, 256)
 
-    var jsonStr = msg.print(this.output)
+    msg.print(this.output)
     var length = this.output.length
 
     if(length < 1) {

@@ -262,7 +262,6 @@ public func (this: *PackageManager) installCommand(options: PackageInstallOption
 public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : PkgStatus {
     buildFile.init(this.allocator)
 
-    var temp:[MAX_PATH]char;
     var projectPath = this.options.projectPath.toString()
     var len = projectPath.length
 

@@ -1617,7 +1617,7 @@ APE_INTERNAL object_t vm_get_global(vm_t *vm, int ix);
 #endif
 
 APE_INTERNAL const src_pos_t src_pos_invalid = { NULL, -1, -1 };
-APE_INTERNAL const src_pos_t src_pos_zero = { NULL, 0, 0 };
+// APE_INTERNAL const src_pos_t src_pos_zero = { NULL, 0, 0 };
 
 APE_INTERNAL src_pos_t src_pos_make(const compiled_file_t *file, int line, int column) {
     return (src_pos_t) {

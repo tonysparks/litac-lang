@@ -52,14 +52,13 @@ func (this: *BucketList<T>) allocBucket<T>() : *Bucket<T> {
     var bucket = mem as (*Bucket<T>)
     bucket.length = 0
     bucket.next = null
-    bucket.elements = (mem + sizeof(:Bucket<T>)) as (*T)
+    bucket.elements = (mem as (*char) + sizeof(:Bucket<T>)) as (*T)
 
     return bucket;
 }
 
 public func (this: *BucketList<T>) free<T>() {
     var current = this.buckets
-    var next: *Bucket<T> = null;
 
     while(current != null) {
         var bucket = current
@@ -72,7 +71,6 @@ public func (this: *BucketList<T>) free<T>() {
 
 public func (this: *BucketList<T>) clear<T>() {
     var current = this.buckets
-    var next: *Bucket<T> = null;
 
     while(current != null) {
         var bucket = current
@@ -117,7 +115,7 @@ public func (this: *BucketList<T>) add<T>(element: T) : i32 {
 }
 
 func (this: *BucketList<T>) getBucketAt<T>(index: usize, iterations: *i32) : *Bucket<T> {
-    if(index < this.bucketSize) {
+    if(index < this.bucketSize as (usize)) {
         *iterations = 0;
 
         return this.buckets
@@ -126,13 +124,11 @@ func (this: *BucketList<T>) getBucketAt<T>(index: usize, iterations: *i32) : *Bu
     var bucketIndex = 0
 
     var current = this.buckets
-    var next: *Bucket<T> = null;
-
     while(current != null) {
         var bucket = current
         current = current.next
 
-        if((bucketIndex + bucket.length) > index) {
+        if((bucketIndex + bucket.length) as (usize) > index) {
             return bucket
         }
 

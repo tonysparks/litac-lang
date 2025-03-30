@@ -14,7 +14,7 @@ import "std/system"
 import "pkg_mgr/pkg_mgr"
 import "pkg_mgr/pkg_install"
 
-public var SEPARATOR = $"|"
+public const SEPARATOR = $"|"
 
 public enum PackageType {
     EXECUTABLE,
@@ -171,8 +171,8 @@ public func ParsePackage(
 
     pm.packages.put(pkgId.id, pkg)
 
-    var type = json.getStr("type", "source")
     /* TODO parse type */
+    //var type = json.getStr("type", "source")
 
     var deps = json.getArray("dependencies")
     if(deps && deps.size() > 0) {
@@ -245,7 +245,7 @@ public func ParsePackageId(
     )
 
     var id = sb.cStr();
-    PackageIdFromString(sb.cStr(), pkgId)
+    PackageIdFromString(id, pkgId)
 
     return PkgStatus.OK
 }
