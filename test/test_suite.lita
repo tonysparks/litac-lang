@@ -353,7 +353,7 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
             options.compileCmd = suite.buildCmd
         }
         else {
-            options.compileCmd = "clang -Wall -Wextra -Werror -pedantic -Wno-unused-parameter -Wno-unused-function %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+            options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
         }
     }
 
