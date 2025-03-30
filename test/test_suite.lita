@@ -318,8 +318,8 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
         var moduleName = StringInit(m.name)
 
         // make sub directories
-        if(moduleName.contains("/")) {
-            var path = moduleName.substring(0, moduleName.lastIndexOfAt("/", 1))
+        if(moduleName.contains($"/")) {
+            var path = moduleName.substring(0, moduleName.lastIndexOfAt($"/"))
 
             moduleFilenameStr.clear()
             moduleFilenameStr.format("test_output/%.*s", path.length, path.buffer)

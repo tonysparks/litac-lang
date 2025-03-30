@@ -275,16 +275,16 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         var view = StringInit(memoryStr)
 
         options.maxMemory = strtol(memoryStr, null, 10)
-        if(view.indexOf("GB") > -1 || view.indexOf("GiB") > -1 ||
-           view.indexOf("gb") > -1 || view.indexOf("gib") > -1) {
+        if(view.indexOf($"GB") > -1 || view.indexOf($"GiB") > -1 ||
+           view.indexOf($"gb") > -1 || view.indexOf($"gib") > -1) {
             options.maxMemory *= GiB
         }
-        else if(view.indexOf("MB") > -1 || view.indexOf("MiB") > -1 ||
-           view.indexOf("mb") > -1 || view.indexOf("mib") > -1) {
+        else if(view.indexOf($"MB") > -1 || view.indexOf($"MiB") > -1 ||
+           view.indexOf($"mb") > -1 || view.indexOf($"mib") > -1) {
             options.maxMemory *= MiB
         }
-        else if(view.indexOf("KB") > -1 || view.indexOf("KiB") > -1 ||
-           view.indexOf("kb") > -1 || view.indexOf("kib") > -1) {
+        else if(view.indexOf($"KB") > -1 || view.indexOf($"KiB") > -1 ||
+           view.indexOf($"kb") > -1 || view.indexOf($"kib") > -1) {
             options.maxMemory *= KiB
         }
     }
@@ -350,7 +350,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     if(options.srcPath.empty()) {
         var path = StringInit(options.inputFile, MAX_PATH)
-        var index = path.lastIndexOfAt("/src/", .len = 5)
+        var index = path.lastIndexOfAt($"/src/")
         if(index > -1) {
             StringCopy(.src = options.inputFile, .dest = options.srcPath, .size = index + 5)
         }

@@ -1016,7 +1016,7 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchT
         return type
     }
 
-    var qualifiedIndex = typeName.view.lastIndexOfAt("::")
+    var qualifiedIndex = typeName.view.lastIndexOfAt($"::")
     var fullScan = this.bypassing || qualifiedIndex > -1
 
     // a work around that allows for looking up ALL
@@ -1118,11 +1118,11 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
             var sym = symbols[index]
             var str = sym.name.view
 
-            var start = str.indexOf("_", 1)
+            var start = str.indexOf($"_")
             if(start < 0) {
                 continue
             }
-            var end = str.indexOf("<", 1)
+            var end = str.indexOf($"<")
 
             // this atleast has the same name, now check if
             // the function types are compatible

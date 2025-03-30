@@ -321,7 +321,7 @@ public func (this: *Module) getMethodsForTypeWithName(
                 continue
             }
 
-            if(!n.key.view.endsWith(methodName.buffer, methodName.length)) {
+            if(!n.key.view.endsWith(methodName.view)) {
                 continue
             }
 
@@ -494,13 +494,13 @@ public func (this: *Module) isInPackage(other: *Module) : bool {
 
     // check if other is a sub-package of this
     {
-        var rootIndex = this.id.packageName.view.lastIndexOfAt("::", 2)
+        var rootIndex = this.id.packageName.view.lastIndexOfAt($"::")
         if(rootIndex < 0) {
             return true
         }
 
         var root = this.id.packageName.view.substring(0, rootIndex)
-        var result = other.id.packageName.view.startsWith(root.buffer, root.length);
+        var result = other.id.packageName.view.startsWith(root);
         if(result) {
             return true
         }
@@ -508,13 +508,13 @@ public func (this: *Module) isInPackage(other: *Module) : bool {
 
     // check if this is a sub-package of other
     {
-        var rootIndex = other.id.packageName.view.lastIndexOfAt("::", 2)
+        var rootIndex = other.id.packageName.view.lastIndexOfAt($"::")
         if(rootIndex < 0) {
             return true
         }
 
         var root = other.id.packageName.view.substring(0, rootIndex)
-        var result = this.id.packageName.view.startsWith(root.buffer, root.length);
+        var result = this.id.packageName.view.startsWith(root);
         if(result) {
             return true
         }

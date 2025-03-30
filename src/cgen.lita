@@ -554,13 +554,13 @@ func (this: using *CGen) escapeName(type: *TypeInfo) : String {
 
 func (this: using *CGen) baseTypeName(name: String) : String {
     // strip module name
-    var index = name.lastIndexOfAt("::")
+    var index = name.lastIndexOfAt($"::")
     if(index >= 0) {
         name = name.substring(index + 2)
     }
 
     // strip generics
-    index = name.indexOf("<")
+    index = name.indexOf($"<")
     if(index >= 0) {
         name = name.substring(0, index)
     }
@@ -1244,7 +1244,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
         var temp:[MAX_PATH]char;
         // this constant is "{relativePath}"..length()
-        const len = 14
+        var relativePath = $"{relativePath}"
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
             var attr = note.arguments.get(i)
@@ -1260,12 +1260,12 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             // are used -- either locally or referenced from the .pkgs
             // directory.
             {
-                var index = value.indexOf("{relativePath}", len)
+                var index = value.indexOf(relativePath)
                 if(index > -1 && note.startPos.filename != null) {
                     var buffer = StringBuilderInit(MAX_PATH, this.lita.allocator)
                     buffer.append("%.*s", value.length, value.buffer)
 
-                    buffer.replace(index, index + len, FileParent(note.startPos.filename, temp))
+                    buffer.replace(index, index + relativePath.length, FileParent(note.startPos.filename, temp))
                     value = buffer.asString()
                 }
             }
@@ -2480,10 +2480,10 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             var end = 0
 
             if(expr.string.mod & Mod.NATIVE_STRING) {
-                this.emitStrn("(", 1)
+                this.buf.appendChar('(')
                 this.emitSymbol(expr.operand.typeInfo.sym)
-                this.emitStrn(")", 1)
-                this.emitStr(" { .buffer = ")
+                this.buf.appendChar(')')
+                this.buf.append(" { .buffer = ")
             }
 
             if(expr.string.mod & Mod.MULTISTR) {
@@ -2563,7 +2563,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                     }
                     start+=1
                 }
-                this.emit(", .length = %d }", length)
+                this.buf.append(", .length = %d }", length)
             }
             return;
         }

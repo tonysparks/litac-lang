@@ -123,7 +123,7 @@ public func _Mkdir(dir: *const char) : bool {
     var view = StringInit(dir)
     // we have to do this non-sense because tinycc stat doesn't like
     // trailing /
-    if(view.endsWith("/")) {
+    if(view.endsWith($"/")) {
         var path = [MAX_PATH]char{0}
         var normalized = StringBufferInit(path, MAX_PATH, 0)
         normalized.format("%.*s", view.length - 1, view.buffer)

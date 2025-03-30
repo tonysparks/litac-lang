@@ -718,7 +718,7 @@ public func FindModulePath(lita: *Lita,
     // If no Lita source file, check to see if there is a folder with the modules name; if one exists,
     // there should be a Lita source file of the same name
     {
-        var index = moduleName.lastIndexOfAt("/", 1)
+        var index = moduleName.lastIndexOfAt($"/")
         var name = index < 0 ? moduleName : moduleName.substring(index + 1)
 
         pathStr.format("%s/%.*s/%.*s.lita", lita.options.srcPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
@@ -746,7 +746,7 @@ public func FindModulePath(lita: *Lita,
                 return true
             }
 
-            var index = moduleName.lastIndexOfAt("/", 1)
+            var index = moduleName.lastIndexOfAt($"/")
             var name = index < 0 ? moduleName : moduleName.substring(index + 1)
 
             pathStr.format("%s/%s/%.*s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
@@ -855,10 +855,11 @@ public func GetPackageName(srcPath: *const char, inputFile: *const char) : Strin
     }
 
     if(srcPath) {
-        var inputFileView = StringInit(inputFile)
-        var index = inputFileView.indexOf(srcPath)
+        var srcPathString = srcPath.toString()
+        var inputFileView = inputFile.toString()
+        var index = inputFileView.indexOf(srcPathString)
         if(index > -1) {
-            inputFile = &inputFile[index + srcPath.length()]
+            inputFile = &inputFile[index + srcPathString.length]
         }
     }
 

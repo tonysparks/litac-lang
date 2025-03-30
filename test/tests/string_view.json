@@ -53,12 +53,12 @@
                 var a = StringInit("Hello World")
                 var e = StringInit(null)
 
-                assert(a.contains("World") == true)
-                assert(a.contains("d") == true)
-                assert(a.contains("H") == true)
-                assert(a.contains("Which", 1) == true)
-                assert(e.contains("World") == false)
-                assert(a.contains(e.buffer, e.length) == false)
+                assert(a.contains($"World") == true)
+                assert(a.contains($"d") == true)
+                assert(a.contains($"H") == true)
+                assert(a.contains($"Which".substring(0, 1)) == true)
+                assert(e.contains($"World") == false)
+                assert(a.contains(e) == false)
             `,
         },
         {
@@ -71,18 +71,18 @@
                 var a = StringInit("Hello World")
                 var e = StringInit(null)
 
-                assert(a.startsWith("World") == false)
-                assert(a.startsWith("World", -1, 2) == false)
-                assert(a.startsWith("World", -1, 6) == true)
-                assert(a.startsWith("d") == false)
-                assert(a.startsWith("H") == true)
-                assert(a.startsWith("Hell") == true)
-                assert(a.startsWith("Hello World") == true)
-                assert(a.startsWith("Hello World!") == false)
-                assert(a.startsWith("Which", 1) == false)
-                assert(a.startsWith("Hhich", 1) == true)
-                assert(e.startsWith("World") == false)
-                assert(a.startsWith(e.buffer, e.length) == false)
+                assert(a.startsWith($"World") == false)
+                assert(a.startsWith($"World", 2) == false)
+                assert(a.startsWith($"World", 6) == true)
+                assert(a.startsWith($"d") == false)
+                assert(a.startsWith($"H") == true)
+                assert(a.startsWith($"Hell") == true)
+                assert(a.startsWith($"Hello World") == true)
+                assert(a.startsWith($"Hello World!") == false)
+                assert(a.startsWith($"Which", 1) == false)
+                assert(a.startsWith($"Hhich".substring(0, 1)) == true)
+                assert(e.startsWith($"World") == false)
+                assert(a.startsWith(e) == false)
             `,
         },
         {
@@ -95,16 +95,16 @@
                 var a = StringInit("Hello World")
                 var e = StringInit(null)
 
-                assert(a.endsWith("World") == true)
-                assert(a.endsWith("d") == true)
-                assert(a.endsWith("H") == false)
-                assert(a.endsWith("Hell") == false)
-                assert(a.endsWith("Hello World") == true)
-                assert(a.endsWith("Hello World!") == false)
-                assert(a.endsWith("Which", 1) == false)
-                assert(a.endsWith("dhich", 1) == true)
-                assert(e.endsWith("World") == false)
-                assert(a.endsWith(e.buffer, e.length) == false)
+                assert(a.endsWith($"World") == true)
+                assert(a.endsWith($"d") == true)
+                assert(a.endsWith($"H") == false)
+                assert(a.endsWith($"Hell") == false)
+                assert(a.endsWith($"Hello World") == true)
+                assert(a.endsWith($"Hello World!") == false)
+                assert(a.endsWith($"Which") == false)
+                assert(a.endsWith($"dhich".substring(0, 1)) == true)
+                assert(e.endsWith($"World") == false)
+                assert(a.endsWith(e) == false)
             `,
         },
         {
@@ -117,14 +117,14 @@
                 var a = StringInit("Hello World")
                 var e = StringInit(null)
 
-                assert(a.indexOfAt("World", 2) == 6)
-                assert(a.indexOfAt("World", 7) == -1)
-                assert(a.indexOfAt("d") == 10)
-                assert(a.indexOfAt("H") == 0)
-                assert(a.indexOfAt("H", 2) == -1)
+                assert(a.indexOfAt($"World", 2) == 6)
+                assert(a.indexOfAt($"World", 7) == -1)
+                assert(a.indexOfAt($"d") == 10)
+                assert(a.indexOfAt($"H") == 0)
+                assert(a.indexOfAt($"H", 2) == -1)
 
-                assert(e.indexOfAt("World") == -1)
-                assert(a.indexOfAt(e.buffer, e.length) == -1)
+                assert(e.indexOfAt($"World") == -1)
+                assert(a.indexOfAt(e) == -1)
             `,
         },
         {
