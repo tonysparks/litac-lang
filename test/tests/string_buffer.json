@@ -132,8 +132,7 @@
                 assert(s.buffer == null)
                 assert(s.empty())
             `,
-        },*/
-
+        },
         {
             "name": "StringBuilder insert",
             "disabled": false,
@@ -454,8 +453,7 @@
                 assert(s.buffer == null)
                 assert(s.empty())
             `,
-        },/*
-
+        },
         {
             "name": "StringBuilder_appends extend",
             "disabled": false,
