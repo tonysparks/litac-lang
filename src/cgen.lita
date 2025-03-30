@@ -1266,7 +1266,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                     buffer.append("%.*s", value.length, value.buffer)
 
                     buffer.replace(index, index + relativePath.length, FileParent(note.startPos.filename, temp))
-                    value = buffer.asString()
+                    value = buffer.toString()
                 }
             }
 

@@ -228,7 +228,7 @@ public func (b: *StringBuilder) indexOf(str: *const char, len: i32 = -1) : i32 {
 }
 
 public func (b: *StringBuilder) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
-    var view = b.asString()
+    var view = b.toString()
     return view.indexOfAt(str.toString(), fromIndex)
 }
 
@@ -322,7 +322,7 @@ public func (b: *StringBuilder) trim() : *StringBuilder {
 }
 
 public func (b: *StringBuilder) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
-    var view = b.asString()
+    var view = b.toString()
     return view.copyTo(buf, len, addZero)
 }
 
@@ -372,7 +372,7 @@ public func (b: *StringBuilder) cStr() : *char {
 }
 
 @inline
-public func (b: *StringBuilder) asStringBuffer() : StringBuffer {
+public func (b: *StringBuilder) toBuffer() : StringBuffer {
     return b.asBuffer
 }
 
