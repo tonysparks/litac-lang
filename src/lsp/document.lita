@@ -1,5 +1,6 @@
 import "std/system"
 import "std/string/builder"
+import "std/string"
 import "std/array"
 import "std/mem"
 
@@ -41,7 +42,7 @@ internal func (this: *Document) insert(range: Range, text: *const char) {
     var fromIndex = (this.getLineStart(range.start.line) + range.start.character) as (i32)
     var toIndex   = (this.getLineStart(range.end.line) + range.end.character) as (i32)
 
-    this.text.replace(fromIndex, toIndex, text)
+    this.text.replace(fromIndex, toIndex, text.toString())
     this.refreshLineMap()
 }
 

@@ -48,6 +48,10 @@ public func (b: *StringBuilder) free() {
     }
 }
 
+public func (b: *StringBuilder) appendString(str: String) : i32 {
+    return b.appendStrn(str.buffer, str.length)
+}
+
 public func (b: *StringBuilder) appendStr(str: *const char) : i32 {
     if(str == null) {
         return 0;
@@ -219,22 +223,22 @@ public func (b: *StringBuilder) delete(start: i32, end: i32) {
     b.length -= (end - start)
 }
 
-public func (b: *StringBuilder) contains(str: *const char, len: i32 = -1) : bool {
-    return b.indexOf(str, len) > -1;
+public func (b: *StringBuilder) contains(str: String) : bool {
+    return b.indexOf(str) > -1;
 }
 
-public func (b: *StringBuilder) indexOf(str: *const char, len: i32 = -1) : i32 {
-    return b.indexOfAt(str, len, 0)
+public func (b: *StringBuilder) indexOf(str: String) : i32 {
+    return b.indexOfAt(str, 0)
 }
 
-public func (b: *StringBuilder) indexOfAt(str: *const char, len: i32 = -1, fromIndex: i32 = 0) : i32 {
+public func (b: *StringBuilder) indexOfAt(str: String, fromIndex: i32 = 0) : i32 {
     var view = b.toString()
-    return view.indexOfAt(str.toString(), fromIndex)
+    return view.indexOfAt(str, fromIndex)
 }
 
-public func (b: *StringBuilder) replace(start: i32, end: i32, str: *const char) : i32 {
+public func (b: *StringBuilder) replace(start: i32, end: i32, str: String) : i32 {
     b.delete(start, end)
-    return b.insert(start, "%s", str)
+    return b.insert(start, "%.*s", str.length, str.buffer)
 }
 
 public func (b: *StringBuilder) insert(index: i32, format: *const char, ...) : i32 {

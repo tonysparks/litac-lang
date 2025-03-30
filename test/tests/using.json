@@ -23,7 +23,7 @@
             "code": `
                 var sb = StringBuilderInit(32)
                 sb.append("Hello World")
-                var str = sb.asString()
+                var str = sb.toString()
                 assert(str.buffer == sb.buffer)
                 assert(str.length == sb.length)
             `

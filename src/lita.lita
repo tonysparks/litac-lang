@@ -558,14 +558,14 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
 
     commandStr.appendStr(this.options.compileCmd)
 
-    var index = commandStr.indexOf("%output%")
+    var index = commandStr.indexOf($"%output%")
     if(index > -1) {
-        commandStr.replace(index, index+"%output%".length(), binaryFilename)
+        commandStr.replace(index, index+"%output%".length(), binaryFilename.toString())
     }
 
-    index = commandStr.indexOf("%input%")
+    index = commandStr.indexOf($"%input%")
     if(index > -1) {
-        commandStr.replace(index, index+"%input%".length(), sourceFilename)
+        commandStr.replace(index, index+"%input%".length(), sourceFilename.toString())
     }
 
     this.applyCompilerOptions(commandStr)
@@ -625,9 +625,9 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
     }
 
     if(this.options.isStrict) {
-        var index = commandStr.indexOf("%options%")
+        var index = commandStr.indexOf($"%options%")
         if(index >= 0) {
-            commandStr.replace(index, index+"%options%".length(), buffer.cStr())
+            commandStr.replace(index, index+"%options%".length(), buffer.toString())
         }
 
         buffer.free()

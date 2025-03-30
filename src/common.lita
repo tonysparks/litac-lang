@@ -79,27 +79,27 @@ public func EscapeName(name: *const char, len: i32, sb: *StringBuilder) : *char 
         var c = sb.buffer[i]
 
         switch(c) {
-            case '*': sb.replace(i, i+1, "_ptr_"); i+=5; break;
-            case '<': sb.replace(i, i+1, "_cb_");  i+=4; break;
-            case '>': sb.replace(i, i+1, "_ce_");  i+=4; break;
-            case '[': sb.replace(i, i+1, "_bb_");  i+=4; break;
-            case ']': sb.replace(i, i+1, "_be_");  i+=4; break;
-            case '(': sb.replace(i, i+1, "_pb_");  i+=4; break;
-            case ')': sb.replace(i, i+1, "_pe_");  i+=4; break;
-            case ',': sb.replace(i, i+1, "_c_");   i+=3; break;
-            case ' ': sb.replace(i, i+1, "_");     i+=1; break;
-            case '-': sb.replace(i, i+1, "_m_");   i+=3; break;
+            case '*': sb.replace(i, i+1, $"_ptr_"); i+=5; break;
+            case '<': sb.replace(i, i+1, $"_cb_");  i+=4; break;
+            case '>': sb.replace(i, i+1, $"_ce_");  i+=4; break;
+            case '[': sb.replace(i, i+1, $"_bb_");  i+=4; break;
+            case ']': sb.replace(i, i+1, $"_be_");  i+=4; break;
+            case '(': sb.replace(i, i+1, $"_pb_");  i+=4; break;
+            case ')': sb.replace(i, i+1, $"_pe_");  i+=4; break;
+            case ',': sb.replace(i, i+1, $"_c_");   i+=3; break;
+            case ' ': sb.replace(i, i+1, $"_");     i+=1; break;
+            case '-': sb.replace(i, i+1, $"_m_");   i+=3; break;
             case ':': {
                 var n = i + 1;
                 if(n < sb.length) {
                     var nc = sb.buffer[n]
                     if(nc == ':') {
-                        sb.replace(i, i+2, "__")
+                        sb.replace(i, i+2, $"__")
                         i+=2;
                         break;
                     }
                 }
-                sb.replace(i, i+1, "_r_")
+                sb.replace(i, i+1, $"_r_")
                 i+=3;
                 break;
             }

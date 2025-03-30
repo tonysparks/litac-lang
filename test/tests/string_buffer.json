@@ -3,6 +3,7 @@
     "disabled": false,
     "program": `
         import "std/string/builder";
+        import "std/string"
 
         @include("assert.h");
         @foreign func assert(e:bool):void;
@@ -157,7 +158,7 @@
                     //printf("%s\n", s.cStr())
                     assert(strcmp(s.cStr(), "Red") == 0)
 
-                    s.insert(0, "%s", AT)
+                    s.insert(0, "%s", AT.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", AT)
@@ -171,7 +172,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(0, "%s", OVER)
+                    s.insert(0, "%s", OVER.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", OVER)
@@ -185,7 +186,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(0, "%s", BEFORE)
+                    s.insert(0, "%s", BEFORE.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", BEFORE)
@@ -198,7 +199,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(0, "%s", WAYLES)
+                    s.insert(0, "%s", WAYLES.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "%sRed", WAYLES)
@@ -214,7 +215,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(2, "%s", AT)
+                    s.insert(2, "%s", AT.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Re%sd", AT)
@@ -228,7 +229,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(2, "%s", OVER)
+                    s.insert(2, "%s", OVER.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Re%sd", OVER)
@@ -242,7 +243,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(2, "%s", BEFORE)
+                    s.insert(2, "%s", BEFORE.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Re%sd", BEFORE)
@@ -255,7 +256,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(2, "%s", WAYLES)
+                    s.insert(2, "%s", WAYLES.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Re%sd", WAYLES)
@@ -270,7 +271,7 @@
                     assert(strcmp(s.cStr(), "RedBear") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", AT)
+                    s.insert(3, "%s", AT.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%sBear", AT)
@@ -284,7 +285,7 @@
                     assert(strcmp(s.cStr(), "RedBear") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", OVER)
+                    s.insert(3, "%s", OVER.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%sBear", OVER)
@@ -298,7 +299,7 @@
                     assert(strcmp(s.cStr(), "RedBear") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", BEFORE)
+                    s.insert(3, "%s", BEFORE.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%sBear", BEFORE)
@@ -311,7 +312,7 @@
                     assert(strcmp(s.cStr(), "RedBear") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", WAYLES)
+                    s.insert(3, "%s", WAYLES.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%sBear", WAYLES)
@@ -325,7 +326,7 @@
                     assert(strcmp(s.cStr(), "RedBeares") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(4, "%s", WAYLES)
+                    s.insert(4, "%s", WAYLES.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "RedB%seares", WAYLES)
@@ -340,7 +341,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", AT)
+                    s.insert(3, "%s", AT.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", AT)
@@ -353,7 +354,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", OVER)
+                    s.insert(3, "%s", OVER.toString())
                    // printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", OVER)
@@ -368,7 +369,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", BEFORE)
+                    s.insert(3, "%s", BEFORE.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", BEFORE)
@@ -381,7 +382,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(3, "%s", WAYLES)
+                    s.insert(3, "%s", WAYLES.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", WAYLES)
@@ -397,7 +398,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(4, "%s", AT)
+                    s.insert(4, "%s", AT.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", AT)
@@ -410,7 +411,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(4, "%s", OVER)
+                    s.insert(4, "%s", OVER.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", OVER)
@@ -425,7 +426,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(4, "%s", BEFORE)
+                    s.insert(4, "%s", BEFORE.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", BEFORE)
@@ -438,7 +439,7 @@
                     assert(strcmp(s.cStr(), "Red") == 0)
                     //printf("%s\n", s.cStr())
 
-                    s.insert(4, "%s", WAYLES)
+                    s.insert(4, "%s", WAYLES.toString())
                     //printf("'%s'\n", s.cStr())
 
                     sprintf(buf, "Red%s", WAYLES)
@@ -666,11 +667,11 @@
                 s.init(16)
 
                 s.append("hello cruel world")
-                assert(s.contains("h") == true)
-                assert(s.contains("z") == false)
-                assert(s.contains("world") == true)
-                assert(s.contains("cruel") == true)
-                assert(s.contains("cruxl") == false)
+                assert(s.contains($"h") == true)
+                assert(s.contains($"z") == false)
+                assert(s.contains($"world") == true)
+                assert(s.contains($"cruel") == true)
+                assert(s.contains($"cruxl") == false)
             `,
         },
         {
@@ -684,11 +685,11 @@
                 s.init(16)
 
                 s.append("hello cruel world")
-                assert(s.indexOf("h") == 0)
-                assert(s.indexOf("l") == 2)
-                assert(s.indexOf("cruel") == 6)
-                assert(s.indexOfAt("l", -1, 5) == 10)
-                assert(s.indexOfAt("h", -1, 5) == -1)
+                assert(s.indexOf($"h") == 0)
+                assert(s.indexOf($"l") == 2)
+                assert(s.indexOf($"cruel") == 6)
+                assert(s.indexOfAt($"l", 5) == 10)
+                assert(s.indexOfAt($"h", 5) == -1)
             `,
         },
     ]

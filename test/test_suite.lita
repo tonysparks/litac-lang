@@ -263,16 +263,16 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
 
     const defsTemplate = "%definitions%"
     var defsLen = defsTemplate.length()
-    var defsIndex = programText.indexOf(defsTemplate)
+    var defsIndex = programText.indexOf(defsTemplate.toString())
     if(defsIndex > -1) {
-        programText.replace(defsIndex, defsIndex + defsLen, testNode.getStr("definitions", ""))
+        programText.replace(defsIndex, defsIndex + defsLen, testNode.getStr("definitions", "").toString())
     }
 
     const codeTemplate = "%code%"
     var codeLen = codeTemplate.length()
-    var codeIndex = programText.indexOf(codeTemplate)
+    var codeIndex = programText.indexOf(codeTemplate.toString())
     if(codeIndex > -1) {
-        programText.replace(codeIndex, codeIndex + codeLen, testNode.getStr("code", ""))
+        programText.replace(codeIndex, codeIndex + codeLen, testNode.getStr("code", "").toString())
     }
 
     output.programText = programText
@@ -428,7 +428,7 @@ report:
         testHarness.buffer.append("Total errors: %d\n", lita.result.errors.size())
 
         if(test.expectedErrorOutput) {
-            if(testHarness.buffer.contains(test.expectedErrorOutput)) {
+            if(testHarness.buffer.contains(test.expectedErrorOutput.toString())) {
                 return TestResult.SUCCESS
             }
             else {
