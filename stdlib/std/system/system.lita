@@ -486,11 +486,12 @@ end:
 }
 
 public func PathNormalize(filename: *const char, out:[MAX_PATH]char) : *char {
+    var i = 0
+
     if(!filename) {
         goto end;
     }
 
-    var i = 0
     for(; filename[i]; i += 1) {
         var c = filename[i]
         if(c == '\\') {
@@ -506,11 +507,12 @@ end:
 }
 
 public func PathNative(filename: *const char, out:[MAX_PATH]char) : *char {
+    var i = 0
+
     if(!filename) {
         goto end;
     }
 
-    var i = 0
     for(; filename[i]; i += 1) {
         var c = filename[i]
 #static_if defined(_WIN32) || defined(_WIN64)

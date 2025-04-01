@@ -300,6 +300,8 @@ func getRepoTemplate(pkgId: *PackageId) : *const char {
 
 // TODO: Should we support Unicode names???
 func sanitizeFilename(filename: *const char, out: [MAX_PATH]char) : *char {
+    var i = 0
+
     if(!filename) {
         goto end;
     }
@@ -307,7 +309,6 @@ func sanitizeFilename(filename: *const char, out: [MAX_PATH]char) : *char {
     var len = filename.length()
     len = MIN(len, MAX_PATH)
 
-    var i = 0
     for(; i < len; i += 1) {
         var c = filename[i]
         if(!isalnum(c) &&

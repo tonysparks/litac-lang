@@ -248,6 +248,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
 }
 
 func (p: *Parser) parseCompileTimeBody() : *Stmt {
+    var pos = p.pos()
 
     if(p.match(TokenType.IMPORT)) {
         var importDecl = p.importDeclaration()
@@ -258,8 +259,6 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
         return importDecl as (*Stmt)
     }
     else {
-        var pos = p.pos()
-
         var notes = Array<*NoteStmt>{}
         if(!p.notes(&notes)) {
             goto err;
