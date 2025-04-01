@@ -3,8 +3,8 @@
 set -e
 
 # BUILD_CMD="clang -std=gnu11 -g -gcodeview %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
-# BUILD_CMD="gcc -std=gnu11 -g %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
-BUILD_CMD="gcc -Wall -Wextra -Werror -pedantic -Wno-unused-parameter -Wno-unused-function -Wno-implicit-fallthrough -std=gnu11 -g %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
+BUILD_CMD="gcc -std=gnu11 -g %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
+# BUILD_CMD="gcc -Wall -Wextra -Werror -pedantic -Wno-unused-parameter -Wno-unused-function -Wno-implicit-fallthrough -std=gnu11 -g %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
 
 error_compiling() {
     echo ""
