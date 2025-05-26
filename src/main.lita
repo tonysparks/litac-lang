@@ -378,6 +378,10 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         StringCopy(.src = ".", .dest = options.projectPath, .size = 2)
     }
 
+    if(parser.hasOption("lib")) {
+        StringCopy(.src = parser.getOption("lib").value, .dest = options.libPath, .size = MAX_PATH)
+    }
+
     // sanitize paths
     TrimPath(options.projectPath)
     TrimPath(options.srcPath)
