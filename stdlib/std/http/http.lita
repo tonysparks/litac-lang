@@ -5,6 +5,8 @@ import "std/string"
 import "std/mem"
 import "std/map"
 import "std/libc"
+import "std/assert"
+import "std/limits"
 
 public enum HttpRequestType {
     GET,
@@ -99,6 +101,7 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     defer curl_easy_cleanup(curl)
 
     curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_URL, req.url);
+    curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_ACCEPT_ENCODING, "");
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_NOPROGRESS, 1_i64);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_FOLLOWLOCATION, 1_i64);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_MAXREDIRS, 8_i64);
@@ -164,12 +167,26 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
 
 func HttpWriteCallback(data: *void, size: usize, n: usize, userdata: *void) : usize {
     var totalSize = size * n
+    assert(totalSize < MAX_I32)
+
     var resp = userdata as (*HttpResponse)
     if(resp.bodyFn) {
         return resp.bodyFn(data, size, n, resp.userdata)
     }
 
-    resp.body.append("%.*s", totalSize, data)
+    if(!resp.body.reserve(totalSize as (i32))) {
+        return 0;
+    }
+
+    // resp.body.append("%.*s", totalSize, data)
+    memcpy(
+        &resp.body.buffer[resp.body.length],
+        data,
+        totalSize
+    )
+    // TODO: usize
+    resp.body.length += totalSize as (i32)
+
     return totalSize
 }
 

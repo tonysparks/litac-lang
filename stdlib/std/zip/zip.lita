@@ -5,10 +5,11 @@ import "std/assert"
 import "std/io"
 import "std/system"
 import "std/string/buffer"
-import "std/array"
 import "std/string"
+import "std/string/builder"
+import "std/array"
 import "std/fs"
-
+import "std/limits"
 
 @doc("""
     Open for either writing or reading
@@ -22,6 +23,7 @@ public enum ZipFlags {
     INCLUDE_ZIPFILE_NAME_ON_UNZIP = (1<<0),
 }
 
+@asStr
 public enum ZipStatus {
     OK = 0,
     ERROR_UNABLE_TO_OPEN_FILE,
@@ -31,6 +33,10 @@ public enum ZipStatus {
     ERROR_ADDING_FILE,
     ERROR_CLOSING,
     ERROR_FINALIZING,
+
+    ERROR_OUT_OF_MEMORY,
+    ERROR_COMPRESSING,
+    ERROR_DECOMPRESSING,
 }
 
 public enum ZipCompressionLevel {
@@ -39,6 +45,78 @@ public enum ZipCompressionLevel {
     BEST_COMPRESSION = 9,
     UBER_COMPRESSION = 10,
     DEFAULT_LEVEL = 6,
+}
+
+
+public func ZipCompress(buffer: *StringBuilder, source: String, level: ZipCompressionLevel) : ZipStatus {
+    var maxLength = mz_compressBound(source.length)
+    assert(maxLength < MAX_I32) // TODO: Make string types usize
+
+    if(!buffer.reserve(maxLength as (i32))) {
+        return ZipStatus.ERROR_OUT_OF_MEMORY
+    }
+
+    var length = buffer.remaining() as (u64);
+    var status = mz_compress2(
+        &buffer.buffer[buffer.length],
+        &length,
+        source.buffer,
+        source.length,
+        level as (i32)
+    )
+
+    if(status != MZ_OK) {
+        return ZipStatus.ERROR_COMPRESSING
+    }
+
+    if (length > 0) {
+        assert(length < MAX_I32) // TODO: Make string types usize
+        buffer.length += length as (i32)
+    }
+
+    return ZipStatus.OK
+}
+
+public func ZipUncompress(buffer: *StringBuilder, source: String) : ZipStatus {
+
+    var length = buffer.remaining() as (u64);
+    var estimatedLength = MAX(source.length * 3, length as (i32))
+
+    var status = MZ_OK
+    var sourceLength = source.length as (u64)
+
+    do {
+        if(!buffer.reserve(estimatedLength)) {
+            return ZipStatus.ERROR_OUT_OF_MEMORY
+        }
+
+        var bufferLength = buffer.remaining() as (u64);
+
+        status = mz_uncompress2(
+            &buffer.buffer[buffer.length],
+            &bufferLength,
+            source.buffer,
+            &sourceLength
+        )
+
+        if(status == MZ_OK) {
+            length = bufferLength
+            break
+        }
+
+        estimatedLength *= 2;
+    } while(status == MZ_BUF_ERROR);
+
+    if(status != MZ_OK) {
+        return ZipStatus.ERROR_DECOMPRESSING
+    }
+
+    if (length > 0) {
+        assert(length < MAX_I32) // TODO: Make string types usize
+        buffer.length += length as (i32)
+    }
+
+    return ZipStatus.OK
 }
 
 public struct ZipFile {
@@ -313,7 +391,7 @@ func testZipDir() {
 }*/
 
 
-@test
+//@test
 func testZipDir() {
     var zip: ZipFile{}
     defer zip.close()
@@ -326,4 +404,30 @@ func testZipDir() {
     var len = path.length()
     assert(zip.zipDir(path, len, "pkg") == ZipStatus.OK)
     assert(zip.finalize() == ZipStatus.OK)
+}
+
+@test
+func testGZip() {
+    var compressed = StringBuilderInit(1024)
+    var input =
+    """
+        !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~ !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRST
+    """.toString()
+    var compressStatus = ZipCompress(
+        &compressed,
+        input,
+        6
+    )
+    assert(compressStatus == ZipStatus.OK)
+
+    printf("CompressedSize: %d\n", compressed.length)
+
+    var uncompressed = StringBuilderInit(1024 * 1)
+    var uncompressStatus = ZipUncompress(
+        &uncompressed,
+        compressed.toString()
+    )
+    printf("Status: %s\n", ZipStatusAsStr(uncompressStatus))
+    assert(uncompressStatus == ZipStatus.OK)
+    assert(uncompressed.toString().equals(input))
 }

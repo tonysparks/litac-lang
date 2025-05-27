@@ -3068,7 +3068,7 @@ static WCHAR* mz_utf8z_to_widechar(const char* str)
 {
   int reqChars = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
   WCHAR* wStr = (WCHAR*)malloc(reqChars * sizeof(WCHAR));
-  MultiByteToWideChar(CP_UTF8, 0, str, -1, wStr, sizeof(WCHAR) * reqChars);
+  MultiByteToWideChar(CP_UTF8, 0, str, -1, wStr, reqChars);
   return wStr;
 }
 
@@ -5750,41 +5750,20 @@ mz_bool mz_zip_writer_init_v2(mz_zip_archive *pZip, mz_uint64 existing_size, mz_
 {
     mz_bool zip64 = (flags & MZ_ZIP_FLAG_WRITE_ZIP64) != 0;
 
-    if (!pZip) {
-        printf("No zip\n");
-    }
-
-    if (pZip->m_pState) {
-        printf("State Prsent\n");
-    }
-
-    if(!pZip->m_pWrite) {
-        printf("No Write\n");
-    }
-    if (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID) {
-        printf("Invalid Mode\n");
-    }
-
-    if ((!pZip) || (pZip->m_pState) || (!pZip->m_pWrite) || (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID)) {
-        printf("State\n");
+    if ((!pZip) || (pZip->m_pState) || (!pZip->m_pWrite) || (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID))
         return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
-    }
 
     if (flags & MZ_ZIP_FLAG_WRITE_ALLOW_READING)
     {
-        if (!pZip->m_pRead) {
-            printf("READ\n");
+        if (!pZip->m_pRead)
             return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
-        }
     }
 
     if (pZip->m_file_offset_alignment)
     {
         /* Ensure user specified file offset alignment is a power of 2. */
-        if (pZip->m_file_offset_alignment & (pZip->m_file_offset_alignment - 1)) {
-            printf("Alignment\n");
+        if (pZip->m_file_offset_alignment & (pZip->m_file_offset_alignment - 1))
             return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
-        }
     }
 
     if (!pZip->m_pAlloc)
