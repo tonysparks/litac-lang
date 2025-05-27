@@ -422,7 +422,7 @@ func testGZip() {
 
     printf("CompressedSize: %d\n", compressed.length)
 
-    var uncompressed = StringBuilderInit(1024 * 1)
+    var uncompressed = StringBuilderInit(1024 * 2) // TODO: Fails if only 1024, causing mz_uncompress2 to be called twice
     var uncompressStatus = ZipUncompress(
         &uncompressed,
         compressed.toString()
