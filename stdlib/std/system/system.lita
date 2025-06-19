@@ -55,6 +55,8 @@ typedef enum Lita_OSType {
     #if defined(BSD)
         // FreeBSD, NetBSD, OpenBSD, DragonFly BSD
         Lita_OSType litaOS = Lita_OSType_BSD;
+    #else
+        Lita_OSType litaOS = Lita_OSType_OTHER;
     #endif
     #define LITA_IS_POSIX 1
 #elif defined(__hpux)
@@ -74,6 +76,8 @@ typedef enum Lita_OSType {
     #elif TARGET_OS_MAC == 1
         // Apple OSX
         Lita_OSType litaOS = Lita_OSType_MAC;
+    #else
+        Lita_OSType litaOS = Lita_OSType_OTHER;
     #endif
     #define LITA_IS_POSIX 1
 #elif defined(__sun) && defined(__SVR4)
