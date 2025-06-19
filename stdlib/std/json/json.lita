@@ -693,6 +693,11 @@ public func (node: *JsonNode) print(buf: *StringBuilder) : *const char {
     return buf.cStr()
 }
 
+public func (node: *JsonNode) prettyPrint(buf: *StringBuilder, tabSize: i32 = 4) : *const char {
+    PrettyPrintJson(node, buf, 0, tabSize)
+    return buf.cStr()
+}
+
 public func (node: *JsonNode) free() {
     if(!node) {
         return;
@@ -977,6 +982,67 @@ public func PrintJson(node: *JsonNode, buf: *StringBuilder) {
     }
 }
 
+
+public func PrettyPrintJson(node: *JsonNode, buf: *StringBuilder, offset:i32 = 0, tabSize: i32 = 4) {
+    if(!node) {
+        return;
+    }
+    switch(node.type) {
+        case JsonType.NULL: {
+            buf.appendStrn("null", 4)
+            break;
+        }
+        case JsonType.BOOLEAN: {
+            (node.boolValue) ?
+                buf.appendStrn("true", 4) : buf.appendStrn("false", 5)
+            break;
+        }
+        case JsonType.INT_NUMBER: {
+            buf.append("%lld", node.intValue)
+            break;
+        }
+        case JsonType.FLOAT_NUMBER: {
+            buf.append("%f", node.doubleValue)
+            break;
+        }
+        case JsonType.STRING: {
+            buf.append("\"%s\"", node.strValue)
+            break;
+        }
+        case JsonType.OBJECT: {
+            buf.appendStrn("{\n", 2)
+            var obj = node.objValue
+
+            var isFirst = true
+            for(var i = 0; i < obj.values.size(); i += 1) {
+                var entry = obj.values.get(i)
+
+                if(!isFirst) buf.appendStrn(",\n", 2)
+                buf.append("%*s", offset + tabSize, "")
+                buf.append("\"%s\": ", entry.key)
+                PrettyPrintJson(entry.value, buf, offset + tabSize)
+                isFirst = false
+            }
+            buf.appendStrn("\n", 1)
+            buf.append("%*s}", offset, "")
+            break;
+        }
+        case JsonType.ARRAY: {
+            buf.appendStrn("[\n", 2)
+            var array = node.arrayValue
+            var isFirst = true
+            for(var i = 0; i < array.size(); i+=1) {
+                if(!isFirst) buf.appendStrn(",\n", 2)
+                buf.append("%*s", offset + tabSize, "")
+                PrettyPrintJson(array.get(i), buf, offset + tabSize)
+                isFirst = false
+            }
+            buf.appendStrn("\n", 1)
+            buf.append("%*s]", offset, "")
+            break;
+        }
+    }
+}
 
 
 func (p: *JsonParser) parseJsonNode() : *JsonNode {
@@ -1524,4 +1590,20 @@ public func testParser() {
 
 err:
     assert(false)
+}
+
+@test
+public func testPrettyPrinter() {
+    // { "x": 7, "y":[1,234,{"x":[], null, true, false, 34.5, [false]}],"z":"hi"}
+    var json = """
+    { "x": 7, "y":[1,234,{"x":[null, true, false, 34.5, [false]] }],"z":"hi"}
+    """
+    var parser = JsonParserInit()
+    var node = parser.parseJson(json)
+    if (parser.hasError()) {
+        printf("Parsing error: %s\n", parser.errorMsg)
+    }
+    var sb = StringBuilderInit(1024)
+    PrettyPrintJson(node, sb)
+    printf("%.*s\n", sb.length, sb.buffer)
 }
