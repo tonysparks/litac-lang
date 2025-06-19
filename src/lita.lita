@@ -22,6 +22,7 @@ import "ast_new"
 import "checker"
 import "cgen"
 import "common"
+import "config"
 import "intern"
 import "types"
 import "types_new"
@@ -36,7 +37,6 @@ import "tcc/libtcc"
 
 public const MAX_PREFIX_SIZE = 32
 public const LITA_VERSION = "0.1.6-alpha"
-public const DEFAULT_BUILD_CMD = "clang -std=c99 %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
 
 public struct Lita {
     allocator: *const Allocator
@@ -428,7 +428,7 @@ public func (this: *Lita) transpile(module: *Module) : bool {
     if(!IsLibtccAvailable()) {
         this.options.isTcc = false
         if(!this.options.compileCmd) {
-            this.options.compileCmd = DEFAULT_BUILD_CMD
+            this.options.compileCmd = BUILD_CMD_DEFAULT
         }
     }
 

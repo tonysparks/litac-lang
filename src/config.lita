@@ -17,7 +17,7 @@ public const LITAC_HOME_DEFAULT : *const char = "";
 
 // the default -buildCmd
 // change to 'gcc' or 'tcc' if you'd prefer
-public const BUILD_CMD_DEFAULT : *const char = "clang %input% -std=c99 -o %output% -D_CRT_SECURE_NO_WARNINGS";
+public const BUILD_CMD_DEFAULT : *const char = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS";
 
 // default -outputDir
 // this writes the output files to the current directory,
