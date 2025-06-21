@@ -18,11 +18,11 @@
 
         Example project folder structure
 
-        .packages/    // stores packages this project depends on
+        .pkgs/    // stores packages this project depends on
         bin/          // stores the binary output of compilation
         lib/          // stores static libraries
         src/          // stores LitaC code
-        package.json  // defines this projects package and dependencies
+        pkg.json  // defines this projects package and dependencies
 
         A package is uniquely defined by these properties:
             * Package Repo - the repository in which the package is hosted.  Example github.com/tonysparks/my-package
@@ -248,7 +248,8 @@ public func (this: *PackageManager) installCommand(options: PackageInstallOption
 
     if(!this.pkg.dependencies.empty()) {
         for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
-            printf("Installing '%s'\n", this.pkg.dependencies.get(i).id)
+            var dep = this.pkg.dependencies.getPtr(i)
+            printf("Installing '%s'\n", dep.pkgId.id)
         }
     }
 

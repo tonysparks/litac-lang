@@ -741,17 +741,45 @@ public func FindModulePath(lita: *Lita,
     {
         for(var i = 0; i < lita.buildFile.pkgPaths.size(); i+=1) {
             var pkgPath = lita.buildFile.pkgPaths.get(i)
-            pathStr.format("%s/%s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer)
-            if(FileExists(pathStr.cStrConst())) {
-                return true
+
+            // Check relative to project path
+            {
+                pathStr.format("%s/%s/%.*s.lita",
+                    lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer
+                )
+                if(FileExists(pathStr.cStrConst())) {
+                    return true
+                }
+
+                var index = moduleName.lastIndexOfAt($"/")
+                var name = index < 0 ? moduleName : moduleName.substring(index + 1)
+
+                pathStr.format("%s/%s/%.*s/%.*s.lita",
+                    lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer
+                )
+                if(FileExists(pathStr.cStrConst())) {
+                    return true
+                }
             }
 
-            var index = moduleName.lastIndexOfAt($"/")
-            var name = index < 0 ? moduleName : moduleName.substring(index + 1)
+            // Check relative to absolute path
+            {
+                pathStr.format("%s/%.*s.lita",
+                    pkgPath, moduleName.length, moduleName.buffer
+                )
+                if(FileExists(pathStr.cStrConst())) {
+                    return true
+                }
 
-            pathStr.format("%s/%s/%.*s/%.*s.lita", lita.options.projectPath, pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer)
-            if(FileExists(pathStr.cStrConst())) {
-                return true
+                var index = moduleName.lastIndexOfAt($"/")
+                var name = index < 0 ? moduleName : moduleName.substring(index + 1)
+
+                pathStr.format("%s/%.*s/%.*s.lita",
+                    pkgPath, moduleName.length, moduleName.buffer, name.length, name.buffer
+                )
+                if(FileExists(pathStr.cStrConst())) {
+                    return true
+                }
             }
         }
     }

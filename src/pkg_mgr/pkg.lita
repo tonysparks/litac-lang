@@ -32,11 +32,16 @@ public struct PackageDef {
 
     type: PackageType
     dynamicLibraries: Array<*const char>
-    dependencies: Array<PackageId>
+    dependencies: Array<PackageDependency>
 
     // The json representation
     // of this package.
     json: *JsonNode
+}
+
+public struct PackageDependency {
+    pkgId: PackageId
+    link: bool
 }
 
 public func (this: *PackageDef) free() {
@@ -181,10 +186,10 @@ public func ParsePackage(
         for(var i = 0; i < deps.size(); i+=1) {
             var depNode = deps.at(i)
 
-            pkg.dependencies.add(PackageId{})
-            var pkgId = pkg.dependencies.getPtr(i)
+            pkg.dependencies.add(PackageDependency{})
+            var pkgDep = pkg.dependencies.getPtr(i)
 
-            var code = ParsePackageId(depNode, pkgId, pm.allocator)
+            var code = ParseDependency(pm, depNode, pkgDep)
             if(code != PkgStatus.OK) {
                 return code
             }
@@ -210,6 +215,20 @@ public func ParsePackage(
     return PkgStatus.OK
 }
 
+func ParseDependency(
+    pm: *PackageManager,
+    json: *JsonNode,
+    dep: *PackageDependency
+) : PkgStatus {
+    var pkgId = &dep.pkgId
+    var code = ParsePackageId(json, pkgId, pm.allocator)
+    if(code != PkgStatus.OK) {
+        return code
+    }
+
+    dep.link = json.getBool("link", false)
+    return PkgStatus.OK
+}
 
 public func ParsePackageId(
         json: *JsonNode,

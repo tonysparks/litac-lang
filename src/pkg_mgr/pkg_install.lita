@@ -49,7 +49,7 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
         }
     }
 
-    var pkgsToInstall = ArrayInit<PackageId>(numOfPkgs, pm.allocator)
+    var pkgsToInstall = ArrayInit<PackageDependency>(numOfPkgs, pm.allocator)
     defer pkgsToInstall.free()
 
     var findCode = findPackagesToInstall(pm, &pkgsToInstall)
@@ -64,7 +64,8 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
     var pkgPath:[MAX_PATH]char;
 
     for(var i = 0; i < pkgsToInstall.size(); i+=1) {
-        var pkgId = pkgsToInstall.get(i)
+        var pkgDep = pkgsToInstall.getPtr(i)
+        var pkgId = pkgDep.pkgId
 
         var status = makePackageDirectory(pm, pkgId, pkgPath)
         if(status != PkgStatus.OK) {
@@ -73,7 +74,14 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
 
         if(isPackageInstalled(pm, pkgId, pkgPath)) {
             var pkg: *PackageDef = null
-            var status = readPackage(pm, pkgId, pkgPath, &pkg, pkgsToInstall)
+            var status = readPackage(
+                pm,
+                pkgId,
+                pkgPath,
+                "/pkg",
+                &pkg,
+                pkgsToInstall
+            )
             if(status != PkgStatus.OK) {
                 return status
             }
@@ -89,8 +97,17 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
         var pkgFile = StringBufferInit(pkgPath, MAX_PATH)
         pkgFile.appendStr("/pkg.zip")
 
-        if(pkgId.repo().startsWith($"file://")) {
-            status = zipLocalPackage(pm, pkgId, pkgFile.cStr())
+        var filePrefix = $"file://"
+        var linkOnly = false
+
+        if(pkgId.repo().startsWith(filePrefix)) {
+            linkOnly = pkgDep.link
+            if(linkOnly) {
+                var repoDir = pkgId.repo().substring(filePrefix.length)
+                pkgFile.format("%.*s", repoDir.length, repoDir.buffer)
+            } else {
+                status = zipLocalPackage(pm, pkgId, pkgFile.cStr())
+            }
         }
         else {
             status = downloadPackage(pm, &http, pkgId, pkgFile.cStr())
@@ -100,7 +117,15 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
             return status
         }
 
-        status = installPackage(pm, pkgId, pkgFile.cStr(), pkgsToInstall)
+        var installOptions = InstallOptions {
+            .pkgId = &pkgId,
+            .pkgFile = pkgFile.cStr(),
+            .pkgParentPath = linkOnly ? "" : "/pkg",
+            .linkOnly = linkOnly,
+            .unzip = !linkOnly // TODO
+        }
+
+        status = installPackage(pm, &installOptions, pkgsToInstall)
         if(status != PkgStatus.OK) {
             return status
         }
@@ -133,6 +158,15 @@ func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
         return PkgStatus.OK
     }
 
+    var buffer = [MAX_PATH]char;
+    var packageRoot = StringBufferInit(buffer, MAX_PATH, 0)
+    packageRoot.format("%s/%s/", CurrentWorkingPath(), pm.options.pkgDir)
+
+    // Do not delete files outside of the package root directory
+    if(!path.toString().startsWith(packageRoot.toString())) {
+        return PkgStatus.OK
+    }
+
     var file: FileHandle;
     if(!file.open(path.cStr())) {
         pm.errors.append("unable to open: '%s'\n", path.cStr())
@@ -161,7 +195,7 @@ func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
     return PkgStatus.OK
 }
 
-func findPackagesToInstall(pm: *PackageManager, pkgsToInstall: *Array<PackageId>) : PkgStatus {
+func findPackagesToInstall(pm: *PackageManager, pkgsToInstall: *Array<PackageDependency>) : PkgStatus {
     // TODO:
     // using the pkg.dependencies, scan the .pkg directory to ensure all packages
     // are download (we can do this by verifying the .litac_pkg file exists in the directory of the
@@ -326,24 +360,36 @@ end:
     return out
 }
 
+struct InstallOptions {
+    pkgId: *PackageId
+    pkgFile: *const char
+    pkgParentPath: *const char
+    linkOnly: bool
+    unzip: bool
+}
+
 func installPackage(
     pm: *PackageManager,
-    pkgId: *PackageId,
-    pkgFile: *const char,
-    pkgsToInstall: *Array<PackageId>) : PkgStatus {
+    options: *InstallOptions,
+    pkgsToInstall: *Array<PackageDependency>
+) : PkgStatus {
 
     var pkgPath:[MAX_PATH]char;
-    FilePath(pkgFile, pkgPath)
+    if(options.linkOnly) {
+        StringCopy(options.pkgFile, pkgPath, MAX_PATH)
+    } else {
+        FilePath(options.pkgFile, pkgPath)
+    }
 
     // unzip the pkg
-    {
+    if(options.unzip) {
         var zip: ZipFile{}
         defer {
             zip.close()
-            FileDelete(pkgFile)
+            FileDelete(options.pkgFile)
         }
 
-        if(zip.open(pkgFile, ZipOpen.READ, pm.allocator) != ZipStatus.OK) {
+        if(zip.open(options.pkgFile, ZipOpen.READ, pm.allocator) != ZipStatus.OK) {
             return PkgStatus.ERROR_UNABLE_TO_OPEN_PKG_FILE
         }
 
@@ -366,7 +412,14 @@ func installPackage(
     }
 
     var pkg: *PackageDef;
-    var status = readPackage(pm, pkgId, pkgPath, &pkg, pkgsToInstall)
+    var status = readPackage(
+        pm,
+        options.pkgId,
+        pkgPath,
+        options.pkgParentPath,
+        &pkg,
+        pkgsToInstall
+    )
     if(status != PkgStatus.OK) {
         return status
     }
@@ -382,7 +435,7 @@ func installPackage(
 
         for(var i = 0; i < pkg.dynamicLibraries.size(); i+=1) {
             var lib = pkg.dynamicLibraries.get(i)
-            libPath.format("%s/pkg/bin/%s", pkgPath, lib)
+            libPath.format("%s%s/bin/%s", pkgPath, options.pkgParentPath, lib)
 
             if(!FileExists(libPath.cStr())) {
                 pm.warnings.append("missing dynamic library: '%s'\n", libPath.cStr())
@@ -402,7 +455,7 @@ func installPackage(
     // package as installed..
     // TODO: should we invert this, create a lock file upon start, and
     // remove it once it's done?
-    {
+    if(!options.linkOnly) {
         var pkgLck = StringBufferInit(pkgPath, MAX_PATH)
         pkgLck.append("/%s", INSTALL_COMPLETED_FILE)
 
@@ -418,15 +471,16 @@ func readPackage(
     pm: *PackageManager,
     pkgId: *PackageId,
     pkgPath: *const char,
+    pkgParentPath: *const char,
     resultPkg: **PackageDef,
-    pkgsToInstall: *Array<PackageId>) : PkgStatus {
+    pkgsToInstall: *Array<PackageDependency>) : PkgStatus {
 
     // var name = pkgId.name()
     // var version = pkgId.version()
 
     var temp:[MAX_PATH]char;
     var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
-    pkgDef.format("%s/pkg/pkg.json", pkgPath)
+    pkgDef.format("%s%s/pkg.json", pkgPath, pkgParentPath)
 
     if(!FileExists(pkgDef.cStr())) {
         return PkgStatus.ERROR_UNABLE_TO_OPEN_PKG_FILE
@@ -444,7 +498,7 @@ func readPackage(
     // TODO: Do we want packages to allow to define an alternative
     // folder for src/bin/lib directories, or should this be
     // standard's by conventions...
-    srcPath.format("%s/pkg/src", pkgPath)
+    srcPath.format("%s%s/src", pkgPath, pkgParentPath)
     srcPath.cStr()
 
     // Add this installed packages dependencies...
