@@ -243,7 +243,7 @@ func (this: *ZipFile) zipFolder(
     level: ZipCompressionLevel) : ZipStatus {
 
     var handle: FileHandle{}
-    if(!handle.openEx(path.buffer, path.length)) {
+    if(!handle.open(path.toString())) {
         return ZipStatus.ERROR_UNABLE_TO_OPEN_FILE
     }
     defer handle.close()

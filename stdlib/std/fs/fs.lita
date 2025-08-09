@@ -9,26 +9,22 @@ public struct FileHandle {
     file: tinydir_file
 }
 
-public func (this: *FileHandle) openEx(path: *const char, len: i32) : bool {
-    if(len > MAX_PATH) {
+public func (this: *FileHandle) open(path: String) : bool {
+    if(path.length > MAX_PATH) {
         return false;
     }
 
     var temp:[MAX_PATH]char;
     var str = StringBufferInit(temp, MAX_PATH, 0)
-    str.format("%.*s", len, path)
-    return this.open(str.cStr())
-}
+    str.format("%.*s", path.length, path.buffer)
 
-public func (this: *FileHandle) open(path: *const char) : bool {
-    if(tinydir_open(&this.dir, path) == -1) {
+    if(tinydir_open(&this.dir, str.cStr()) == -1) {
         this.close()
         return false
     }
 
     return true
 }
-
 
 public func (this: *FileHandle) isFile() : bool {
     return this.file.is_reg
@@ -96,7 +92,7 @@ func testFileHandle() {
     printf("~~~~~~~~\n")
 
     var handle: FileHandle{}
-    if(!handle.open("/home/tony/projects/ring-http/.pkgs/liburing")) {
+    if(!handle.open($"/home/tony/projects/ring-http/.pkgs/liburing")) {
         printf("Failed to open\n")
     }
 

@@ -168,7 +168,7 @@ func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
     }
 
     var file: FileHandle;
-    if(!file.open(path.cStr())) {
+    if(!file.open(path.toString())) {
         pm.errors.append("unable to open: '%s'\n", path.cStr())
         return PkgStatus.ERROR_CLEANING_PKG
     }
