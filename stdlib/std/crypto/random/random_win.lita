@@ -1,6 +1,11 @@
 import "std/libc"
 
-@include("<bcrypt.h>");
+@raw("""
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <bcrypt.h>
+""");
+
 @compiler_option(
     .os = "windows",
     .options = "-lbcrypt"
