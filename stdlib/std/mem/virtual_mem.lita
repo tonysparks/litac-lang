@@ -1,0 +1,11 @@
+
+#if (OS == "WINDOWS")
+    import using "std/mem/virtual_mem_win"
+#else
+    import using "std/mem/virtual_mem_posix"
+#end
+
+
+public func IsPagedAligned(addr: usize, pageSize: usize) : bool {
+    return (addr & (pageSize - 1)) == 0
+}

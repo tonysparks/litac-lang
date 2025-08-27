@@ -10,6 +10,21 @@ const WHITESPACE = [256]bool {
     [32] = true,
 }
 
+const HEX = [256]i32 {
+    // digits '0'..'9'
+    ['0'] = 0, ['1'] = 1, ['2'] = 2, ['3'] = 3,
+    ['4'] = 4, ['5'] = 5, ['6'] = 6, ['7'] = 7,
+    ['8'] = 8, ['9'] = 9,
+
+    // uppercase 'A'..'F'
+    ['A'] = 10, ['B'] = 11, ['C'] = 12,
+    ['D'] = 13, ['E'] = 14, ['F'] = 15,
+
+    // lowercase 'a'..'f'
+    ['a'] = 10, ['b'] = 11, ['c'] = 12,
+    ['d'] = 13, ['e'] = 14, ['f'] = 15,
+}
+
 public func (this: char) isWhitespace() : bool {
     return WHITESPACE[this & 0xFF]
 }
@@ -25,6 +40,10 @@ public func (this: char) isAlphabetic() : bool {
 
 public func (this: char) isAlphanumeric() : bool {
     return this.isNumeric() || this.isAlphabetic();
+}
+
+public func (this: char) asHex() : i32 {
+    return HEX[this]
 }
 
 @test

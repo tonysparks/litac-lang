@@ -189,11 +189,14 @@ public func (s: *StringBuffer) appendChar(c: char) {
 }
 
 public func (s: StringBuffer) substring(start: i32, end: i32) : String {
-    if(start < 0 || end < start) {
-        return String{
-            .buffer = null,
-            .length = 0
-        }
+    if(start < 0) {
+        start = 0
+    }
+    if(end > s.length || end < 0) {
+        end = s.length
+    }
+    if(start > end) {
+        return String{}
     }
 
     var len = end - start

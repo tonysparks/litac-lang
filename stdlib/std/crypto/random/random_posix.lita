@@ -1,0 +1,14 @@
+import "std/libc"
+
+
+@include("sys/random.h");
+
+@foreign
+func getrandom(buf: *void, buflen: usize, flags: u32): i32;
+
+
+public func SecureRandom64() : u64 {
+    var result = 0u64;
+    getrandom(&result, sizeof(result), 0)
+    return result
+}

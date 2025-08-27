@@ -1,0 +1,34 @@
+import "std/limits"
+
+#if (OS == "WINDOWS")
+    import using "std/crypto/random/random_win"
+#elseif (OS == "LINUX")
+    import using "std/crypto/random/random_posix"
+#elseif (OS == "MAC" || OS == "IOS")
+    import using "std/crypto/random/random_macos"
+#else
+    // #error "Unknown OS platform"
+#end
+
+public func SecureRandom64Max(max: u64) : u64 {
+    if (max == 0) return 0;
+
+    var r = 0u64;
+    var m = MAX_U64 - (MAX_U64 % max);
+
+    do {
+        r = SecureRandom64()
+    } while (r >= m);
+
+    return r % max;
+}
+
+import "std/assert"
+
+@test
+func testSecureMax() {
+    assert(SecureRandom64Max(0) <= 0)
+    assert(SecureRandom64Max(2) <= 2)
+
+    assert(SecureRandom64Max(10) <= 10)
+}

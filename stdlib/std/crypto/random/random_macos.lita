@@ -1,0 +1,20 @@
+import "std/libc"
+
+@include("stdlib.h");
+
+@foreign
+func arc4random_buf(buf: *void, len: usize) : void;
+
+public func SecureRandom64() : u64 {
+    var result = 0u64;
+    arc4random_buf((&result) as (*void), sizeof(result))
+    return result
+}
+
+@test
+func testSecureRandom64() {
+    for(var i = 0; i < 10; i += 1) {
+        var r = SecureRandom64()
+        printf("%llu\n", r)
+    }
+}

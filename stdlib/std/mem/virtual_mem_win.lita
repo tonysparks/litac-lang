@@ -1,0 +1,131 @@
+@raw("""
+#include <sysinfoapi.h>
+#include <memoryapi.h>
+""");
+
+@foreign
+struct SYSTEM_INFO {
+    dwPageSize: u32
+}
+
+@foreign
+func GetSystemInfo(info: *SYSTEM_INFO) : void;
+
+@foreign
+const PAGE_NOACCESS:i32;
+
+@foreign
+const PAGE_GUARD:i32;
+
+@foreign
+const PAGE_NOCACHE:i32;
+
+@foreign
+const PAGE_WRITECOMBINE:i32;
+
+@foreign
+const PAGE_READWRITE:i32;
+
+@foreign
+const PAGE_EXECUTE_READWRITE:i32;
+
+
+@foreign
+const MEM_COMMIT:i32;
+
+@foreign
+const MEM_RESERVE:i32;
+
+@foreign
+const MEM_RESET:i32;
+
+@foreign
+const MEM_RESET_UNDO:i32;
+
+@foreign
+const MEM_LARGE_PAGES:i32;
+
+@foreign
+const MEM_WRITE_WATCH:i32;
+
+@foreign
+const MEM_DECOMMIT:i32;
+
+@foreign
+const MEM_RELEASE:i32;
+
+@foreign("VirtualAlloc")
+func msVirtualAlloc(
+    lpAddress: *void,      // Starting address of the region
+    dwSize: usize,         // Size of the memory region
+    flAllocationType: u32, // Type of allocation (e.g., reserve or commit)
+    flProtect: u32         // Memory protection options
+) : *void;
+
+@foreign("VirtualFree")
+func msVirtualFree(
+    lpAddress: *void,      // Starting address of the region
+    dwSize: usize,         // Size of the memory region
+    dwFreeType: u32,       // Type of free
+) : bool;
+
+func Alloc(size: usize, prot: i32, large: bool) : *void {
+    if(large) {
+        prot |= MEM_LARGE_PAGES
+    }
+
+    var mem = msVirtualAlloc(null, size, prot, PAGE_READWRITE)
+    return mem;
+}
+
+// TODO: Move to System/OS package
+public func GetOSPageSize() : i64 {
+    var sysInfo: SYSTEM_INFO;
+    GetSystemInfo(&sysInfo)
+
+    return sysInfo.dwPageSize;
+}
+
+public func VirtualAlloc(size: usize, large: bool = false) : *void {
+    return Alloc(size, MEM_RESERVE|MEM_COMMIT, large)
+}
+
+public func VirtualReserve(size: usize, large: bool = false) : *void {
+    return Alloc(size, MEM_RESERVE, large)
+}
+
+public func VirtualCommit(addr: *void, size: usize) : i32 {
+    return msVirtualAlloc(addr, size, MEM_COMMIT, PAGE_READWRITE) != null
+}
+
+public func VirtualUncommit(addr: *void, size: usize) : i32 {
+    return msVirtualFree(addr, size, MEM_DECOMMIT)
+}
+
+public func VirtualFree(mem: *void, size: usize) : i32 {
+    if(!mem) return 1;
+    return msVirtualFree(mem, 0, MEM_RELEASE)
+}
+
+import "std/assert"
+import "std/libc"
+import "std/mem"
+@test
+func testVirtualMem() {
+    const size = 5 * 1024 * 1024
+    var mem = VirtualReserve(size)
+    assert(mem != null)
+
+    VirtualCommit(mem, 1024)
+    VirtualCommit(mem, 1024 * 2)
+    var bytes = mem as (*u8)
+    bytes[0] = 1_u8
+    bytes[2] = 2_u8
+    var pageSize = GetOSPageSize()
+    printf("Here! %ld pageSize: %lld\n", LITAC_DEFAULT_ALIGNMENT, pageSize)
+
+    var x = 4*4096_usize-1
+    var y = alignForward(x, pageSize)
+    printf("Start: %zu, end: %zu\n", x, y)
+    VirtualFree(mem, size)
+}
