@@ -1,0 +1,135 @@
+import "std/crypto/random"
+import "std/string"
+import "std/string/buffer"
+import "std/ascii"
+
+
+public union UUID {
+    struct {
+        low: u64
+        high: u64
+    }
+    bytes: [16]u8
+}
+
+public func NewRandom() : UUID {
+    var high = SecureRandom64()
+    var low = SecureRandom64()
+    var uuid = UUID {
+        .low = low,
+        .high = high,
+    }
+
+    uuid.bytes[6] &= 0x0f_u8;  // clear version
+    uuid.bytes[6] |= 0x40_u8;  // set to version 4
+    uuid.bytes[8] &= 0x3f_u8;  // clear variant
+    uuid.bytes[8] |= 0x80_u8;  // set to IETF variant
+
+    return uuid
+}
+
+public func (this: *UUID) equals(other: *UUID) : bool {
+    return this.low == other.low && this.high == other.high
+}
+
+public func (this: *UUID) version() : i32 {
+    return (this.bytes[6] >> 4) & 0x0F;
+}
+
+
+public func (this: *UUID) toString(sb: StringBuffer) : String {
+    if(sb.remaining() < 37) {
+        return String{}
+    }
+
+    var pos = sb.length
+
+    var uuid = this.bytes
+    sb.append(
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        uuid[0], uuid[1], uuid[2], uuid[3],
+        uuid[4], uuid[5],
+        uuid[6], uuid[7],
+        uuid[8], uuid[9],
+        uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]
+    )
+    return sb.substring(pos, pos + 36)
+}
+
+public func FromString(str: String) : UUID {
+    if(str.length != 36) {
+        return UUID {
+            .low = 0u64,
+            .high = 0u64,
+        }
+    }
+
+    // if no hyphens at the correct positions
+    // bail out
+    if (
+        str.buffer[8]  != '-' ||
+        str.buffer[13] != '-' ||
+        str.buffer[18] != '-' ||
+        str.buffer[23] != '-'
+    ) {
+        return UUID {
+            .low = 0u64,
+            .high = 0u64,
+        }
+    }
+
+    var i = 0;
+    var j = 0;
+
+    var result = UUID{}
+
+    for(;i < str.length; i+=1) {
+        if (str.buffer[i] == '-') {
+            continue
+        }
+
+        var hi = str.buffer[i+0].asHex()
+        var lo = str.buffer[i+1].asHex()
+
+        result.bytes[j] = ((hi << 4) | lo) as (u8)
+
+        i+=1
+        j+=1
+    }
+    return result
+}
+
+import "std/libc"
+import "std/assert"
+
+@test
+func testFromString() {
+    var id = $"9366d52b-97c1-40b4-8acb-0fc68de878ce";
+    var uuid = FromString(id)
+    printf("Low: %llu vs Hi: %llu\n", uuid.low, uuid.high)
+
+    var buffer = [37]char{}
+    var sb = StringBufferInit(buffer, 37)
+    var uuidAsStr = uuid.toString(sb)
+    printf("Result: %.*s\n", uuidAsStr.length, uuidAsStr.buffer)
+    assert(id.equals(uuidAsStr))
+    assert(uuid.version() == 4)
+}
+
+@test
+func testIterations() {
+    var buffer = [37]char{}
+    var sb = StringBufferInit(buffer, 37)
+    for(var i = 0; i < 100_000; i+=1) {
+        var uuid = NewRandom()
+
+        sb.clear()
+        var asStr = uuid.toString(sb)
+
+        var fromString = FromString(asStr)
+
+        // printf("Result: %.*s\n", asStr.length, asStr.buffer)
+        assert(uuid.equals(fromString))
+        assert(uuid.version() == 4)
+    }
+}

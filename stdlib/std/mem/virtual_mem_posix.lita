@@ -1,0 +1,130 @@
+@raw("""
+#if !defined(_GNU_SOURCE)
+    #define _GNU_SOURCE
+#endif
+
+#include <sys/mman.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdint.h>
+""");
+
+@foreign
+const PROT_NONE:i32;
+
+@foreign
+const PROT_READ:i32;
+
+@foreign
+const PROT_WRITE:i32;
+
+@foreign
+const PROT_EXEC:i32;
+
+
+@foreign
+const MAP_SHARED:i32;
+
+@foreign
+const MAP_PRIVATE:i32;
+
+@foreign
+const MAP_ANONYMOUS:i32;
+
+@foreign
+const MAP_FIXED:i32;
+
+@foreign
+const MAP_FIXED_NOREPLACE:i32;
+
+@foreign
+const MAP_POPULATE:i32;
+
+@foreign
+const MAP_LOCKED:i32;
+
+@foreign
+const MAP_FAILED:i32;
+
+@foreign
+const MAP_HUGETLB:i32;
+
+@foreign
+const _SC_PAGESIZE:i32;
+
+@foreign
+func sysconf(c: i32) : i64;
+
+@foreign
+func mmap(addr: *void, length: usize, prot: i32, flags: i32, fd: i32, offset: u64) : *void;
+
+@foreign
+func munmap(addr: *void, length: usize) : i32;
+
+@foreign
+func mprotect(addr: *void, length: usize, prot: i32) : i32;
+
+func Alloc(size: usize, prot: i32, large: bool) : *void {
+    var flags = MAP_ANONYMOUS|MAP_PRIVATE
+
+#static_if defined(__linux__)
+    if(large) {
+        flags |= MAP_HUGETLB
+    }
+#end
+    var mem = mmap(null, size, prot, flags, -1, 0)
+    if(mem == MAP_FAILED) {
+        return null
+    }
+
+    return mem;
+}
+
+// TODO: Move to System/OS package
+public func GetOSPageSize() : i64 {
+    return sysconf(_SC_PAGESIZE)
+}
+
+public func VirtualAlloc(size: usize, large: bool = false) : *void {
+    return Alloc(size, PROT_READ|PROT_WRITE, large)
+}
+
+public func VirtualReserve(size: usize, large: bool = false) : *void {
+    return Alloc(size, PROT_NONE, large)
+}
+
+public func VirtualCommit(addr: *void, size: usize) : i32 {
+    return mprotect(addr, size, PROT_READ|PROT_WRITE) == 0
+}
+
+public func VirtualUncommit(addr: *void, size: usize) : i32 {
+    return mprotect(addr, size, PROT_NONE) == 0
+}
+
+public func VirtualFree(mem: *void, size: usize) : i32 {
+    if(!mem) return 1;
+    return munmap(mem, size) == 0
+}
+
+import "std/assert"
+import "std/libc"
+import "std/mem"
+@test
+func testVirtualMem() {
+    const size = 5 * 1024 * 1024
+    var mem = VirtualReserve(size)
+    assert(mem != null)
+
+    VirtualCommit(mem, 1024)
+    VirtualCommit(mem, 1024 * 2)
+    var bytes = mem as (*u8)
+    bytes[0] = 1_u8
+    bytes[2] = 2_u8
+    var pageSize = GetOSPageSize()
+    printf("Here! %ld pageSize: %lld\n", LITAC_DEFAULT_ALIGNMENT, pageSize)
+
+    var x = 4*4096_usize-1
+    var y = alignForward(x, pageSize)
+    printf("Start: %zu, end: %zu\n", x, y)
+    VirtualFree(mem, size)
+}

@@ -1,0 +1,145 @@
+import "std/mem"
+import "std/assert"
+import "std/libc" as c
+import "std/mem/virtual_mem" as v
+
+
+/**
+=========================================================
+// Virtual allocator
+=========================================================
+*/
+public struct VirtualAllocator {
+    allocator: using Allocator
+    mem: *void
+
+    commitSize: usize
+    reservedSize: usize
+
+    currentOffset: usize
+    committedPosition: usize
+    alignment: usize
+
+    pageSize: usize
+
+    totalAllocations: u32
+    totalBytesAllocated: usize
+}
+
+public func (this: *VirtualAllocator) init(
+    commitSize: usize,
+    reservedSize: usize,
+    align: usize = LITAC_DEFAULT_ALIGNMENT
+) {
+    this.allocator = Allocator {
+        .allocFn:   &GenericMalloc<VirtualAllocator>,
+        .callocFn:  &GenericCalloc<VirtualAllocator>,
+        .reallocFn: &GenericRealloc<VirtualAllocator>,
+        .freeFn:    &VirtualFree
+    }
+
+    this.pageSize = v::GetOSPageSize()
+
+    this.commitSize = alignForward(commitSize, this.pageSize)
+    this.reservedSize = alignForward(reservedSize, this.pageSize)
+    this.mem = v::VirtualReserve(this.reservedSize)
+
+    this.committedPosition = this.mem as (usize)
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+    this.alignment = align
+}
+
+@doc("Zero out all allocated memory and reset current offset")
+public func (this: *VirtualAllocator) clear() {
+    // Way too costly for performance, put the ownes on the owner
+    // of the memory to clear out if they want to
+    //c::memset(this.mem, 0, this.size)
+    this.totalBytesAllocated = 0
+    this.totalAllocations = 0
+    this.currentOffset = 0
+}
+
+public func (this: *VirtualAllocator) free() {
+    v::VirtualFree(this.mem, this.reservedSize)
+    this.clear()
+}
+
+public func (this: *VirtualAllocator) malloc(size: usize) : *void {
+    var currentPosition = (this.mem + this.currentOffset) as (usize)
+    var startPosition = alignForward(currentPosition, this.alignment)
+
+    var nextPosition = startPosition + size
+    var requestedSize = (startPosition - currentPosition) + size
+
+    // We've reached our last commited memory size
+    // bump up the usage of our virtual memory
+    if(nextPosition > this.committedPosition) {
+        var allocationSize = c::MAX(requestedSize, this.commitSize)
+        var commitLength = alignForward(allocationSize, this.commitSize)
+
+        // We've exhausted our virtual memory
+        var committedOffset = this.committedPosition - this.mem as (usize)
+        if(committedOffset + commitLength > this.reservedSize) {
+            return null
+        }
+
+        var nextPageStart = this.committedPosition
+        if(!v::VirtualCommit(nextPageStart as (*void), commitLength)) {
+            return null
+        }
+
+        this.committedPosition += commitLength
+    }
+
+    this.currentOffset += requestedSize
+    this.totalBytesAllocated += size
+    this.totalAllocations += 1
+
+    return startPosition as (*void);
+}
+
+func VirtualFree(alloc: *const Allocator, ptr: *void) {
+    // DO NOTHING
+}
+
+@test
+func testVirtualAlloc() {
+    var pageSize = v::GetOSPageSize()
+    var allocator = VirtualAllocator{}
+    allocator.init(
+        .commitSize = pageSize,
+        .reservedSize = 1*GiB
+    )
+
+    var mem = allocator.malloc(pageSize)
+
+    c::printf("Here: addr: %p vs %p\nCP: %p\nBA: %zu\nCO: %zu\n",
+    mem, allocator.mem,
+    allocator.committedPosition as (*void),
+    allocator.totalBytesAllocated,
+    allocator.currentOffset)
+
+    var mark = allocator.currentOffset
+
+    mem = allocator.malloc(pageSize*4)
+
+    c::printf("Here: addr: %p vs %p\nCP: %p\nBA: %zu\nCO: %zu\n",
+    mem, allocator.mem,
+    allocator.committedPosition as (*void),
+    allocator.totalBytesAllocated,
+    allocator.currentOffset)
+
+    allocator.currentOffset = mark
+
+    mem = allocator.malloc(1024)
+
+    c::printf("Here: addr: %p vs %p\nCP: %p\nBA: %zu\nCO: %zu\n",
+    mem, allocator.mem,
+    allocator.committedPosition as (*void),
+    allocator.totalBytesAllocated,
+    allocator.currentOffset)
+
+    allocator.free()
+}
