@@ -13,6 +13,9 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
     var buffer = [MAX_BUFFER]char{};
     var path = StringBufferInit(buffer, MAX_BUFFER, 0)
 
+    path.format("%s/.vscode", pm.options.projectPath)
+    Mkdir(path.cStr())
+
     path.format("%s/bin", pm.options.projectPath)
     Mkdir(path.cStr())
 
@@ -31,6 +34,118 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
 
     var sb = StringBuilderInit(1024)
     defer sb.free()
+
+    // Write out tasks.json
+    {
+        sb.append("%s",
+"""
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "BuildRun",
+            "type": "shell",
+            "command": "litac",
+            "args": [
+                "-pkg-build",
+                "-run"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "BuildRunRelease",
+            "type": "shell",
+            "command": "litac",
+            "args": [
+                "-pkg-build",
+                "-release",
+                "-run"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "BuildTestFile",
+            "type": "shell",
+            "command": "litac",
+            "args": [
+                "-pkg-build",
+                "-run",
+                "-testFile",
+                "${file}"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "BuildTest",
+            "type": "shell",
+            "command": "litac",
+            "args": [
+                "-pkg-build",
+                "-run",
+                "-test",
+                ".*"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
+""") //"
+
+        path.format("%s/.vscode/tasks.json", pm.options.projectPath)
+        if(!FileExists(path.cStr())) {
+            if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                return PkgStatus.ERROR_INIT_PACKAGE
+            }
+        }
+    }
 
     // Write out main.lita
     {
