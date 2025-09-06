@@ -166,8 +166,19 @@
                 import "std/json/to_json";
                 import "std/json/from_json";
                 import "std/string/builder";
+                import "std/string";
                 import "std/io";
                 import "std/libc";
+
+                @asStr
+                @json
+                public enum ParamType {
+                    UNKNOWN,
+                    @json(.name = "string")
+                    STRING,
+                    INT,
+                    FLOAT
+                }
 
                 @json
                 public struct Test {
@@ -195,6 +206,8 @@
 
                     @json(.ignore = true)
                     shouldNotBe: i32
+
+                    aEnum: ParamType
                 }
 
             `,
@@ -214,13 +227,14 @@
                     .aFloat: 3.1415f32,
                     .aDouble: 3.56_f64,
                     .aBool: true,
+                    .aEnum: ParamType.STRING,
                 };
 
                 var sb = StringBuilderInit(1024)
                 test.toJson(&sb)
                 var json = sb.cStr()
                 //printf("Json: %s\n", json)
-                assert(strcmp(json, """{"aStr":"Hello World","aU8":4,"aI8":22,"aU16":33,"aI16":55,"aInt":42,"aUInt":44,"aU64":77,"aI64":66,"float":3.14,"float":3.6,"aBool":true}""") == 0);
+                assert(strcmp(json, """{"aStr":"Hello World","aU8":4,"aI8":22,"aU16":33,"aI16":55,"aInt":42,"aUInt":44,"aU64":77,"aI64":66,"float":3.14,"float":3.6,"aBool":true,"aEnum":"string"}""") == 0);
                 //assert(strcmp(json, """{"aPtr":null,"aStr":"Hello World","aU8":4,"aI8":22,"aU16":33,"aI16":55,"aInt":42,"aUInt":44,"aU64":77,"aI64":66,"float":3.14,"float":3.6,"aBool":1}""") == 0);
             `
     }

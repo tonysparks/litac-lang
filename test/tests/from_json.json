@@ -681,9 +681,20 @@
                 import "std/json/from_json";
                 import "std/json/to_json";
                 import "std/string/builder";
+                import "std/string";
                 import "std/io";
                 import "std/libc";
                 import "std/mem";
+
+                @asStr
+                @json
+                public enum ParamType {
+                    UNKNOWN,
+                    @json(.name = "string")
+                    STRING,
+                    INT,
+                    FLOAT
+                }
 
                 @json
                 public struct Test {
@@ -693,6 +704,8 @@
 
                     @json(.ignore = true)
                     shouldNotBe: i32
+
+                    aEnum: ParamType
                 }
             `,
       "code": `
@@ -703,6 +716,7 @@
                     "aStr": "Hello World",
                     "aInt": 4,
                     "aFloat": 3.14,
+                    "aEnum": "string",
                 }
                 """
 
@@ -723,6 +737,7 @@
 
                 var x = test.aFloat - 3.14
                 assert(x < 0.1 && x > -0.1)
+                assert(test.aEnum == ParamType.STRING)
                 //printf("S: %s I: %d\n", test.aStr, test.aInt)
                 //context.bind(typeof(:Test), &test)
             `

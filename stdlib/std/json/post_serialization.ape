@@ -94,7 +94,7 @@ fn SerializeEnum(sym) {
          // TODO
       }
       else {
-         emit("         sb.append(\"\\"%%s\\"\", \"%s\")\n", field.name)
+         emit("         sb.append(\"\\"%%s\\"\", \"%s\")\n", name)
       }
       emit("         break;\n")
       emit("      }\n")
@@ -178,14 +178,9 @@ fn DeserializeEnum(sym) {
          emit("    ")
       }
 
-      emit("if ($\"%s\".equals(value)) {\n", field.name)
-      if(format != "") {
-         // TODO
-      }
-      else {
-         emit("         *this = %s.%s;\n", sym.name, field.name)
-         emit("         return true;\n")
-      }
+      emit(`if ($"${name}".equals(value)) {\n`)
+      emit("         *this = %s.%s;\n", sym.name, field.name)
+      emit("         return true;\n")
       emit("    }\n")
       isFirst = false
    }
