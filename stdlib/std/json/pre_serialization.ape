@@ -7,7 +7,7 @@ fn EmitJsonFunctions(sym) {
 }
 
 fn JsonSymbols(sym) {
-   if(sym.kind == "STRUCT_DECL") {
+   if(sym.kind == "STRUCT_DECL" || sym.kind == "ENUM_DECL") {
       return EmitJsonFunctions(sym)
    }
    return false

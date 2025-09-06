@@ -293,19 +293,22 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
         return true
     }
 
-    if(!IsAggregateLike(argInfo)) {
+    if(!IsAggregateLike(argInfo) && !IsEnum(argInfo)) {
         return true
     }
 
-    if(!IsAggregateLike(paramInfo) || IsTraitLike(paramInfo)) {
+    if((!IsAggregateLike(paramInfo) && !IsEnum(argInfo)) || IsTraitLike(paramInfo)) {
         return true
     }
 
     argExpr = this.coerceTypeWithUsing(argExpr, argInfo, paramInfo)
     argInfo = argExpr.operand.typeInfo
 
+    var needsAddressOf = (IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) ||
+                         (IsPtr(paramInfo) && (!IsPtr(argInfo) && IsEnum(argInfo)))
+
     // promote the argument to a pointer
-    if(IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) {
+    if(needsAddressOf) {
         // can't take the address of a right value
         if(argExpr.operand.isRightValue) {
             return true
@@ -1769,6 +1772,11 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         var enumInfo = objectTypeInfo
         var field = enumInfo.getEnumField(expr.field.type.name)
         if(!field) {
+            // allow for methods on enum fields
+            if(this.checkMethodExpr(expr, enumInfo)) {
+                return true
+            }
+
             this.errorNoField(expr.field, objectTypeInfo, expr.field.type.name)
             return false
         }
@@ -1776,7 +1784,7 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
         this.lita.references.addFieldReference(expr.field.type.pos, enumInfo, enumInfo.getEnumFieldIndex(expr.field.type.name))
 
         expr.flags |= GetExprFlags.IS_ENUM
-        expr.operand.typeInfo = &I32_TYPE
+        expr.operand.typeInfo = enumInfo
         expr.operand.isConst = true
         expr.operand.isRightValue = true
         return true

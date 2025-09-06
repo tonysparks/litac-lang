@@ -102,6 +102,19 @@ public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
     return TypeKind.MAX_TYPE_KINDS
 }
 
+public func IsEnum(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    if(type.kind == TypeKind.CONST) {
+        var constInfo = type
+        return IsEnum(constInfo.constOf)
+    }
+
+    return type.kind == TypeKind.ENUM
+}
+
 public func IsPtr(type: *TypeInfo) : bool {
     if(!type) {
         return false;
@@ -803,6 +816,7 @@ public func (this: *TypeInfo) isAssignable(
         case TypeKind.USIZE: {
             return other.kind <= TypeKind.USIZE ||
                    other.kind == TypeKind.NULL ||
+                   other.kind == TypeKind.ENUM ||
                    IsPtrLike(other);
         }
         case TypeKind.NULL: {

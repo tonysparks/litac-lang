@@ -694,5 +694,63 @@
                 assert('a'.isLowerCase() == true)
             `,
         },
+
+        // Enums methods
+
+        {
+            "name": "Enum Function Call",
+            "definitions": `
+                public enum Status {
+                    UKNOWN,
+                    OK,
+                    BAD
+            }
+
+                public func (this: Status) get() : i32 {
+                    return this + 4
+            }
+            `,
+            "code": `
+                var s = Status.OK
+                assert(s.get() == 5)
+                assert(Status.BAD.get() == 6)
+            `
+        },
+        {
+            "name": "Enum Function Call With Ptr",
+            "definitions": `
+                public enum Status {
+                    UKNOWN,
+                    OK,
+                    BAD
+            }
+
+                public func (this: *Status) get() : i32 {
+                    return (*this) + 4
+            }
+            `,
+            "code": `
+                var s = Status.OK
+                assert(s.get() == 5)
+            `
+        },
+        {
+            "name": "Enum Function Call With Ptr on Direct Enum",
+            "definitions": `
+                public enum Status {
+                    UKNOWN,
+                    OK,
+                    BAD
+            }
+
+                public func (this: *Status) get() : i32 {
+                    return (*this) + 4
+            }
+            `,
+            "code": `
+                assert(Status.BAD.get() == 6)
+            `,
+            "error": "'Status' is not of type '*Status'"
+        },
     ]
 }

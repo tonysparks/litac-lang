@@ -63,6 +63,51 @@ fn SerializeStruct(sym) {
    return true
 }
 
+fn SerializeEnum(sym) {
+   emit("public func (this: *%s) toJson(sb: *StringBuilder) : bool {\n", sym.name)
+   emit("   switch(*this) {\n")
+
+   var isFirst = true
+   for(field in sym.enumDecl.fields) {
+      var name = field.name
+      var format = ""
+
+      if(field.notes) {
+         for(note in field.notes) {
+            if(note.name == "json") {
+               if(note.arguments) {
+                  for(arg in note.arguments) {
+                     if(arg.name == "format") {
+                        format = arg.value
+                     }
+                     else if(arg.name == "name") {
+                        name = arg.value
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      emit("      case %s.%s: {\n", sym.name, field.name)
+      if(format != "") {
+         // TODO
+      }
+      else {
+         emit("         sb.append(\"\\"%%s\\"\", \"%s\")\n", field.name)
+      }
+      emit("         break;\n")
+      emit("      }\n")
+      isFirst = false
+   }
+   emit("    }\n")
+   emit("    return true;\n")
+   emit("\n}\n")
+
+   return true
+}
+
+
 fn DeserializeStruct(sym) {
    emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool {\n", sym.name)
    var isFirst = true
@@ -92,7 +137,7 @@ fn DeserializeStruct(sym) {
          continue;
       }
 
-      emit("    var %sField = &this.%s;", field.name, field.name)
+      emit("    var %sField = &this.%s;\n", field.name, field.name)
       emit("    %sField.fromJson(context, json.get(\"%s\")); \n", field.name, field.name, name)
    }
    emit("    return true;\n")
@@ -101,9 +146,60 @@ fn DeserializeStruct(sym) {
    return true
 }
 
+fn DeserializeEnum(sym) {
+   emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool {\n", sym.name)
+
+   emit("    var value = json.asString().toString(); \n")
+   var isFirst = true
+   for(field in sym.enumDecl.fields) {
+      var name = field.name
+      var format = ""
+
+      if(field.notes) {
+         for(note in field.notes) {
+            if(note.name == "json") {
+               if(note.arguments) {
+                  for(arg in note.arguments) {
+                     if(arg.name == "format") {
+                        format = arg.value
+                     }
+                     else if(arg.name == "name") {
+                        name = arg.value
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      if (!isFirst) {
+         emit("    else ")
+      } else {
+         emit("    ")
+      }
+
+      emit("if ($\"%s\".equals(value)) {\n", field.name)
+      if(format != "") {
+         // TODO
+      }
+      else {
+         emit("         *this = %s.%s;\n", sym.name, field.name)
+         emit("         return true;\n")
+      }
+      emit("    }\n")
+      isFirst = false
+   }
+   emit("    return false;\n")
+   emit("\n}\n")
+   return true
+}
+
 fn SerializeSymbol(sym) {
    if(sym.kind == "STRUCT_DECL") {
        return SerializeStruct(sym)
+   }
+   else if(sym.kind == "ENUM_DECL") {
+      return SerializeEnum(sym)
    }
    else {
       error("Unsupported to_json on declaration '%s'", sym.name)
@@ -114,6 +210,9 @@ fn SerializeSymbol(sym) {
 fn DeserializeSymbol(sym) {
    if(sym.kind == "STRUCT_DECL") {
        return DeserializeStruct(sym)
+   }
+   else if(sym.kind == "ENUM_DECL") {
+      return DeserializeEnum(sym)
    }
    else {
       error("Unsupported from_json on declaration '%s'", sym.name)
@@ -131,12 +230,12 @@ for(sym in symbols) {
    if(SerializeSymbol(sym)) {
       replaceDeclaration(sym.moduleFilename, emitStr())
    }
-   //print("Ser: ", emitStr())
+   // print("Ser: ", emitStr())
 
    emitClear()
    if(DeserializeSymbol(sym)) {
       replaceDeclaration(sym.moduleFilename, emitStr())
    }
-   //print("Deser: ", emitStr())
+   // print("Deser: ", emitStr())
 }
 

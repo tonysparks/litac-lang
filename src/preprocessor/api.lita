@@ -321,6 +321,7 @@ func (this: *Preprocessor) typeInfoToApe(typeInfo: *TypeInfo) : ape_object_t {
     ape_object_set_map_bool(typeObj, "isPrimitive", IsPrimitive(typeInfo))
     ape_object_set_map_bool(typeObj, "isString", IsStringLike(typeInfo))
     ape_object_set_map_bool(typeObj, "isPointer", IsPtr(typeInfo))
+    ape_object_set_map_bool(typeObj, "isEnum", IsEnum(typeInfo))
     ape_object_set_map_value(typeObj, "typePtr", ape_object_make_external(this.runtime.ape, typeInfo))
 
     switch(typeInfo.kind) {
