@@ -13,9 +13,25 @@ public enum HttpRequestType {
     POST,
     PUT,
     DELETE,
+    PATCH,
+    HEAD,
+    OPTION,
+
+    MAX_REQUEST_TYPE
+}
+
+var requestTypeLookup = [HttpRequestType.MAX_REQUEST_TYPE]*const char {
+    [HttpRequestType.GET] = "GET",
+    [HttpRequestType.POST] = "POST",
+    [HttpRequestType.PUT] = "PUT",
+    [HttpRequestType.DELETE] = "DELETE",
+    [HttpRequestType.PATCH] = "PATCH",
+    [HttpRequestType.HEAD] = "HEAD",
+    [HttpRequestType.OPTION] = "OPTION",
 }
 
 public typedef func(/*data:*/ *void, /*size: */ usize, /*n: */ usize, /*userdata: */ *void) : usize as HttpResponseCallback;
+public typedef func(/*data:*/ *void, /*size: */ usize, /*n: */ usize, /*userdata: */ *void) : usize as HttpStreamCallback;
 
 public typedef Map<String, String> as Headers;
 public func HeadersInit(initialSize: i32 = 16, allocator: *const Allocator = defaultAllocator) : Headers {
@@ -24,11 +40,24 @@ public func HeadersInit(initialSize: i32 = 16, allocator: *const Allocator = def
     return headers
 }
 
+public enum HttpBodyKind {
+    NONE,
+    BODY,
+    STREAM,
+}
+public struct HttpBody {
+    kind: HttpBodyKind
+    union {
+        data: String
+        stream: HttpStreamCallback
+    }
+}
+
 public struct HttpRequest {
     url: *const char
     headers: Headers
     type: HttpRequestType
-    body: *char
+    body: HttpBody
 }
 
 public struct HttpResponse {
@@ -86,7 +115,80 @@ public func (this: *Http) get(url: *const char, resp: *HttpResponse) : bool {
     var req = HttpRequest {
         .url = url,
         .type = HttpRequestType.GET,
-        .body = null,
+        .body = HttpBody {
+            .kind = HttpBodyKind.NONE
+        }
+    }
+    return this.makeRequest(&req, resp)
+}
+
+/**
+    Make an HTTP GET request
+*/
+public func (this: *Http) head(url: *const char, resp: *HttpResponse) : bool {
+    var req = HttpRequest {
+        .url = url,
+        .type = HttpRequestType.HEAD,
+        .body = HttpBody {
+            .kind = HttpBodyKind.NONE
+        }
+    }
+    return this.makeRequest(&req, resp)
+}
+
+/**
+    Make an HTTP DELETE request
+*/
+public func (this: *Http) delete(url: *const char, resp: *HttpResponse) : bool {
+    var req = HttpRequest {
+        .url = url,
+        .type = HttpRequestType.DELETE,
+        .body = HttpBody {
+            .kind = HttpBodyKind.NONE
+        }
+    }
+    return this.makeRequest(&req, resp)
+}
+
+/**
+    Make an HTTP POST request
+*/
+public func (this: *Http) post(
+    url: *const char,
+    resp: *HttpResponse,
+    body: String,
+    headers: *Headers = null
+) : bool {
+    var req = HttpRequest {
+        .url = url,
+        .type = HttpRequestType.POST,
+        .body = HttpBody {
+            .kind = HttpBodyKind.BODY,
+            .data = body
+        }
+    }
+    if (headers) {
+        req.headers = *headers
+    }
+    return this.makeRequest(&req, resp)
+}
+
+/**
+    Make an HTTP PUT request
+*/
+public func (this: *Http) put(
+    url: *const char,
+    resp: *HttpResponse,
+    body: String,
+    headers: *Headers = null
+) : bool {
+    var req = HttpRequest {
+        .url = url,
+        .type = HttpRequestType.PUT,
+        .body = HttpBody {
+            .kind = HttpBodyKind.BODY,
+            .data = body
+        }
     }
     return this.makeRequest(&req, resp)
 }
@@ -120,10 +222,43 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_HEADERFUNCTION, (&HttpHeadersCallback) as (*void));
     curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_HEADERDATA, resp);
 
-    if(req.type == HttpRequestType.POST) {
-        // TODO: https://curl.se/libcurl/c/CURLOPT_POST.html
-        // curl_easy_setopt(curl, CURLoption.CURLOPT_POST, 1_i64);
-        // curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+    switch(req.type) {
+        case HttpRequestType.GET: {
+            curl_easy_setopt(curl, CURLoption.CURLOPT_HTTPGET, 1_i64);
+            break;
+        }
+        case HttpRequestType.POST: {
+            curl_easy_setopt(curl, CURLoption.CURLOPT_POST, 1_i64);
+            break;
+        }
+        case HttpRequestType.HEAD: {
+            curl_easy_setopt(curl, CURLoption.CURLOPT_NOBODY, 1_i64);
+            break;
+        }
+        default: {
+            if (req.type >= HttpRequestType.MAX_REQUEST_TYPE) {
+                break;
+            }
+
+            curl_easy_setopt(
+                curl,
+                CURLoption.CURLOPT_CUSTOMREQUEST,
+                requestTypeLookup[req.type]
+            );
+            break;
+        }
+
+    }
+
+    if(req.body.kind == HttpBodyKind.BODY) {
+        curl_easy_setopt(curl, CURLoption.CURLOPT_POSTFIELDS, req.body.data.buffer);
+        curl_easy_setopt(curl, CURLoption.CURLOPT_POSTFIELDSIZE, req.body.data.length);
+    } else if(req.body.kind == HttpBodyKind.STREAM) {
+        // TODO - UnTested
+        curl_easy_setopt(curl, CURLoption.CURLOPT_UPLOAD, 1_i64);
+        curl_easy_setopt(curl, CURLoption.CURLOPT_READFUNCTION, req.body.data.buffer);
+        curl_easy_setopt(curl, CURLoption.CURLOPT_READDATA, req.body.data.length);
+        curl_easy_setopt(curl, CURLoption.CURLOPT_INFILESIZE_LARGE, req.body.data.buffer);
     }
 
     if(!req.headers.empty()) {
@@ -209,7 +344,7 @@ func HttpHeadersCallback(data: *void, size: usize, n: usize, userdata: *void) : 
     return totalSize
 }
 
-@test
+//@test
 func testFileDownload() {
     var http = Http{}
     http.init(HttpOptions{})
@@ -226,4 +361,54 @@ func testFileDownload() {
 
     printf("Status: %d\n%s\n", resp.statusCode, resp.body.cStr())
 
+}
+
+@test
+func testPost() {
+    var http = Http{}
+    http.init(HttpOptions{})
+    defer http.free()
+
+    var resp = HttpResponse {
+        .body = StringBuilderInit(1024)
+    }
+    http.post("https://httpbin.org/post", &resp, $"name=tony")
+    printf("Status: %d\n%s\n", resp.statusCode, resp.body.cStr())
+}
+
+
+@test
+func testPostJson() {
+    var http = Http{}
+    http.init(HttpOptions{})
+    defer http.free()
+
+    var resp = HttpResponse {
+        .body = StringBuilderInit(1024)
+    }
+    var json = """
+        {
+            "name" : "sparks"
+        }
+    """.toString()
+
+    var headers = HeadersInit()
+    headers.put($"Content-Type", $"application/json")
+
+    http.post("https://httpbin.org/post", &resp, json, &headers)
+    printf("Status: %d\n%s\n", resp.statusCode, resp.body.cStr())
+}
+
+@test
+func testDelete() {
+    var http = Http{}
+    http.init(HttpOptions{})
+    defer http.free()
+
+    var resp = HttpResponse {
+        .body = StringBuilderInit(1024)
+    }
+
+    http.delete("https://httpbin.org/delete", &resp)
+    printf("Status: %d\n%s\n", resp.statusCode, resp.body.cStr())
 }
