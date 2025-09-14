@@ -100,8 +100,9 @@ public enum TypeSpecKind {
 }
 
 public enum FuncFlags {
-    HAS_VARARGS = (1<<0),
-    IS_METHOD   = (1<<1),
+    HAS_VARARGS         = (1<<0),
+    IS_METHOD           = (1<<1),
+    HAS_NATIVE_VARARGS  = (1<<2),
 }
 
 public enum AggregateFlags {
@@ -130,8 +131,9 @@ public struct TypeSpec {
         struct {
             args: Array<*TypeSpec>
             ret: *TypeSpec
-            hasVarargs: bool
             genericParams: Array<GenericParam>
+            hasVarargs: bool
+            hasNativeVararg: bool
         }
     }
 }
@@ -390,6 +392,7 @@ public struct ParametersStmt {
     stmt: using Stmt
     params: using Array<*ParameterDecl>
     isVararg: bool
+    isNativeVararg: bool
 }
 
 public struct ReturnStmt {
@@ -491,6 +494,11 @@ public struct FuncCallExpr {
     object: *Expr
     genericArgs: Array<GenericArg>
     arguments: Array<CallArg>
+    flags: i32
+}
+
+public enum FuncCallExprFlags {
+    HAS_NATIVE_VARARG = (1<<0)
 }
 
 public enum GetExprFlags {

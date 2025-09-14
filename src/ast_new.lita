@@ -1019,6 +1019,7 @@ public func NewParametersStmt(startPos: SrcPos,
                               endPos: SrcPos,
                               params: Array<*ParameterDecl>,
                               isVararg: bool,
+                              isNativeVararg: bool,
                               allocator: *const Allocator) : *Stmt {
     var stmt = new<ParametersStmt>(allocator)
     stmt.kind = StmtKind.PARAMETERS_STMT
@@ -1026,6 +1027,7 @@ public func NewParametersStmt(startPos: SrcPos,
     stmt.endPos = endPos
     stmt.params = *stmt.node.becomeParentOfChildren(params)
     stmt.isVararg = isVararg
+    stmt.isNativeVararg = isNativeVararg
     return stmt as (*Stmt)
 }
 

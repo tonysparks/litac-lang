@@ -561,6 +561,7 @@ public func CopyStmt(stmt: *Stmt, module: *Module) : *Stmt {
                                          original.endPos,
                                          params,
                                          original.isVararg,
+                                         original.isNativeVararg,
                                          module.allocator)
             return copy
         }
@@ -750,6 +751,7 @@ public func CopyParameters(params: ParametersStmt, module: *Module) : *Parameter
                                        params.endPos,
                                        paramDecls,
                                        params.isVararg,
+                                       params.isNativeVararg,
                                        module.allocator)
     return paramsCopy as (*ParametersStmt)
 }

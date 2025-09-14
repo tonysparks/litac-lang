@@ -2320,7 +2320,8 @@ func (p: *Parser) funcPtrType() : *TypeSpec {
 
     if(!p.check(TokenType.RIGHT_PAREN)) {
         do {
-            if(p.match(TokenType.VAR_ARGS)) {
+            spec.hasNativeVararg = p.match(TokenType.DOLLAR_VAR_ARGS)
+            if(spec.hasNativeVararg || p.match(TokenType.VAR_ARGS)) {
                 spec.hasVarargs = true
                 if(!p.check(TokenType.RIGHT_PAREN)) {
                     p.errorAtToken(p.peek(), ErrorCode.INVALID_VARARG_POSITION)
@@ -2362,6 +2363,7 @@ func (p: *Parser) parametersStatement() : *ParametersStmt {
     var pos = p.pos()
     var params = Array<*ParameterDecl>{}
     var isVarargs = false;
+    var isNativeVararg = false;
 
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
@@ -2371,7 +2373,8 @@ func (p: *Parser) parametersStatement() : *ParametersStmt {
         params.init(8, p.allocator)
 
         do {
-            if(p.match(TokenType.VAR_ARGS)) {
+            isNativeVararg = p.match(TokenType.DOLLAR_VAR_ARGS)
+            if(isNativeVararg || p.match(TokenType.VAR_ARGS)) {
                 isVarargs = true;
 
                 if(!p.check(TokenType.RIGHT_PAREN)) {
@@ -2395,7 +2398,14 @@ func (p: *Parser) parametersStatement() : *ParametersStmt {
         goto err;
     }
 
-    return NewParametersStmt(pos, p.pos(), params, isVarargs, p.allocator) as (*ParametersStmt)
+    return NewParametersStmt(
+        pos,
+        p.pos(),
+        params,
+        isVarargs,
+        isNativeVararg,
+        p.allocator
+    ) as (*ParametersStmt)
 
 err:
     return null

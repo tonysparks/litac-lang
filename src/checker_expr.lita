@@ -21,6 +21,7 @@ import "common"
 import "ast_print"
 import "error_codes"
 import "intern"
+import "parser"
 import "lsp/references"
 
 public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
@@ -761,6 +762,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
     var numberOfSuppliedArgs = suppliedArgs.size()
     var success = true
     var hasVarargs = false
+    var isNativeVararg = false
     var i = 0;
 
     if(funcType.kind == TypeKind.FUNC_PTR) {
@@ -793,13 +795,13 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                 }
             }
         }
-
-
     }
     else {
         var funcInfo = funcType
         var hasNamedArg = false
         hasVarargs = funcInfo.funcDecl.params.isVararg
+        isNativeVararg = funcInfo.funcDecl.params.isNativeVararg &&
+            !(expr.flags & FuncCallExprFlags.HAS_NATIVE_VARARG)
 
         for(; i < funcInfo.funcDecl.params.size(); i+=1) {
             var p = funcInfo.funcDecl.params.get(i)
@@ -870,6 +872,23 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
     }
 
     if(hasVarargs) {
+        var sb = StringBuilder{}
+
+        if(isNativeVararg) {
+            // we may reprocess this again, we don't
+            // want to keep injecting in this multiple times
+            expr.flags |= FuncCallExprFlags.HAS_NATIVE_VARARG
+
+            var numberOfArgs = numberOfSuppliedArgs - i;
+            sb.init(256, this.allocator)
+            sb.append(
+                """
+                NativeVararg {
+                    .numberOfArgs = %d,
+                    .args = [%d]typeid {
+                """, numberOfArgs, numberOfArgs
+            )
+        }
         for(; i < numberOfSuppliedArgs; i+=1) {
             var arg = suppliedArgs.getPtr(i)
             arg.index = i
@@ -877,6 +896,32 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
             if(!this.resolveExpr(arg.argExpr)) {
                 return false
             }
+
+            if(isNativeVararg && arg.argExpr) {
+                sb.append("%lu,", arg.argExpr.operand.typeInfo.typeid)
+            }
+        }
+
+        if(isNativeVararg) {
+            sb.append("}}")
+
+            var parser = ParserInit(
+                expr.startPos.filename,
+                sb.buffer,
+                sb.length,
+                this.current,
+                this.lita
+            )
+            var nativeArg = parser.expression()
+            if(!this.resolveExpr(nativeArg)) {
+                return false
+            }
+
+            var index = (i - numberOfSuppliedArgs) + 1
+            suppliedArgs.insertAt(index, CallArg {
+                .argExpr = nativeArg,
+                .index = index
+            })
         }
     }
 
@@ -885,8 +930,8 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
 func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     assert(expr != null)
-    var errors = this.errors()
 
+    var errors = this.errors()
     if(!this.resolveExpr(expr.object)) {
         return false
     }
@@ -903,6 +948,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     suppliedArgs.addAll(expr.arguments)
 
     var hasVarargs = false
+    var isNativeVarargs = false
     var maxNumOfArgs = 0
     var returnType: *TypeInfo = null
     var genericParams: Array<GenericParam>;
@@ -918,6 +964,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
 
         maxNumOfArgs = funcInfo.funcDecl.params.size()
         hasVarargs = funcInfo.funcDecl.params.isVararg
+        isNativeVarargs = funcInfo.funcDecl.params.isNativeVararg
         returnType = funcInfo.returnType
         genericParams = funcInfo.funcDecl.genericParams
 
@@ -932,6 +979,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         var funcPtr = objectType
         maxNumOfArgs = funcPtr.paramDecls.size()
         hasVarargs = funcPtr.hasVarargs
+        // isNativeVarargs = funcPtr.isNativeVarargs
         returnType = funcPtr.returnType
         genericParams = funcPtr.genericParams
 

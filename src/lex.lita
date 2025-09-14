@@ -78,6 +78,7 @@ public enum TokenType {
     HASH,
     DOT,
     VAR_ARGS,
+    DOLLAR_VAR_ARGS,
     AT,
     QUESTION_MARK,
     COMMA,
@@ -203,6 +204,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.HASH] = "#",
     [TokenType.DOT] = ".",
     [TokenType.VAR_ARGS] = "...",
+    [TokenType.DOLLAR_VAR_ARGS] = "$...",
     [TokenType.AT] = "@",
     [TokenType.QUESTION_MARK] = "?",
     [TokenType.COMMA] = ",",
@@ -1339,6 +1341,15 @@ func (l: *Lexer) scanSymbol() : Token {
             if(l.stream[0] == '"') {
                 l.nextChar()
                 l.token.type = TokenType.DOLLAR_QUOTE
+            } else if(
+                l.stream[0] == '.' &&
+                l.stream[1] == '.' &&
+                l.stream[2] == '.'
+            ) {
+                l.nextChar()
+                l.nextChar()
+                l.nextChar()
+                l.token.type = TokenType.DOLLAR_VAR_ARGS
             }
             break;
         }
@@ -1349,7 +1360,7 @@ func (l: *Lexer) scanSymbol() : Token {
         case '.': {
             l.token.type = TokenType.DOT
             if(l.stream[0] == '.') {
-                if( l.stream[1] == '.') {
+                if(l.stream[1] == '.') {
                     l.nextChar()
                     l.nextChar()
                     l.token.type = TokenType.VAR_ARGS
