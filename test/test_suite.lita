@@ -33,6 +33,7 @@ struct TestSuite {
     disabled: bool
     programTemplate: *const char
     buildCmd: *const char
+    includeTypeInfo: bool
     tests: Array<Test>
 }
 
@@ -144,6 +145,7 @@ func main(len: i32, args: **char) : i32 {
             .filename = filename,
             .description = null,
             .buildCmd = null,
+            .includeTypeInfo = false,
             .programTemplate = """
             @include("assert.h");
             @foreign func assert(e:bool):void;
@@ -197,6 +199,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     suite.disabled = node.getBool("disabled", false)
     suite.programTemplate = node.getStr("program", suite.programTemplate)
     suite.buildCmd = node.getStr("buildCmd", null)
+    suite.includeTypeInfo = node.getBool("includeTypeInfos", false)
 
     var tests = node.getArray("tests")
     if(!tests) {
@@ -344,6 +347,9 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     options.showProfileInfo = false
     options.run = false // we run outselves
     options.cFormat = false
+    if(suite.includeTypeInfo) {
+        options.typeOption = TypeInfoOption.ALL
+    }
     //options.maxMemory = 1024 * 1024 * 50
     //options.isDebug = true
     if(test.buildCmd) {

@@ -32,9 +32,13 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
 
 
     var filename = [MAX_PATH]char{0}
-    var moduleName = StringInit("type")
+    var moduleName = $"std/type"
     if(!FindModulePath(this.lita, moduleName, filename)) {
-        this.lita.result.addError(SrcPos{}, "could not find builtin module 'type' on the system path.")
+        this.lita.result.addError(
+            SrcPos{},
+            "could not find builtin module '%.*s' on the system path.",
+            moduleName.length, moduleName.buffer
+        )
         return;
     }
 
@@ -324,13 +328,12 @@ func (this: *Introspect) emitType(sb: *StringBuilder, scratch: *StringBuilder, s
                                     .name = "%.*s",
                                     .type = %llu,
                                     .modifiers = Modifiers.%s,
-                                    .offset = offsetof(%.*s::%.*s, %.*s)
+                                    .offset = offsetof(%.*s, %.*s)
                                 },
                             """, traitField.name.str.length, traitField.name.str.buffer,
                                  typeid,
                                  "None",
-                                 sym.declared.id.name.length, sym.declared.id.name.buffer,
-                                 type.name.length, type.name.buffer,
+                                 sym.qualifiedName.length, sym.qualifiedName.buffer,
                                  traitField.name.str.length, traitField.name.str.buffer)
 
                             break;
@@ -349,15 +352,13 @@ func (this: *Introspect) emitType(sb: *StringBuilder, scratch: *StringBuilder, s
                                     .name = "%.*s",
                                     .type = %llu,
                                     .modifiers = Modifiers.%s,
-                                    .offset = offsetof(%.*s::%.*s, %.*s)
+                                    .offset = offsetof(%.*s, %.*s)
                                 },
                             """, varField.name.str.length, varField.name.str.buffer,
                                  typeid,
                                  (varField.attributes.isUsing) ? "Using" : "None",
-                                 sym.declared.id.name.length, sym.declared.id.name.buffer,
-                                 type.name.length, type.name.buffer,
+                                 sym.qualifiedName.length, sym.qualifiedName.buffer,
                                  varField.name.str.length, varField.name.str.buffer)
-
                             break;
                         }
                         case StmtKind.ENUM_FIELD_DECL: {
