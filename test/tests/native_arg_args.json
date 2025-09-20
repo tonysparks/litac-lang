@@ -1,6 +1,6 @@
 {
     "description": "Native Var Args",
-    "disabled": true,
+    "disabled": false,
     "includeTypeInfos": true,
     "program": `
         @include("assert.h");
