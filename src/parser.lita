@@ -966,6 +966,14 @@ err:
     return p.poisonExpr(pos)
 }
 
+func (p: *Parser) nameOf() : *Expr {
+    var expr = p.typeOf()
+    if (expr.kind == StmtKind.TYPE_OF_EXPR) {
+        expr.kind = StmtKind.NAME_OF_EXPR
+    }
+    return expr
+}
+
 func (p: *Parser) offsetOf() : *Expr {
     var pos = p.prevPos()
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
@@ -1367,6 +1375,10 @@ func (p: *Parser) primary() : *Expr {
 
     if(p.match(TokenType.TYPEOF)) {
         return p.typeOf()
+    }
+
+    if(p.match(TokenType.NAMEOF)) {
+        return p.nameOf()
     }
 
     if(p.match(TokenType.OFFSETOF)) {
@@ -2994,6 +3006,7 @@ func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
             var castExpr = expr as (*CastExpr)
             return p.checkConstExpr(castExpr.exprToCast)
         }
+        case StmtKind.NAME_OF_EXPR:
         case StmtKind.TYPE_OF_EXPR:
         case StmtKind.SIZE_OF_EXPR:
             return true;

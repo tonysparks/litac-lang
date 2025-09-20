@@ -80,6 +80,7 @@ func main(len: i32, args: **char) : i32 {
         // "../test/tests/misc.json", json syntax error
 
         "../test/tests/single.json",
+        "../test/tests/nameof.json",
         "../test/tests/native_arg_args.json",
         "../test/tests/random.json",
         "../test/tests/number_types.json",
@@ -206,6 +207,11 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
     if(!tests) {
         printf("No tests\n")
         return 0
+    }
+
+    if(suite.disabled) {
+        printf("    %-85s ......%s\n", "Tests disabled", "SKIPPED!")
+        return 1
     }
 
     suite.tests.init(tests.size(), testHarness.allocator)

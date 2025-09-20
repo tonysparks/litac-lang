@@ -55,6 +55,7 @@ size_t strnlen(const char * s, size_t len) {
 
 """);
 
+
 // mem
 @foreign public func malloc(size: usize) : *void;
 @foreign public func realloc(ptr:*void, size: usize) : *void;
@@ -123,9 +124,9 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func va_start<T>(args: va_list, firstArg: T);
 @foreign public func va_end(args: va_list);
 @foreign public func va_copy(a: va_list, b: va_list);
-@foreign("va_arg") public func native_va_arg<T>(a: va_list, type: T) : T;
+@foreign("va_arg") public func native_va_arg<T>(a: va_list, type: typeid) : T;
 public func va_arg<T>(args: va_list) : T {
-    return native_va_arg(args, T)
+    return T{}//native_va_arg<T>(args, nameof(:T))
 }
 @foreign public func vprintf(format: *const char, ap: va_list) : i32;
 @foreign public func vfprintf(f:*FILE, format: *const char, args: va_list);

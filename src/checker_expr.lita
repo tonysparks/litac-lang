@@ -118,6 +118,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
             return this.resolveTypeIdentifierExpr(expr as (*TypeIdentifierExpr))
         }
+        case StmtKind.NAME_OF_EXPR:
         case StmtKind.TYPE_OF_EXPR: {
             return this.resolveTypeOfExpr(expr as (*TypeOfExpr))
         }
@@ -874,7 +875,9 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
     if(hasVarargs) {
         var sb = StringBuilder{}
 
+        var targetIndex = i
         if(isNativeVararg) {
+            // printf("Supplied args: %d vs i = %d\n", numberOfSuppliedArgs, i)
             // we may reprocess this again, we don't
             // want to keep injecting in this multiple times
             expr.flags |= FuncCallExprFlags.HAS_NATIVE_VARARG
@@ -917,7 +920,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
                 return false
             }
 
-            var index = (i - numberOfSuppliedArgs) + 1
+            var index = targetIndex
             suppliedArgs.insertAt(index, CallArg {
                 .argExpr = nativeArg,
                 .index = index

@@ -836,7 +836,7 @@ func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
             }
             break
         }
-
+        case StmtKind.NAME_OF_EXPR:
         case StmtKind.TYPE_OF_EXPR: {
             var expr = node as (*TypeOfExpr)
             if(this.isTypeAtPos(expr.type)) {

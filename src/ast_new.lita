@@ -741,6 +741,21 @@ public func NewTypeOfExpr(startPos: SrcPos,
     return expr as (*Expr)
 }
 
+public func NewNameOfExpr(startPos: SrcPos,
+                          endPos: SrcPos,
+                          typeOfExpr: *Expr,
+                          type: *TypeSpec,
+                          allocator: *const Allocator) : *Expr {
+    var expr = new<TypeOfExpr>(allocator)
+    expr.kind = StmtKind.NAME_OF_EXPR
+    expr.startPos = startPos
+    expr.endPos = endPos
+    expr.typeOfExpr = expr.node.becomeParentOf(typeOfExpr)
+    expr.type = type
+
+    return expr as (*Expr)
+}
+
 public func NewOffsetOfExpr(startPos: SrcPos,
                           endPos: SrcPos,
                           type: *TypeSpec,

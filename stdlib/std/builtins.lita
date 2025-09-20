@@ -15,6 +15,7 @@ public struct NativeVararg {
     numberOfArgs: i32
 }
 
+
 /**
 ========================================================================
 Note declarations
