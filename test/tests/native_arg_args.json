@@ -1,0 +1,97 @@
+{
+    "description": "Single",
+    "disabled": false,
+    "includeTypeInfos": true,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name" : "Native varargs",
+            "definitions": `
+                import "std/libc"
+                import "std/string/builder"
+                import "std/string"
+                import "std/type"
+
+                public func TestFunction(x: i32, $...) : i32 {
+                    var list: va_list
+                    va_start(list, x)
+                    var args = va_arg<NativeVararg>(list)
+                    return args.numberOfArgs
+                }
+
+                public func TestFunction2(sb: *StringBuilder, $...) : *const char {
+                    var list: va_list
+                    va_start(list, sb)
+                    var args = va_arg<NativeVararg>(list)
+                    for(var i = 0; i < args.numberOfArgs; i+=1) {
+                        var typeInfo = getTypeInfo(args.args[i])
+                        if (typeInfo == null) {
+                            printf("Empty typeinfo!\n")
+                            continue
+                        }
+
+                        switch(typeInfo.kind) {
+                            case TypeKind.BOOL: {
+                                sb.append("bool;")
+                                break
+                            }
+                            case TypeKind.I32: {
+                                sb.append("i32;")
+                                break
+                            }
+                            case TypeKind.F64: {
+                                sb.append("f64;")
+                                break
+                            }
+                            case TypeKind.ARRAY: {
+                                sb.append("[]i32;")
+                                break
+                            }
+                            case TypeKind.STR: {
+                                sb.append("*const char;")
+                                break
+                            }
+                            case TypeKind.STRUCT: {
+                                sb.append("%s;", typeInfo.name)
+                                break
+                            }
+                            default: {
+                                sb.append("%s;", typeInfo.name)
+                                break
+                            }
+                        }
+                    }
+                    return sb.cStr()
+                }
+            `,
+            "code": `
+                assert(TestFunction(5, $"Hello", 42, true) == 3)
+                assert(TestFunction(57, "By", 4f64, null, []i32 {45}) == 4)
+                var z = []i32 { 1 }
+                var x1 = typeof(:*const char)
+                var x2 = typeof("Hello")
+                var x3 = typeof(:*const char)
+                var x4 = typeof(:[1]i32)
+                var x5 = typeof(z)
+                //printf("x1: %llu, x2: %llu, x3: %llu, x4: %llu, x5: %llu\n", x1, x2, x3, x4, x5)
+                var sb = StringBuilderInit(256)
+                var v = TestFunction2(&sb, $"Hello", 42, true)
+                //printf("%s\n", sb.cStr())
+                assert(v.equals("String;i32;bool;"))
+                sb.clear()
+
+                var w = TestFunction2(&sb, "By", 4f64, []i32 {45})
+                assert(w.equals("*const char;f64;[]i32;"))
+            `,
+        },
+    ]
+}
