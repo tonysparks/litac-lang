@@ -209,6 +209,11 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
         return 0
     }
 
+    if(suite.disabled) {
+        printf("    %-85s ......%s\n", "Tests disabled", "SKIPPED!")
+        return 1
+    }
+
     suite.tests.init(tests.size(), testHarness.allocator)
     for(var i = 0; i < tests.size(); i += 1) {
         var testNode = tests.at(i)
