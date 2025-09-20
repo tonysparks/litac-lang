@@ -1,7 +1,7 @@
 #ifndef _LITAC_HEADER_H
 #define _LITAC_HEADER_H
 
-// Generated on Tue Apr  1 23:22:10 2025
+// Generated on Sat Sep 20 21:40:26 2025
 
 #include <stdint.h>
 #include <stddef.h>
@@ -112,9 +112,9 @@ litaC_usize litaC_std__mem__arena_allocator__PAGE_SIZE = (litaC_usize)4096UL;
 
 #define litaC_generics__MAX_GENERIC_NAME (1024)
 
-#define litaC_std__json__MAX_MESSAGE_SIZE (256)
-
 #define litaC_parser__DECL_ADJUST_TOKENS_COUNT (12)
+
+#define litaC_std__json__MAX_MESSAGE_SIZE (256)
 
 #define litaC_std__mem__track_allocator__MAX_PATH (256)
 
@@ -2358,10 +2358,10 @@ enum
     MZ_DEFAULT_COMPRESSION = -1
 };
 
-#define MZ_VERSION "11.0.1"
-#define MZ_VERNUM 0xB001
+#define MZ_VERSION "11.0.2"
+#define MZ_VERNUM 0xB002
 #define MZ_VER_MAJOR 11
-#define MZ_VER_MINOR 1
+#define MZ_VER_MINOR 2
 #define MZ_VER_REVISION 0
 #define MZ_VER_SUBREVISION 0
 
@@ -6576,7 +6576,7 @@ static WCHAR* mz_utf8z_to_widechar(const char* str)
 {
   int reqChars = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
   WCHAR* wStr = (WCHAR*)malloc(reqChars * sizeof(WCHAR));
-  MultiByteToWideChar(CP_UTF8, 0, str, -1, wStr, sizeof(WCHAR) * reqChars);
+  MultiByteToWideChar(CP_UTF8, 0, str, -1, wStr, reqChars);
   return wStr;
 }
 
@@ -9258,41 +9258,20 @@ mz_bool mz_zip_writer_init_v2(mz_zip_archive *pZip, mz_uint64 existing_size, mz_
 {
     mz_bool zip64 = (flags & MZ_ZIP_FLAG_WRITE_ZIP64) != 0;
 
-    if (!pZip) {
-        printf("No zip\n");
-    }
-
-    if (pZip->m_pState) {
-        printf("State Prsent\n");
-    }
-
-    if(!pZip->m_pWrite) {
-        printf("No Write\n");
-    }
-    if (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID) {
-        printf("Invalid Mode\n");
-    }
-
-    if ((!pZip) || (pZip->m_pState) || (!pZip->m_pWrite) || (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID)) {
-        printf("State\n");
+    if ((!pZip) || (pZip->m_pState) || (!pZip->m_pWrite) || (pZip->m_zip_mode != MZ_ZIP_MODE_INVALID))
         return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
-    }
 
     if (flags & MZ_ZIP_FLAG_WRITE_ALLOW_READING)
     {
-        if (!pZip->m_pRead) {
-            printf("READ\n");
+        if (!pZip->m_pRead)
             return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
-        }
     }
 
     if (pZip->m_file_offset_alignment)
     {
         /* Ensure user specified file offset alignment is a power of 2. */
-        if (pZip->m_file_offset_alignment & (pZip->m_file_offset_alignment - 1)) {
-            printf("Alignment\n");
+        if (pZip->m_file_offset_alignment & (pZip->m_file_offset_alignment - 1))
             return mz_zip_set_error(pZip, MZ_ZIP_INVALID_PARAMETER);
-        }
     }
 
     if (!pZip->m_pAlloc)
@@ -28585,6 +28564,8 @@ typedef enum Lita_OSType {
     #if defined(BSD)
         // FreeBSD, NetBSD, OpenBSD, DragonFly BSD
         Lita_OSType litaOS = Lita_OSType_BSD;
+    #else
+        Lita_OSType litaOS = Lita_OSType_OTHER;
     #endif
     #define LITA_IS_POSIX 1
 #elif defined(__hpux)
@@ -28604,6 +28585,8 @@ typedef enum Lita_OSType {
     #elif TARGET_OS_MAC == 1
         // Apple OSX
         Lita_OSType litaOS = Lita_OSType_MAC;
+    #else
+        Lita_OSType litaOS = Lita_OSType_OTHER;
     #endif
     #define LITA_IS_POSIX 1
 #elif defined(__sun) && defined(__SVR4)
@@ -29521,6 +29504,7 @@ typedef enum litaC_main__ParseStatus {
 } litaC_main__ParseStatus;
 typedef struct litaC_std__builtins__any litaC_std__builtins__any;
 typedef struct litaC_std__builtins__String litaC_std__builtins__String;
+typedef struct litaC_std__builtins__NativeVararg litaC_std__builtins__NativeVararg;
 typedef struct litaC_std__mem__Allocator litaC_std__mem__Allocator;
 typedef struct litaC_std__string__SplitIter litaC_std__string__SplitIter;
 typedef struct litaC_std__mem__bucket_allocator__Bucket litaC_std__mem__bucket_allocator__Bucket;
@@ -29577,8 +29561,19 @@ typedef enum litaC_std__http__HttpRequestType {
     litaC_std__http__HttpRequestType_GET,
     litaC_std__http__HttpRequestType_POST,
     litaC_std__http__HttpRequestType_PUT,
-    litaC_std__http__HttpRequestType_DELETE
+    litaC_std__http__HttpRequestType_DELETE,
+    litaC_std__http__HttpRequestType_PATCH,
+    litaC_std__http__HttpRequestType_HEAD,
+    litaC_std__http__HttpRequestType_OPTION,
+    litaC_std__http__HttpRequestType_MAX_REQUEST_TYPE
 } litaC_std__http__HttpRequestType;
+typedef enum litaC_std__http__HttpBodyKind {
+    litaC_std__http__HttpBodyKind_NONE,
+    litaC_std__http__HttpBodyKind_BODY,
+    litaC_std__http__HttpBodyKind_STREAM
+} litaC_std__http__HttpBodyKind;
+typedef union litaC_std__http__anon_0 litaC_std__http__anon_0;
+typedef struct litaC_std__http__HttpBody litaC_std__http__HttpBody;
 typedef struct litaC_std__http__HttpRequest litaC_std__http__HttpRequest;
 typedef struct litaC_std__http__HttpResponse litaC_std__http__HttpResponse;
 typedef struct litaC_std__http__HttpOptions litaC_std__http__HttpOptions;
@@ -29627,6 +29622,7 @@ typedef enum litaC_lex__TokenType {
     litaC_lex__TokenType_GOTO,
     litaC_lex__TokenType_SIZEOF,
     litaC_lex__TokenType_TYPEOF,
+    litaC_lex__TokenType_NAMEOF,
     litaC_lex__TokenType_OFFSETOF,
     litaC_lex__TokenType_AS,
     litaC_lex__TokenType_PUBLIC,
@@ -29642,6 +29638,7 @@ typedef enum litaC_lex__TokenType {
     litaC_lex__TokenType_HASH,
     litaC_lex__TokenType_DOT,
     litaC_lex__TokenType_VAR_ARGS,
+    litaC_lex__TokenType_DOLLAR_VAR_ARGS,
     litaC_lex__TokenType_AT,
     litaC_lex__TokenType_QUESTION_MARK,
     litaC_lex__TokenType_COMMA,
@@ -29734,14 +29731,14 @@ typedef enum litaC_types__TypeKind {
 typedef struct litaC_types__FieldPositionResult litaC_types__FieldPositionResult;
 typedef struct litaC_types__FieldPath litaC_types__FieldPath;
 typedef struct litaC_types__MethodResult litaC_types__MethodResult;
-typedef struct litaC_types__anon_1 litaC_types__anon_1;
 typedef struct litaC_types__anon_2 litaC_types__anon_2;
 typedef struct litaC_types__anon_3 litaC_types__anon_3;
 typedef struct litaC_types__anon_4 litaC_types__anon_4;
 typedef struct litaC_types__anon_5 litaC_types__anon_5;
 typedef struct litaC_types__anon_6 litaC_types__anon_6;
 typedef struct litaC_types__anon_7 litaC_types__anon_7;
-typedef union litaC_types__anon_0 litaC_types__anon_0;
+typedef struct litaC_types__anon_8 litaC_types__anon_8;
+typedef union litaC_types__anon_1 litaC_types__anon_1;
 typedef struct litaC_types__TypeInfo litaC_types__TypeInfo;
 typedef struct litaC_ast_new__TypeSpecAllocator litaC_ast_new__TypeSpecAllocator;
 
@@ -29810,6 +29807,7 @@ typedef enum litaC_ast__StmtKind {
     litaC_ast__StmtKind_TERNARY_EXPR,
     litaC_ast__StmtKind_TYPE_IDENTIFIER_EXPR,
     litaC_ast__StmtKind_TYPE_OF_EXPR,
+    litaC_ast__StmtKind_NAME_OF_EXPR,
     litaC_ast__StmtKind_UNARY_EXPR,
     litaC_ast__StmtKind_POISON_EXPR,
     litaC_ast__StmtKind_MAX_STMT_KINDS
@@ -29826,23 +29824,24 @@ typedef enum litaC_ast__TypeSpecKind {
 } litaC_ast__TypeSpecKind;
 typedef enum litaC_ast__FuncFlags {
     litaC_ast__FuncFlags_HAS_VARARGS = (1 << 0),
-    litaC_ast__FuncFlags_IS_METHOD = (1 << 1)
+    litaC_ast__FuncFlags_IS_METHOD = (1 << 1),
+    litaC_ast__FuncFlags_HAS_NATIVE_VARARGS = (1 << 2)
 } litaC_ast__FuncFlags;
 typedef enum litaC_ast__AggregateFlags {
     litaC_ast__AggregateFlags_IS_EMBEDDED = (1 << 0),
     litaC_ast__AggregateFlags_IS_ANONYMOUS = (1 << 1)
 } litaC_ast__AggregateFlags;
-typedef struct litaC_ast__anon_9 litaC_ast__anon_9;
 typedef struct litaC_ast__anon_10 litaC_ast__anon_10;
 typedef struct litaC_ast__anon_11 litaC_ast__anon_11;
-typedef union litaC_ast__anon_8 litaC_ast__anon_8;
+typedef struct litaC_ast__anon_12 litaC_ast__anon_12;
+typedef union litaC_ast__anon_9 litaC_ast__anon_9;
 typedef struct litaC_ast__TypeSpec litaC_ast__TypeSpec;
 typedef struct litaC_ast__Identifier litaC_ast__Identifier;
 typedef struct litaC_ast__GenericParam litaC_ast__GenericParam;
 typedef enum litaC_ast__GenericArgKind {
     litaC_ast__GenericArgKind_TYPE
 } litaC_ast__GenericArgKind;
-typedef union litaC_ast__anon_12 litaC_ast__anon_12;
+typedef union litaC_ast__anon_13 litaC_ast__anon_13;
 typedef struct litaC_ast__GenericArg litaC_ast__GenericArg;
 typedef enum litaC_ast__Visibility {
     litaC_ast__Visibility_PRIVATE,
@@ -29884,7 +29883,7 @@ typedef struct litaC_ast__SwitchCaseStmt litaC_ast__SwitchCaseStmt;
 typedef struct litaC_ast__SwitchStmt litaC_ast__SwitchStmt;
 typedef struct litaC_ast__VarFieldDecl litaC_ast__VarFieldDecl;
 typedef struct litaC_ast__TraitFieldDecl litaC_ast__TraitFieldDecl;
-typedef union litaC_ast__anon_13 litaC_ast__anon_13;
+typedef union litaC_ast__anon_14 litaC_ast__anon_14;
 typedef struct litaC_ast__FieldStmt litaC_ast__FieldStmt;
 typedef struct litaC_ast__WhileStmt litaC_ast__WhileStmt;
 typedef struct litaC_ast__Stmt litaC_ast__Stmt;
@@ -29896,6 +29895,9 @@ typedef struct litaC_ast__CastExpr litaC_ast__CastExpr;
 typedef struct litaC_ast__CharExpr litaC_ast__CharExpr;
 typedef struct litaC_ast__CallArg litaC_ast__CallArg;
 typedef struct litaC_ast__FuncCallExpr litaC_ast__FuncCallExpr;
+typedef enum litaC_ast__FuncCallExprFlags {
+    litaC_ast__FuncCallExprFlags_HAS_NATIVE_VARARG = (1 << 0)
+} litaC_ast__FuncCallExprFlags;
 typedef enum litaC_ast__GetExprFlags {
     litaC_ast__GetExprFlags_IS_NORMAL = 0,
     litaC_ast__GetExprFlags_IS_METHOD_CALL = (1 << 0),
@@ -30049,8 +30051,8 @@ typedef enum litaC_checker__SearchType {
 } litaC_checker__SearchType;
 typedef struct litaC_types_new__TypeCache litaC_types_new__TypeCache;
 typedef struct litaC_types_new__ArrayEntry litaC_types_new__ArrayEntry;
-typedef struct litaC_intern__anon_14 litaC_intern__anon_14;
 typedef struct litaC_intern__anon_15 litaC_intern__anon_15;
+typedef struct litaC_intern__anon_16 litaC_intern__anon_16;
 typedef union litaC_intern__InternedString litaC_intern__InternedString;
 typedef struct litaC_intern__Strings litaC_intern__Strings;
 typedef struct litaC_generics__Template litaC_generics__Template;
@@ -30112,6 +30114,7 @@ typedef enum litaC_error_codes__ConsoleColors {
     litaC_error_codes__ConsoleColors_CYAN,
     litaC_error_codes__ConsoleColors_WHITE
 } litaC_error_codes__ConsoleColors;
+typedef struct litaC_parser__Parser litaC_parser__Parser;
 typedef struct litaC_lsp__references__Reference litaC_lsp__references__Reference;
 typedef struct litaC_lsp__references__FieldReference litaC_lsp__references__FieldReference;
 typedef struct litaC_lsp__references__ReferenceDatabase litaC_lsp__references__ReferenceDatabase;
@@ -30148,7 +30151,7 @@ typedef enum litaC_std__json__TokenKind {
     litaC_std__json__TokenKind_STRING
 } litaC_std__json__TokenKind;
 typedef struct litaC_std__json__SrcPos litaC_std__json__SrcPos;
-typedef union litaC_std__json__anon_16 litaC_std__json__anon_16;
+typedef union litaC_std__json__anon_17 litaC_std__json__anon_17;
 typedef struct litaC_std__json__Token litaC_std__json__Token;
 typedef enum litaC_std__json__JsonParserStatus {
     litaC_std__json__JsonParserStatus_OK = 0,
@@ -30156,7 +30159,6 @@ typedef enum litaC_std__json__JsonParserStatus {
     litaC_std__json__JsonParserStatus_ERROR
 } litaC_std__json__JsonParserStatus;
 typedef struct litaC_std__json__JsonParser litaC_std__json__JsonParser;
-typedef struct litaC_parser__Parser litaC_parser__Parser;
 typedef struct litaC_lsp__workspace__Workspace litaC_lsp__workspace__Workspace;
 typedef struct litaC_std__mem__track_allocator__Allocation litaC_std__mem__track_allocator__Allocation;
 typedef struct litaC_std__mem__track_allocator__TrackAllocator litaC_std__mem__track_allocator__TrackAllocator;
@@ -30218,7 +30220,7 @@ typedef enum litaC_lsp__util__SourceLocationKind {
     litaC_lsp__util__SourceLocationKind_AST,
     litaC_lsp__util__SourceLocationKind_TYPE
 } litaC_lsp__util__SourceLocationKind;
-typedef union litaC_lsp__util__anon_17 litaC_lsp__util__anon_17;
+typedef union litaC_lsp__util__anon_18 litaC_lsp__util__anon_18;
 typedef struct litaC_lsp__util__SourceLocation litaC_lsp__util__SourceLocation;
 typedef struct litaC_lsp__util__SourceLookup litaC_lsp__util__SourceLookup;
 typedef struct litaC_lsp__document__Document litaC_lsp__document__Document;
@@ -30274,7 +30276,9 @@ typedef enum litaC_pkg_mgr__pkg__PackageType {
     litaC_pkg_mgr__pkg__PackageType_SOURCE_LIBRARY
 } litaC_pkg_mgr__pkg__PackageType;
 typedef struct litaC_pkg_mgr__pkg__PackageDef litaC_pkg_mgr__pkg__PackageDef;
+typedef struct litaC_pkg_mgr__pkg__PackageDependency litaC_pkg_mgr__pkg__PackageDependency;
 typedef struct litaC_pkg_mgr__pkg__PackageId litaC_pkg_mgr__pkg__PackageId;
+typedef struct litaC_pkg_mgr__pkg_install__InstallOptions litaC_pkg_mgr__pkg_install__InstallOptions;
 
 typedef enum litaC_std__zip__ZipOpen {
     litaC_std__zip__ZipOpen_READ,
@@ -30283,6 +30287,7 @@ typedef enum litaC_std__zip__ZipOpen {
 typedef enum litaC_std__zip__ZipFlags {
     litaC_std__zip__ZipFlags_INCLUDE_ZIPFILE_NAME_ON_UNZIP = (1 << 0)
 } litaC_std__zip__ZipFlags;
+
 typedef enum litaC_std__zip__ZipStatus {
     litaC_std__zip__ZipStatus_OK = 0,
     litaC_std__zip__ZipStatus_ERROR_UNABLE_TO_OPEN_FILE,
@@ -30291,7 +30296,10 @@ typedef enum litaC_std__zip__ZipStatus {
     litaC_std__zip__ZipStatus_ERROR_UNABLE_WRITE_FILE,
     litaC_std__zip__ZipStatus_ERROR_ADDING_FILE,
     litaC_std__zip__ZipStatus_ERROR_CLOSING,
-    litaC_std__zip__ZipStatus_ERROR_FINALIZING
+    litaC_std__zip__ZipStatus_ERROR_FINALIZING,
+    litaC_std__zip__ZipStatus_ERROR_OUT_OF_MEMORY,
+    litaC_std__zip__ZipStatus_ERROR_COMPRESSING,
+    litaC_std__zip__ZipStatus_ERROR_DECOMPRESSING
 } litaC_std__zip__ZipStatus;
 typedef enum litaC_std__zip__ZipCompressionLevel {
     litaC_std__zip__ZipCompressionLevel_NO_COMPRESSION = 0,
@@ -30359,6 +30367,7 @@ typedef struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_typ
 typedef struct litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_;
 typedef struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_;
 typedef struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_;
+typedef struct litaC_std__array__std__array__Array_cb_lex__Token_ce_ litaC_std__array__std__array__Array_cb_lex__Token_ce_;
 typedef struct litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_;
 typedef struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_;
 typedef struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_;
@@ -30367,7 +30376,6 @@ typedef struct litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_l
 typedef struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_;
 typedef struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_ litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_;
 typedef struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_;
-typedef struct litaC_std__array__std__array__Array_cb_lex__Token_ce_ litaC_std__array__std__array__Array_cb_lex__Token_ce_;
 typedef struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_;
 typedef struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_;
 typedef struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_;
@@ -30378,7 +30386,7 @@ typedef struct litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_depende
 typedef struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_;
 typedef struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_;
 typedef struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_;
-typedef struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_;
+typedef struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_ litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_;
 typedef struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ litaC_std__map__std__map__Map_cb_i32_c_i32_ce_;
 typedef struct litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_ litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_;
 typedef struct litaC_std__map__std__map__MapIterator_cb_std__builtins__String_c_std__builtins__String_ce_ litaC_std__map__std__map__MapIterator_cb_std__builtins__String_c_std__builtins__String_ce_;
@@ -30563,6 +30571,7 @@ litaC_bool litaC_std__ascii__char_isWhitespace(litaC_char litaC_this);
 litaC_bool litaC_std__ascii__char_isNumeric(litaC_char litaC_this);
 litaC_bool litaC_std__ascii__char_isAlphabetic(litaC_char litaC_this);
 litaC_bool litaC_std__ascii__char_isAlphanumeric(litaC_char litaC_this);
+litaC_i32 litaC_std__ascii__char_asHex(litaC_char litaC_this);
 litaC_std__cmdline__CmdParser litaC_std__cmdline__CmdParserInit(const litaC_std__mem__Allocator* litaC_allocator);
 litaC_void litaC_std__cmdline__CmdParser_init(litaC_std__cmdline__CmdParser* litaC_p,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_void litaC_std__cmdline__CmdParser_free(litaC_std__cmdline__CmdParser* litaC_p);
@@ -30661,9 +30670,14 @@ litaC_bool litaC_std__http__Http_init(litaC_std__http__Http* litaC_this,litaC_st
 litaC_void litaC_std__http__Http_free(litaC_std__http__Http* litaC_this);
 litaC_void litaC_std__http__Http_setProxy(litaC_std__http__Http* litaC_this,const litaC_char* litaC_proxy);
 litaC_bool litaC_std__http__Http_get(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp);
+litaC_bool litaC_std__http__Http_head(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp);
+litaC_bool litaC_std__http__Http_delete(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp);
+litaC_bool litaC_std__http__Http_post(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp,litaC_std__builtins__String litaC_body,litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* litaC_headers);
+litaC_bool litaC_std__http__Http_put(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp,litaC_std__builtins__String litaC_body,litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* litaC_headers);
 litaC_bool litaC_std__http__Http_makeRequest(litaC_std__http__Http* litaC_this,litaC_std__http__HttpRequest* litaC_req,litaC_std__http__HttpResponse* litaC_resp);
 litaC_usize litaC_std__http__HttpWriteCallback(litaC_void* litaC_data,litaC_usize litaC_size,litaC_usize litaC_n,litaC_void* litaC_userdata);
 litaC_usize litaC_std__http__HttpHeadersCallback(litaC_void* litaC_data,litaC_usize litaC_size,litaC_usize litaC_n,litaC_void* litaC_userdata);
+litaC_void litaC_std__http__testFileDownload(void);
 litaC_bool litaC_lex__Token_nameEquals(litaC_lex__Token* litaC_token,const litaC_char* litaC_str);
 litaC_i32 litaC_lex__SrcPos_getLineLength(litaC_lex__SrcPos* litaC_p);
 
@@ -30703,6 +30717,7 @@ litaC_i32 litaC_std__unicode__utf8__Utf8Encode(litaC_i32 litaC_codepoint,litaC_u
 litaC_i32 litaC_std__unicode__utf8__Utf8CharWidth(litaC_i32 litaC_codepoint);
 litaC_bool litaC_std__unicode__utf8__Utf8CodepointValid(litaC_i32 litaC_codepoint);
 litaC_types__TypeKind litaC_types__TypeKindFromString(const litaC_char* litaC_str,litaC_i32 litaC_len);
+litaC_bool litaC_types__IsEnum(litaC_types__TypeInfo* litaC_type);
 litaC_bool litaC_types__IsPtr(litaC_types__TypeInfo* litaC_type);
 litaC_bool litaC_types__IsPtrLike(litaC_types__TypeInfo* litaC_type);
 litaC_bool litaC_types__IsPtrOf(litaC_types__TypeInfo* litaC_type,litaC_types__TypeKind litaC_kind);
@@ -30804,6 +30819,7 @@ litaC_ast__Expr* litaC_ast_new__NewGroupExpr(litaC_lex__SrcPos litaC_startPos,li
 litaC_ast__Expr* litaC_ast_new__NewArrayInitExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__TypeSpec* litaC_type,litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ litaC_values,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewSizeOfExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_sizeOfExpr,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewTypeOfExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_typeOfExpr,litaC_ast__TypeSpec* litaC_type,const litaC_std__mem__Allocator* litaC_allocator);
+litaC_ast__Expr* litaC_ast_new__NewNameOfExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_typeOfExpr,litaC_ast__TypeSpec* litaC_type,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewOffsetOfExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__TypeSpec* litaC_type,litaC_ast__Identifier litaC_field,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Expr* litaC_ast_new__NewPoisonExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Stmt* litaC_ast_new__NewModuleStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ litaC_imports,litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ litaC_notes,litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ litaC_declarations,const litaC_std__mem__Allocator* litaC_allocator);
@@ -30824,7 +30840,7 @@ litaC_ast__Stmt* litaC_ast_new__NewGotoStmt(litaC_lex__SrcPos litaC_startPos,lit
 litaC_ast__Stmt* litaC_ast_new__NewLabelStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Identifier litaC_label,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Stmt* litaC_ast_new__NewNoteStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__TypeSpec* litaC_type,litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ litaC_arguments,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Stmt* litaC_ast_new__NewEmptyStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,const litaC_std__mem__Allocator* litaC_allocator);
-litaC_ast__Stmt* litaC_ast_new__NewParametersStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ litaC_params,litaC_bool litaC_isVararg,const litaC_std__mem__Allocator* litaC_allocator);
+litaC_ast__Stmt* litaC_ast_new__NewParametersStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ litaC_params,litaC_bool litaC_isVararg,litaC_bool litaC_isNativeVararg,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Stmt* litaC_ast_new__NewVarFieldDecl(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Identifier litaC_fieldName,litaC_ast__TypeSpec* litaC_type,litaC_ast__Attributes litaC_attributes,litaC_ast__Expr* litaC_defaultExpr,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Stmt* litaC_ast_new__NewTraitFieldDecl(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Identifier litaC_fieldName,litaC_ast__TypeSpec* litaC_type,litaC_ast__Attributes litaC_attributes,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_ast__Stmt* litaC_ast_new__NewEnumFieldEntryDecl(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Identifier litaC_fieldName,litaC_ast__Expr* litaC_value,litaC_ast__Attributes litaC_attributes,const litaC_std__mem__Allocator* litaC_allocator);
@@ -31126,6 +31142,110 @@ litaC_bool litaC_checker_expr__TypeChecker_checkTruthyness(litaC_checker__TypeCh
 litaC_bool litaC_checker_expr__TypeChecker_checkRightValue(litaC_checker__TypeChecker* litaC_this,litaC_ast__Expr* litaC_expr);
 litaC_bool litaC_checker_expr__TypeChecker_resolveIdentiferExpr(litaC_checker__TypeChecker* litaC_this,litaC_ast__IdentifierExpr* litaC_expr);
 litaC_void litaC_error_codes__PrintError(litaC_bool litaC_useColors,litaC_std__string__builder__StringBuilder* litaC_sb,litaC_phase_result__PhaseError litaC_error);
+litaC_parser__Parser litaC_parser__ParserInit(const litaC_char* litaC_filename,const litaC_char* litaC_text,litaC_i64 litaC_length,litaC_module__Module* litaC_module,litaC_lita__Lita* litaC_lita);
+litaC_ast__ModuleStmt* litaC_parser__Parser_parseModule(litaC_parser__Parser* litaC_p);
+litaC_void litaC_parser__Parser_parseModuleDeclaration(litaC_parser__Parser* litaC_p,litaC_ast__ModuleStmt* litaC_moduleStmt);
+litaC_ast__Stmt* litaC_parser__Parser_parseCompileTimeBody(litaC_parser__Parser* litaC_p);
+litaC_ast__ImportDecl* litaC_parser__Parser_importDeclaration(litaC_parser__Parser* litaC_p);
+litaC_bool litaC_parser__Parser_notes(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_* litaC_notes);
+litaC_ast__Decl* litaC_parser__Parser_varDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_constDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_funcDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_structDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_unionDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_traitDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_aggregateDeclaration(litaC_parser__Parser* litaC_p,litaC_ast__StmtKind litaC_kind);
+litaC_ast__Decl* litaC_parser__Parser_enumDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_typedefDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Decl* litaC_parser__Parser_noteDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__ParameterDecl* litaC_parser__Parser_paramDeclaration(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_expression(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_constExpression(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_group(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_arrayInit(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_aggregateInit(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_sizeOf(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_typeOf(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_nameOf(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_offsetOf(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_assignment(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_ternary(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_or(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_and(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_bitOr(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_bitXor(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_bitAnd(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_equality(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_comparison(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_bitShift(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_term(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_factor(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_unary(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_functionCall(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_primary(litaC_parser__Parser* litaC_p);
+litaC_ast__Expr* litaC_parser__Parser_finishFunctionCall(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
+litaC_ast__Expr* litaC_parser__Parser_cast(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
+litaC_ast__Stmt* litaC_parser__Parser_statement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_tryStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_compStatement(litaC_parser__Parser* litaC_p,litaC_bool litaC_isStaticIf);
+litaC_ast__Stmt* litaC_parser__Parser_blockStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_ifStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_whileStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_doWhileStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_forStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_switchCaseStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_switchDefaultStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_switchStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_breakStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_continueStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_returnStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_deferStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_gotoStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__Stmt* litaC_parser__Parser_tryLabelStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__TypeSpec* litaC_parser__Parser_type(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
+litaC_ast__TypeSpec* litaC_parser__Parser_identifierType(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
+litaC_ast__TypeSpec* litaC_parser__Parser_qualifiedIdentifierType(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
+litaC_ast__TypeSpec* litaC_parser__Parser_arrayType(litaC_parser__Parser* litaC_p);
+litaC_ast__TypeSpec* litaC_parser__Parser_funcPtrType(litaC_parser__Parser* litaC_p);
+litaC_ast__ParametersStmt* litaC_parser__Parser_parametersStatement(litaC_parser__Parser* litaC_p);
+litaC_bool litaC_parser__Parser_structArguments(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_* litaC_arguments);
+litaC_bool litaC_parser__Parser_arguments(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb_ast__CallArg_ce_* litaC_arguments);
+litaC_bool litaC_parser__Parser_genericParameters(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* litaC_arguments);
+litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_parser__Parser_genericArguments(litaC_parser__Parser* litaC_p);
+litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_parser__Parser_tryGenericArguments(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
+litaC_bool litaC_parser__Parser_arrayArguments(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_* litaC_arguments);
+litaC_ast__Expr* litaC_parser__Parser_tryArrayDesignationExpr(litaC_parser__Parser* litaC_p);
+litaC_ast__FieldStmt litaC_parser__Parser_fieldStatement(litaC_parser__Parser* litaC_p,litaC_ast__StmtKind litaC_aggKind);
+litaC_ast__FieldStmt litaC_parser__Parser_noteFieldStatement(litaC_parser__Parser* litaC_p);
+litaC_ast__EnumFieldEntryDecl* litaC_parser__Parser_enumFieldEntryDecl(litaC_parser__Parser* litaC_p);
+litaC_void litaC_parser__Parser_rewindTo(litaC_parser__Parser* litaC_p,litaC_i32 litaC_backtrack,litaC_u64 litaC_numOfErrors);
+litaC_ast__Expr* litaC_parser__Parser_tryBitShiftRight(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
+litaC_void litaC_parser__Parser_eatSemicolon(litaC_parser__Parser* litaC_p);
+litaC_lex__Token litaC_parser__Parser_identifier(litaC_parser__Parser* litaC_p);
+litaC_bool litaC_parser__Parser_checkConstExpr(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
+litaC_ast__Stmt* litaC_parser__Parser_poisonStatement(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos);
+litaC_ast__Expr* litaC_parser__Parser_poisonExpr(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos);
+litaC_ast__Decl* litaC_parser__Parser_poisonDecl(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos);
+LITAC_INLINE 
+litaC_lex__SrcPos litaC_parser__Parser_pos(litaC_parser__Parser* litaC_p);
+litaC_lex__SrcPos litaC_parser__Parser_prevPos(litaC_parser__Parser* litaC_p);
+LITAC_INLINE 
+litaC_lex__Token* litaC_parser__Parser_peek(litaC_parser__Parser* litaC_p);
+litaC_void litaC_parser__Parser_rewind(litaC_parser__Parser* litaC_p);
+litaC_lex__Token* litaC_parser__Parser_previous(litaC_parser__Parser* litaC_p);
+litaC_bool litaC_parser__Parser_atEnd(litaC_parser__Parser* litaC_p);
+litaC_void litaC_parser__Parser_advance(litaC_parser__Parser* litaC_p);
+litaC_lex__Token* litaC_parser__Parser_advancep(litaC_parser__Parser* litaC_p);
+LITAC_INLINE 
+litaC_bool litaC_parser__Parser_check(litaC_parser__Parser* litaC_p,litaC_lex__TokenType litaC_type);
+litaC_bool litaC_parser__Parser_match(litaC_parser__Parser* litaC_p,litaC_lex__TokenType litaC_type);
+litaC_bool litaC_parser__Parser_matches(litaC_parser__Parser* litaC_p,litaC_lex__TokenType* litaC_types,litaC_i32 litaC_len);
+litaC_lex__Token* litaC_parser__Parser_consume(litaC_parser__Parser* litaC_p,litaC_lex__TokenType litaC_type,litaC_error_codes__ErrorCode litaC_errorCode);
+litaC_void litaC_parser__Parser_adjust(litaC_parser__Parser* litaC_p,litaC_lex__TokenType* litaC_types,litaC_i32 litaC_len);
+litaC_void litaC_parser__Parser_errorAtToken(litaC_parser__Parser* litaC_p,litaC_lex__Token* litaC_token,litaC_error_codes__ErrorCode litaC_errorCode);
+litaC_void litaC_parser__Parser_errorAtPos(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos,litaC_error_codes__ErrorCode litaC_errorCode);
+litaC_void litaC_parser__Parser_errorUnexpectedToken(litaC_parser__Parser* litaC_p,litaC_lex__Token* litaC_token,litaC_error_codes__ErrorCode litaC_errorCode);
+litaC_i32 litaC_parser__Parser_numOfErrors(litaC_parser__Parser* litaC_p);
 litaC_void litaC_lsp__references__ReferenceDatabase_init(litaC_lsp__references__ReferenceDatabase* litaC_this,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_void litaC_lsp__references__ReferenceDatabase_addSymbolReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_symbols__Symbol* litaC_symbol,litaC_lex__SrcPos litaC_pos);
 litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_ast__TypeSpec* litaC_type);
@@ -31206,6 +31326,7 @@ litaC_bool litaC_std__json__JsonIterator_hasNext(litaC_std__json__JsonIterator* 
 litaC_std__json__JsonEntry litaC_std__json__JsonIterator_next(litaC_std__json__JsonIterator* litaC_this);
 litaC_bool litaC_std__json__JsonNode_equals(litaC_std__json__JsonNode* litaC_node,litaC_std__json__JsonNode* litaC_other);
 const litaC_char* litaC_std__json__JsonNode_print(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf);
+const litaC_char* litaC_std__json__JsonNode_prettyPrint(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf,litaC_i32 litaC_tabSize);
 litaC_void litaC_std__json__JsonNode_free(litaC_std__json__JsonNode* litaC_node);
 litaC_std__json__JsonParser litaC_std__json__JsonParserInit(const litaC_std__mem__Allocator* litaC_alloc);
 litaC_void litaC_std__json__JsonParser_init(litaC_std__json__JsonParser* litaC_p,const litaC_std__mem__Allocator* litaC_alloc);
@@ -31213,6 +31334,7 @@ litaC_void litaC_std__json__JsonParser_free(litaC_std__json__JsonParser* litaC_p
 litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJson(litaC_std__json__JsonParser* litaC_p,const litaC_char* litaC_buffer);
 litaC_bool litaC_std__json__JsonParser_hasError(litaC_std__json__JsonParser* litaC_p);
 litaC_void litaC_std__json__PrintJson(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf);
+litaC_void litaC_std__json__PrettyPrintJson(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf,litaC_i32 litaC_offset,litaC_i32 litaC_tabSize);
 litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonNode(litaC_std__json__JsonParser* litaC_p);
 litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonIntNumber(litaC_std__json__JsonParser* litaC_p);
 litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonRealNumber(litaC_std__json__JsonParser* litaC_p);
@@ -31230,109 +31352,6 @@ litaC_void litaC_std__json__JsonParser_nextToken(litaC_std__json__JsonParser* li
 litaC_bool litaC_std__json__JsonParser_check(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind);
 litaC_bool litaC_std__json__JsonParser_match(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind);
 litaC_bool litaC_std__json__JsonParser_expect(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind);
-litaC_parser__Parser litaC_parser__ParserInit(const litaC_char* litaC_filename,const litaC_char* litaC_text,litaC_i64 litaC_length,litaC_module__Module* litaC_module,litaC_lita__Lita* litaC_lita);
-litaC_ast__ModuleStmt* litaC_parser__Parser_parseModule(litaC_parser__Parser* litaC_p);
-litaC_void litaC_parser__Parser_parseModuleDeclaration(litaC_parser__Parser* litaC_p,litaC_ast__ModuleStmt* litaC_moduleStmt);
-litaC_ast__Stmt* litaC_parser__Parser_parseCompileTimeBody(litaC_parser__Parser* litaC_p);
-litaC_ast__ImportDecl* litaC_parser__Parser_importDeclaration(litaC_parser__Parser* litaC_p);
-litaC_bool litaC_parser__Parser_notes(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_* litaC_notes);
-litaC_ast__Decl* litaC_parser__Parser_varDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_constDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_funcDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_structDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_unionDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_traitDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_aggregateDeclaration(litaC_parser__Parser* litaC_p,litaC_ast__StmtKind litaC_kind);
-litaC_ast__Decl* litaC_parser__Parser_enumDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_typedefDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Decl* litaC_parser__Parser_noteDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__ParameterDecl* litaC_parser__Parser_paramDeclaration(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_expression(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_constExpression(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_group(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_arrayInit(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_aggregateInit(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_sizeOf(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_typeOf(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_offsetOf(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_assignment(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_ternary(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_or(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_and(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_bitOr(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_bitXor(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_bitAnd(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_equality(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_comparison(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_bitShift(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_term(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_factor(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_unary(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_functionCall(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_primary(litaC_parser__Parser* litaC_p);
-litaC_ast__Expr* litaC_parser__Parser_finishFunctionCall(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
-litaC_ast__Expr* litaC_parser__Parser_cast(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
-litaC_ast__Stmt* litaC_parser__Parser_statement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_tryStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_compStatement(litaC_parser__Parser* litaC_p,litaC_bool litaC_isStaticIf);
-litaC_ast__Stmt* litaC_parser__Parser_blockStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_ifStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_whileStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_doWhileStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_forStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_switchCaseStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_switchDefaultStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_switchStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_breakStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_continueStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_returnStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_deferStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_gotoStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__Stmt* litaC_parser__Parser_tryLabelStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__TypeSpec* litaC_parser__Parser_type(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
-litaC_ast__TypeSpec* litaC_parser__Parser_identifierType(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
-litaC_ast__TypeSpec* litaC_parser__Parser_qualifiedIdentifierType(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
-litaC_ast__TypeSpec* litaC_parser__Parser_arrayType(litaC_parser__Parser* litaC_p);
-litaC_ast__TypeSpec* litaC_parser__Parser_funcPtrType(litaC_parser__Parser* litaC_p);
-litaC_ast__ParametersStmt* litaC_parser__Parser_parametersStatement(litaC_parser__Parser* litaC_p);
-litaC_bool litaC_parser__Parser_structArguments(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_* litaC_arguments);
-litaC_bool litaC_parser__Parser_arguments(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb_ast__CallArg_ce_* litaC_arguments);
-litaC_bool litaC_parser__Parser_genericParameters(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* litaC_arguments);
-litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_parser__Parser_genericArguments(litaC_parser__Parser* litaC_p);
-litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ litaC_parser__Parser_tryGenericArguments(litaC_parser__Parser* litaC_p,litaC_bool litaC_disambiguate);
-litaC_bool litaC_parser__Parser_arrayArguments(litaC_parser__Parser* litaC_p,litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_* litaC_arguments);
-litaC_ast__Expr* litaC_parser__Parser_tryArrayDesignationExpr(litaC_parser__Parser* litaC_p);
-litaC_ast__FieldStmt litaC_parser__Parser_fieldStatement(litaC_parser__Parser* litaC_p,litaC_ast__StmtKind litaC_aggKind);
-litaC_ast__FieldStmt litaC_parser__Parser_noteFieldStatement(litaC_parser__Parser* litaC_p);
-litaC_ast__EnumFieldEntryDecl* litaC_parser__Parser_enumFieldEntryDecl(litaC_parser__Parser* litaC_p);
-litaC_void litaC_parser__Parser_rewindTo(litaC_parser__Parser* litaC_p,litaC_i32 litaC_backtrack,litaC_u64 litaC_numOfErrors);
-litaC_ast__Expr* litaC_parser__Parser_tryBitShiftRight(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
-litaC_void litaC_parser__Parser_eatSemicolon(litaC_parser__Parser* litaC_p);
-litaC_lex__Token litaC_parser__Parser_identifier(litaC_parser__Parser* litaC_p);
-litaC_bool litaC_parser__Parser_checkConstExpr(litaC_parser__Parser* litaC_p,litaC_ast__Expr* litaC_expr);
-litaC_ast__Stmt* litaC_parser__Parser_poisonStatement(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos);
-litaC_ast__Expr* litaC_parser__Parser_poisonExpr(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos);
-litaC_ast__Decl* litaC_parser__Parser_poisonDecl(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos);
-LITAC_INLINE 
-litaC_lex__SrcPos litaC_parser__Parser_pos(litaC_parser__Parser* litaC_p);
-litaC_lex__SrcPos litaC_parser__Parser_prevPos(litaC_parser__Parser* litaC_p);
-LITAC_INLINE 
-litaC_lex__Token* litaC_parser__Parser_peek(litaC_parser__Parser* litaC_p);
-litaC_void litaC_parser__Parser_rewind(litaC_parser__Parser* litaC_p);
-litaC_lex__Token* litaC_parser__Parser_previous(litaC_parser__Parser* litaC_p);
-litaC_bool litaC_parser__Parser_atEnd(litaC_parser__Parser* litaC_p);
-litaC_void litaC_parser__Parser_advance(litaC_parser__Parser* litaC_p);
-litaC_lex__Token* litaC_parser__Parser_advancep(litaC_parser__Parser* litaC_p);
-LITAC_INLINE 
-litaC_bool litaC_parser__Parser_check(litaC_parser__Parser* litaC_p,litaC_lex__TokenType litaC_type);
-litaC_bool litaC_parser__Parser_match(litaC_parser__Parser* litaC_p,litaC_lex__TokenType litaC_type);
-litaC_bool litaC_parser__Parser_matches(litaC_parser__Parser* litaC_p,litaC_lex__TokenType* litaC_types,litaC_i32 litaC_len);
-litaC_lex__Token* litaC_parser__Parser_consume(litaC_parser__Parser* litaC_p,litaC_lex__TokenType litaC_type,litaC_error_codes__ErrorCode litaC_errorCode);
-litaC_void litaC_parser__Parser_adjust(litaC_parser__Parser* litaC_p,litaC_lex__TokenType* litaC_types,litaC_i32 litaC_len);
-litaC_void litaC_parser__Parser_errorAtToken(litaC_parser__Parser* litaC_p,litaC_lex__Token* litaC_token,litaC_error_codes__ErrorCode litaC_errorCode);
-litaC_void litaC_parser__Parser_errorAtPos(litaC_parser__Parser* litaC_p,litaC_lex__SrcPos litaC_pos,litaC_error_codes__ErrorCode litaC_errorCode);
-litaC_void litaC_parser__Parser_errorUnexpectedToken(litaC_parser__Parser* litaC_p,litaC_lex__Token* litaC_token,litaC_error_codes__ErrorCode litaC_errorCode);
-litaC_i32 litaC_parser__Parser_numOfErrors(litaC_parser__Parser* litaC_p);
 litaC_void litaC_lsp__workspace__Workspace_init(litaC_lsp__workspace__Workspace* litaC_this,litaC_lsp__lsp__LspServer* litaC_lsp,const litaC_std__mem__Allocator* litaC_alloc);
 litaC_void litaC_lsp__workspace__Workspace_setup(litaC_lsp__workspace__Workspace* litaC_this,const litaC_char* litaC_rootPath,const litaC_char* litaC_rootUri);
 litaC_bool litaC_lsp__workspace__Workspace_isDocumentOpen(litaC_lsp__workspace__Workspace* litaC_this,const litaC_char* litaC_uri);
@@ -31559,21 +31578,24 @@ litaC_std__builtins__String litaC_pkg_mgr__pkg__PackageId_version(litaC_pkg_mgr_
 litaC_bool litaC_pkg_mgr__pkg__PackageIdFromString(const litaC_char* litaC_id,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackageFile(litaC_pkg_mgr__PackageManager* litaC_pm,const litaC_char* litaC_pkgFile,litaC_pkg_mgr__pkg__PackageDef** litaC_result);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__json__JsonNode* litaC_json,litaC_pkg_mgr__pkg__PackageDef** litaC_result);
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParseDependency(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__json__JsonNode* litaC_json,litaC_pkg_mgr__pkg__PackageDependency* litaC_dep);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackageId(litaC_std__json__JsonNode* litaC_json,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__PackageInstallOptions litaC_options);
 litaC_bool litaC_pkg_mgr__pkg_install__isPackageInstalled(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgDir);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__cleanPackageDirectory(litaC_pkg_mgr__PackageManager* litaC_pm,const litaC_char* litaC_pkgPath);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__deleteDir(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__string__buffer__StringBuffer* litaC_path);
-litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__findPackagesToInstall(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_pkgsToInstall);
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__findPackagesToInstall(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_pkgsToInstall);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__makePackageDirectory(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,litaC_char* litaC_output);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__downloadPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__http__Http* litaC_http,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgFile);
 litaC_usize litaC_pkg_mgr__pkg_install__httpCallback(litaC_void* litaC_data,litaC_usize litaC_size,litaC_usize litaC_n,litaC_void* litaC_userdata);
 const litaC_char* litaC_pkg_mgr__pkg_install__getRepoTemplate(litaC_pkg_mgr__pkg__PackageId* litaC_pkgId);
 litaC_char* litaC_pkg_mgr__pkg_install__sanitizeFilename(const litaC_char* litaC_filename,litaC_char* litaC_out);
-litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__installPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgFile,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_pkgsToInstall);
-litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__readPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgPath,litaC_pkg_mgr__pkg__PackageDef** litaC_resultPkg,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_pkgsToInstall);
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__installPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg_install__InstallOptions* litaC_options,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_pkgsToInstall);
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__readPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgPath,const litaC_char* litaC_pkgParentPath,litaC_pkg_mgr__pkg__PackageDef** litaC_resultPkg,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_pkgsToInstall);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__dealWithGithubBS(const litaC_char* litaC_pkgPath,litaC_std__array__std__array__Array_cb__ptr_const_char_ce_* litaC_extractedFiles);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__zipLocalPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgFile);
+litaC_std__zip__ZipStatus litaC_std__zip__ZipCompress(litaC_std__string__builder__StringBuilder* litaC_buffer,litaC_std__builtins__String litaC_source,litaC_std__zip__ZipCompressionLevel litaC_level);
+litaC_std__zip__ZipStatus litaC_std__zip__ZipUncompress(litaC_std__string__builder__StringBuilder* litaC_buffer,litaC_std__builtins__String litaC_source);
 litaC_void* litaC_std__zip__ZipFileAlloc(litaC_void* litaC_opaque,litaC_usize litaC_items,litaC_usize litaC_size);
 litaC_void* litaC_std__zip__ZipFileReAlloc(litaC_void* litaC_opaque,litaC_void* litaC_address,litaC_usize litaC_old_items,litaC_usize litaC_old_size,litaC_usize litaC_items,litaC_usize litaC_size);
 litaC_void litaC_std__zip__ZipFileFree(litaC_void* litaC_opaque,litaC_void* litaC_address);
@@ -31588,8 +31610,8 @@ litaC_std__zip__ZipStatus litaC_std__zip__ZipFile_zipFolder(litaC_std__zip__ZipF
 litaC_std__zip__ZipStatus litaC_std__zip__ZipFile_addFile(litaC_std__zip__ZipFile* litaC_this,const litaC_char* litaC_archiveName,const litaC_char* litaC_filename,litaC_std__zip__ZipCompressionLevel litaC_level);
 
 litaC_std__zip__ZipStatus litaC_std__zip__ZipFile_unzip(litaC_std__zip__ZipFile* litaC_this,const litaC_char* litaC_dest,litaC_std__array__std__array__Array_cb__ptr_const_char_ce_* litaC_extractedFiles,litaC_i32 litaC_flags);
-litaC_bool litaC_std__fs__FileHandle_openEx(litaC_std__fs__FileHandle* litaC_this,const litaC_char* litaC_path,litaC_i32 litaC_len);
-litaC_bool litaC_std__fs__FileHandle_open(litaC_std__fs__FileHandle* litaC_this,const litaC_char* litaC_path);
+litaC_void litaC_std__zip__testZipDir(void);
+litaC_bool litaC_std__fs__FileHandle_open(litaC_std__fs__FileHandle* litaC_this,litaC_std__builtins__String litaC_path);
 litaC_bool litaC_std__fs__FileHandle_isFile(litaC_std__fs__FileHandle* litaC_this);
 litaC_bool litaC_std__fs__FileHandle_isDirectory(litaC_std__fs__FileHandle* litaC_this);
 const litaC_char* litaC_std__fs__FileHandle_name(litaC_std__fs__FileHandle* litaC_this);
@@ -31605,6 +31627,7 @@ litaC_std__json__JsonNode* litaC_pkg_mgr__pkg_build__GetOS(litaC_std__json__Json
 litaC_std__json__JsonNode* litaC_pkg_mgr__pkg_build__GetArch(litaC_std__json__JsonNode* litaC_os,litaC_std__json__JsonNode* litaC_defaultOS);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_run__PackageRun(litaC_pkg_mgr__PackageManager* litaC_pm,const litaC_char* litaC_cmd);
 litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_init__PackageInit(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__PackageInitOptions litaC_options);
+const litaC_char* litaC_std__zip__ZipStatusAsStr(litaC_std__zip__ZipStatus litaC_enumType);
 const litaC_char* litaC_pkg_mgr__PkgStatusAsStr(litaC_pkg_mgr__PkgStatus litaC_enumType);
 const litaC_char* litaC_lsp__protocol__SymbolInfoKindAsStr(litaC_lsp__protocol__SymbolInfoKind litaC_enumType);
 const litaC_char* litaC_std__json__JsonTypeAsStr(litaC_std__json__JsonType litaC_enumType);
@@ -31994,6 +32017,22 @@ litaC_void litaC_std__array__std__array__Array_set_cb_ast__CallArg_ce_(litaC_std
 litaC_i32 litaC_std__array__std__array__Array_addAll_cb_ast__CallArg_ce_(litaC_std__array__std__array__Array_cb_ast__CallArg_ce_* litaC_a,litaC_std__array__std__array__Array_cb_ast__CallArg_ce_* litaC_other);
 litaC_void litaC_std__array__std__array__Array_sort_cb_ast__CallArg_ce_(litaC_std__array__std__array__Array_cb_ast__CallArg_ce_* litaC_a,litaC_i32 (*litaC_sorter)(litaC_ast__CallArg,litaC_ast__CallArg));
 litaC_void litaC_std__array__std__array__QuickSort_cb_ast__CallArg_ce_(litaC_std__array__std__array__Array_cb_ast__CallArg_ce_* litaC_array,litaC_i32 (*litaC_comp)(litaC_ast__CallArg,litaC_ast__CallArg));
+litaC_void litaC_std__array__std__array__Array_init_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
+litaC_i32 litaC_std__array__std__array__Array_add_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_lex__Token litaC_element);
+litaC_bool litaC_std__array__std__array__ArrayGrow_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_increment);
+LITAC_INLINE 
+litaC_bool litaC_std__array__std__array__Array_empty_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a);
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__ImportDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__NoteStmt_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
+litaC_ast__Decl* litaC_std__array__std__array__Array_last_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a);
+litaC_i32 litaC_std__array__std__array__Array_insertAt_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element);
+litaC_void litaC_std__array__std__array__Array_set_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element);
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
+litaC_i32 litaC_std__array__std__array__Array_add_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_ast__EnumFieldEntryDecl* litaC_element);
+litaC_bool litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_increment);
+LITAC_INLINE 
+litaC_i32 litaC_std__array__std__array__Array_size_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a);
 litaC_void litaC_std__array__std__array__Array_init_cb_lsp__references__Reference_ce_(litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
 litaC_void litaC_std__array__std__array__Array_init_cb_lsp__references__FieldReference_ce_(litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
 litaC_void litaC_std__map__std__map__Map_init_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* litaC_m,litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator,litaC_usize litaC_emptyKey);
@@ -32046,22 +32085,6 @@ LITAC_INLINE
 litaC_i32 litaC_std__map__std__map__Map_size_cb__ptr_const_char_c_i32_ce_(litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_* litaC_m);
 litaC_void litaC_std__array__std__array__Array_free_cb__ptr_std__json__JsonNode_ce_(litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* litaC_a);
 litaC_void litaC_std__array__std__array__Array_free_cb_std__json__JsonEntry_ce_(litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_* litaC_a);
-litaC_void litaC_std__array__std__array__Array_init_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
-litaC_i32 litaC_std__array__std__array__Array_add_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_lex__Token litaC_element);
-litaC_bool litaC_std__array__std__array__ArrayGrow_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_increment);
-LITAC_INLINE 
-litaC_bool litaC_std__array__std__array__Array_empty_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a);
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__ImportDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__NoteStmt_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
-litaC_ast__Decl* litaC_std__array__std__array__Array_last_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a);
-litaC_i32 litaC_std__array__std__array__Array_insertAt_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element);
-litaC_void litaC_std__array__std__array__Array_set_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element);
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
-litaC_i32 litaC_std__array__std__array__Array_add_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_ast__EnumFieldEntryDecl* litaC_element);
-litaC_bool litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_increment);
-LITAC_INLINE 
-litaC_i32 litaC_std__array__std__array__Array_size_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a);
 litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ litaC_std__map__std__map__StrMap_cb__ptr_lsp__document__Document_ce_(litaC_lsp__document__Document* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator);
 litaC_void litaC_std__map__std__map__Map_init_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_(litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_* litaC_m,litaC_lsp__document__Document* litaC_emptyValue,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_allocator,const litaC_char* litaC_emptyKey);
 litaC_bool litaC_std__map__std__map__MapGrow_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_(litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_* litaC_m,litaC_i32 litaC_newlength);
@@ -32147,20 +32170,19 @@ litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__Pa
 litaC_bool litaC_std__map__std__map__MapIterator_hasNext_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_(litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* litaC_iter);
 litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ litaC_std__map__std__map__MapIterator_next_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_(litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* litaC_iter);
 LITAC_INLINE 
-litaC_i32 litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a);
+litaC_i32 litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a);
 LITAC_INLINE 
-litaC_bool litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a);
-litaC_pkg_mgr__pkg__PackageId litaC_std__array__std__array__Array_get_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_index);
-litaC_void litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a);
+litaC_bool litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a);
+litaC_pkg_mgr__pkg__PackageDependency* litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_i32 litaC_index);
+litaC_void litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a);
 litaC_bool litaC_std__map__std__map__Map_contains_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_(litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* litaC_m,const litaC_char* litaC_key);
 litaC_pkg_mgr__pkg__PackageDef* litaC_std__map__std__map__Map_get_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_(litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* litaC_m,const litaC_char* litaC_key);
 litaC_pkg_mgr__pkg__PackageDef* litaC_std__mem__std__mem__new_cb_pkg_mgr__pkg__PackageDef_ce_(const litaC_std__mem__Allocator* litaC_a);
-litaC_void litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
-litaC_i32 litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_pkg_mgr__pkg__PackageId litaC_element);
-litaC_bool litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_increment);
-litaC_pkg_mgr__pkg__PackageId* litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_index);
-litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ litaC_std__array__std__array__ArrayInit_cb_pkg_mgr__pkg__PackageId_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
-litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_other);
+litaC_void litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
+litaC_i32 litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_pkg_mgr__pkg__PackageDependency litaC_element);
+litaC_bool litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_i32 litaC_increment);
+litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_ litaC_std__array__std__array__ArrayInit_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc);
+litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_other);
 
 
 // Generated code for interfaces
@@ -32173,84 +32195,13 @@ litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-struct litaC_pkg_mgr__pkg_build__CommandArgs {
-    litaC_i32 n;
-    litaC_char** args;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_char** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-
-struct litaC_preprocessor__CheckerContext {
-    litaC_module__Module* module;
-    litaC_ast__CompStmt* stmt;
-    
-};
-
-struct litaC_checker_expr__ParamInfo {
-    litaC_ast__TypeSpec* spec;
-    litaC_types__TypeInfo* typeInfo;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__CallArg* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_phase_result__PhaseError* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_module__ModuleImport {
-    litaC_module__Module* module;
-    litaC_intern__InternedString* alias;
-    litaC_bool isUsing;
-    
-};
-
-struct litaC_std__json__JsonIterator {
-    litaC_i32 index;
-    litaC_std__json__JsonNode* json;
-    
-};
-
-struct litaC_symbols__SymGenericArg {
-    litaC_ast__GenericArgKind kind;
-    litaC_types__TypeInfo* type;
-    
-};
-
-struct litaC_pkg_mgr__PackageOptions {
-    const litaC_char* projectPath;
-    const litaC_char* pkgDir;
-    litaC_lita__LitaOptions* litaOptions;
-    
-};
-
-struct litaC_lita__Metric {
-    litaC_usize bytesAllocated;
-    litaC_u32 allocationCount;
-    litaC_f64 executionTime;
+struct litaC_std__profile__ProfileEntry {
+    const litaC_char* functionName;
+    litaC_u64 count;
     litaC_f64 startTime;
+    litaC_f64 totalTime;
     
 };
-
-
 
 struct litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_ {
     litaC_i32 length;
@@ -32260,12 +32211,27 @@ struct litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_ {
     
 };
 
-struct litaC_intern__Strings {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__builtins__String* keys;
-    litaC_intern__InternedString* values;
+struct litaC_std__mem__bucket_allocator__Bucket {
+    litaC_std__mem__bucket_allocator__Bucket* prev;
+    litaC_u8* mem;
+    litaC_usize size;
+    litaC_void* padding;
+    
+};
+
+
+struct litaC_types_new__ArrayEntry {
+    litaC_types__TypeInfo* arrayOf;
+    litaC_ast__Expr* expr;
+    litaC_usize length;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
     
 };
 
@@ -32274,13 +32240,6 @@ struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_module__M
     litaC_i32 it;
     litaC_i32 prevIt;
     litaC_i32 count;
-    
-};
-
-struct litaC_cgen__CompilationUnit {
-    litaC_module__Module* module;
-    litaC_char filename[PATH_MAX];
-    FILE* file;
     
 };
 
@@ -32300,25 +32259,21 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    const litaC_char* key;
-    litaC_module__Module* value;
-    litaC_module__Module** valuePtr;
+struct litaC_std__builtins__String {
+    const litaC_char* buffer;
+    litaC_i32 length;
     
 };
 
-
-struct litaC_std__http__HttpOptions {
-    const litaC_char* proxy;
+struct litaC_pkg_mgr__pkg_install__InstallOptions {
+    litaC_pkg_mgr__pkg__PackageId* pkgId;
+    const litaC_char* pkgFile;
+    const litaC_char* pkgParentPath;
+    litaC_bool linkOnly;
+    litaC_bool unzip;
     
 };
 
-struct litaC_preprocessor__DeclContext {
-    litaC_checker__TypeChecker* checker;
-    litaC_ast__CompStmt* comp;
-    litaC_bool resolveSymbols;
-    
-};
 
 struct litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ {
     litaC_i32 length;
@@ -32336,22 +32291,27 @@ struct litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ {
     
 };
 
-struct litaC_std__builtins__any {
-    litaC_void* value;
-    litaC_u64 id;
-    
-};
-
-struct litaC_std__mem__linear_allocator__ExpandInfo {
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
     const litaC_std__mem__Allocator* allocator;
-    litaC_std__mem__linear_allocator__ExpandStrategy strategy;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_* entries;
+    litaC_i32 emptyValue;
+    const litaC_char* emptyKey;
     
 };
 
-struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    litaC_u32 hash;
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
     const litaC_char* key;
-    litaC_pkg_mgr__pkg__PackageDef* value;
+    litaC_module__Module* value;
+    litaC_module__Module** valuePtr;
+    
+};
+
+struct litaC_std__json__JsonContext {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_void (*maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*);
+    litaC_void* (*makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*);
     
 };
 
@@ -32364,22 +32324,26 @@ struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_
     
 };
 
-struct litaC_pkg_mgr__PackageInitOptions {
-    const litaC_char* name;
-    const litaC_char* version;
-    const litaC_char* type;
-    const litaC_char* repo;
+struct litaC_std__io__File {
+    FILE* file;
+    litaC_i64 _position;
     
 };
 
-struct litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lex__SrcPos* elements;
-    const litaC_std__mem__Allocator* alloc;
+union litaC_lex__Value {
+    litaC_f64 floatValue;
+    litaC_i64 intValue;
+    litaC_u64 uintValue;
+    litaC_std__builtins__String str;
     
 };
 
+struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_u32 hash;
+    const litaC_char* key;
+    litaC_pkg_mgr__pkg__PackageDef* value;
+    
+};
 
 struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ {
     litaC_u32 hash;
@@ -32388,46 +32352,39 @@ struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__
     
 };
 
-struct litaC_std__map__std__map__MapIterator_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-
-struct litaC_std__json__JsonEntry {
-    const litaC_char* key;
-    litaC_std__json__JsonNode* value;
-    
-};
-
-struct litaC_lsp__protocol__Position {
-    litaC_i32 line;
-    litaC_i32 character;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ {
+struct litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_lsp__references__Reference* elements;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_std__builtins__String_c_std__builtins__String_ce_* entries;
+    litaC_std__builtins__String emptyValue;
+    litaC_std__builtins__String emptyKey;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lex__Token_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lex__Token* elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_ {
-    litaC_u32 hash;
-    const litaC_char* key;
-    litaC_i32 value;
+struct litaC_std__mem__arena_allocator__Arena {
+    litaC_usize size;
+    litaC_usize current;
+    litaC_std__mem__arena_allocator__Arena* next;
+    litaC_u8* region;
     
 };
 
-struct litaC_preprocessor__api__ScriptRuntime {
-    ape_t* ape;
+struct litaC_pkg_mgr__PackageOptions {
+    const litaC_char* projectPath;
+    const litaC_char* pkgDir;
+    litaC_lita__LitaOptions* litaOptions;
     
 };
+
 
 struct litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ {
     litaC_i32 length;
@@ -32447,17 +32404,6 @@ struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce
     
 };
 
-struct litaC_pkg_mgr__pkg__PackageId {
-    litaC_char id[PATH_MAX];
-    litaC_i32 repoOffset;
-    litaC_i32 repoLength;
-    litaC_i32 nameOffset;
-    litaC_i32 nameLength;
-    litaC_i32 versionOffset;
-    litaC_i32 versionLength;
-    
-};
-
 struct litaC_std__map__std__map__Entry_cb_i64_c__ptr_types__TypeInfo_ce_ {
     litaC_u32 hash;
     litaC_i64 key;
@@ -32465,14 +32411,11 @@ struct litaC_std__map__std__map__Entry_cb_i64_c__ptr_types__TypeInfo_ce_ {
     
 };
 
-struct litaC_std__mem__Allocator {
-    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
-    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
-    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
-    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
+struct litaC_std__builtins__NativeVararg {
+    litaC_u64* args;
+    litaC_i32 numberOfArgs;
     
 };
-
 
 struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
     litaC_i32 length;
@@ -32482,28 +32425,9 @@ struct litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ {
     
 };
 
-struct litaC_std__http__Http {
-    litaC_std__http__HttpOptions options;
-    const litaC_std__mem__Allocator* allocator;
-    
-};
-
-struct litaC_preprocessor__ScriptDecl {
-    litaC_preprocessor__DeclContext ctx;
-    litaC_module__Module* module;
-    litaC_ast__ModuleStmt* declarations;
-    litaC_bool replacement;
-    
-};
-
-struct litaC_std__builtins__String {
-    const litaC_char* buffer;
-    litaC_i32 length;
-    
-};
-
-struct litaC_std__system__Process {
-    FILE* pipe;
+struct litaC_types__FieldPositionResult {
+    litaC_types__TypeInfo* aggInfo;
+    litaC_i32 position;
     
 };
 
@@ -32516,6 +32440,13 @@ struct litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_c
     
 };
 
+struct litaC_cgen__CompilationUnit {
+    litaC_module__Module* module;
+    litaC_char filename[PATH_MAX];
+    FILE* file;
+    
+};
+
 struct litaC_std__array__std__array__Array_cb_i64_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -32524,56 +32455,19 @@ struct litaC_std__array__std__array__Array_cb_i64_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapIterator_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
+union litaC_std__json__JsonValue {
+    litaC_bool boolValue;
+    litaC_f64 doubleValue;
+    litaC_i64 intValue;
+    const litaC_char* strValue;
+    litaC_std__json__JsonObject* objValue;
+    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
     
 };
 
-struct litaC_std__mem__arena_allocator__Arena {
-    litaC_usize size;
-    litaC_usize current;
-    litaC_std__mem__arena_allocator__Arena* next;
-    litaC_u8* region;
-    
-};
-
-struct litaC_pkg_mgr__PackageBuildOptions {
-    litaC_bool isRelease;
-    
-};
-
-struct litaC_std__cmdline__Option {
+struct litaC_std__json__SrcPos {
     const litaC_char* name;
-    litaC_char shortName;
-    const litaC_char* description;
-    const litaC_char* value;
-    const litaC_char* defaultValue;
-    litaC_i32 flags;
-    
-};
-
-
-struct litaC_lita__CCompilerOption {
-    Lita_OSType os;
-    Lita_ArchType arch;
-    litaC_std__builtins__String options;
-    
-};
-
-struct litaC_types_new__ArrayEntry {
-    litaC_types__TypeInfo* arrayOf;
-    litaC_ast__Expr* expr;
-    litaC_usize length;
-    
-};
-
-struct litaC_std__json__JsonContext {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_void (*maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*);
-    litaC_void* (*makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*);
+    litaC_i32 line;
     
 };
 
@@ -32582,12 +32476,6 @@ struct litaC_std__map__std__map__MapIterator_cb_i64_c_std__array__Array_cb_i64_c
     litaC_i32 it;
     litaC_i32 prevIt;
     litaC_i32 count;
-    
-};
-
-struct litaC_std__mem__track_allocator__Allocation {
-    litaC_void* addr;
-    litaC_usize size;
     
 };
 
@@ -32607,210 +32495,10 @@ struct litaC_std__array__std__array__Array_cb_symbols__SymGenericArg_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_types_new__ArrayEntry key;
-    litaC_types__TypeInfo* value;
-    litaC_types__TypeInfo** valuePtr;
-    
-};
-
 struct litaC_std__map__std__map__MapEntry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
     litaC_i64 key;
     litaC_std__array__std__array__Array_cb_i64_ce_ value;
     litaC_std__array__std__array__Array_cb_i64_ce_* valuePtr;
-    
-};
-
-struct litaC_std__json__SrcPos {
-    const litaC_char* name;
-    litaC_i32 line;
-    
-};
-
-struct litaC_lsp__protocol__Range {
-    litaC_lsp__protocol__Position start;
-    litaC_lsp__protocol__Position end;
-    
-};
-
-struct litaC_std__profile__ProfileEntry {
-    const litaC_char* functionName;
-    litaC_u64 count;
-    litaC_f64 startTime;
-    litaC_f64 totalTime;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__ImportDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_* entries;
-    litaC_module__ModuleImport emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_std__string__SplitIter {
-    litaC_std__builtins__String str;
-    litaC_std__builtins__String split;
-    litaC_i32 lastIndex;
-    litaC_i32 currentIndex;
-    
-};
-
-
-struct litaC_build__BuildFile {
-    const litaC_std__mem__Allocator* allocator;
-    const litaC_char* compileCmdTemplate;
-    const litaC_char* projectSrcDir;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
-    
-};
-
-struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_ {
-    litaC_i32 length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* next;
-    litaC_ast__TypeSpec* elements;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    const litaC_char* key;
-    litaC_module__ModuleImport value;
-    litaC_module__ModuleImport* valuePtr;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_usize key;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
-    
-};
-
-struct litaC_std__string__buffer__StringBuffer {
-    litaC_char* buffer;
-    litaC_i32 length;
-    litaC_i32 capacity;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_u32 hash;
-    litaC_usize key;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_dependency_graph__Dependency** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__mem__linear_allocator__LinearAllocator {
-    litaC_std__mem__Allocator allocator;
-    litaC_void* mem;
-    litaC_usize size;
-    litaC_usize currentOffset;
-    litaC_usize alignment;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    litaC_std__mem__linear_allocator__ExpandInfo expandInfo;
-    
-};
-
-struct litaC_ast_new__TypeSpecAllocator {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ typeSpecs;
-    
-};
-
-
-struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_* entries;
-    litaC_i32 emptyValue;
-    litaC_i32 emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lsp__references__FieldReference* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_pkg_mgr__PackageInstallOptions {
-    litaC_bool fullSync;
-    litaC_std__http__HttpOptions httpOptions;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__SwitchCaseStmt** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lex__Token_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lex__Token* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_pkg_mgr__pkg__PackageId* elements;
-    const litaC_std__mem__Allocator* alloc;
     
 };
 
@@ -32822,6 +32510,7 @@ struct litaC_std__map__std__map__MapIterator_cb__ptr_symbols__Symbol_c_dependenc
     
 };
 
+
 struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
     litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* m;
     litaC_i32 it;
@@ -32830,19 +32519,165 @@ struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c__ptr_pkg_mgr__
     
 };
 
-union litaC_std__json__JsonValue {
-    litaC_bool boolValue;
-    litaC_f64 doubleValue;
-    litaC_i64 intValue;
-    const litaC_char* strValue;
-    litaC_std__json__JsonObject* objValue;
-    litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* arrayValue;
+struct litaC_pkg_mgr__PackageInitOptions {
+    const litaC_char* name;
+    const litaC_char* version;
+    const litaC_char* type;
+    const litaC_char* repo;
     
 };
 
-struct litaC_lsp__protocol__Location {
-    const litaC_char* uri;
-    litaC_lsp__protocol__Range range;
+struct litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__ImportDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    const litaC_char* key;
+    litaC_pkg_mgr__pkg__PackageDef* value;
+    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
+    
+};
+
+
+struct litaC_lita__PkgOptions {
+    litaC_lita__PkgCommand pkgCmd;
+    const litaC_char* pkgRunCmdArg;
+    litaC_bool forceClean;
+    litaC_bool isRelease;
+    const litaC_char* pkgName;
+    
+};
+
+
+struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_ {
+    litaC_i32 length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_ast__TypeSpec_ce_* next;
+    litaC_ast__TypeSpec* elements;
+    
+};
+
+struct litaC_std__mem__linear_allocator__ExpandInfo {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__mem__linear_allocator__ExpandStrategy strategy;
+    
+};
+
+struct litaC_lsp__protocol__Position {
+    litaC_i32 line;
+    litaC_i32 character;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lex__SrcPos* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_preprocessor__api__ScriptRuntime {
+    ape_t* ape;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_i32_c_i32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_* entries;
+    litaC_i32 emptyValue;
+    litaC_i32 emptyKey;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ {
+    litaC_i64 key;
+    litaC_types__TypeInfo* value;
+    litaC_types__TypeInfo** valuePtr;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lsp__references__Reference* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_dependency_graph__Dependency** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_ {
+    litaC_u32 hash;
+    const litaC_char* key;
+    litaC_i32 value;
+    
+};
+
+struct litaC_std__json__JsonNode {
+    const litaC_std__mem__Allocator* alloc;
+    litaC_std__json__JsonType type;
+    litaC_std__json__JsonValue value;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__SwitchCaseStmt** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__process__Process {
+    subprocess_s sub;
+    litaC_i32 options;
+    
+};
+
+struct litaC_checker__GenericContext {
+    litaC_module__Module* callsite;
+    
+};
+
+struct litaC_pkg_mgr__pkg_build__CommandArgs {
+    litaC_i32 n;
+    litaC_char** args;
     
 };
 
@@ -32862,352 +32697,27 @@ struct litaC_std__array__std__array__Array_cb_preprocessor__CheckerContext_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    const litaC_char* key;
-    litaC_pkg_mgr__pkg__PackageDef* value;
-    litaC_pkg_mgr__pkg__PackageDef** valuePtr;
-    
-};
-
-struct litaC_phase_result__PhaseResult {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ errors;
-    litaC_bool enabled;
-    litaC_bool isReadable;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ {
+struct litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
-    litaC_ast__GenericParam* elements;
+    litaC_pkg_mgr__pkg__PackageDependency* elements;
     const litaC_std__mem__Allocator* alloc;
     
 };
 
-struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* next;
-    litaC_types__TypeInfo* elements;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__mem__track_allocator__Allocation** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__string__builder__StringBuilder {
-    litaC_std__string__buffer__StringBuffer asBuffer;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_std__builtins__String_c_std__builtins__String_ce_ {
-    litaC_u32 hash;
-    litaC_std__builtins__String key;
-    litaC_std__builtins__String value;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_u32 hash;
-    litaC_i64 key;
-    litaC_std__array__std__array__Array_cb_i64_ce_ value;
-    
-};
-
-struct litaC_lex__SrcPos {
-    const litaC_char* filename;
-    const litaC_char* lineStart;
-    const litaC_char* start;
-    const litaC_char* end;
-    litaC_i32 lineNumber;
-    litaC_i32 position;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__cmdline__Option* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_std__json__JsonEntry* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
-    litaC_u32 hash;
-    const litaC_char* key;
-    litaC_module__Module* value;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_symbols__Symbol** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_lita__CCompilerOption* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_* entries;
-    litaC_types__TypeInfo* emptyValue;
-    litaC_types_new__ArrayEntry emptyKey;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Decl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-
-
-struct litaC_lita__PkgOptions {
-    litaC_lita__PkgCommand pkgCmd;
-    const litaC_char* pkgRunCmdArg;
-    litaC_bool forceClean;
+struct litaC_pkg_mgr__PackageBuildOptions {
     litaC_bool isRelease;
-    const litaC_char* pkgName;
     
 };
 
-struct litaC_std__json__JsonNode {
-    const litaC_std__mem__Allocator* alloc;
-    litaC_std__json__JsonType type;
-    litaC_std__json__JsonValue value;
+struct litaC_std__mem__Allocator {
+    litaC_void* (*allocFn)(const litaC_std__mem__Allocator*,litaC_usize);
+    litaC_void* (*callocFn)(const litaC_std__mem__Allocator*,litaC_usize,litaC_usize);
+    litaC_void* (*reallocFn)(const litaC_std__mem__Allocator*,litaC_void*,litaC_usize,litaC_usize);
+    litaC_void (*freeFn)(const litaC_std__mem__Allocator*,litaC_void*);
     
 };
 
-
-struct litaC_lsp__protocol__TextDocument {
-    const litaC_char* uri;
-    litaC_u32 version;
-    
-};
-
-struct litaC_types__FieldPositionResult {
-    litaC_types__TypeInfo* aggInfo;
-    litaC_i32 position;
-    
-};
-
-struct litaC_ast__FieldStmt {
-    litaC_ast__StmtKind kind;
-    litaC_types__TypeInfo* typeInfo;
-    union  {
-        litaC_ast__EnumDecl* enumField;
-        litaC_ast__AggregateDecl* aggregateField;
-        litaC_ast__VarFieldDecl* varField;
-        litaC_ast__TraitFieldDecl* traitField;
-        litaC_ast__Expr* poisonField;
-        
-    };
-    
-};
-
-struct litaC_introspection__Introspect {
-    litaC_lita__Lita* lita;
-    
-};
-
-struct litaC_cgen__CGenScope {
-    litaC_cgen__CGenScope* parent;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ defers;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ constDefs;
-    litaC_bool isLoop;
-    litaC_bool isSwitch;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* entries;
-    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__mem__bucket_allocator__Bucket {
-    litaC_std__mem__bucket_allocator__Bucket* prev;
-    litaC_u8* mem;
-    litaC_usize size;
-    litaC_void* padding;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_std__builtins__String_c_std__builtins__String_ce_ {
-    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
-
-struct litaC_preprocessor__CallContext {
-    litaC_preprocessor__Preprocessor* pp;
-    litaC_checker__TypeChecker* checker;
-    litaC_ast__CompStmt* comp;
-    litaC_std__string__builder__StringBuilder buffer;
-    litaC_bool resolveSymbols;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* entries;
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
-    litaC_usize emptyKey;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_u32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_u32* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__String_ce_ {
-    litaC_std__builtins__String key;
-    litaC_std__builtins__String value;
-    litaC_std__builtins__String* valuePtr;
-    
-};
-
-union litaC_lex__Value {
-    litaC_f64 floatValue;
-    litaC_i64 intValue;
-    litaC_u64 uintValue;
-    litaC_std__builtins__String str;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
-    litaC_u32 hash;
-    const litaC_char* key;
-    litaC_module__ModuleImport value;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__Expr** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_* entries;
-    litaC_lsp__document__Document* emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__process__Process {
-    subprocess_s sub;
-    litaC_i32 options;
-    
-};
-
-struct litaC_checker__GenericContext {
-    litaC_module__Module* callsite;
-    
-};
-
-
-struct litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_ast__EnumFieldEntryDecl** elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__array__std__array__Array_cb_preprocessor__ScriptDecl_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    litaC_preprocessor__ScriptDecl* elements;
-    const litaC_std__mem__Allocator* alloc;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_i32_ce_* entries;
-    litaC_i32 emptyValue;
-    const litaC_char* emptyKey;
-    
-};
-
-struct litaC_std__io__File {
-    FILE* file;
-    litaC_i64 _position;
-    
-};
-
-struct litaC_dependency_graph__Dependency {
-    litaC_dependency_graph__State state;
-    litaC_symbols__Symbol* sym;
-    litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ dependsOn;
-    
-};
-
-struct litaC_pkg_mgr__PackageManager {
-    litaC_pkg_mgr__PackageOptions options;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ packages;
-    litaC_pkg_mgr__pkg__PackageDef* pkg;
-    litaC_std__string__builder__StringBuilder errors;
-    litaC_std__string__builder__StringBuilder warnings;
-    
-};
-
-struct litaC_std__map__std__map__MapIterator_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_* m;
-    litaC_i32 it;
-    litaC_i32 prevIt;
-    litaC_i32 count;
-    
-};
 
 struct litaC_lita__LitaOptions {
     litaC_char projectPath[PATH_MAX];
@@ -33245,6 +32755,337 @@ struct litaC_lita__LitaOptions {
     
 };
 
+struct litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__GenericParam* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_std__bucket_list__std__bucket_list__Bucket_cb_types__TypeInfo_ce_* next;
+    litaC_types__TypeInfo* elements;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__mem__track_allocator__Allocation** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_generics__Template {
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
+    litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_* genericArgs;
+    
+};
+
+struct litaC_std__mem__track_allocator__Allocation {
+    litaC_void* addr;
+    litaC_usize size;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_std__builtins__String_c_std__builtins__String_ce_ {
+    litaC_u32 hash;
+    litaC_std__builtins__String key;
+    litaC_std__builtins__String value;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_u32 hash;
+    litaC_i64 key;
+    litaC_std__array__std__array__Array_cb_i64_ce_ value;
+    
+};
+
+struct litaC_lsp__protocol__Range {
+    litaC_lsp__protocol__Position start;
+    litaC_lsp__protocol__Position end;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__cmdline__Option* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__http__HttpOptions {
+    const litaC_char* proxy;
+    
+};
+
+
+struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_module__Module_ce_ {
+    litaC_u32 hash;
+    const litaC_char* key;
+    litaC_module__Module* value;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_symbols__Symbol** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lita__CCompilerOption* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_* entries;
+    litaC_types__TypeInfo* emptyValue;
+    litaC_types_new__ArrayEntry emptyKey;
+    
+};
+
+struct litaC_preprocessor__CheckerContext {
+    litaC_module__Module* module;
+    litaC_ast__CompStmt* stmt;
+    
+};
+
+struct litaC_checker_expr__ParamInfo {
+    litaC_ast__TypeSpec* spec;
+    litaC_types__TypeInfo* typeInfo;
+    
+};
+
+struct litaC_pkg_mgr__pkg__PackageId {
+    litaC_char id[PATH_MAX];
+    litaC_i32 repoOffset;
+    litaC_i32 repoLength;
+    litaC_i32 nameOffset;
+    litaC_i32 nameLength;
+    litaC_i32 versionOffset;
+    litaC_i32 versionLength;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Decl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+
+
+struct litaC_std__map__std__map__MapIterator_cb_std__builtins__String_c_std__builtins__String_ce_ {
+    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+
+struct litaC_lita__Metric {
+    litaC_usize bytesAllocated;
+    litaC_u32 allocationCount;
+    litaC_f64 executionTime;
+    litaC_f64 startTime;
+    
+};
+
+struct litaC_std__regex__Regex {
+    re_t reg;
+    
+};
+
+struct litaC_std__fs__FileHandle {
+    tinydir_dir dir;
+    tinydir_file file;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_u32 hash;
+    litaC_usize key;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_std__builtins__String_c_std__builtins__String_ce_ {
+    litaC_std__builtins__String key;
+    litaC_std__builtins__String value;
+    litaC_std__builtins__String* valuePtr;
+    
+};
+
+struct litaC_std__string__SplitIter {
+    litaC_std__builtins__String str;
+    litaC_std__builtins__String split;
+    litaC_i32 lastIndex;
+    litaC_i32 currentIndex;
+    
+};
+
+struct litaC_pkg_mgr__PackageInstallOptions {
+    litaC_bool fullSync;
+    litaC_std__http__HttpOptions httpOptions;
+    
+};
+
+struct litaC_std__string__buffer__StringBuffer {
+    litaC_char* buffer;
+    litaC_i32 length;
+    litaC_i32 capacity;
+    
+};
+
+
+struct litaC_ast__Attributes {
+    litaC_ast__Visibility visibility;
+    litaC_bool isGlobal;
+    litaC_bool isUsing;
+    litaC_bool isGenerated;
+    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
+    
+};
+
+struct litaC_std__json__JsonIterator {
+    litaC_i32 index;
+    litaC_std__json__JsonNode* json;
+    
+};
+
+struct litaC_std__mem__track_allocator__TrackAllocator {
+    litaC_std__mem__Allocator alloc;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
+    litaC_usize totalAllocations;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_lsp__references__FieldReference* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_u32_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_u32* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_* entries;
+    litaC_pkg_mgr__pkg__PackageDef* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_std__mem__linear_allocator__LinearAllocator {
+    litaC_std__mem__Allocator allocator;
+    litaC_void* mem;
+    litaC_usize size;
+    litaC_usize currentOffset;
+    litaC_usize alignment;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    litaC_std__mem__linear_allocator__ExpandInfo expandInfo;
+    
+};
+
+struct litaC_intern__Strings {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__builtins__String* keys;
+    litaC_intern__InternedString* values;
+    
+};
+
+struct litaC_lsp__protocol__Location {
+    const litaC_char* uri;
+    litaC_lsp__protocol__Range range;
+    
+};
+
+struct litaC_std__http__Http {
+    litaC_std__http__HttpOptions options;
+    const litaC_std__mem__Allocator* allocator;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__Expr** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_* entries;
+    litaC_lsp__document__Document* emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+
+struct litaC_preprocessor__DeclContext {
+    litaC_checker__TypeChecker* checker;
+    litaC_ast__CompStmt* comp;
+    litaC_bool resolveSymbols;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__EnumFieldEntryDecl** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_preprocessor__ScriptDecl_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_preprocessor__ScriptDecl* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_module__ModuleImport {
+    litaC_module__Module* module;
+    litaC_intern__InternedString* alias;
+    litaC_bool isUsing;
+    
+};
+
 struct litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ {
     litaC_i32 length;
     litaC_i32 capacity;
@@ -33278,40 +33119,184 @@ struct litaC_std__map__std__map__Entry_cb_i32_c_i32_ce_ {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_i64_c__ptr_types__TypeInfo_ce_ {
-    litaC_i64 key;
+struct litaC_symbols__SymGenericArg {
+    litaC_ast__GenericArgKind kind;
+    litaC_types__TypeInfo* type;
+    
+};
+
+
+struct litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_char** elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_std__json__JsonEntry* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__string__builder__StringBuilder {
+    litaC_std__string__buffer__StringBuffer asBuffer;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__builtins__any {
+    litaC_void* value;
+    litaC_u64 id;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_i64_c_std__array__Array_cb_i64_ce__ce_* entries;
+    litaC_std__array__std__array__Array_cb_i64_ce_ emptyValue;
+    litaC_i64 emptyKey;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_std__http__HttpBody {
+    litaC_std__http__HttpBodyKind kind;
+    union  {
+        litaC_std__builtins__String data;
+        litaC_usize (*stream)(litaC_void*,litaC_usize,litaC_usize,litaC_void*);
+        
+    };
+    
+};
+
+struct litaC_lsp__document__Document {
+    litaC_char filename[PATH_MAX];
+    litaC_std__string__builder__StringBuilder text;
+    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
+    
+};
+
+struct litaC_std__system__Process {
+    FILE* pipe;
+    
+};
+
+struct litaC_lsp__protocol__TextDocument {
+    const litaC_char* uri;
+    litaC_u32 version;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_ast__CallArg* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    litaC_phase_result__PhaseError* elements;
+    const litaC_std__mem__Allocator* alloc;
+    
+};
+
+struct litaC_introspection__Introspect {
+    litaC_lita__Lita* lita;
+    
+};
+
+struct litaC_cgen__CGenScope {
+    litaC_cgen__CGenScope* parent;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ defers;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ constDefs;
+    litaC_bool isLoop;
+    litaC_bool isSwitch;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_types_new__ArrayEntry key;
     litaC_types__TypeInfo* value;
     litaC_types__TypeInfo** valuePtr;
     
 };
 
-struct litaC_generics__Template {
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_* genericParams;
-    litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_* genericArgs;
+struct litaC_lex__SrcPos {
+    const litaC_char* filename;
+    const litaC_char* lineStart;
+    const litaC_char* start;
+    const litaC_char* end;
+    litaC_i32 lineNumber;
+    litaC_i32 position;
     
 };
 
-struct litaC_parser__Parser {
+
+struct litaC_std__zip__ZipFile {
+    mz_zip_archive archive;
+    litaC_std__zip__ZipOpen type;
     const litaC_std__mem__Allocator* allocator;
-    litaC_ast_new__TypeSpecAllocator* typeAllocator;
+    
+};
+
+struct litaC_std__cmdline__Option {
+    const litaC_char* name;
+    litaC_char shortName;
+    const litaC_char* description;
+    const litaC_char* value;
+    const litaC_char* defaultValue;
+    litaC_i32 flags;
+    
+};
+
+struct litaC_preprocessor__ScriptDecl {
+    litaC_preprocessor__DeclContext ctx;
     litaC_module__Module* module;
-    litaC_phase_result__PhaseResult* result;
-    litaC_lita__Lita* lita;
-    litaC_intern__Strings* strings;
-    const litaC_char* filename;
-    litaC_i32 totalLines;
-    litaC_std__array__std__array__Array_cb_lex__Token_ce_ tokens;
-    litaC_i32 current;
-    litaC_lex__SrcPos currentPos;
-    litaC_i32 breakLevel;
-    litaC_i32 loopLevel;
-    litaC_i32 switchLevel;
-    litaC_i32 funcLevel;
-    litaC_i32 aggregateLevel;
-    litaC_u32 tryLevel;
-    litaC_u64 tryErrorCounter;
-    litaC_bool panicMode;
-    litaC_i32 preprocessorLevel;
+    litaC_ast__ModuleStmt* declarations;
+    litaC_bool replacement;
+    
+};
+
+struct litaC_std__json__JsonEntry {
+    const litaC_char* key;
+    litaC_std__json__JsonNode* value;
+    
+};
+
+struct litaC_std__map__std__map__MapIterator_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* m;
+    litaC_i32 it;
+    litaC_i32 prevIt;
+    litaC_i32 count;
+    
+};
+
+struct litaC_ast_new__TypeSpecAllocator {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__bucket_list__std__bucket_list__BucketList_cb_ast__TypeSpec_ce_ typeSpecs;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
+    litaC_u32 hash;
+    litaC_types_new__ArrayEntry key;
+    litaC_types__TypeInfo* value;
     
 };
 
@@ -33325,75 +33310,6 @@ struct litaC_ast__Node {
 
 struct litaC_ast__Stmt {
     litaC_ast__Node node;
-    
-};
-
-struct litaC_ast__ReturnStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* expr;
-    
-};
-
-struct litaC_ast__Operand {
-    litaC_types__TypeInfo* typeInfo;
-    litaC_bool isRightValue;
-    litaC_bool isConst;
-    litaC_lex__Value val;
-    
-};
-
-struct litaC_ast__Expr {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Operand operand;
-    litaC_types__TypeInfo* expectedType;
-    
-};
-
-struct litaC_ast__PoisonExpr {
-    litaC_ast__Expr expr;
-    
-};
-
-struct litaC_lsp__protocol__TextDocumentDidChange {
-    litaC_lsp__protocol__TextDocument textDocument;
-    litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ contentChanges;
-    
-};
-
-struct litaC_std__zip__ZipFile {
-    mz_zip_archive archive;
-    litaC_std__zip__ZipOpen type;
-    const litaC_std__mem__Allocator* allocator;
-    
-};
-
-struct litaC_pkg_mgr__pkg__PackageDef {
-    litaC_pkg_mgr__pkg__PackageId id;
-    litaC_char path[PATH_MAX];
-    litaC_pkg_mgr__pkg__PackageType type;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ dynamicLibraries;
-    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ dependencies;
-    litaC_std__json__JsonNode* json;
-    
-};
-
-struct litaC_std__fs__FileHandle {
-    tinydir_dir dir;
-    tinydir_file file;
-    
-};
-
-struct litaC_std__mem__bucket_allocator__BucketAllocator {
-    litaC_std__mem__Allocator allocator;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__mem__bucket_allocator__Bucket* buckets;
-    litaC_std__mem__bucket_allocator__Bucket* head;
-    litaC_usize bucketSize;
-    litaC_usize currentOffset;
-    litaC_u32 totalAllocations;
-    litaC_usize totalBytesAllocated;
-    litaC_usize totalGrossBytesAllocated;
-    litaC_u32 totalBuckets;
     
 };
 
@@ -33427,15 +33343,6 @@ struct litaC_ast__Identifier {
     
 };
 
-struct litaC_ast__Attributes {
-    litaC_ast__Visibility visibility;
-    litaC_bool isGlobal;
-    litaC_bool isUsing;
-    litaC_bool isGenerated;
-    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
-    
-};
-
 struct litaC_ast__Decl {
     litaC_ast__Stmt stmt;
     litaC_symbols__Symbol* sym;
@@ -33444,271 +33351,9 @@ struct litaC_ast__Decl {
     
 };
 
-struct litaC_ast__GenericDecl {
-    litaC_ast__Decl declaration;
-    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
-    
-};
-
-struct litaC_ast__FuncDecl {
-    litaC_ast__GenericDecl decl;
-    litaC_ast__ParametersStmt* params;
-    litaC_ast__Stmt* body;
-    litaC_ast__TypeSpec* returnType;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_i64_c_std__array__Array_cb_i64_ce__ce_* entries;
-    litaC_std__array__std__array__Array_cb_i64_ce_ emptyValue;
-    litaC_i64 emptyKey;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_std__builtins__String_c_std__builtins__String_ce_* entries;
-    litaC_std__builtins__String emptyValue;
-    litaC_std__builtins__String emptyKey;
-    
-};
-
-struct litaC_std__http__HttpResponse {
-    litaC_i32 statusCode;
-    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
-    litaC_std__string__builder__StringBuilder body;
-    litaC_void* userdata;
-    litaC_usize (*bodyFn)(litaC_void*,litaC_usize,litaC_usize,litaC_void*);
-    
-};
-
-struct litaC_ast__BooleanExpr {
-    litaC_ast__Expr expr;
-    litaC_bool boolean;
-    
-};
-
-struct litaC_ast__PoisonDecl {
+struct litaC_ast__EnumFieldEntryDecl {
     litaC_ast__Decl decl;
-    
-};
-
-struct litaC_ast__GetExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__IdentifierExpr* field;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_lex__Lexer {
-    const litaC_std__mem__Allocator* allocator;
-    const litaC_char* filename;
-    litaC_lex__Token token;
-    const litaC_char* stream;
-    litaC_i64 length;
-    const litaC_char* lineStart;
-    litaC_i32 lineNumber;
-    litaC_i32 position;
-    const litaC_char* errorMsg;
-    
-};
-
-struct litaC_ast__DoWhileStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* cond;
-    litaC_ast__Stmt* body;
-    
-};
-
-
-struct litaC_lsp__util__SourceLocation {
-    litaC_lsp__util__SourceLocationKind kind;
-    litaC_module__Module* module;
-    litaC_lsp__protocol__Location location;
-    union  {
-        litaC_ast__Node* node;
-        litaC_ast__TypeSpec* type;
-        
-    };
-    
-};
-
-
-struct litaC_lsp__util__SourceLookup {
-    litaC_lsp__lsp__LspServer* lsp;
-    litaC_lsp__protocol__Position lookupPos;
-    litaC_lsp__util__SourceLocation result;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* entries;
-    litaC_symbols__Symbol* emptyValue;
-    litaC_intern__InternedString emptyKey;
-    
-};
-
-
-
-struct litaC_ast__NumberExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__Token number;
-    
-};
-
-struct litaC_std__regex__Regex {
-    re_t reg;
-    
-};
-
-struct litaC_ast__IfStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* cond;
-    litaC_ast__Stmt* then;
-    litaC_ast__Stmt* elseStmt;
-    
-};
-
-struct litaC_ast__SubscriptSetExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__Expr* index;
-    litaC_lex__TokenType operator;
     litaC_ast__Expr* value;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ {
-    litaC_u32 hash;
-    litaC_types_new__ArrayEntry key;
-    litaC_types__TypeInfo* value;
-    
-};
-
-struct litaC_ast__SwitchCaseStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* cond;
-    litaC_ast__Stmt* body;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* entries;
-    litaC_dependency_graph__Dependency emptyValue;
-    litaC_symbols__Symbol* emptyKey;
-    
-};
-
-struct litaC_lsp__protocol__TextDocumentChangeEvent {
-    litaC_bool hasRange;
-    litaC_lsp__protocol__Range range;
-    litaC_u32 rangeLength;
-    const litaC_char* text;
-    
-};
-
-struct litaC_ast__WhileStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Expr* cond;
-    litaC_ast__Stmt* body;
-    
-};
-
-struct litaC_ast__AggregateDecl {
-    litaC_ast__GenericDecl decl;
-    litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ fields;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_ast__CastExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__TypeSpec* castTo;
-    litaC_ast__Expr* exprToCast;
-    
-};
-
-struct litaC_ast__BlockStmt {
-    litaC_ast__Stmt stmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ stmts;
-    
-};
-
-
-
-struct litaC_ast__TypeSpec {
-    litaC_ast__TypeSpecKind kind;
-    litaC_lex__SrcPos pos;
-    litaC_ast__TypeSpec* base;
-    litaC_types__TypeInfo* typeInfo;
-    union  {
-        struct  {
-            litaC_intern__InternedString name;
-            litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ genericArgs;
-            
-        };
-        struct  {
-            litaC_ast__Expr* numElements;
-            
-        };
-        struct  {
-            litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ args;
-            litaC_ast__TypeSpec* ret;
-            litaC_bool hasVarargs;
-            litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
-            
-        };
-        
-    };
-    
-};
-
-struct litaC_ast__GroupExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* groupedExpr;
-    
-};
-
-struct litaC_module__ModuleId {
-    litaC_char filename[PATH_MAX];
-    litaC_char filenameKey[PATH_MAX];
-    litaC_intern__InternedString packageName;
-    litaC_intern__InternedString name;
-    
-};
-
-struct litaC_symbols__Scope {
-    litaC_symbols__ScopeKind kind;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_phase_result__PhaseResult* result;
-    litaC_symbols__Scope* parent;
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ symbolNotes;
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ symbolTypes;
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ symbolFuncs;
-    litaC_module__Module* module;
-    
-};
-
-struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_* entries;
-    litaC_module__Module* emptyValue;
-    litaC_intern__InternedString emptyKey;
     
 };
 
@@ -33723,61 +33368,51 @@ struct litaC_std__mem__arena_allocator__ArenaAllocator {
     
 };
 
-struct litaC_module__Module {
-    litaC_module__ModuleId id;
-    litaC_std__string__buffer__StringBuffer text;
-    litaC_ast__ModuleStmt* ast;
-    litaC_symbols__Scope symbols;
-    litaC_symbols__Scope* currentScope;
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* genericSymbols;
-    litaC_i32 flags;
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ importedBy;
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ importAliases;
-    litaC_ast_new__TypeSpecAllocator typeSpecAllocator;
-    litaC_std__mem__arena_allocator__ArenaAllocator arena;
+struct litaC_lsp__references__Reference {
+    litaC_i64 type;
+    litaC_lex__SrcPos pos;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
     const litaC_std__mem__Allocator* allocator;
-    litaC_lita__Lita* lita;
+    litaC_std__map__std__map__Entry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_* entries;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ emptyValue;
+    litaC_usize emptyKey;
     
 };
 
-struct litaC_ast__EmptyStmt {
+struct litaC_dependency_graph__Dependency {
+    litaC_dependency_graph__State state;
+    litaC_symbols__Symbol* sym;
+    litaC_std__array__std__array__Array_cb__ptr_dependency_graph__Dependency_ce_ dependsOn;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_* entries;
+    litaC_dependency_graph__Dependency emptyValue;
+    litaC_symbols__Symbol* emptyKey;
+    
+};
+
+struct litaC_ast__Operand {
+    litaC_types__TypeInfo* typeInfo;
+    litaC_bool isRightValue;
+    litaC_bool isConst;
+    litaC_lex__Value val;
+    
+};
+
+struct litaC_ast__Expr {
     litaC_ast__Stmt stmt;
-    
-};
-
-struct litaC_checker__LabelInfo {
-    litaC_intern__InternedString name;
-    litaC_bool defined;
-    litaC_ast__Stmt* stmt;
-    
-};
-
-struct litaC_checker__TypeChecker {
-    litaC_lita__Lita* lita;
-    litaC_module__Module* current;
-    litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ moduleStack;
-    litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ funcDeclStack;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ pendingValues;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolTypes;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolFuncs;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolTraits;
-    litaC_symbols__Symbol* mainEntry;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolNotes;
-    litaC_checker__GenericContext genericContext;
-    litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ genericParamStack;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ genericTemplates;
-    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ interfaceImpls;
-    litaC_checker__LabelInfo labels[256];
-    litaC_i32 numOfLabels;
-    litaC_types_new__TypeCache* typeCache;
-    litaC_u32 randomNameIndex;
-    litaC_bool bypassing;
-    
-};
-
-struct litaC_ast__GenericParam {
-    litaC_ast__Identifier name;
-    litaC_ast__TypeSpec* typeConstraint;
+    litaC_ast__Operand operand;
+    litaC_types__TypeInfo* expectedType;
     
 };
 
@@ -33788,29 +33423,35 @@ struct litaC_ast__OffsetOfExpr {
     
 };
 
-struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
-    litaC_i32 length;
-    litaC_i32 capacity;
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_* entries;
-    litaC_types__TypeInfo* emptyValue;
-    litaC_intern__InternedString emptyKey;
+struct litaC_lita__CCompilerOption {
+    Lita_OSType os;
+    Lita_ArchType arch;
+    litaC_std__builtins__String options;
     
 };
 
-struct litaC_types_new__TypeCache {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ typeInfos;
-    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ constCache;
-    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ ptrCache;
-    litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ arrayCache;
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ genericCache;
-    
-};
-
-struct litaC_ast__LabelStmt {
+struct litaC_ast__ModuleStmt {
     litaC_ast__Stmt stmt;
-    litaC_ast__Identifier label;
+    litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ imports;
+    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ declarations;
+    
+};
+
+struct litaC_pkg_mgr__PackageManager {
+    litaC_pkg_mgr__PackageOptions options;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__PackageDef_ce_ packages;
+    litaC_pkg_mgr__pkg__PackageDef* pkg;
+    litaC_std__string__builder__StringBuilder errors;
+    litaC_std__string__builder__StringBuilder warnings;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ {
+    litaC_usize key;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ value;
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* valuePtr;
     
 };
 
@@ -33822,18 +33463,132 @@ struct litaC_ast__TernaryExpr {
     
 };
 
-struct litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_intern__InternedString key;
-    litaC_symbols__Symbol* value;
-    litaC_symbols__Symbol** valuePtr;
+struct litaC_ast__VarFieldDecl {
+    litaC_ast__Decl decl;
+    litaC_ast__TypeSpec* type;
+    litaC_ast__Expr* defaultExpr;
     
 };
 
-struct litaC_ast__SwitchStmt {
+struct litaC_ast__ImportDecl {
+    litaC_ast__Decl decl;
+    litaC_ast__Identifier alias;
+    litaC_bool isUsing;
+    litaC_module__ModuleId* moduleId;
+    
+};
+
+struct litaC_lsp__protocol__TextDocumentDidChange {
+    litaC_lsp__protocol__TextDocument textDocument;
+    litaC_std__array__std__array__Array_cb_lsp__protocol__TextDocumentChangeEvent_ce_ contentChanges;
+    
+};
+
+struct litaC_ast__FieldStmt {
+    litaC_ast__StmtKind kind;
+    litaC_types__TypeInfo* typeInfo;
+    union  {
+        litaC_ast__EnumDecl* enumField;
+        litaC_ast__AggregateDecl* aggregateField;
+        litaC_ast__VarFieldDecl* varField;
+        litaC_ast__TraitFieldDecl* traitField;
+        litaC_ast__Expr* poisonField;
+        
+    };
+    
+};
+
+struct litaC_types__FieldPath {
+    litaC_ast__FieldStmt fields[256];
+    litaC_i32 numOfFields;
+    
+};
+
+struct litaC_ast__ArrayDesignationExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* index;
+    litaC_ast__Expr* value;
+    
+};
+
+struct litaC_pkg_mgr__pkg__PackageDef {
+    litaC_pkg_mgr__pkg__PackageId id;
+    litaC_char path[PATH_MAX];
+    litaC_pkg_mgr__pkg__PackageType type;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ dynamicLibraries;
+    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_ dependencies;
+    litaC_std__json__JsonNode* json;
+    
+};
+
+struct litaC_ast__GenericDecl {
+    litaC_ast__Decl declaration;
+    litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
+    
+};
+
+struct litaC_ast__TypedefDecl {
+    litaC_ast__GenericDecl decl;
+    litaC_ast__TypeSpec* type;
+    
+};
+
+struct litaC_std__cmdline__CmdParser {
+    litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ options;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ args;
+    litaC_char errors[256];
+    litaC_std__cmdline__CmdParserStatus status;
+    const litaC_char* header;
+    
+};
+
+struct litaC_types__MethodResult {
+    litaC_symbols__Symbol* symbol;
+    litaC_intern__InternedString name;
+    
+};
+
+struct litaC_ast__CallArg {
+    litaC_ast__Expr* argExpr;
+    litaC_ast__Identifier argName;
+    litaC_i32 index;
+    litaC_bool isDefault;
+    
+};
+
+struct litaC_std__json__JsonObject {
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
+    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_* entries;
+    litaC_module__Module* emptyValue;
+    litaC_intern__InternedString emptyKey;
+    
+};
+
+struct litaC_ast__CompStmt {
     litaC_ast__Stmt stmt;
-    litaC_ast__Expr* cond;
-    litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ cases;
-    litaC_ast__Stmt* defaultStmt;
+    litaC_intern__InternedString type;
+    litaC_std__builtins__String expr;
+    litaC_ast__CompStmt* end;
+    litaC_ast__Stmt* evaluatedStmt;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ body;
+    litaC_bool isScriptLoad;
+    litaC_bool isStatic;
+    
+};
+
+
+struct litaC_ast__IdentifierExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__TypeSpec* type;
+    litaC_symbols__Symbol* sym;
     
 };
 
@@ -33863,70 +33618,12 @@ struct litaC_std__json__JsonParser {
     
 };
 
-struct litaC_lsp__references__Reference {
-    litaC_i64 type;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_std__mem__track_allocator__TrackAllocator {
-    litaC_std__mem__Allocator alloc;
-    const litaC_std__mem__Allocator* decorated;
-    litaC_std__array__std__array__Array_cb__ptr_std__mem__track_allocator__Allocation_ce_ allocations;
-    litaC_usize totalAllocations;
-    
-};
-
-struct litaC_lsp__workspace__Workspace {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__mem__track_allocator__TrackAllocator docAllocator;
-    litaC_lsp__lsp__LspServer* lsp;
-    litaC_char rootPath[PATH_MAX];
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ openedDocuments;
-    
-};
-
-struct litaC_lsp__lsp__LspServer {
-    litaC_std__mem__bucket_allocator__BucketAllocator requestAllocator;
-    litaC_std__mem__bucket_allocator__BucketAllocator applicationAllocator;
-    litaC_lita__Lita* lita;
-    litaC_std__string__builder__StringBuilder message;
-    litaC_std__string__builder__StringBuilder output;
-    litaC_std__string__builder__StringBuilder outbound;
-    litaC_bool isInitialized;
-    litaC_bool isRunning;
-    litaC_lsp__workspace__Workspace workspace;
-    FILE* logFile;
-    
-};
-
-struct litaC_ast__EnumDecl {
-    litaC_ast__Decl decl;
-    litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ fields;
-    
-};
-
-struct litaC_ast__CharExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__Token character;
-    
-};
-
-struct litaC_ast__BreakStmt {
+struct litaC_ast__ForStmt {
     litaC_ast__Stmt stmt;
-    
-};
-
-struct litaC_ast__IdentifierExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__TypeSpec* type;
-    litaC_symbols__Symbol* sym;
-    
-};
-
-struct litaC_ast__EnumFieldEntryDecl {
-    litaC_ast__Decl decl;
-    litaC_ast__Expr* value;
+    litaC_ast__Stmt* init;
+    litaC_ast__Expr* cond;
+    litaC_ast__Stmt* post;
+    litaC_ast__Stmt* body;
     
 };
 
@@ -33948,74 +33645,6 @@ struct litaC_symbols__Symbol {
     
 };
 
-struct litaC_ast__SetExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* object;
-    litaC_ast__IdentifierExpr* field;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* value;
-    litaC_i32 flags;
-    
-};
-
-struct litaC_ast__ModuleStmt {
-    litaC_ast__Stmt stmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_ imports;
-    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_ declarations;
-    
-};
-
-struct litaC_std__json__JsonObject {
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_ indexes;
-    litaC_std__array__std__array__Array_cb_std__json__JsonEntry_ce_ values;
-    
-};
-
-struct litaC_ast__TypeIdentifierExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__TypeSpec* type;
-    litaC_symbols__Symbol* sym;
-    litaC_bool isBased;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
-    litaC_u32 hash;
-    litaC_intern__InternedString key;
-    litaC_symbols__Symbol* value;
-    
-};
-
-struct litaC_ast__VarFieldDecl {
-    litaC_ast__Decl decl;
-    litaC_ast__TypeSpec* type;
-    litaC_ast__Expr* defaultExpr;
-    
-};
-
-struct litaC_phase_result__PhaseError {
-    litaC_phase_result__ErrorType type;
-    const litaC_char* message;
-    litaC_lex__SrcPos pos;
-    
-};
-
-struct litaC_ast__ImportDecl {
-    litaC_ast__Decl decl;
-    litaC_ast__Identifier alias;
-    litaC_bool isUsing;
-    litaC_module__ModuleId* moduleId;
-    
-};
-
-struct litaC_ast__ArrayDesignationExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* index;
-    litaC_ast__Expr* value;
-    
-};
-
 struct litaC_lsp__references__FieldReference {
     litaC_i64 parent;
     litaC_i32 offset;
@@ -34023,75 +33652,38 @@ struct litaC_lsp__references__FieldReference {
     
 };
 
-struct litaC_ast__TypedefDecl {
-    litaC_ast__GenericDecl decl;
-    litaC_ast__TypeSpec* type;
-    
-};
 
-struct litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_u32 hash;
-    litaC_symbols__Symbol* key;
-    litaC_dependency_graph__Dependency value;
-    
-};
-
-struct litaC_ast__CallArg {
-    litaC_ast__Expr* argExpr;
-    litaC_ast__Identifier argName;
-    litaC_i32 index;
-    litaC_bool isDefault;
-    
-};
-
-struct litaC_ast__CompStmt {
-    litaC_ast__Stmt stmt;
-    litaC_intern__InternedString type;
-    litaC_std__builtins__String expr;
-    litaC_ast__CompStmt* end;
-    litaC_ast__Stmt* evaluatedStmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ body;
-    litaC_bool isScriptLoad;
-    litaC_bool isStatic;
-    
-};
-
-struct litaC_ast__InitArgExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Identifier fieldName;
-    litaC_i32 argPosition;
-    litaC_ast__Expr* value;
-    
-};
-
-struct litaC_ast__ForStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Stmt* init;
-    litaC_ast__Expr* cond;
-    litaC_ast__Stmt* post;
-    litaC_ast__Stmt* body;
+struct litaC_lsp__util__SourceLocation {
+    litaC_lsp__util__SourceLocationKind kind;
+    litaC_module__Module* module;
+    litaC_lsp__protocol__Location location;
+    union  {
+        litaC_ast__Node* node;
+        litaC_ast__TypeSpec* type;
+        
+    };
     
 };
 
 
-struct litaC_dependency_graph__DependencyGraph {
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
-    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
-    litaC_lita__Lita* lita;
+struct litaC_lsp__util__SourceLookup {
+    litaC_lsp__lsp__LspServer* lsp;
+    litaC_lsp__protocol__Position lookupPos;
+    litaC_lsp__util__SourceLocation result;
     
 };
 
-
-struct litaC_std__cmdline__CmdParser {
-    litaC_std__array__std__array__Array_cb_std__cmdline__Option_ce_ options;
-    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ args;
-    litaC_char errors[256];
-    litaC_std__cmdline__CmdParserStatus status;
-    const litaC_char* header;
+struct litaC_std__mem__bucket_allocator__BucketAllocator {
+    litaC_std__mem__Allocator allocator;
+    const litaC_std__mem__Allocator* decorated;
+    litaC_std__mem__bucket_allocator__Bucket* buckets;
+    litaC_std__mem__bucket_allocator__Bucket* head;
+    litaC_usize bucketSize;
+    litaC_usize currentOffset;
+    litaC_u32 totalAllocations;
+    litaC_usize totalBytesAllocated;
+    litaC_usize totalGrossBytesAllocated;
+    litaC_u32 totalBuckets;
     
 };
 
@@ -34104,9 +33696,13 @@ struct litaC_ast__GenericArg {
     
 };
 
-struct litaC_ast__SizeOfExpr {
+struct litaC_ast__SetExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* sizeOfExpr;
+    litaC_ast__Expr* object;
+    litaC_ast__IdentifierExpr* field;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* value;
+    litaC_i32 flags;
     
 };
 
@@ -34117,27 +33713,19 @@ struct litaC_ast__NoteStmt {
     
 };
 
-struct litaC_symbols__ProgramSymbols {
-    litaC_module__Module* root;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ values;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolTypes;
-    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolFuncs;
-    litaC_symbols__Symbol* mainEntry;
-    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ interfaceImpls;
-    
-};
-
-struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
-    litaC_symbols__Symbol* key;
-    litaC_dependency_graph__Dependency value;
-    litaC_dependency_graph__Dependency* valuePtr;
-    
-};
-
-struct litaC_ast__TypeOfExpr {
+struct litaC_ast__TypeIdentifierExpr {
     litaC_ast__Expr expr;
-    litaC_ast__Expr* typeOfExpr;
     litaC_ast__TypeSpec* type;
+    litaC_symbols__Symbol* sym;
+    litaC_bool isBased;
+    
+};
+
+struct litaC_std__http__HttpRequest {
+    const litaC_char* url;
+    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
+    litaC_std__http__HttpRequestType type;
+    litaC_std__http__HttpBody body;
     
 };
 
@@ -34147,30 +33735,10 @@ struct litaC_ast__TraitFieldDecl {
     
 };
 
-struct litaC_cgen__CGen {
-    litaC_lita__Lita* lita;
-    litaC_std__string__builder__StringBuilder buf;
-    litaC_std__string__builder__StringBuilder line;
-    litaC_bool format;
-    litaC_i32 indent;
-    litaC_i32 aggregateLevel;
-    litaC_i32 currentLine;
-    const litaC_char* currentFile;
-    litaC_bool bufferFlush;
-    litaC_i32 funcIndex;
-    litaC_i32 tmpVar;
-    litaC_i32 deferStack;
-    litaC_bool inTextBlock;
-    litaC_types__TypeInfo* currentFunc;
-    litaC_cgen__CGenScope* currentScope;
-    litaC_std__io__File* output;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_ {
-    litaC_u32 hash;
-    litaC_intern__InternedString key;
-    litaC_module__Module* value;
+struct litaC_phase_result__PhaseError {
+    litaC_phase_result__ErrorType type;
+    const litaC_char* message;
+    litaC_lex__SrcPos pos;
     
 };
 
@@ -34181,9 +33749,11 @@ struct litaC_ast__VarDecl {
     
 };
 
-struct litaC_types__FieldPath {
-    litaC_ast__FieldStmt fields[256];
-    litaC_i32 numOfFields;
+struct litaC_lsp__protocol__TextDocumentChangeEvent {
+    litaC_bool hasRange;
+    litaC_lsp__protocol__Range range;
+    litaC_u32 rangeLength;
+    const litaC_char* text;
     
 };
 
@@ -34191,6 +33761,15 @@ struct litaC_ast__ArrayInitExpr {
     litaC_ast__Expr expr;
     litaC_ast__TypeSpec* type;
     litaC_std__array__std__array__Array_cb__ptr_ast__Expr_ce_ values;
+    
+};
+
+struct litaC_preprocessor__CallContext {
+    litaC_preprocessor__Preprocessor* pp;
+    litaC_checker__TypeChecker* checker;
+    litaC_ast__CompStmt* comp;
+    litaC_std__string__builder__StringBuilder buffer;
+    litaC_bool resolveSymbols;
     
 };
 
@@ -34204,11 +33783,9 @@ struct litaC_preprocessor__Preprocessor {
     
 };
 
-struct litaC_lsp__references__ReferenceDatabase {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
-    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
-    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
+struct litaC_pkg_mgr__pkg__PackageDependency {
+    litaC_pkg_mgr__pkg__PackageId pkgId;
+    litaC_bool link;
     
 };
 
@@ -34218,17 +33795,36 @@ struct litaC_ast__NativeDecl {
     
 };
 
-struct litaC_types__MethodResult {
-    litaC_symbols__Symbol* symbol;
-    litaC_intern__InternedString name;
-    
-};
-
 struct litaC_ast__FuncCallExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* object;
     litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ genericArgs;
     litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ arguments;
+    litaC_i32 flags;
+    
+};
+
+struct litaC_build__BuildFile {
+    const litaC_std__mem__Allocator* allocator;
+    const litaC_char* compileCmdTemplate;
+    const litaC_char* projectSrcDir;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ pkgPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ includePaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ libraryPaths;
+    litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ staticLibs;
+    
+};
+
+struct litaC_lex__Lexer {
+    const litaC_std__mem__Allocator* allocator;
+    const litaC_char* filename;
+    litaC_lex__Token token;
+    const litaC_char* stream;
+    litaC_i64 length;
+    const litaC_char* lineStart;
+    litaC_i32 lineNumber;
+    litaC_i32 position;
+    const litaC_char* errorMsg;
     
 };
 
@@ -34237,113 +33833,14 @@ struct litaC_ast__ContinueStmt {
     
 };
 
-struct litaC_ast__InitExpr {
-    litaC_ast__Expr expr;
-    litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ genericArgs;
-    litaC_ast__TypeSpec* type;
-    litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ arguments;
+struct litaC_checker__LabelInfo {
+    litaC_intern__InternedString name;
+    litaC_bool defined;
+    litaC_ast__Stmt* stmt;
     
 };
 
-struct litaC_lita__Lita {
-    const litaC_std__mem__Allocator* allocator;
-    litaC_std__mem__bucket_allocator__BucketAllocator globalAllocator;
-    litaC_std__mem__bucket_allocator__BucketAllocator stringsAllocator;
-    litaC_preprocessor__Preprocessor preprocessor;
-    litaC_phase_result__PhaseResult result;
-    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ modules;
-    litaC_lita__Metric metrics[litaC_lita__MetricType_MAX_METRIC_TYPES];
-    litaC_u32 totalSourceLines;
-    litaC_u32 totalAllocations;
-    litaC_lita__LitaOptions* options;
-    litaC_char binaryFilename[PATH_MAX];
-    litaC_char sourceFilename[PATH_MAX];
-    litaC_build__BuildFile buildFile;
-    litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ compilerOptions;
-    litaC_symbols__ProgramSymbols programSymbols;
-    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ genericSymbols;
-    litaC_types_new__TypeCache typeCache;
-    litaC_intern__Strings strings;
-    litaC_lsp__references__ReferenceDatabase references;
-    litaC_lsp__workspace__Workspace* workspace;
-    
-};
 
-struct litaC_ast__FuncBodyStmt {
-    litaC_ast__Stmt stmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ stmts;
-    
-};
-
-struct litaC_ast__StringExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__Token string;
-    
-};
-
-struct litaC_ast__ParametersStmt {
-    litaC_ast__Stmt stmt;
-    litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ params;
-    litaC_bool isVararg;
-    
-};
-
-struct litaC_lsp__document__Document {
-    litaC_char filename[PATH_MAX];
-    litaC_std__string__builder__StringBuilder text;
-    litaC_std__array__std__array__Array_cb_u32_ce_ lineMap;
-    
-};
-
-struct litaC_ast__UnaryExpr {
-    litaC_ast__Expr expr;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* unaryExpr;
-    
-};
-
-struct litaC_ast__ParameterDecl {
-    litaC_ast__Decl decl;
-    litaC_ast__TypeSpec* type;
-    litaC_ast__Expr* defaultExpr;
-    litaC_types__TypeInfo* typeInfo;
-    
-};
-
-struct litaC_std__http__HttpRequest {
-    const litaC_char* url;
-    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
-    litaC_std__http__HttpRequestType type;
-    litaC_char* body;
-    
-};
-
-struct litaC_ast__BinaryExpr {
-    litaC_ast__Expr expr;
-    litaC_ast__Expr* left;
-    litaC_lex__TokenType operator;
-    litaC_ast__Expr* right;
-    
-};
-
-struct litaC_ast__NotesDecl {
-    litaC_ast__Decl decl;
-    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
-    
-};
-
-struct litaC_ast__DeferStmt {
-    litaC_ast__Stmt stmt;
-    litaC_ast__Stmt* deferedStmt;
-    
-};
-
-struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
-    litaC_u32 hash;
-    litaC_intern__InternedString key;
-    litaC_types__TypeInfo* value;
-    
-};
 
 struct litaC_types__TypeInfo {
     litaC_types__TypeKind kind;
@@ -34392,8 +33889,249 @@ struct litaC_types__TypeInfo {
     
 };
 
-struct litaC_ast__NullExpr {
+struct litaC_ast__InitArgExpr {
     litaC_ast__Expr expr;
+    litaC_ast__Identifier fieldName;
+    litaC_i32 argPosition;
+    litaC_ast__Expr* value;
+    
+};
+
+struct litaC_phase_result__PhaseResult {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__array__std__array__Array_cb_phase_result__PhaseError_ce_ errors;
+    litaC_bool enabled;
+    litaC_bool isReadable;
+    
+};
+
+struct litaC_symbols__ProgramSymbols {
+    litaC_module__Module* root;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ values;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolTypes;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolFuncs;
+    litaC_symbols__Symbol* mainEntry;
+    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ interfaceImpls;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* entries;
+    litaC_symbols__Symbol* emptyValue;
+    litaC_intern__InternedString emptyKey;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_* entries;
+    litaC_types__TypeInfo* emptyValue;
+    litaC_intern__InternedString emptyKey;
+    
+};
+
+struct litaC_types_new__TypeCache {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__bucket_list__std__bucket_list__BucketList_cb_types__TypeInfo_ce_ typeInfos;
+    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ constCache;
+    litaC_std__map__std__map__Map_cb_i64_c__ptr_types__TypeInfo_ce_ ptrCache;
+    litaC_std__map__std__map__Map_cb_types_new__ArrayEntry_c__ptr_types__TypeInfo_ce_ arrayCache;
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ genericCache;
+    
+};
+
+struct litaC_lsp__references__ReferenceDatabase {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_ typeReferences;
+    litaC_std__array__std__array__Array_cb_lsp__references__FieldReference_ce_ fieldReferences;
+    litaC_std__map__std__map__Map_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ symbols;
+    
+};
+
+struct litaC_lita__Lita {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__mem__bucket_allocator__BucketAllocator globalAllocator;
+    litaC_std__mem__bucket_allocator__BucketAllocator stringsAllocator;
+    litaC_preprocessor__Preprocessor preprocessor;
+    litaC_phase_result__PhaseResult result;
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_module__Module_ce_ modules;
+    litaC_lita__Metric metrics[litaC_lita__MetricType_MAX_METRIC_TYPES];
+    litaC_u32 totalSourceLines;
+    litaC_u32 totalAllocations;
+    litaC_lita__LitaOptions* options;
+    litaC_char binaryFilename[PATH_MAX];
+    litaC_char sourceFilename[PATH_MAX];
+    litaC_build__BuildFile buildFile;
+    litaC_std__array__std__array__Array_cb_lita__CCompilerOption_ce_ compilerOptions;
+    litaC_symbols__ProgramSymbols programSymbols;
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ genericSymbols;
+    litaC_types_new__TypeCache typeCache;
+    litaC_intern__Strings strings;
+    litaC_lsp__references__ReferenceDatabase references;
+    litaC_lsp__workspace__Workspace* workspace;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_u32 hash;
+    litaC_intern__InternedString key;
+    litaC_symbols__Symbol* value;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_symbols__Symbol* key;
+    litaC_dependency_graph__Dependency value;
+    litaC_dependency_graph__Dependency* valuePtr;
+    
+};
+
+struct litaC_ast__FuncBodyStmt {
+    litaC_ast__Stmt stmt;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ stmts;
+    
+};
+
+struct litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_i32 length;
+    litaC_i32 capacity;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_* entries;
+    litaC_module__ModuleImport emptyValue;
+    const litaC_char* emptyKey;
+    
+};
+
+struct litaC_ast__SizeOfExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* sizeOfExpr;
+    
+};
+
+struct litaC_ast__ParametersStmt {
+    litaC_ast__Stmt stmt;
+    litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ params;
+    litaC_bool isVararg;
+    litaC_bool isNativeVararg;
+    
+};
+
+struct litaC_ast__TypeOfExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* typeOfExpr;
+    litaC_ast__TypeSpec* type;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ {
+    litaC_u32 hash;
+    litaC_symbols__Symbol* key;
+    litaC_dependency_graph__Dependency value;
+    
+};
+
+struct litaC_std__http__HttpResponse {
+    litaC_i32 statusCode;
+    litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_ headers;
+    litaC_std__string__builder__StringBuilder body;
+    litaC_void* userdata;
+    litaC_usize (*bodyFn)(litaC_void*,litaC_usize,litaC_usize,litaC_void*);
+    
+};
+
+struct litaC_ast__ParameterDecl {
+    litaC_ast__Decl decl;
+    litaC_ast__TypeSpec* type;
+    litaC_ast__Expr* defaultExpr;
+    litaC_types__TypeInfo* typeInfo;
+    
+};
+
+struct litaC_ast__BinaryExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* left;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* right;
+    
+};
+
+struct litaC_parser__Parser {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_ast_new__TypeSpecAllocator* typeAllocator;
+    litaC_module__Module* module;
+    litaC_phase_result__PhaseResult* result;
+    litaC_lita__Lita* lita;
+    litaC_intern__Strings* strings;
+    const litaC_char* filename;
+    litaC_i32 totalLines;
+    litaC_std__array__std__array__Array_cb_lex__Token_ce_ tokens;
+    litaC_i32 current;
+    litaC_lex__SrcPos currentPos;
+    litaC_i32 breakLevel;
+    litaC_i32 loopLevel;
+    litaC_i32 switchLevel;
+    litaC_i32 funcLevel;
+    litaC_i32 aggregateLevel;
+    litaC_u32 tryLevel;
+    litaC_u64 tryErrorCounter;
+    litaC_bool panicMode;
+    litaC_i32 preprocessorLevel;
+    
+};
+
+struct litaC_lsp__workspace__Workspace {
+    const litaC_std__mem__Allocator* allocator;
+    litaC_std__mem__track_allocator__TrackAllocator docAllocator;
+    litaC_lsp__lsp__LspServer* lsp;
+    litaC_char rootPath[PATH_MAX];
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c__ptr_lsp__document__Document_ce_ openedDocuments;
+    
+};
+
+struct litaC_lsp__lsp__LspServer {
+    litaC_std__mem__bucket_allocator__BucketAllocator requestAllocator;
+    litaC_std__mem__bucket_allocator__BucketAllocator applicationAllocator;
+    litaC_lita__Lita* lita;
+    litaC_std__string__builder__StringBuilder message;
+    litaC_std__string__builder__StringBuilder output;
+    litaC_std__string__builder__StringBuilder outbound;
+    litaC_bool isInitialized;
+    litaC_bool isRunning;
+    litaC_lsp__workspace__Workspace workspace;
+    FILE* logFile;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    const litaC_char* key;
+    litaC_module__ModuleImport value;
+    litaC_module__ModuleImport* valuePtr;
+    
+};
+
+struct litaC_ast__NotesDecl {
+    litaC_ast__Decl decl;
+    litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_ notes;
+    
+};
+
+struct litaC_ast__DeferStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Stmt* deferedStmt;
+    
+};
+
+
+struct litaC_ast__InitExpr {
+    litaC_ast__Expr expr;
+    litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ genericArgs;
+    litaC_ast__TypeSpec* type;
+    litaC_std__array__std__array__Array_cb__ptr_ast__InitArgExpr_ce_ arguments;
     
 };
 
@@ -34403,10 +34141,329 @@ struct litaC_ast__GotoStmt {
     
 };
 
+struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_module__Module_ce_ {
+    litaC_u32 hash;
+    litaC_intern__InternedString key;
+    litaC_module__Module* value;
+    
+};
+
+struct litaC_ast__StringExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__Token string;
+    
+};
+
+struct litaC_ast__ReturnStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* expr;
+    
+};
+
+struct litaC_symbols__Scope {
+    litaC_symbols__ScopeKind kind;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_phase_result__PhaseResult* result;
+    litaC_symbols__Scope* parent;
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ symbolNotes;
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ symbolTypes;
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ symbolFuncs;
+    litaC_module__Module* module;
+    
+};
+
+struct litaC_ast__UnaryExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* unaryExpr;
+    
+};
+
+struct litaC_ast__FuncDecl {
+    litaC_ast__GenericDecl decl;
+    litaC_ast__ParametersStmt* params;
+    litaC_ast__Stmt* body;
+    litaC_ast__TypeSpec* returnType;
+    litaC_i32 flags;
+    
+};
+
+struct litaC_ast__BooleanExpr {
+    litaC_ast__Expr expr;
+    litaC_bool boolean;
+    
+};
+
+struct litaC_ast__PoisonDecl {
+    litaC_ast__Decl decl;
+    
+};
+
+struct litaC_module__ModuleId {
+    litaC_char filename[PATH_MAX];
+    litaC_char filenameKey[PATH_MAX];
+    litaC_intern__InternedString packageName;
+    litaC_intern__InternedString name;
+    
+};
+
+struct litaC_ast__DoWhileStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* cond;
+    litaC_ast__Stmt* body;
+    
+};
+
+struct litaC_ast__NullExpr {
+    litaC_ast__Expr expr;
+    
+};
+
+struct litaC_ast__IfStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* cond;
+    litaC_ast__Stmt* then;
+    litaC_ast__Stmt* elseStmt;
+    
+};
+
+
+struct litaC_dependency_graph__DependencyGraph {
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedPrimitives;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedGlobals;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedAggregates;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedFuncs;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ sortedSymbols;
+    litaC_std__map__std__map__Map_cb__ptr_symbols__Symbol_c_dependency_graph__Dependency_ce_ dependencies;
+    litaC_lita__Lita* lita;
+    
+};
+
+
 struct litaC_ast__SubscriptGetExpr {
     litaC_ast__Expr expr;
     litaC_ast__Expr* object;
     litaC_ast__Expr* index;
+    
+};
+
+struct litaC_ast__SwitchCaseStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* cond;
+    litaC_ast__Stmt* body;
+    
+};
+
+struct litaC_ast__PoisonExpr {
+    litaC_ast__Expr expr;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb__ptr_const_char_c_module__ModuleImport_ce_ {
+    litaC_u32 hash;
+    const litaC_char* key;
+    litaC_module__ModuleImport value;
+    
+};
+
+struct litaC_ast__WhileStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* cond;
+    litaC_ast__Stmt* body;
+    
+};
+
+struct litaC_cgen__CGen {
+    litaC_lita__Lita* lita;
+    litaC_std__string__builder__StringBuilder buf;
+    litaC_std__string__builder__StringBuilder line;
+    litaC_bool format;
+    litaC_i32 indent;
+    litaC_i32 aggregateLevel;
+    litaC_i32 currentLine;
+    const litaC_char* currentFile;
+    litaC_bool bufferFlush;
+    litaC_i32 funcIndex;
+    litaC_i32 tmpVar;
+    litaC_i32 deferStack;
+    litaC_bool inTextBlock;
+    litaC_types__TypeInfo* currentFunc;
+    litaC_cgen__CGenScope* currentScope;
+    litaC_std__io__File* output;
+    
+};
+
+struct litaC_ast__AggregateDecl {
+    litaC_ast__GenericDecl decl;
+    litaC_std__array__std__array__Array_cb_ast__FieldStmt_ce_ fields;
+    litaC_i32 flags;
+    
+};
+
+struct litaC_std__map__std__map__Entry_cb_intern__InternedString_c__ptr_types__TypeInfo_ce_ {
+    litaC_u32 hash;
+    litaC_intern__InternedString key;
+    litaC_types__TypeInfo* value;
+    
+};
+
+struct litaC_ast__CastExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__TypeSpec* castTo;
+    litaC_ast__Expr* exprToCast;
+    
+};
+
+struct litaC_ast__BlockStmt {
+    litaC_ast__Stmt stmt;
+    litaC_std__array__std__array__Array_cb__ptr_ast__Stmt_ce_ stmts;
+    
+};
+
+
+struct litaC_ast__TypeSpec {
+    litaC_ast__TypeSpecKind kind;
+    litaC_lex__SrcPos pos;
+    litaC_ast__TypeSpec* base;
+    litaC_types__TypeInfo* typeInfo;
+    union  {
+        struct  {
+            litaC_intern__InternedString name;
+            litaC_std__array__std__array__Array_cb_ast__GenericArg_ce_ genericArgs;
+            
+        };
+        struct  {
+            litaC_ast__Expr* numElements;
+            
+        };
+        struct  {
+            litaC_std__array__std__array__Array_cb__ptr_ast__TypeSpec_ce_ args;
+            litaC_ast__TypeSpec* ret;
+            litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ genericParams;
+            litaC_bool hasVarargs;
+            litaC_bool hasNativeVararg;
+            
+        };
+        
+    };
+    
+};
+
+struct litaC_ast__GetExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* object;
+    litaC_ast__IdentifierExpr* field;
+    litaC_i32 flags;
+    
+};
+
+struct litaC_ast__EmptyStmt {
+    litaC_ast__Stmt stmt;
+    
+};
+
+struct litaC_checker__TypeChecker {
+    litaC_lita__Lita* lita;
+    litaC_module__Module* current;
+    litaC_std__array__std__array__Array_cb__ptr_module__Module_ce_ moduleStack;
+    litaC_std__array__std__array__Array_cb__ptr_types__TypeInfo_ce_ funcDeclStack;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ pendingValues;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolTypes;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolFuncs;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolTraits;
+    litaC_symbols__Symbol* mainEntry;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ symbolNotes;
+    litaC_checker__GenericContext genericContext;
+    litaC_std__array__std__array__Array_cb_std__array__Array_cb_ast__GenericParam_ce__ce_ genericParamStack;
+    litaC_std__array__std__array__Array_cb__ptr_symbols__Symbol_ce_ genericTemplates;
+    litaC_std__map__std__map__Map_cb_i64_c_std__array__Array_cb_i64_ce__ce_ interfaceImpls;
+    litaC_checker__LabelInfo labels[256];
+    litaC_i32 numOfLabels;
+    litaC_types_new__TypeCache* typeCache;
+    litaC_u32 randomNameIndex;
+    litaC_bool bypassing;
+    
+};
+
+struct litaC_ast__GenericParam {
+    litaC_ast__Identifier name;
+    litaC_ast__TypeSpec* typeConstraint;
+    
+};
+
+struct litaC_ast__NumberExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__Token number;
+    
+};
+
+struct litaC_ast__LabelStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Identifier label;
+    
+};
+
+struct litaC_ast__SubscriptSetExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* object;
+    litaC_ast__Expr* index;
+    litaC_lex__TokenType operator;
+    litaC_ast__Expr* value;
+    
+};
+
+struct litaC_ast__SwitchStmt {
+    litaC_ast__Stmt stmt;
+    litaC_ast__Expr* cond;
+    litaC_std__array__std__array__Array_cb__ptr_ast__SwitchCaseStmt_ce_ cases;
+    litaC_ast__Stmt* defaultStmt;
+    
+};
+
+struct litaC_ast__EnumDecl {
+    litaC_ast__Decl decl;
+    litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_ fields;
+    
+};
+
+struct litaC_ast__CharExpr {
+    litaC_ast__Expr expr;
+    litaC_lex__Token character;
+    
+};
+
+struct litaC_ast__BreakStmt {
+    litaC_ast__Stmt stmt;
+    
+};
+
+struct litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ {
+    litaC_intern__InternedString key;
+    litaC_symbols__Symbol* value;
+    litaC_symbols__Symbol** valuePtr;
+    
+};
+
+struct litaC_ast__GroupExpr {
+    litaC_ast__Expr expr;
+    litaC_ast__Expr* groupedExpr;
+    
+};
+
+struct litaC_module__Module {
+    litaC_module__ModuleId id;
+    litaC_std__string__buffer__StringBuffer text;
+    litaC_ast__ModuleStmt* ast;
+    litaC_symbols__Scope symbols;
+    litaC_symbols__Scope* currentScope;
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_* genericSymbols;
+    litaC_i32 flags;
+    litaC_std__map__std__map__Map_cb__ptr_const_char_c_module__ModuleImport_ce_ importedBy;
+    litaC_std__map__std__map__Map_cb_intern__InternedString_c__ptr_module__Module_ce_ importAliases;
+    litaC_ast_new__TypeSpecAllocator typeSpecAllocator;
+    litaC_std__mem__arena_allocator__ArenaAllocator arena;
+    const litaC_std__mem__Allocator* allocator;
+    litaC_lita__Lita* lita;
     
 };
 
@@ -34434,6 +34491,30 @@ litaC_bool litaC_std__ascii__WHITESPACE[256] =  {
     [12] = litaC_true,
     [13] = litaC_true,
     [32] = litaC_true
+};
+litaC_i32 litaC_std__ascii__HEX[256] =  {
+    ['0'] = 0,
+    ['1'] = 1,
+    ['2'] = 2,
+    ['3'] = 3,
+    ['4'] = 4,
+    ['5'] = 5,
+    ['6'] = 6,
+    ['7'] = 7,
+    ['8'] = 8,
+    ['9'] = 9,
+    ['A'] = 10,
+    ['B'] = 11,
+    ['C'] = 12,
+    ['D'] = 13,
+    ['E'] = 14,
+    ['F'] = 15,
+    ['a'] = 10,
+    ['b'] = 11,
+    ['c'] = 12,
+    ['d'] = 13,
+    ['e'] = 14,
+    ['f'] = 15
 };
 
 #define litaC_std__system__OPEN_MODE ("r")
@@ -34466,6 +34547,15 @@ litaC_char litaC_std__system__system_posix__pwd[PATH_MAX] =  {
 
 litaC_std__profile__ProfileEntry litaC_std__profile__profileEntries[1] =  {
     0
+};
+const litaC_char* litaC_std__http__requestTypeLookup[litaC_std__http__HttpRequestType_MAX_REQUEST_TYPE] =  {
+    [litaC_std__http__HttpRequestType_GET] = "GET",
+    [litaC_std__http__HttpRequestType_POST] = "POST",
+    [litaC_std__http__HttpRequestType_PUT] = "PUT",
+    [litaC_std__http__HttpRequestType_DELETE] = "DELETE",
+    [litaC_std__http__HttpRequestType_PATCH] = "PATCH",
+    [litaC_std__http__HttpRequestType_HEAD] = "HEAD",
+    [litaC_std__http__HttpRequestType_OPTION] = "OPTION"
 };
 const litaC_char* litaC_lex__tokenText[litaC_lex__TokenType_MAX_TOKEN_TYPES] =  {
     [litaC_lex__TokenType_IMPORT] = "import",
@@ -34510,6 +34600,7 @@ const litaC_char* litaC_lex__tokenText[litaC_lex__TokenType_MAX_TOKEN_TYPES] =  
     [litaC_lex__TokenType_GOTO] = "goto",
     [litaC_lex__TokenType_SIZEOF] = "sizeof",
     [litaC_lex__TokenType_TYPEOF] = "typeof",
+    [litaC_lex__TokenType_NAMEOF] = "nameof",
     [litaC_lex__TokenType_OFFSETOF] = "offsetof",
     [litaC_lex__TokenType_AS] = "as",
     [litaC_lex__TokenType_PUBLIC] = "public",
@@ -34525,6 +34616,7 @@ const litaC_char* litaC_lex__tokenText[litaC_lex__TokenType_MAX_TOKEN_TYPES] =  
     [litaC_lex__TokenType_HASH] = "#",
     [litaC_lex__TokenType_DOT] = ".",
     [litaC_lex__TokenType_VAR_ARGS] = "...",
+    [litaC_lex__TokenType_DOLLAR_VAR_ARGS] = "$...",
     [litaC_lex__TokenType_AT] = "@",
     [litaC_lex__TokenType_QUESTION_MARK] = "?",
     [litaC_lex__TokenType_COMMA] = ",",
@@ -34663,13 +34755,14 @@ const litaC_char** litaC_lex__keywordCache[9] =  {
         "@note",
         NULL
     },
-    [6] = (const litaC_char*[8]) {
+    [6] = (const litaC_char*[9]) {
         "import",
         "struct",
         "switch",
         "return",
         "sizeof",
         "typeof",
+        "nameof",
         "public",
         NULL
     },
@@ -34729,13 +34822,14 @@ litaC_lex__TokenType* litaC_lex__keywordCacheIndex[9] =  {
         litaC_lex__TokenType_USING,
         litaC_lex__TokenType_NOTE
     },
-    [6] = (litaC_lex__TokenType[7]) {
+    [6] = (litaC_lex__TokenType[8]) {
         litaC_lex__TokenType_IMPORT,
         litaC_lex__TokenType_STRUCT,
         litaC_lex__TokenType_SWITCH,
         litaC_lex__TokenType_RETURN,
         litaC_lex__TokenType_SIZEOF,
         litaC_lex__TokenType_TYPEOF,
+        litaC_lex__TokenType_NAMEOF,
         litaC_lex__TokenType_PUBLIC
     },
     [7] = (litaC_lex__TokenType[2]) {
@@ -34922,8 +35016,6 @@ litaC_module__Module litaC_module__builtins =  {
 FILE* litaC_common__outputFile = NULL;
 
 #define litaC_lita__LITA_VERSION ("0.1.6-alpha")
-
-#define litaC_lita__DEFAULT_BUILD_CMD ("clang -std=c99 %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS")
 litaC_intern__InternedString litaC_intern__EMPTY_STR =  {
     .buffer = NULL,
     .length = 0
@@ -35135,6 +35227,34 @@ const litaC_char* litaC_error_codes__errorCodeText[43] =  {
     [litaC_error_codes__ErrorCode_TOO_MANY_ERRORS] = "Too many syntax errors",
     [litaC_error_codes__ErrorCode_MAX_NUM_ERROR_CODES] = ""
 };
+litaC_lex__TokenType litaC_parser__DECL_ADJUST_TOKENS[12] =  {
+    litaC_lex__TokenType_IMPORT,
+    litaC_lex__TokenType_HASH,
+    litaC_lex__TokenType_PUBLIC,
+    litaC_lex__TokenType_INTERNAL,
+    litaC_lex__TokenType_VAR,
+    litaC_lex__TokenType_CONST,
+    litaC_lex__TokenType_FUNC,
+    litaC_lex__TokenType_STRUCT,
+    litaC_lex__TokenType_UNION,
+    litaC_lex__TokenType_TRAIT,
+    litaC_lex__TokenType_ENUM,
+    litaC_lex__TokenType_TYPEDEF
+};
+litaC_lex__TokenType litaC_parser__STMT_ADJUST_TOKENS[12] =  {
+    litaC_lex__TokenType_IMPORT,
+    litaC_lex__TokenType_HASH,
+    litaC_lex__TokenType_PUBLIC,
+    litaC_lex__TokenType_INTERNAL,
+    litaC_lex__TokenType_VAR,
+    litaC_lex__TokenType_CONST,
+    litaC_lex__TokenType_FUNC,
+    litaC_lex__TokenType_STRUCT,
+    litaC_lex__TokenType_UNION,
+    litaC_lex__TokenType_TRAIT,
+    litaC_lex__TokenType_ENUM,
+    litaC_lex__TokenType_TYPEDEF
+};
 const litaC_char* litaC_std__json__escapeStrings[256] =  {
     ['"'] = "\\\"",
     ['\b'] = "\\b",
@@ -35227,34 +35347,6 @@ litaC_char litaC_std__json__escapeToChar[256] =  {
     ['t'] = '\t',
     ['/'] = '/'
 };
-litaC_lex__TokenType litaC_parser__DECL_ADJUST_TOKENS[12] =  {
-    litaC_lex__TokenType_IMPORT,
-    litaC_lex__TokenType_HASH,
-    litaC_lex__TokenType_PUBLIC,
-    litaC_lex__TokenType_INTERNAL,
-    litaC_lex__TokenType_VAR,
-    litaC_lex__TokenType_CONST,
-    litaC_lex__TokenType_FUNC,
-    litaC_lex__TokenType_STRUCT,
-    litaC_lex__TokenType_UNION,
-    litaC_lex__TokenType_TRAIT,
-    litaC_lex__TokenType_ENUM,
-    litaC_lex__TokenType_TYPEDEF
-};
-litaC_lex__TokenType litaC_parser__STMT_ADJUST_TOKENS[12] =  {
-    litaC_lex__TokenType_IMPORT,
-    litaC_lex__TokenType_HASH,
-    litaC_lex__TokenType_PUBLIC,
-    litaC_lex__TokenType_INTERNAL,
-    litaC_lex__TokenType_VAR,
-    litaC_lex__TokenType_CONST,
-    litaC_lex__TokenType_FUNC,
-    litaC_lex__TokenType_STRUCT,
-    litaC_lex__TokenType_UNION,
-    litaC_lex__TokenType_TRAIT,
-    litaC_lex__TokenType_ENUM,
-    litaC_lex__TokenType_TYPEDEF
-};
 
 #define litaC_lsp__lsp__VERSION ("0.12")
 const litaC_char* litaC_cgen__escapeStrings[256] =  {
@@ -35284,7 +35376,7 @@ litaC_dependency_graph__Dependency litaC_dependency_graph__EmptyDependency =  {
 
 #define litaC_config__LITAC_HOME_DEFAULT ("")
 
-#define litaC_config__BUILD_CMD_DEFAULT ("clang %input% -std=c99 -o %output% -D_CRT_SECURE_NO_WARNINGS")
+#define litaC_config__BUILD_CMD_DEFAULT ("clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS")
 
 #define litaC_config__OUTPUT_DIR_DEFAULT (".")
 
@@ -35862,6 +35954,15 @@ litaC_main__ParseStatus litaC_main__ParseArgs(litaC_i32 litaC_n,litaC_char** lit
     if(litaC_std__string__char_empty(litaC_options->projectPath)) {
         {
             litaC_std__string__StringCopy(".", litaC_options->projectPath, 2);
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_std__cmdline__CmdParser_hasOption(&((litaC_parser)), "lib")) {
+        {
+            litaC_std__string__StringCopy(litaC_std__cmdline__CmdParser_getOption(&((litaC_parser)), "lib")->value, litaC_options->libPath, PATH_MAX);
             
             
         }
@@ -36483,7 +36584,7 @@ litaC_bool litaC_std__string__String_equalsString(litaC_std__builtins__String li
         
     } 
     
-    return strncmp(litaC_b.buffer, litaC_str, litaC_len) == 0;
+    return strncmp(litaC_b.buffer, litaC_str, litaC_b.length) == 0;
     
     
 }
@@ -38878,11 +38979,28 @@ litaC_void litaC_std__string__buffer__StringBuffer_appendChar(litaC_std__string_
 }
 
 litaC_std__builtins__String litaC_std__string__buffer__StringBuffer_substring(litaC_std__string__buffer__StringBuffer litaC_s,litaC_i32 litaC_start,litaC_i32 litaC_end) {
-    if(litaC_start < 0 || litaC_end < litaC_start) {
+    if(litaC_start < 0) {
+        {
+            litaC_start = 0;
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_end > litaC_s.length || litaC_end < 0) {
+        {
+            litaC_end = litaC_s.length;
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_start > litaC_end) {
         {
             return (litaC_std__builtins__String) {
-                .buffer = NULL,
-                .length = 0
+                0
             };
             
             
@@ -39049,6 +39167,12 @@ litaC_bool litaC_std__ascii__char_isAlphabetic(litaC_char litaC_this) {
 
 litaC_bool litaC_std__ascii__char_isAlphanumeric(litaC_char litaC_this) {
     return litaC_std__ascii__char_isNumeric(litaC_this) || litaC_std__ascii__char_isAlphabetic(litaC_this);
+    
+    
+}
+
+litaC_i32 litaC_std__ascii__char_asHex(litaC_char litaC_this) {
+    return litaC_std__ascii__HEX[litaC_this];
     
     
 }
@@ -40941,7 +41065,72 @@ litaC_bool litaC_std__http__Http_get(litaC_std__http__Http* litaC_this,const lit
     litaC_std__http__HttpRequest litaC_req =  {
         .url = litaC_url,
         .type = litaC_std__http__HttpRequestType_GET,
-        .body = NULL
+        .body =  {
+            .kind = litaC_std__http__HttpBodyKind_NONE
+        }
+    };
+    return litaC_std__http__Http_makeRequest(litaC_this, &(litaC_req), litaC_resp);
+    
+    
+}
+
+litaC_bool litaC_std__http__Http_head(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp) {
+    litaC_std__http__HttpRequest litaC_req =  {
+        .url = litaC_url,
+        .type = litaC_std__http__HttpRequestType_HEAD,
+        .body =  {
+            .kind = litaC_std__http__HttpBodyKind_NONE
+        }
+    };
+    return litaC_std__http__Http_makeRequest(litaC_this, &(litaC_req), litaC_resp);
+    
+    
+}
+
+litaC_bool litaC_std__http__Http_delete(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp) {
+    litaC_std__http__HttpRequest litaC_req =  {
+        .url = litaC_url,
+        .type = litaC_std__http__HttpRequestType_DELETE,
+        .body =  {
+            .kind = litaC_std__http__HttpBodyKind_NONE
+        }
+    };
+    return litaC_std__http__Http_makeRequest(litaC_this, &(litaC_req), litaC_resp);
+    
+    
+}
+
+litaC_bool litaC_std__http__Http_post(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp,litaC_std__builtins__String litaC_body,litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* litaC_headers) {
+    litaC_std__http__HttpRequest litaC_req =  {
+        .url = litaC_url,
+        .type = litaC_std__http__HttpRequestType_POST,
+        .body =  {
+            .kind = litaC_std__http__HttpBodyKind_BODY,
+            .data = litaC_body
+        }
+    };
+    if(litaC_headers) {
+        {
+            litaC_req.headers = *(litaC_headers);
+            
+            
+        }
+        
+    } 
+    
+    return litaC_std__http__Http_makeRequest(litaC_this, &(litaC_req), litaC_resp);
+    
+    
+}
+
+litaC_bool litaC_std__http__Http_put(litaC_std__http__Http* litaC_this,const litaC_char* litaC_url,litaC_std__http__HttpResponse* litaC_resp,litaC_std__builtins__String litaC_body,litaC_std__map__std__map__Map_cb_std__builtins__String_c_std__builtins__String_ce_* litaC_headers) {
+    litaC_std__http__HttpRequest litaC_req =  {
+        .url = litaC_url,
+        .type = litaC_std__http__HttpRequestType_PUT,
+        .body =  {
+            .kind = litaC_std__http__HttpBodyKind_BODY,
+            .data = litaC_body
+        }
     };
     return litaC_std__http__Http_makeRequest(litaC_this, &(litaC_req), litaC_resp);
     
@@ -40963,6 +41152,7 @@ litaC_bool litaC_std__http__Http_makeRequest(litaC_std__http__Http* litaC_this,l
     
     
     curl_easy_setopt(litaC_curl, CURLOPT_URL, litaC_req->url);
+    curl_easy_setopt(litaC_curl, CURLOPT_ACCEPT_ENCODING, "");
     curl_easy_setopt(litaC_curl, CURLOPT_NOPROGRESS, 1L);
     curl_easy_setopt(litaC_curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(litaC_curl, CURLOPT_MAXREDIRS, 8L);
@@ -40980,11 +41170,77 @@ litaC_bool litaC_std__http__Http_makeRequest(litaC_std__http__Http* litaC_this,l
     curl_easy_setopt(litaC_curl, CURLOPT_WRITEDATA, litaC_resp);
     curl_easy_setopt(litaC_curl, CURLOPT_HEADERFUNCTION, (litaC_void*)(&(litaC_std__http__HttpHeadersCallback)));
     curl_easy_setopt(litaC_curl, CURLOPT_HEADERDATA, litaC_resp);
-    if(litaC_req->type == litaC_std__http__HttpRequestType_POST) {
-        {
+    switch(litaC_req->type) {
+        case litaC_std__http__HttpRequestType_GET: {
+            {
+                curl_easy_setopt(litaC_curl, CURLOPT_HTTPGET, 1L);
+                break;
+                
+                
+            }
             
             
         }
+        case litaC_std__http__HttpRequestType_POST: {
+            {
+                curl_easy_setopt(litaC_curl, CURLOPT_POST, 1L);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__http__HttpRequestType_HEAD: {
+            {
+                curl_easy_setopt(litaC_curl, CURLOPT_NOBODY, 1L);
+                break;
+                
+                
+            }
+            
+            
+        }
+        default: {
+            {
+                if(litaC_req->type >= litaC_std__http__HttpRequestType_MAX_REQUEST_TYPE) {
+                    {
+                        break;
+                        
+                        
+                    }
+                    
+                } 
+                
+                curl_easy_setopt(litaC_curl, CURLOPT_CUSTOMREQUEST, litaC_std__http__requestTypeLookup[litaC_req->type]);
+                break;
+                
+                
+            }
+            
+            
+        }
+    }
+    if(litaC_req->body.kind == litaC_std__http__HttpBodyKind_BODY) {
+        {
+            curl_easy_setopt(litaC_curl, CURLOPT_POSTFIELDS, litaC_req->body.data.buffer);
+            curl_easy_setopt(litaC_curl, CURLOPT_POSTFIELDSIZE, litaC_req->body.data.length);
+            
+            
+        }
+        
+    } else {
+        if(litaC_req->body.kind == litaC_std__http__HttpBodyKind_STREAM) {
+            {
+                curl_easy_setopt(litaC_curl, CURLOPT_UPLOAD, 1L);
+                curl_easy_setopt(litaC_curl, CURLOPT_READFUNCTION, litaC_req->body.data.buffer);
+                curl_easy_setopt(litaC_curl, CURLOPT_READDATA, litaC_req->body.data.length);
+                curl_easy_setopt(litaC_curl, CURLOPT_INFILESIZE_LARGE, litaC_req->body.data.buffer);
+                
+                
+            }
+            
+        } 
         
     } 
     
@@ -41047,6 +41303,7 @@ litaC_bool litaC_std__http__Http_makeRequest(litaC_std__http__Http* litaC_this,l
 
 litaC_usize litaC_std__http__HttpWriteCallback(litaC_void* litaC_data,litaC_usize litaC_size,litaC_usize litaC_n,litaC_void* litaC_userdata) {
     litaC_usize litaC_totalSize = litaC_size * litaC_n;
+    assert(litaC_totalSize < litaC_std__limits__MAX_I32);
     litaC_std__http__HttpResponse* litaC_resp = (litaC_std__http__HttpResponse*)litaC_userdata;
     if(litaC_resp->bodyFn) {
         {
@@ -41058,7 +41315,18 @@ litaC_usize litaC_std__http__HttpWriteCallback(litaC_void* litaC_data,litaC_usiz
         
     } 
     
-    litaC_std__string__builder__StringBuilder_append(&((litaC_resp->body)), "%.*s", litaC_totalSize, litaC_data);
+    if(!(litaC_std__string__builder__StringBuilder_reserve(&((litaC_resp->body)), (litaC_i32)litaC_totalSize))) {
+        {
+            return 0;
+            
+            
+            
+        }
+        
+    } 
+    
+    memcpy(&(litaC_resp->body.asBuffer.buffer[litaC_resp->body.asBuffer.length]), litaC_data, litaC_totalSize);
+    litaC_resp->body.asBuffer.length += (litaC_i32)litaC_totalSize;
     return litaC_totalSize;
     
     
@@ -41084,6 +41352,27 @@ litaC_usize litaC_std__http__HttpHeadersCallback(litaC_void* litaC_data,litaC_us
     
     return litaC_totalSize;
     
+    
+}
+
+litaC_void litaC_std__http__testFileDownload(void) {
+    litaC_std__http__Http litaC_http =  {
+        0
+    };
+    litaC_std__http__Http_init(&((litaC_http)), &(((litaC_std__http__HttpOptions) {
+        0
+    })), litaC_std__mem__defaultAllocator);
+    
+    litaC_std__string__builder__StringBuilder litaC_body =  {
+        0
+    };
+    litaC_std__string__builder__StringBuilder_init(&((litaC_body)), 256, NULL);
+    litaC_std__http__HttpResponse litaC_resp =  {
+        .body = litaC_body
+    };
+    litaC_std__http__Http_get(&((litaC_http)), "https://curl.se/libcurl/c/CURLOPT_POST.html", &(litaC_resp));
+    printf("Status: %d\n%s\n", litaC_resp.statusCode, litaC_std__string__builder__StringBuilder_cStr(&((litaC_resp.body))));
+    litaC_std__http__Http_free(&((litaC_http)));
     
 }
 
@@ -42639,6 +42928,19 @@ litaC_lex__Token litaC_lex__Lexer_scanSymbol(litaC_lex__Lexer* litaC_l) {
                         
                     }
                     
+                } else {
+                    if(litaC_l->stream[0] == '.' && litaC_l->stream[1] == '.' && litaC_l->stream[2] == '.') {
+                        {
+                            litaC_lex__Lexer_nextChar(litaC_l);
+                            litaC_lex__Lexer_nextChar(litaC_l);
+                            litaC_lex__Lexer_nextChar(litaC_l);
+                            litaC_l->token.type = litaC_lex__TokenType_DOLLAR_VAR_ARGS;
+                            
+                            
+                        }
+                        
+                    } 
+                    
                 } 
                 
                 break;
@@ -43401,7 +43703,7 @@ litaC_bool litaC_std__unicode__utf8__Utf8CodepointValid(litaC_i32 litaC_codepoin
 
 litaC_types__TypeKind litaC_types__TypeKindFromString(const litaC_char* litaC_str,litaC_i32 litaC_len) {
     litaC_std__builtins__String litaC_view = litaC_std__string__StringInit(litaC_str, litaC_len);
-    for(litaC_i32 litaC_i = litaC_types__TypeKind_BOOL;litaC_i < litaC_types__TypeKind_MAX_TYPE_KINDS;litaC_i += 1) {
+    for(litaC_types__TypeKind litaC_i = litaC_types__TypeKind_BOOL;litaC_i < litaC_types__TypeKind_MAX_TYPE_KINDS;litaC_i += 1) {
         {
             if(litaC_std__string__String_equalsString(litaC_view, litaC_types__typeKindText[litaC_i], -(1))) {
                 {
@@ -43418,6 +43720,33 @@ litaC_types__TypeKind litaC_types__TypeKindFromString(const litaC_char* litaC_st
         }
     }
     return litaC_types__TypeKind_MAX_TYPE_KINDS;
+    
+    
+}
+
+litaC_bool litaC_types__IsEnum(litaC_types__TypeInfo* litaC_type) {
+    if(!(litaC_type)) {
+        {
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_type->kind == litaC_types__TypeKind_CONST) {
+        {
+            litaC_types__TypeInfo* litaC_constInfo = litaC_type;
+            return litaC_types__IsEnum(litaC_constInfo->constOf);
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_type->kind == litaC_types__TypeKind_ENUM;
     
     
 }
@@ -44904,7 +45233,7 @@ litaC_bool litaC_types__TypeInfo_isAssignable(litaC_types__TypeInfo* litaC_this,
         }
         case litaC_types__TypeKind_USIZE: {
             {
-                return litaC_other->kind <= litaC_types__TypeKind_USIZE || litaC_other->kind == litaC_types__TypeKind_NULL || litaC_types__IsPtrLike(litaC_other);
+                return litaC_other->kind <= litaC_types__TypeKind_USIZE || litaC_other->kind == litaC_types__TypeKind_NULL || litaC_other->kind == litaC_types__TypeKind_ENUM || litaC_types__IsPtrLike(litaC_other);
                 
                 
                 
@@ -48839,6 +49168,18 @@ litaC_ast__Expr* litaC_ast_new__NewTypeOfExpr(litaC_lex__SrcPos litaC_startPos,l
     
 }
 
+litaC_ast__Expr* litaC_ast_new__NewNameOfExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__Expr* litaC_typeOfExpr,litaC_ast__TypeSpec* litaC_type,const litaC_std__mem__Allocator* litaC_allocator) {
+    litaC_ast__TypeOfExpr* litaC_expr = litaC_std__mem__std__mem__new_cb_ast__TypeOfExpr_ce_(litaC_allocator);
+    litaC_expr->expr.stmt.node.kind = litaC_ast__StmtKind_NAME_OF_EXPR;
+    litaC_expr->expr.stmt.node.startPos = litaC_startPos;
+    litaC_expr->expr.stmt.node.endPos = litaC_endPos;
+    litaC_expr->typeOfExpr = litaC_ast__ast__Node_becomeParentOf_cb_ast__Expr_ce_(&((litaC_expr->expr.stmt.node)), litaC_typeOfExpr);
+    litaC_expr->type = litaC_type;
+    return (litaC_ast__Expr*)litaC_expr;
+    
+    
+}
+
 litaC_ast__Expr* litaC_ast_new__NewOffsetOfExpr(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_ast__TypeSpec* litaC_type,litaC_ast__Identifier litaC_field,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_ast__OffsetOfExpr* litaC_expr = litaC_std__mem__std__mem__new_cb_ast__OffsetOfExpr_ce_(litaC_allocator);
     litaC_expr->expr.stmt.node.kind = litaC_ast__StmtKind_OFFSET_OF_EXPR;
@@ -49075,13 +49416,14 @@ litaC_ast__Stmt* litaC_ast_new__NewEmptyStmt(litaC_lex__SrcPos litaC_startPos,li
     
 }
 
-litaC_ast__Stmt* litaC_ast_new__NewParametersStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ litaC_params,litaC_bool litaC_isVararg,const litaC_std__mem__Allocator* litaC_allocator) {
+litaC_ast__Stmt* litaC_ast_new__NewParametersStmt(litaC_lex__SrcPos litaC_startPos,litaC_lex__SrcPos litaC_endPos,litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_ litaC_params,litaC_bool litaC_isVararg,litaC_bool litaC_isNativeVararg,const litaC_std__mem__Allocator* litaC_allocator) {
     litaC_ast__ParametersStmt* litaC_stmt = litaC_std__mem__std__mem__new_cb_ast__ParametersStmt_ce_(litaC_allocator);
     litaC_stmt->stmt.node.kind = litaC_ast__StmtKind_PARAMETERS_STMT;
     litaC_stmt->stmt.node.startPos = litaC_startPos;
     litaC_stmt->stmt.node.endPos = litaC_endPos;
     litaC_stmt->params = *(litaC_ast__ast__Node_becomeParentOfChildren_cb__ptr_ast__ParameterDecl_ce_(&((litaC_stmt->stmt.node)), &((litaC_params))));
     litaC_stmt->isVararg = litaC_isVararg;
+    litaC_stmt->isNativeVararg = litaC_isNativeVararg;
     return (litaC_ast__Stmt*)litaC_stmt;
     
     
@@ -49189,6 +49531,7 @@ litaC_bool litaC_ast__IsExpr(litaC_ast__Node* litaC_node) {
         case litaC_ast__StmtKind_TERNARY_EXPR: 
         case litaC_ast__StmtKind_TYPE_IDENTIFIER_EXPR: 
         case litaC_ast__StmtKind_TYPE_OF_EXPR: 
+        case litaC_ast__StmtKind_NAME_OF_EXPR: 
         case litaC_ast__StmtKind_UNARY_EXPR: 
         case litaC_ast__StmtKind_POISON_EXPR: {
             return litaC_true;
@@ -50087,7 +50430,7 @@ litaC_symbols__Symbol* litaC_symbols__Scope_addSymbol(litaC_symbols__Scope* lita
         }
     }
     litaC_symbols__Symbol* litaC_sym = NULL;
-    litaC_i32 litaC_isRebuild = litaC_this->module->flags & litaC_module__ModuleFlags_INCREMENTAL_COMPILATION;
+    litaC_module__ModuleFlags litaC_isRebuild = litaC_this->module->flags & litaC_module__ModuleFlags_INCREMENTAL_COMPILATION;
     if(litaC_std__map__std__map__Map_contains_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_(litaC_symbolStorage, litaC_name)) {
         {
             litaC_bool litaC_isError = litaC_true;
@@ -50241,7 +50584,7 @@ litaC_symbols__Symbol* litaC_symbols__Scope_addSymbol(litaC_symbols__Scope* lita
         
     } 
     
-    litaC_i32 litaC_kind = litaC_symbols__SymbolKind_VAR;
+    litaC_symbols__SymbolKind litaC_kind = litaC_symbols__SymbolKind_VAR;
     switch(litaC_decl->stmt.node.kind) {
         case litaC_ast__StmtKind_TYPEDEF_DECL: {
             {
@@ -50370,6 +50713,32 @@ litaC_symbols__Symbol* litaC_symbols__Scope_addSymbol(litaC_symbols__Scope* lita
 litaC_intern__InternedString litaC_symbols__Scope_createQualifiedName(litaC_symbols__Scope* litaC_this,litaC_intern__InternedString litaC_name) {
     litaC_char litaC_buffer[256] = {0};
     litaC_std__string__buffer__StringBuffer litaC_qualifiedNameBuffer = litaC_std__string__buffer__StringBufferInit(litaC_buffer, litaC_symbols__MAX_SYMBOL_NAME, 0);
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_name.length;litaC_i += 1) {
+        {
+            litaC_char litaC_c = litaC_name.buffer[litaC_i];
+            if(litaC_c == ':') {
+                {
+                    return litaC_name;
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            if(litaC_c == '<') {
+                {
+                    break;
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+    }
     litaC_std__string__buffer__StringBuffer_append(&((litaC_qualifiedNameBuffer)), "%.*s::%.*s", litaC_this->module->id.packageName.length, litaC_this->module->id.packageName.buffer, litaC_name.length, litaC_name.buffer);
     litaC_intern__InternedString litaC_qualifiedName = litaC_intern__Strings_internCopy(&((litaC_this->module->lita->strings)), litaC_qualifiedNameBuffer.buffer, litaC_qualifiedNameBuffer.length);
     return litaC_qualifiedName;
@@ -52117,7 +52486,7 @@ litaC_bool litaC_lita__Lita_transpile(litaC_lita__Lita* litaC_this,litaC_module_
             litaC_this->options->isTcc = litaC_false;
             if(!(litaC_this->options->compileCmd)) {
                 {
-                    litaC_this->options->compileCmd = litaC_lita__DEFAULT_BUILD_CMD;
+                    litaC_this->options->compileCmd = litaC_config__BUILD_CMD_DEFAULT;
                     
                     
                 }
@@ -52718,48 +53087,98 @@ litaC_bool litaC_lita__FindModulePath(litaC_lita__Lita* litaC_lita,litaC_std__bu
         for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_lita->buildFile.pkgPaths)));litaC_i += 1) {
             {
                 const litaC_char* litaC_pkgPath = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_lita->buildFile.pkgPaths)), litaC_i);
-                litaC_std__string__buffer__StringBuffer_format(&((litaC_pathStr)), "%s/%s/%.*s.lita", litaC_lita->options->projectPath, litaC_pkgPath, litaC_moduleName.length, litaC_moduleName.buffer);
-                if(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStrConst(litaC_pathStr))) {
-                    {
+                {
+                    litaC_std__string__buffer__StringBuffer_format(&((litaC_pathStr)), "%s/%s/%.*s.lita", litaC_lita->options->projectPath, litaC_pkgPath, litaC_moduleName.length, litaC_moduleName.buffer);
+                    if(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStrConst(litaC_pathStr))) {
                         {
-                            litaC_bool ___result = litaC_true;
                             {
-                                litaC_std__system__GetAbsolutePath(litaC_std__system__CurrentWorkingPath(), litaC_std__string__buffer__StringBuffer_cStr(litaC_pathStr), litaC_filename);
+                                litaC_bool ___result = litaC_true;
+                                {
+                                    litaC_std__system__GetAbsolutePath(litaC_std__system__CurrentWorkingPath(), litaC_std__string__buffer__StringBuffer_cStr(litaC_pathStr), litaC_filename);
+                                    
+                                    
+                                };
+                                return ___result;
                                 
-                                
-                            };
-                            return ___result;
+                            }
+                            
+                            
                             
                         }
                         
-                        
-                        
-                    }
+                    } 
                     
-                } 
-                
-                litaC_i32 litaC_index = litaC_std__string__String_lastIndexOfAt(litaC_moduleName, (litaC_std__builtins__String) { .buffer = "/", .length = 1 }, -(1));
-                litaC_std__builtins__String litaC_name = (litaC_index < 0) ? litaC_moduleName : litaC_std__string__String_substring(litaC_moduleName, litaC_index + 1, -(1));
-                litaC_std__string__buffer__StringBuffer_format(&((litaC_pathStr)), "%s/%s/%.*s/%.*s.lita", litaC_lita->options->projectPath, litaC_pkgPath, litaC_moduleName.length, litaC_moduleName.buffer, litaC_name.length, litaC_name.buffer);
-                if(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStrConst(litaC_pathStr))) {
-                    {
+                    litaC_i32 litaC_index = litaC_std__string__String_lastIndexOfAt(litaC_moduleName, (litaC_std__builtins__String) { .buffer = "/", .length = 1 }, -(1));
+                    litaC_std__builtins__String litaC_name = (litaC_index < 0) ? litaC_moduleName : litaC_std__string__String_substring(litaC_moduleName, litaC_index + 1, -(1));
+                    litaC_std__string__buffer__StringBuffer_format(&((litaC_pathStr)), "%s/%s/%.*s/%.*s.lita", litaC_lita->options->projectPath, litaC_pkgPath, litaC_moduleName.length, litaC_moduleName.buffer, litaC_name.length, litaC_name.buffer);
+                    if(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStrConst(litaC_pathStr))) {
                         {
-                            litaC_bool ___result = litaC_true;
                             {
-                                litaC_std__system__GetAbsolutePath(litaC_std__system__CurrentWorkingPath(), litaC_std__string__buffer__StringBuffer_cStr(litaC_pathStr), litaC_filename);
+                                litaC_bool ___result = litaC_true;
+                                {
+                                    litaC_std__system__GetAbsolutePath(litaC_std__system__CurrentWorkingPath(), litaC_std__string__buffer__StringBuffer_cStr(litaC_pathStr), litaC_filename);
+                                    
+                                    
+                                };
+                                return ___result;
                                 
-                                
-                            };
-                            return ___result;
+                            }
+                            
+                            
                             
                         }
                         
-                        
-                        
-                    }
+                    } 
                     
-                } 
-                
+                    
+                    
+                }
+                {
+                    litaC_std__string__buffer__StringBuffer_format(&((litaC_pathStr)), "%s/%.*s.lita", litaC_pkgPath, litaC_moduleName.length, litaC_moduleName.buffer);
+                    if(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStrConst(litaC_pathStr))) {
+                        {
+                            {
+                                litaC_bool ___result = litaC_true;
+                                {
+                                    litaC_std__system__GetAbsolutePath(litaC_std__system__CurrentWorkingPath(), litaC_std__string__buffer__StringBuffer_cStr(litaC_pathStr), litaC_filename);
+                                    
+                                    
+                                };
+                                return ___result;
+                                
+                            }
+                            
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    litaC_i32 litaC_index = litaC_std__string__String_lastIndexOfAt(litaC_moduleName, (litaC_std__builtins__String) { .buffer = "/", .length = 1 }, -(1));
+                    litaC_std__builtins__String litaC_name = (litaC_index < 0) ? litaC_moduleName : litaC_std__string__String_substring(litaC_moduleName, litaC_index + 1, -(1));
+                    litaC_std__string__buffer__StringBuffer_format(&((litaC_pathStr)), "%s/%.*s/%.*s.lita", litaC_pkgPath, litaC_moduleName.length, litaC_moduleName.buffer, litaC_name.length, litaC_name.buffer);
+                    if(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStrConst(litaC_pathStr))) {
+                        {
+                            {
+                                litaC_bool ___result = litaC_true;
+                                {
+                                    litaC_std__system__GetAbsolutePath(litaC_std__system__CurrentWorkingPath(), litaC_std__string__buffer__StringBuffer_cStr(litaC_pathStr), litaC_filename);
+                                    
+                                    
+                                };
+                                return ___result;
+                                
+                            }
+                            
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    
+                    
+                }
                 
                 
             }
@@ -54508,6 +54927,18 @@ litaC_ast__Expr* litaC_ast_copy__CopyExpr(litaC_ast__Expr* litaC_expr,litaC_modu
             
             
         }
+        case litaC_ast__StmtKind_NAME_OF_EXPR: {
+            {
+                litaC_ast__TypeOfExpr* litaC_original = (litaC_ast__TypeOfExpr*)litaC_expr;
+                litaC_ast__Expr* litaC_copy = litaC_ast_new__NewNameOfExpr(litaC_original->expr.stmt.node.startPos, litaC_original->expr.stmt.node.endPos, litaC_ast_copy__CopyExpr(litaC_original->typeOfExpr, litaC_module), litaC_ast_copy__CopyTypeSpec(litaC_original->type, litaC_module), litaC_module->allocator);
+                return litaC_copy;
+                
+                
+                
+            }
+            
+            
+        }
         case litaC_ast__StmtKind_UNARY_EXPR: {
             {
                 litaC_ast__UnaryExpr* litaC_original = (litaC_ast__UnaryExpr*)litaC_expr;
@@ -54740,7 +55171,7 @@ litaC_ast__Stmt* litaC_ast_copy__CopyStmt(litaC_ast__Stmt* litaC_stmt,litaC_modu
                         
                     }
                 }
-                litaC_ast__Stmt* litaC_copy = litaC_ast_new__NewParametersStmt(litaC_original->stmt.node.startPos, litaC_original->stmt.node.endPos, litaC_params, litaC_original->isVararg, litaC_module->allocator);
+                litaC_ast__Stmt* litaC_copy = litaC_ast_new__NewParametersStmt(litaC_original->stmt.node.startPos, litaC_original->stmt.node.endPos, litaC_params, litaC_original->isVararg, litaC_original->isNativeVararg, litaC_module->allocator);
                 return litaC_copy;
                 
                 
@@ -54993,7 +55424,7 @@ litaC_ast__ParametersStmt* litaC_ast_copy__CopyParameters(litaC_ast__ParametersS
             
         }
     }
-    litaC_ast__Stmt* litaC_paramsCopy = litaC_ast_new__NewParametersStmt(litaC_params.stmt.node.startPos, litaC_params.stmt.node.endPos, litaC_paramDecls, litaC_params.isVararg, litaC_module->allocator);
+    litaC_ast__Stmt* litaC_paramsCopy = litaC_ast_new__NewParametersStmt(litaC_params.stmt.node.startPos, litaC_params.stmt.node.endPos, litaC_paramDecls, litaC_params.isVararg, litaC_params.isNativeVararg, litaC_module->allocator);
     return (litaC_ast__ParametersStmt*)litaC_paramsCopy;
     
     
@@ -55899,7 +56330,7 @@ litaC_symbols__Symbol* litaC_checker__TypeChecker_createDeclSymbol(litaC_checker
         case litaC_ast__StmtKind_FUNC_DECL: {
             {
                 litaC_ast__FuncDecl* litaC_funcDecl = (litaC_ast__FuncDecl*)litaC_decl;
-                litaC_i32 litaC_isMethod = litaC_funcDecl->flags & litaC_ast__FuncFlags_IS_METHOD;
+                litaC_ast__FuncFlags litaC_isMethod = litaC_funcDecl->flags & litaC_ast__FuncFlags_IS_METHOD;
                 if(litaC_isMethod) {
                     {
                         litaC_char litaC_buffer[256] =  {
@@ -58448,6 +58879,7 @@ litaC_bool litaC_checker__TypeChecker_resolveStmt(litaC_checker__TypeChecker* li
         case litaC_ast__StmtKind_TERNARY_EXPR: 
         case litaC_ast__StmtKind_TYPE_IDENTIFIER_EXPR: 
         case litaC_ast__StmtKind_TYPE_OF_EXPR: 
+        case litaC_ast__StmtKind_NAME_OF_EXPR: 
         case litaC_ast__StmtKind_UNARY_EXPR: 
         case litaC_ast__StmtKind_POISON_EXPR: {
             {
@@ -58816,10 +59248,10 @@ litaC_void litaC_intern__Strings_init(litaC_intern__Strings* litaC_this,const li
     litaC_intern__Strings_internConstant(litaC_this, "<poison>", 8, &(litaC_intern__POISON));
     litaC_intern__Strings_internConstant(litaC_this, "builtin", 7, &(litaC_intern__BUILTIN));
     litaC_intern__Strings_internConstant(litaC_this, "main", 4, &(litaC_intern__MAIN));
-    litaC_intern__Strings_internConstant(litaC_this, "numOfTypeInfos", 15, &(litaC_intern__NUM_OF_TYPE_INFOS));
+    litaC_intern__Strings_internConstant(litaC_this, "numOfTypeInfos", 14, &(litaC_intern__NUM_OF_TYPE_INFOS));
     litaC_intern__Strings_internConstant(litaC_this, "typeInfos", 9, &(litaC_intern__TYPE_INFOS));
     litaC_intern__Strings_internConstant(litaC_this, "ProfileTag", 10, &(litaC_intern__PROFILE_TAG));
-    litaC_intern__Strings_internConstant(litaC_this, "profileEntries", 15, &(litaC_intern__PROFILE_ENTRIES));
+    litaC_intern__Strings_internConstant(litaC_this, "profileEntries", 14, &(litaC_intern__PROFILE_ENTRIES));
     litaC_intern__Strings_internConstant(litaC_this, "if", 2, &(litaC_intern__IF));
     litaC_intern__Strings_internConstant(litaC_this, "static_if", 9, &(litaC_intern__STATIC_IF));
     litaC_intern__Strings_internConstant(litaC_this, "else", 4, &(litaC_intern__ELSE));
@@ -62471,6 +62903,7 @@ litaC_bool litaC_generics__ReplaceTypes(litaC_generics__Template* litaC_template
             
             
         }
+        case litaC_ast__StmtKind_NAME_OF_EXPR: 
         case litaC_ast__StmtKind_TYPE_OF_EXPR: {
             {
                 litaC_ast__TypeOfExpr* litaC_expr = (litaC_ast__TypeOfExpr*)litaC_ast;
@@ -63369,6 +63802,7 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveExpr(litaC_checker__TypeChecke
             
             
         }
+        case litaC_ast__StmtKind_NAME_OF_EXPR: 
         case litaC_ast__StmtKind_TYPE_OF_EXPR: {
             {
                 {
@@ -63795,7 +64229,7 @@ litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArg(litaC_checker__TypeChec
         
     } 
     
-    if(!(litaC_types__IsAggregateLike(litaC_argInfo))) {
+    if(!(litaC_types__IsAggregateLike(litaC_argInfo)) && !(litaC_types__IsEnum(litaC_argInfo))) {
         {
             return litaC_true;
             
@@ -63805,7 +64239,7 @@ litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArg(litaC_checker__TypeChec
         
     } 
     
-    if(!(litaC_types__IsAggregateLike(litaC_paramInfo)) || litaC_types__IsTraitLike(litaC_paramInfo)) {
+    if((!(litaC_types__IsAggregateLike(litaC_paramInfo)) && !(litaC_types__IsEnum(litaC_argInfo))) || litaC_types__IsTraitLike(litaC_paramInfo)) {
         {
             return litaC_true;
             
@@ -63817,7 +64251,8 @@ litaC_bool litaC_checker_expr__TypeChecker_coerceFuncArg(litaC_checker__TypeChec
     
     litaC_argExpr = litaC_checker_expr__TypeChecker_coerceTypeWithUsing(litaC_this, litaC_argExpr, litaC_argInfo, litaC_paramInfo);
     litaC_argInfo = litaC_argExpr->operand.typeInfo;
-    if(litaC_types__IsPtrAggregate(litaC_paramInfo) && (!(litaC_types__IsPtrAggregate(litaC_argInfo)) && litaC_argInfo->kind != litaC_types__TypeKind_NULL)) {
+    litaC_bool litaC_needsAddressOf = (litaC_types__IsPtrAggregate(litaC_paramInfo) && (!(litaC_types__IsPtrAggregate(litaC_argInfo)) && litaC_argInfo->kind != litaC_types__TypeKind_NULL)) || (litaC_types__IsPtr(litaC_paramInfo) && (!(litaC_types__IsPtr(litaC_argInfo)) && litaC_types__IsEnum(litaC_argInfo)));
+    if(litaC_needsAddressOf) {
         {
             if(litaC_argExpr->operand.isRightValue) {
                 {
@@ -64646,6 +65081,7 @@ litaC_bool litaC_checker_expr__TypeChecker_checkFuncCallArgs(litaC_checker__Type
     litaC_i32 litaC_numberOfSuppliedArgs = litaC_std__array__std__array__Array_size_cb_ast__CallArg_ce_(litaC_suppliedArgs);
     litaC_bool litaC_success = litaC_true;
     litaC_bool litaC_hasVarargs = litaC_false;
+    litaC_bool litaC_isNativeVararg = litaC_false;
     litaC_i32 litaC_i = 0;
     if(litaC_funcType->kind == litaC_types__TypeKind_FUNC_PTR) {
         {
@@ -64700,6 +65136,7 @@ litaC_bool litaC_checker_expr__TypeChecker_checkFuncCallArgs(litaC_checker__Type
             litaC_types__TypeInfo* litaC_funcInfo = litaC_funcType;
             litaC_bool litaC_hasNamedArg = litaC_false;
             litaC_hasVarargs = litaC_funcInfo->funcDecl->params->isVararg;
+            litaC_isNativeVararg = litaC_funcInfo->funcDecl->params->isNativeVararg && !((litaC_expr->flags & litaC_ast__FuncCallExprFlags_HAS_NATIVE_VARARG));
             for(;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__ParameterDecl_ce_(&((litaC_funcInfo->funcDecl->params->params)));litaC_i += 1) {
                 {
                     litaC_ast__ParameterDecl* litaC_p = litaC_std__array__std__array__Array_get_cb__ptr_ast__ParameterDecl_ce_(&((litaC_funcInfo->funcDecl->params->params)), litaC_i);
@@ -64841,6 +65278,22 @@ litaC_bool litaC_checker_expr__TypeChecker_checkFuncCallArgs(litaC_checker__Type
     
     if(litaC_hasVarargs) {
         {
+            litaC_std__string__builder__StringBuilder litaC_sb =  {
+                0
+            };
+            litaC_i32 litaC_targetIndex = litaC_i;
+            if(litaC_isNativeVararg) {
+                {
+                    litaC_expr->flags |= litaC_ast__FuncCallExprFlags_HAS_NATIVE_VARARG;
+                    litaC_i32 litaC_numberOfArgs = litaC_numberOfSuppliedArgs - litaC_i;
+                    litaC_std__string__builder__StringBuilder_init(&((litaC_sb)), 256, litaC_this->lita->allocator);
+                    litaC_std__string__builder__StringBuilder_append(&((litaC_sb)), "\n                NativeVararg {\n                    .numberOfArgs = %d,\n                    .args = [%d]typeid {\n                ", litaC_numberOfArgs, litaC_numberOfArgs);
+                    
+                    
+                }
+                
+            } 
+            
             for(;litaC_i < litaC_numberOfSuppliedArgs;litaC_i += 1) {
                 {
                     litaC_ast__CallArg* litaC_arg = litaC_std__array__std__array__Array_getPtr_cb_ast__CallArg_ce_(litaC_suppliedArgs, litaC_i);
@@ -64855,10 +65308,46 @@ litaC_bool litaC_checker_expr__TypeChecker_checkFuncCallArgs(litaC_checker__Type
                         
                     } 
                     
+                    if(litaC_isNativeVararg && litaC_arg->argExpr) {
+                        {
+                            litaC_std__string__builder__StringBuilder_append(&((litaC_sb)), "%lu,", litaC_arg->argExpr->operand.typeInfo->typeid);
+                            
+                            
+                        }
+                        
+                    } 
+                    
                     
                     
                 }
             }
+            if(litaC_isNativeVararg) {
+                {
+                    litaC_std__string__builder__StringBuilder_append(&((litaC_sb)), "}}");
+                    litaC_parser__Parser litaC_parser = litaC_parser__ParserInit(litaC_expr->expr.stmt.node.startPos.filename, litaC_sb.asBuffer.buffer, litaC_sb.asBuffer.length, litaC_this->current, litaC_this->lita);
+                    litaC_ast__Expr* litaC_nativeArg = litaC_parser__Parser_expression(&((litaC_parser)));
+                    if(!(litaC_checker_expr__TypeChecker_resolveExpr(litaC_this, litaC_nativeArg))) {
+                        {
+                            return litaC_false;
+                            
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    litaC_i32 litaC_index = litaC_targetIndex;
+                    litaC_std__array__std__array__Array_insertAt_cb_ast__CallArg_ce_(litaC_suppliedArgs, litaC_index, (litaC_ast__CallArg) {
+                        .argExpr = litaC_nativeArg,
+                        .index = litaC_index,
+                        .isDefault = litaC_false
+                    });
+                    
+                    
+                }
+                
+            } 
+            
             
             
         }
@@ -64900,6 +65389,7 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
     litaC_std__array__std__array__Array_cb_ast__CallArg_ce_ litaC_suppliedArgs = litaC_std__array__std__array__ArrayInit_cb_ast__CallArg_ce_(litaC_std__array__std__array__Array_size_cb_ast__CallArg_ce_(&((litaC_expr->arguments))) + 1, litaC_this->lita->allocator);
     litaC_std__array__std__array__Array_addAll_cb_ast__CallArg_ce_(&((litaC_suppliedArgs)), &((litaC_expr->arguments)));
     litaC_bool litaC_hasVarargs = litaC_false;
+    litaC_bool litaC_isNativeVarargs = litaC_false;
     litaC_i32 litaC_maxNumOfArgs = 0;
     litaC_types__TypeInfo* litaC_returnType = NULL;
     litaC_std__array__std__array__Array_cb_ast__GenericParam_ce_ litaC_genericParams = {0};
@@ -64919,6 +65409,7 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveFuncCallExpr(litaC_checker__Ty
             
             litaC_maxNumOfArgs = litaC_std__array__std__array__Array_size_cb__ptr_ast__ParameterDecl_ce_(&((litaC_funcInfo->funcDecl->params->params)));
             litaC_hasVarargs = litaC_funcInfo->funcDecl->params->isVararg;
+            litaC_isNativeVarargs = litaC_funcInfo->funcDecl->params->isNativeVararg;
             litaC_returnType = litaC_funcInfo->returnType;
             litaC_genericParams = litaC_funcInfo->funcDecl->decl.genericParams;
             for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_ast__ParameterDecl_ce_(&((litaC_funcInfo->funcDecl->params->params)));litaC_i += 1) {
@@ -66447,6 +66938,16 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveGetExpr(litaC_checker__TypeChe
             litaC_ast__EnumFieldEntryDecl* litaC_field = litaC_types__TypeInfo_getEnumField(litaC_enumInfo, litaC_expr->field->type->name);
             if(!(litaC_field)) {
                 {
+                    if(litaC_checker_expr__TypeChecker_checkMethodExpr(litaC_this, litaC_expr, litaC_enumInfo)) {
+                        {
+                            return litaC_true;
+                            
+                            
+                            
+                        }
+                        
+                    } 
+                    
                     litaC_checker_expr__TypeChecker_errorNoField(litaC_this, &((litaC_expr->field->expr)), litaC_objectTypeInfo, litaC_expr->field->type->name);
                     return litaC_false;
                     
@@ -66458,7 +66959,7 @@ litaC_bool litaC_checker_expr__TypeChecker_resolveGetExpr(litaC_checker__TypeChe
             
             litaC_lsp__references__ReferenceDatabase_addFieldReference(&((litaC_this->lita->references)), litaC_expr->field->type->pos, litaC_enumInfo, litaC_types__TypeInfo_getEnumFieldIndex(litaC_enumInfo, litaC_expr->field->type->name));
             litaC_expr->flags |= litaC_ast__GetExprFlags_IS_ENUM;
-            litaC_expr->expr.operand.typeInfo = &(litaC_types__I32_TYPE);
+            litaC_expr->expr.operand.typeInfo = litaC_enumInfo;
             litaC_expr->expr.operand.isConst = litaC_true;
             litaC_expr->expr.operand.isRightValue = litaC_true;
             return litaC_true;
@@ -67693,2524 +68194,6 @@ litaC_void litaC_error_codes__PrintError(litaC_bool litaC_useColors,litaC_std__s
     
 }
 
-litaC_void litaC_lsp__references__ReferenceDatabase_init(litaC_lsp__references__ReferenceDatabase* litaC_this,const litaC_std__mem__Allocator* litaC_allocator) {
-    litaC_this->allocator = litaC_allocator;
-    
-#define litaC_INITIAL_SIZE (1024)
-    litaC_std__array__std__array__Array_init_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), litaC_INITIAL_SIZE, litaC_allocator);
-    litaC_std__array__std__array__Array_init_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)), litaC_INITIAL_SIZE, litaC_allocator);
-    litaC_std__map__std__map__Map_init_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
-        0
-    }, litaC_INITIAL_SIZE, litaC_allocator, 0);
-    #undef litaC_INITIAL_SIZE
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_addSymbolReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_symbols__Symbol* litaC_symbol,litaC_lex__SrcPos litaC_pos) {
-    if(!(litaC_symbol)) {
-        return;
-        
-        
-    } 
-    
-    litaC_usize litaC_ptr = (litaC_usize)litaC_symbol;
-    if(!(litaC_std__map__std__map__Map_contains_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr))) {
-        {
-            litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_locations = litaC_std__array__std__array__ArrayInit_cb_lex__SrcPos_ce_(16, litaC_this->allocator);
-            litaC_std__map__std__map__Map_put_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr, litaC_locations);
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* litaC_locations = litaC_std__map__std__map__Map_getPtr_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr);
-    litaC_std__array__std__array__Array_add_cb_lex__SrcPos_ce_(litaC_locations, litaC_pos);
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_ast__TypeSpec* litaC_type) {
-    if(!(litaC_type)) {
-        return;
-        
-        
-    } 
-    
-    litaC_ast__TypeSpec* litaC_base = litaC_ast__TypeSpec_getBaseType(litaC_type);
-    if(!(litaC_base)) {
-        return;
-        
-        
-    } 
-    
-    litaC_lsp__references__ReferenceDatabase_addTypeReferenceByTypeInfo(litaC_this, litaC_type->pos, litaC_base->typeInfo);
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReferenceBySymbol(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_lex__SrcPos litaC_srcPos,litaC_symbols__Symbol* litaC_sym) {
-    if(litaC_sym && litaC_sym->type) {
-        {
-            litaC_lsp__references__ReferenceDatabase_addTypeReferenceByTypeInfo(litaC_this, litaC_srcPos, litaC_sym->type);
-            
-            
-        }
-        
-    } 
-    
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReferenceByTypeInfo(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_lex__SrcPos litaC_srcPos,litaC_types__TypeInfo* litaC_typeInfo) {
-    if(!(litaC_typeInfo)) {
-        return;
-        
-        
-    } 
-    
-    litaC_typeInfo = litaC_types__TypeInfo_getBaseType(litaC_typeInfo);
-    if(litaC_types__IsGenericCapable(litaC_typeInfo)) {
-        {
-            if(litaC_typeInfo->sym && litaC_typeInfo->sym->flags & litaC_symbols__SymbolFlags_IS_FROM_GENERIC_TEMPLATE) {
-                {
-                    litaC_types__TypeInfo* litaC_genInfo = litaC_typeInfo;
-                    litaC_std__array__std__array__Array_add_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), (litaC_lsp__references__Reference) {
-                        .type = litaC_genInfo->genericTypeid,
-                        .pos = litaC_srcPos
-                    });
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__array__std__array__Array_add_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), (litaC_lsp__references__Reference) {
-        .type = litaC_typeInfo->typeid,
-        .pos = litaC_srcPos
-    });
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_addFieldReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_lex__SrcPos litaC_srcPos,litaC_types__TypeInfo* litaC_parent,litaC_i32 litaC_offset) {
-    if(!(litaC_parent)) {
-        return;
-        
-        
-    } 
-    
-    litaC_std__array__std__array__Array_add_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)), (litaC_lsp__references__FieldReference) {
-        .parent = litaC_parent->typeid,
-        .offset = litaC_offset,
-        .pos = litaC_srcPos
-    });
-    
-}
-
-litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_lsp__references__ReferenceDatabase_getSymbolReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_symbols__Symbol* litaC_symbol) {
-    if(!(litaC_symbol)) {
-        return (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
-            0
-        };
-        
-        
-    } 
-    
-    litaC_usize litaC_ptr = (litaC_usize)litaC_symbol;
-    if(litaC_std__map__std__map__Map_contains_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr)) {
-        {
-            litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_result = litaC_std__map__std__map__Map_get_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr);
-            return litaC_result;
-            
-            
-            
-        }
-        
-    } 
-    
-    return (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
-        0
-    };
-    
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_removeLocalSymbolReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_module__Module* litaC_module) {
-    if(!(litaC_module)) {
-        return;
-        
-        
-    } 
-    
-    for(litaC_std__map__std__map__MapIterator_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ litaC_it = litaC_std__map__std__map__Map_iter_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)));litaC_std__map__std__map__MapIterator_hasNext_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_it)));) {
-        {
-            litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ litaC_entry = litaC_std__map__std__map__MapIterator_next_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_it)));
-            litaC_symbols__Symbol* litaC_symbol = (litaC_symbols__Symbol*)litaC_entry.key;
-            if(litaC_symbol && (litaC_symbol->flags & litaC_symbols__SymbolFlags_IS_LOCAL) && litaC_module__Module_equals(litaC_symbol->declared, litaC_module)) {
-                {
-                    litaC_std__map__std__map__MapIterator_remove_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_it)));
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-    }
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_getTypeReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_i64 litaC_typeid,litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* litaC_results) {
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)));litaC_i += 1) {
-        {
-            litaC_lsp__references__Reference* litaC_ref = litaC_std__array__std__array__Array_getPtr_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), litaC_i);
-            if(litaC_ref->type == litaC_typeid) {
-                {
-                    litaC_std__array__std__array__Array_add_cb_lex__SrcPos_ce_(litaC_results, litaC_ref->pos);
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-    }
-    
-}
-
-litaC_void litaC_lsp__references__ReferenceDatabase_getFieldReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_i64 litaC_typeid,litaC_i32 litaC_offset,litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* litaC_results) {
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)));litaC_i += 1) {
-        {
-            litaC_lsp__references__FieldReference* litaC_ref = litaC_std__array__std__array__Array_getPtr_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)), litaC_i);
-            if(litaC_ref->parent == litaC_typeid && litaC_ref->offset == litaC_offset) {
-                {
-                    litaC_std__array__std__array__Array_add_cb_lex__SrcPos_ce_(litaC_results, litaC_ref->pos);
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-    }
-    
-}
-
-litaC_void* litaC_std__json__DefaultMakePtrFn(litaC_u64 litaC_type,litaC_std__json__JsonContext* litaC_context,litaC_std__json__JsonNode* litaC_json) {
-    return NULL;
-    
-    
-}
-
-litaC_void litaC_std__json__DefaultMakeFn(litaC_u64 litaC_type,litaC_std__json__JsonContext* litaC_context,litaC_std__json__JsonNode* litaC_json,litaC_void* litaC_result) {
-    
-}
-
-litaC_std__json__JsonContext litaC_std__json__JsonContextInit(litaC_void (*litaC_maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*),litaC_void* (*litaC_makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*),const litaC_std__mem__Allocator* litaC_allocator) {
-    litaC_std__json__JsonContext litaC_context =  {
-        0
-    };
-    litaC_std__json__JsonContext_init(&((litaC_context)), litaC_maker, litaC_makerPtr, litaC_allocator);
-    return litaC_context;
-    
-    
-}
-
-litaC_void litaC_std__json__JsonContext_init(litaC_std__json__JsonContext* litaC_this,litaC_void (*litaC_maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*),litaC_void* (*litaC_makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*),const litaC_std__mem__Allocator* litaC_allocator) {
-    litaC_this->allocator = litaC_allocator;
-    litaC_this->maker = litaC_maker;
-    litaC_this->makerPtr = litaC_makerPtr;
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isNull(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->type == litaC_std__json__JsonType_NULL;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isBool(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->type == litaC_std__json__JsonType_BOOLEAN;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isTrue(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->type == litaC_std__json__JsonType_BOOLEAN && litaC_node->value.boolValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isFalse(litaC_std__json__JsonNode* litaC_node) {
-    return !(litaC_std__json__JsonNode_isTrue(litaC_node));
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isNumber(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->type == litaC_std__json__JsonType_INT_NUMBER || litaC_node->type == litaC_std__json__JsonType_FLOAT_NUMBER;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isString(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->type == litaC_std__json__JsonType_STRING;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isArray(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->type == litaC_std__json__JsonType_ARRAY;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_isObject(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->type == litaC_std__json__JsonType_OBJECT;
-    
-    
-}
-
-LITAC_INLINE 
-const litaC_char* litaC_std__json__JsonNode_asString(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->value.strValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__json__JsonNode_asBool(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->value.boolValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_f64 litaC_std__json__JsonNode_asNumber(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->value.doubleValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_f64 litaC_std__json__JsonNode_asFloat(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->value.doubleValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_i32 litaC_std__json__JsonNode_asInt(litaC_std__json__JsonNode* litaC_node) {
-    return (litaC_i32)litaC_node->value.intValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_i64 litaC_std__json__JsonNode_asLong(litaC_std__json__JsonNode* litaC_node) {
-    return (litaC_i64)litaC_node->value.intValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* litaC_std__json__JsonNode_asArray(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->value.arrayValue;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_std__json__JsonObject* litaC_std__json__JsonNode_asObject(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_node->value.objValue;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__CreateJsonNumber(litaC_f64 litaC_value,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
-    litaC_node->alloc = litaC_alloc;
-    litaC_node->type = litaC_std__json__JsonType_FLOAT_NUMBER;
-    litaC_node->value = (litaC_std__json__JsonValue) {
-        .doubleValue = litaC_value
-    };
-    return litaC_node;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__CreateJsonIntNumber(litaC_i64 litaC_value,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
-    litaC_node->alloc = litaC_alloc;
-    litaC_node->type = litaC_std__json__JsonType_INT_NUMBER;
-    litaC_node->value = (litaC_std__json__JsonValue) {
-        .intValue = litaC_value
-    };
-    return litaC_node;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__CreateJsonFloatNumber(litaC_f64 litaC_value,const litaC_std__mem__Allocator* litaC_alloc) {
-    return litaC_std__json__CreateJsonNumber(litaC_value, litaC_alloc);
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__CreateJsonString(const litaC_char* litaC_str,litaC_i32 litaC_len,const litaC_std__mem__Allocator* litaC_alloc) {
-    if(litaC_str == NULL) {
-        {
-            return litaC_std__json__JSON_NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_len < 0) {
-        {
-            litaC_len = litaC_std__string__char_length(litaC_str);
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__string__builder__StringBuilder litaC_sb = litaC_std__string__builder__StringBuilderInit(litaC_len + 1, litaC_alloc);
-    litaC_std__json__JsonEscapeString(&((litaC_sb)), litaC_str, litaC_len);
-    return litaC_std__json__CreateJsonStringNoDup(litaC_std__string__builder__StringBuilder_cStr(&((litaC_sb))), litaC_alloc);
-    
-    
-}
-
-litaC_void litaC_std__json__JsonEscapeString(litaC_std__string__builder__StringBuilder* litaC_buf,const litaC_char* litaC_string,litaC_i32 litaC_length) {
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_length;litaC_i += 1) {
-        {
-            litaC_char litaC_c = litaC_string[litaC_i];
-            const litaC_char* litaC_escaped = litaC_std__json__escapeStrings[(litaC_u32)litaC_c];
-            if(litaC_escaped) {
-                {
-                    litaC_std__string__builder__StringBuilder_appendStr(litaC_buf, litaC_escaped);
-                    continue;
-                    
-                    
-                }
-                
-            } else {
-                {
-                    litaC_std__string__builder__StringBuilder_appendChar(litaC_buf, litaC_c);
-                    
-                    
-                }
-            } 
-            
-            
-            
-        }
-    }
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__CreateJsonStringNoDup(const litaC_char* litaC_str,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
-    litaC_node->alloc = litaC_alloc;
-    litaC_node->type = litaC_std__json__JsonType_STRING;
-    litaC_node->value = (litaC_std__json__JsonValue) {
-        .strValue = litaC_str
-    };
-    return litaC_node;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__CreateJsonArray(const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
-    litaC_node->alloc = litaC_alloc;
-    litaC_node->type = litaC_std__json__JsonType_ARRAY;
-    litaC_node->value = (litaC_std__json__JsonValue) {
-        .arrayValue = litaC_std__mem__std__mem__new_cb_std__array__Array_ce_(litaC_alloc)
-    };
-    litaC_std__array__std__array__Array_init_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, 16, litaC_alloc);
-    return litaC_node;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__CreateJsonObject(const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
-    litaC_node->alloc = litaC_alloc;
-    litaC_node->type = litaC_std__json__JsonType_OBJECT;
-    litaC_node->value = (litaC_std__json__JsonValue) {
-        .objValue = litaC_std__mem__std__mem__new_cb_std__json__JsonObject_ce_(litaC_alloc)
-    };
-    litaC_std__map__std__map__Map_init_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), -(1), 16, litaC_alloc, 0);
-    litaC_std__array__std__array__Array_init_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), 16, litaC_alloc);
-    return litaC_node;
-    
-    
-}
-
-litaC_void litaC_std__json__JsonNode_put(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_std__json__JsonNode* litaC_n) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_n == NULL) {
-        {
-            litaC_n = litaC_std__json__JSON_NULL;
-            
-            
-        }
-        
-    } 
-    
-    litaC_char* litaC_copy = litaC_std__string__StringClone(litaC_key, litaC_std__string__char_length(litaC_key), litaC_node->alloc);
-    litaC_std__json__JsonEntry litaC_entry =  {
-        .key = litaC_copy,
-        .value = litaC_n
-    };
-    litaC_std__array__std__array__Array_add_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_entry);
-    litaC_std__map__std__map__Map_put_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_copy, litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values))) - 1);
-    
-}
-
-litaC_void litaC_std__json__JsonNode_putNoDup(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_std__json__JsonNode* litaC_n) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_n == NULL) {
-        {
-            litaC_n = litaC_std__json__JSON_NULL;
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonEntry litaC_entry =  {
-        .key = litaC_key,
-        .value = litaC_n
-    };
-    litaC_std__array__std__array__Array_add_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_entry);
-    litaC_std__map__std__map__Map_put_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_key, litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values))) - 1);
-    
-}
-
-litaC_void litaC_std__json__JsonNode_putStr(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,const litaC_char* litaC_str,litaC_i32 litaC_len) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_str == NULL) {
-        {
-            litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_std__json__JSON_NULL);
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonString(litaC_str, litaC_len, litaC_node->alloc);
-    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
-    
-}
-
-litaC_void litaC_std__json__JsonNode_putNumber(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_f64 litaC_number) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonFloatNumber(litaC_number, litaC_node->alloc);
-    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
-    
-}
-
-litaC_void litaC_std__json__JsonNode_putIntNumber(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_i64 litaC_number) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonIntNumber(litaC_number, litaC_node->alloc);
-    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
-    
-}
-
-litaC_void litaC_std__json__JsonNode_putFloatNumber(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_f64 litaC_number) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonFloatNumber(litaC_number, litaC_node->alloc);
-    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
-    
-}
-
-litaC_void litaC_std__json__JsonNode_putBool(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_bool litaC_b) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonNode_put(litaC_node, litaC_key, (litaC_b) ? litaC_std__json__JSON_TRUE : litaC_std__json__JSON_FALSE);
-    
-}
-
-litaC_bool litaC_std__json__JsonNode_contains(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return litaC_false;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_std__map__std__map__Map_contains_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_key);
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonNode_get(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
-    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
-        {
-            return NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_i32 litaC_index = litaC_std__map__std__map__Map_get_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_key);
-    if(litaC_index < 0) {
-        {
-            return NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_index).value;
-    
-    
-}
-
-litaC_bool litaC_std__json__JsonNode_getBool(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_bool litaC_defaultValue) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n) || !(litaC_std__json__JsonNode_isBool(litaC_n))) {
-        {
-            return litaC_defaultValue;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_n->value.boolValue;
-    
-    
-}
-
-litaC_i32 litaC_std__json__JsonNode_getInt(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_i32 litaC_defaultValue) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n)) {
-        {
-            return litaC_defaultValue;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_n->type == litaC_std__json__JsonType_FLOAT_NUMBER) {
-        {
-            return (litaC_i32)litaC_n->value.doubleValue;
-            
-            
-            
-        }
-        
-    } else {
-        if(litaC_n->type == litaC_std__json__JsonType_INT_NUMBER) {
-            {
-                return (litaC_i32)litaC_n->value.intValue;
-                
-                
-                
-            }
-            
-        } 
-        
-    } 
-    
-    return litaC_defaultValue;
-    
-    
-}
-
-litaC_i64 litaC_std__json__JsonNode_getLong(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_i64 litaC_defaultValue) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n) || !(litaC_std__json__JsonNode_isNumber(litaC_n))) {
-        {
-            return litaC_defaultValue;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_n->type == litaC_std__json__JsonType_FLOAT_NUMBER) {
-        {
-            return (litaC_i64)litaC_n->value.doubleValue;
-            
-            
-            
-        }
-        
-    } else {
-        if(litaC_n->type == litaC_std__json__JsonType_INT_NUMBER) {
-            {
-                return litaC_n->value.intValue;
-                
-                
-                
-            }
-            
-        } 
-        
-    } 
-    
-    return litaC_defaultValue;
-    
-    
-}
-
-litaC_f64 litaC_std__json__JsonNode_getFloat(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_f64 litaC_defaultValue) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n)) {
-        {
-            return litaC_defaultValue;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_n->type == litaC_std__json__JsonType_FLOAT_NUMBER) {
-        {
-            return litaC_n->value.doubleValue;
-            
-            
-            
-        }
-        
-    } else {
-        if(litaC_n->type == litaC_std__json__JsonType_INT_NUMBER) {
-            {
-                return (litaC_f64)litaC_n->value.intValue;
-                
-                
-                
-            }
-            
-        } 
-        
-    } 
-    
-    return litaC_defaultValue;
-    
-    
-}
-
-const litaC_char* litaC_std__json__JsonNode_getStr(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,const litaC_char* litaC_defaultValue) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n) || !(litaC_std__json__JsonNode_isString(litaC_n))) {
-        {
-            return litaC_defaultValue;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_n->value.strValue;
-    
-    
-}
-
-litaC_char* litaC_std__json__JsonNode_getStrCopy(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_char* litaC_str,litaC_i32 litaC_len) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n) || !(litaC_std__json__JsonNode_isString(litaC_n))) {
-        {
-            return litaC_str;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_i32 litaC_srcLen = litaC_std__string__char_length(litaC_n->value.strValue);
-    litaC_std__string__StringCopy(litaC_n->value.strValue, litaC_str, MIN(litaC_srcLen, litaC_len) + 1);
-    return litaC_str;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonNode_getArray(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n) || !(litaC_std__json__JsonNode_isArray(litaC_n))) {
-        {
-            return NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_n;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonNode_getObject(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
-    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
-    if(!(litaC_n) || !(litaC_std__json__JsonNode_isObject(litaC_n))) {
-        {
-            return NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_n;
-    
-    
-}
-
-litaC_void litaC_std__json__JsonNode_add(litaC_std__json__JsonNode* litaC_node,litaC_std__json__JsonNode* litaC_n) {
-    if(litaC_node->type == litaC_std__json__JsonType_ARRAY) {
-        {
-            litaC_std__array__std__array__Array_add_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_n);
-            
-            
-        }
-        
-    } 
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonNode_at(litaC_std__json__JsonNode* litaC_node,litaC_i32 litaC_index) {
-    if(litaC_node->type != litaC_std__json__JsonType_ARRAY) {
-        {
-            return NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_index);
-    
-    
-}
-
-litaC_i32 litaC_std__json__JsonNode_size(litaC_std__json__JsonNode* litaC_node) {
-    if(litaC_node->type == litaC_std__json__JsonType_ARRAY) {
-        {
-            return litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);
-            
-            
-            
-        }
-        
-    } else {
-        if(litaC_node->type == litaC_std__json__JsonType_OBJECT) {
-            {
-                return litaC_std__map__std__map__Map_size_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)));
-                
-                
-                
-            }
-            
-        } 
-        
-    } 
-    
-    return 0;
-    
-    
-}
-
-litaC_bool litaC_std__json__JsonNode_empty(litaC_std__json__JsonNode* litaC_node) {
-    return litaC_std__json__JsonNode_size(litaC_node) == 0;
-    
-    
-}
-
-litaC_std__json__JsonIterator litaC_std__json__JsonNode_iter(litaC_std__json__JsonNode* litaC_node) {
-    return (litaC_std__json__JsonIterator) {
-        .index = 0,
-        .json = litaC_node
-    };
-    
-    
-}
-
-litaC_bool litaC_std__json__JsonIterator_hasNext(litaC_std__json__JsonIterator* litaC_this) {
-    return litaC_this->index < litaC_std__json__JsonNode_size(litaC_this->json);
-    
-    
-}
-
-litaC_std__json__JsonEntry litaC_std__json__JsonIterator_next(litaC_std__json__JsonIterator* litaC_this) {
-    if(litaC_this->index >= litaC_std__json__JsonNode_size(litaC_this->json)) {
-        {
-            return (litaC_std__json__JsonEntry) {
-                .key = NULL,
-                .value = NULL
-            };
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_this->index += 1;
-    if(litaC_std__json__JsonNode_isArray(litaC_this->json)) {
-        {
-            litaC_std__json__JsonNode* litaC_value = litaC_std__json__JsonNode_at(litaC_this->json, litaC_this->index - 1);
-            return (litaC_std__json__JsonEntry) {
-                .key = NULL,
-                .value = litaC_value
-            };
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_std__json__JsonNode_isObject(litaC_this->json)) {
-        {
-            return litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_this->json->value.objValue->values)), litaC_this->index - 1);
-            
-            
-            
-        }
-        
-    } 
-    
-    return (litaC_std__json__JsonEntry) {
-        .key = NULL,
-        .value = litaC_this->json
-    };
-    
-    
-}
-
-litaC_bool litaC_std__json__JsonNode_equals(litaC_std__json__JsonNode* litaC_node,litaC_std__json__JsonNode* litaC_other) {
-    if(litaC_node == litaC_other) {
-        {
-            return litaC_true;
-            
-            
-            
-        }
-        
-    } 
-    
-    if(!(litaC_node) && litaC_other) {
-        return litaC_false;
-        
-        
-    } 
-    
-    if(litaC_node && !(litaC_other)) {
-        return litaC_false;
-        
-        
-    } 
-    
-    if(litaC_node->type != litaC_other->type) {
-        {
-            return litaC_false;
-            
-            
-            
-        }
-        
-    } 
-    
-    switch(litaC_node->type) {
-        case litaC_std__json__JsonType_ARRAY: {
-            {
-                if(litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue) != litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_other->value.arrayValue)) {
-                    {
-                        return litaC_false;
-                        
-                        
-                        
-                    }
-                    
-                } 
-                
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);litaC_i += 1) {
-                    {
-                        litaC_std__json__JsonNode* litaC_thisElement = litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_i);
-                        litaC_std__json__JsonNode* litaC_otherElement = litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_other->value.arrayValue, litaC_i);
-                        if(!(litaC_std__json__JsonNode_equals(litaC_thisElement, litaC_otherElement))) {
-                            {
-                                return litaC_false;
-                                
-                                
-                                
-                            }
-                            
-                        } 
-                        
-                        
-                        
-                    }
-                }
-                return litaC_true;
-                
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_OBJECT: {
-            {
-                litaC_i32 litaC_thisCount = 0;
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)));litaC_i += 1) {
-                    {
-                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_i);
-                        const litaC_char* litaC_key = litaC_entry.key;
-                        litaC_std__json__JsonNode* litaC_thisValue = litaC_entry.value;
-                        if(litaC_thisValue != NULL && litaC_thisValue->type != litaC_std__json__JsonType_NULL) {
-                            {
-                                litaC_thisCount += 1;
-                                
-                                
-                            }
-                            
-                        } 
-                        
-                        litaC_std__json__JsonNode* litaC_otherValue = litaC_std__json__JsonNode_get(litaC_other, litaC_key);
-                        if(!(litaC_std__json__JsonNode_equals(litaC_thisValue, litaC_otherValue))) {
-                            {
-                                return litaC_false;
-                                
-                                
-                                
-                            }
-                            
-                        } 
-                        
-                        
-                        
-                    }
-                }
-                litaC_i32 litaC_otherCount = 0;
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_other->value.objValue->values)));litaC_i += 1) {
-                    {
-                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_other->value.objValue->values)), litaC_i);
-                        litaC_std__json__JsonNode* litaC_otherValue = litaC_entry.value;
-                        if(litaC_otherValue != NULL && litaC_otherValue->type != litaC_std__json__JsonType_NULL) {
-                            {
-                                litaC_otherCount += 1;
-                                
-                                
-                            }
-                            
-                        } 
-                        
-                        
-                        
-                    }
-                }
-                return litaC_otherCount == litaC_thisCount;
-                
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_STRING: {
-            {
-                return litaC_std__string__char_equals(litaC_node->value.strValue, litaC_other->value.strValue);
-                
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_NULL: {
-            {
-                return litaC_true;
-                
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_BOOLEAN: {
-            {
-                return litaC_node->value.boolValue == litaC_other->value.boolValue;
-                
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_INT_NUMBER: {
-            {
-                return litaC_node->value.intValue == litaC_other->value.intValue;
-                
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_FLOAT_NUMBER: {
-            {
-                return litaC_node->value.doubleValue == litaC_other->value.doubleValue;
-                
-                
-                
-            }
-            
-            
-        }
-        default: {
-            {
-                assert(litaC_false);
-                
-                
-            }
-            
-            
-        }
-    }
-    
-}
-
-const litaC_char* litaC_std__json__JsonNode_print(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf) {
-    litaC_std__json__PrintJson(litaC_node, litaC_buf);
-    return litaC_std__string__builder__StringBuilder_cStr(litaC_buf);
-    
-    
-}
-
-litaC_void litaC_std__json__JsonNode_free(litaC_std__json__JsonNode* litaC_node) {
-    if(!(litaC_node)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    const litaC_std__mem__Allocator* litaC_alloc = litaC_node->alloc;
-    if(!(litaC_alloc)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    switch(litaC_node->type) {
-        case litaC_std__json__JsonType_ARRAY: {
-            {
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);litaC_i += 1) {
-                    {
-                        litaC_std__json__JsonNode* litaC_n = litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_i);
-                        if(litaC_n) {
-                            {
-                                litaC_std__json__JsonNode_free(litaC_n);
-                                
-                                
-                            }
-                            
-                        } 
-                        
-                        
-                        
-                    }
-                }
-                litaC_std__array__std__array__Array_free_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);
-                litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node->value.arrayValue);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_OBJECT: {
-            {
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)));litaC_i += 1) {
-                    {
-                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_i);
-                        const litaC_char* litaC_key = litaC_entry.key;
-                        litaC_std__json__JsonNode* litaC_node = litaC_entry.value;
-                        litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_key);
-                        if(litaC_node) {
-                            {
-                                litaC_std__json__JsonNode_free(litaC_node);
-                                
-                                
-                            }
-                            
-                        } 
-                        
-                        
-                        
-                    }
-                }
-                litaC_std__map__std__map__Map_free_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)));
-                litaC_std__array__std__array__Array_free_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)));
-                litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node->value.objValue);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_STRING: {
-            {
-                litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node->value.strValue);
-                break;
-                
-                
-            }
-            
-            
-        }
-        default: {
-            
-            
-        }
-    }
-    litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node);
-    
-}
-
-litaC_std__json__JsonParser litaC_std__json__JsonParserInit(const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_std__json__JsonParser litaC_parser =  {
-        0
-    };
-    litaC_std__json__JsonParser_init(&((litaC_parser)), litaC_alloc);
-    return litaC_parser;
-    
-    
-}
-
-litaC_void litaC_std__json__JsonParser_init(litaC_std__json__JsonParser* litaC_p,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_p->alloc = litaC_alloc;
-    litaC_p->status = litaC_std__json__JsonParserStatus_OK;
-    memset(litaC_p->errorMsg, 0, litaC_std__json__MAX_MESSAGE_SIZE);
-    litaC_p->stream = NULL;
-    litaC_p->lineStart = NULL;
-    litaC_p->token.pos.name = "<string>";
-    litaC_p->token.pos.line = 1;
-    litaC_std__string__builder__StringBuilder_init(&((litaC_p->buffer)), 16, litaC_alloc);
-    
-}
-
-litaC_void litaC_std__json__JsonParser_free(litaC_std__json__JsonParser* litaC_p) {
-    litaC_std__string__builder__StringBuilder_free(&((litaC_p->buffer)));
-    litaC_p->stream = NULL;
-    litaC_p->lineStart = NULL;
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJson(litaC_std__json__JsonParser* litaC_p,const litaC_char* litaC_buffer) {
-    litaC_p->stream = litaC_buffer;
-    litaC_p->lineStart = litaC_p->stream;
-    litaC_std__string__builder__StringBuilder_clear(&((litaC_p->buffer)));
-    litaC_std__json__JsonParser_nextToken(litaC_p);
-    litaC_std__json__JsonNode* litaC_node = litaC_std__json__JsonParser_parseJsonNode(litaC_p);
-    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-        {
-            if(litaC_node) {
-                {
-                    litaC_std__json__JsonNode_free(litaC_node);
-                    
-                    
-                }
-                
-            } 
-            
-            return NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    return litaC_node;
-    
-    
-}
-
-litaC_bool litaC_std__json__JsonParser_hasError(litaC_std__json__JsonParser* litaC_p) {
-    return litaC_p->status == litaC_std__json__JsonParserStatus_ERROR;
-    
-    
-}
-
-litaC_void litaC_std__json__PrintJson(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf) {
-    if(!(litaC_node)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    switch(litaC_node->type) {
-        case litaC_std__json__JsonType_NULL: {
-            {
-                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "null", 4);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_BOOLEAN: {
-            {
-                ((litaC_node->value.boolValue)) ? litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "true", 4) : litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "false", 5);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_INT_NUMBER: {
-            {
-                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%lld", litaC_node->value.intValue);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_FLOAT_NUMBER: {
-            {
-                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%f", litaC_node->value.doubleValue);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_STRING: {
-            {
-                litaC_std__string__builder__StringBuilder_append(litaC_buf, "\"%s\"", litaC_node->value.strValue);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_OBJECT: {
-            {
-                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "{", 1);
-                litaC_std__json__JsonObject* litaC_obj = litaC_node->value.objValue;
-                litaC_bool litaC_isFirst = litaC_true;
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_obj->values)));litaC_i += 1) {
-                    {
-                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_obj->values)), litaC_i);
-                        if(!(litaC_isFirst)) {
-                            litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, ",", 1);
-                            
-                        } 
-                        
-                        litaC_std__string__builder__StringBuilder_append(litaC_buf, "\"%s\":", litaC_entry.key);
-                        litaC_std__json__PrintJson(litaC_entry.value, litaC_buf);
-                        litaC_isFirst = litaC_false;
-                        
-                        
-                    }
-                }
-                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "}", 1);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case litaC_std__json__JsonType_ARRAY: {
-            {
-                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "[", 1);
-                litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* litaC_array = litaC_node->value.arrayValue;
-                litaC_bool litaC_isFirst = litaC_true;
-                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_array);litaC_i += 1) {
-                    {
-                        if(!(litaC_isFirst)) {
-                            litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, ",", 1);
-                            
-                        } 
-                        
-                        litaC_std__json__PrintJson(litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_array, litaC_i), litaC_buf);
-                        litaC_isFirst = litaC_false;
-                        
-                        
-                    }
-                }
-                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "]", 1);
-                break;
-                
-                
-            }
-            
-            
-        }
-    }
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonNode(litaC_std__json__JsonParser* litaC_p) {
-    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-        {
-            return NULL;
-            
-            
-            
-        }
-        
-    } 
-    
-    switch(litaC_p->token.kind) {
-        case litaC_std__json__TokenKind_EOF: 
-        case litaC_std__json__TokenKind_ERROR: {
-            return NULL;
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_TRUE: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JSON_TRUE;
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_FALSE: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JSON_FALSE;
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_NULL: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JSON_NULL;
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_INT_NUMBER: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JsonParser_parseJsonIntNumber(litaC_p);
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_REAL_NUMBER: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JsonParser_parseJsonRealNumber(litaC_p);
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_STRING: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JsonParser_parseJsonStr(litaC_p);
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_LEFT_BRACE: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JsonParser_parseJsonObject(litaC_p);
-            
-            
-            
-        }
-        case litaC_std__json__TokenKind_LEFT_BRACKET: {
-            litaC_std__json__JsonParser_nextToken(litaC_p);
-            return litaC_std__json__JsonParser_parseJsonArray(litaC_p);
-            
-            
-            
-        }
-        default: {
-            
-            
-        }
-    }
-    return NULL;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonIntNumber(litaC_std__json__JsonParser* litaC_p) {
-    return litaC_std__json__CreateJsonIntNumber(litaC_p->token.intNumValue, litaC_p->alloc);
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonRealNumber(litaC_std__json__JsonParser* litaC_p) {
-    return litaC_std__json__CreateJsonFloatNumber(litaC_p->token.realNumValue, litaC_p->alloc);
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonStr(litaC_std__json__JsonParser* litaC_p) {
-    return litaC_std__json__CreateJsonStringNoDup(litaC_p->token.strValue, litaC_p->alloc);
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonArray(litaC_std__json__JsonParser* litaC_p) {
-    litaC_std__json__JsonNode* litaC_node = litaC_std__json__CreateJsonArray(litaC_p->alloc);
-    do {
-        {
-            if(litaC_std__json__JsonParser_check(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACKET)) {
-                {
-                    break;
-                    
-                    
-                }
-                
-            } 
-            
-            litaC_std__json__JsonNode* litaC_element = litaC_std__json__JsonParser_parseJsonNode(litaC_p);
-            litaC_std__array__std__array__Array_add_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_element);
-            
-            
-        }
-    }
-    while(litaC_std__json__JsonParser_match(litaC_p, litaC_std__json__TokenKind_COMMA));
-    litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACKET);
-    return litaC_node;
-    
-    
-}
-
-litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonObject(litaC_std__json__JsonParser* litaC_p) {
-    litaC_std__json__JsonNode* litaC_node = litaC_std__json__CreateJsonObject(litaC_p->alloc);
-    do {
-        {
-            if(litaC_std__json__JsonParser_check(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACE)) {
-                {
-                    break;
-                    
-                    
-                }
-                
-            } 
-            
-            const litaC_char* litaC_key = litaC_p->token.strValue;
-            if(!(litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_STRING))) {
-                {
-                    goto err;
-                    
-                    
-                    
-                }
-                
-            } 
-            
-            if(!(litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_COLON))) {
-                {
-                    goto err;
-                    
-                    
-                    
-                }
-                
-            } 
-            
-            litaC_std__json__JsonNode* litaC_value = litaC_std__json__JsonParser_parseJsonNode(litaC_p);
-            litaC_std__json__JsonNode_putNoDup(litaC_node, litaC_key, litaC_value);
-            
-            
-        }
-    }
-    while(litaC_std__json__JsonParser_match(litaC_p, litaC_std__json__TokenKind_COMMA));
-    litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACE);
-    err:;
-    
-    return litaC_node;
-    
-    
-}
-
-const litaC_char* litaC_std__json__TokenName(litaC_std__json__TokenKind litaC_t) {
-    return litaC_std__json__tokenKindNames[litaC_t];
-    
-    
-}
-
-litaC_void litaC_std__json__JsonParser_error(litaC_std__json__JsonParser* litaC_p,const litaC_char* litaC_format,...) {
-    va_list litaC_args = {0};
-    va_start(litaC_args, litaC_format);
-    vsnprintf(litaC_p->errorMsg, litaC_std__json__MAX_MESSAGE_SIZE, litaC_format, litaC_args);
-    va_end(litaC_args);
-    litaC_p->status = litaC_std__json__JsonParserStatus_ERROR;
-    litaC_p->token.kind = litaC_std__json__TokenKind_ERROR;
-    
-}
-
-litaC_void litaC_std__json__JsonParser_scanInt(litaC_std__json__JsonParser* litaC_p) {
-    litaC_i32 litaC_base = 10;
-    const litaC_char* litaC_start_digits = litaC_p->stream;
-    if(*(litaC_p->stream) == '0') {
-        {
-            litaC_p->stream += 1;
-            if(tolower(*(litaC_p->stream)) == 'x') {
-                {
-                    litaC_p->stream += 1;
-                    litaC_base = 16;
-                    litaC_start_digits = litaC_p->stream;
-                    
-                    
-                }
-                
-            } else {
-                if(tolower(*(litaC_p->stream)) == 'b') {
-                    {
-                        litaC_p->stream += 1;
-                        litaC_base = 2;
-                        litaC_start_digits = litaC_p->stream;
-                        
-                        
-                    }
-                    
-                } else {
-                    if(isdigit(*(litaC_p->stream))) {
-                        {
-                            litaC_base = 8;
-                            litaC_start_digits = litaC_p->stream;
-                            
-                            
-                        }
-                        
-                    } 
-                    
-                } 
-                
-            } 
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_i64 litaC_val = 0;
-    for(;;) {
-        {
-            if(*(litaC_p->stream) == '_') {
-                {
-                    litaC_p->stream += 1;
-                    continue;
-                    
-                    
-                }
-                
-            } 
-            
-            litaC_i32 litaC_digit = litaC_std__json__charToDigit[(litaC_i32)(*(litaC_p->stream))];
-            if(litaC_digit == 0 && *(litaC_p->stream) != '0') {
-                {
-                    break;
-                    
-                    
-                }
-                
-            } 
-            
-            if(litaC_digit >= litaC_base) {
-                {
-                    litaC_std__json__JsonParser_error(litaC_p, "Digit '%c' out of range for base %d", *(litaC_p->stream), litaC_base);
-                    litaC_digit = 0;
-                    
-                    
-                }
-                
-            } 
-            
-            if(litaC_val > (litaC_std__limits__MAX_I64 - litaC_digit) / litaC_base) {
-                {
-                    litaC_std__json__JsonParser_error(litaC_p, "Integer literal overflow");
-                    while(isdigit(*(litaC_p->stream))) {
-                        {
-                            litaC_p->stream += 1;
-                            
-                            
-                        }
-                    }
-                    litaC_val = 0;
-                    break;
-                    
-                    
-                }
-                
-            } 
-            
-            litaC_val = litaC_val * litaC_base + litaC_digit;
-            litaC_p->stream += 1;
-            
-            
-        }
-    }
-    if(litaC_p->stream == litaC_start_digits) {
-        {
-            litaC_std__json__JsonParser_error(litaC_p, "Expected base %d digit, got '%c'", litaC_base, *(litaC_p->stream));
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_p->token.kind = litaC_std__json__TokenKind_INT_NUMBER;
-    litaC_p->token.intNumValue = litaC_val;
-    
-}
-
-litaC_void litaC_std__json__JsonParser_scanFloat(litaC_std__json__JsonParser* litaC_p) {
-    const litaC_char* litaC_start = litaC_p->stream;
-    while(isdigit(*(litaC_p->stream))) {
-        {
-            litaC_p->stream += 1;
-            
-            
-        }
-    }
-    if(*(litaC_p->stream) == '.') {
-        {
-            litaC_p->stream += 1;
-            
-            
-        }
-        
-    } 
-    
-    while(isdigit(*(litaC_p->stream))) {
-        {
-            litaC_p->stream += 1;
-            
-            
-        }
-    }
-    if(tolower(*(litaC_p->stream)) == 'e') {
-        {
-            litaC_p->stream += 1;
-            if(*(litaC_p->stream) == '+' || *(litaC_p->stream) == '-') {
-                {
-                    litaC_p->stream += 1;
-                    
-                    
-                }
-                
-            } 
-            
-            if(!(isdigit(*(litaC_p->stream)))) {
-                {
-                    litaC_std__json__JsonParser_error(litaC_p, "Expected digit after float literal exponent, found '%c'.", *(litaC_p->stream));
-                    
-                    
-                }
-                
-            } 
-            
-            while(isdigit(*(litaC_p->stream))) {
-                {
-                    litaC_p->stream += 1;
-                    
-                    
-                }
-            }
-            
-            
-        }
-        
-    } 
-    
-    litaC_f64 litaC_val = strtod(litaC_start, NULL);
-    if(litaC_val == HUGE_VAL) {
-        {
-            litaC_std__json__JsonParser_error(litaC_p, "Float literal overflow");
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_p->token.kind = litaC_std__json__TokenKind_REAL_NUMBER;
-    litaC_p->token.realNumValue = litaC_val;
-    
-}
-
-litaC_void litaC_std__json__JsonParser_scanStr(litaC_std__json__JsonParser* litaC_p) {
-    assert(*(litaC_p->stream) == '"');
-    litaC_p->stream += 1;
-    litaC_std__string__builder__StringBuilder_clear(&((litaC_p->buffer)));
-    while(*(litaC_p->stream) && *(litaC_p->stream) != '"') {
-        {
-            litaC_u8 litaC_c = (litaC_u8)(*(litaC_p->stream));
-            if(litaC_c >= 0x80) {
-                {
-                    litaC_i32 litaC_result = 0;
-                    litaC_i32 litaC_len = litaC_std__unicode__utf8__Utf8Decode((const litaC_u8*)litaC_p->stream, -(1), &(litaC_result));
-                    if(litaC_len < 0) {
-                        {
-                            litaC_std__json__JsonParser_error(litaC_p, "Invalid codepoint");
-                            
-                            
-                        }
-                        
-                    } else {
-                        {
-                            litaC_std__string__builder__StringBuilder_appendStrn(&((litaC_p->buffer)), litaC_p->stream, (litaC_i32)litaC_len);
-                            litaC_p->stream += litaC_len;
-                            
-                            
-                        }
-                    } 
-                    
-                    
-                    
-                }
-                
-            } else {
-                {
-                    litaC_char litaC_val = *(litaC_p->stream);
-                    if(litaC_val == '\n') {
-                        {
-                            litaC_std__json__JsonParser_error(litaC_p, "String literal cannot contain newline");
-                            break;
-                            
-                            
-                        }
-                        
-                    } else {
-                        if(litaC_val == '\\') {
-                            {
-                                litaC_p->stream += 1;
-                                if(*(litaC_p->stream) == 'x') {
-                                    {
-                                        
-                                        
-                                    }
-                                    
-                                } else {
-                                    {
-                                        litaC_val = litaC_std__json__escapeToChar[(litaC_i32)(*(litaC_p->stream))];
-                                        if(litaC_val == 0 && *(litaC_p->stream) != '0') {
-                                            {
-                                                litaC_std__json__JsonParser_error(litaC_p, "Invalid string literal escape '\\%c'", *(litaC_p->stream));
-                                                
-                                                
-                                            }
-                                            
-                                        } 
-                                        
-                                        litaC_p->stream += 1;
-                                        
-                                        
-                                    }
-                                } 
-                                
-                                
-                                
-                            }
-                            
-                        } else {
-                            {
-                                litaC_p->stream += 1;
-                                
-                                
-                            }
-                        } 
-                        
-                    } 
-                    
-                    litaC_std__string__builder__StringBuilder_append(&((litaC_p->buffer)), "%c", litaC_val);
-                    
-                    
-                }
-            } 
-            
-            
-            
-        }
-    }
-    if(*(litaC_p->stream)) {
-        {
-            litaC_p->stream += 1;
-            
-            
-        }
-        
-    } else {
-        {
-            litaC_std__json__JsonParser_error(litaC_p, "Unexpected end of file within string literal");
-            
-            
-        }
-    } 
-    
-    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_p->token.kind = litaC_std__json__TokenKind_STRING;
-    litaC_p->token.strValue = (const litaC_char*)litaC_std__mem__memduplicate((const litaC_void*)litaC_std__string__builder__StringBuilder_cStr(&((litaC_p->buffer))), litaC_std__string__builder__StringBuilder_size(&((litaC_p->buffer))) + 1, litaC_p->alloc);
-    
-}
-
-litaC_void litaC_std__json__JsonParser_scanMultiStr(litaC_std__json__JsonParser* litaC_p) {
-    assert(*(litaC_p->stream) == '`');
-    litaC_p->stream += 1;
-    litaC_std__string__builder__StringBuilder_clear(&((litaC_p->buffer)));
-    while(*(litaC_p->stream) && *(litaC_p->stream) != '`') {
-        {
-            litaC_u8 litaC_c = (litaC_u8)(*(litaC_p->stream));
-            if(litaC_c >= 0x80) {
-                {
-                    litaC_i32 litaC_result = 0;
-                    litaC_i32 litaC_len = litaC_std__unicode__utf8__Utf8Decode((const litaC_u8*)litaC_p->stream, -(1), &(litaC_result));
-                    if(litaC_len < 0) {
-                        {
-                            litaC_std__json__JsonParser_error(litaC_p, "Invalid codepoint");
-                            
-                            
-                        }
-                        
-                    } else {
-                        {
-                            litaC_std__string__builder__StringBuilder_appendStrn(&((litaC_p->buffer)), litaC_p->stream, (litaC_i32)litaC_len);
-                            litaC_p->stream += litaC_len;
-                            
-                            
-                        }
-                    } 
-                    
-                    
-                    
-                }
-                
-            } else {
-                {
-                    litaC_char litaC_val = *(litaC_p->stream);
-                    if(litaC_val == '\\') {
-                        {
-                            litaC_p->stream += 1;
-                            if(*(litaC_p->stream) == '`') {
-                                {
-                                    litaC_val = '`';
-                                    litaC_p->stream += 1;
-                                    
-                                    
-                                }
-                                
-                            } else {
-                                if(*(litaC_p->stream) == '\\') {
-                                    {
-                                        litaC_val = '\\';
-                                        litaC_p->stream += 1;
-                                        
-                                        
-                                    }
-                                    
-                                } else {
-                                    {
-                                        litaC_std__string__builder__StringBuilder_append(&((litaC_p->buffer)), "%c", litaC_val);
-                                        litaC_val = *(litaC_p->stream);
-                                        litaC_p->stream += 1;
-                                        
-                                        
-                                    }
-                                } 
-                                
-                            } 
-                            
-                            
-                            
-                        }
-                        
-                    } else {
-                        {
-                            litaC_p->stream += 1;
-                            
-                            
-                        }
-                    } 
-                    
-                    if(litaC_val == '\r') {
-                        {
-                            continue;
-                            
-                            
-                        }
-                        
-                    } 
-                    
-                    litaC_std__string__builder__StringBuilder_append(&((litaC_p->buffer)), "%c", litaC_val);
-                    
-                    
-                }
-            } 
-            
-            
-            
-        }
-    }
-    if(*(litaC_p->stream)) {
-        {
-            litaC_p->stream += 1;
-            
-            
-        }
-        
-    } else {
-        {
-            litaC_std__json__JsonParser_error(litaC_p, "Unexpected end of file within string literal");
-            
-            
-        }
-    } 
-    
-    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_p->token.kind = litaC_std__json__TokenKind_STRING;
-    litaC_p->token.strValue = (const litaC_char*)litaC_std__mem__memduplicate((const litaC_void*)litaC_std__string__builder__StringBuilder_cStr(&((litaC_p->buffer))), litaC_std__string__builder__StringBuilder_size(&((litaC_p->buffer))) + 1, litaC_p->alloc);
-    
-}
-
-litaC_void litaC_std__json__JsonParser_skipComments(litaC_std__json__JsonParser* litaC_l) {
-    if(*(litaC_l->stream) == '/') {
-        {
-            if(litaC_l->stream[1] == '/') {
-                {
-                    litaC_l->stream += 1;
-                    do {
-                        {
-                            litaC_l->stream += 1;
-                            if(*(litaC_l->stream) == '\n') {
-                                {
-                                    break;
-                                    
-                                    
-                                }
-                                
-                            } 
-                            
-                            
-                            
-                        }
-                    }
-                    while(litaC_l->stream);
-                    
-                    
-                }
-                
-            } else {
-                if(litaC_l->stream[1] == '*') {
-                    {
-                        litaC_l->stream += 1;
-                        do {
-                            {
-                                litaC_l->stream += 1;
-                                if((litaC_l->stream[0] == '*' && litaC_l->stream[1] == '/')) {
-                                    {
-                                        litaC_l->stream += 2;
-                                        break;
-                                        
-                                        
-                                    }
-                                    
-                                } 
-                                
-                                
-                                
-                            }
-                        }
-                        while(litaC_l->stream);
-                        
-                        
-                    }
-                    
-                } 
-                
-            } 
-            
-            
-            
-        }
-        
-    } 
-    
-    
-}
-
-litaC_void litaC_std__json__JsonParser_nextToken(litaC_std__json__JsonParser* litaC_p) {
-    repeat:;
-    
-    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-        {
-            return;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonParser_skipComments(litaC_p);
-    litaC_p->token.start = litaC_p->stream;
-    switch(*(litaC_p->stream)) {
-        case ' ': 
-        case '\n': 
-        case '\r': 
-        case '\t': {
-            {
-                while(isspace(*(litaC_p->stream))) {
-                    {
-                        if(*(litaC_p->stream) == '\n') {
-                            {
-                                litaC_p->lineStart = litaC_p->stream;
-                                litaC_p->token.pos.line += 1;
-                                
-                                
-                            }
-                            
-                        } 
-                        
-                        litaC_p->stream += 1;
-                        
-                        
-                    }
-                }
-                goto repeat;
-                
-                
-                
-            }
-            
-            
-        }
-        case '"': {
-            {
-                litaC_std__json__JsonParser_scanStr(litaC_p);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case '`': {
-            {
-                litaC_std__json__JsonParser_scanMultiStr(litaC_p);
-                break;
-                
-                
-            }
-            
-            
-        }
-        case '.': {
-            if(isdigit(litaC_p->stream[1])) {
-                {
-                    litaC_std__json__JsonParser_scanFloat(litaC_p);
-                    
-                    
-                }
-                
-            } 
-            
-            break;
-            
-            
-        }
-        case '-': {
-            if(isdigit(litaC_p->stream[1])) {
-                {
-                    litaC_p->stream += 1;
-                    litaC_std__json__JsonParser_scanInt(litaC_p);
-                    litaC_p->token.intNumValue *= -(1);
-                    
-                    
-                }
-                
-            } 
-            
-            break;
-            
-            
-        }
-        case '0': 
-        case '1': 
-        case '2': 
-        case '3': 
-        case '4': 
-        case '5': 
-        case '6': 
-        case '7': 
-        case '8': 
-        case '9': {
-            {
-                while(isdigit(*(litaC_p->stream))) {
-                    {
-                        litaC_p->stream += 1;
-                        
-                        
-                    }
-                }
-                litaC_char litaC_c = *(litaC_p->stream);
-                litaC_p->stream = litaC_p->token.start;
-                if(litaC_c == '.' || tolower(litaC_c) == 'e') {
-                    {
-                        litaC_std__json__JsonParser_scanFloat(litaC_p);
-                        
-                        
-                    }
-                    
-                } else {
-                    {
-                        litaC_std__json__JsonParser_scanInt(litaC_p);
-                        
-                        
-                    }
-                } 
-                
-                break;
-                
-                
-            }
-            
-            
-        }
-        case 'n': {
-            {
-                if(litaC_p->stream[1] == 'u' && litaC_p->stream[2] == 'l' && litaC_p->stream[3] == 'l') {
-                    {
-                        litaC_p->stream += 4;
-                        litaC_p->token.kind = litaC_std__json__TokenKind_NULL;
-                        break;
-                        
-                        
-                    }
-                    
-                } 
-                
-                litaC_std__json__JsonParser_error(litaC_p, "invalid identifier, did you mean 'null'?");
-                break;
-                
-                
-            }
-            
-            
-        }
-        case 't': {
-            {
-                if(litaC_p->stream[1] == 'r' && litaC_p->stream[2] == 'u' && litaC_p->stream[3] == 'e') {
-                    {
-                        litaC_p->stream += 4;
-                        litaC_p->token.kind = litaC_std__json__TokenKind_TRUE;
-                        break;
-                        
-                        
-                    }
-                    
-                } 
-                
-                litaC_std__json__JsonParser_error(litaC_p, "invalid identifier, did you mean 'true'?");
-                break;
-                
-                
-            }
-            
-            
-        }
-        case 'f': {
-            {
-                if(litaC_p->stream[1] == 'a' && litaC_p->stream[2] == 'l' && litaC_p->stream[3] == 's' && litaC_p->stream[4] == 'e') {
-                    {
-                        litaC_p->stream += 5;
-                        litaC_p->token.kind = litaC_std__json__TokenKind_FALSE;
-                        break;
-                        
-                        
-                    }
-                    
-                } 
-                
-                litaC_std__json__JsonParser_error(litaC_p, "invalid identifier, did you mean 'false'?");
-                break;
-                
-                
-            }
-            
-            
-        }
-        case '\0': {
-            litaC_p->token.kind = litaC_std__json__TokenKind_EOF;
-            litaC_p->stream += 1;
-            break;
-            
-            
-        }
-        case '{': {
-            litaC_p->token.kind = litaC_std__json__TokenKind_LEFT_BRACE;
-            litaC_p->stream += 1;
-            break;
-            
-            
-        }
-        case '}': {
-            litaC_p->token.kind = litaC_std__json__TokenKind_RIGHT_BRACE;
-            litaC_p->stream += 1;
-            break;
-            
-            
-        }
-        case '[': {
-            litaC_p->token.kind = litaC_std__json__TokenKind_LEFT_BRACKET;
-            litaC_p->stream += 1;
-            break;
-            
-            
-        }
-        case ']': {
-            litaC_p->token.kind = litaC_std__json__TokenKind_RIGHT_BRACKET;
-            litaC_p->stream += 1;
-            break;
-            
-            
-        }
-        case ',': {
-            litaC_p->token.kind = litaC_std__json__TokenKind_COMMA;
-            litaC_p->stream += 1;
-            break;
-            
-            
-        }
-        case ':': {
-            litaC_p->token.kind = litaC_std__json__TokenKind_COLON;
-            litaC_p->stream += 1;
-            break;
-            
-            
-        }
-        default: {
-            {
-                litaC_std__json__JsonParser_error(litaC_p, "Invalid '%c' ('%u') token", *(litaC_p->stream), *(litaC_p->stream));
-                litaC_p->stream += 1;
-                litaC_p->token.kind = litaC_std__json__TokenKind_ERROR;
-                break;
-                
-                
-            }
-            
-            
-        }
-    }
-    litaC_p->token.end = litaC_p->stream;
-    
-}
-
-litaC_bool litaC_std__json__JsonParser_check(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind) {
-    return litaC_p->token.kind == litaC_kind;
-    
-    
-}
-
-litaC_bool litaC_std__json__JsonParser_match(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind) {
-    if(!(litaC_std__json__JsonParser_check(litaC_p, litaC_kind))) {
-        {
-            return litaC_false;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonParser_nextToken(litaC_p);
-    return litaC_true;
-    
-    
-}
-
-litaC_bool litaC_std__json__JsonParser_expect(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind) {
-    if(!(litaC_std__json__JsonParser_check(litaC_p, litaC_kind))) {
-        {
-            if(litaC_std__json__JsonParser_hasError(litaC_p)) {
-                {
-                    return litaC_false;
-                    
-                    
-                    
-                }
-                
-            } 
-            
-            litaC_std__json__JsonParser_error(litaC_p, "Expected token %s, got %s", litaC_std__json__TokenName(litaC_kind), litaC_std__json__TokenName(litaC_p->token.kind));
-            return litaC_false;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_std__json__JsonParser_nextToken(litaC_p);
-    return litaC_true;
-    
-    
-}
-
 litaC_parser__Parser litaC_parser__ParserInit(const litaC_char* litaC_filename,const litaC_char* litaC_text,litaC_i64 litaC_length,litaC_module__Module* litaC_module,litaC_lita__Lita* litaC_lita) {
     litaC_parser__Parser litaC_parser =  {
         .allocator = litaC_module->allocator,
@@ -70368,7 +68351,7 @@ litaC_void litaC_parser__Parser_parseModuleDeclaration(litaC_parser__Parser* lit
                     
                 } 
                 
-                litaC_i32 litaC_visibility = litaC_ast__Visibility_PRIVATE;
+                litaC_ast__Visibility litaC_visibility = litaC_ast__Visibility_PRIVATE;
                 if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_INTERNAL)) {
                     {
                         litaC_visibility = litaC_ast__Visibility_INTERNAL;
@@ -70564,7 +68547,7 @@ litaC_ast__Stmt* litaC_parser__Parser_parseCompileTimeBody(litaC_parser__Parser*
                 
             } 
             
-            litaC_i32 litaC_visibility = litaC_ast__Visibility_PRIVATE;
+            litaC_ast__Visibility litaC_visibility = litaC_ast__Visibility_PRIVATE;
             if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_INTERNAL)) {
                 {
                     litaC_visibility = litaC_ast__Visibility_INTERNAL;
@@ -71862,6 +69845,22 @@ litaC_ast__Expr* litaC_parser__Parser_typeOf(litaC_parser__Parser* litaC_p) {
     
 }
 
+litaC_ast__Expr* litaC_parser__Parser_nameOf(litaC_parser__Parser* litaC_p) {
+    litaC_ast__Expr* litaC_expr = litaC_parser__Parser_typeOf(litaC_p);
+    if(litaC_expr->stmt.node.kind == litaC_ast__StmtKind_TYPE_OF_EXPR) {
+        {
+            litaC_expr->stmt.node.kind = litaC_ast__StmtKind_NAME_OF_EXPR;
+            
+            
+        }
+        
+    } 
+    
+    return litaC_expr;
+    
+    
+}
+
 litaC_ast__Expr* litaC_parser__Parser_offsetOf(litaC_parser__Parser* litaC_p) {
     litaC_lex__SrcPos litaC_pos = litaC_parser__Parser_prevPos(litaC_p);
     if(!(litaC_parser__Parser_consume(litaC_p, litaC_lex__TokenType_LEFT_PAREN, litaC_error_codes__ErrorCode_MISSING_LEFT_PAREN))) {
@@ -72502,6 +70501,16 @@ litaC_ast__Expr* litaC_parser__Parser_primary(litaC_parser__Parser* litaC_p) {
     if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_TYPEOF)) {
         {
             return litaC_parser__Parser_typeOf(litaC_p);
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_NAMEOF)) {
+        {
+            return litaC_parser__Parser_nameOf(litaC_p);
             
             
             
@@ -74275,7 +72284,8 @@ litaC_ast__TypeSpec* litaC_parser__Parser_funcPtrType(litaC_parser__Parser* lita
         {
             do {
                 {
-                    if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_VAR_ARGS)) {
+                    litaC_spec->hasNativeVararg = litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_DOLLAR_VAR_ARGS);
+                    if(litaC_spec->hasNativeVararg || litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_VAR_ARGS)) {
                         {
                             litaC_spec->hasVarargs = litaC_true;
                             if(!(litaC_parser__Parser_check(litaC_p, litaC_lex__TokenType_RIGHT_PAREN))) {
@@ -74369,6 +72379,7 @@ litaC_ast__ParametersStmt* litaC_parser__Parser_parametersStatement(litaC_parser
         0
     };
     litaC_bool litaC_isVarargs = litaC_false;
+    litaC_bool litaC_isNativeVararg = litaC_false;
     if(!(litaC_parser__Parser_consume(litaC_p, litaC_lex__TokenType_LEFT_PAREN, litaC_error_codes__ErrorCode_MISSING_LEFT_PAREN))) {
         {
             goto err;
@@ -74384,7 +72395,8 @@ litaC_ast__ParametersStmt* litaC_parser__Parser_parametersStatement(litaC_parser
             litaC_std__array__std__array__Array_init_cb__ptr_ast__ParameterDecl_ce_(&((litaC_params)), 8, litaC_p->allocator);
             do {
                 {
-                    if(litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_VAR_ARGS)) {
+                    litaC_isNativeVararg = litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_DOLLAR_VAR_ARGS);
+                    if(litaC_isNativeVararg || litaC_parser__Parser_match(litaC_p, litaC_lex__TokenType_VAR_ARGS)) {
                         {
                             litaC_isVarargs = litaC_true;
                             if(!(litaC_parser__Parser_check(litaC_p, litaC_lex__TokenType_RIGHT_PAREN))) {
@@ -74442,7 +72454,7 @@ litaC_ast__ParametersStmt* litaC_parser__Parser_parametersStatement(litaC_parser
         
     } 
     
-    return (litaC_ast__ParametersStmt*)litaC_ast_new__NewParametersStmt(litaC_pos, litaC_parser__Parser_pos(litaC_p), litaC_params, litaC_isVarargs, litaC_p->allocator);
+    return (litaC_ast__ParametersStmt*)litaC_ast_new__NewParametersStmt(litaC_pos, litaC_parser__Parser_pos(litaC_p), litaC_params, litaC_isVarargs, litaC_isNativeVararg, litaC_p->allocator);
     
     err:;
     
@@ -75482,6 +73494,7 @@ litaC_bool litaC_parser__Parser_checkConstExpr(litaC_parser__Parser* litaC_p,lit
             
             
         }
+        case litaC_ast__StmtKind_NAME_OF_EXPR: 
         case litaC_ast__StmtKind_TYPE_OF_EXPR: 
         case litaC_ast__StmtKind_SIZE_OF_EXPR: {
             return litaC_true;
@@ -75825,6 +73838,2655 @@ litaC_void litaC_parser__Parser_errorUnexpectedToken(litaC_parser__Parser* litaC
 
 litaC_i32 litaC_parser__Parser_numOfErrors(litaC_parser__Parser* litaC_p) {
     return litaC_std__array__std__array__Array_size_cb_phase_result__PhaseError_ce_(&((litaC_p->result->errors)));
+    
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_init(litaC_lsp__references__ReferenceDatabase* litaC_this,const litaC_std__mem__Allocator* litaC_allocator) {
+    litaC_this->allocator = litaC_allocator;
+    
+#define litaC_INITIAL_SIZE (1024)
+    litaC_std__array__std__array__Array_init_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), litaC_INITIAL_SIZE, litaC_allocator);
+    litaC_std__array__std__array__Array_init_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)), litaC_INITIAL_SIZE, litaC_allocator);
+    litaC_std__map__std__map__Map_init_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
+        0
+    }, litaC_INITIAL_SIZE, litaC_allocator, 0);
+    #undef litaC_INITIAL_SIZE
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_addSymbolReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_symbols__Symbol* litaC_symbol,litaC_lex__SrcPos litaC_pos) {
+    if(!(litaC_symbol)) {
+        return;
+        
+        
+    } 
+    
+    litaC_usize litaC_ptr = (litaC_usize)litaC_symbol;
+    if(!(litaC_std__map__std__map__Map_contains_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr))) {
+        {
+            litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_locations = litaC_std__array__std__array__ArrayInit_cb_lex__SrcPos_ce_(16, litaC_this->allocator);
+            litaC_std__map__std__map__Map_put_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr, litaC_locations);
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* litaC_locations = litaC_std__map__std__map__Map_getPtr_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr);
+    litaC_std__array__std__array__Array_add_cb_lex__SrcPos_ce_(litaC_locations, litaC_pos);
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_ast__TypeSpec* litaC_type) {
+    if(!(litaC_type)) {
+        return;
+        
+        
+    } 
+    
+    litaC_ast__TypeSpec* litaC_base = litaC_ast__TypeSpec_getBaseType(litaC_type);
+    if(!(litaC_base)) {
+        return;
+        
+        
+    } 
+    
+    litaC_lsp__references__ReferenceDatabase_addTypeReferenceByTypeInfo(litaC_this, litaC_type->pos, litaC_base->typeInfo);
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReferenceBySymbol(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_lex__SrcPos litaC_srcPos,litaC_symbols__Symbol* litaC_sym) {
+    if(litaC_sym && litaC_sym->type) {
+        {
+            litaC_lsp__references__ReferenceDatabase_addTypeReferenceByTypeInfo(litaC_this, litaC_srcPos, litaC_sym->type);
+            
+            
+        }
+        
+    } 
+    
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_addTypeReferenceByTypeInfo(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_lex__SrcPos litaC_srcPos,litaC_types__TypeInfo* litaC_typeInfo) {
+    if(!(litaC_typeInfo)) {
+        return;
+        
+        
+    } 
+    
+    litaC_typeInfo = litaC_types__TypeInfo_getBaseType(litaC_typeInfo);
+    if(litaC_types__IsGenericCapable(litaC_typeInfo)) {
+        {
+            if(litaC_typeInfo->sym && litaC_typeInfo->sym->flags & litaC_symbols__SymbolFlags_IS_FROM_GENERIC_TEMPLATE) {
+                {
+                    litaC_types__TypeInfo* litaC_genInfo = litaC_typeInfo;
+                    litaC_std__array__std__array__Array_add_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), (litaC_lsp__references__Reference) {
+                        .type = litaC_genInfo->genericTypeid,
+                        .pos = litaC_srcPos
+                    });
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__array__std__array__Array_add_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), (litaC_lsp__references__Reference) {
+        .type = litaC_typeInfo->typeid,
+        .pos = litaC_srcPos
+    });
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_addFieldReference(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_lex__SrcPos litaC_srcPos,litaC_types__TypeInfo* litaC_parent,litaC_i32 litaC_offset) {
+    if(!(litaC_parent)) {
+        return;
+        
+        
+    } 
+    
+    litaC_std__array__std__array__Array_add_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)), (litaC_lsp__references__FieldReference) {
+        .parent = litaC_parent->typeid,
+        .offset = litaC_offset,
+        .pos = litaC_srcPos
+    });
+    
+}
+
+litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_lsp__references__ReferenceDatabase_getSymbolReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_symbols__Symbol* litaC_symbol) {
+    if(!(litaC_symbol)) {
+        return (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
+            0
+        };
+        
+        
+    } 
+    
+    litaC_usize litaC_ptr = (litaC_usize)litaC_symbol;
+    if(litaC_std__map__std__map__Map_contains_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr)) {
+        {
+            litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_ litaC_result = litaC_std__map__std__map__Map_get_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)), litaC_ptr);
+            return litaC_result;
+            
+            
+            
+        }
+        
+    } 
+    
+    return (litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_) {
+        0
+    };
+    
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_removeLocalSymbolReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_module__Module* litaC_module) {
+    if(!(litaC_module)) {
+        return;
+        
+        
+    } 
+    
+    for(litaC_std__map__std__map__MapIterator_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ litaC_it = litaC_std__map__std__map__Map_iter_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_this->symbols)));litaC_std__map__std__map__MapIterator_hasNext_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_it)));) {
+        {
+            litaC_std__map__std__map__MapEntry_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_ litaC_entry = litaC_std__map__std__map__MapIterator_next_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_it)));
+            litaC_symbols__Symbol* litaC_symbol = (litaC_symbols__Symbol*)litaC_entry.key;
+            if(litaC_symbol && (litaC_symbol->flags & litaC_symbols__SymbolFlags_IS_LOCAL) && litaC_module__Module_equals(litaC_symbol->declared, litaC_module)) {
+                {
+                    litaC_std__map__std__map__MapIterator_remove_cb_usize_c_std__array__Array_cb_lex__SrcPos_ce__ce_(&((litaC_it)));
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+    }
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_getTypeReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_i64 litaC_typeid,litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* litaC_results) {
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)));litaC_i += 1) {
+        {
+            litaC_lsp__references__Reference* litaC_ref = litaC_std__array__std__array__Array_getPtr_cb_lsp__references__Reference_ce_(&((litaC_this->typeReferences)), litaC_i);
+            if(litaC_ref->type == litaC_typeid) {
+                {
+                    litaC_std__array__std__array__Array_add_cb_lex__SrcPos_ce_(litaC_results, litaC_ref->pos);
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+    }
+    
+}
+
+litaC_void litaC_lsp__references__ReferenceDatabase_getFieldReferences(litaC_lsp__references__ReferenceDatabase* litaC_this,litaC_i64 litaC_typeid,litaC_i32 litaC_offset,litaC_std__array__std__array__Array_cb_lex__SrcPos_ce_* litaC_results) {
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)));litaC_i += 1) {
+        {
+            litaC_lsp__references__FieldReference* litaC_ref = litaC_std__array__std__array__Array_getPtr_cb_lsp__references__FieldReference_ce_(&((litaC_this->fieldReferences)), litaC_i);
+            if(litaC_ref->parent == litaC_typeid && litaC_ref->offset == litaC_offset) {
+                {
+                    litaC_std__array__std__array__Array_add_cb_lex__SrcPos_ce_(litaC_results, litaC_ref->pos);
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+    }
+    
+}
+
+litaC_void* litaC_std__json__DefaultMakePtrFn(litaC_u64 litaC_type,litaC_std__json__JsonContext* litaC_context,litaC_std__json__JsonNode* litaC_json) {
+    return NULL;
+    
+    
+}
+
+litaC_void litaC_std__json__DefaultMakeFn(litaC_u64 litaC_type,litaC_std__json__JsonContext* litaC_context,litaC_std__json__JsonNode* litaC_json,litaC_void* litaC_result) {
+    
+}
+
+litaC_std__json__JsonContext litaC_std__json__JsonContextInit(litaC_void (*litaC_maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*),litaC_void* (*litaC_makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*),const litaC_std__mem__Allocator* litaC_allocator) {
+    litaC_std__json__JsonContext litaC_context =  {
+        0
+    };
+    litaC_std__json__JsonContext_init(&((litaC_context)), litaC_maker, litaC_makerPtr, litaC_allocator);
+    return litaC_context;
+    
+    
+}
+
+litaC_void litaC_std__json__JsonContext_init(litaC_std__json__JsonContext* litaC_this,litaC_void (*litaC_maker)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*,litaC_void*),litaC_void* (*litaC_makerPtr)(litaC_u64,litaC_std__json__JsonContext*,litaC_std__json__JsonNode*),const litaC_std__mem__Allocator* litaC_allocator) {
+    litaC_this->allocator = litaC_allocator;
+    litaC_this->maker = litaC_maker;
+    litaC_this->makerPtr = litaC_makerPtr;
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isNull(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->type == litaC_std__json__JsonType_NULL;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isBool(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->type == litaC_std__json__JsonType_BOOLEAN;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isTrue(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->type == litaC_std__json__JsonType_BOOLEAN && litaC_node->value.boolValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isFalse(litaC_std__json__JsonNode* litaC_node) {
+    return !(litaC_std__json__JsonNode_isTrue(litaC_node));
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isNumber(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->type == litaC_std__json__JsonType_INT_NUMBER || litaC_node->type == litaC_std__json__JsonType_FLOAT_NUMBER;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isString(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->type == litaC_std__json__JsonType_STRING;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isArray(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->type == litaC_std__json__JsonType_ARRAY;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_isObject(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->type == litaC_std__json__JsonType_OBJECT;
+    
+    
+}
+
+LITAC_INLINE 
+const litaC_char* litaC_std__json__JsonNode_asString(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->value.strValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__json__JsonNode_asBool(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->value.boolValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_f64 litaC_std__json__JsonNode_asNumber(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->value.doubleValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_f64 litaC_std__json__JsonNode_asFloat(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->value.doubleValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_i32 litaC_std__json__JsonNode_asInt(litaC_std__json__JsonNode* litaC_node) {
+    return (litaC_i32)litaC_node->value.intValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_i64 litaC_std__json__JsonNode_asLong(litaC_std__json__JsonNode* litaC_node) {
+    return (litaC_i64)litaC_node->value.intValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* litaC_std__json__JsonNode_asArray(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->value.arrayValue;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_std__json__JsonObject* litaC_std__json__JsonNode_asObject(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_node->value.objValue;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__CreateJsonNumber(litaC_f64 litaC_value,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
+    litaC_node->alloc = litaC_alloc;
+    litaC_node->type = litaC_std__json__JsonType_FLOAT_NUMBER;
+    litaC_node->value = (litaC_std__json__JsonValue) {
+        .doubleValue = litaC_value
+    };
+    return litaC_node;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__CreateJsonIntNumber(litaC_i64 litaC_value,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
+    litaC_node->alloc = litaC_alloc;
+    litaC_node->type = litaC_std__json__JsonType_INT_NUMBER;
+    litaC_node->value = (litaC_std__json__JsonValue) {
+        .intValue = litaC_value
+    };
+    return litaC_node;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__CreateJsonFloatNumber(litaC_f64 litaC_value,const litaC_std__mem__Allocator* litaC_alloc) {
+    return litaC_std__json__CreateJsonNumber(litaC_value, litaC_alloc);
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__CreateJsonString(const litaC_char* litaC_str,litaC_i32 litaC_len,const litaC_std__mem__Allocator* litaC_alloc) {
+    if(litaC_str == NULL) {
+        {
+            return litaC_std__json__JSON_NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_len < 0) {
+        {
+            litaC_len = litaC_std__string__char_length(litaC_str);
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__string__builder__StringBuilder litaC_sb = litaC_std__string__builder__StringBuilderInit(litaC_len + 1, litaC_alloc);
+    litaC_std__json__JsonEscapeString(&((litaC_sb)), litaC_str, litaC_len);
+    return litaC_std__json__CreateJsonStringNoDup(litaC_std__string__builder__StringBuilder_cStr(&((litaC_sb))), litaC_alloc);
+    
+    
+}
+
+litaC_void litaC_std__json__JsonEscapeString(litaC_std__string__builder__StringBuilder* litaC_buf,const litaC_char* litaC_string,litaC_i32 litaC_length) {
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_length;litaC_i += 1) {
+        {
+            litaC_char litaC_c = litaC_string[litaC_i];
+            const litaC_char* litaC_escaped = litaC_std__json__escapeStrings[(litaC_u32)litaC_c];
+            if(litaC_escaped) {
+                {
+                    litaC_std__string__builder__StringBuilder_appendStr(litaC_buf, litaC_escaped);
+                    continue;
+                    
+                    
+                }
+                
+            } else {
+                {
+                    litaC_std__string__builder__StringBuilder_appendChar(litaC_buf, litaC_c);
+                    
+                    
+                }
+            } 
+            
+            
+            
+        }
+    }
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__CreateJsonStringNoDup(const litaC_char* litaC_str,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
+    litaC_node->alloc = litaC_alloc;
+    litaC_node->type = litaC_std__json__JsonType_STRING;
+    litaC_node->value = (litaC_std__json__JsonValue) {
+        .strValue = litaC_str
+    };
+    return litaC_node;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__CreateJsonArray(const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
+    litaC_node->alloc = litaC_alloc;
+    litaC_node->type = litaC_std__json__JsonType_ARRAY;
+    litaC_node->value = (litaC_std__json__JsonValue) {
+        .arrayValue = litaC_std__mem__std__mem__new_cb_std__array__Array_ce_(litaC_alloc)
+    };
+    litaC_std__array__std__array__Array_init_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, 16, litaC_alloc);
+    return litaC_node;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__CreateJsonObject(const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_std__json__JsonNode* litaC_node = litaC_std__mem__std__mem__new_cb_std__json__JsonNode_ce_(litaC_alloc);
+    litaC_node->alloc = litaC_alloc;
+    litaC_node->type = litaC_std__json__JsonType_OBJECT;
+    litaC_node->value = (litaC_std__json__JsonValue) {
+        .objValue = litaC_std__mem__std__mem__new_cb_std__json__JsonObject_ce_(litaC_alloc)
+    };
+    litaC_std__map__std__map__Map_init_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), -(1), 16, litaC_alloc, 0);
+    litaC_std__array__std__array__Array_init_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), 16, litaC_alloc);
+    return litaC_node;
+    
+    
+}
+
+litaC_void litaC_std__json__JsonNode_put(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_std__json__JsonNode* litaC_n) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_n == NULL) {
+        {
+            litaC_n = litaC_std__json__JSON_NULL;
+            
+            
+        }
+        
+    } 
+    
+    litaC_char* litaC_copy = litaC_std__string__StringClone(litaC_key, litaC_std__string__char_length(litaC_key), litaC_node->alloc);
+    litaC_std__json__JsonEntry litaC_entry =  {
+        .key = litaC_copy,
+        .value = litaC_n
+    };
+    litaC_std__array__std__array__Array_add_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_entry);
+    litaC_std__map__std__map__Map_put_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_copy, litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values))) - 1);
+    
+}
+
+litaC_void litaC_std__json__JsonNode_putNoDup(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_std__json__JsonNode* litaC_n) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_n == NULL) {
+        {
+            litaC_n = litaC_std__json__JSON_NULL;
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonEntry litaC_entry =  {
+        .key = litaC_key,
+        .value = litaC_n
+    };
+    litaC_std__array__std__array__Array_add_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_entry);
+    litaC_std__map__std__map__Map_put_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_key, litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values))) - 1);
+    
+}
+
+litaC_void litaC_std__json__JsonNode_putStr(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,const litaC_char* litaC_str,litaC_i32 litaC_len) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_str == NULL) {
+        {
+            litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_std__json__JSON_NULL);
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonString(litaC_str, litaC_len, litaC_node->alloc);
+    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
+    
+}
+
+litaC_void litaC_std__json__JsonNode_putNumber(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_f64 litaC_number) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonFloatNumber(litaC_number, litaC_node->alloc);
+    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
+    
+}
+
+litaC_void litaC_std__json__JsonNode_putIntNumber(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_i64 litaC_number) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonIntNumber(litaC_number, litaC_node->alloc);
+    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
+    
+}
+
+litaC_void litaC_std__json__JsonNode_putFloatNumber(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_f64 litaC_number) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonNode* litaC_value = litaC_std__json__CreateJsonFloatNumber(litaC_number, litaC_node->alloc);
+    litaC_std__json__JsonNode_put(litaC_node, litaC_key, litaC_value);
+    
+}
+
+litaC_void litaC_std__json__JsonNode_putBool(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_bool litaC_b) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonNode_put(litaC_node, litaC_key, (litaC_b) ? litaC_std__json__JSON_TRUE : litaC_std__json__JSON_FALSE);
+    
+}
+
+litaC_bool litaC_std__json__JsonNode_contains(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_std__map__std__map__Map_contains_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_key);
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonNode_get(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
+    if(litaC_node->type != litaC_std__json__JsonType_OBJECT) {
+        {
+            return NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_i32 litaC_index = litaC_std__map__std__map__Map_get_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)), litaC_key);
+    if(litaC_index < 0) {
+        {
+            return NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_index).value;
+    
+    
+}
+
+litaC_bool litaC_std__json__JsonNode_getBool(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_bool litaC_defaultValue) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n) || !(litaC_std__json__JsonNode_isBool(litaC_n))) {
+        {
+            return litaC_defaultValue;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_n->value.boolValue;
+    
+    
+}
+
+litaC_i32 litaC_std__json__JsonNode_getInt(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_i32 litaC_defaultValue) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n)) {
+        {
+            return litaC_defaultValue;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_n->type == litaC_std__json__JsonType_FLOAT_NUMBER) {
+        {
+            return (litaC_i32)litaC_n->value.doubleValue;
+            
+            
+            
+        }
+        
+    } else {
+        if(litaC_n->type == litaC_std__json__JsonType_INT_NUMBER) {
+            {
+                return (litaC_i32)litaC_n->value.intValue;
+                
+                
+                
+            }
+            
+        } 
+        
+    } 
+    
+    return litaC_defaultValue;
+    
+    
+}
+
+litaC_i64 litaC_std__json__JsonNode_getLong(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_i64 litaC_defaultValue) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n) || !(litaC_std__json__JsonNode_isNumber(litaC_n))) {
+        {
+            return litaC_defaultValue;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_n->type == litaC_std__json__JsonType_FLOAT_NUMBER) {
+        {
+            return (litaC_i64)litaC_n->value.doubleValue;
+            
+            
+            
+        }
+        
+    } else {
+        if(litaC_n->type == litaC_std__json__JsonType_INT_NUMBER) {
+            {
+                return litaC_n->value.intValue;
+                
+                
+                
+            }
+            
+        } 
+        
+    } 
+    
+    return litaC_defaultValue;
+    
+    
+}
+
+litaC_f64 litaC_std__json__JsonNode_getFloat(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_f64 litaC_defaultValue) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n)) {
+        {
+            return litaC_defaultValue;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_n->type == litaC_std__json__JsonType_FLOAT_NUMBER) {
+        {
+            return litaC_n->value.doubleValue;
+            
+            
+            
+        }
+        
+    } else {
+        if(litaC_n->type == litaC_std__json__JsonType_INT_NUMBER) {
+            {
+                return (litaC_f64)litaC_n->value.intValue;
+                
+                
+                
+            }
+            
+        } 
+        
+    } 
+    
+    return litaC_defaultValue;
+    
+    
+}
+
+const litaC_char* litaC_std__json__JsonNode_getStr(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,const litaC_char* litaC_defaultValue) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n) || !(litaC_std__json__JsonNode_isString(litaC_n))) {
+        {
+            return litaC_defaultValue;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_n->value.strValue;
+    
+    
+}
+
+litaC_char* litaC_std__json__JsonNode_getStrCopy(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key,litaC_char* litaC_str,litaC_i32 litaC_len) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n) || !(litaC_std__json__JsonNode_isString(litaC_n))) {
+        {
+            return litaC_str;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_i32 litaC_srcLen = litaC_std__string__char_length(litaC_n->value.strValue);
+    litaC_std__string__StringCopy(litaC_n->value.strValue, litaC_str, MIN(litaC_srcLen, litaC_len) + 1);
+    return litaC_str;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonNode_getArray(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n) || !(litaC_std__json__JsonNode_isArray(litaC_n))) {
+        {
+            return NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_n;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonNode_getObject(litaC_std__json__JsonNode* litaC_node,const litaC_char* litaC_key) {
+    litaC_std__json__JsonNode* litaC_n = litaC_std__json__JsonNode_get(litaC_node, litaC_key);
+    if(!(litaC_n) || !(litaC_std__json__JsonNode_isObject(litaC_n))) {
+        {
+            return NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_n;
+    
+    
+}
+
+litaC_void litaC_std__json__JsonNode_add(litaC_std__json__JsonNode* litaC_node,litaC_std__json__JsonNode* litaC_n) {
+    if(litaC_node->type == litaC_std__json__JsonType_ARRAY) {
+        {
+            litaC_std__array__std__array__Array_add_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_n);
+            
+            
+        }
+        
+    } 
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonNode_at(litaC_std__json__JsonNode* litaC_node,litaC_i32 litaC_index) {
+    if(litaC_node->type != litaC_std__json__JsonType_ARRAY) {
+        {
+            return NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_index);
+    
+    
+}
+
+litaC_i32 litaC_std__json__JsonNode_size(litaC_std__json__JsonNode* litaC_node) {
+    if(litaC_node->type == litaC_std__json__JsonType_ARRAY) {
+        {
+            return litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);
+            
+            
+            
+        }
+        
+    } else {
+        if(litaC_node->type == litaC_std__json__JsonType_OBJECT) {
+            {
+                return litaC_std__map__std__map__Map_size_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)));
+                
+                
+                
+            }
+            
+        } 
+        
+    } 
+    
+    return 0;
+    
+    
+}
+
+litaC_bool litaC_std__json__JsonNode_empty(litaC_std__json__JsonNode* litaC_node) {
+    return litaC_std__json__JsonNode_size(litaC_node) == 0;
+    
+    
+}
+
+litaC_std__json__JsonIterator litaC_std__json__JsonNode_iter(litaC_std__json__JsonNode* litaC_node) {
+    return (litaC_std__json__JsonIterator) {
+        .index = 0,
+        .json = litaC_node
+    };
+    
+    
+}
+
+litaC_bool litaC_std__json__JsonIterator_hasNext(litaC_std__json__JsonIterator* litaC_this) {
+    return litaC_this->index < litaC_std__json__JsonNode_size(litaC_this->json);
+    
+    
+}
+
+litaC_std__json__JsonEntry litaC_std__json__JsonIterator_next(litaC_std__json__JsonIterator* litaC_this) {
+    if(litaC_this->index >= litaC_std__json__JsonNode_size(litaC_this->json)) {
+        {
+            return (litaC_std__json__JsonEntry) {
+                .key = NULL,
+                .value = NULL
+            };
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_this->index += 1;
+    if(litaC_std__json__JsonNode_isArray(litaC_this->json)) {
+        {
+            litaC_std__json__JsonNode* litaC_value = litaC_std__json__JsonNode_at(litaC_this->json, litaC_this->index - 1);
+            return (litaC_std__json__JsonEntry) {
+                .key = NULL,
+                .value = litaC_value
+            };
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_std__json__JsonNode_isObject(litaC_this->json)) {
+        {
+            return litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_this->json->value.objValue->values)), litaC_this->index - 1);
+            
+            
+            
+        }
+        
+    } 
+    
+    return (litaC_std__json__JsonEntry) {
+        .key = NULL,
+        .value = litaC_this->json
+    };
+    
+    
+}
+
+litaC_bool litaC_std__json__JsonNode_equals(litaC_std__json__JsonNode* litaC_node,litaC_std__json__JsonNode* litaC_other) {
+    if(litaC_node == litaC_other) {
+        {
+            return litaC_true;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(!(litaC_node) && litaC_other) {
+        return litaC_false;
+        
+        
+    } 
+    
+    if(litaC_node && !(litaC_other)) {
+        return litaC_false;
+        
+        
+    } 
+    
+    if(litaC_node->type != litaC_other->type) {
+        {
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    switch(litaC_node->type) {
+        case litaC_std__json__JsonType_ARRAY: {
+            {
+                if(litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue) != litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_other->value.arrayValue)) {
+                    {
+                        return litaC_false;
+                        
+                        
+                        
+                    }
+                    
+                } 
+                
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);litaC_i += 1) {
+                    {
+                        litaC_std__json__JsonNode* litaC_thisElement = litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_i);
+                        litaC_std__json__JsonNode* litaC_otherElement = litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_other->value.arrayValue, litaC_i);
+                        if(!(litaC_std__json__JsonNode_equals(litaC_thisElement, litaC_otherElement))) {
+                            {
+                                return litaC_false;
+                                
+                                
+                                
+                            }
+                            
+                        } 
+                        
+                        
+                        
+                    }
+                }
+                return litaC_true;
+                
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_OBJECT: {
+            {
+                litaC_i32 litaC_thisCount = 0;
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)));litaC_i += 1) {
+                    {
+                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_i);
+                        const litaC_char* litaC_key = litaC_entry.key;
+                        litaC_std__json__JsonNode* litaC_thisValue = litaC_entry.value;
+                        if(litaC_thisValue != NULL && litaC_thisValue->type != litaC_std__json__JsonType_NULL) {
+                            {
+                                litaC_thisCount += 1;
+                                
+                                
+                            }
+                            
+                        } 
+                        
+                        litaC_std__json__JsonNode* litaC_otherValue = litaC_std__json__JsonNode_get(litaC_other, litaC_key);
+                        if(!(litaC_std__json__JsonNode_equals(litaC_thisValue, litaC_otherValue))) {
+                            {
+                                return litaC_false;
+                                
+                                
+                                
+                            }
+                            
+                        } 
+                        
+                        
+                        
+                    }
+                }
+                litaC_i32 litaC_otherCount = 0;
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_other->value.objValue->values)));litaC_i += 1) {
+                    {
+                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_other->value.objValue->values)), litaC_i);
+                        litaC_std__json__JsonNode* litaC_otherValue = litaC_entry.value;
+                        if(litaC_otherValue != NULL && litaC_otherValue->type != litaC_std__json__JsonType_NULL) {
+                            {
+                                litaC_otherCount += 1;
+                                
+                                
+                            }
+                            
+                        } 
+                        
+                        
+                        
+                    }
+                }
+                return litaC_otherCount == litaC_thisCount;
+                
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_STRING: {
+            {
+                return litaC_std__string__char_equals(litaC_node->value.strValue, litaC_other->value.strValue);
+                
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_NULL: {
+            {
+                return litaC_true;
+                
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_BOOLEAN: {
+            {
+                return litaC_node->value.boolValue == litaC_other->value.boolValue;
+                
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_INT_NUMBER: {
+            {
+                return litaC_node->value.intValue == litaC_other->value.intValue;
+                
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_FLOAT_NUMBER: {
+            {
+                return litaC_node->value.doubleValue == litaC_other->value.doubleValue;
+                
+                
+                
+            }
+            
+            
+        }
+        default: {
+            {
+                assert(litaC_false);
+                
+                
+            }
+            
+            
+        }
+    }
+    
+}
+
+const litaC_char* litaC_std__json__JsonNode_print(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf) {
+    litaC_std__json__PrintJson(litaC_node, litaC_buf);
+    return litaC_std__string__builder__StringBuilder_cStr(litaC_buf);
+    
+    
+}
+
+const litaC_char* litaC_std__json__JsonNode_prettyPrint(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf,litaC_i32 litaC_tabSize) {
+    litaC_std__json__PrettyPrintJson(litaC_node, litaC_buf, 0, litaC_tabSize);
+    return litaC_std__string__builder__StringBuilder_cStr(litaC_buf);
+    
+    
+}
+
+litaC_void litaC_std__json__JsonNode_free(litaC_std__json__JsonNode* litaC_node) {
+    if(!(litaC_node)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    const litaC_std__mem__Allocator* litaC_alloc = litaC_node->alloc;
+    if(!(litaC_alloc)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    switch(litaC_node->type) {
+        case litaC_std__json__JsonType_ARRAY: {
+            {
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);litaC_i += 1) {
+                    {
+                        litaC_std__json__JsonNode* litaC_n = litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_i);
+                        if(litaC_n) {
+                            {
+                                litaC_std__json__JsonNode_free(litaC_n);
+                                
+                                
+                            }
+                            
+                        } 
+                        
+                        
+                        
+                    }
+                }
+                litaC_std__array__std__array__Array_free_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue);
+                litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node->value.arrayValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_OBJECT: {
+            {
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)));litaC_i += 1) {
+                    {
+                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)), litaC_i);
+                        const litaC_char* litaC_key = litaC_entry.key;
+                        litaC_std__json__JsonNode* litaC_node = litaC_entry.value;
+                        litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_key);
+                        if(litaC_node) {
+                            {
+                                litaC_std__json__JsonNode_free(litaC_node);
+                                
+                                
+                            }
+                            
+                        } 
+                        
+                        
+                        
+                    }
+                }
+                litaC_std__map__std__map__Map_free_cb__ptr_const_char_c_i32_ce_(&((litaC_node->value.objValue->indexes)));
+                litaC_std__array__std__array__Array_free_cb_std__json__JsonEntry_ce_(&((litaC_node->value.objValue->values)));
+                litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node->value.objValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_STRING: {
+            {
+                litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node->value.strValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        default: {
+            
+            
+        }
+    }
+    litaC_std__mem__Allocator_free(litaC_alloc, (litaC_void*)litaC_node);
+    
+}
+
+litaC_std__json__JsonParser litaC_std__json__JsonParserInit(const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_std__json__JsonParser litaC_parser =  {
+        0
+    };
+    litaC_std__json__JsonParser_init(&((litaC_parser)), litaC_alloc);
+    return litaC_parser;
+    
+    
+}
+
+litaC_void litaC_std__json__JsonParser_init(litaC_std__json__JsonParser* litaC_p,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_p->alloc = litaC_alloc;
+    litaC_p->status = litaC_std__json__JsonParserStatus_OK;
+    memset(litaC_p->errorMsg, 0, litaC_std__json__MAX_MESSAGE_SIZE);
+    litaC_p->stream = NULL;
+    litaC_p->lineStart = NULL;
+    litaC_p->token.pos.name = "<string>";
+    litaC_p->token.pos.line = 1;
+    litaC_std__string__builder__StringBuilder_init(&((litaC_p->buffer)), 16, litaC_alloc);
+    
+}
+
+litaC_void litaC_std__json__JsonParser_free(litaC_std__json__JsonParser* litaC_p) {
+    litaC_std__string__builder__StringBuilder_free(&((litaC_p->buffer)));
+    litaC_p->stream = NULL;
+    litaC_p->lineStart = NULL;
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJson(litaC_std__json__JsonParser* litaC_p,const litaC_char* litaC_buffer) {
+    litaC_p->stream = litaC_buffer;
+    litaC_p->lineStart = litaC_p->stream;
+    litaC_std__string__builder__StringBuilder_clear(&((litaC_p->buffer)));
+    litaC_std__json__JsonParser_nextToken(litaC_p);
+    litaC_std__json__JsonNode* litaC_node = litaC_std__json__JsonParser_parseJsonNode(litaC_p);
+    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+        {
+            if(litaC_node) {
+                {
+                    litaC_std__json__JsonNode_free(litaC_node);
+                    
+                    
+                }
+                
+            } 
+            
+            return NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    return litaC_node;
+    
+    
+}
+
+litaC_bool litaC_std__json__JsonParser_hasError(litaC_std__json__JsonParser* litaC_p) {
+    return litaC_p->status == litaC_std__json__JsonParserStatus_ERROR;
+    
+    
+}
+
+litaC_void litaC_std__json__PrintJson(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf) {
+    if(!(litaC_node)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    switch(litaC_node->type) {
+        case litaC_std__json__JsonType_NULL: {
+            {
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "null", 4);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_BOOLEAN: {
+            {
+                ((litaC_node->value.boolValue)) ? litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "true", 4) : litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "false", 5);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_INT_NUMBER: {
+            {
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%lld", litaC_node->value.intValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_FLOAT_NUMBER: {
+            {
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%f", litaC_node->value.doubleValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_STRING: {
+            {
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "\"%s\"", litaC_node->value.strValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_OBJECT: {
+            {
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "{", 1);
+                litaC_std__json__JsonObject* litaC_obj = litaC_node->value.objValue;
+                litaC_bool litaC_isFirst = litaC_true;
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_obj->values)));litaC_i += 1) {
+                    {
+                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_obj->values)), litaC_i);
+                        if(!(litaC_isFirst)) {
+                            litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, ",", 1);
+                            
+                        } 
+                        
+                        litaC_std__string__builder__StringBuilder_append(litaC_buf, "\"%s\":", litaC_entry.key);
+                        litaC_std__json__PrintJson(litaC_entry.value, litaC_buf);
+                        litaC_isFirst = litaC_false;
+                        
+                        
+                    }
+                }
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "}", 1);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_ARRAY: {
+            {
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "[", 1);
+                litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* litaC_array = litaC_node->value.arrayValue;
+                litaC_bool litaC_isFirst = litaC_true;
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_array);litaC_i += 1) {
+                    {
+                        if(!(litaC_isFirst)) {
+                            litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, ",", 1);
+                            
+                        } 
+                        
+                        litaC_std__json__PrintJson(litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_array, litaC_i), litaC_buf);
+                        litaC_isFirst = litaC_false;
+                        
+                        
+                    }
+                }
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "]", 1);
+                break;
+                
+                
+            }
+            
+            
+        }
+    }
+    
+}
+
+litaC_void litaC_std__json__PrettyPrintJson(litaC_std__json__JsonNode* litaC_node,litaC_std__string__builder__StringBuilder* litaC_buf,litaC_i32 litaC_offset,litaC_i32 litaC_tabSize) {
+    if(!(litaC_node)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    switch(litaC_node->type) {
+        case litaC_std__json__JsonType_NULL: {
+            {
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "null", 4);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_BOOLEAN: {
+            {
+                ((litaC_node->value.boolValue)) ? litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "true", 4) : litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "false", 5);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_INT_NUMBER: {
+            {
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%lld", litaC_node->value.intValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_FLOAT_NUMBER: {
+            {
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%f", litaC_node->value.doubleValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_STRING: {
+            {
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "\"%s\"", litaC_node->value.strValue);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_OBJECT: {
+            {
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "{\n", 2);
+                litaC_std__json__JsonObject* litaC_obj = litaC_node->value.objValue;
+                litaC_bool litaC_isFirst = litaC_true;
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_std__json__JsonEntry_ce_(&((litaC_obj->values)));litaC_i += 1) {
+                    {
+                        litaC_std__json__JsonEntry litaC_entry = litaC_std__array__std__array__Array_get_cb_std__json__JsonEntry_ce_(&((litaC_obj->values)), litaC_i);
+                        if(!(litaC_isFirst)) {
+                            litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, ",\n", 2);
+                            
+                        } 
+                        
+                        litaC_std__string__builder__StringBuilder_append(litaC_buf, "%*s", litaC_offset + litaC_tabSize, "");
+                        litaC_std__string__builder__StringBuilder_append(litaC_buf, "\"%s\": ", litaC_entry.key);
+                        litaC_std__json__PrettyPrintJson(litaC_entry.value, litaC_buf, litaC_offset + litaC_tabSize, 4);
+                        litaC_isFirst = litaC_false;
+                        
+                        
+                    }
+                }
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "\n", 1);
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%*s}", litaC_offset, "");
+                break;
+                
+                
+            }
+            
+            
+        }
+        case litaC_std__json__JsonType_ARRAY: {
+            {
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "[\n", 2);
+                litaC_std__array__std__array__Array_cb__ptr_std__json__JsonNode_ce_* litaC_array = litaC_node->value.arrayValue;
+                litaC_bool litaC_isFirst = litaC_true;
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_std__json__JsonNode_ce_(litaC_array);litaC_i += 1) {
+                    {
+                        if(!(litaC_isFirst)) {
+                            litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, ",\n", 2);
+                            
+                        } 
+                        
+                        litaC_std__string__builder__StringBuilder_append(litaC_buf, "%*s", litaC_offset + litaC_tabSize, "");
+                        litaC_std__json__PrettyPrintJson(litaC_std__array__std__array__Array_get_cb__ptr_std__json__JsonNode_ce_(litaC_array, litaC_i), litaC_buf, litaC_offset + litaC_tabSize, 4);
+                        litaC_isFirst = litaC_false;
+                        
+                        
+                    }
+                }
+                litaC_std__string__builder__StringBuilder_appendStrn(litaC_buf, "\n", 1);
+                litaC_std__string__builder__StringBuilder_append(litaC_buf, "%*s]", litaC_offset, "");
+                break;
+                
+                
+            }
+            
+            
+        }
+    }
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonNode(litaC_std__json__JsonParser* litaC_p) {
+    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+        {
+            return NULL;
+            
+            
+            
+        }
+        
+    } 
+    
+    switch(litaC_p->token.kind) {
+        case litaC_std__json__TokenKind_EOF: 
+        case litaC_std__json__TokenKind_ERROR: {
+            return NULL;
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_TRUE: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JSON_TRUE;
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_FALSE: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JSON_FALSE;
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_NULL: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JSON_NULL;
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_INT_NUMBER: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JsonParser_parseJsonIntNumber(litaC_p);
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_REAL_NUMBER: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JsonParser_parseJsonRealNumber(litaC_p);
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_STRING: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JsonParser_parseJsonStr(litaC_p);
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_LEFT_BRACE: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JsonParser_parseJsonObject(litaC_p);
+            
+            
+            
+        }
+        case litaC_std__json__TokenKind_LEFT_BRACKET: {
+            litaC_std__json__JsonParser_nextToken(litaC_p);
+            return litaC_std__json__JsonParser_parseJsonArray(litaC_p);
+            
+            
+            
+        }
+        default: {
+            
+            
+        }
+    }
+    return NULL;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonIntNumber(litaC_std__json__JsonParser* litaC_p) {
+    return litaC_std__json__CreateJsonIntNumber(litaC_p->token.intNumValue, litaC_p->alloc);
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonRealNumber(litaC_std__json__JsonParser* litaC_p) {
+    return litaC_std__json__CreateJsonFloatNumber(litaC_p->token.realNumValue, litaC_p->alloc);
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonStr(litaC_std__json__JsonParser* litaC_p) {
+    return litaC_std__json__CreateJsonStringNoDup(litaC_p->token.strValue, litaC_p->alloc);
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonArray(litaC_std__json__JsonParser* litaC_p) {
+    litaC_std__json__JsonNode* litaC_node = litaC_std__json__CreateJsonArray(litaC_p->alloc);
+    do {
+        {
+            if(litaC_std__json__JsonParser_check(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACKET)) {
+                {
+                    break;
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_std__json__JsonNode* litaC_element = litaC_std__json__JsonParser_parseJsonNode(litaC_p);
+            litaC_std__array__std__array__Array_add_cb__ptr_std__json__JsonNode_ce_(litaC_node->value.arrayValue, litaC_element);
+            
+            
+        }
+    }
+    while(litaC_std__json__JsonParser_match(litaC_p, litaC_std__json__TokenKind_COMMA));
+    litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACKET);
+    return litaC_node;
+    
+    
+}
+
+litaC_std__json__JsonNode* litaC_std__json__JsonParser_parseJsonObject(litaC_std__json__JsonParser* litaC_p) {
+    litaC_std__json__JsonNode* litaC_node = litaC_std__json__CreateJsonObject(litaC_p->alloc);
+    do {
+        {
+            if(litaC_std__json__JsonParser_check(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACE)) {
+                {
+                    break;
+                    
+                    
+                }
+                
+            } 
+            
+            const litaC_char* litaC_key = litaC_p->token.strValue;
+            if(!(litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_STRING))) {
+                {
+                    goto err;
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            if(!(litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_COLON))) {
+                {
+                    goto err;
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_std__json__JsonNode* litaC_value = litaC_std__json__JsonParser_parseJsonNode(litaC_p);
+            litaC_std__json__JsonNode_putNoDup(litaC_node, litaC_key, litaC_value);
+            
+            
+        }
+    }
+    while(litaC_std__json__JsonParser_match(litaC_p, litaC_std__json__TokenKind_COMMA));
+    litaC_std__json__JsonParser_expect(litaC_p, litaC_std__json__TokenKind_RIGHT_BRACE);
+    err:;
+    
+    return litaC_node;
+    
+    
+}
+
+const litaC_char* litaC_std__json__TokenName(litaC_std__json__TokenKind litaC_t) {
+    return litaC_std__json__tokenKindNames[litaC_t];
+    
+    
+}
+
+litaC_void litaC_std__json__JsonParser_error(litaC_std__json__JsonParser* litaC_p,const litaC_char* litaC_format,...) {
+    va_list litaC_args = {0};
+    va_start(litaC_args, litaC_format);
+    vsnprintf(litaC_p->errorMsg, litaC_std__json__MAX_MESSAGE_SIZE, litaC_format, litaC_args);
+    va_end(litaC_args);
+    litaC_p->status = litaC_std__json__JsonParserStatus_ERROR;
+    litaC_p->token.kind = litaC_std__json__TokenKind_ERROR;
+    
+}
+
+litaC_void litaC_std__json__JsonParser_scanInt(litaC_std__json__JsonParser* litaC_p) {
+    litaC_i32 litaC_base = 10;
+    const litaC_char* litaC_start_digits = litaC_p->stream;
+    if(*(litaC_p->stream) == '0') {
+        {
+            litaC_p->stream += 1;
+            if(tolower(*(litaC_p->stream)) == 'x') {
+                {
+                    litaC_p->stream += 1;
+                    litaC_base = 16;
+                    litaC_start_digits = litaC_p->stream;
+                    
+                    
+                }
+                
+            } else {
+                if(tolower(*(litaC_p->stream)) == 'b') {
+                    {
+                        litaC_p->stream += 1;
+                        litaC_base = 2;
+                        litaC_start_digits = litaC_p->stream;
+                        
+                        
+                    }
+                    
+                } else {
+                    if(isdigit(*(litaC_p->stream))) {
+                        {
+                            litaC_base = 8;
+                            litaC_start_digits = litaC_p->stream;
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                } 
+                
+            } 
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_i64 litaC_val = 0;
+    for(;;) {
+        {
+            if(*(litaC_p->stream) == '_') {
+                {
+                    litaC_p->stream += 1;
+                    continue;
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_i32 litaC_digit = litaC_std__json__charToDigit[(litaC_i32)(*(litaC_p->stream))];
+            if(litaC_digit == 0 && *(litaC_p->stream) != '0') {
+                {
+                    break;
+                    
+                    
+                }
+                
+            } 
+            
+            if(litaC_digit >= litaC_base) {
+                {
+                    litaC_std__json__JsonParser_error(litaC_p, "Digit '%c' out of range for base %d", *(litaC_p->stream), litaC_base);
+                    litaC_digit = 0;
+                    
+                    
+                }
+                
+            } 
+            
+            if(litaC_val > (litaC_std__limits__MAX_I64 - litaC_digit) / litaC_base) {
+                {
+                    litaC_std__json__JsonParser_error(litaC_p, "Integer literal overflow");
+                    while(isdigit(*(litaC_p->stream))) {
+                        {
+                            litaC_p->stream += 1;
+                            
+                            
+                        }
+                    }
+                    litaC_val = 0;
+                    break;
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_val = litaC_val * litaC_base + litaC_digit;
+            litaC_p->stream += 1;
+            
+            
+        }
+    }
+    if(litaC_p->stream == litaC_start_digits) {
+        {
+            litaC_std__json__JsonParser_error(litaC_p, "Expected base %d digit, got '%c'", litaC_base, *(litaC_p->stream));
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_p->token.kind = litaC_std__json__TokenKind_INT_NUMBER;
+    litaC_p->token.intNumValue = litaC_val;
+    
+}
+
+litaC_void litaC_std__json__JsonParser_scanFloat(litaC_std__json__JsonParser* litaC_p) {
+    const litaC_char* litaC_start = litaC_p->stream;
+    while(isdigit(*(litaC_p->stream))) {
+        {
+            litaC_p->stream += 1;
+            
+            
+        }
+    }
+    if(*(litaC_p->stream) == '.') {
+        {
+            litaC_p->stream += 1;
+            
+            
+        }
+        
+    } 
+    
+    while(isdigit(*(litaC_p->stream))) {
+        {
+            litaC_p->stream += 1;
+            
+            
+        }
+    }
+    if(tolower(*(litaC_p->stream)) == 'e') {
+        {
+            litaC_p->stream += 1;
+            if(*(litaC_p->stream) == '+' || *(litaC_p->stream) == '-') {
+                {
+                    litaC_p->stream += 1;
+                    
+                    
+                }
+                
+            } 
+            
+            if(!(isdigit(*(litaC_p->stream)))) {
+                {
+                    litaC_std__json__JsonParser_error(litaC_p, "Expected digit after float literal exponent, found '%c'.", *(litaC_p->stream));
+                    
+                    
+                }
+                
+            } 
+            
+            while(isdigit(*(litaC_p->stream))) {
+                {
+                    litaC_p->stream += 1;
+                    
+                    
+                }
+            }
+            
+            
+        }
+        
+    } 
+    
+    litaC_f64 litaC_val = strtod(litaC_start, NULL);
+    if(litaC_val == HUGE_VAL) {
+        {
+            litaC_std__json__JsonParser_error(litaC_p, "Float literal overflow");
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_p->token.kind = litaC_std__json__TokenKind_REAL_NUMBER;
+    litaC_p->token.realNumValue = litaC_val;
+    
+}
+
+litaC_void litaC_std__json__JsonParser_scanStr(litaC_std__json__JsonParser* litaC_p) {
+    assert(*(litaC_p->stream) == '"');
+    litaC_p->stream += 1;
+    litaC_std__string__builder__StringBuilder_clear(&((litaC_p->buffer)));
+    while(*(litaC_p->stream) && *(litaC_p->stream) != '"') {
+        {
+            litaC_u8 litaC_c = (litaC_u8)(*(litaC_p->stream));
+            if(litaC_c >= 0x80) {
+                {
+                    litaC_i32 litaC_result = 0;
+                    litaC_i32 litaC_len = litaC_std__unicode__utf8__Utf8Decode((const litaC_u8*)litaC_p->stream, -(1), &(litaC_result));
+                    if(litaC_len < 0) {
+                        {
+                            litaC_std__json__JsonParser_error(litaC_p, "Invalid codepoint");
+                            
+                            
+                        }
+                        
+                    } else {
+                        {
+                            litaC_std__string__builder__StringBuilder_appendStrn(&((litaC_p->buffer)), litaC_p->stream, (litaC_i32)litaC_len);
+                            litaC_p->stream += litaC_len;
+                            
+                            
+                        }
+                    } 
+                    
+                    
+                    
+                }
+                
+            } else {
+                {
+                    litaC_char litaC_val = *(litaC_p->stream);
+                    if(litaC_val == '\n') {
+                        {
+                            litaC_std__json__JsonParser_error(litaC_p, "String literal cannot contain newline");
+                            break;
+                            
+                            
+                        }
+                        
+                    } else {
+                        if(litaC_val == '\\') {
+                            {
+                                litaC_p->stream += 1;
+                                if(*(litaC_p->stream) == 'x') {
+                                    {
+                                        
+                                        
+                                    }
+                                    
+                                } else {
+                                    {
+                                        litaC_val = litaC_std__json__escapeToChar[(litaC_i32)(*(litaC_p->stream))];
+                                        if(litaC_val == 0 && *(litaC_p->stream) != '0') {
+                                            {
+                                                litaC_std__json__JsonParser_error(litaC_p, "Invalid string literal escape '\\%c'", *(litaC_p->stream));
+                                                
+                                                
+                                            }
+                                            
+                                        } 
+                                        
+                                        litaC_p->stream += 1;
+                                        
+                                        
+                                    }
+                                } 
+                                
+                                
+                                
+                            }
+                            
+                        } else {
+                            {
+                                litaC_p->stream += 1;
+                                
+                                
+                            }
+                        } 
+                        
+                    } 
+                    
+                    litaC_std__string__builder__StringBuilder_append(&((litaC_p->buffer)), "%c", litaC_val);
+                    
+                    
+                }
+            } 
+            
+            
+            
+        }
+    }
+    if(*(litaC_p->stream)) {
+        {
+            litaC_p->stream += 1;
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_std__json__JsonParser_error(litaC_p, "Unexpected end of file within string literal");
+            
+            
+        }
+    } 
+    
+    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_p->token.kind = litaC_std__json__TokenKind_STRING;
+    litaC_p->token.strValue = (const litaC_char*)litaC_std__mem__memduplicate((const litaC_void*)litaC_std__string__builder__StringBuilder_cStr(&((litaC_p->buffer))), litaC_std__string__builder__StringBuilder_size(&((litaC_p->buffer))) + 1, litaC_p->alloc);
+    
+}
+
+litaC_void litaC_std__json__JsonParser_scanMultiStr(litaC_std__json__JsonParser* litaC_p) {
+    assert(*(litaC_p->stream) == '`');
+    litaC_p->stream += 1;
+    litaC_std__string__builder__StringBuilder_clear(&((litaC_p->buffer)));
+    while(*(litaC_p->stream) && *(litaC_p->stream) != '`') {
+        {
+            litaC_u8 litaC_c = (litaC_u8)(*(litaC_p->stream));
+            if(litaC_c >= 0x80) {
+                {
+                    litaC_i32 litaC_result = 0;
+                    litaC_i32 litaC_len = litaC_std__unicode__utf8__Utf8Decode((const litaC_u8*)litaC_p->stream, -(1), &(litaC_result));
+                    if(litaC_len < 0) {
+                        {
+                            litaC_std__json__JsonParser_error(litaC_p, "Invalid codepoint");
+                            
+                            
+                        }
+                        
+                    } else {
+                        {
+                            litaC_std__string__builder__StringBuilder_appendStrn(&((litaC_p->buffer)), litaC_p->stream, (litaC_i32)litaC_len);
+                            litaC_p->stream += litaC_len;
+                            
+                            
+                        }
+                    } 
+                    
+                    
+                    
+                }
+                
+            } else {
+                {
+                    litaC_char litaC_val = *(litaC_p->stream);
+                    if(litaC_val == '\\') {
+                        {
+                            litaC_p->stream += 1;
+                            if(*(litaC_p->stream) == '`') {
+                                {
+                                    litaC_val = '`';
+                                    litaC_p->stream += 1;
+                                    
+                                    
+                                }
+                                
+                            } else {
+                                if(*(litaC_p->stream) == '\\') {
+                                    {
+                                        litaC_val = '\\';
+                                        litaC_p->stream += 1;
+                                        
+                                        
+                                    }
+                                    
+                                } else {
+                                    {
+                                        litaC_std__string__builder__StringBuilder_append(&((litaC_p->buffer)), "%c", litaC_val);
+                                        litaC_val = *(litaC_p->stream);
+                                        litaC_p->stream += 1;
+                                        
+                                        
+                                    }
+                                } 
+                                
+                            } 
+                            
+                            
+                            
+                        }
+                        
+                    } else {
+                        {
+                            litaC_p->stream += 1;
+                            
+                            
+                        }
+                    } 
+                    
+                    if(litaC_val == '\r') {
+                        {
+                            continue;
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                    litaC_std__string__builder__StringBuilder_append(&((litaC_p->buffer)), "%c", litaC_val);
+                    
+                    
+                }
+            } 
+            
+            
+            
+        }
+    }
+    if(*(litaC_p->stream)) {
+        {
+            litaC_p->stream += 1;
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_std__json__JsonParser_error(litaC_p, "Unexpected end of file within string literal");
+            
+            
+        }
+    } 
+    
+    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_p->token.kind = litaC_std__json__TokenKind_STRING;
+    litaC_p->token.strValue = (const litaC_char*)litaC_std__mem__memduplicate((const litaC_void*)litaC_std__string__builder__StringBuilder_cStr(&((litaC_p->buffer))), litaC_std__string__builder__StringBuilder_size(&((litaC_p->buffer))) + 1, litaC_p->alloc);
+    
+}
+
+litaC_void litaC_std__json__JsonParser_skipComments(litaC_std__json__JsonParser* litaC_l) {
+    if(*(litaC_l->stream) == '/') {
+        {
+            if(litaC_l->stream[1] == '/') {
+                {
+                    litaC_l->stream += 1;
+                    do {
+                        {
+                            litaC_l->stream += 1;
+                            if(*(litaC_l->stream) == '\n') {
+                                {
+                                    break;
+                                    
+                                    
+                                }
+                                
+                            } 
+                            
+                            
+                            
+                        }
+                    }
+                    while(litaC_l->stream);
+                    
+                    
+                }
+                
+            } else {
+                if(litaC_l->stream[1] == '*') {
+                    {
+                        litaC_l->stream += 1;
+                        do {
+                            {
+                                litaC_l->stream += 1;
+                                if((litaC_l->stream[0] == '*' && litaC_l->stream[1] == '/')) {
+                                    {
+                                        litaC_l->stream += 2;
+                                        break;
+                                        
+                                        
+                                    }
+                                    
+                                } 
+                                
+                                
+                                
+                            }
+                        }
+                        while(litaC_l->stream);
+                        
+                        
+                    }
+                    
+                } 
+                
+            } 
+            
+            
+            
+        }
+        
+    } 
+    
+    
+}
+
+litaC_void litaC_std__json__JsonParser_nextToken(litaC_std__json__JsonParser* litaC_p) {
+    repeat:;
+    
+    if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+        {
+            return;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonParser_skipComments(litaC_p);
+    litaC_p->token.start = litaC_p->stream;
+    switch(*(litaC_p->stream)) {
+        case ' ': 
+        case '\n': 
+        case '\r': 
+        case '\t': {
+            {
+                while(isspace(*(litaC_p->stream))) {
+                    {
+                        if(*(litaC_p->stream) == '\n') {
+                            {
+                                litaC_p->lineStart = litaC_p->stream;
+                                litaC_p->token.pos.line += 1;
+                                
+                                
+                            }
+                            
+                        } 
+                        
+                        litaC_p->stream += 1;
+                        
+                        
+                    }
+                }
+                goto repeat;
+                
+                
+                
+            }
+            
+            
+        }
+        case '"': {
+            {
+                litaC_std__json__JsonParser_scanStr(litaC_p);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case '`': {
+            {
+                litaC_std__json__JsonParser_scanMultiStr(litaC_p);
+                break;
+                
+                
+            }
+            
+            
+        }
+        case '.': {
+            if(isdigit(litaC_p->stream[1])) {
+                {
+                    litaC_std__json__JsonParser_scanFloat(litaC_p);
+                    
+                    
+                }
+                
+            } 
+            
+            break;
+            
+            
+        }
+        case '-': {
+            if(isdigit(litaC_p->stream[1])) {
+                {
+                    litaC_p->stream += 1;
+                    litaC_std__json__JsonParser_scanInt(litaC_p);
+                    litaC_p->token.intNumValue *= -(1);
+                    
+                    
+                }
+                
+            } 
+            
+            break;
+            
+            
+        }
+        case '0': 
+        case '1': 
+        case '2': 
+        case '3': 
+        case '4': 
+        case '5': 
+        case '6': 
+        case '7': 
+        case '8': 
+        case '9': {
+            {
+                while(isdigit(*(litaC_p->stream))) {
+                    {
+                        litaC_p->stream += 1;
+                        
+                        
+                    }
+                }
+                litaC_char litaC_c = *(litaC_p->stream);
+                litaC_p->stream = litaC_p->token.start;
+                if(litaC_c == '.' || tolower(litaC_c) == 'e') {
+                    {
+                        litaC_std__json__JsonParser_scanFloat(litaC_p);
+                        
+                        
+                    }
+                    
+                } else {
+                    {
+                        litaC_std__json__JsonParser_scanInt(litaC_p);
+                        
+                        
+                    }
+                } 
+                
+                break;
+                
+                
+            }
+            
+            
+        }
+        case 'n': {
+            {
+                if(litaC_p->stream[1] == 'u' && litaC_p->stream[2] == 'l' && litaC_p->stream[3] == 'l') {
+                    {
+                        litaC_p->stream += 4;
+                        litaC_p->token.kind = litaC_std__json__TokenKind_NULL;
+                        break;
+                        
+                        
+                    }
+                    
+                } 
+                
+                litaC_std__json__JsonParser_error(litaC_p, "invalid identifier, did you mean 'null'?");
+                break;
+                
+                
+            }
+            
+            
+        }
+        case 't': {
+            {
+                if(litaC_p->stream[1] == 'r' && litaC_p->stream[2] == 'u' && litaC_p->stream[3] == 'e') {
+                    {
+                        litaC_p->stream += 4;
+                        litaC_p->token.kind = litaC_std__json__TokenKind_TRUE;
+                        break;
+                        
+                        
+                    }
+                    
+                } 
+                
+                litaC_std__json__JsonParser_error(litaC_p, "invalid identifier, did you mean 'true'?");
+                break;
+                
+                
+            }
+            
+            
+        }
+        case 'f': {
+            {
+                if(litaC_p->stream[1] == 'a' && litaC_p->stream[2] == 'l' && litaC_p->stream[3] == 's' && litaC_p->stream[4] == 'e') {
+                    {
+                        litaC_p->stream += 5;
+                        litaC_p->token.kind = litaC_std__json__TokenKind_FALSE;
+                        break;
+                        
+                        
+                    }
+                    
+                } 
+                
+                litaC_std__json__JsonParser_error(litaC_p, "invalid identifier, did you mean 'false'?");
+                break;
+                
+                
+            }
+            
+            
+        }
+        case '\0': {
+            litaC_p->token.kind = litaC_std__json__TokenKind_EOF;
+            litaC_p->stream += 1;
+            break;
+            
+            
+        }
+        case '{': {
+            litaC_p->token.kind = litaC_std__json__TokenKind_LEFT_BRACE;
+            litaC_p->stream += 1;
+            break;
+            
+            
+        }
+        case '}': {
+            litaC_p->token.kind = litaC_std__json__TokenKind_RIGHT_BRACE;
+            litaC_p->stream += 1;
+            break;
+            
+            
+        }
+        case '[': {
+            litaC_p->token.kind = litaC_std__json__TokenKind_LEFT_BRACKET;
+            litaC_p->stream += 1;
+            break;
+            
+            
+        }
+        case ']': {
+            litaC_p->token.kind = litaC_std__json__TokenKind_RIGHT_BRACKET;
+            litaC_p->stream += 1;
+            break;
+            
+            
+        }
+        case ',': {
+            litaC_p->token.kind = litaC_std__json__TokenKind_COMMA;
+            litaC_p->stream += 1;
+            break;
+            
+            
+        }
+        case ':': {
+            litaC_p->token.kind = litaC_std__json__TokenKind_COLON;
+            litaC_p->stream += 1;
+            break;
+            
+            
+        }
+        default: {
+            {
+                litaC_std__json__JsonParser_error(litaC_p, "Invalid '%c' ('%u') token", *(litaC_p->stream), *(litaC_p->stream));
+                litaC_p->stream += 1;
+                litaC_p->token.kind = litaC_std__json__TokenKind_ERROR;
+                break;
+                
+                
+            }
+            
+            
+        }
+    }
+    litaC_p->token.end = litaC_p->stream;
+    
+}
+
+litaC_bool litaC_std__json__JsonParser_check(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind) {
+    return litaC_p->token.kind == litaC_kind;
+    
+    
+}
+
+litaC_bool litaC_std__json__JsonParser_match(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind) {
+    if(!(litaC_std__json__JsonParser_check(litaC_p, litaC_kind))) {
+        {
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonParser_nextToken(litaC_p);
+    return litaC_true;
+    
+    
+}
+
+litaC_bool litaC_std__json__JsonParser_expect(litaC_std__json__JsonParser* litaC_p,litaC_std__json__TokenKind litaC_kind) {
+    if(!(litaC_std__json__JsonParser_check(litaC_p, litaC_kind))) {
+        {
+            if(litaC_std__json__JsonParser_hasError(litaC_p)) {
+                {
+                    return litaC_false;
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_std__json__JsonParser_error(litaC_p, "Expected token %s, got %s", litaC_std__json__TokenName(litaC_kind), litaC_std__json__TokenName(litaC_p->token.kind));
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_std__json__JsonParser_nextToken(litaC_p);
+    return litaC_true;
     
     
 }
@@ -77236,7 +77898,7 @@ litaC_std__json__JsonNode* litaC_lsp__workspace__Workspace_autoComplete(litaC_ls
                 {
                     litaC_std__map__std__map__MapEntry_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_ litaC_entry = litaC_std__map__std__map__MapIterator_next_cb_intern__InternedString_c__ptr_symbols__Symbol_ce_(&((litaC_it)));
                     litaC_symbols__Symbol* litaC_symbol = litaC_entry.value;
-                    litaC_i32 litaC_isMethod = litaC_symbol->flags & litaC_symbols__SymbolFlags_IS_METHOD;
+                    litaC_symbols__SymbolFlags litaC_isMethod = litaC_symbol->flags & litaC_symbols__SymbolFlags_IS_METHOD;
                     if(litaC_isMethodLookUp && !(litaC_isMethod)) {
                         {
                             continue;
@@ -80747,6 +81409,7 @@ litaC_bool litaC_lsp__util__SourceLookup_visitExpr(litaC_lsp__util__SourceLookup
             
             
         }
+        case litaC_ast__StmtKind_NAME_OF_EXPR: 
         case litaC_ast__StmtKind_TYPE_OF_EXPR: {
             {
                 litaC_ast__TypeOfExpr* litaC_expr = (litaC_ast__TypeOfExpr*)litaC_node;
@@ -80886,12 +81549,12 @@ litaC_void litaC_introspection__Introspect_generate(litaC_introspection__Introsp
     litaC_char litaC_filename[PATH_MAX] =  {
         0
     };
-    litaC_std__builtins__String litaC_moduleName = litaC_std__string__StringInit("type", -(1));
+    litaC_std__builtins__String litaC_moduleName = (litaC_std__builtins__String) { .buffer = "std/type", .length = 8 };
     if(!(litaC_lita__FindModulePath(litaC_this->lita, litaC_moduleName, litaC_filename))) {
         {
             litaC_phase_result__PhaseResult_addError(&((litaC_this->lita->result)), (litaC_lex__SrcPos) {
                 0
-            }, "could not find builtin module 'type' on the system path.");
+            }, "could not find builtin module '%.*s' on the system path.", litaC_moduleName.length, litaC_moduleName.buffer);
             return;
             
             
@@ -81270,7 +81933,7 @@ litaC_void litaC_introspection__Introspect_emitType(litaC_introspection__Introsp
                                             } 
                                             
                                             litaC_i64 litaC_typeid = ((litaC_field.typeInfo)) ? litaC_field.typeInfo->typeid : 0L;
-                                            litaC_std__string__builder__StringBuilder_append(litaC_scratch, "\n                                FieldInfo {\n                                    .kind = FieldInfoKind.VAR_FIELD,\n                                    .name = \"%.*s\",\n                                    .type = %llu,\n                                    .modifiers = Modifiers.%s,\n                                    .offset = offsetof(%.*s::%.*s, %.*s)\n                                },\n                            ", litaC_traitField->decl.name.str.length, litaC_traitField->decl.name.str.buffer, litaC_typeid, "None", litaC_sym->declared->id.name.length, litaC_sym->declared->id.name.buffer, litaC_type->name.length, litaC_type->name.buffer, litaC_traitField->decl.name.str.length, litaC_traitField->decl.name.str.buffer);
+                                            litaC_std__string__builder__StringBuilder_append(litaC_scratch, "\n                                FieldInfo {\n                                    .kind = FieldInfoKind.VAR_FIELD,\n                                    .name = \"%.*s\",\n                                    .type = %llu,\n                                    .modifiers = Modifiers.%s,\n                                    .offset = offsetof(%.*s, %.*s)\n                                },\n                            ", litaC_traitField->decl.name.str.length, litaC_traitField->decl.name.str.buffer, litaC_typeid, "None", litaC_sym->qualifiedName.length, litaC_sym->qualifiedName.buffer, litaC_traitField->decl.name.str.length, litaC_traitField->decl.name.str.buffer);
                                             break;
                                             
                                             
@@ -81291,7 +81954,7 @@ litaC_void litaC_introspection__Introspect_emitType(litaC_introspection__Introsp
                                             } 
                                             
                                             litaC_i64 litaC_typeid = ((litaC_field.typeInfo)) ? litaC_field.typeInfo->typeid : 0L;
-                                            litaC_std__string__builder__StringBuilder_append(litaC_scratch, "\n                                FieldInfo {\n                                    .kind = FieldInfoKind.VAR_FIELD,\n                                    .name = \"%.*s\",\n                                    .type = %llu,\n                                    .modifiers = Modifiers.%s,\n                                    .offset = offsetof(%.*s::%.*s, %.*s)\n                                },\n                            ", litaC_varField->decl.name.str.length, litaC_varField->decl.name.str.buffer, litaC_typeid, ((litaC_varField->decl.attributes.isUsing)) ? "Using" : "None", litaC_sym->declared->id.name.length, litaC_sym->declared->id.name.buffer, litaC_type->name.length, litaC_type->name.buffer, litaC_varField->decl.name.str.length, litaC_varField->decl.name.str.buffer);
+                                            litaC_std__string__builder__StringBuilder_append(litaC_scratch, "\n                                FieldInfo {\n                                    .kind = FieldInfoKind.VAR_FIELD,\n                                    .name = \"%.*s\",\n                                    .type = %llu,\n                                    .modifiers = Modifiers.%s,\n                                    .offset = offsetof(%.*s, %.*s)\n                                },\n                            ", litaC_varField->decl.name.str.length, litaC_varField->decl.name.str.buffer, litaC_typeid, ((litaC_varField->decl.attributes.isUsing)) ? "Using" : "None", litaC_sym->qualifiedName.length, litaC_sym->qualifiedName.buffer, litaC_varField->decl.name.str.length, litaC_varField->decl.name.str.buffer);
                                             break;
                                             
                                             
@@ -82224,7 +82887,7 @@ litaC_bool litaC_checker_decl__TypeChecker_resolveNoteDecl(litaC_checker__TypeCh
 litaC_bool litaC_checker_decl__TypeChecker_resolveAggregateDecl(litaC_checker__TypeChecker* litaC_this,litaC_ast__AggregateDecl* litaC_aggDecl) {
     
     litaC_i32 litaC_errors = litaC_checker__TypeChecker_errors(litaC_this);
-    litaC_i32 litaC_hasGenerics = litaC_aggDecl->decl.declaration.sym->flags & litaC_symbols__SymbolFlags_IS_GENERIC_TEMPLATE;
+    litaC_symbols__SymbolFlags litaC_hasGenerics = litaC_aggDecl->decl.declaration.sym->flags & litaC_symbols__SymbolFlags_IS_GENERIC_TEMPLATE;
     if(litaC_hasGenerics) {
         {
             litaC_std__array__std__array__Array_add_cb_std__array__Array_cb_ast__GenericParam_ce__ce_(&((litaC_this->genericParamStack)), litaC_aggDecl->decl.genericParams);
@@ -82259,7 +82922,7 @@ litaC_bool litaC_checker_decl__TypeChecker_resolveAggregateDecl(litaC_checker__T
         
     } 
     
-    litaC_i32 litaC_isTrait = litaC_aggDecl->decl.declaration.sym->flags & litaC_symbols__SymbolFlags_IS_TRAIT;
+    litaC_symbols__SymbolFlags litaC_isTrait = litaC_aggDecl->decl.declaration.sym->flags & litaC_symbols__SymbolFlags_IS_TRAIT;
     litaC_module__Module* litaC_module = litaC_this->current;
     if(litaC_isTrait && !((litaC_aggDecl->decl.declaration.sym->flags & litaC_symbols__SymbolFlags_IS_GENERIC_TEMPLATE))) {
         {
@@ -83101,7 +83764,7 @@ litaC_bool litaC_checker_decl__TypeChecker_resolveFuncDecl(litaC_checker__TypeCh
     
     litaC_std__array__std__array__Array_add_cb__ptr_types__TypeInfo_ce_(&((litaC_this->funcDeclStack)), litaC_sym->type);
     
-    litaC_i32 litaC_hasGenerics = litaC_sym->flags & litaC_symbols__SymbolFlags_IS_GENERIC_TEMPLATE;
+    litaC_symbols__SymbolFlags litaC_hasGenerics = litaC_sym->flags & litaC_symbols__SymbolFlags_IS_GENERIC_TEMPLATE;
     if(litaC_hasGenerics) {
         {
             litaC_std__array__std__array__Array_add_cb_std__array__Array_cb_ast__GenericParam_ce__ce_(&((litaC_this->genericParamStack)), litaC_funcDecl->decl.genericParams);
@@ -84416,6 +85079,7 @@ ape_object_t litaC_preprocessor__api__Preprocessor_typeInfoToApe(litaC_preproces
     ape_object_set_map_bool(litaC_typeObj, "isPrimitive", litaC_types__IsPrimitive(litaC_typeInfo));
     ape_object_set_map_bool(litaC_typeObj, "isString", litaC_types__IsStringLike(litaC_typeInfo));
     ape_object_set_map_bool(litaC_typeObj, "isPointer", litaC_types__IsPtr(litaC_typeInfo));
+    ape_object_set_map_bool(litaC_typeObj, "isEnum", litaC_types__IsEnum(litaC_typeInfo));
     ape_object_set_map_value(litaC_typeObj, "typePtr", ape_object_make_external(litaC_this->runtime.ape, litaC_typeInfo));
     switch(litaC_typeInfo->kind) {
         case litaC_types__TypeKind_PTR: {
@@ -90274,6 +90938,38 @@ litaC_void litaC_cgen__CGen_emitStmt(litaC_cgen__CGen* litaC_this,litaC_ast__Stm
             
             
         }
+        case litaC_ast__StmtKind_NAME_OF_EXPR: {
+            {
+                litaC_ast__TypeOfExpr* litaC_expr = (litaC_ast__TypeOfExpr*)litaC_s;
+                litaC_types__TypeInfo* litaC_typeInfo = NULL;
+                if(litaC_expr->typeOfExpr) {
+                    {
+                        litaC_typeInfo = litaC_expr->typeOfExpr->operand.typeInfo;
+                        
+                        
+                    }
+                    
+                } else {
+                    if(litaC_expr->type) {
+                        {
+                            litaC_typeInfo = litaC_expr->type->typeInfo;
+                            
+                            
+                        }
+                        
+                    } 
+                    
+                } 
+                
+                litaC_cgen__CGen_emit(litaC_this, "%s", litaC_cgen__CGen_cType(litaC_this, litaC_typeInfo, litaC_false, litaC_false));
+                return;
+                
+                
+                
+            }
+            
+            
+        }
         case litaC_ast__StmtKind_UNARY_EXPR: {
             {
                 litaC_ast__UnaryExpr* litaC_expr = (litaC_ast__UnaryExpr*)litaC_s;
@@ -91461,12 +92157,13 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__PackageManager_installCommand(litaC_pkg_
         
     } 
     
-    printf("Found '%s/pkg.json' with %d package dependencies.\n", litaC_std__system__CurrentWorkingPath(), litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_this->pkg->dependencies))));
-    if(!(litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_this->pkg->dependencies))))) {
+    printf("Found '%s/pkg.json' with %d package dependencies.\n", litaC_std__system__CurrentWorkingPath(), litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_this->pkg->dependencies))));
+    if(!(litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_this->pkg->dependencies))))) {
         {
-            for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_this->pkg->dependencies)));litaC_i += 1) {
+            for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_this->pkg->dependencies)));litaC_i += 1) {
                 {
-                    printf("Installing '%s'\n", litaC_std__array__std__array__Array_get_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_this->pkg->dependencies)), litaC_i).id);
+                    litaC_pkg_mgr__pkg__PackageDependency* litaC_dep = litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_this->pkg->dependencies)), litaC_i);
+                    printf("Installing '%s'\n", litaC_dep->pkgId.id);
                     
                     
                 }
@@ -91581,7 +92278,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__PackageManager_readProjectPkg(litaC_pkg_
 }
 
 litaC_void litaC_pkg_mgr__pkg__PackageDef_free(litaC_pkg_mgr__pkg__PackageDef* litaC_this) {
-    litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_this->dependencies)));
+    litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_this->dependencies)));
     for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_this->dynamicLibraries)));litaC_i += 1) {
         {
             const litaC_char* litaC_lib = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_this->dynamicLibraries)), litaC_i);
@@ -91779,15 +92476,15 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackage(litaC_pkg_mgr__Package
     litaC_std__json__JsonNode* litaC_deps = litaC_std__json__JsonNode_getArray(litaC_json, "dependencies");
     if(litaC_deps && litaC_std__json__JsonNode_size(litaC_deps) > 0) {
         {
-            litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkg->dependencies)), litaC_std__json__JsonNode_size(litaC_deps), litaC_pm->allocator);
+            litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkg->dependencies)), litaC_std__json__JsonNode_size(litaC_deps), litaC_pm->allocator);
             for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__json__JsonNode_size(litaC_deps);litaC_i += 1) {
                 {
                     litaC_std__json__JsonNode* litaC_depNode = litaC_std__json__JsonNode_at(litaC_deps, litaC_i);
-                    litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkg->dependencies)), (litaC_pkg_mgr__pkg__PackageId) {
+                    litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkg->dependencies)), (litaC_pkg_mgr__pkg__PackageDependency) {
                         0
                     });
-                    litaC_pkg_mgr__pkg__PackageId* litaC_pkgId = litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkg->dependencies)), litaC_i);
-                    litaC_pkg_mgr__PkgStatus litaC_code = litaC_pkg_mgr__pkg__ParsePackageId(litaC_depNode, litaC_pkgId, litaC_pm->allocator);
+                    litaC_pkg_mgr__pkg__PackageDependency* litaC_pkgDep = litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkg->dependencies)), litaC_i);
+                    litaC_pkg_mgr__PkgStatus litaC_code = litaC_pkg_mgr__pkg__ParseDependency(litaC_pm, litaC_depNode, litaC_pkgDep);
                     if(litaC_code != litaC_pkg_mgr__PkgStatus_OK) {
                         {
                             return litaC_code;
@@ -91837,6 +92534,25 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParsePackage(litaC_pkg_mgr__Package
     } 
     
     (*(litaC_result)) = litaC_pkg;
+    return litaC_pkg_mgr__PkgStatus_OK;
+    
+    
+}
+
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg__ParseDependency(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__json__JsonNode* litaC_json,litaC_pkg_mgr__pkg__PackageDependency* litaC_dep) {
+    litaC_pkg_mgr__pkg__PackageId* litaC_pkgId = &(litaC_dep->pkgId);
+    litaC_pkg_mgr__PkgStatus litaC_code = litaC_pkg_mgr__pkg__ParsePackageId(litaC_json, litaC_pkgId, litaC_pm->allocator);
+    if(litaC_code != litaC_pkg_mgr__PkgStatus_OK) {
+        {
+            return litaC_code;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_dep->link = litaC_std__json__JsonNode_getBool(litaC_json, "link", litaC_false);
     return litaC_pkg_mgr__PkgStatus_OK;
     
     
@@ -91915,7 +92631,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
         
     } 
     
-    litaC_i32 litaC_numOfPkgs = litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pm->pkg->dependencies)));
+    litaC_i32 litaC_numOfPkgs = litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pm->pkg->dependencies)));
     if(litaC_numOfPkgs < 1) {
         {
             return litaC_pkg_mgr__PkgStatus_OK;
@@ -91948,14 +92664,14 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
         
     } 
     
-    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ litaC_pkgsToInstall = litaC_std__array__std__array__ArrayInit_cb_pkg_mgr__pkg__PackageId_ce_(litaC_numOfPkgs, litaC_pm->allocator);
+    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_ litaC_pkgsToInstall = litaC_std__array__std__array__ArrayInit_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_numOfPkgs, litaC_pm->allocator);
     
     litaC_pkg_mgr__PkgStatus litaC_findCode = litaC_pkg_mgr__pkg_install__findPackagesToInstall(litaC_pm, &(litaC_pkgsToInstall));
     if(litaC_findCode != litaC_pkg_mgr__PkgStatus_OK) {
         {
             {
                 litaC_pkg_mgr__PkgStatus ___result = litaC_findCode;
-                litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+                litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
                 return ___result;
                 
             }
@@ -91972,16 +92688,17 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
     litaC_std__http__Http_init(&((litaC_http)), &((litaC_options.httpOptions)), litaC_std__mem__defaultAllocator);
     
     litaC_char litaC_pkgPath[PATH_MAX] = {0};
-    for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));litaC_i += 1) {
+    for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));litaC_i += 1) {
         {
-            litaC_pkg_mgr__pkg__PackageId litaC_pkgId = litaC_std__array__std__array__Array_get_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)), litaC_i);
+            litaC_pkg_mgr__pkg__PackageDependency* litaC_pkgDep = litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)), litaC_i);
+            litaC_pkg_mgr__pkg__PackageId litaC_pkgId = litaC_pkgDep->pkgId;
             litaC_pkg_mgr__PkgStatus litaC_status = litaC_pkg_mgr__pkg_install__makePackageDirectory(litaC_pm, &((litaC_pkgId)), litaC_pkgPath);
             if(litaC_status != litaC_pkg_mgr__PkgStatus_OK) {
                 {
                     {
                         litaC_pkg_mgr__PkgStatus ___result = litaC_status;
                         litaC_std__http__Http_free(&((litaC_http)));
-                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
                         return ___result;
                         
                     }
@@ -91995,13 +92712,13 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
             if(litaC_pkg_mgr__pkg_install__isPackageInstalled(litaC_pm, &((litaC_pkgId)), litaC_pkgPath)) {
                 {
                     litaC_pkg_mgr__pkg__PackageDef* litaC_pkg = NULL;
-                    litaC_pkg_mgr__PkgStatus litaC_status = litaC_pkg_mgr__pkg_install__readPackage(litaC_pm, &((litaC_pkgId)), litaC_pkgPath, &(litaC_pkg), &((litaC_pkgsToInstall)));
+                    litaC_pkg_mgr__PkgStatus litaC_status = litaC_pkg_mgr__pkg_install__readPackage(litaC_pm, &((litaC_pkgId)), litaC_pkgPath, "/pkg", &(litaC_pkg), &((litaC_pkgsToInstall)));
                     if(litaC_status != litaC_pkg_mgr__PkgStatus_OK) {
                         {
                             {
                                 litaC_pkg_mgr__PkgStatus ___result = litaC_status;
                                 litaC_std__http__Http_free(&((litaC_http)));
-                                litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+                                litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
                                 return ___result;
                                 
                             }
@@ -92025,7 +92742,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
                     {
                         litaC_pkg_mgr__PkgStatus ___result = litaC_status;
                         litaC_std__http__Http_free(&((litaC_http)));
-                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
                         return ___result;
                         
                     }
@@ -92038,9 +92755,27 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
             
             litaC_std__string__buffer__StringBuffer litaC_pkgFile = litaC_std__string__buffer__StringBufferInit(litaC_pkgPath, PATH_MAX, -(1));
             litaC_std__string__buffer__StringBuffer_appendStr(&((litaC_pkgFile)), "/pkg.zip");
-            if(litaC_std__string__String_startsWith(litaC_pkg_mgr__pkg__PackageId_repo(&((litaC_pkgId))), (litaC_std__builtins__String) { .buffer = "file://", .length = 7 }, 0)) {
+            litaC_std__builtins__String litaC_filePrefix = (litaC_std__builtins__String) { .buffer = "file://", .length = 7 };
+            litaC_bool litaC_linkOnly = litaC_false;
+            if(litaC_std__string__String_startsWith(litaC_pkg_mgr__pkg__PackageId_repo(&((litaC_pkgId))), litaC_filePrefix, 0)) {
                 {
-                    litaC_status = litaC_pkg_mgr__pkg_install__zipLocalPackage(litaC_pm, &((litaC_pkgId)), litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgFile));
+                    litaC_linkOnly = litaC_pkgDep->link;
+                    if(litaC_linkOnly) {
+                        {
+                            litaC_std__builtins__String litaC_repoDir = litaC_std__string__String_substring(litaC_pkg_mgr__pkg__PackageId_repo(&((litaC_pkgId))), litaC_filePrefix.length, -(1));
+                            litaC_std__string__buffer__StringBuffer_format(&((litaC_pkgFile)), "%.*s", litaC_repoDir.length, litaC_repoDir.buffer);
+                            
+                            
+                        }
+                        
+                    } else {
+                        {
+                            litaC_status = litaC_pkg_mgr__pkg_install__zipLocalPackage(litaC_pm, &((litaC_pkgId)), litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgFile));
+                            
+                            
+                        }
+                    } 
+                    
                     
                     
                 }
@@ -92058,7 +92793,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
                     {
                         litaC_pkg_mgr__PkgStatus ___result = litaC_status;
                         litaC_std__http__Http_free(&((litaC_http)));
-                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
                         return ___result;
                         
                     }
@@ -92069,13 +92804,20 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
                 
             } 
             
-            litaC_status = litaC_pkg_mgr__pkg_install__installPackage(litaC_pm, &((litaC_pkgId)), litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgFile), &((litaC_pkgsToInstall)));
+            litaC_pkg_mgr__pkg_install__InstallOptions litaC_installOptions =  {
+                .pkgId = &(litaC_pkgId),
+                .pkgFile = litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgFile),
+                .pkgParentPath = (litaC_linkOnly) ? "" : "/pkg",
+                .linkOnly = litaC_linkOnly,
+                .unzip = !(litaC_linkOnly)
+            };
+            litaC_status = litaC_pkg_mgr__pkg_install__installPackage(litaC_pm, &(litaC_installOptions), &((litaC_pkgsToInstall)));
             if(litaC_status != litaC_pkg_mgr__PkgStatus_OK) {
                 {
                     {
                         litaC_pkg_mgr__PkgStatus ___result = litaC_status;
                         litaC_std__http__Http_free(&((litaC_http)));
-                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+                        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
                         return ___result;
                         
                     }
@@ -92093,13 +92835,13 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__PackageInstall(litaC_pkg_mg
     {
         litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_OK;
         litaC_std__http__Http_free(&((litaC_http)));
-        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+        litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
         return ___result;
         
     }
     
     litaC_std__http__Http_free(&((litaC_http)));
-    litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkgsToInstall)));
+    litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkgsToInstall)));
     
 }
 
@@ -92142,8 +92884,23 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__deleteDir(litaC_pkg_mgr__Pa
         
     } 
     
+    litaC_char litaC_buffer[PATH_MAX] =  {
+        0
+    };
+    litaC_std__string__buffer__StringBuffer litaC_packageRoot = litaC_std__string__buffer__StringBufferInit(litaC_buffer, PATH_MAX, 0);
+    litaC_std__string__buffer__StringBuffer_format(&((litaC_packageRoot)), "%s/%s/", litaC_std__system__CurrentWorkingPath(), litaC_pm->options.pkgDir);
+    if(!(litaC_std__string__String_startsWith(litaC_std__string__buffer__StringBuffer_toString(*((litaC_path))), litaC_std__string__buffer__StringBuffer_toString(litaC_packageRoot), 0))) {
+        {
+            return litaC_pkg_mgr__PkgStatus_OK;
+            
+            
+            
+        }
+        
+    } 
+    
     litaC_std__fs__FileHandle litaC_file = {0};
-    if(!(litaC_std__fs__FileHandle_open(&((litaC_file)), litaC_std__string__buffer__StringBuffer_cStr(*((litaC_path)))))) {
+    if(!(litaC_std__fs__FileHandle_open(&((litaC_file)), litaC_std__string__buffer__StringBuffer_toString(*((litaC_path)))))) {
         {
             litaC_std__string__builder__StringBuilder_append(&((litaC_pm->errors)), "unable to open: '%s'\n", litaC_std__string__buffer__StringBuffer_cStr(*((litaC_path))));
             return litaC_pkg_mgr__PkgStatus_ERROR_CLEANING_PKG;
@@ -92218,10 +92975,10 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__deleteDir(litaC_pkg_mgr__Pa
     
 }
 
-litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__findPackagesToInstall(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_pkgsToInstall) {
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__findPackagesToInstall(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_pkgsToInstall) {
     if(litaC_pm->pkg) {
         {
-            litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_ce_(litaC_pkgsToInstall, &((litaC_pm->pkg->dependencies)));
+            litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_pkgsToInstall, &((litaC_pm->pkg->dependencies)));
             
             
         }
@@ -92432,128 +93189,146 @@ litaC_char* litaC_pkg_mgr__pkg_install__sanitizeFilename(const litaC_char* litaC
     
 }
 
-litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__installPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgFile,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_pkgsToInstall) {
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__installPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg_install__InstallOptions* litaC_options,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_pkgsToInstall) {
     litaC_char litaC_pkgPath[PATH_MAX] = {0};
-    litaC_std__system__FilePath(litaC_pkgFile, litaC_pkgPath);
-    {
-        litaC_std__zip__ZipFile litaC_zip = {0};
+    if(litaC_options->linkOnly) {
         {
+            litaC_std__string__StringCopy(litaC_options->pkgFile, litaC_pkgPath, PATH_MAX);
             
             
         }
         
-        if(litaC_std__zip__ZipFile_open(&((litaC_zip)), litaC_pkgFile, litaC_std__zip__ZipOpen_READ, litaC_pm->allocator) != litaC_std__zip__ZipStatus_OK) {
-            {
-                {
-                    litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_ERROR_UNABLE_TO_OPEN_PKG_FILE;
-                    {
-                        litaC_std__zip__ZipFile_close(&((litaC_zip)));
-                        litaC_std__system__FileDelete(litaC_pkgFile);
-                        
-                        
-                    };
-                    return ___result;
-                    
-                }
-                
-                
-                
-            }
-            
-        } 
-        
-        litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ litaC_extractedFiles = litaC_std__array__std__array__ArrayInit_cb__ptr_const_char_ce_(64, litaC_pm->allocator);
-        
-        if(litaC_std__zip__ZipFile_unzip(&((litaC_zip)), litaC_pkgPath, &(litaC_extractedFiles), 0) != litaC_std__zip__ZipStatus_OK) {
-            {
-                {
-                    litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_ERROR_UNABLE_TO_EXTRACT_PKG_FILE;
-                    {
-                        for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));litaC_i += 1) {
-                            {
-                                const litaC_char* litaC_file = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_extractedFiles)), litaC_i);
-                                litaC_std__mem__Allocator_free(litaC_pm->allocator, (litaC_void*)litaC_file);
-                                
-                                
-                            }
-                        }
-                        litaC_std__array__std__array__Array_free_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));
-                        
-                        
-                    };
-                    {
-                        litaC_std__zip__ZipFile_close(&((litaC_zip)));
-                        litaC_std__system__FileDelete(litaC_pkgFile);
-                        
-                        
-                    };
-                    return ___result;
-                    
-                }
-                
-                
-                
-            }
-            
-        } 
-        
-        if(litaC_pkg_mgr__pkg_install__dealWithGithubBS(litaC_pkgPath, &(litaC_extractedFiles)) != litaC_pkg_mgr__PkgStatus_OK) {
-            {
-                {
-                    litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_ERROR_UNABLE_TO_EXTRACT_PKG_FILE;
-                    {
-                        for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));litaC_i += 1) {
-                            {
-                                const litaC_char* litaC_file = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_extractedFiles)), litaC_i);
-                                litaC_std__mem__Allocator_free(litaC_pm->allocator, (litaC_void*)litaC_file);
-                                
-                                
-                            }
-                        }
-                        litaC_std__array__std__array__Array_free_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));
-                        
-                        
-                    };
-                    {
-                        litaC_std__zip__ZipFile_close(&((litaC_zip)));
-                        litaC_std__system__FileDelete(litaC_pkgFile);
-                        
-                        
-                    };
-                    return ___result;
-                    
-                }
-                
-                
-                
-            }
-            
-        } 
-        
+    } else {
         {
-            for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));litaC_i += 1) {
+            litaC_std__system__FilePath(litaC_options->pkgFile, litaC_pkgPath);
+            
+            
+        }
+    } 
+    
+    if(litaC_options->unzip) {
+        {
+            litaC_std__zip__ZipFile litaC_zip = {0};
+            {
+                
+                
+            }
+            
+            if(litaC_std__zip__ZipFile_open(&((litaC_zip)), litaC_options->pkgFile, litaC_std__zip__ZipOpen_READ, litaC_pm->allocator) != litaC_std__zip__ZipStatus_OK) {
                 {
-                    const litaC_char* litaC_file = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_extractedFiles)), litaC_i);
-                    litaC_std__mem__Allocator_free(litaC_pm->allocator, (litaC_void*)litaC_file);
+                    {
+                        litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_ERROR_UNABLE_TO_OPEN_PKG_FILE;
+                        {
+                            litaC_std__zip__ZipFile_close(&((litaC_zip)));
+                            litaC_std__system__FileDelete(litaC_options->pkgFile);
+                            
+                            
+                        };
+                        return ___result;
+                        
+                    }
+                    
                     
                     
                 }
-            }
-            litaC_std__array__std__array__Array_free_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));
+                
+            } 
+            
+            litaC_std__array__std__array__Array_cb__ptr_const_char_ce_ litaC_extractedFiles = litaC_std__array__std__array__ArrayInit_cb__ptr_const_char_ce_(64, litaC_pm->allocator);
+            
+            if(litaC_std__zip__ZipFile_unzip(&((litaC_zip)), litaC_pkgPath, &(litaC_extractedFiles), 0) != litaC_std__zip__ZipStatus_OK) {
+                {
+                    {
+                        litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_ERROR_UNABLE_TO_EXTRACT_PKG_FILE;
+                        {
+                            for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));litaC_i += 1) {
+                                {
+                                    const litaC_char* litaC_file = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_extractedFiles)), litaC_i);
+                                    litaC_std__mem__Allocator_free(litaC_pm->allocator, (litaC_void*)litaC_file);
+                                    
+                                    
+                                }
+                            }
+                            litaC_std__array__std__array__Array_free_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));
+                            
+                            
+                        };
+                        {
+                            litaC_std__zip__ZipFile_close(&((litaC_zip)));
+                            litaC_std__system__FileDelete(litaC_options->pkgFile);
+                            
+                            
+                        };
+                        return ___result;
+                        
+                    }
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            if(litaC_pkg_mgr__pkg_install__dealWithGithubBS(litaC_pkgPath, &(litaC_extractedFiles)) != litaC_pkg_mgr__PkgStatus_OK) {
+                {
+                    {
+                        litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_ERROR_UNABLE_TO_EXTRACT_PKG_FILE;
+                        {
+                            for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));litaC_i += 1) {
+                                {
+                                    const litaC_char* litaC_file = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_extractedFiles)), litaC_i);
+                                    litaC_std__mem__Allocator_free(litaC_pm->allocator, (litaC_void*)litaC_file);
+                                    
+                                    
+                                }
+                            }
+                            litaC_std__array__std__array__Array_free_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));
+                            
+                            
+                        };
+                        {
+                            litaC_std__zip__ZipFile_close(&((litaC_zip)));
+                            litaC_std__system__FileDelete(litaC_options->pkgFile);
+                            
+                            
+                        };
+                        return ___result;
+                        
+                    }
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            {
+                for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));litaC_i += 1) {
+                    {
+                        const litaC_char* litaC_file = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_extractedFiles)), litaC_i);
+                        litaC_std__mem__Allocator_free(litaC_pm->allocator, (litaC_void*)litaC_file);
+                        
+                        
+                    }
+                }
+                litaC_std__array__std__array__Array_free_cb__ptr_const_char_ce_(&((litaC_extractedFiles)));
+                
+                
+            };
+            {
+                litaC_std__zip__ZipFile_close(&((litaC_zip)));
+                litaC_std__system__FileDelete(litaC_options->pkgFile);
+                
+                
+            };
             
             
-        };
-        {
-            litaC_std__zip__ZipFile_close(&((litaC_zip)));
-            litaC_std__system__FileDelete(litaC_pkgFile);
-            
-            
-        };
+        }
         
-        
-    }
+    } 
+    
     litaC_pkg_mgr__pkg__PackageDef* litaC_pkg = NULL;
-    litaC_pkg_mgr__PkgStatus litaC_status = litaC_pkg_mgr__pkg_install__readPackage(litaC_pm, litaC_pkgId, litaC_pkgPath, &(litaC_pkg), litaC_pkgsToInstall);
+    litaC_pkg_mgr__PkgStatus litaC_status = litaC_pkg_mgr__pkg_install__readPackage(litaC_pm, litaC_options->pkgId, litaC_pkgPath, litaC_options->pkgParentPath, &(litaC_pkg), litaC_pkgsToInstall);
     if(litaC_status != litaC_pkg_mgr__PkgStatus_OK) {
         {
             return litaC_status;
@@ -92572,7 +93347,7 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__installPackage(litaC_pkg_mg
         for(litaC_i32 litaC_i = 0;litaC_i < litaC_std__array__std__array__Array_size_cb__ptr_const_char_ce_(&((litaC_pkg->dynamicLibraries)));litaC_i += 1) {
             {
                 const litaC_char* litaC_lib = litaC_std__array__std__array__Array_get_cb__ptr_const_char_ce_(&((litaC_pkg->dynamicLibraries)), litaC_i);
-                litaC_std__string__buffer__StringBuffer_format(&((litaC_libPath)), "%s/pkg/bin/%s", litaC_pkgPath, litaC_lib);
+                litaC_std__string__buffer__StringBuffer_format(&((litaC_libPath)), "%s%s/bin/%s", litaC_pkgPath, litaC_options->pkgParentPath, litaC_lib);
                 if(!(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStr(litaC_libPath)))) {
                     {
                         litaC_std__string__builder__StringBuilder_append(&((litaC_pm->warnings)), "missing dynamic library: '%s'\n", litaC_std__string__buffer__StringBuffer_cStr(litaC_libPath));
@@ -92600,26 +93375,30 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__installPackage(litaC_pkg_mg
         
         
     }
-    {
-        litaC_std__string__buffer__StringBuffer litaC_pkgLck = litaC_std__string__buffer__StringBufferInit(litaC_pkgPath, PATH_MAX, -(1));
-        litaC_std__string__buffer__StringBuffer_append(&((litaC_pkgLck)), "/%s", litaC_pkg_mgr__pkg_install__INSTALL_COMPLETED_FILE);
-        litaC_std__io__File litaC_lockFile =  {
-            0
-        };
-        litaC_std__io__File_open(&((litaC_lockFile)), litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgLck), litaC_std__io__FileOpenOp_WRITE);
-        litaC_std__io__File_close(&((litaC_lockFile)));
+    if(!(litaC_options->linkOnly)) {
+        {
+            litaC_std__string__buffer__StringBuffer litaC_pkgLck = litaC_std__string__buffer__StringBufferInit(litaC_pkgPath, PATH_MAX, -(1));
+            litaC_std__string__buffer__StringBuffer_append(&((litaC_pkgLck)), "/%s", litaC_pkg_mgr__pkg_install__INSTALL_COMPLETED_FILE);
+            litaC_std__io__File litaC_lockFile =  {
+                0
+            };
+            litaC_std__io__File_open(&((litaC_lockFile)), litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgLck), litaC_std__io__FileOpenOp_WRITE);
+            litaC_std__io__File_close(&((litaC_lockFile)));
+            
+            
+        }
         
-        
-    }
+    } 
+    
     return litaC_pkg_mgr__PkgStatus_OK;
     
     
 }
 
-litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__readPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgPath,litaC_pkg_mgr__pkg__PackageDef** litaC_resultPkg,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_pkgsToInstall) {
+litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__readPackage(litaC_pkg_mgr__PackageManager* litaC_pm,litaC_pkg_mgr__pkg__PackageId* litaC_pkgId,const litaC_char* litaC_pkgPath,const litaC_char* litaC_pkgParentPath,litaC_pkg_mgr__pkg__PackageDef** litaC_resultPkg,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_pkgsToInstall) {
     litaC_char litaC_temp[PATH_MAX] = {0};
     litaC_std__string__buffer__StringBuffer litaC_pkgDef = litaC_std__string__buffer__StringBufferInit(litaC_temp, PATH_MAX, 0);
-    litaC_std__string__buffer__StringBuffer_format(&((litaC_pkgDef)), "%s/pkg/pkg.json", litaC_pkgPath);
+    litaC_std__string__buffer__StringBuffer_format(&((litaC_pkgDef)), "%s%s/pkg.json", litaC_pkgPath, litaC_pkgParentPath);
     if(!(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStr(litaC_pkgDef)))) {
         {
             return litaC_pkg_mgr__PkgStatus_ERROR_UNABLE_TO_OPEN_PKG_FILE;
@@ -92642,11 +93421,11 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__readPackage(litaC_pkg_mgr__
     
     litaC_pkg_mgr__pkg__PackageDef* litaC_pkg = (*(litaC_resultPkg));
     litaC_std__string__buffer__StringBuffer litaC_srcPath = litaC_std__string__buffer__StringBufferInit(litaC_pkg->path, PATH_MAX, 0);
-    litaC_std__string__buffer__StringBuffer_format(&((litaC_srcPath)), "%s/pkg/src", litaC_pkgPath);
+    litaC_std__string__buffer__StringBuffer_format(&((litaC_srcPath)), "%s%s/src", litaC_pkgPath, litaC_pkgParentPath);
     litaC_std__string__buffer__StringBuffer_cStr(litaC_srcPath);
-    if(!(litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_pkg->dependencies))))) {
+    if(!(litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_pkg->dependencies))))) {
         {
-            litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_ce_(litaC_pkgsToInstall, &((litaC_pkg->dependencies)));
+            litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_pkgsToInstall, &((litaC_pkg->dependencies)));
             
             
         }
@@ -92763,6 +93542,106 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_install__zipLocalPackage(litaC_pkg_m
     }
     
     litaC_std__zip__ZipFile_close(&((litaC_zip)));
+    
+}
+
+litaC_std__zip__ZipStatus litaC_std__zip__ZipCompress(litaC_std__string__builder__StringBuilder* litaC_buffer,litaC_std__builtins__String litaC_source,litaC_std__zip__ZipCompressionLevel litaC_level) {
+    litaC_u64 litaC_maxLength = mz_compressBound(litaC_source.length);
+    assert(litaC_maxLength < litaC_std__limits__MAX_I32);
+    if(!(litaC_std__string__builder__StringBuilder_reserve(litaC_buffer, (litaC_i32)litaC_maxLength))) {
+        {
+            return litaC_std__zip__ZipStatus_ERROR_OUT_OF_MEMORY;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_u64 litaC_length = (litaC_u64)litaC_std__string__builder__StringBuilder_remaining(litaC_buffer);
+    litaC_i32 litaC_status = mz_compress2((litaC_u8*)(&(litaC_buffer->asBuffer.buffer[litaC_buffer->asBuffer.length])), (litaC_u64*)(&(litaC_length)), (const litaC_u8*)litaC_source.buffer, (litaC_u64)litaC_source.length, (litaC_i32)litaC_level);
+    if(litaC_status != MZ_OK) {
+        {
+            return litaC_std__zip__ZipStatus_ERROR_COMPRESSING;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_length > 0) {
+        {
+            assert(litaC_length < litaC_std__limits__MAX_I32);
+            litaC_buffer->asBuffer.length += (litaC_i32)litaC_length;
+            
+            
+        }
+        
+    } 
+    
+    return litaC_std__zip__ZipStatus_OK;
+    
+    
+}
+
+litaC_std__zip__ZipStatus litaC_std__zip__ZipUncompress(litaC_std__string__builder__StringBuilder* litaC_buffer,litaC_std__builtins__String litaC_source) {
+    litaC_u64 litaC_length = (litaC_u64)litaC_std__string__builder__StringBuilder_remaining(litaC_buffer);
+    litaC_i32 litaC_estimatedLength = MAX(litaC_source.length * 3, (litaC_i32)litaC_length);
+    litaC_i32 litaC_status = MZ_OK;
+    litaC_u64 litaC_sourceLength = (litaC_u64)litaC_source.length;
+    do {
+        {
+            if(!(litaC_std__string__builder__StringBuilder_reserve(litaC_buffer, litaC_estimatedLength))) {
+                {
+                    return litaC_std__zip__ZipStatus_ERROR_OUT_OF_MEMORY;
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_u64 litaC_bufferLength = (litaC_u64)litaC_std__string__builder__StringBuilder_remaining(litaC_buffer);
+            litaC_status = mz_uncompress2((litaC_u8*)(&(litaC_buffer->asBuffer.buffer[litaC_buffer->asBuffer.length])), (litaC_u64*)(&(litaC_bufferLength)), (const litaC_u8*)litaC_source.buffer, (litaC_u64*)(&(litaC_sourceLength)));
+            if(litaC_status == MZ_OK) {
+                {
+                    litaC_length = litaC_bufferLength;
+                    break;
+                    
+                    
+                }
+                
+            } 
+            
+            litaC_estimatedLength *= 2;
+            
+            
+        }
+    }
+    while(litaC_status == MZ_BUF_ERROR);
+    if(litaC_status != MZ_OK) {
+        {
+            return litaC_std__zip__ZipStatus_ERROR_DECOMPRESSING;
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_length > 0) {
+        {
+            assert(litaC_length < litaC_std__limits__MAX_I32);
+            litaC_buffer->asBuffer.length += (litaC_i32)litaC_length;
+            
+            
+        }
+        
+    } 
+    
+    return litaC_std__zip__ZipStatus_OK;
+    
     
 }
 
@@ -92947,7 +93826,7 @@ litaC_std__zip__ZipStatus litaC_std__zip__ZipFile_zipFolder(litaC_std__zip__ZipF
         
         
     }
-    if(!(litaC_std__fs__FileHandle_openEx(&((litaC_handle)), litaC_path->buffer, litaC_path->length))) {
+    if(!(litaC_std__fs__FileHandle_open(&((litaC_handle)), litaC_std__string__buffer__StringBuffer_toString(*((litaC_path)))))) {
         {
             return litaC_std__zip__ZipStatus_ERROR_UNABLE_TO_OPEN_FILE;
             
@@ -93142,8 +94021,24 @@ litaC_std__zip__ZipStatus litaC_std__zip__ZipFile_unzip(litaC_std__zip__ZipFile*
     
 }
 
-litaC_bool litaC_std__fs__FileHandle_openEx(litaC_std__fs__FileHandle* litaC_this,const litaC_char* litaC_path,litaC_i32 litaC_len) {
-    if(litaC_len > PATH_MAX) {
+litaC_void litaC_std__zip__testZipDir(void) {
+    litaC_std__zip__ZipFile litaC_zip = {0};
+    {
+        
+        
+    }
+    
+    assert(litaC_std__zip__ZipFile_open(&((litaC_zip)), "test.zip", litaC_std__zip__ZipOpen_WRITE, litaC_std__mem__defaultAllocator) == litaC_std__zip__ZipStatus_OK);
+    const char* litaC_path = "/home/tony/projects/libio_uring";
+    litaC_i32 litaC_len = litaC_std__string__char_length(litaC_path);
+    assert(litaC_std__zip__ZipFile_zipDir(&((litaC_zip)), litaC_path, litaC_len, "pkg", litaC_std__zip__ZipCompressionLevel_DEFAULT_LEVEL) == litaC_std__zip__ZipStatus_OK);
+    assert(litaC_std__zip__ZipFile_finalize(&((litaC_zip))) == litaC_std__zip__ZipStatus_OK);
+    litaC_std__zip__ZipFile_close(&((litaC_zip)));
+    
+}
+
+litaC_bool litaC_std__fs__FileHandle_open(litaC_std__fs__FileHandle* litaC_this,litaC_std__builtins__String litaC_path) {
+    if(litaC_path.length > PATH_MAX) {
         {
             return litaC_false;
             
@@ -93155,14 +94050,8 @@ litaC_bool litaC_std__fs__FileHandle_openEx(litaC_std__fs__FileHandle* litaC_thi
     
     litaC_char litaC_temp[PATH_MAX] = {0};
     litaC_std__string__buffer__StringBuffer litaC_str = litaC_std__string__buffer__StringBufferInit(litaC_temp, PATH_MAX, 0);
-    litaC_std__string__buffer__StringBuffer_format(&((litaC_str)), "%.*s", litaC_len, litaC_path);
-    return litaC_std__fs__FileHandle_open(litaC_this, litaC_std__string__buffer__StringBuffer_cStr(litaC_str));
-    
-    
-}
-
-litaC_bool litaC_std__fs__FileHandle_open(litaC_std__fs__FileHandle* litaC_this,const litaC_char* litaC_path) {
-    if(tinydir_open(&(litaC_this->dir), litaC_path) == -(1)) {
+    litaC_std__string__buffer__StringBuffer_format(&((litaC_str)), "%.*s", litaC_path.length, litaC_path.buffer);
+    if(tinydir_open(&(litaC_this->dir), litaC_std__string__buffer__StringBuffer_cStr(litaC_str)) == -(1)) {
         {
             litaC_std__fs__FileHandle_close(litaC_this);
             return litaC_false;
@@ -93910,6 +94799,8 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_init__PackageInit(litaC_pkg_mgr__Pac
         0
     };
     litaC_std__string__buffer__StringBuffer litaC_path = litaC_std__string__buffer__StringBufferInit(litaC_buffer, litaC_MAX_BUFFER, 0);
+    litaC_std__string__buffer__StringBuffer_format(&((litaC_path)), "%s/.vscode", litaC_pm->options.projectPath);
+    litaC_std__system__Mkdir(litaC_std__string__buffer__StringBuffer_cStr(litaC_path));
     litaC_std__string__buffer__StringBuffer_format(&((litaC_path)), "%s/bin", litaC_pm->options.projectPath);
     litaC_std__system__Mkdir(litaC_std__string__buffer__StringBuffer_cStr(litaC_path));
     litaC_std__string__buffer__StringBuffer_format(&((litaC_path)), "%s/doc", litaC_pm->options.projectPath);
@@ -93922,6 +94813,35 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_init__PackageInit(litaC_pkg_mgr__Pac
     litaC_std__system__Mkdir(litaC_std__string__buffer__StringBuffer_cStr(litaC_path));
     litaC_std__string__builder__StringBuilder litaC_sb = litaC_std__string__builder__StringBuilderInit(1024, NULL);
     
+    {
+        litaC_std__string__builder__StringBuilder_append(&((litaC_sb)), "%s", "\n{\n    \"version\": \"2.0.0\",\n    \"tasks\": [\n        {\n            \"label\": \"BuildRun\",\n            \"type\": \"shell\",\n            \"command\": \"litac\",\n            \"args\": [\n                \"-pkg-build\",\n                \"-run\"\n            ],\n            \"presentation\": {\n                \"echo\": true,\n                \"reveal\": \"always\",\n                \"focus\": false,\n                \"panel\": \"shared\",\n                \"showReuseMessage\": false,\n                \"clear\": true\n            },\n            \"problemMatcher\": [],\n            \"group\": {\n                \"kind\": \"build\",\n                \"isDefault\": true\n            }\n        },\n        {\n            \"label\": \"BuildRunRelease\",\n            \"type\": \"shell\",\n            \"command\": \"litac\",\n            \"args\": [\n                \"-pkg-build\",\n                \"-release\",\n                \"-run\"\n            ],\n            \"presentation\": {\n                \"echo\": true,\n                \"reveal\": \"always\",\n                \"focus\": false,\n                \"panel\": \"shared\",\n                \"showReuseMessage\": false,\n                \"clear\": true\n            },\n            \"problemMatcher\": [],\n            \"group\": {\n                \"kind\": \"build\",\n                \"isDefault\": true\n            }\n        },\n        {\n            \"label\": \"BuildTestFile\",\n            \"type\": \"shell\",\n            \"command\": \"litac\",\n            \"args\": [\n                \"-pkg-build\",\n                \"-run\",\n                \"-testFile\",\n                \"${file}\"\n            ],\n            \"presentation\": {\n                \"echo\": true,\n                \"reveal\": \"always\",\n                \"focus\": false,\n                \"panel\": \"shared\",\n                \"showReuseMessage\": false,\n                \"clear\": true\n            },\n            \"problemMatcher\": [],\n            \"group\": {\n                \"kind\": \"build\",\n                \"isDefault\": true\n            }\n        },\n        {\n            \"label\": \"BuildTest\",\n            \"type\": \"shell\",\n            \"command\": \"litac\",\n            \"args\": [\n                \"-pkg-build\",\n                \"-run\",\n                \"-test\",\n                \".*\"\n            ],\n            \"presentation\": {\n                \"echo\": true,\n                \"reveal\": \"always\",\n                \"focus\": false,\n                \"panel\": \"shared\",\n                \"showReuseMessage\": false,\n                \"clear\": true\n            },\n            \"problemMatcher\": [],\n            \"group\": {\n                \"kind\": \"build\",\n                \"isDefault\": true\n            }\n        }\n    ]\n}\n");
+        litaC_std__string__buffer__StringBuffer_format(&((litaC_path)), "%s/.vscode/tasks.json", litaC_pm->options.projectPath);
+        if(!(litaC_std__system__FileExists(litaC_std__string__buffer__StringBuffer_cStr(litaC_path)))) {
+            {
+                if(litaC_std__io__WriteFile(litaC_std__string__buffer__StringBuffer_cStr(litaC_path), litaC_sb.asBuffer.buffer, litaC_sb.asBuffer.length) != litaC_std__io__FileStatus_Ok) {
+                    {
+                        {
+                            litaC_pkg_mgr__PkgStatus ___result = litaC_pkg_mgr__PkgStatus_ERROR_INIT_PACKAGE;
+                            litaC_std__string__builder__StringBuilder_free(&((litaC_sb)));
+                            return ___result;
+                            
+                        }
+                        
+                        
+                        
+                    }
+                    
+                } 
+                
+                
+                
+            }
+            
+        } 
+        
+        
+        
+    }
     {
         litaC_std__string__builder__StringBuilder_append(&((litaC_sb)), "%s", "\nimport \"std/libc\"\n\nfunc main(len: i32, args: **char) : i32 {\n    printf(\"Hello World\\n\")\n    return 0\n}\n");
         litaC_std__string__buffer__StringBuffer_format(&((litaC_path)), "%s/src/main.lita", litaC_pm->options.projectPath);
@@ -94018,6 +94938,84 @@ litaC_pkg_mgr__PkgStatus litaC_pkg_mgr__pkg_init__PackageInit(litaC_pkg_mgr__Pac
     
     litaC_std__string__builder__StringBuilder_free(&((litaC_sb)));
     #undef litaC_MAX_BUFFER
+    
+}
+
+const litaC_char* litaC_std__zip__ZipStatusAsStr(litaC_std__zip__ZipStatus litaC_enumType) {
+    switch(litaC_enumType) {
+        case litaC_std__zip__ZipStatus_OK: {
+            return "OK";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_UNABLE_TO_OPEN_FILE: {
+            return "ERROR_UNABLE_TO_OPEN_FILE";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_UNABLE_TO_STAT: {
+            return "ERROR_UNABLE_TO_STAT";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_UNABLE_CREATE_DIR: {
+            return "ERROR_UNABLE_CREATE_DIR";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_UNABLE_WRITE_FILE: {
+            return "ERROR_UNABLE_WRITE_FILE";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_ADDING_FILE: {
+            return "ERROR_ADDING_FILE";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_CLOSING: {
+            return "ERROR_CLOSING";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_FINALIZING: {
+            return "ERROR_FINALIZING";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_OUT_OF_MEMORY: {
+            return "ERROR_OUT_OF_MEMORY";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_COMPRESSING: {
+            return "ERROR_COMPRESSING";
+            
+            
+            
+        }
+        case litaC_std__zip__ZipStatus_ERROR_DECOMPRESSING: {
+            return "ERROR_DECOMPRESSING";
+            
+            
+            
+        }
+        default: {
+            return NULL;
+            
+            
+            
+        }
+    }
     
 }
 
@@ -95043,6 +96041,12 @@ const litaC_char* litaC_ast__StmtKindAsStr(litaC_ast__StmtKind litaC_enumType) {
             
             
         }
+        case litaC_ast__StmtKind_NAME_OF_EXPR: {
+            return "NAME_OF_EXPR";
+            
+            
+            
+        }
         case litaC_ast__StmtKind_UNARY_EXPR: {
             return "UNARY_EXPR";
             
@@ -95505,6 +96509,12 @@ const litaC_char* litaC_lex__TokenTypeAsStr(litaC_lex__TokenType litaC_enumType)
             
             
         }
+        case litaC_lex__TokenType_NAMEOF: {
+            return "NAMEOF";
+            
+            
+            
+        }
         case litaC_lex__TokenType_OFFSETOF: {
             return "OFFSETOF";
             
@@ -95591,6 +96601,12 @@ const litaC_char* litaC_lex__TokenTypeAsStr(litaC_lex__TokenType litaC_enumType)
         }
         case litaC_lex__TokenType_VAR_ARGS: {
             return "VAR_ARGS";
+            
+            
+            
+        }
+        case litaC_lex__TokenType_DOLLAR_VAR_ARGS: {
+            return "DOLLAR_VAR_ARGS";
             
             
             
@@ -102962,6 +103978,372 @@ litaC_void litaC_std__array__std__array__QuickSort_cb_ast__CallArg_ce_(litaC_std
     
 }
 
+litaC_void litaC_std__array__std__array__Array_init_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_a->alloc = litaC_alloc;
+    litaC_a->length = 0;
+    litaC_a->capacity = litaC_initialSize;
+    litaC_usize litaC_length = (sizeof(litaC_lex__Token) * (litaC_u64)litaC_initialSize);
+    if(litaC_initialSize > 0) {
+        {
+            litaC_a->elements = (litaC_lex__Token*)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
+            if(!(litaC_a->elements)) {
+                {
+                    litaC_a->length = 0;
+                    litaC_a->capacity = 0;
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_a->elements = NULL;
+            
+            
+        }
+    } 
+    
+    
+}
+
+litaC_i32 litaC_std__array__std__array__Array_add_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_lex__Token litaC_element) {
+    if(litaC_a->length + 1 > litaC_a->capacity) {
+        {
+            if(!(litaC_std__array__std__array__ArrayGrow_cb_lex__Token_ce_(litaC_a, 1))) {
+                {
+                    return -(1);
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } 
+    
+    assert(litaC_a->length < litaC_a->capacity);
+    assert(litaC_a->capacity > 0);
+    assert(litaC_a->elements);
+    {
+        litaC_a->elements[litaC_a->length] = litaC_element;
+        
+        
+    }
+    litaC_a->length += 1;
+    return 1;
+    
+    
+}
+
+litaC_bool litaC_std__array__std__array__ArrayGrow_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_increment) {
+    litaC_i32 litaC_doubleCurrent = litaC_a->capacity * 2;
+    litaC_i32 litaC_minReq = litaC_a->length + litaC_increment;
+    litaC_i32 litaC_n = litaC_minReq;
+    if(litaC_doubleCurrent > litaC_minReq) {
+        {
+            litaC_n = litaC_doubleCurrent;
+            
+            
+        }
+        
+    } 
+    
+    litaC_usize litaC_newlength = (sizeof(litaC_lex__Token) * (litaC_usize)litaC_n);
+    litaC_usize litaC_oldlength = (sizeof(litaC_lex__Token) * (litaC_usize)litaC_a->capacity);
+    litaC_lex__Token* litaC_newArray = (litaC_lex__Token*)litaC_std__mem__Allocator_realloc(litaC_a->alloc, (litaC_void*)litaC_a->elements, litaC_oldlength, litaC_newlength);
+    if(!(litaC_newArray)) {
+        {
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_a->elements = litaC_newArray;
+    litaC_a->capacity = litaC_n;
+    return litaC_true;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_bool litaC_std__array__std__array__Array_empty_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a) {
+    return litaC_a->length == 0;
+    
+    
+}
+
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__ImportDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_a->alloc = litaC_alloc;
+    litaC_a->length = 0;
+    litaC_a->capacity = litaC_initialSize;
+    litaC_usize litaC_length = (sizeof(litaC_ast__ImportDecl*) * (litaC_u64)litaC_initialSize);
+    if(litaC_initialSize > 0) {
+        {
+            litaC_a->elements = (litaC_ast__ImportDecl**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
+            if(!(litaC_a->elements)) {
+                {
+                    litaC_a->length = 0;
+                    litaC_a->capacity = 0;
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_a->elements = NULL;
+            
+            
+        }
+    } 
+    
+    
+}
+
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__NoteStmt_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_a->alloc = litaC_alloc;
+    litaC_a->length = 0;
+    litaC_a->capacity = litaC_initialSize;
+    litaC_usize litaC_length = (sizeof(litaC_ast__NoteStmt*) * (litaC_u64)litaC_initialSize);
+    if(litaC_initialSize > 0) {
+        {
+            litaC_a->elements = (litaC_ast__NoteStmt**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
+            if(!(litaC_a->elements)) {
+                {
+                    litaC_a->length = 0;
+                    litaC_a->capacity = 0;
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_a->elements = NULL;
+            
+            
+        }
+    } 
+    
+    
+}
+
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_a->alloc = litaC_alloc;
+    litaC_a->length = 0;
+    litaC_a->capacity = litaC_initialSize;
+    litaC_usize litaC_length = (sizeof(litaC_ast__Decl*) * (litaC_u64)litaC_initialSize);
+    if(litaC_initialSize > 0) {
+        {
+            litaC_a->elements = (litaC_ast__Decl**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
+            if(!(litaC_a->elements)) {
+                {
+                    litaC_a->length = 0;
+                    litaC_a->capacity = 0;
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_a->elements = NULL;
+            
+            
+        }
+    } 
+    
+    
+}
+
+litaC_ast__Decl* litaC_std__array__std__array__Array_last_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a) {
+    assert(litaC_a->length != 0);
+    return litaC_a->elements[litaC_a->length - 1];
+    
+    
+}
+
+litaC_i32 litaC_std__array__std__array__Array_insertAt_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element) {
+    assert(litaC_index >= 0 && litaC_index <= litaC_a->length);
+    if(litaC_index == litaC_a->length) {
+        {
+            return litaC_std__array__std__array__Array_add_cb__ptr_ast__ParameterDecl_ce_(litaC_a, litaC_element);
+            
+            
+            
+        }
+        
+    } 
+    
+    if(litaC_a->length + 1 >= litaC_a->capacity) {
+        {
+            if(!(litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__ParameterDecl_ce_(litaC_a, 1))) {
+                {
+                    return -(1);
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_a->length += 1;
+    memmove((litaC_void*)(&(litaC_a->elements[litaC_index + 1])), (const litaC_void*)(&(litaC_a->elements[litaC_index])), (litaC_a->length - litaC_index) * sizeof(litaC_ast__ParameterDecl*));
+    litaC_std__array__std__array__Array_set_cb__ptr_ast__ParameterDecl_ce_(litaC_a, litaC_index, litaC_element);
+    return 1;
+    
+    
+}
+
+litaC_void litaC_std__array__std__array__Array_set_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element) {
+    assert(litaC_index >= 0 && litaC_index < litaC_a->length);
+    {
+        litaC_a->elements[litaC_index] = litaC_element;
+        
+        
+    }
+    
+}
+
+litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_a->alloc = litaC_alloc;
+    litaC_a->length = 0;
+    litaC_a->capacity = litaC_initialSize;
+    litaC_usize litaC_length = (sizeof(litaC_ast__EnumFieldEntryDecl*) * (litaC_u64)litaC_initialSize);
+    if(litaC_initialSize > 0) {
+        {
+            litaC_a->elements = (litaC_ast__EnumFieldEntryDecl**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
+            if(!(litaC_a->elements)) {
+                {
+                    litaC_a->length = 0;
+                    litaC_a->capacity = 0;
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } else {
+        {
+            litaC_a->elements = NULL;
+            
+            
+        }
+    } 
+    
+    
+}
+
+litaC_i32 litaC_std__array__std__array__Array_add_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_ast__EnumFieldEntryDecl* litaC_element) {
+    if(litaC_a->length + 1 > litaC_a->capacity) {
+        {
+            if(!(litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_a, 1))) {
+                {
+                    return -(1);
+                    
+                    
+                    
+                }
+                
+            } 
+            
+            
+            
+        }
+        
+    } 
+    
+    assert(litaC_a->length < litaC_a->capacity);
+    assert(litaC_a->capacity > 0);
+    assert(litaC_a->elements);
+    {
+        litaC_a->elements[litaC_a->length] = litaC_element;
+        
+        
+    }
+    litaC_a->length += 1;
+    return 1;
+    
+    
+}
+
+litaC_bool litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_increment) {
+    litaC_i32 litaC_doubleCurrent = litaC_a->capacity * 2;
+    litaC_i32 litaC_minReq = litaC_a->length + litaC_increment;
+    litaC_i32 litaC_n = litaC_minReq;
+    if(litaC_doubleCurrent > litaC_minReq) {
+        {
+            litaC_n = litaC_doubleCurrent;
+            
+            
+        }
+        
+    } 
+    
+    litaC_usize litaC_newlength = (sizeof(litaC_ast__EnumFieldEntryDecl*) * (litaC_usize)litaC_n);
+    litaC_usize litaC_oldlength = (sizeof(litaC_ast__EnumFieldEntryDecl*) * (litaC_usize)litaC_a->capacity);
+    litaC_ast__EnumFieldEntryDecl** litaC_newArray = (litaC_ast__EnumFieldEntryDecl**)litaC_std__mem__Allocator_realloc(litaC_a->alloc, (litaC_void*)litaC_a->elements, litaC_oldlength, litaC_newlength);
+    if(!(litaC_newArray)) {
+        {
+            return litaC_false;
+            
+            
+            
+        }
+        
+    } 
+    
+    litaC_a->elements = litaC_newArray;
+    litaC_a->capacity = litaC_n;
+    return litaC_true;
+    
+    
+}
+
+LITAC_INLINE 
+litaC_i32 litaC_std__array__std__array__Array_size_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a) {
+    return litaC_a->length;
+    
+    
+}
+
 litaC_void litaC_std__array__std__array__Array_init_cb_lsp__references__Reference_ce_(litaC_std__array__std__array__Array_cb_lsp__references__Reference_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_a->alloc = litaC_alloc;
     litaC_a->length = 0;
@@ -104209,372 +105591,6 @@ litaC_void litaC_std__array__std__array__Array_free_cb_std__json__JsonEntry_ce_(
         }
         
     } 
-    
-    
-}
-
-litaC_void litaC_std__array__std__array__Array_init_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_a->alloc = litaC_alloc;
-    litaC_a->length = 0;
-    litaC_a->capacity = litaC_initialSize;
-    litaC_usize litaC_length = (sizeof(litaC_lex__Token) * (litaC_u64)litaC_initialSize);
-    if(litaC_initialSize > 0) {
-        {
-            litaC_a->elements = (litaC_lex__Token*)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
-            if(!(litaC_a->elements)) {
-                {
-                    litaC_a->length = 0;
-                    litaC_a->capacity = 0;
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } else {
-        {
-            litaC_a->elements = NULL;
-            
-            
-        }
-    } 
-    
-    
-}
-
-litaC_i32 litaC_std__array__std__array__Array_add_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_lex__Token litaC_element) {
-    if(litaC_a->length + 1 > litaC_a->capacity) {
-        {
-            if(!(litaC_std__array__std__array__ArrayGrow_cb_lex__Token_ce_(litaC_a, 1))) {
-                {
-                    return -(1);
-                    
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } 
-    
-    assert(litaC_a->length < litaC_a->capacity);
-    assert(litaC_a->capacity > 0);
-    assert(litaC_a->elements);
-    {
-        litaC_a->elements[litaC_a->length] = litaC_element;
-        
-        
-    }
-    litaC_a->length += 1;
-    return 1;
-    
-    
-}
-
-litaC_bool litaC_std__array__std__array__ArrayGrow_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a,litaC_i32 litaC_increment) {
-    litaC_i32 litaC_doubleCurrent = litaC_a->capacity * 2;
-    litaC_i32 litaC_minReq = litaC_a->length + litaC_increment;
-    litaC_i32 litaC_n = litaC_minReq;
-    if(litaC_doubleCurrent > litaC_minReq) {
-        {
-            litaC_n = litaC_doubleCurrent;
-            
-            
-        }
-        
-    } 
-    
-    litaC_usize litaC_newlength = (sizeof(litaC_lex__Token) * (litaC_usize)litaC_n);
-    litaC_usize litaC_oldlength = (sizeof(litaC_lex__Token) * (litaC_usize)litaC_a->capacity);
-    litaC_lex__Token* litaC_newArray = (litaC_lex__Token*)litaC_std__mem__Allocator_realloc(litaC_a->alloc, (litaC_void*)litaC_a->elements, litaC_oldlength, litaC_newlength);
-    if(!(litaC_newArray)) {
-        {
-            return litaC_false;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_a->elements = litaC_newArray;
-    litaC_a->capacity = litaC_n;
-    return litaC_true;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_bool litaC_std__array__std__array__Array_empty_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a) {
-    return litaC_a->length == 0;
-    
-    
-}
-
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__ImportDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ImportDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_a->alloc = litaC_alloc;
-    litaC_a->length = 0;
-    litaC_a->capacity = litaC_initialSize;
-    litaC_usize litaC_length = (sizeof(litaC_ast__ImportDecl*) * (litaC_u64)litaC_initialSize);
-    if(litaC_initialSize > 0) {
-        {
-            litaC_a->elements = (litaC_ast__ImportDecl**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
-            if(!(litaC_a->elements)) {
-                {
-                    litaC_a->length = 0;
-                    litaC_a->capacity = 0;
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } else {
-        {
-            litaC_a->elements = NULL;
-            
-            
-        }
-    } 
-    
-    
-}
-
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__NoteStmt_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__NoteStmt_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_a->alloc = litaC_alloc;
-    litaC_a->length = 0;
-    litaC_a->capacity = litaC_initialSize;
-    litaC_usize litaC_length = (sizeof(litaC_ast__NoteStmt*) * (litaC_u64)litaC_initialSize);
-    if(litaC_initialSize > 0) {
-        {
-            litaC_a->elements = (litaC_ast__NoteStmt**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
-            if(!(litaC_a->elements)) {
-                {
-                    litaC_a->length = 0;
-                    litaC_a->capacity = 0;
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } else {
-        {
-            litaC_a->elements = NULL;
-            
-            
-        }
-    } 
-    
-    
-}
-
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_a->alloc = litaC_alloc;
-    litaC_a->length = 0;
-    litaC_a->capacity = litaC_initialSize;
-    litaC_usize litaC_length = (sizeof(litaC_ast__Decl*) * (litaC_u64)litaC_initialSize);
-    if(litaC_initialSize > 0) {
-        {
-            litaC_a->elements = (litaC_ast__Decl**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
-            if(!(litaC_a->elements)) {
-                {
-                    litaC_a->length = 0;
-                    litaC_a->capacity = 0;
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } else {
-        {
-            litaC_a->elements = NULL;
-            
-            
-        }
-    } 
-    
-    
-}
-
-litaC_ast__Decl* litaC_std__array__std__array__Array_last_cb__ptr_ast__Decl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__Decl_ce_* litaC_a) {
-    assert(litaC_a->length != 0);
-    return litaC_a->elements[litaC_a->length - 1];
-    
-    
-}
-
-litaC_i32 litaC_std__array__std__array__Array_insertAt_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element) {
-    assert(litaC_index >= 0 && litaC_index <= litaC_a->length);
-    if(litaC_index == litaC_a->length) {
-        {
-            return litaC_std__array__std__array__Array_add_cb__ptr_ast__ParameterDecl_ce_(litaC_a, litaC_element);
-            
-            
-            
-        }
-        
-    } 
-    
-    if(litaC_a->length + 1 >= litaC_a->capacity) {
-        {
-            if(!(litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__ParameterDecl_ce_(litaC_a, 1))) {
-                {
-                    return -(1);
-                    
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_a->length += 1;
-    memmove((litaC_void*)(&(litaC_a->elements[litaC_index + 1])), (const litaC_void*)(&(litaC_a->elements[litaC_index])), (litaC_a->length - litaC_index) * sizeof(litaC_ast__ParameterDecl*));
-    litaC_std__array__std__array__Array_set_cb__ptr_ast__ParameterDecl_ce_(litaC_a, litaC_index, litaC_element);
-    return 1;
-    
-    
-}
-
-litaC_void litaC_std__array__std__array__Array_set_cb__ptr_ast__ParameterDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__ParameterDecl_ce_* litaC_a,litaC_i32 litaC_index,litaC_ast__ParameterDecl* litaC_element) {
-    assert(litaC_index >= 0 && litaC_index < litaC_a->length);
-    {
-        litaC_a->elements[litaC_index] = litaC_element;
-        
-        
-    }
-    
-}
-
-litaC_void litaC_std__array__std__array__Array_init_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_a->alloc = litaC_alloc;
-    litaC_a->length = 0;
-    litaC_a->capacity = litaC_initialSize;
-    litaC_usize litaC_length = (sizeof(litaC_ast__EnumFieldEntryDecl*) * (litaC_u64)litaC_initialSize);
-    if(litaC_initialSize > 0) {
-        {
-            litaC_a->elements = (litaC_ast__EnumFieldEntryDecl**)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
-            if(!(litaC_a->elements)) {
-                {
-                    litaC_a->length = 0;
-                    litaC_a->capacity = 0;
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } else {
-        {
-            litaC_a->elements = NULL;
-            
-            
-        }
-    } 
-    
-    
-}
-
-litaC_i32 litaC_std__array__std__array__Array_add_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_ast__EnumFieldEntryDecl* litaC_element) {
-    if(litaC_a->length + 1 > litaC_a->capacity) {
-        {
-            if(!(litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_a, 1))) {
-                {
-                    return -(1);
-                    
-                    
-                    
-                }
-                
-            } 
-            
-            
-            
-        }
-        
-    } 
-    
-    assert(litaC_a->length < litaC_a->capacity);
-    assert(litaC_a->capacity > 0);
-    assert(litaC_a->elements);
-    {
-        litaC_a->elements[litaC_a->length] = litaC_element;
-        
-        
-    }
-    litaC_a->length += 1;
-    return 1;
-    
-    
-}
-
-litaC_bool litaC_std__array__std__array__ArrayGrow_cb__ptr_ast__EnumFieldEntryDecl_ce_(litaC_std__array__std__array__Array_cb__ptr_ast__EnumFieldEntryDecl_ce_* litaC_a,litaC_i32 litaC_increment) {
-    litaC_i32 litaC_doubleCurrent = litaC_a->capacity * 2;
-    litaC_i32 litaC_minReq = litaC_a->length + litaC_increment;
-    litaC_i32 litaC_n = litaC_minReq;
-    if(litaC_doubleCurrent > litaC_minReq) {
-        {
-            litaC_n = litaC_doubleCurrent;
-            
-            
-        }
-        
-    } 
-    
-    litaC_usize litaC_newlength = (sizeof(litaC_ast__EnumFieldEntryDecl*) * (litaC_usize)litaC_n);
-    litaC_usize litaC_oldlength = (sizeof(litaC_ast__EnumFieldEntryDecl*) * (litaC_usize)litaC_a->capacity);
-    litaC_ast__EnumFieldEntryDecl** litaC_newArray = (litaC_ast__EnumFieldEntryDecl**)litaC_std__mem__Allocator_realloc(litaC_a->alloc, (litaC_void*)litaC_a->elements, litaC_oldlength, litaC_newlength);
-    if(!(litaC_newArray)) {
-        {
-            return litaC_false;
-            
-            
-            
-        }
-        
-    } 
-    
-    litaC_a->elements = litaC_newArray;
-    litaC_a->capacity = litaC_n;
-    return litaC_true;
-    
-    
-}
-
-LITAC_INLINE 
-litaC_i32 litaC_std__array__std__array__Array_size_cb_lex__Token_ce_(litaC_std__array__std__array__Array_cb_lex__Token_ce_* litaC_a) {
-    return litaC_a->length;
     
     
 }
@@ -106380,27 +107396,27 @@ litaC_std__map__std__map__MapEntry_cb__ptr_const_char_c__ptr_pkg_mgr__pkg__Packa
 }
 
 LITAC_INLINE 
-litaC_i32 litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a) {
+litaC_i32 litaC_std__array__std__array__Array_size_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a) {
     return litaC_a->length;
     
     
 }
 
 LITAC_INLINE 
-litaC_bool litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a) {
+litaC_bool litaC_std__array__std__array__Array_empty_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a) {
     return litaC_a->length == 0;
     
     
 }
 
-litaC_pkg_mgr__pkg__PackageId litaC_std__array__std__array__Array_get_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_index) {
+litaC_pkg_mgr__pkg__PackageDependency* litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_i32 litaC_index) {
     assert(litaC_index >= 0 && litaC_index < litaC_a->length);
-    return litaC_a->elements[litaC_index];
+    return &(litaC_a->elements[litaC_index]);
     
     
 }
 
-litaC_void litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a) {
+litaC_void litaC_std__array__std__array__Array_free_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a) {
     if(litaC_a && litaC_a->elements) {
         {
             litaC_std__mem__Allocator_free(litaC_a->alloc, (litaC_void*)litaC_a->elements);
@@ -106517,14 +107533,14 @@ litaC_pkg_mgr__pkg__PackageDef* litaC_std__mem__std__mem__new_cb_pkg_mgr__pkg__P
     
 }
 
-litaC_void litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
+litaC_void litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
     litaC_a->alloc = litaC_alloc;
     litaC_a->length = 0;
     litaC_a->capacity = litaC_initialSize;
-    litaC_usize litaC_length = (sizeof(litaC_pkg_mgr__pkg__PackageId) * (litaC_u64)litaC_initialSize);
+    litaC_usize litaC_length = (sizeof(litaC_pkg_mgr__pkg__PackageDependency) * (litaC_u64)litaC_initialSize);
     if(litaC_initialSize > 0) {
         {
-            litaC_a->elements = (litaC_pkg_mgr__pkg__PackageId*)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
+            litaC_a->elements = (litaC_pkg_mgr__pkg__PackageDependency*)litaC_std__mem__Allocator_alloc(litaC_alloc, litaC_length);
             if(!(litaC_a->elements)) {
                 {
                     litaC_a->length = 0;
@@ -106550,10 +107566,10 @@ litaC_void litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageId_c
     
 }
 
-litaC_i32 litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_pkg_mgr__pkg__PackageId litaC_element) {
+litaC_i32 litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_pkg_mgr__pkg__PackageDependency litaC_element) {
     if(litaC_a->length + 1 > litaC_a->capacity) {
         {
-            if(!(litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageId_ce_(litaC_a, 1))) {
+            if(!(litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_a, 1))) {
                 {
                     return -(1);
                     
@@ -106583,7 +107599,7 @@ litaC_i32 litaC_std__array__std__array__Array_add_cb_pkg_mgr__pkg__PackageId_ce_
     
 }
 
-litaC_bool litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_increment) {
+litaC_bool litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_i32 litaC_increment) {
     litaC_i32 litaC_doubleCurrent = litaC_a->capacity * 2;
     litaC_i32 litaC_minReq = litaC_a->length + litaC_increment;
     litaC_i32 litaC_n = litaC_minReq;
@@ -106596,9 +107612,9 @@ litaC_bool litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageId_ce
         
     } 
     
-    litaC_usize litaC_newlength = (sizeof(litaC_pkg_mgr__pkg__PackageId) * (litaC_usize)litaC_n);
-    litaC_usize litaC_oldlength = (sizeof(litaC_pkg_mgr__pkg__PackageId) * (litaC_usize)litaC_a->capacity);
-    litaC_pkg_mgr__pkg__PackageId* litaC_newArray = (litaC_pkg_mgr__pkg__PackageId*)litaC_std__mem__Allocator_realloc(litaC_a->alloc, (litaC_void*)litaC_a->elements, litaC_oldlength, litaC_newlength);
+    litaC_usize litaC_newlength = (sizeof(litaC_pkg_mgr__pkg__PackageDependency) * (litaC_usize)litaC_n);
+    litaC_usize litaC_oldlength = (sizeof(litaC_pkg_mgr__pkg__PackageDependency) * (litaC_usize)litaC_a->capacity);
+    litaC_pkg_mgr__pkg__PackageDependency* litaC_newArray = (litaC_pkg_mgr__pkg__PackageDependency*)litaC_std__mem__Allocator_realloc(litaC_a->alloc, (litaC_void*)litaC_a->elements, litaC_oldlength, litaC_newlength);
     if(!(litaC_newArray)) {
         {
             return litaC_false;
@@ -106616,24 +107632,17 @@ litaC_bool litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageId_ce
     
 }
 
-litaC_pkg_mgr__pkg__PackageId* litaC_std__array__std__array__Array_getPtr_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_i32 litaC_index) {
-    assert(litaC_index >= 0 && litaC_index < litaC_a->length);
-    return &(litaC_a->elements[litaC_index]);
-    
-    
-}
-
-litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ litaC_std__array__std__array__ArrayInit_cb_pkg_mgr__pkg__PackageId_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
-    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_ litaC_array =  {
+litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_ litaC_std__array__std__array__ArrayInit_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_i32 litaC_initialSize,const litaC_std__mem__Allocator* litaC_alloc) {
+    litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_ litaC_array =  {
         0
     };
-    litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageId_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
+    litaC_std__array__std__array__Array_init_cb_pkg_mgr__pkg__PackageDependency_ce_(&((litaC_array)), litaC_initialSize, litaC_alloc);
     return litaC_array;
     
     
 }
 
-litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_a,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageId_ce_* litaC_other) {
+litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_a,litaC_std__array__std__array__Array_cb_pkg_mgr__pkg__PackageDependency_ce_* litaC_other) {
     if(!(litaC_other) || litaC_other->length == 0) {
         {
             return 0;
@@ -106646,7 +107655,7 @@ litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_
     
     if(litaC_a->length + litaC_other->length > litaC_a->capacity) {
         {
-            if(!(litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageId_ce_(litaC_a, litaC_other->length))) {
+            if(!(litaC_std__array__std__array__ArrayGrow_cb_pkg_mgr__pkg__PackageDependency_ce_(litaC_a, litaC_other->length))) {
                 {
                     return -(1);
                     
@@ -106662,7 +107671,7 @@ litaC_i32 litaC_std__array__std__array__Array_addAll_cb_pkg_mgr__pkg__PackageId_
         
     } 
     
-    memcpy((litaC_void*)(&(litaC_a->elements[litaC_a->length])), (const litaC_void*)(&(litaC_other->elements[0])), litaC_other->length * sizeof(litaC_pkg_mgr__pkg__PackageId));
+    memcpy((litaC_void*)(&(litaC_a->elements[litaC_a->length])), (const litaC_void*)(&(litaC_other->elements[0])), litaC_other->length * sizeof(litaC_pkg_mgr__pkg__PackageDependency));
     litaC_a->length += litaC_other->length;
     return litaC_other->length;
     
