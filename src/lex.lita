@@ -59,6 +59,7 @@ public enum TokenType {
 
     SIZEOF,
     TYPEOF,
+    NAMEOF,
     OFFSETOF,
 
     AS,
@@ -184,6 +185,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
 
     [TokenType.SIZEOF] = "sizeof",
     [TokenType.TYPEOF] = "typeof",
+    [TokenType.NAMEOF] = "nameof",
     [TokenType.OFFSETOF] = "offsetof",
 
     [TokenType.AS] = "as",
@@ -357,6 +359,7 @@ const keywordCache = [MAX_KEYWORD_CACHE]**const char {
         "return",
         "sizeof",
         "typeof",
+        "nameof",
         "public",
         null
     },
@@ -424,6 +427,7 @@ const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
         TokenType.RETURN,
         TokenType.SIZEOF,
         TokenType.TYPEOF,
+        TokenType.NAMEOF,
         TokenType.PUBLIC,
     },
     [7] = []TokenType {

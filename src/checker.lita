@@ -1811,6 +1811,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.TERNARY_EXPR:
         case StmtKind.TYPE_IDENTIFIER_EXPR:
         case StmtKind.TYPE_OF_EXPR:
+        case StmtKind.NAME_OF_EXPR:
         case StmtKind.UNARY_EXPR:
         case StmtKind.POISON_EXPR: {
             return this.resolveExpr(stmt as (*Expr))

@@ -2629,6 +2629,18 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             return;
         }
+        case StmtKind.NAME_OF_EXPR: {
+            var expr = s as (*TypeOfExpr)
+            var typeInfo: *TypeInfo
+            if(expr.typeOfExpr) {
+                typeInfo = expr.typeOfExpr.operand.typeInfo
+            }
+            else if(expr.type) {
+                typeInfo = expr.type.typeInfo
+            }
+            this.emit("%s", this.cType(typeInfo))
+            return;
+        }
         case StmtKind.UNARY_EXPR: {
             var expr = s as (*UnaryExpr)
             this.emitStr(tokenText[expr.operator])

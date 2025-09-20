@@ -1,6 +1,11 @@
 import "std/libc"
 import "std/string"
 
+@raw("""
+    #define get_name(T) #T
+""");
+@foreign func GetNameInternal<T>(type: typeid) : *const char;
+
 @generated public const typeInfos: **TypeInfo = [1]*TypeInfo{0};
 @generated public const numOfTypeInfos : usize = 0;
 
@@ -54,6 +59,9 @@ public struct any {
     id: typeid
 }*/
 
+public func GetTypeName<T>() : *const char {
+    return GetNameInternal<T>(nameof(:T))
+}
 
 public enum Modifiers {
     None  = 0,

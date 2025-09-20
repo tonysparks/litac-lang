@@ -13,7 +13,7 @@
         }
     `,
     "tests": [
-        {
+        /*{
             "name" : "Native varargs",
             "definitions": `
 
@@ -21,7 +21,6 @@
             "code": `
                 assert(true)
             `,
-        },
-
+        },*/
     ]
 }

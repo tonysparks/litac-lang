@@ -429,6 +429,15 @@ public func CopyExpr(expr: *Expr, module: *Module) : *Expr {
                                      module.allocator)
             return copy
         }
+        case StmtKind.NAME_OF_EXPR: {
+            var original = expr as (*TypeOfExpr)
+            var copy = NewNameOfExpr(original.startPos,
+                                     original.endPos,
+                                     CopyExpr(original.typeOfExpr, module),
+                                     CopyTypeSpec(original.type, module),
+                                     module.allocator)
+            return copy
+        }
         case StmtKind.UNARY_EXPR: {
             var original = expr as (*UnaryExpr)
             var copy = NewUnaryExpr(original.startPos,
