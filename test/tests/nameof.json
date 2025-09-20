@@ -1,0 +1,69 @@
+{
+    "description": "NameOf",
+    "disabled": false,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name" : "Name Of",
+            "definitions": `
+                import "std/string"
+                import "std/libc"
+                import "std/map"
+
+                @raw("""
+                    #define get_name(T) #T
+                """);
+                @foreign public func get_name<T>(type: typeid) : *const char;
+
+                public func tester<T>() : String {
+                    return get_name<T>(nameof(:T)).toString()
+                }
+            `,
+            "code": `
+                {
+                    var x = tester<i32>()
+                    assert(x.equals($"i32"))
+                }
+                {
+                    var x = tester<bool>()
+                    assert(x.equals($"bool"))
+                }
+                {
+                    var x = tester<*const char>()
+                    //printf("->%.*s\n", x.length, x.buffer)
+                    assert(x.equals($"const char*"))
+                }
+
+                {
+                    var x1 = tester<String>()
+                    //printf("->%.*s\n", x1.length, x1.buffer)
+                    var r = x1.equals($"std__builtins__String")
+                    assert(r)
+                }
+
+                {
+                    var x1 = tester<Map<*const char, i32>>()
+                    // printf("->%.*s\n", x1.length, x1.buffer)
+                    var r = x1.equals($"std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_")
+                    assert(r)
+                }
+                {
+                    var m = Map<*const char, i32>{}
+                    var x1 = get_name<Map<*const char, i32>>(nameof(m)).toString()
+                    // printf("->%.*s\n", x1.length, x1.buffer)
+                    var r = x1.equals($"std__map__std__map__Map_cb__ptr_const_char_c_i32_ce_")
+                    assert(r)
+                }
+            `,
+        },
+    ]
+}

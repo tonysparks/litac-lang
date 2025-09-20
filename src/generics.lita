@@ -927,6 +927,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             expr.type = template.replaceTypeSpec(expr.type)
             break;
         }
+        case StmtKind.NAME_OF_EXPR:
         case StmtKind.TYPE_OF_EXPR: {
             var expr = ast as (*TypeOfExpr)
             ReplaceTypes(template, expr.typeOfExpr)

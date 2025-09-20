@@ -4,6 +4,7 @@ import "std/map"
 import "std/mem"
 import "std/string/buffer"
 import "std/string/builder"
+import "std/string"
 import "std/assert"
 import "std/hash"
 
@@ -519,6 +520,16 @@ public func (this: *Scope) addSymbol(name: InternedString,
 public func (this: *Scope) createQualifiedName(name: InternedString) : InternedString {
     var buffer:[MAX_SYMBOL_NAME]char;
     var qualifiedNameBuffer = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
+
+    for(var i = 0; i < name.length; i+=1) {
+        var c = name.buffer[i]
+        if(c == ':') {
+            return name
+        }
+        if(c == '<') {
+            break
+        }
+    }
 
     qualifiedNameBuffer.append("%.*s::%.*s",
         this.module.id.packageName.length,

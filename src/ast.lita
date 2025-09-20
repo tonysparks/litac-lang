@@ -81,6 +81,7 @@ public enum StmtKind {
     TERNARY_EXPR,
     TYPE_IDENTIFIER_EXPR,
     TYPE_OF_EXPR,
+    NAME_OF_EXPR,
     UNARY_EXPR,
     POISON_EXPR,
 
@@ -663,6 +664,7 @@ public func IsExpr(node: *Node) : bool {
         case StmtKind.TERNARY_EXPR:
         case StmtKind.TYPE_IDENTIFIER_EXPR:
         case StmtKind.TYPE_OF_EXPR:
+        case StmtKind.NAME_OF_EXPR:
         case StmtKind.UNARY_EXPR:
         case StmtKind.POISON_EXPR:
             return true;
