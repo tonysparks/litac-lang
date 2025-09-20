@@ -139,10 +139,10 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("builtin", 7, &BUILTIN)
     this.internConstant("main", 4, &MAIN)
 
-    this.internConstant("numOfTypeInfos", 15, &NUM_OF_TYPE_INFOS)
+    this.internConstant("numOfTypeInfos", 14, &NUM_OF_TYPE_INFOS)
     this.internConstant("typeInfos", 9, &TYPE_INFOS)
     this.internConstant("ProfileTag", 10, &PROFILE_TAG)
-    this.internConstant("profileEntries", 15, &PROFILE_ENTRIES)
+    this.internConstant("profileEntries", 14, &PROFILE_ENTRIES)
 
     this.internConstant("if", 2, &IF)
     this.internConstant("static_if", 9, &STATIC_IF)

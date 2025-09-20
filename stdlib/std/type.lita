@@ -1,4 +1,5 @@
 import "std/libc"
+import "std/string"
 
 @generated public const typeInfos: **TypeInfo = [1]*TypeInfo{0};
 @generated public const numOfTypeInfos : usize = 0;

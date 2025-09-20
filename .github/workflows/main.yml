@@ -136,7 +136,7 @@ jobs:
           cd libtcc-cmake
           mkdir build
           cd build
-          cmake ..
+          cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 ..
           make
           cd ../..
           cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a

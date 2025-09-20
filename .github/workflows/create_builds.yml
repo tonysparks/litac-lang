@@ -135,17 +135,17 @@ jobs:
       - uses: actions/checkout@v3
 
       # Install tcc
-      - name: Install tcc
-        run: |
-          echo Install tcc compiler
-          git clone https://github.com/Alex2804/libtcc-cmake
-          cd libtcc-cmake
-          mkdir build
-          cd build
-          cmake ..
-          make
-          cd ../..
-          cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a
+    #   - name: Install tcc
+    #     run: |
+    #       echo Install tcc compiler
+    #       git clone https://github.com/Alex2804/libtcc-cmake
+    #       cd libtcc-cmake
+    #       mkdir build
+    #       cd build
+    #       cmake ..
+    #       make
+    #       cd ../..
+    #       cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a
 
       # Print compiler information
       - name: Compiler Info

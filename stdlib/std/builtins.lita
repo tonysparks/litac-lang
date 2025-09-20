@@ -10,6 +10,11 @@ public struct String {
     length: i32
 }
 
+public struct NativeVararg {
+    args: *typeid
+    numberOfArgs: i32
+}
+
 /**
 ========================================================================
 Note declarations

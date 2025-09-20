@@ -58,10 +58,10 @@ public func ZipCompress(buffer: *StringBuilder, source: String, level: ZipCompre
 
     var length = buffer.remaining() as (u64);
     var status = mz_compress2(
-        &buffer.buffer[buffer.length],
-        &length,
-        source.buffer,
-        source.length,
+        (&buffer.buffer[buffer.length]) as (*u8),
+        (&length) as (*mz_ulong),
+        source.buffer as (*const u8),
+        source.length as (mz_ulong),
         level as (i32)
     )
 
@@ -93,10 +93,10 @@ public func ZipUncompress(buffer: *StringBuilder, source: String) : ZipStatus {
         var bufferLength = buffer.remaining() as (u64);
 
         status = mz_uncompress2(
-            &buffer.buffer[buffer.length],
-            &bufferLength,
-            source.buffer,
-            &sourceLength
+            (&buffer.buffer[buffer.length]) as (*u8),
+            (&bufferLength) as (*mz_ulong),
+            source.buffer as (*const u8),
+            (&sourceLength) as (*mz_ulong)
         )
 
         if(status == MZ_OK) {
