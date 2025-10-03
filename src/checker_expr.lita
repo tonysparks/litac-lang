@@ -1329,6 +1329,10 @@ func IsDecayable(arg: *InitArgExpr) : bool {
         return false
     }
 
+    if(IsArray(arg.value.operand.typeInfo)) {
+        return true
+    }
+
     if(arg.value.kind == StmtKind.ARRAY_INIT_EXPR ||
        arg.value.kind == StmtKind.STRING_EXPR) {
         return true

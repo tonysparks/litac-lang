@@ -102,6 +102,19 @@ public func TypeKindFromString(str: *const char, len: i32) : TypeKind {
     return TypeKind.MAX_TYPE_KINDS
 }
 
+public func IsArray(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    if(type.kind == TypeKind.CONST) {
+        var constInfo = type
+        return IsArray(constInfo.constOf)
+    }
+
+    return type.kind == TypeKind.ARRAY
+}
+
 public func IsEnum(type: *TypeInfo) : bool {
     if(!type) {
         return false;
@@ -1256,8 +1269,13 @@ public func (this: *TypeInfo) isDeclarable(other: *TypeInfo, checker: *TypeCheck
             return this.typeid == other.typeid
         }
         case TypeKind.FUNC: {
+            if(!IsFuncLike(other)) {
+                return false
+            }
+
             // TODO
-            assert(false)
+            return true
+
             break;
         }
         case TypeKind.POISON: {
