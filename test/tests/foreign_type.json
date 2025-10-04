@@ -14,6 +14,56 @@
     `,
     "tests": [
         {
+            "name" : "Test foreign names",
+            "definitions": `
+                @raw("""
+                    typedef float vec2[2];
+                """);
+                @foreign public typedef [2]f32 as vec2;
+            `,
+            "code": `
+                @raw("__attribute__((aligned(16)))") var v: vec2 = vec2 { 0f, 2f };
+                assert(v[0] == 0f)
+                assert(v[1] == 2f)
+            `,
+        },
+        {
+            "name": "Foreign funcPtr",
+            "symbolPrefix": "litaC__",
+            "definitions": `
+                @raw("""
+                typedef int (*SomeFunc)(int x);
+
+                int nativeFn(SomeFunc aFn) {
+                    return aFn(4);
+                }
+
+                """);
+
+                @foreign
+                func nativeFn(aFn: SomeFunc) : i32;
+
+                @foreign
+                typedef func(i32) : i32 as SomeFunc;
+
+                func test(x: i32) : i32 {
+                    return x
+                }
+
+                func testFn(aFn: SomeFunc) : i32 {
+                    return aFn(4)
+                }
+            `,
+            "code": `
+                var fn = &test
+
+                assert(fn(4)== 4)
+                assert(testFn(fn) == 4)
+                assert(nativeFn(fn) == 4)
+
+            `,
+        },
+        {
             "name": "Foreign Primitive",
             "definitions": `
                 @raw("""

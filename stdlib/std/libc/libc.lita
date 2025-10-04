@@ -53,6 +53,10 @@ size_t strnlen(const char * s, size_t len) {
 #define fileno _fileno
 #endif
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 """);
 
 

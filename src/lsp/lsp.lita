@@ -388,13 +388,15 @@ public func (this: *LspServer) handleTextDocumentSaveMessage(msg: *JsonNode, par
 
     var uri = textDoc.getStr("uri", null)
     this.workspace.saveDocument(uri)
-    this.writeDiagnostic(uri, true)
+    // TODO re-enable to enable LSP
+    // this.writeDiagnostic(uri, true)
 }
 
 public func (this: *LspServer) handleTextDocumentChangeMessage(msg: *JsonNode, params: *JsonNode) {
     var changeEvent = JsonNodeToTextDocumentChangeEvent(params, this.requestAlloc())
     if(changeEvent) {
         this.workspace.changeDocument(changeEvent)
+        // TODO re-enable to enable LSP
         // this.writeDiagnostic(changeEvent.textDocument.uri)
     }
 }

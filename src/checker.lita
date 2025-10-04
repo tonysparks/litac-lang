@@ -842,8 +842,13 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                         goto err;
                     }
 
-                    if(typedefDecl.hasNote("foreign") && aliasedType.kind == TypeKind.VOID) {
-                        aliasedType = this.typeCache.newForeignTypeInfo(sym)
+                    if(typedefDecl.hasNote("foreign")) {
+                        if (aliasedType.kind == TypeKind.VOID) {
+                            aliasedType = this.typeCache.newForeignTypeInfo(sym)
+                        }
+                        else {
+                            aliasedType = this.typeCache.newAliasedForeignTypeInfo(sym, aliasedType)
+                        }
                     }
                     sym.type = aliasedType
                     break;

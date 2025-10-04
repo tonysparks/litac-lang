@@ -687,6 +687,10 @@ public func (this: using *CGen) cType(type: *TypeInfo,
                                       isCast: bool = false,
                                       decay: bool = false) : *const char {
     var sb = StringBuilderInit(256, this.allocator)
+    if (type.sym && type.sym.flags & SymbolFlags.IS_FOREIGN) {
+        return this.cTypeName(type)
+    }
+
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type
@@ -804,6 +808,14 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
                                    decay: bool = false) : *const char {
 
     var sb = StringBuilderInit(256, this.allocator)
+    if (type.sym && type.sym.flags & SymbolFlags.IS_FOREIGN) {
+        var cType = this.cType(type, false, decay)
+        sb.appendStr(cType)
+        sb.appendStrn(" ", 1)
+        sb.appendStr(name)
+        return sb.cStrConst()
+    }
+
     switch(type.kind) {
         case TypeKind.PTR: {
             var ptrInfo = type
@@ -2136,14 +2148,30 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitStrn(")", 1)
             return;
         }
-        case StmtKind.IDENTIFIER_EXPR:
-        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+        case StmtKind.IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
 
             var type = expr.type.typeInfo
             var sym: *Symbol = (type) ? type.sym : expr.sym;
 
             if(!sym) {
+                this.emitStr(this.options.cPrefix)
+                this.emitStrn(expr.type.name.buffer, expr.type.name.length)
+            }
+            else {
+                this.emitSymbol(sym)
+            }
+
+            return;
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            var expr = s as (*IdentifierExpr)
+
+            var type = expr.type.typeInfo
+            var sym: *Symbol = (type) ? type.sym : expr.sym;
+
+            // This can be a function pointer, in which case this is a variable symbol
+            if(sym == null || (expr.sym && expr.sym.kind == SymbolKind.VAR)) {
                 this.emitStr(this.options.cPrefix)
                 this.emitStrn(expr.type.name.buffer, expr.type.name.length)
             }

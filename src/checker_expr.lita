@@ -145,8 +145,10 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
         this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
-// TODO: must we check types for FUNC_PTR?
+
     var sym = type.sym
+
+    // If this is a function pointer, we want to grab the variable symbol
     if(type.kind == TypeKind.FUNC_PTR) {
         var funcSym = this.currentScope().lookup(expr.type.name)
         if(funcSym && funcSym.type && funcSym.type.kind == TypeKind.FUNC_PTR) {
@@ -1329,7 +1331,10 @@ func IsDecayable(arg: *InitArgExpr) : bool {
         return false
     }
 
-    if(IsArray(arg.value.operand.typeInfo)) {
+    if(IsArray(arg.value.operand.typeInfo) &&
+       (arg.value.kind == StmtKind.ARRAY_INIT_EXPR ||
+        arg.value.kind == StmtKind.INIT_EXPR)
+    ) {
         return true
     }
 

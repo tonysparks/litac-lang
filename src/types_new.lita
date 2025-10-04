@@ -178,6 +178,17 @@ public func (this: *TypeCache) newForeignTypeInfo(sym: *Symbol) : *TypeInfo {
     return type
 }
 
+public func (this: *TypeCache) newAliasedForeignTypeInfo(sym: *Symbol, alias: *TypeInfo) : *TypeInfo {
+
+    var type = sym.type != null ? sym.type : this.newTypeInfo()
+    memcpy(type, alias, sizeof(:TypeInfo))
+    type.kind = alias.kind
+    type.name = sym.name
+    type.sym = sym
+
+    return type
+}
+
 public func (this: *TypeCache) newConstTypeInfo(base: *TypeInfo) : *TypeInfo {
     // can't have const const
     if(base.kind == TypeKind.CONST) {
