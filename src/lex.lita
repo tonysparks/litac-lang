@@ -1257,7 +1257,7 @@ func (l: *Lexer) scanString(isNative: bool) : Token {
                     continue
                 }
 
-                if(escapeToChar[c] == 0 && c != '0') {
+                if(escapeToChar[c] == 0 && c != '0' && !isVerbatim) {
                     l.error("Illegal escaped character: '%c'", c)
                     isValid = false
                     continue

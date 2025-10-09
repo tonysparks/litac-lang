@@ -13,7 +13,80 @@
         }
     `,
     "tests": [
-        /*{
+        {
+            "name": "Foreign funcPtr alias variable",
+            "symbolPrefix": "litaC__",
+            "definitions": `
+                @raw("""
+                    int testViewport(int x, int y) {
+                        return x + y;
+                    }
+
+                    typedef int (*PFNGLVIEWPORTPROC)(int x, int y);
+                    PFNGLVIEWPORTPROC glad_glViewport = testViewport;
+                    #define glViewport glad_glViewport
+                """);
+
+                @foreign public typedef func(i32, i32) : i32 as PFNGLVIEWPORTPROC;
+
+                @foreign public const glViewport: PFNGLVIEWPORTPROC
+            `,
+            "code": `
+                var r = glViewport(2, 6)
+                assert(r == 8)
+            `,
+        },
+        {
+            "name": "Foreign byte alias",
+            "symbolPrefix": "litaC__",
+            "definitions": `
+                @foreign public typedef char as GLchar;
+
+                func (this: char) isSpace() : bool {
+                    return this == ' '
+                }
+            `,
+            "code": `
+                var c1 = 'x' as (GLchar)
+                var c2 = ' ' as (GLchar)
+                assert(c1.isSpace() == false)
+                assert(c2.isSpace() == true)
+            `,
+        },
+        {
+            "name" : "Test foreign names",
+            "definitions": `
+                @raw("""
+                    typedef __attribute__((aligned(16))) float vec4[4];
+                    typedef __attribute__((aligned(16))) vec4     mat4[4];
+                    #define GLM_MAT4_IDENTITY_INIT  {{1.0f, 0.0f, 0.0f, 0.0f},                   \
+                                                    {0.0f, 1.0f, 0.0f, 0.0f},                    \
+                                                    {0.0f, 0.0f, 1.0f, 0.0f},                    \
+                                                    {0.0f, 0.0f, 0.0f, 1.0f}}
+                """);
+                @foreign(.strict = true)
+                public typedef [4][4]f32 as mat4;
+
+                @foreign(.strict = true)
+                public var GLM_MAT4_IDENTITY_INIT: mat4;
+
+                func Clear(m: mat4) {
+                    @raw("__attribute__((aligned(16)))") var v: mat4 = GLM_MAT4_IDENTITY_INIT;
+                }
+            `,
+            "code": `
+                @raw("__attribute__((aligned(16)))") var v: mat4 = mat4 {
+                    [4]f32 { 0f, 2f, 0f, 2f },
+                    [4]f32 { 0f, 2f, 0f, 2f },
+                    [4]f32 { 0f, 2f, 0f, 2f },
+                    [4]f32 { 0f, 2f, 0f, 2f },
+                };
+                assert(v[0][0] == 0f)
+                assert(v[1][1] == 2f)
+                Clear(v)
+            `,
+        },
+        {
             "name": "Foreign funcPtr",
             "symbolPrefix": "litaC__",
             "definitions": `
@@ -48,8 +121,8 @@
                 assert(nativeFn(fn) == 4)
 
             `,
-        },*/
-
+        },
+        /*
         {
             "name": "array assigned to array",
             "definitions": `
@@ -89,6 +162,6 @@
                 assert(v[0] == 0f)
                 assert(v[1] == 2f)
             `,
-        },
+        },*/
     ]
 }

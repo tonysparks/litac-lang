@@ -48,6 +48,7 @@ struct Test {
     buildCmd: *const char
 
     modules: Array<TestModule>
+    symbolPrefix: *const char
     //definitions: *const char
     //code: *const char
     disabled: bool
@@ -292,6 +293,7 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
     output.expectedErrorOutput = testNode.getStr("error", null)
     output.disabled = testNode.getBool("disabled", false)
     output.buildCmd = testNode.getStr("buildCmd", null)
+    output.symbolPrefix = testNode.getStr("symbolPrefix", null)
 
     var modules = testNode.getArray("modules")
     if(modules) {
@@ -356,6 +358,9 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     options.cFormat = false
     if(suite.includeTypeInfo) {
         options.typeOption = TypeInfoOption.ALL
+    }
+    if(test.symbolPrefix) {
+        memcpy(.dest = options.cPrefix, .src = test.symbolPrefix , .num = MAX_PREFIX_SIZE)
     }
     //options.maxMemory = 1024 * 1024 * 50
     //options.isDebug = true

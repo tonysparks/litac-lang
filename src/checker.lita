@@ -847,7 +847,15 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                             aliasedType = this.typeCache.newForeignTypeInfo(sym)
                         }
                         else {
-                            aliasedType = this.typeCache.newAliasedForeignTypeInfo(sym, aliasedType)
+                            // HACK! this hasn't resolved yet..so we look at the raw AST
+                            var strictArg = typedefDecl.getNoteArgument("foreign", "strict")
+                            if(strictArg && strictArg.argExpr && strictArg.argExpr.kind == StmtKind.BOOLEAN_EXPR) {
+                                var boolExpr = strictArg.argExpr as (*BooleanExpr)
+                                if(boolExpr.boolean) {
+                                    aliasedType = this.typeCache.newAliasedForeignTypeInfo(sym, aliasedType)
+                                }
+
+                            }
                         }
                     }
                     sym.type = aliasedType
@@ -1403,7 +1411,7 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
         var aggInfo = typeInfo
 
         for(var j = 0; j < note.arguments.size(); j += 1) {
-            var arg = note.arguments.get(j)
+            var arg = note.arguments.getPtr(j)
             if(!this.resolveStmt(arg.argExpr)) {
                 success = false
                 continue
@@ -1411,7 +1419,7 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
 
             // no type checking on no-named arguments
             // Is this a good thing???
-            if(arg.argName.str.length == 0) {
+            if(arg.argName.str.empty()) {
                 continue;
             }
 

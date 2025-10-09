@@ -962,6 +962,16 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: String) : String 
         return defaultName
     }
 
+    // no name and is a string, this is the alias
+    if(arg.argName.str.empty() && arg.argExpr.kind == StmtKind.STRING_EXPR) {
+        return arg.argExpr.operand.val.str;
+    }
+
+    var aliasArg = decl.getNoteArgument("foreign", "alias")
+    if(aliasArg == null || !aliasArg.argExpr || aliasArg.argExpr.operand.val.str.empty()) {
+        return defaultName
+    }
+
     return arg.argExpr.operand.val.str;
 }
 
@@ -2172,7 +2182,9 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
 
             // This can be a function pointer, in which case this is a variable symbol
             if(sym == null || (expr.sym && expr.sym.kind == SymbolKind.VAR)) {
-                this.emitStr(this.options.cPrefix)
+                if((sym == null || expr.sym == null) && !(expr.sym.flags & SymbolFlags.IS_FOREIGN)) {
+                    this.emitStr(this.options.cPrefix)
+                }
                 this.emitStrn(expr.type.name.buffer, expr.type.name.length)
             }
             else {
