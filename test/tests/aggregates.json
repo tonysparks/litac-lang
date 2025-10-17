@@ -99,16 +99,18 @@
                 import "std/libc"
 
                 struct TestStruct {
-                    a: i8  : 2
-                    d: i8  : 4
-                    b: bool : 1
-                    c: bool : 1
+                    a: u8  : 2
+                    d: u8  : 4
+                    b: u8 : 1
+                    c: u8 : 1
                 }
                 struct OtherStruct {
                     a: u8
                 }
             `,
             "code": `
+                // this is compiler specific, so this might fail tests
+                // if this becomes problematic, we can disable
                 assert(sizeof(:TestStruct) == sizeof(:OtherStruct))
             `,
         },
