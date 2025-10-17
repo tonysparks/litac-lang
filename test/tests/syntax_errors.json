@@ -19,7 +19,7 @@
             "name" : "Invalid Member Syntax Error",
             "definitions": `
                 struct Struct {
-                    a: i32:
+                    a: i32~
                 }
             `,
             "code": `

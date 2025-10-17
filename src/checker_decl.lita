@@ -420,6 +420,16 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     }
                     this.checkDeclarability(varField.defaultExpr.startPos, field.typeInfo, varField.defaultExpr.operand.typeInfo)
                 }
+                if(varField.bitFieldExpr) {
+                    if(!this.resolveExpr(varField.bitFieldExpr)) {
+                        return false
+                    }
+                    this.checkDeclarability(
+                        varField.bitFieldExpr.startPos,
+                        &U32_TYPE,
+                        varField.bitFieldExpr.operand.typeInfo
+                    )
+                }
                 if(varField.attributes.isUsing) {
                     if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
                         this.errorUsingMember(aggDecl, varField.name.str, varField.startPos)
