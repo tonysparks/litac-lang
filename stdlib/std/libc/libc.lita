@@ -47,10 +47,12 @@ size_t strnlen(const char * s, size_t len) {
 #endif
 
 #if defined(_MSC_VER) || defined(__TINYC__) && (defined(_WIN32) || defined(_WIN64))
-#include <io.h>
+    #include <io.h>
 
-#define ftruncate(fd, sz) (-(_chsize_s((fd), (sz)) != 0))
-#define fileno _fileno
+    #define ftruncate(fd, sz) (-(_chsize_s((fd), (sz)) != 0))
+    #define fileno _fileno
+#else
+    #include <unistd.h>
 #endif
 
 #ifndef M_PI
