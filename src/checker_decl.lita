@@ -424,11 +424,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     if(!this.resolveExpr(varField.bitFieldExpr)) {
                         return false
                     }
-                    this.checkDeclarability(
-                        varField.bitFieldExpr.startPos,
-                        &U32_TYPE,
-                        varField.bitFieldExpr.operand.typeInfo
-                    )
+                    this.checkBitField(aggDecl, field)
                 }
                 if(varField.attributes.isUsing) {
                     if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
@@ -623,6 +619,28 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
     return position
 }
 
+func (this: *TypeChecker) checkBitField(aggDecl: *AggregateDecl, field: *FieldStmt) {
+    var varField = field.varField
+
+    if(!IsBitField(field.typeInfo)) {
+        var sb = StringBuilderInit(256, this.allocator)
+        field.typeInfo.toString(sb, .fullyQualify = true)
+        this.result.addError(varField.startPos,
+            "only integer like fields are allowed on bit field definitions, '%.*s' is of type '%.*s'",
+            varField.name.str.length, varField.name.str.buffer,
+            sb.length, sb.buffer
+        )
+        return;
+    }
+
+    if(!IsBitField(varField.bitFieldExpr.operand.typeInfo)) {
+        this.result.addError(varField.bitFieldExpr.startPos,
+            "the bit field definition must be an integer value for field '%.*s'",
+            varField.name.str.length, varField.name.str.buffer
+        )
+        return;
+    }
+}
 
 func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *EnumFieldEntryDecl, index: i32) : bool {
     var hasDuplicates = false

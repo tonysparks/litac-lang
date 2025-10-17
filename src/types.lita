@@ -280,6 +280,35 @@ public func IsInteger(type: *TypeInfo) : bool {
     }
 }
 
+
+public func IsBitField(type: *TypeInfo) : bool {
+    if(!type) {
+        return false;
+    }
+
+    switch(type.kind) {
+        case TypeKind.BOOL:
+        case TypeKind.I8:
+        case TypeKind.U8:
+        case TypeKind.I16:
+        case TypeKind.U16:
+        case TypeKind.I32:
+        case TypeKind.U32:
+        case TypeKind.I64:
+        case TypeKind.U64:
+        case TypeKind.USIZE: {
+            return true;
+        }
+        case TypeKind.CONST: {
+            var constInfo = type
+            return IsInteger(constInfo.constOf)
+        }
+        default: {
+            return false
+        }
+    }
+}
+
 public func IsBooleanable(type: *TypeInfo) : bool {
     if(!type) {
         return false;

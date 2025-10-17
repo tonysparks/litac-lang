@@ -94,12 +94,56 @@
             "error" : "Invalid bit field constant expression, only integer values are supported"
         },
         {
+            "name": "BitField field is not an integer but is enum",
+            "definitions": `
+                enum Another {
+                    ONE,
+                    TWO
+                }
+                struct TestStruct {
+                    a: Another:1
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "only integer like fields are allowed on bit field definitions, 'a' is of type 'lita_test::Another'"
+        },
+        {
+            "name": "BitField field is not an integer but is f32",
+            "definitions": `
+
+                struct TestStruct {
+                    a: f32:1
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "only integer like fields are allowed on bit field definitions, 'a' is of type 'f32'"
+        },
+        {
+            "name": "BitField field is not an integer but is struct",
+            "definitions": `
+                struct Another {
+                    a: i32
+                }
+                struct TestStruct {
+                    a: Another:1
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "only integer like fields are allowed on bit field definitions, 'a' is of type 'lita_test::Another'"
+        },
+        {
             "name": "BitField valid bit fields",
             "definitions": `
                 import "std/libc"
 
                 struct TestStruct {
-                    a: u8  : 2
+                    a: const u8  : 2
                     d: u8  : 4
                     b: u8 : 1
                     c: u8 : 1
