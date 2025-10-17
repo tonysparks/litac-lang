@@ -2774,14 +2774,16 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
                 if(!type) {
                     goto err;
                 }
-/*
+
                 if(p.match(TokenType.COLON)) {
                     bitFieldExpr = p.constExpression()
-                    if(!IsInteger(bitFieldExpr.operand.typeInfo)) {
+                    if(bitFieldExpr.kind != StmtKind.NUMBER_EXPR ||
+                      (bitFieldExpr as (*NumberExpr)).number.type != TokenType.INT_NUMBER
+                    ) {
                         p.errorAtToken(p.previous(), ErrorCode.INVALID_BIT_FIELD_EXPR)
                         goto err;
                     }
-                }*/
+                }
 
                 if(p.match(TokenType.EQUALS)) {
                     if(!isStruct) {

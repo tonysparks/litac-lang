@@ -13,31 +13,6 @@
         }
     `,
     "tests": [
-        /*
-        {
-            "name": "Foreign funcPtr alias variable",
-            "symbolPrefix": "litaC__",
-            "definitions": `
-                @raw("""
-                    int testViewport(int x, int y) {
-                        return x + y;
-                    }
-
-                    typedef int (*PFNGLVIEWPORTPROC)(int x, int y);
-                    PFNGLVIEWPORTPROC glad_glViewport = testViewport;
-                    #define glViewport glad_glViewport
-                """);
-
-                @foreign public typedef func(i32, i32) : i32 as PFNGLVIEWPORTPROC;
-
-                @foreign public const glViewport: PFNGLVIEWPORTPROC
-            `,
-            "code": `
-                var r = glViewport(2, 6)
-                assert(r == 8)
-            `,
-        },*/
-        /*
         {
             "name": "Foreign funcPtr alias variable",
             "symbolPrefix": "litaC__",

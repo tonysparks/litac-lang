@@ -80,7 +80,7 @@ func main(len: i32, args: **char) : i32 {
     var testFiles = []*const char {
         // "../test/tests/misc.json", json syntax error
 
-        "../test/tests/single.json",/*
+        "../test/tests/single.json",
         "../test/tests/nameof.json",
         "../test/tests/native_arg_args.json",
         "../test/tests/random.json",
@@ -123,7 +123,7 @@ func main(len: i32, args: **char) : i32 {
         "../test/tests/syntax_errors.json",
         "../test/tests/generics.json",
         "../test/tests/generics_inference.json",
-        "../test/tests/generics_constraints.json",*/
+        "../test/tests/generics_constraints.json",
         null
     }
 

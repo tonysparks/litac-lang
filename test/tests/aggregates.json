@@ -16,6 +16,103 @@
     `,
     "tests": [
         {
+            "name": "BitField invalid integer type float",
+            "definitions": `
+                struct TestStruct {
+                    a: i32:2
+                    b: bool:1
+                    c: bool:1
+                    d: i32:0.5
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "Invalid bit field constant expression, only integer values are supported"
+        },
+        {
+            "name": "BitField invalid integer type bool",
+            "definitions": `
+                struct TestStruct {
+                    a: i32:true
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "Invalid bit field constant expression, only integer values are supported"
+        },
+        {
+            "name": "BitField invalid integer type null",
+            "definitions": `
+                struct TestStruct {
+                    a: i32:null
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "Invalid bit field constant expression, only integer values are supported"
+        },
+        {
+            "name": "BitField invalid integer type string",
+            "definitions": `
+                struct TestStruct {
+                    a: i32:"true"
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "Invalid bit field constant expression, only integer values are supported"
+        },
+        {
+            "name": "BitField missing const expression",
+            "definitions": `
+                struct TestStruct {
+                    a: i32:
+                    z: bool
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "Invalid bit field constant expression, only integer values are supported"
+        },
+        {
+            "name": "BitField invalid from constant variable",
+            "definitions": `
+                const Z = 12
+                struct TestStruct {
+                    a: i32:Z
+                    z: bool
+                }
+            `,
+            "code": `
+
+            `,
+            "error" : "Invalid bit field constant expression, only integer values are supported"
+        },
+        {
+            "name": "BitField valid bit fields",
+            "definitions": `
+                import "std/libc"
+
+                struct TestStruct {
+                    a: i8  : 2
+                    d: i8  : 4
+                    b: bool : 1
+                    c: bool : 1
+                }
+                struct OtherStruct {
+                    a: u8
+                }
+            `,
+            "code": `
+                assert(sizeof(:TestStruct) == sizeof(:OtherStruct))
+            `,
+        },
+        {
             "name": "Struct default values",
             "definitions": `
                 struct X {

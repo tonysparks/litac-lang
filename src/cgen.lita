@@ -1969,6 +1969,9 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             }
 
             this.emitStr(this.cTypeDecl(decl.type.typeInfo, nameStr.cStrConst()))
+            if(decl.bitFieldExpr) {
+                this.emit(" : %d", decl.bitFieldExpr.operand.val.intValue)
+            }
             this.emitStrn(";\n", 2)
             return;
         }
