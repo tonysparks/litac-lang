@@ -617,6 +617,7 @@ func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
                 voidType,
                 Attributes{.isGenerated = true},
                 null,
+                null,
                 p.allocator
             )
             fields.add(FieldStmt {
@@ -2767,10 +2768,20 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
                 attributes.notes = notes
 
                 var defaultExpr: *Expr = null
+                var bitFieldExpr: *Expr = null
+
                 var type = p.type()
                 if(!type) {
                     goto err;
                 }
+/*
+                if(p.match(TokenType.COLON)) {
+                    bitFieldExpr = p.constExpression()
+                    if(!IsInteger(bitFieldExpr.operand.typeInfo)) {
+                        p.errorAtToken(p.previous(), ErrorCode.INVALID_BIT_FIELD_EXPR)
+                        goto err;
+                    }
+                }*/
 
                 if(p.match(TokenType.EQUALS)) {
                     if(!isStruct) {
@@ -2781,7 +2792,16 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
                     defaultExpr = p.constExpression()
                 }
 
-                var varField = NewVarFieldDecl(pos, p.pos(), fieldName, type, attributes, defaultExpr, p.allocator);
+                var varField = NewVarFieldDecl(
+                    pos,
+                    p.pos(),
+                    fieldName,
+                    type,
+                    attributes,
+                    defaultExpr,
+                    bitFieldExpr,
+                    p.allocator
+                );
                 return FieldStmt {
                     .kind = StmtKind.VAR_FIELD_DECL,
                     .varField = varField as (*VarFieldDecl)
@@ -2860,7 +2880,16 @@ func (p: *Parser) noteFieldStatement() : FieldStmt {
         defaultExpr = p.constExpression()
     }
 
-    var varField = NewVarFieldDecl(pos, p.pos(), fieldName, type, attributes, defaultExpr, p.allocator);
+    var varField = NewVarFieldDecl(
+        pos,
+        p.pos(),
+        fieldName,
+        type,
+        attributes,
+        defaultExpr,
+        null,
+        p.allocator
+    );
     return FieldStmt {
         .kind = StmtKind.VAR_FIELD_DECL,
         .varField = varField as (*VarFieldDecl)

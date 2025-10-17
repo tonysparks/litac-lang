@@ -7,6 +7,7 @@ import "lex"
 public enum ErrorCode {
     INVALID_ASSIGNMENT,
     INVALID_CONST_EXPR,
+    INVALID_BIT_FIELD_EXPR,
     INVALID_ARRAY_DIMENSION_EXPR,
     INVALID_CHARACTER,
     INVALID_NUMBER,
@@ -60,6 +61,7 @@ public enum ErrorCode {
 public const errorCodeText = []*const char {
     [ErrorCode.INVALID_ASSIGNMENT] = "Invalid assignment statement",
     [ErrorCode.INVALID_CONST_EXPR] = "Invalid constant expression",
+    [ErrorCode.INVALID_BIT_FIELD_EXPR] = "Invalid bit field constant expression, only integer values are supported",
     [ErrorCode.INVALID_ARRAY_DIMENSION_EXPR] = "Invalid array dimension expression",
     [ErrorCode.INVALID_CHARACTER] = "Invalid character",
     [ErrorCode.INVALID_NUMBER] = "Invalid number",

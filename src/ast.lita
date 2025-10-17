@@ -418,6 +418,7 @@ public struct VarFieldDecl {
     decl: using Decl
     type: *TypeSpec
     defaultExpr: *Expr
+    bitFieldExpr: *Expr
 }
 
 public struct TraitFieldDecl {
