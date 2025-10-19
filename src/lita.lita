@@ -64,6 +64,8 @@ public struct Lita {
     typeCache: TypeCache
     strings: Strings
 
+    builtins: Module
+
     // Language Server support
     references: ReferenceDatabase
     workspace: *Workspace
@@ -297,7 +299,7 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
                                         },
                                         false,
                                         this.allocator) as (*ImportDecl)
-        builtinImport.moduleId = &builtins.id
+        builtinImport.moduleId = &this.builtins.id
         module.ast.imports.insertAt(0, builtinImport)
     }
 

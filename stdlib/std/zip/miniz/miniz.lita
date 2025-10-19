@@ -19,7 +19,7 @@ public const Z_MEM_ERROR: i32;
 public const MZ_BUF_ERROR: i32;
 
 @foreign
-public typedef u64 as mz_ulong;
+public typedef void as mz_ulong;
 
 @foreign
 public enum mz_zip_flags {

@@ -61,6 +61,10 @@ public struct Module {
     arena: ArenaAllocator
     allocator: *const Allocator
     lita: *Lita
+
+    // super cached built-ins
+    anyBuiltin: *Symbol
+    stringBuiltin: *Symbol
 }
 
 public const BUILTIN_IMPORT_IDENT = Identifier {
@@ -76,20 +80,18 @@ public const BUILTIN_IMPORT_TOKEN = Token {
     }
 }
 
-public var anyBuiltin: *Symbol = null
-public var stringBuiltin: *Symbol = null
-
-public const builtins = Module{}
 public func BuiltinsInit(lita: *Lita) : *Module {
     BUILTIN_IMPORT_IDENT.str = BUILTIN
     BUILTIN_IMPORT_IDENT.token = BUILTIN_IMPORT_TOKEN
+
+    var builtins = &lita.builtins
 
     builtins.text = StringBuffer{}
     builtins.ast = null
     builtins.flags = ModuleFlags.IS_BUILTIN
     builtins.allocator = lita.allocator
     builtins.importedBy = StrMap<ModuleImport>(ModuleImport{}, 512, lita.allocator)
-    builtins.symbols.init(ScopeKind.MODULE, null, lita.result, &builtins, lita.allocator)
+    builtins.symbols.init(ScopeKind.MODULE, null, lita.result, builtins, lita.allocator)
     builtins.importAliases = InternMap<*Module>(null, 16, lita.allocator)
     builtins.genericSymbols = &lita.genericSymbols
     builtins.lita = lita
@@ -116,22 +118,22 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     AddBuiltin(lita, &NULL_TYPE)
     AddBuiltin(lita, &VOID_TYPE)
 
-    return &builtins
+    return builtins
 }
 
 public func AssignBuiltinSymbols(module: *Module) {
     assert(module != null)
 
-    stringBuiltin = module.getType(STRING_TYPE)
-    assert(stringBuiltin != null)
+    module.stringBuiltin = module.getType(STRING_TYPE)
+    assert(module.stringBuiltin != null)
 
-    anyBuiltin = module.getType(ANY_TYPE)
-    assert(anyBuiltin != null)
+    module.anyBuiltin = module.getType(ANY_TYPE)
+    assert(module.anyBuiltin != null)
 }
 
 func AddBuiltin(lita: *Lita, type: *TypeInfo) {
-    var sym = builtins.symbols.addSymbol(type.name,
-                                        &builtins,
+    var sym = lita.builtins.symbols.addSymbol(type.name,
+                                        &lita.builtins,
                                         NewBuiltinDecl(SrcPos{}, SrcPos{}, type, lita.allocator),
                                         SymbolFlags.IS_BUILTIN|SymbolFlags.IS_TYPE|SymbolFlags.IS_FOREIGN)
 
@@ -177,13 +179,15 @@ public func (this: *Module) init(lita: *Lita) {
 
     // We want these to be owned by the global allocator
     this.importedBy = StrMap<ModuleImport>(ModuleImport{}, 64, lita.allocator)
-    this.symbols.init(ScopeKind.MODULE, &builtins.symbols, &lita.result, this, lita.allocator)
-
+    this.symbols.init(ScopeKind.MODULE, &lita.builtins.symbols, &lita.result, this, lita.allocator)
 
     this.flags = 0
     this.currentScope = &this.symbols
     this.genericSymbols = &lita.genericSymbols
     this.lita = lita
+
+    this.stringBuiltin = null
+    this.anyBuiltin = null
 }
 
 public func (this: *Module) initIncrementalBuild() {
@@ -200,7 +204,7 @@ public func (this: *Module) initIncrementalBuild() {
 }
 
 public func (this: *Module) isBuiltin() : bool {
-    return this == &builtins
+    return this.flags & ModuleFlags.IS_BUILTIN
 }
 
 public func (this: *Module) postIncrementalBuild() {

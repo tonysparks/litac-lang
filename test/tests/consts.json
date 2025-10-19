@@ -16,6 +16,26 @@
     `,
     "tests": [
         {
+            "name": "Constant native string",
+            "definitions": `
+                const sourceDir = $"../src/"
+            `,
+            "code": `
+                assert(sourceDir.buffer != null)
+                assert(sourceDir.length == 7)
+            `,
+        },
+        {
+            "name": "Var native string",
+            "definitions": `
+                var sourceDir = $"../src/"
+            `,
+            "code": `
+                assert(sourceDir.buffer != null)
+                assert(sourceDir.length == 7)
+            `,
+        },
+        {
             "name": "Const Primitives",
             "code": `
                 const X = 10;

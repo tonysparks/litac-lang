@@ -18,6 +18,12 @@ struct CommandArgs {
     args: **char
 }
 
+enum RunType {
+    PRE_BUILD,
+    BUILD,
+    POST_BUILD,
+}
+
 public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : PkgStatus {
     if(!pm.pkg) {
         return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
@@ -27,7 +33,38 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
         return PkgStatus.ERROR_PARSING_PKG_JSON
     }
 
+    var preBuildCommand = pm.pkg.json.get("pre_build_command")
+    if(preBuildCommand) {
+        var status = pm.build(preBuildCommand, options, RunType.PRE_BUILD)
+        if(status != PkgStatus.OK) {
+            return status
+        }
+    }
+
     var buildCommand = pm.pkg.json.get("build_command")
+    if(buildCommand) {
+        var status = pm.build(buildCommand, options, RunType.BUILD)
+        if(status != PkgStatus.OK) {
+            return status
+        }
+    }
+
+    var postBuildCommand = pm.pkg.json.get("post_build_command")
+    if(postBuildCommand) {
+        var status = pm.build(postBuildCommand, options, RunType.POST_BUILD)
+        if(status != PkgStatus.OK) {
+            return status
+        }
+    }
+
+    return PkgStatus.OK
+}
+
+func (this: *PackageManager) build(
+    buildCommand: *JsonNode,
+    options: PackageBuildOptions,
+    runType: RunType
+) : PkgStatus {
     if(!buildCommand) {
         return PkgStatus.ERROR_COMMAND_NOT_DEFINED
     }
@@ -37,11 +74,11 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
 
     // copy over all other command line options to
     // this execution
-    memcpy(litaOptions, pm.options.litaOptions, sizeof(:LitaOptions))
+    memcpy(litaOptions, this.options.litaOptions, sizeof(:LitaOptions))
 
 
     var args = CommandArgs{}
-    var result = pm.buildCommandArgs(buildCommand, options, &args)
+    var result = this.buildCommandArgs(buildCommand, options, &args, runType)
     if(result != PkgStatus.OK) {
         return result
     }
@@ -65,7 +102,9 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
 func (this: *PackageManager) buildCommandArgs(
     buildCommand: *JsonNode,
     options: PackageBuildOptions,
-    args: *CommandArgs) : PkgStatus {
+    args: *CommandArgs,
+    runType: RunType
+) : PkgStatus {
 
     var buildSection: *JsonNode = null
 
@@ -154,7 +193,19 @@ func (this: *PackageManager) buildCommandArgs(
 
     if(!ContainsOption("-output", &programArgs)) {
         programArgs.add("-output")
-        programArgs.add(this.pkg.json.getStr("name", "a"))
+        switch(runType) {
+            case RunType.PRE_BUILD: {
+                programArgs.add("pre_build")
+                break;
+            }
+            case RunType.POST_BUILD: {
+                programArgs.add("post_build")
+                break;
+            }
+            default: {
+                programArgs.add(this.pkg.json.getStr("name", "a"))
+            }
+        }
     }
 
     if(!ContainsOption("-srcDir", &programArgs)) {
@@ -163,6 +214,18 @@ func (this: *PackageManager) buildCommandArgs(
     }
 
     var mainFile = "./src/main.lita"
+    switch(runType) {
+        case RunType.PRE_BUILD: {
+            mainFile = "./src/pre_main.lita"
+            break;
+        }
+        case RunType.POST_BUILD: {
+            mainFile = "./src/post_main.lita"
+            break;
+        }
+        default: {
+        }
+    }
 
     // TEMP: should move into specific commands?
     {
@@ -170,7 +233,7 @@ func (this: *PackageManager) buildCommandArgs(
             programArgs.add("-run")
         }
 
-        if(this.options.litaOptions.testsOnly) {
+        if(this.options.litaOptions.testsOnly && runType == RunType.BUILD) {
             programArgs.add("-testDir")
             programArgs.add("./test/")
 
@@ -186,7 +249,7 @@ func (this: *PackageManager) buildCommandArgs(
         }
     }
 
-    if(!this.options.litaOptions.inputFile.empty()) {
+    if(!this.options.litaOptions.inputFile.empty() && runType == RunType.BUILD) {
         mainFile = this.options.litaOptions.inputFile as (*const char)
     }
 
