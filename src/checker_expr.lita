@@ -1110,17 +1110,16 @@ func (this: *TypeChecker) resolveStringExpr(expr: *StringExpr) : bool {
 }
 
 func (this: *TypeChecker) resolveNativeStringExpr(expr: *StringExpr) : bool {
+    assert(expr != null)
+
     // Since this is a built-in, we might
     // attempt to resolve this before built-in types are
     // created, therefore we need to tell the checker this didn't
     // resolve, so it can attempt it later
     var stringBuiltin = this.lita.builtins.stringBuiltin
-    if(!stringBuiltin) {
+    if(!stringBuiltin || !stringBuiltin.type) {
         return false
     }
-
-    assert(expr != null)
-    assert(stringBuiltin.type != null)
 
     expr.operand.typeInfo = stringBuiltin.type
     expr.operand.isConst = true
