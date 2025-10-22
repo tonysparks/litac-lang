@@ -1,8 +1,68 @@
 import "std/fs/tinydir"
-import "std/system" // TODO: move the FS stuff into here!!
+import "std/system"
 import "std/string/buffer"
+import "std/string/builder"
 import "std/string"
 import "std/libc"
+import "std/array"
+import "std/mem"
+import "std/io"
+// TODO: Refactor this mess
+// move to std/io/fs package
+// use String instead of *const char
+// make proper hasNext/next usage
+
+
+public enum ListFileFlags {
+    RECURSE_DIRECTORIES       = (1<<1),
+    // FOLLOW_SYMLINKS = (1<<2),
+}
+
+public func ListFiles(
+    path: String,
+    result: *Array<String>,
+    flags: i32,
+    allocator: *const Allocator = defaultAllocator
+) : FileStatus {
+
+    if(result.capacity == 0) {
+        *result = ArrayInit<String>(32, allocator)
+    }
+
+    return WalkDir(path, result, flags, allocator)
+}
+
+func WalkDir(
+    path: String,
+    result: *Array<String>,
+    flags: i32,
+    allocator: *const Allocator = defaultAllocator
+) : FileStatus {
+    var handle = FileHandle{}
+    defer handle.close()
+
+    if(!handle.open(path)) {
+        return FileStatus.FileNotFoundError
+    }
+
+    while(handle.next()) {
+        var name = handle.name().toString()
+
+        var sb = StringBuilderInit(path.length + name.length + 1, allocator)
+        sb.append("%.*s/%.*s", path.length, path.buffer, name.length, name.buffer)
+
+        if(handle.isDirectory() && flags & ListFileFlags.RECURSE_DIRECTORIES) {
+            var status = WalkDir(sb.toString(), result, flags, allocator)
+            if(status != FileStatus.Ok) {
+                return status
+            }
+        }
+        else {
+            result.add(sb.toString())
+        }
+    }
+    return FileStatus.Ok
+}
 
 public struct FileHandle {
     dir: tinydir_dir
