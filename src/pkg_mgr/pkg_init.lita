@@ -149,7 +149,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
 
     // Write out main.lita
     {
-        sb.append("%s",
+        sb.clear().append("%s",
 """
 import "std/libc"
 
