@@ -365,9 +365,15 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 context.allocator
             )
 
+            var cond = forStmt.cond ? forStmt.cond : NewBooleanExpr(
+                forStmt.startPos, forStmt.endPos,
+                true,
+                context.allocator
+            )
+
             var whileStmt = NewWhileStmt(
                 forStmt.startPos, forStmt.endPos,
-                forStmt.cond,
+                cond,
                 whileBody,
                 context.allocator
             )
@@ -547,14 +553,16 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         ----------------------------------------*/
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = ast as (*ArrayDesignationExpr)
-            FunctionLowering(context, expr.index)
-            FunctionLowering(context, expr.value)
+            expr.index = FunctionLowering(context, expr.index) as (*Expr)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
             break;
         }
         case StmtKind.ARRAY_INIT_EXPR: {
             var expr = ast as (*ArrayInitExpr)
             for(var i = 0; i < expr.values.size(); i += 1) {
-                FunctionLowering(context, expr.values.get(i))
+                var arg = expr.values.get(i)
+                arg = FunctionLowering(context, arg) as (*Expr)
+                expr.values.set(i, arg)
             }
             break;
         }
@@ -776,8 +784,8 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.GET_EXPR: {
             var expr = ast as (*GetExpr)
-            FunctionLowering(context, expr.object)
-            FunctionLowering(context, expr.field as (*Node))
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.field = FunctionLowering(context, expr.field) as (*IdentifierExpr)
             break;
         }
         case StmtKind.GROUP_EXPR: {
@@ -816,14 +824,14 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.SET_EXPR: {
             var expr = ast as (*SetExpr)
-            FunctionLowering(context, expr.object)
-            FunctionLowering(context, expr.field as (*Node))
-            FunctionLowering(context, expr.value)
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.field = FunctionLowering(context, expr.field) as (*IdentifierExpr)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
             break;
         }
         case StmtKind.SIZE_OF_EXPR: {
             var expr = ast as (*SizeOfExpr)
-            FunctionLowering(context, expr.sizeOfExpr)
+            expr.sizeOfExpr = FunctionLowering(context, expr.sizeOfExpr) as (*Expr)
             break;
         }
         case StmtKind.NATIVE_STRING_EXPR: {
@@ -834,15 +842,15 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
             var expr = ast as (*SubscriptGetExpr)
-            FunctionLowering(context, expr.object)
-            FunctionLowering(context, expr.index)
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.index = FunctionLowering(context, expr.index) as (*Expr)
             break;
         }
         case StmtKind.SUBSCRIPT_SET_EXPR: {
             var expr = ast as (*SubscriptSetExpr)
-            FunctionLowering(context, expr.object)
-            FunctionLowering(context, expr.index)
-            FunctionLowering(context, expr.value)
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.index = FunctionLowering(context, expr.index) as (*Expr)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
             break;
         }
         case StmtKind.TERNARY_EXPR: {

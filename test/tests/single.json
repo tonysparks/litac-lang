@@ -15,6 +15,139 @@
     `,
     "tests": [
         {
+            "name": "Coroutine for statement empty",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var total = 0
+                    var y = 0
+                    for(;;) {
+                        total += aCoroutine(1, a)
+                        break
+                    }
+                    return total
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 1
+                )
+                assert(global == 1)
+
+                global = 0
+
+
+            `,
+        },/*
+        {
+            "name": "Coroutine get/set[] expr",
+            "definitions": `
+                struct TestStruct {
+                    a:i32
+                }
+
+                var global: i32 = 0
+                var order: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x:[2]TestStruct
+                    x[0].a = aCoroutine(1, a+1)
+                    x[1] = TestStruct {
+                        .a = aCoroutine(1, a+2)
+                    }
+                    var y:[2]i32;
+                    y[0] = aCoroutine(1, a+3)
+
+                    return global
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 2
+                )
+            `,
+        },
+        {
+            "name": "Coroutine set expr",
+            "definitions": `
+                struct TestStruct {
+                    a:i32
+                }
+
+                var global: i32 = 0
+                var order: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = TestStruct {}
+                    x.a = aCoroutine(1, a)
+                    return x.a
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 1
+                )
+            `,
+        },
+        {
+            "name": "Coroutine call with coroutine args",
+            "definitions": `
+                var global: i32 = 0
+                var order: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(
+                        aCoroutine(1, a+1),
+                        aCoroutine(1, a+2)
+                    )
+                    return global
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 0
+                )
+                assert(order == 3)
+            `,
+        },/*
+        {
             "name": "Coroutine init expression",
             "definitions": `
                 var global: i32 = 0

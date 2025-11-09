@@ -749,7 +749,8 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         // Coroutines needs special AST modifications
         // in order to do these, we need type information
         // and this generates new AST
-        if(isCoroutine) {
+        if(isCoroutine)
+        {
             LowerFuncBody(this, funcDecl)
 
             //this.result.enabled = false
