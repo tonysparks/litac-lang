@@ -15,7 +15,43 @@
     `,
     "tests": [
         {
-            "name": "Coroutine if while stmt",
+            "name": "Coroutine if with AND stmt",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 2 &&
+                        aCoroutine(a, 1) > 4
+                    ) {
+                        x = 11
+                    } else x = 22
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 22
+                )
+                assert(global == 1)
+
+                global = 0
+
+                assert(
+                    bCoroutine(5) == 11
+                )
+                assert(global == 2)
+
+            `,
+        },
+        {
+            "name": "Coroutine if with OR stmt",
             "definitions": `
                 var global: i32 = 0
                 @suspend
@@ -41,11 +77,12 @@
                 )
                 assert(global == 2)
 
+                global = 0
+
                 assert(
                     bCoroutine(5) == 11
                 )
                 assert(global == 1)
-                global = 0
 
             `,
         },/*

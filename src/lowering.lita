@@ -73,7 +73,7 @@ func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
         expr,
         context.allocator
     )
-
+/*
     // TODO: This does right to left ordering of parameters
     // we probably want left to right even though this
     // isn't standard in C
@@ -83,8 +83,30 @@ func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
     scope.block.stmts.insertAt(index, temp as (*Stmt))
     scope.block.becomeParentOf(temp)
     scope.numberOfInserts += 1
+*/
+    InsertTempStmt(context, temp as (*Stmt), .atEnd = false)
 
     return temp as (*VarDecl)
+}
+
+func InsertTempStmt(
+    context: *FuncLowerContext,
+    stmt: *Stmt,
+    atEnd: bool
+) {
+
+    // TODO: This does right to left ordering of parameters
+    // we probably want left to right even though this
+    // isn't standard in C
+    var scope = context.current
+    var index = scope.insertIndex// + scope.numberOfInserts
+    if(atEnd) {
+        index += scope.numberOfInserts
+    }
+    // printf("Inserting at %d\n", index)
+    scope.block.stmts.insertAt(index, stmt)
+    scope.block.becomeParentOf(stmt)
+    scope.numberOfInserts += 1
 }
 
 /**
@@ -439,7 +461,6 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 }
             */
             if(expr.operator == TokenType.AND) {
-                // create the resulting value temp
                 var result = NewTempAssignment(
                     context,
                     NewBooleanExpr(
@@ -455,35 +476,125 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                     &context.module.typeSpecAllocator
                 )
 
-                var right = FunctionLowering(context, expr.right) as (*Expr)
+                var resultExpr = NewIdentifierExpr(
+                    expr.startPos, expr.endPos,
+                    nameTypeSpec,
+                    context.allocator
+                )
+
                 var ifRight = NewIfStmt(
                     expr.startPos, expr.endPos,
-                    right,
+                    expr.right,
                     NewBinaryExpr(
                         expr.startPos, expr.endPos,
-                        NewIdentifierExpr(
-                            expr.startPos, expr.endPos,
-                            nameTypeSpec,
-                            context.allocator
-                        ),
+                        resultExpr,
                         TokenType.EQUALS,
                         NewBooleanExpr(
                             expr.startPos, expr.endPos,
                             true,
                             context.allocator
-                        )
+                        ),
+                        context.allocator
                     ),
                     null,
                     context.allocator
                 )
 
-                var left = FunctionLowering(context, expr.left) as (*Expr)
+                ifRight = FunctionLowering(context, ifRight) as (*Stmt)
+
                 var ifLeft = NewIfStmt(
                     expr.startPos, expr.endPos,
-                    left,
+                    expr.left,
+                    ifRight,
+                    null,
+                    context.allocator
                 )
-            } else if(expr.operator == TokenType.OR) {
 
+                ifLeft = FunctionLowering(context, ifLeft) as (*Stmt)
+                InsertTempStmt(context, ifLeft, .atEnd = true)
+
+                return resultExpr as (*Node)
+            }
+            /*
+                left || right
+
+                lowered to:
+
+                var result = false
+                var t1 = left
+                if (t1) {
+                    result = true
+                } else {
+                    var t2 = right
+                    if (t2) {
+                        result = true
+                    }
+                }
+            */
+            else if(expr.operator == TokenType.OR) {
+                var result = NewTempAssignment(
+                    context,
+                    NewBooleanExpr(
+                        expr.startPos, expr.endPos,
+                        false,
+                        context.allocator
+                    )
+                )
+
+                var nameTypeSpec = NewNameTypeSpecIntern(
+                    expr.startPos,
+                    result.name.str,
+                    &context.module.typeSpecAllocator
+                )
+
+                var resultExpr = NewIdentifierExpr(
+                    expr.startPos, expr.endPos,
+                    nameTypeSpec,
+                    context.allocator
+                )
+
+                var ifRight = NewIfStmt(
+                    expr.startPos, expr.endPos,
+                    expr.right,
+                    NewBinaryExpr(
+                        expr.startPos, expr.endPos,
+                        resultExpr,
+                        TokenType.EQUALS,
+                        NewBooleanExpr(
+                            expr.startPos, expr.endPos,
+                            true,
+                            context.allocator
+                        ),
+                        context.allocator
+                    ),
+                    null,
+                    context.allocator
+                )
+
+                ifRight = FunctionLowering(context, ifRight) as (*Stmt)
+
+                var ifLeft = NewIfStmt(
+                    expr.startPos, expr.endPos,
+                    expr.left,
+                    NewBinaryExpr(
+                        expr.startPos, expr.endPos,
+                        resultExpr,
+                        TokenType.EQUALS,
+                        NewBooleanExpr(
+                            expr.startPos, expr.endPos,
+                            true,
+                            context.allocator
+                        ),
+                        context.allocator
+                    ),
+                    ifRight,
+                    context.allocator
+                )
+
+                ifLeft = FunctionLowering(context, ifLeft) as (*Stmt)
+                InsertTempStmt(context, ifLeft, .atEnd = true)
+
+                return resultExpr as (*Node)
             } else {
                 expr.left = FunctionLowering(context, expr.left) as (*Expr)
                 expr.right = FunctionLowering(context, expr.right) as (*Expr)
@@ -495,7 +606,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.CAST_EXPR: {
             var expr = ast as (*CastExpr)
-            FunctionLowering(context, expr.exprToCast)
+            expr.exprToCast = FunctionLowering(context, expr.exprToCast) as (*Expr)
             break;
         }
         case StmtKind.CHAR_EXPR: {
@@ -622,7 +733,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         case StmtKind.NAME_OF_EXPR:
         case StmtKind.TYPE_OF_EXPR: {
             var expr = ast as (*TypeOfExpr)
-            FunctionLowering(context, expr.typeOfExpr)
+            expr.typeOfExpr = FunctionLowering(context, expr.typeOfExpr) as (*Expr)
             break;
         }
         case StmtKind.UNARY_EXPR: {
