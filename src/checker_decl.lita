@@ -742,12 +742,27 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     if(funcDecl.body) {
         this.numOfLabels = 0
 
-        if(isCoroutine) {
-            LowerFuncBody(this, funcDecl)
-        }
-
         if(!this.resolveStmt(funcDecl.body)) {
             return false
+        }
+
+        // Coroutines needs special AST modifications
+        // in order to do these, we need type information
+        // and this generates new AST
+        if(isCoroutine) {
+            LowerFuncBody(this, funcDecl)
+
+            //this.result.enabled = false
+            this.current.flags |= ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
+
+            defer {
+                // this.result.enabled = true
+                this.current.flags &= ~ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
+            }
+
+            if(!this.resolveStmt(funcDecl.body)) {
+                return false
+            }
         }
 
         this.checkLabels()

@@ -370,7 +370,7 @@ public func (this: *Scope) addSymbol(name: InternedString,
     var isRebuild = this.module.flags & ModuleFlags.INCREMENTAL_COMPILATION;
 
     if(symbolStorage.contains(name)) {
-        var isError = true
+        var isError = !(this.module.flags & ModuleFlags.IGNORE_DUPLICATE_SYMBOLS);
 
         // if we are incrementally rebuilding this module,
         // we will allow for recreating this existing symbol

@@ -57,15 +57,20 @@ struct BlockScope {
     noTemp: bool
 }
 
+func NewTempName(context: *FuncLowerContext) : StringBuilder {
+    var name = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
+    name.append("__%d", context.tempIndex += 1)
+    return name
+}
+
 func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
-    var stringBuffer = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
-    stringBuffer.append("__%d", context.tempIndex += 1)
+    var name = NewTempName(context)
 
     var temp = NewVarDecl(
         expr.startPos,
         expr.endPos,
         NewIdentifier(
-            stringBuffer.cStr(),
+            name.cStr(),
             expr.startPos,
             context.strings
         ),
@@ -84,8 +89,30 @@ func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
     scope.block.becomeParentOf(temp)
     scope.numberOfInserts += 1
 */
-    InsertTempStmt(context, temp as (*Stmt), .atEnd = false)
+    InsertTempStmt(context, temp as (*Stmt), .atEnd = true)
 
+    return temp as (*VarDecl)
+}
+
+func NewTempEmptyAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
+    var name = NewTempName(context)
+
+    var temp = NewVarDecl(
+        expr.startPos,
+        expr.endPos,
+        NewIdentifier(
+            name.cStr(),
+            expr.startPos,
+            context.strings
+        ),
+        expr.operand.typeInfo.asTypeSpec(
+            context.module, true
+        ),
+        null,
+        context.allocator
+    )
+
+    InsertTempStmt(context, temp as (*Stmt), .atEnd = true)
     return temp as (*VarDecl)
 }
 
@@ -107,6 +134,32 @@ func InsertTempStmt(
     scope.block.stmts.insertAt(index, stmt)
     scope.block.becomeParentOf(stmt)
     scope.numberOfInserts += 1
+}
+
+func PushBlock(
+    context: *FuncLowerContext,
+    scope: *BlockScope,
+    stmt1: *Stmt,
+    stmt2: *Stmt = null
+) : *BlockStmt {
+    var stmts = ArrayInit<*Stmt>(2, context.allocator)
+    stmts.add(stmt1)
+    if(stmt2) {
+        stmts.add(stmt2)
+    }
+
+    var block = NewBlockStmt(
+        stmt1.startPos, stmt1.endPos,
+        stmts,
+        context.allocator
+    ) as (*BlockStmt)
+
+    scope.block = block
+    scope.insertIndex = 0
+    scope.numberOfInserts = 0
+
+    context.push(scope)
+    return block
 }
 
 /**
@@ -200,35 +253,16 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
             defer context.pop()
 
             for(var i = 0; i < body.stmts.size(); i+=1) {
-                var s = body.stmts.get(i)
+                var stmt = body.stmts.get(i)
                 scope.insertIndex = i
-                scope.noTemp = !RequiresFuncTempResult(s)
+                scope.noTemp = !RequiresFuncTempResult(stmt)
 
-                s = FunctionLowering(context, s) as (*Stmt)
-                //printf("StmtKind: %s\n", StmtKindAsStr(s.kind))
+                stmt = FunctionLowering(context, stmt) as (*Stmt)
                 i = i + scope.numberOfInserts
-                // printf("I = %d vs %d\n", i, body.stmts.size())
-                body.stmts.set(i, s)
+                body.stmts.set(i, stmt)
 
                 scope.numberOfInserts = 0
             }
-
-            // for(var i = 0; i < body.stmts.size(); i+=1) {
-            //     var s = body.stmts.get(i)
-            //     printf("StmtKind: %s", StmtKindAsStr(s.kind))
-            //     if (s.kind == StmtKind.VAR_DECL) {
-            //         var varDecl = s as (*VarDecl)
-            //         printf("(%.*s) = %s@%d",
-            //             varDecl.name.str.length, varDecl.name.str.buffer,
-            //             StmtKindAsStr(varDecl.expr.kind),
-            //             varDecl.expr.startPos.lineNumber
-            //         )
-
-            //     }
-            //     printf("\n")
-            // }
-
-            // printf("Body length: %d\n", body.stmts.size())
             break;
         }
         case StmtKind.BREAK_STMT: {
@@ -259,7 +293,45 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.DO_WHILE_STMT: {
             var whileStmt = ast as (*DoWhileStmt)
-            whileStmt.body = FunctionLowering(context, whileStmt.body) as (*Stmt)
+            /*
+                convert to:
+
+                do {
+                    body
+                    if(cond)
+                        continue
+                    else
+                        break
+                } while(true);
+            */
+
+            var cond = whileStmt.cond
+
+            var ifStmt = NewIfStmt(
+                cond.startPos, cond.endPos,
+                cond,
+                NewContinueStmt(
+                    cond.startPos, cond.endPos,
+                    context.allocator
+                ),
+                NewBreakStmt(
+                    cond.startPos, cond.endPos,
+                    context.allocator
+                ),
+                context.allocator
+            )
+
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, whileStmt.body, ifStmt)
+            defer context.pop()
+
+            whileStmt.cond = NewBooleanExpr(
+                cond.startPos, cond.endPos,
+                true,
+                context.allocator
+            )
+
+            whileStmt.body = FunctionLowering(context, block) as (*Stmt)
             whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Expr)
             break;
         }
@@ -268,19 +340,48 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.FOR_STMT: {
             var forStmt = ast as (*ForStmt)
-            if(forStmt.init) {
-                FunctionLowering(context, forStmt.init)
-            }
-            if(forStmt.cond) {
-                FunctionLowering(context, forStmt.cond)
+            /*
+                lowered to:
+
+                {
+                    init
+                    while(cond) {
+                        body
+                        post
+                    }
+                }
+            */
+            var stmts = ArrayInit<*Stmt>(2, context.allocator)
+            if(forStmt.body) {
+                stmts.add(forStmt.body)
             }
             if(forStmt.post) {
-                FunctionLowering(context, forStmt.post)
+                stmts.add(forStmt.post)
             }
-            if(forStmt.body) {
-                FunctionLowering(context, forStmt.body)
-            }
-            break;
+
+            var whileBody = NewBlockStmt(
+                forStmt.startPos, forStmt.endPos,
+                stmts,
+                context.allocator
+            )
+
+            var whileStmt = NewWhileStmt(
+                forStmt.startPos, forStmt.endPos,
+                forStmt.cond,
+                whileBody,
+                context.allocator
+            )
+
+            var initStmt = forStmt.init ? forStmt.init : NewEmptyStmt(
+                forStmt.startPos, forStmt.endPos,
+                context.allocator
+            )
+
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, initStmt, whileStmt)
+            defer context.pop()
+
+            return FunctionLowering(context, block) as (*Node)
         }
         case StmtKind.GOTO_STMT: {
             break;
@@ -292,49 +393,45 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 Lower to:
 
                 {
-                    if(cond)
-                        body
-                    else
-                        other
+                if(cond)
+                    {body}
+                else
+                    {other}
                 }
 
                 which if else's get modified to:
 
                 {
                     if(cond)
-                        body
+                        {body}
                     else
                         {
                             if(cond)
-                                body
+                                {body}
                             else
-                                other
+                                {other}
                         }
                 }
             */
-
-            var stmts = ArrayInit<*Stmt>(1, context.allocator)
-            stmts.add(ifStmt as (*Stmt))
-
-            var block = NewBlockStmt(
-                ifStmt.startPos, ifStmt.endPos,
-                stmts,
-                context.allocator
-            ) as (*BlockStmt)
-
-            var scope = BlockScope {
-                .block = block,
-                .insertIndex = 0,
-                .numberOfInserts = 0,
-            }
-
-            context.push(&scope)
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, ifStmt)
             defer context.pop()
 
             ifStmt.cond = FunctionLowering(context, ifStmt.cond) as (*Expr)
-            ifStmt.then = FunctionLowering(context, ifStmt.then) as (*Stmt)
+            {
+                var scope = BlockScope{}
+                var thenBlock = PushBlock(context, &scope, ifStmt.then)
+                defer context.pop()
+
+                ifStmt.then = FunctionLowering(context, thenBlock) as (*Stmt)
+            }
+
             if(ifStmt.elseStmt) {
-                ifStmt.elseStmt = FunctionLowering(context, ifStmt.elseStmt) as (*Stmt)
+                var scope = BlockScope{}
+                var elseBlock = PushBlock(context, &scope, ifStmt.elseStmt)
+                defer context.pop()
+
+                ifStmt.elseStmt = FunctionLowering(context, elseBlock) as (*Stmt)
             }
 
             return block as (*Node)
@@ -352,7 +449,9 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
             var params = ast as (*ParametersStmt)
             for(var i = 0; i < params.size(); i += 1) {
                 var param = params.get(i)
-                FunctionLowering(context, param as (*Node))
+
+                param = FunctionLowering(context, param) as (*ParameterDecl)
+                params.set(i, param)
             }
             break;
         }
@@ -365,21 +464,36 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.SWITCH_CASE_STMT: {
             var caseStmt = ast as (*SwitchCaseStmt)
-            FunctionLowering(context, caseStmt.cond)
-            FunctionLowering(context, caseStmt.body)
+            caseStmt.cond = FunctionLowering(context, caseStmt.cond) as (*Expr)
+            caseStmt.body = FunctionLowering(context, caseStmt.body) as (*Stmt)
             break;
         }
         case StmtKind.SWITCH_STMT:{
             var switchStmt = ast as (*SwitchStmt)
-            FunctionLowering(context, switchStmt.cond)
+            /*
+                lowered to
+
+                {
+                    switch(cond) {
+                        case c1: stmt
+                    }
+                }
+            */
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, switchStmt)
+            defer context.pop()
+
+            switchStmt.cond = FunctionLowering(context, switchStmt.cond) as (*Expr)
             for(var i = 0; i < switchStmt.cases.size(); i+=1) {
                 var caseStmt = switchStmt.cases.get(i)
-                FunctionLowering(context, caseStmt as (*Node))
+                caseStmt = FunctionLowering(context, caseStmt) as (*SwitchCaseStmt)
+                switchStmt.cases.set(i, caseStmt)
             }
             if(switchStmt.defaultStmt) {
-                FunctionLowering(context, switchStmt.defaultStmt)
+                switchStmt.defaultStmt = FunctionLowering(context, switchStmt.defaultStmt) as (*Stmt)
             }
-            break;
+
+            return block as (*Node)
         }
         case StmtKind.ENUM_FIELD_DECL:
         case StmtKind.ENUM_FIELD_ENTRY_DECL:
@@ -614,14 +728,22 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.FUNC_CALL_EXPR: {
             var expr = ast as (*FuncCallExpr)
+            /*
+                Lowered to
 
-            var hasTemp = !context.current.noTemp
+                var t1 = call()
+                t1
 
-            var temp: *VarDecl = null
-            if (hasTemp) {
-                temp = NewTempAssignment(context, expr)
-            }
+                ordering:
 
+                expr.object
+                a1
+                a2
+                ...
+
+                var t1 = temp
+                t1
+            */
             expr.object = FunctionLowering(context, expr.object) as (*Expr)
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
@@ -629,9 +751,11 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Expr)
             }
 
-            if (!hasTemp) {
+            if (context.current.noTemp) {
                 return expr as (*Node)
             }
+
+            var temp = NewTempAssignment(context, expr)
 
             var nameTypeSpec = NewNameTypeSpecIntern(
                 expr.startPos,
@@ -669,13 +793,15 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
             var expr = ast as (*InitExpr)
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
-                FunctionLowering(context, expr.arguments.get(i) as (*Node))
+                var arg = expr.arguments.get(i)
+                arg = FunctionLowering(context, arg) as (*InitArgExpr)
+                expr.arguments.set(i, arg)
             }
             break;
         }
         case StmtKind.INIT_ARG_EXPR: {
             var expr = ast as (*InitArgExpr)
-            FunctionLowering(context, expr.value)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
             break;
         }
         case StmtKind.NULL_EXPR: {
@@ -721,10 +847,57 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.TERNARY_EXPR: {
             var expr = ast as (*TernaryExpr)
-            FunctionLowering(context, expr.cond)
-            FunctionLowering(context, expr.then)
-            FunctionLowering(context, expr.other)
-            break;
+            /*
+                var x = cond ? then : other
+
+                lowered to
+
+                var result
+                if (cond) {
+                    result = then
+                } else {
+                    result = other
+                }
+                result
+            */
+            var resultTemp = NewTempEmptyAssignment(context, expr.then)
+
+            var nameTypeSpec = NewNameTypeSpecIntern(
+                expr.startPos,
+                resultTemp.name.str,
+                &context.module.typeSpecAllocator
+            )
+
+            var resultExpr = NewIdentifierExpr(
+                expr.startPos, expr.endPos,
+                nameTypeSpec,
+                context.allocator
+            )
+
+            var ifStmt = NewIfStmt(
+                expr.startPos, expr.endPos,
+                expr.cond,
+                NewBinaryExpr(
+                    expr.startPos, expr.endPos,
+                    resultExpr,
+                    TokenType.EQUALS,
+                    expr.then,
+                    context.allocator
+                ),
+                NewBinaryExpr(
+                    expr.startPos, expr.endPos,
+                    resultExpr,
+                    TokenType.EQUALS,
+                    expr.other,
+                    context.allocator
+                ),
+                context.allocator
+            )
+
+            ifStmt = FunctionLowering(context, ifStmt) as (*Stmt)
+            InsertTempStmt(context, ifStmt, .atEnd = true)
+
+            return resultExpr as (*Node)
         }
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
             var expr = ast as (*TypeIdentifierExpr)
