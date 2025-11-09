@@ -197,6 +197,7 @@ public func (this: *Strings) internString(string: *String) : InternedString {
     return this.internCopy(string.buffer, string.length)
 }
 
+
 @doc("""
     The supplied `string` must be long-lived, as in for the duration of the lifetime of this
     `Strings`.  If you can't garauntee to the lifetime of the supplied `string`, use `Strings#internCopy`

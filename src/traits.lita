@@ -369,9 +369,3 @@ func GetTraitName(traitSym: *Symbol, sb: *StringBuilder) : String {
         .length = sb.length
     }
 }
-
-func Parse(sb: *StringBuilder, checker: *TypeChecker, decls: *Array<*Decl>) {
-    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
-    var stmts = parser.parseModule()
-    decls.addAll(stmts.declarations)
-}

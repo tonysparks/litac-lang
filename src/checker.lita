@@ -29,6 +29,10 @@ import "checker_expr"
 import "intern"
 import "preprocessor"
 import "lsp/references"
+import "coroutine"
+
+import "lowering"
+
 /**
 ===================================================================
     Type Checker
@@ -50,7 +54,8 @@ struct GenericContext {
 }
 
 public enum TypeCheckerFlags {
-    DISABLE_TRAIT_WRAPPERS = (1<<0),
+    DISABLE_TRAIT_WRAPPERS        = (1<<0),
+    DISABLE_COROUTINE_WRAPPERS    = (1<<1),
 }
 
 public struct TypeChecker {
@@ -65,6 +70,7 @@ public struct TypeChecker {
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
     symbolTraits: Array<*Symbol>
+    symbolCoroutines: Array<*Symbol>
     mainEntry: *Symbol // main entry point to the program
 
     symbolNotes: Array<*Symbol>
@@ -83,6 +89,7 @@ public struct TypeChecker {
     randomNameIndex: u32
 
     bypassing: bool // if the checker should bypass imported modules and look at all modules
+    captureScope: bool // capture scopes if in coroutine
 }
 
 public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) {
@@ -94,6 +101,8 @@ public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) 
     this.symbolTypes.init(256, allocator)
     this.symbolFuncs.init(256, allocator)
     this.symbolTraits.init(64, allocator)
+    this.symbolCoroutines.init(256, allocator)
+
     this.genericParamStack.init(128, allocator)
     this.genericTemplates.init(64, allocator)
     this.genericContext.callsite = null
@@ -155,6 +164,28 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
             this.bypassing = true
             for(var i = 0; i < traitDecls.size(); i += 1) {
                 var decl = traitDecls.get(i)
+
+                var sym = this.createDeclSymbol(decl)
+                if(sym == null) {
+                    continue
+                }
+
+                this.resolveSymbol(sym)
+                this.finishResolveSymbol(sym)
+            }
+            this.bypassing = false
+        }
+        this.leaveModule()
+    }
+
+    // Generate coroutine wrappers/etc
+    if(!(flags & TypeCheckerFlags.DISABLE_COROUTINE_WRAPPERS)) {
+        this.enterModule(root)
+        {
+            var decls = CreateCoroutines(this)
+            this.bypassing = true
+            for(var i = 0; i < decls.size(); i += 1) {
+                var decl = decls.get(i)
 
                 var sym = this.createDeclSymbol(decl)
                 if(sym == null) {
@@ -686,15 +717,48 @@ public func (this: *TypeChecker) currentScope() : *Scope {
     return this.current.currentScope
 }
 
-public func (this: *TypeChecker) pushScope(scope: *Scope) {
+public func (this: *TypeChecker) pushScope(scope: *Scope, isCoroutine: bool = false) {
     scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.current, this.current.allocator)
     this.current.currentScope = scope
+
+    if (isCoroutine) {
+        this.captureScope = true
+    }
+
+    if (this.captureScope) {
+        var currentFuncDecl = this.funcDeclStack.last()
+        assert(currentFuncDecl != null)
+
+        var sym = currentFuncDecl.sym
+        assert(sym != null && sym.coroutine != null)
+
+        sym.coroutine.pushScope(this.current.currentScope)
+    }
 }
 
-public func (this: *TypeChecker) popScope() {
+public func (this: *TypeChecker) popScope(isCoroutine: bool = false) {
     if(this.currentScope()) {
+        if(this.captureScope) {
+            var currentFuncDecl = this.funcDeclStack.last()
+            assert(currentFuncDecl != null)
+
+            var sym = currentFuncDecl.sym
+            assert(sym != null && sym.coroutine != null)
+
+            sym.coroutine.popScope(this.current.currentScope)
+
+            if (isCoroutine) {
+               this.symbolCoroutines.add(sym)
+            }
+        }
+
         this.current.currentScope = this.current.currentScope.parent
     }
+
+    if (isCoroutine) {
+        this.captureScope = false
+    }
+
 }
 
 public func (this: *TypeChecker) isGenericParamType(name: *TypeSpec) : bool {

@@ -1,0 +1,816 @@
+import "std/array"
+import "std/mem"
+import "std/map"
+import "std/libc"
+import "std/hash"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/assert"
+
+import "intern"
+import "symbols"
+import "types"
+
+import "lita"
+import "ast"
+import "ast_copy"
+import "ast_new"
+import "parser"
+import "checker"
+import "lex"
+import "module"
+import "common"
+
+public struct FuncLowerContext {
+    allocator: *const Allocator
+    strings: *Strings
+    module: *Module
+
+    funcDecl: *FuncDecl
+    tempIndex: u32
+
+    current: *BlockScope
+}
+
+func (this: *FuncLowerContext) push(scope: *BlockScope) {
+    var current = this.current
+    this.current = scope
+    scope.parent = current
+}
+func (this: *FuncLowerContext) pop() {
+    if(!this.current) return;
+
+    var parent = this.current.parent
+    this.current = parent
+}
+func (this: *FuncLowerContext) currentBlock(): *BlockStmt {
+    if(!this.current) return null;
+    return this.current.block
+}
+
+struct BlockScope {
+    parent: *BlockScope
+    block: *BlockStmt
+    insertIndex: i32
+    numberOfInserts: i32
+    noTemp: bool
+}
+
+func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
+    var stringBuffer = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
+    stringBuffer.append("__%d", context.tempIndex += 1)
+
+    var temp = NewVarDecl(
+        expr.startPos,
+        expr.endPos,
+        NewIdentifier(
+            stringBuffer.cStr(),
+            expr.startPos,
+            context.strings
+        ),
+        null,
+        expr,
+        context.allocator
+    )
+
+    // TODO: This does right to left ordering of parameters
+    // we probably want left to right even though this
+    // isn't standard in C
+    var scope = context.current
+    var index = scope.insertIndex// + scope.numberOfInserts
+    // printf("Inserting at %d\n", index)
+    scope.block.stmts.insertAt(index, temp as (*Stmt))
+    scope.block.becomeParentOf(temp)
+    scope.numberOfInserts += 1
+
+    return temp as (*VarDecl)
+}
+
+/**
+    Convert function call expressions into lowered expressions:
+
+    var x = object.value(call1(), call2()) ?
+    object.value1(call3(), call4()) :
+    object.value2(call6(), call6())
+
+    var x = undefined
+    var _1 = call1()
+    var _2 = call2()
+    var _r3 = object.value(_1, _2)
+    if (_r3) {
+        var _3 = call3()
+        var _4 = call4()
+        x = object.value(_3, _4)
+    } else {
+        var _5 = call5()
+        var _6 = call6()
+        x = object.value(_5, _6)
+    }
+*/
+public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) {
+    if(!funcDecl.body) {
+        return;
+    }
+
+    var context = FuncLowerContext {
+        .allocator = checker.allocator,
+        .strings = &checker.strings,
+        .module = checker.current,
+        .funcDecl = funcDecl,
+        .tempIndex = 0_u32,
+        .current = null,
+    }
+
+    if(funcDecl.body.kind != StmtKind.FUNC_BODY_STMT) {
+        var body = funcDecl.body
+        var stmts = ArrayInit<*Stmt>(1, checker.allocator)
+        stmts.add(body)
+
+        funcDecl.body = NewFuncBodyStmt(
+            body.startPos, body.endPos,
+            stmts,
+            checker.allocator
+        )
+    }
+
+    funcDecl.body = FunctionLowering(&context, funcDecl.body) as (*Stmt)
+}
+
+func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
+    if(!ast) {
+        return null;
+    }
+
+    switch(ast.kind) {
+        case StmtKind.TRAIT_DECL:
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.FUNC_DECL:
+        case StmtKind.IMPORT_DECL:
+        case StmtKind.TYPEDEF_DECL:
+        case StmtKind.ENUM_DECL:
+        case StmtKind.PARAM_DECL:
+        case StmtKind.NATIVE_DECL:
+        case StmtKind.POISON_DECL: {
+            break;
+        }
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL: {
+            var decl = ast as (*VarDecl)
+            if(decl.expr) {
+                decl.expr = FunctionLowering(context, decl.expr) as (*Expr)
+            }
+            break;
+        }
+
+        case StmtKind.FUNC_BODY_STMT:
+        case StmtKind.BLOCK_STMT: {
+            var body = ast as (*BlockStmt)
+
+            var scope = BlockScope {
+                .block = body,
+                .insertIndex = 0,
+                .numberOfInserts = 0,
+            }
+
+            context.push(&scope)
+            defer context.pop()
+
+            for(var i = 0; i < body.stmts.size(); i+=1) {
+                var s = body.stmts.get(i)
+                scope.insertIndex = i
+                scope.noTemp = !RequiresFuncTempResult(s)
+
+                s = FunctionLowering(context, s) as (*Stmt)
+                //printf("StmtKind: %s\n", StmtKindAsStr(s.kind))
+                i = i + scope.numberOfInserts
+                // printf("I = %d vs %d\n", i, body.stmts.size())
+                body.stmts.set(i, s)
+
+                scope.numberOfInserts = 0
+            }
+
+            // for(var i = 0; i < body.stmts.size(); i+=1) {
+            //     var s = body.stmts.get(i)
+            //     printf("StmtKind: %s", StmtKindAsStr(s.kind))
+            //     if (s.kind == StmtKind.VAR_DECL) {
+            //         var varDecl = s as (*VarDecl)
+            //         printf("(%.*s) = %s@%d",
+            //             varDecl.name.str.length, varDecl.name.str.buffer,
+            //             StmtKindAsStr(varDecl.expr.kind),
+            //             varDecl.expr.startPos.lineNumber
+            //         )
+
+            //     }
+            //     printf("\n")
+            // }
+
+            // printf("Body length: %d\n", body.stmts.size())
+            break;
+        }
+        case StmtKind.BREAK_STMT: {
+            break;
+        }
+        case StmtKind.COMP_STMT: {
+            var comp = ast as (*CompStmt)
+            if(comp.evaluatedStmt) {
+                comp.evaluatedStmt = FunctionLowering(context, comp.evaluatedStmt) as (*Stmt)
+            }
+            if(comp.end) {
+                comp.end = FunctionLowering(context, comp.end) as (*CompStmt)
+            }
+            for(var i = 0; i < comp.body.size(); i+=1) {
+                var s = comp.body.get(i)
+                s = FunctionLowering(context, s) as (*Stmt)
+                comp.body.set(i, s)
+            }
+            break;
+        }
+        case StmtKind.CONTINUE_STMT: {
+            break;
+        }
+        case StmtKind.DEFER_STMT: {
+            var deferStmt = ast as (*DeferStmt)
+            deferStmt.deferedStmt = FunctionLowering(context, deferStmt.deferedStmt) as (*Stmt)
+            break;
+        }
+        case StmtKind.DO_WHILE_STMT: {
+            var whileStmt = ast as (*DoWhileStmt)
+            whileStmt.body = FunctionLowering(context, whileStmt.body) as (*Stmt)
+            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Expr)
+            break;
+        }
+        case StmtKind.EMPTY_STMT: {
+            break;
+        }
+        case StmtKind.FOR_STMT: {
+            var forStmt = ast as (*ForStmt)
+            if(forStmt.init) {
+                FunctionLowering(context, forStmt.init)
+            }
+            if(forStmt.cond) {
+                FunctionLowering(context, forStmt.cond)
+            }
+            if(forStmt.post) {
+                FunctionLowering(context, forStmt.post)
+            }
+            if(forStmt.body) {
+                FunctionLowering(context, forStmt.body)
+            }
+            break;
+        }
+        case StmtKind.GOTO_STMT: {
+            break;
+        }
+        case StmtKind.IF_STMT: {
+            var ifStmt = ast as (*IfStmt)
+
+            /*
+                Lower to:
+
+                {
+                    if(cond)
+                        body
+                    else
+                        other
+                }
+
+                which if else's get modified to:
+
+                {
+                    if(cond)
+                        body
+                    else
+                        {
+                            if(cond)
+                                body
+                            else
+                                other
+                        }
+                }
+            */
+
+            var stmts = ArrayInit<*Stmt>(1, context.allocator)
+            stmts.add(ifStmt as (*Stmt))
+
+            var block = NewBlockStmt(
+                ifStmt.startPos, ifStmt.endPos,
+                stmts,
+                context.allocator
+            ) as (*BlockStmt)
+
+            var scope = BlockScope {
+                .block = block,
+                .insertIndex = 0,
+                .numberOfInserts = 0,
+            }
+
+            context.push(&scope)
+            defer context.pop()
+
+            ifStmt.cond = FunctionLowering(context, ifStmt.cond) as (*Expr)
+            ifStmt.then = FunctionLowering(context, ifStmt.then) as (*Stmt)
+            if(ifStmt.elseStmt) {
+                ifStmt.elseStmt = FunctionLowering(context, ifStmt.elseStmt) as (*Stmt)
+            }
+
+            return block as (*Node)
+        }
+        case StmtKind.LABEL_STMT: {
+            break;
+        }
+        case StmtKind.MODULE_STMT: {
+            break;
+        }
+        case StmtKind.NOTE_STMT: {
+            break;
+        }
+        case StmtKind.PARAMETERS_STMT: {
+            var params = ast as (*ParametersStmt)
+            for(var i = 0; i < params.size(); i += 1) {
+                var param = params.get(i)
+                FunctionLowering(context, param as (*Node))
+            }
+            break;
+        }
+        case StmtKind.RETURN_STMT: {
+            var stmt = ast as (*ReturnStmt)
+            if(stmt.expr) {
+                stmt.expr = FunctionLowering(context, stmt.expr) as (*Expr)
+            }
+            break;
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            var caseStmt = ast as (*SwitchCaseStmt)
+            FunctionLowering(context, caseStmt.cond)
+            FunctionLowering(context, caseStmt.body)
+            break;
+        }
+        case StmtKind.SWITCH_STMT:{
+            var switchStmt = ast as (*SwitchStmt)
+            FunctionLowering(context, switchStmt.cond)
+            for(var i = 0; i < switchStmt.cases.size(); i+=1) {
+                var caseStmt = switchStmt.cases.get(i)
+                FunctionLowering(context, caseStmt as (*Node))
+            }
+            if(switchStmt.defaultStmt) {
+                FunctionLowering(context, switchStmt.defaultStmt)
+            }
+            break;
+        }
+        case StmtKind.ENUM_FIELD_DECL:
+        case StmtKind.ENUM_FIELD_ENTRY_DECL:
+        case StmtKind.STRUCT_FIELD_DECL:
+        case StmtKind.UNION_FIELD_DECL:
+        case StmtKind.TRAIT_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL: {
+            // TODO: Is this needed??
+            break;
+        }
+        case StmtKind.WHILE_STMT: {
+            var whileStmt = ast as (*WhileStmt)
+
+            /*
+                Convert to:
+                while(true) {
+                    if(cond)
+                        body
+                    else
+                        break;
+                }
+            */
+
+            var cond = whileStmt.cond
+
+            whileStmt.cond = NewBooleanExpr(
+                cond.startPos, cond.endPos,
+                true,
+                context.allocator
+            )
+
+            whileStmt.body = NewIfStmt(
+                cond.startPos, cond.endPos,
+                cond,
+                whileStmt.body,
+                NewBreakStmt(
+                    cond.startPos, cond.endPos,
+                    context.allocator
+                ),
+                context.allocator
+            )
+
+            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Expr)
+            whileStmt.body = FunctionLowering(context, whileStmt.body) as (*Stmt)
+            break;
+        }
+
+
+        /*--------------------------------------
+            Expressions
+        ----------------------------------------*/
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            var expr = ast as (*ArrayDesignationExpr)
+            FunctionLowering(context, expr.index)
+            FunctionLowering(context, expr.value)
+            break;
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            var expr = ast as (*ArrayInitExpr)
+            for(var i = 0; i < expr.values.size(); i += 1) {
+                FunctionLowering(context, expr.values.get(i))
+            }
+            break;
+        }
+        case StmtKind.BINARY_EXPR: {
+            var expr = ast as (*BinaryExpr)
+            /*
+                left && right
+
+                lowered to:
+
+                var result = false
+                var t1 = left
+                if (t1) {
+                    var t2 = right
+                    if (t2) {
+                        result = true
+                    }
+                }
+            */
+            if(expr.operator == TokenType.AND) {
+                // create the resulting value temp
+                var result = NewTempAssignment(
+                    context,
+                    NewBooleanExpr(
+                        expr.startPos, expr.endPos,
+                        false,
+                        context.allocator
+                    )
+                )
+
+                var nameTypeSpec = NewNameTypeSpecIntern(
+                    expr.startPos,
+                    result.name.str,
+                    &context.module.typeSpecAllocator
+                )
+
+                var right = FunctionLowering(context, expr.right) as (*Expr)
+                var ifRight = NewIfStmt(
+                    expr.startPos, expr.endPos,
+                    right,
+                    NewBinaryExpr(
+                        expr.startPos, expr.endPos,
+                        NewIdentifierExpr(
+                            expr.startPos, expr.endPos,
+                            nameTypeSpec,
+                            context.allocator
+                        ),
+                        TokenType.EQUALS,
+                        NewBooleanExpr(
+                            expr.startPos, expr.endPos,
+                            true,
+                            context.allocator
+                        )
+                    ),
+                    null,
+                    context.allocator
+                )
+
+                var left = FunctionLowering(context, expr.left) as (*Expr)
+                var ifLeft = NewIfStmt(
+                    expr.startPos, expr.endPos,
+                    left,
+                )
+            } else if(expr.operator == TokenType.OR) {
+
+            } else {
+                expr.left = FunctionLowering(context, expr.left) as (*Expr)
+                expr.right = FunctionLowering(context, expr.right) as (*Expr)
+            }
+            break;
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            break;
+        }
+        case StmtKind.CAST_EXPR: {
+            var expr = ast as (*CastExpr)
+            FunctionLowering(context, expr.exprToCast)
+            break;
+        }
+        case StmtKind.CHAR_EXPR: {
+            break;
+        }
+        case StmtKind.FUNC_CALL_EXPR: {
+            var expr = ast as (*FuncCallExpr)
+
+            var hasTemp = !context.current.noTemp
+
+            var temp: *VarDecl = null
+            if (hasTemp) {
+                temp = NewTempAssignment(context, expr)
+            }
+
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                var arg = expr.arguments.getPtr(i)
+                arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Expr)
+            }
+
+            if (!hasTemp) {
+                return expr as (*Node)
+            }
+
+            var nameTypeSpec = NewNameTypeSpecIntern(
+                expr.startPos,
+                temp.name.str,
+                &context.module.typeSpecAllocator
+            )
+
+            return NewIdentifierExpr(
+                expr.startPos,
+                expr.endPos,
+                nameTypeSpec,
+                context.allocator
+            ) as (*Node)
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            var expr = ast as (*IdentifierExpr)
+            break;
+        }
+        case StmtKind.GET_EXPR: {
+            var expr = ast as (*GetExpr)
+            FunctionLowering(context, expr.object)
+            FunctionLowering(context, expr.field as (*Node))
+            break;
+        }
+        case StmtKind.GROUP_EXPR: {
+            var expr = ast as (*GroupExpr)
+            expr.groupedExpr = FunctionLowering(context, expr.groupedExpr) as (*Expr)
+            break;
+        }
+        case StmtKind.IDENTIFIER_EXPR: {
+            var expr = ast as (*IdentifierExpr)
+            break;
+        }
+        case StmtKind.INIT_EXPR: {
+            var expr = ast as (*InitExpr)
+
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                FunctionLowering(context, expr.arguments.get(i) as (*Node))
+            }
+            break;
+        }
+        case StmtKind.INIT_ARG_EXPR: {
+            var expr = ast as (*InitArgExpr)
+            FunctionLowering(context, expr.value)
+            break;
+        }
+        case StmtKind.NULL_EXPR: {
+            break;
+        }
+        case StmtKind.NUMBER_EXPR: {
+            break;
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            var expr = ast as (*OffsetOfExpr)
+            break;
+        }
+        case StmtKind.SET_EXPR: {
+            var expr = ast as (*SetExpr)
+            FunctionLowering(context, expr.object)
+            FunctionLowering(context, expr.field as (*Node))
+            FunctionLowering(context, expr.value)
+            break;
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var expr = ast as (*SizeOfExpr)
+            FunctionLowering(context, expr.sizeOfExpr)
+            break;
+        }
+        case StmtKind.NATIVE_STRING_EXPR: {
+            break;
+        }
+        case StmtKind.STRING_EXPR: {
+            break;
+        }
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            var expr = ast as (*SubscriptGetExpr)
+            FunctionLowering(context, expr.object)
+            FunctionLowering(context, expr.index)
+            break;
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            var expr = ast as (*SubscriptSetExpr)
+            FunctionLowering(context, expr.object)
+            FunctionLowering(context, expr.index)
+            FunctionLowering(context, expr.value)
+            break;
+        }
+        case StmtKind.TERNARY_EXPR: {
+            var expr = ast as (*TernaryExpr)
+            FunctionLowering(context, expr.cond)
+            FunctionLowering(context, expr.then)
+            FunctionLowering(context, expr.other)
+            break;
+        }
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            var expr = ast as (*TypeIdentifierExpr)
+            break;
+        }
+        case StmtKind.NAME_OF_EXPR:
+        case StmtKind.TYPE_OF_EXPR: {
+            var expr = ast as (*TypeOfExpr)
+            FunctionLowering(context, expr.typeOfExpr)
+            break;
+        }
+        case StmtKind.UNARY_EXPR: {
+            var expr = ast as (*UnaryExpr)
+            expr.unaryExpr = FunctionLowering(context, expr.unaryExpr) as (*Expr)
+            break;
+        }
+        case StmtKind.POISON_EXPR: {
+            break;
+        }
+        default: {
+            printf("Statement Kind: %s\n", StmtKindAsStr(ast.kind))
+            assert(false)
+        }
+    }
+    return ast
+}
+
+
+func RequiresFuncTempResult(ast: *Node) : bool {
+    if(!ast) {
+        return false;
+    }
+
+    switch(ast.kind) {
+        case StmtKind.TRAIT_DECL:
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.FUNC_DECL:
+        case StmtKind.IMPORT_DECL:
+        case StmtKind.TYPEDEF_DECL:
+        case StmtKind.ENUM_DECL:
+        case StmtKind.PARAM_DECL:
+        case StmtKind.NATIVE_DECL:
+        case StmtKind.POISON_DECL: {
+            break;
+        }
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL: {
+            return true;
+        }
+
+        case StmtKind.FUNC_BODY_STMT:
+        case StmtKind.BLOCK_STMT:
+        case StmtKind.BREAK_STMT:
+        case StmtKind.COMP_STMT:
+        case StmtKind.CONTINUE_STMT:
+        case StmtKind.DEFER_STMT: {
+            break;
+        }
+        case StmtKind.DO_WHILE_STMT: {
+            return true;
+        }
+        case StmtKind.EMPTY_STMT: {
+            break;
+        }
+        case StmtKind.FOR_STMT: {
+            return true;
+        }
+        case StmtKind.GOTO_STMT: {
+            break;
+        }
+        case StmtKind.IF_STMT: {
+            return true;
+        }
+        case StmtKind.LABEL_STMT: {
+            break;
+        }
+        case StmtKind.MODULE_STMT: {
+            break;
+        }
+        case StmtKind.NOTE_STMT: {
+            break;
+        }
+        case StmtKind.PARAMETERS_STMT: {
+            break;
+        }
+        case StmtKind.RETURN_STMT: {
+            return true;
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            break;
+        }
+        case StmtKind.SWITCH_STMT:{
+            return true;
+        }
+        case StmtKind.ENUM_FIELD_DECL:
+        case StmtKind.ENUM_FIELD_ENTRY_DECL:
+        case StmtKind.STRUCT_FIELD_DECL:
+        case StmtKind.UNION_FIELD_DECL:
+        case StmtKind.TRAIT_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL: {
+            break;
+        }
+        case StmtKind.WHILE_STMT: {
+            return true;
+        }
+
+
+        /*--------------------------------------
+            Expressions
+        ----------------------------------------*/
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            return true;
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            return true;
+        }
+        case StmtKind.BINARY_EXPR: {
+            return true;
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            break;
+        }
+        case StmtKind.CAST_EXPR: {
+            return true;
+        }
+        case StmtKind.CHAR_EXPR: {
+            break;
+        }
+        case StmtKind.FUNC_CALL_EXPR: {
+            break;
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR: {
+            break;
+        }
+        case StmtKind.GET_EXPR: {
+            break;
+        }
+        case StmtKind.GROUP_EXPR: {
+            break;
+        }
+        case StmtKind.IDENTIFIER_EXPR: {
+            break;
+        }
+        case StmtKind.INIT_EXPR: {
+            return true;
+        }
+        case StmtKind.INIT_ARG_EXPR: {
+            break;
+        }
+        case StmtKind.NULL_EXPR: {
+            break;
+        }
+        case StmtKind.NUMBER_EXPR: {
+            break;
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            return true;
+        }
+        case StmtKind.SET_EXPR: {
+            return true;
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            return true;
+        }
+        case StmtKind.NATIVE_STRING_EXPR: {
+            break;
+        }
+        case StmtKind.STRING_EXPR: {
+            break;
+        }
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            break;
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            return true;
+        }
+        case StmtKind.TERNARY_EXPR: {
+            return true;
+        }
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            break;
+        }
+        case StmtKind.NAME_OF_EXPR:
+        case StmtKind.TYPE_OF_EXPR: {
+            return true;
+        }
+        case StmtKind.UNARY_EXPR: {
+            return true;
+        }
+        case StmtKind.POISON_EXPR: {
+            break;
+        }
+        default: {
+            printf("Statement Kind: %s\n", StmtKindAsStr(ast.kind))
+            assert(false)
+        }
+    }
+    return false
+}

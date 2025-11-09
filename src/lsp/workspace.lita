@@ -883,7 +883,11 @@ public func (this: *Workspace) runDiagnostics(
             goto report
         }
 
-        var checked = lita.typeCheck(root, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
+        var checked = lita.typeCheck(
+            root,
+            .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS
+                    |TypeCheckerFlags.DISABLE_COROUTINE_WRAPPERS
+        )
         if(!checked) {
             this.lsp.log("Failed to type check\n")
             lita.result.isReadable = false

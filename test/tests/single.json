@@ -8,11 +8,224 @@
 
         %definitions%
 
+        @suspend
         func main(len:i32, args:**char):i32 {
             %code%
         }
     `,
     "tests": [
+        {
+            "name": "Coroutine if while stmt",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 4 ||
+                        aCoroutine(a, 1) > 2
+                    ) {
+                        x = 11
+                    } else x = 22
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 22
+                )
+                assert(global == 2)
+
+                assert(
+                    bCoroutine(5) == 11
+                )
+                assert(global == 1)
+                global = 0
+
+            `,
+        },/*
+        {
+            "name": "Coroutine if while stmt",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 4) {
+                        while(x < a) {
+                            x+=1
+                        }
+                    } else x = 22
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 22
+                )
+                assert(
+                    bCoroutine(2) == 22
+                )
+                assert(
+                    bCoroutine(3) == 22
+                )
+                assert(
+                    bCoroutine(4) == 4
+                )
+            `,
+        },
+        {
+            "name": "Coroutine if else stmt",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 4) {
+                        x = 3
+                    } else if (aCoroutine(a, 1) > 3) {
+                        x = 2
+                    }
+                    else if (aCoroutine(a, 1) > 2) {
+                        x = 1
+                    }
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 0
+                )
+                assert(
+                    bCoroutine(2) == 1
+                )
+                assert(
+                    bCoroutine(3) == 2
+                )
+                assert(
+                    bCoroutine(4) == 3
+                )
+            `,
+        },/*
+        {
+            "name": "Coroutine if stmt",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 2) {
+                        x += 1
+                    }
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 0
+                )
+                assert(
+                    bCoroutine(2) == 1
+                )
+            `,
+        },
+        {
+            "name": "Coroutine while loop",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b - a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    while(aCoroutine(a, x) < a) {
+                        x += 1
+                    }
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 1
+                )
+                assert(
+                    bCoroutine(2) == 2
+                )
+                assert(
+                    bCoroutine(3) == 3
+                )
+                assert(
+                    bCoroutine(0) == 0
+                )
+            `,
+        },*/
+/*
+        {
+            "name": "Coroutine Symbols",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: f32) : bool {
+                    var x = a + 1
+                    if (x == 2) {
+                        var innerY = x + 3
+                        while (innerY) {
+                            innerY -= 1
+                            if (innerY < 0) {
+                                var xxx = 3
+                                break
+                            }
+                        }
+                    } else {
+                        var innerY = b
+                        var xxx = "hello world"
+                    }
+
+                    var result = (x > 3);
+                    return result
+                }
+            `,
+            "code": `
+                var r = aCoroutine(3, 4)
+            `,
+        },
+
+        {
+            "name": "Coroutine called in a non Coroutine",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                func nonCoroutine() : i32 {
+                    return aCoroutine(4, 6)
+                }
+            `,
+            "code": `
+                var r = nonCoroutine()
+            `,
+        },*/
+
+        /*
         {
             "name": "Foreign funcPtr alias variable",
             "symbolPrefix": "litaC__",

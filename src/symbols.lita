@@ -16,6 +16,7 @@ import "lita"
 import "phase_result"
 import "intern"
 import "common"
+import "coroutine"
 
 @asStr
 public enum SymbolKind {
@@ -63,6 +64,8 @@ public enum SymbolFlags {
     IS_HIDDEN               = (1<<25),
     IS_FROM_PREPROCESSOR    = (1<<26),
 
+    IS_COROUTINE            = (1<<27),
+
 }
 
 public struct SymGenericArg {
@@ -87,6 +90,8 @@ public struct Symbol {
     usingModule: *Module
     flags: i32
     val: Value
+
+    coroutine: *CoroutineStack
 
     // TODO: put in struct
     genericCallsiteModule: *Module
@@ -192,7 +197,7 @@ public func (scope: *Scope) init(kind: ScopeKind,
     // we can only declare notes and functions at the module
     // level
     if(kind == ScopeKind.MODULE) {
-        scope.symbolFuncs = InternMap<*Symbol>(null, 16, allocator)
+        scope.symbolFuncs = InternMap<*Symbol>(null, 32, allocator)
         scope.symbolNotes = InternMap<*Symbol>(null, 16, allocator)
     }
     else {
@@ -478,10 +483,18 @@ public func (this: *Scope) addSymbol(name: InternedString,
             if(decl.hasNote("test")) {
                 flags |= SymbolFlags.IS_TEST
             }
+            if(decl.hasNote("suspend")) {
+                flags |= SymbolFlags.IS_COROUTINE
+            }
 
             var funcDecl = decl as (*FuncDecl)
             if(funcDecl.flags & FuncFlags.IS_METHOD) {
                 flags |= SymbolFlags.IS_METHOD
+            }
+            // TODO: Revisit if this should be a keyword or
+            // a note
+            if(funcDecl.flags & FuncFlags.IS_COROUTINE) {
+                flags |= SymbolFlags.IS_COROUTINE
             }
             break;
         }
@@ -498,6 +511,9 @@ public func (this: *Scope) addSymbol(name: InternedString,
     var isNewSym = sym == null
     if(isNewSym) {
         sym = new<Symbol>(this.allocator);
+        sym.coroutine = new<CoroutineStack>(this.allocator);
+        sym.coroutine.init(this.allocator)
+
         sym.type = null
     }
 

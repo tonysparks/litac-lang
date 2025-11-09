@@ -308,7 +308,11 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
         var checker = TypeChecker{}
         checker.init(this, module.allocator)
 
-        checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
+        checker.typeCheck(
+            module,
+            .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS
+                    |TypeCheckerFlags.DISABLE_COROUTINE_WRAPPERS
+        )
 
         // Reconcile any changed symbols
         this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs, SymbolKind.FUNC)

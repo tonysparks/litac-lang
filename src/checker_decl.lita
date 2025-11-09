@@ -22,6 +22,7 @@ import "ast_print"
 import "checker"
 import "checker_expr"
 import "intern"
+import "lowering"
 import "lsp/references"
 
 public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
@@ -711,12 +712,14 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     this.enterModule(sym.declared)
     defer this.leaveModule()
 
-    this.pushScope(Scope{})
-    defer this.popScope()
-
     // keep track of which function we are currently parsing
     this.funcDeclStack.add(sym.type)
     defer this.funcDeclStack.pop()
+
+    var isCoroutine = (sym.flags & SymbolFlags.IS_COROUTINE) > 0
+    this.pushScope(Scope{}, isCoroutine)
+    defer this.popScope(isCoroutine)
+
 
     var hasGenerics = sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE
     if(hasGenerics) {
@@ -738,6 +741,11 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
 
     if(funcDecl.body) {
         this.numOfLabels = 0
+
+        if(isCoroutine) {
+            LowerFuncBody(this, funcDecl)
+        }
+
         if(!this.resolveStmt(funcDecl.body)) {
             return false
         }

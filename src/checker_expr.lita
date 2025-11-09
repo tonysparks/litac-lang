@@ -947,6 +947,14 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         return false
     }
 
+    if(!this.captureScope) {
+        var sym = objectType.sym
+        if(sym && (sym.flags & SymbolFlags.IS_COROUTINE) > 0) {
+            this.errorSuspendFuncInNonSuspendScope(expr, sym)
+            return false
+        }
+    }
+
     var isMethod = false
     var numberOfDefaultArgs = 0
     var suppliedArgs = ArrayInit<CallArg>(expr.arguments.size() + 1, this.allocator)
@@ -2319,6 +2327,17 @@ func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
     type.toString(sb)
     sb.appendStrn("'", 1)
     sb.appendStr(" must be function type")
+
+    this.result.addErrorStr(expr.startPos, sb)
+}
+
+func (this: *TypeChecker) errorSuspendFuncInNonSuspendScope(expr: *Expr, sym: *Symbol) {
+    assert(expr != null)
+    assert(sym != null)
+
+    var sb = StringBuilderInit(256, this.allocator)
+    sb.append("'%.*s'", sym.name.length, sym.name.buffer)
+    sb.appendStr(" is a suspend function, which can only be invoked within another suspend function")
 
     this.result.addErrorStr(expr.startPos, sb)
 }
