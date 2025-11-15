@@ -247,11 +247,19 @@ public struct ImportDecl {
     moduleId: *ModuleId
 }
 
+public enum VarDeclFlags {
+    IS_TERNARY = (1<<0),
+}
+
 // For var or const declarations
 public struct VarDecl {
     decl: using Decl
     typeSpec: *TypeSpec
     expr: *Expr
+
+    // related to lowered ternary operations
+    flags: i32
+    scope: *Scope
 }
 
 public struct ParameterDecl {
@@ -467,6 +475,10 @@ public struct BinaryExpr {
     left: *Expr
     operator: TokenType
     right: *Expr
+
+    // if this is a lowered ternary operator,
+    // the source variable declaration
+    ternaryDecl: *VarDecl
 }
 
 public struct BooleanExpr {

@@ -23,6 +23,7 @@ import "error_codes"
 import "intern"
 import "parser"
 import "lsp/references"
+import "checker_decl"
 
 public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
     if(!this.resolveExpr(expr)) {
@@ -2137,6 +2138,41 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
 
     var errors = this.errors()
 
+    // this is a lowered ternary operation
+    // all the tomfoolery here is due to not knowing the
+    // type of the temp variable assignment, with normal ternary
+    // this type information can be inferred, but since there is
+    // no assignment NOR type declaration, we must do this hack below
+    if(expr.ternaryDecl) {
+        assert(expr.operator == TokenType.EQUALS)
+
+        if(!this.resolveExpr(expr.right)) {
+            goto err;
+        }
+
+        this.current.flags |= ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
+        defer {
+            this.current.flags &= ~ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
+        }
+
+        var rightType = expr.right.operand.typeInfo
+        expr.ternaryDecl.typeSpec = rightType.asTypeSpec(
+            this.current, true
+        )
+
+        var typeInfo = this.resolveValueDecl(expr.ternaryDecl)
+        if (!typeInfo) {
+            return false
+        }
+
+        assert(expr.ternaryDecl.scope)
+        this.addSymbolToScope(
+            expr.ternaryDecl,
+            typeInfo,
+            expr.ternaryDecl.scope
+        )
+    }
+
     if(!this.resolveExpr(expr.left)) {
         goto err;
     }
@@ -2144,6 +2180,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
     if(!this.resolveExpr(expr.right)) {
         goto err;
     }
+
 
     var leftType = expr.left.operand.typeInfo
     var rightType = expr.right.operand.typeInfo

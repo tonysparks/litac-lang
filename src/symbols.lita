@@ -511,10 +511,14 @@ public func (this: *Scope) addSymbol(name: InternedString,
     var isNewSym = sym == null
     if(isNewSym) {
         sym = new<Symbol>(this.allocator);
-        sym.coroutine = new<CoroutineStack>(this.allocator);
-        sym.coroutine.init(this.allocator)
-
         sym.type = null
+        sym.coroutine = null
+
+        // TODO: Shouldn't this be only for func types?
+        if(kind == SymbolKind.FUNC) {
+            sym.coroutine = new<CoroutineStack>(this.allocator);
+            sym.coroutine.init(this.allocator)
+        }
     }
 
     sym.kind = kind

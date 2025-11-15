@@ -1391,10 +1391,10 @@ err:
     return &POISON_TYPE
 }
 
-public func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
+public func (this: *TypeChecker) addSymbolToScope(decl: *Decl, typeInfo: *TypeInfo, scope: *Scope) : *Symbol {
     assert(decl.name.token.type == TokenType.IDENTIFIER)
 
-    var sym = this.current.currentScope.addSymbol(decl.name.str, this.current, decl, 0)
+    var sym = scope.addSymbol(decl.name.str, this.current, decl, 0)
     if(sym) {
         sym.type = typeInfo
         this.resolveSymbol(sym)
@@ -1403,6 +1403,10 @@ public func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *
     }
 
     return sym
+}
+
+public func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
+    return this.addSymbolToScope(decl, typeInfo, this.current.currentScope)
 }
 
 public func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {

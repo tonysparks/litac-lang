@@ -701,6 +701,10 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             PrintStmt(expr.left, indent)
             printf(" %s ", tokenText[expr.operator])
             PrintStmt(expr.right, 0)
+            if(expr.ternaryDecl) {
+                printf(" ~> ")
+                PrintStmt(expr.ternaryDecl as (*Stmt))
+            }
             break;
         }
         case StmtKind.BOOLEAN_EXPR: {

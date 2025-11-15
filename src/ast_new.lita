@@ -163,6 +163,9 @@ public func NewVarDecl(startPos: SrcPos,
     decl.typeSpec = type
     decl.expr = expr
 
+    decl.flags = 0
+    decl.scope = null
+
     return decl as (*Decl)
 }
 
@@ -400,6 +403,7 @@ public func NewBinaryExpr(startPos: SrcPos,
     binExpr.operator = operator
     binExpr.right = binExpr.node.becomeParentOf(right)
     binExpr.endPos = endPos
+    binExpr.ternaryDecl = null
 
     return binExpr as (*Expr)
 }

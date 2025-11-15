@@ -78,23 +78,17 @@ func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
         expr,
         context.allocator
     )
-/*
-    // TODO: This does right to left ordering of parameters
-    // we probably want left to right even though this
-    // isn't standard in C
-    var scope = context.current
-    var index = scope.insertIndex// + scope.numberOfInserts
-    // printf("Inserting at %d\n", index)
-    scope.block.stmts.insertAt(index, temp as (*Stmt))
-    scope.block.becomeParentOf(temp)
-    scope.numberOfInserts += 1
-*/
+
     InsertTempStmt(context, temp as (*Stmt), .atEnd = true)
 
     return temp as (*VarDecl)
 }
 
-func NewTempEmptyAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
+func NewTempEmptyAssignment(
+    context: *FuncLowerContext,
+    expr: *Expr,
+    isTernary: bool = false
+) : *VarDecl {
     var name = NewTempName(context)
 
     var temp = NewVarDecl(
@@ -105,9 +99,9 @@ func NewTempEmptyAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl 
             expr.startPos,
             context.strings
         ),
-        expr.operand.typeInfo.asTypeSpec(
+        !isTernary ? expr.operand.typeInfo.asTypeSpec(
             context.module, true
-        ),
+        ) : null,
         null,
         context.allocator
     )
@@ -868,7 +862,8 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 }
                 result
             */
-            var resultTemp = NewTempEmptyAssignment(context, expr.then)
+            var resultTemp = NewTempEmptyAssignment(context, expr.then, true)
+            resultTemp.flags |= VarDeclFlags.IS_TERNARY
 
             var nameTypeSpec = NewNameTypeSpecIntern(
                 expr.startPos,
@@ -882,16 +877,22 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 context.allocator
             )
 
+            var thenExpr = NewBinaryExpr(
+                expr.startPos, expr.endPos,
+                resultExpr,
+                TokenType.EQUALS,
+                expr.then,
+                context.allocator
+            )
+
+            // mark this as a ternary lowering declaration
+            var binExpr = thenExpr as (*BinaryExpr)
+            binExpr.ternaryDecl = resultTemp
+
             var ifStmt = NewIfStmt(
                 expr.startPos, expr.endPos,
                 expr.cond,
-                NewBinaryExpr(
-                    expr.startPos, expr.endPos,
-                    resultExpr,
-                    TokenType.EQUALS,
-                    expr.then,
-                    context.allocator
-                ),
+                thenExpr,
                 NewBinaryExpr(
                     expr.startPos, expr.endPos,
                     resultExpr,

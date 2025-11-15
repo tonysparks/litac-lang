@@ -197,13 +197,27 @@ func GetCoroutineName(sym: *Symbol, sb: *StringBuilder) : String {
         .length = sb.length
     }
 }
-/*
+
+public func MakeCoroutine(checker: *TypeChecker, funcDecl: *FuncDecl) {
+    var context = ContinuationContext {
+
+    }
+
+    InjectContinuationState(
+        &context,
+        funcDecl.body as (*Node)
+    )
+}
+
+struct ContinuationContext {
+
+}
 
 func InjectContinuationState(context: *ContinuationContext, ast: *Node) {
     if(!ast) {
         return;
     }
-
+printf("Here: %s\n", StmtKindAsStr(ast.kind))
     switch(ast.kind) {
         case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
@@ -267,7 +281,7 @@ func InjectContinuationState(context: *ContinuationContext, ast: *Node) {
             break;
         }
         case StmtKind.EMPTY_STMT: {
-            return true;
+            break;
         }
         case StmtKind.FOR_STMT: {
             var forStmt = ast as (*ForStmt)
@@ -400,8 +414,8 @@ func InjectContinuationState(context: *ContinuationContext, ast: *Node) {
         }
         case StmtKind.FUNC_CALL_EXPR: {
             var expr = ast as (*FuncCallExpr)
-
-            var sym = expr.object.operand.type.sym
+            /*
+            var sym = expr.object.operand.typeInfo.sym
             if(sym.flags & SymbolFlags.IS_COROUTINE) {
                 var parent = ast.parent
 
@@ -411,7 +425,7 @@ func InjectContinuationState(context: *ContinuationContext, ast: *Node) {
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
                 InjectContinuationState(context, expr.arguments.get(i).argExpr)
-            }
+            }*/
             break;
         }
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
@@ -518,4 +532,4 @@ func InjectContinuationState(context: *ContinuationContext, ast: *Node) {
         }
     }
 }
-*/
+

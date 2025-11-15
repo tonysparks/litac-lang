@@ -23,6 +23,8 @@ import "checker"
 import "checker_expr"
 import "intern"
 import "lowering"
+import "coroutine"
+
 import "lsp/references"
 
 public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
@@ -99,6 +101,12 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
 
     if(decl.typeSpec) {
         declaredType = this.resolveTypeSpec(decl.typeSpec)
+        if(decl.flags & VarDeclFlags.IS_TERNARY &&
+           declaredType &&
+           declaredType.kind == TypeKind.ARRAY
+        ) {
+            declaredType = this.typeCache.typeDecay(declaredType)
+        }
     }
 
     if(decl.expr) {
@@ -135,6 +143,13 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
 
     var resultType = declaredType ? declaredType : inferredType
     if(!resultType) {
+        // this is part of a lowered ternary operator
+        // we will attach type info later
+        if(decl.flags & VarDeclFlags.IS_TERNARY) {
+            decl.scope = this.current.currentScope
+            return &POISON_TYPE
+        }
+
         this.result.addError(decl.startPos,
                 "invalid variable declaration, can't infer type for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
     }
@@ -742,29 +757,18 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     if(funcDecl.body) {
         this.numOfLabels = 0
 
+        // Coroutines needs special AST modifications
+        // if(isCoroutine) {
+        //     LowerFuncBody(this, funcDecl)
+        // }
+
         if(!this.resolveStmt(funcDecl.body)) {
             return false
         }
 
-        // Coroutines needs special AST modifications
-        // in order to do these, we need type information
-        // and this generates new AST
-        if(isCoroutine)
-        {
-            LowerFuncBody(this, funcDecl)
-
-            //this.result.enabled = false
-            this.current.flags |= ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
-
-            defer {
-                // this.result.enabled = true
-                this.current.flags &= ~ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
-            }
-
-            if(!this.resolveStmt(funcDecl.body)) {
-                return false
-            }
-        }
+        // if(isCoroutine) {
+        //     // MakeCoroutine(this, funcDecl)
+        // }
 
         this.checkLabels()
     }
