@@ -137,9 +137,9 @@ public func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
 /*
     type: *const char
     expr: *const char
-    body: Array<*Stmt>
+    body: Array<*Node>
     end: *CompStmt
-    evaluatedStmt: *Stmt
+    evaluatedStmt: *Node
 */
 @profile
 public func (this: *Preprocessor) evaluateForModule(
@@ -199,7 +199,7 @@ public func (this: *Preprocessor) evaluateForModule(
                     }
                     default: {
                         if(IsDecl(stmt)) {
-                            moduleStmt.declarations.add(stmt as (*Decl))
+                            moduleStmt.declarations.add(stmt as (*Node))
                         }
                     }
                 }
@@ -215,7 +215,7 @@ public func (this: *Preprocessor) evaluateForModule(
 public func (this: *Preprocessor) evaluateForFunction(
         checker: *TypeChecker,
         comp: *CompStmt,
-        isFirst: bool = true) : *Stmt {
+        isFirst: bool = true) : *Node {
 
     assert(comp != null)
 

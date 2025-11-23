@@ -46,7 +46,7 @@ const MAX_LABEL_NAME = 32;
 struct LabelInfo {
     name: InternedString
     defined: bool
-    stmt: *Stmt
+    stmt: *Node
 }
 
 struct GenericContext {
@@ -514,7 +514,7 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
     this.resolveNotes(module.ast.notes)
 }
 
-public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
+public func (this: *TypeChecker) createDeclSymbol(decl: *Node) : *Symbol {
     assert(decl != null)
 
     if(decl.sym) {
@@ -687,7 +687,7 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             break; // Ignore, as this will already have a parsing error
         }
         default: {
-            PrintStmt(decl as (*Stmt), 0)
+            PrintStmt(decl as (*Node), 0)
             assert(false)
         }
     }
@@ -1391,7 +1391,7 @@ err:
     return &POISON_TYPE
 }
 
-public func (this: *TypeChecker) addSymbolToScope(decl: *Decl, typeInfo: *TypeInfo, scope: *Scope) : *Symbol {
+public func (this: *TypeChecker) addSymbolToScope(decl: *Node, typeInfo: *TypeInfo, scope: *Scope) : *Symbol {
     assert(decl.name.token.type == TokenType.IDENTIFIER)
 
     var sym = scope.addSymbol(decl.name.str, this.current, decl, 0)
@@ -1405,11 +1405,11 @@ public func (this: *TypeChecker) addSymbolToScope(decl: *Decl, typeInfo: *TypeIn
     return sym
 }
 
-public func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
+public func (this: *TypeChecker) addSymbol(decl: *Node, typeInfo: *TypeInfo) : *Symbol {
     return this.addSymbolToScope(decl, typeInfo, this.current.currentScope)
 }
 
-public func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {
+public func (this: *TypeChecker) addTypeToScope(decl: *Node, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {
     for(var i = 0; i < currentType.aggDecl.fields.size(); i += 1) {
         var field = currentType.aggDecl.fields.get(i)
 
@@ -1515,11 +1515,11 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
     return success
 }
 
-func (this: *TypeChecker) isBoolExpr(expr: *Expr) : bool {
+func (this: *TypeChecker) isBoolExpr(expr: *Node) : bool {
     return this.checkTruthyness(expr, expr.operand.typeInfo)
 }
 
-public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
+public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
     if(!stmt) return true;
 
     switch(stmt.kind) {
@@ -1539,7 +1539,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.PARAM_DECL:
         case StmtKind.NATIVE_DECL:
         case StmtKind.POISON_DECL: {
-            return this.resolveDecl(stmt as (*Decl))
+            return this.resolveDecl(stmt as (*Node))
         }
 
         // --------------------------------------------------
@@ -1895,7 +1895,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
         case StmtKind.NAME_OF_EXPR:
         case StmtKind.UNARY_EXPR:
         case StmtKind.POISON_EXPR: {
-            return this.resolveExpr(stmt as (*Expr))
+            return this.resolveExpr(stmt as (*Node))
         }
         default: {
             assert(false)

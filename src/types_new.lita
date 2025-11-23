@@ -23,7 +23,7 @@ public struct TypeCache {
 
 public struct ArrayEntry {
     arrayOf: *TypeInfo
-    expr: *Expr
+    expr: *Node
     length: usize
 }
 
@@ -94,7 +94,7 @@ public func (this: *TypeCache) newFuncTypeInfo(sym: *Symbol,
 
 public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
                                                 length: usize,
-                                                numOfElements: *Expr,
+                                                numOfElements: *Node,
                                                 isLengthDefined: bool) : *TypeInfo {
 
     var entry = ArrayEntry{.arrayOf = arrayOf, .expr = numOfElements, .length = length}

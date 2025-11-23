@@ -127,7 +127,7 @@ public struct TypeSpec {
         }
         // ArrayTypeSpec
         struct {
-            numElements: *Expr
+            numElements: *Node
         }
         // FuncPtrTypeSpec
         struct {
@@ -189,6 +189,72 @@ public struct Node {
     parent: *Node
     startPos: SrcPos
     endPos: SrcPos
+
+    union {
+        // Declarations
+        importDecl: ImportDecl
+        varDecl: VarDecl
+        paramDecl: ParameterDecl
+        funcDecl: FuncDecl
+        aggDecl: AggregateDecl
+        enumDecl: EnumDecl
+        typedefDecl: TypedefDecl
+        nativeDecl: NativeDecl
+        notesDecl: NotesDecl
+        poisonDecl: PoisonDecl
+        // Field Stmts Declarations
+        enumFieldEntryDecl: EnumFieldEntryDecl
+        varFieldDecl: VarFieldDecl
+        traitFieldDecl: TraitFieldDecl
+
+        // Statements
+        blockStmt: BlockStmt
+        breakStmt: BreakStmt
+        compStmt: CompStmt
+        continueStmt: ContinueStmt
+        deferStmt: DeferStmt
+        doWhileStmt: DoWhileStmt
+        emptyStmt: EmptyStmt
+        forStmt: ForStmt
+        funcBodyStmt: FuncBodyStmt
+        gotoStmt: GotoStmt
+        ifStmt: IfStmt
+        labelStmt: LabelStmt
+        moduleStmt: ModuleStmt // Move to declarations
+        noteStmt: NoteStmt
+        parametersStmt: ParametersStmt
+        returnStmt: ReturnStmt
+        switchCaseStmt: SwitchCaseStmt
+        switchStmt: SwitchStmt
+        whileStmt: WhileStmt
+
+        // Expressions
+        arrayDesignationExpr: ArrayDesignationExpr
+        arrayInitExpr: ArrayInitExpr
+        binaryExpr: BinaryExpr
+        booleanExpr: BooleanExpr
+        castExpr: CastExpr
+        charExpr: CharExpr
+        funcCallExpr: FuncCallExpr
+        getExpr: GetExpr
+        groupExpr: GroupExpr
+        identifierExpr: IdentifierExpr
+        initArgExpr: InitArgExpr
+        initExpr: InitExpr
+        nullExpr: NullExpr
+        numberExpr: NumberExpr
+        offsetOfExpr: OffsetOfExpr
+        setExpr: SetExpr
+        sizeOfExpr: SizeOfExpr
+        stringExpr: StringExpr
+        subscriptGetExpr: SubscriptGetExpr
+        subscriptSetExpr: SubscriptSetExpr
+        ternaryExpr: TernaryExpr
+        typeIdentifierExpr: TypeIdentifierExpr
+        typeOfExpr: TypeOfExpr
+        unaryExpr: UnaryExpr
+        poisonExpr: PoisonExpr
+    }
 }
 
 public func (n: *Node) setSrcPos(start: SrcPos, end: SrcPos) {
@@ -196,14 +262,14 @@ public func (n: *Node) setSrcPos(start: SrcPos, end: SrcPos) {
     n.endPos = end
 }
 
-public func (n: *Node) becomeParentOf<T>(child: *T) : *T {
+public func (n: *Node) becomeParentOf(child: *Node) : *Node {
     if(!child) return null;
 
-    child.parent = n as (*Node)
+    child.parent = n
     return child
 }
 
-public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) : *Array<T> {
+public func (n: *Node) becomeParentOfChildren(children: *Array<*Node>) : *Array<*Node> {
     var size = children.size()
     for(var i = 0; i < size; i += 1) {
         var child = children.get(i)
@@ -228,7 +294,7 @@ public func (n: *Node) becomeParentOfChildrenCallArgs(children: *Array<CallArg>)
 }
 
 public struct Decl {
-    stmt: using Stmt
+//    stmt: using Stmt
     sym: *Symbol
     name: Identifier
     attributes: Attributes
@@ -248,14 +314,15 @@ public struct ImportDecl {
 }
 
 public enum VarDeclFlags {
-    IS_TERNARY = (1<<0),
+    IS_TERNARY   = (1<<0),
+    IS_TEMPORARY = (1<<1),
 }
 
 // For var or const declarations
 public struct VarDecl {
     decl: using Decl
     typeSpec: *TypeSpec
-    expr: *Expr
+    expr: *Node
 
     // related to lowered ternary operations
     flags: i32
@@ -265,7 +332,7 @@ public struct VarDecl {
 public struct ParameterDecl {
     decl: using Decl
     type: *TypeSpec
-    defaultExpr: *Expr
+    defaultExpr: *Node
     typeInfo: *TypeInfo
 }
 
@@ -273,7 +340,7 @@ public struct ParameterDecl {
 public struct FuncDecl {
     decl: using GenericDecl
     params: *ParametersStmt
-    body: *Stmt
+    body: *Node
     returnType: *TypeSpec
     flags: i32
 }
@@ -310,7 +377,7 @@ public struct PoisonDecl {
 
 public struct BlockStmt {
     stmt: using Stmt
-    stmts: Array<*Stmt>
+    stmts: Array<*Node>
 }
 
 public struct BreakStmt {
@@ -322,8 +389,8 @@ public struct CompStmt {
     type: InternedString
     expr: String
     end: *CompStmt
-    evaluatedStmt: *Stmt
-    body: Array<*Stmt>
+    evaluatedStmt: *Node
+    body: Array<*Node>
     isScriptLoad: bool
     isStatic: bool
 }
@@ -334,13 +401,13 @@ public struct ContinueStmt {
 
 public struct DeferStmt {
     stmt: using Stmt
-    deferedStmt: *Stmt
+    deferedStmt: *Node
 }
 
 public struct DoWhileStmt {
     stmt: using Stmt
-    cond: *Expr
-    body: *Stmt
+    cond: *Node
+    body: *Node
 }
 
 public struct EmptyStmt {
@@ -349,20 +416,20 @@ public struct EmptyStmt {
 
 public struct EnumFieldEntryDecl {
     decl: using Decl
-    value: *Expr
+    value: *Node
 }
 
 public struct ForStmt {
     stmt: using Stmt
-    init: *Stmt
-    cond: *Expr
-    post: *Stmt
-    body: *Stmt
+    init: *Node
+    cond: *Node
+    post: *Node
+    body: *Node
 }
 
 public struct FuncBodyStmt {
     stmt: using Stmt
-    stmts: Array<*Stmt>
+    stmts: Array<*Node>
 }
 
 public struct GotoStmt {
@@ -372,9 +439,9 @@ public struct GotoStmt {
 
 public struct IfStmt {
     stmt: using Stmt
-    cond: *Expr
-    then: *Stmt
-    elseStmt: *Stmt
+    cond: *Node
+    then: *Node
+    elseStmt: *Node
 }
 
 
@@ -388,7 +455,7 @@ public struct ModuleStmt {
     stmt: using Stmt
     imports: Array<*ImportDecl>
     notes: Array<*NoteStmt>
-    declarations: Array<*Decl>
+    declarations: Array<*Node>
     //TODO: id: ModuleId
 }
 
@@ -407,27 +474,27 @@ public struct ParametersStmt {
 
 public struct ReturnStmt {
     stmt: using Stmt
-    expr: *Expr
+    expr: *Node
 }
 
 public struct SwitchCaseStmt {
     stmt: using Stmt
-    cond: *Expr
-    body: *Stmt
+    cond: *Node
+    body: *Node
 }
 
 public struct SwitchStmt {
     stmt: using Stmt
-    cond: *Expr
+    cond: *Node
     cases: Array<*SwitchCaseStmt>
-    defaultStmt: *Stmt
+    defaultStmt: *Node
 }
 
 public struct VarFieldDecl {
     decl: using Decl
     type: *TypeSpec
-    defaultExpr: *Expr
-    bitFieldExpr: *Expr
+    defaultExpr: *Node
+    bitFieldExpr: *Node
 }
 
 public struct TraitFieldDecl {
@@ -443,38 +510,38 @@ public struct FieldStmt {
         aggregateField: *AggregateDecl
         varField: *VarFieldDecl
         traitField: *TraitFieldDecl
-        poisonField: *Expr
+        poisonField: *Node
     }
 }
 
 public struct WhileStmt {
     stmt: using Stmt
-    cond: *Expr
-    body: *Stmt
+    cond: *Node
+    body: *Node
 }
 
 
 public struct Stmt {
-    node: using Node
+    //node: using Node
 }
 
 public struct ArrayDesignationExpr {
     expr: using Expr
-    index: *Expr
-    value: *Expr
+    index: *Node
+    value: *Node
 }
 
 public struct ArrayInitExpr {
     expr: using Expr
     type: *TypeSpec
-    values: Array<*Expr>
+    values: Array<*Node>
 }
 
 public struct BinaryExpr {
     expr: using Expr
-    left: *Expr
+    left: *Node
     operator: TokenType
-    right: *Expr
+    right: *Node
 
     // if this is a lowered ternary operator,
     // the source variable declaration
@@ -489,7 +556,7 @@ public struct BooleanExpr {
 public struct CastExpr {
     expr: using Expr
     castTo: *TypeSpec
-    exprToCast: *Expr
+    exprToCast: *Node
 }
 
 public struct CharExpr {
@@ -498,7 +565,7 @@ public struct CharExpr {
 }
 
 public struct CallArg {
-    argExpr: *Expr
+    argExpr: *Node
     argName: Identifier
     index: i32
     isDefault: bool = false
@@ -506,7 +573,7 @@ public struct CallArg {
 
 public struct FuncCallExpr {
     expr: using Expr
-    object: *Expr
+    object: *Node
     genericArgs: Array<GenericArg>
     arguments: Array<CallArg>
     flags: i32
@@ -527,14 +594,14 @@ public enum GetExprFlags {
 
 public struct GetExpr {
     expr: using Expr
-    object: *Expr
+    object: *Node
     field: *IdentifierExpr
     flags: i32
 }
 
 public struct GroupExpr {
     expr: using Expr
-    groupedExpr: *Expr
+    groupedExpr: *Node
 }
 
 public struct IdentifierExpr {
@@ -548,7 +615,7 @@ public struct InitArgExpr {
     expr: using Expr
     fieldName: Identifier
     argPosition: i32
-    value: *Expr
+    value: *Node
 }
 
 public struct InitExpr {
@@ -575,16 +642,16 @@ public struct OffsetOfExpr {
 
 public struct SetExpr {
     expr: using Expr
-    object: *Expr
+    object: *Node
     field: *IdentifierExpr
     operator: TokenType
-    value: *Expr
+    value: *Node
     flags: i32
 }
 
 public struct SizeOfExpr {
     expr: using Expr
-    sizeOfExpr: *Expr
+    sizeOfExpr: *Node
 }
 
 public struct StringExpr {
@@ -594,23 +661,23 @@ public struct StringExpr {
 
 public struct SubscriptGetExpr {
     expr: using Expr
-    object: *Expr
-    index: *Expr
+    object: *Node
+    index: *Node
 }
 
 public struct SubscriptSetExpr {
     expr: using Expr
-    object: *Expr
-    index: *Expr
+    object: *Node
+    index: *Node
     operator: TokenType
-    value: *Expr
+    value: *Node
 }
 
 public struct TernaryExpr {
     expr: using Expr
-    cond: *Expr
-    then: *Expr
-    other: *Expr
+    cond: *Node
+    then: *Node
+    other: *Node
 }
 
 public struct TypeIdentifierExpr {
@@ -623,14 +690,14 @@ public struct TypeIdentifierExpr {
 
 public struct TypeOfExpr {
     expr: using Expr
-    typeOfExpr: *Expr
+    typeOfExpr: *Node
     type: *TypeSpec
 }
 
 public struct UnaryExpr {
     expr: using Expr
     operator: TokenType
-    unaryExpr: *Expr
+    unaryExpr: *Node
 }
 
 public struct PoisonExpr {
@@ -710,17 +777,17 @@ public func IsDecl(node: *Node) : bool {
     }
 }
 
-public func (d: *Decl) hasNotes() : bool {
+public func (d: *Node) hasNotes() : bool {
     if(!d) return false
     return !d.attributes.notes.empty()
 }
 
-public func (d: *Decl) hasNote(name: *const char) : bool {
+public func (d: *Node) hasNote(name: *const char) : bool {
     return d.getNote(name) != null
 }
 
 
-public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
+public func (d: *Node) getNote(name: *const char) : *NoteStmt {
     if(!d) return null;
 
     if(d.attributes.notes.empty()) {
@@ -736,7 +803,7 @@ public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
     return null;
 }
 
-public func (d: *Decl) getNoteArgument(name: *const char, arg: *const char) : *CallArg {
+public func (d: *Node) getNoteArgument(name: *const char, arg: *const char) : *CallArg {
     var note = d.getNote(name)
     if(!note) {
         return null;
@@ -831,7 +898,7 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
     return true
 }
 
-public func (expr: *Expr) isIdentifier() : bool {
+public func (expr: *Node) isIdentifier() : bool {
     if(!expr) {
         return false
     }
@@ -842,7 +909,7 @@ public func (expr: *Expr) isIdentifier() : bool {
 }
 
 
-public func (expr: *Expr) isConstNumberExpr() : bool {
+public func (expr: *Node) isConstNumberExpr() : bool {
     if(!expr) {
         return false;
     }
@@ -856,20 +923,20 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
             return true
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var sizeofExpr = expr as (*SizeOfExpr)
+            var sizeofExpr = expr
             return sizeofExpr.sizeOfExpr.isConstNumberExpr()
         }
         case StmtKind.GROUP_EXPR: {
-            var groupExpr = expr as (*GroupExpr)
+            var groupExpr = expr
             return groupExpr.groupedExpr.isConstNumberExpr()
         }
         case StmtKind.BINARY_EXPR: {
-            var binExpr = expr as (*BinaryExpr)
+            var binExpr = expr
             return binExpr.left.isConstNumberExpr() &&
                    binExpr.right.isConstNumberExpr()
         }
         case StmtKind.UNARY_EXPR: {
-            var unaryExpr = expr as (*UnaryExpr)
+            var unaryExpr = expr
             return unaryExpr.unaryExpr.isConstNumberExpr()
         }
         default: {
@@ -879,7 +946,7 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
     return false
 }
 
-public func (expr: *Expr) isConstExpr() : bool {
+public func (expr: *Node) isConstExpr() : bool {
     if(!expr) {
         return false;
     }
@@ -895,20 +962,20 @@ public func (expr: *Expr) isConstExpr() : bool {
             return true
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var sizeofExpr = expr as (*SizeOfExpr)
+            var sizeofExpr = expr
             return sizeofExpr.sizeOfExpr.isConstExpr()
         }
         case StmtKind.GROUP_EXPR: {
-            var groupExpr = expr as (*GroupExpr)
+            var groupExpr = expr
             return groupExpr.groupedExpr.isConstExpr()
         }
         case StmtKind.BINARY_EXPR: {
-            var binExpr = expr as (*BinaryExpr)
+            var binExpr = expr
             return binExpr.left.isConstExpr() &&
                    binExpr.right.isConstExpr()
         }
         case StmtKind.UNARY_EXPR: {
-            var unaryExpr = expr as (*UnaryExpr)
+            var unaryExpr = expr
             return unaryExpr.unaryExpr.isConstExpr()
         }
         default: {

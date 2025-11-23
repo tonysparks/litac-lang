@@ -2406,7 +2406,7 @@ public struct TypeInfo {
         struct {
             arrayOf: *TypeInfo
             length: usize
-            numOfElements: *Expr
+            numOfElements: *Node
             isLengthDefined: bool
         }
         // FuncPtrTypeInfo

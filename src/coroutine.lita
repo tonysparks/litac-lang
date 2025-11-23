@@ -101,7 +101,7 @@ public func (this: *CoroutineStack) print() {
    ---------------------------------------------------------------------- */
 
 
-public func CreateCoroutines(checker: *TypeChecker) : Array<*Decl> {
+public func CreateCoroutines(checker: *TypeChecker) : Array<*Node> {
     var allocator = checker.current.allocator
 
     var sb = StringBuilderInit(2048, allocator)

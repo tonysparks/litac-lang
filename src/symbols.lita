@@ -82,7 +82,7 @@ public struct Symbol {
     qualifiedName: InternedString
 
     state: SymbolState
-    decl: *Decl
+    decl: *Node
     type: *TypeInfo
 
     usingParent: *Symbol
@@ -351,7 +351,7 @@ public func (this: *Scope) removeSymbol(symbol: *Symbol) {
 
 public func (this: *Scope) addSymbol(name: InternedString,
                                      module: *Module,
-                                     decl: *Decl,
+                                     decl: *Node,
                                      flags: i32) : *Symbol {
 
     var symbolStorage = &this.symbolTypes

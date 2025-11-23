@@ -27,7 +27,7 @@ import "coroutine"
 
 import "lsp/references"
 
-public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
+public func (this: *TypeChecker) resolveDecl(decl: *Node) : bool {
     assert(decl != null)
 
     switch(decl.kind) {
@@ -36,7 +36,7 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
         }
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
-            var type = this.resolveValueDecl(decl as (*VarDecl))
+            var type = this.resolveValueDecl(decl)
             if(!type) {
                 return false
             }
@@ -45,29 +45,29 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
             return true;
         }
         case StmtKind.NOTE_DECL: {
-            var aggDecl = decl as (*AggregateDecl)
+            var aggDecl = decl
             return this.resolveNoteDecl(aggDecl)
         }
         case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
-            var aggDecl = decl as (*AggregateDecl)
+            var aggDecl = decl
             return this.resolveAggregateDecl(aggDecl)
         }
         case StmtKind.ENUM_DECL: {
-            var enumDecl = decl as (*EnumDecl)
+            var enumDecl = decl
             return this.resolveEnumDecl(enumDecl)
         }
         case StmtKind.FUNC_DECL: {
-            var funcDecl = decl as (*FuncDecl)
+            var funcDecl = decl
             return this.resolveFuncDecl(funcDecl)
         }
         case StmtKind.TYPEDEF_DECL: {
-            var typedefDecl = decl as (*TypedefDecl)
+            var typedefDecl = decl
             return this.resolveTypedefDecl(typedefDecl)
         }
         case StmtKind.PARAM_DECL: {
-            var paramDecl = decl as (*ParameterDecl)
+            var paramDecl = decl
             return this.resolveParamDecl(paramDecl)
         }
         case StmtKind.NATIVE_DECL:
@@ -82,12 +82,13 @@ public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     return false
 }
 
-public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
-    defer this.references.addTypeReferenceBySymbol(decl.startPos, decl.sym)
+public func (this: *TypeChecker) resolveValueDecl(node: *Node) : *TypeInfo {
+    defer this.references.addTypeReferenceBySymbol(node.startPos, decl.sym)
+    var decl = node.varDecl
 
     if(!decl.expr && decl.kind == StmtKind.CONST_DECL) {
         if(!decl.hasNote("foreign")) {
-            this.result.addError(decl.startPos, "const declaration must have an assignment (unless it is '@foreign')")
+            this.result.addError(node.startPos, "const declaration must have an assignment (unless it is '@foreign')")
             return null
         }
     }
@@ -150,13 +151,14 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
             return &POISON_TYPE
         }
 
-        this.result.addError(decl.startPos,
+        this.result.addError(node.startPos,
                 "invalid variable declaration, can't infer type for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
     }
     return resultType
 }
 
-func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {
+func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(node: *Node, field: FieldStmt, index: i32) : bool {
+    var aggDecl = &node.aggregateDecl
     var errors = this.errors()
     switch(field.kind) {
         case StmtKind.TRAIT_FIELD_DECL: {
@@ -235,7 +237,7 @@ func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
 
 }
 
-func (this: *TypeChecker) errorDuplicateMember(aggDecl: *Decl, fieldName: InternedString, pos: SrcPos) {
+func (this: *TypeChecker) errorDuplicateMember(aggDecl: *Node, fieldName: InternedString, pos: SrcPos) {
     if(aggDecl.name.str.length) {
         this.result.addError(pos, "duplicate member '%.*s' in '%.*s'",
                                         fieldName.length, fieldName.buffer,
@@ -758,9 +760,9 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         this.numOfLabels = 0
 
         // Coroutines needs special AST modifications
-        // if(isCoroutine) {
-        //     LowerFuncBody(this, funcDecl)
-        // }
+        if(isCoroutine) {
+            LowerFuncBody(this, funcDecl)
+        }
 
         if(!this.resolveStmt(funcDecl.body)) {
             return false

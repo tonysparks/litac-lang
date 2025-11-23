@@ -198,7 +198,7 @@ func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
 }
 
 
-func (this: *SourceLookup) isDeclAtPos(decl: *Decl) : bool {
+func (this: *SourceLookup) isDeclAtPos(decl: *Node) : bool {
     if(!decl) {
         return false
     }
@@ -213,7 +213,7 @@ func (this: *SourceLookup) isDeclAtPos(decl: *Decl) : bool {
     return this.isNodeAtPos(decl.node)
 }
 
-func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
+func (this: *SourceLookup) visitDecl(node: *Node) : bool {
     if(!node) return false;
 
     switch(node.kind) {
@@ -421,15 +421,15 @@ func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
 }
 
 
-func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
+func (this: *SourceLookup) visitStmt(node: *Node) : bool {
     if(!node) return false;
 
     if(IsExpr(node)) {
-        return this.visitExpr(node as (*Expr))
+        return this.visitExpr(node as (*Node))
     }
 
     if(IsDecl(node)) {
-        return this.visitDecl(node as (*Decl))
+        return this.visitDecl(node as (*Node))
     }
 
     switch(node.kind) {
@@ -608,7 +608,7 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
     return false
 }
 
-func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
+func (this: *SourceLookup) visitExpr(node: *Node) : bool {
     if(!node) return false;
 
     switch(node.kind) {

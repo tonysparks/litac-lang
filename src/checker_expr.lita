@@ -25,7 +25,7 @@ import "parser"
 import "lsp/references"
 import "checker_decl"
 
-public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
+public func (this: *TypeChecker) resolveConstExpr(expr: *Node) : bool {
     if(!this.resolveExpr(expr)) {
         return false
     }
@@ -37,7 +37,7 @@ public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
     return true
 }
 
-public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
+public func (this: *TypeChecker) resolveExpr(expr: *Node) : bool {
     if(!expr) return false
 
     defer {
@@ -130,7 +130,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
             return false
         }
         default: {
-            PrintStmt(expr as (*Stmt))
+            PrintStmt(expr as (*Node))
             assert(false)
         }
     }
@@ -190,9 +190,9 @@ func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, suppliedArgs: *Arr
     return true
 }
 
-public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
+public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Node,
                                               sourceType: *TypeInfo,
-                                              targetType: *TypeInfo) : *Expr {
+                                              targetType: *TypeInfo) : *Node {
 
     if(!IsAggregateLike(targetType)) {
         return expr
@@ -285,7 +285,7 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
 
 func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
                                         index: i32,
-                                        argExpr: *Expr,
+                                        argExpr: *Node,
                                         paramInfo: *TypeInfo,
                                         suppliedArgs: *Array<CallArg>) : bool {
     if(!this.resolveExpr(argExpr)) {
@@ -577,7 +577,7 @@ func (this: *TypeChecker) inferredType(
     return null
 }
 
-func (this: *TypeChecker) checkInferrability(expr: *Expr, type: *TypeInfo) : bool {
+func (this: *TypeChecker) checkInferrability(expr: *Node, type: *TypeInfo) : bool {
     // Function ptr with generic arguments can't be inferred when used as a parameter to a generic function
     // for which we are trying to infer for, as there is nothing in the function ptr to hint for the
     // actual type.
@@ -606,7 +606,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
             goto err;
         }
     }
-    var objectExpr: *Expr = expr.object
+    var objectExpr: *Node = expr.object
     if(isMethodCall) {
         var getExpr: *GetExpr = expr.object as (*GetExpr);
         objectExpr = &getExpr.field.expr;
@@ -2291,7 +2291,7 @@ err:
     return false
 }
 
-func (this: *TypeChecker) errorRvalueAssignmentToTrait(expr: *Expr, type: *TypeInfo, typeTrait: *TypeInfo) {
+func (this: *TypeChecker) errorRvalueAssignmentToTrait(expr: *Node, type: *TypeInfo, typeTrait: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
@@ -2305,7 +2305,7 @@ func (this: *TypeChecker) errorRvalueAssignmentToTrait(expr: *Expr, type: *TypeI
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {
+func (this: *TypeChecker) errorNonIndexableType(expr: *Node, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
@@ -2317,7 +2317,7 @@ func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorSetIndexingConstType(expr: *Expr, type: *TypeInfo) {
+func (this: *TypeChecker) errorSetIndexingConstType(expr: *Node, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
@@ -2329,7 +2329,7 @@ func (this: *TypeChecker) errorSetIndexingConstType(expr: *Expr, type: *TypeInfo
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorIndexType(expr: *Expr, type: *TypeInfo) {
+func (this: *TypeChecker) errorIndexType(expr: *Node, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
@@ -2342,7 +2342,7 @@ func (this: *TypeChecker) errorIndexType(expr: *Expr, type: *TypeInfo) {
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNonAggregateType(expr: *Expr, type: *TypeInfo) {
+func (this: *TypeChecker) errorNonAggregateType(expr: *Node, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
@@ -2355,7 +2355,7 @@ func (this: *TypeChecker) errorNonAggregateType(expr: *Expr, type: *TypeInfo) {
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
+func (this: *TypeChecker) errorNonFuncType(expr: *Node, type: *TypeInfo) {
     assert(expr != null)
     assert(type != null)
 
@@ -2368,7 +2368,7 @@ func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorSuspendFuncInNonSuspendScope(expr: *Expr, sym: *Symbol) {
+func (this: *TypeChecker) errorSuspendFuncInNonSuspendScope(expr: *Node, sym: *Symbol) {
     assert(expr != null)
     assert(sym != null)
 
@@ -2379,7 +2379,7 @@ func (this: *TypeChecker) errorSuspendFuncInNonSuspendScope(expr: *Expr, sym: *S
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *const char) {
+func (this: *TypeChecker) errorOperand(expr: *Node, type: *TypeInfo, side: *const char) {
     assert(expr != null)
     assert(type != null)
 
@@ -2391,7 +2391,7 @@ func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *cons
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field: InternedString) {
+func (this: *TypeChecker) errorEnumFieldSet(expr: *Node, type: *TypeInfo, field: InternedString) {
     assert(expr != null)
     assert(type != null)
 
@@ -2403,7 +2403,7 @@ func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field:
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-public func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: InternedString) {
+public func (this: *TypeChecker) errorNoField(expr: *Node, type: *TypeInfo, field: InternedString) {
     assert(expr != null)
     assert(type != null)
 
@@ -2416,7 +2416,7 @@ public func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, fiel
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNoFieldAt(expr: *Expr, type: *TypeInfo, position: i32) {
+func (this: *TypeChecker) errorNoFieldAt(expr: *Node, type: *TypeInfo, position: i32) {
     assert(expr != null)
     assert(type != null)
 
@@ -2429,7 +2429,7 @@ func (this: *TypeChecker) errorNoFieldAt(expr: *Expr, type: *TypeInfo, position:
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field: InternedString) {
+func (this: *TypeChecker) errorNoFieldAccess(expr: *Node, type: *TypeInfo, field: InternedString) {
     assert(expr != null)
     assert(type != null)
 
@@ -2442,13 +2442,13 @@ func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorInferGenericParameter(expr: *Expr, param: *GenericParam) {
+func (this: *TypeChecker) errorInferGenericParameter(expr: *Node, param: *GenericParam) {
     assert(expr != null)
     assert(param != null)
     this.result.addError(expr.startPos, "unable to infer generic parameter '%.*s'", param.name.str.length, param.name.str.buffer)
 }
 
-func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Array<GenericParam>, details: *const char = null) {
+func (this: *TypeChecker) errorInferGenericParameters(expr: *Node, params: *Array<GenericParam>, details: *const char = null) {
     assert(expr != null)
     assert(params != null)
 
@@ -2470,7 +2470,7 @@ func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Arra
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: InternedString, genericParams: *Array<GenericParam>) {
+func (this: *TypeChecker) errorMissingGenericArguments(expr: *Node, typeName: InternedString, genericParams: *Array<GenericParam>) {
     assert(expr != null)
     assert(genericParams != null)
 
@@ -2488,7 +2488,7 @@ func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: In
     this.result.addErrorStr(expr.startPos, sb)
 }
 
-func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Expr) {
+func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Node) {
     assert(arg != null)
 
     var sb = StringBuilderInit(128, this.allocator)
@@ -2498,7 +2498,7 @@ func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Expr) {
 }
 
 
-func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Expr) {
+func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Node) {
     assert(expr != null)
 
     var sb = StringBuilderInit(128, this.allocator)
@@ -2528,7 +2528,7 @@ func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *Interned
     this.result.addErrorStr(pos, sb)
 }
 
-func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
+func (this: *TypeChecker) checkConstant(expr: *Node) : bool {
     assert(expr != null)
 
     var sym: *Symbol = null
@@ -2564,7 +2564,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     return true
 }
 
-internal func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo) : bool {
+internal func (this: *TypeChecker) checkTruthyness(expr: *Node, type: *TypeInfo) : bool {
     assert(expr != null)
     assert(type != null)
 
@@ -2580,7 +2580,7 @@ internal func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo)
     return true
 }
 
-func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
+func (this: *TypeChecker) checkRightValue(expr: *Node) : bool {
     assert(expr != null)
     if(expr.operand.isRightValue) {
         this.result.addError(expr.startPos, "rvalue can't be assigned to")

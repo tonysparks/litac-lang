@@ -30,24 +30,23 @@ public struct FuncLowerContext {
     funcDecl: *FuncDecl
     tempIndex: u32
 
+
     current: *BlockScope
+
+    //stack: Map<String, InternedString>
+    stack: Array<InternedString>
+    scopeIndex: u32
+    // numOfScopes: u32
+
+    patches: Array<Patch>
 }
 
-func (this: *FuncLowerContext) push(scope: *BlockScope) {
-    var current = this.current
-    this.current = scope
-    scope.parent = current
+struct Patch {
+    stmt: *Node
+    block: *BlockStmt
+    index: u32
 }
-func (this: *FuncLowerContext) pop() {
-    if(!this.current) return;
 
-    var parent = this.current.parent
-    this.current = parent
-}
-func (this: *FuncLowerContext) currentBlock(): *BlockStmt {
-    if(!this.current) return null;
-    return this.current.block
-}
 
 struct BlockScope {
     parent: *BlockScope
@@ -55,6 +54,58 @@ struct BlockScope {
     insertIndex: i32
     numberOfInserts: i32
     noTemp: bool
+
+    locals: Array<InternedString>
+}
+
+func (this: *FuncLowerContext) setVar(name: InternedString) : InternedString {
+    if (this.current.locals.capacity == 0) {
+        this.current.locals = ArrayInit<InternedString>(16, this.allocator)
+    }
+
+    var buffer: [MAX_SYMBOL_NAME]char;
+    var sb = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
+    sb.format("%.*s__%d", name.length, name.buffer, this.scopeIndex)
+
+    var internedName = this.strings.internCopy(sb.cStr(), sb.length)
+    this.current.locals.add(internedName)
+    this.stack.add(internedName)
+}
+
+func (this: *FuncLowerContext) getVar(name: InternedString) : InternedString {
+    assert(this.current != null)
+
+    var scope = this.current
+    while(scope != null) {
+        for(var i = 0; i < scope.locals.size(); i+=1) {
+            var localName = scope.locals.get(i)
+            if (localName.view.startsWith(name.view)) {
+                return localName
+            }
+        }
+
+        scope = scope.parent
+    }
+
+    return InternedString{}
+}
+
+func (this: *FuncLowerContext) push(scope: *BlockScope) {
+    var current = this.current
+    this.current = scope
+    scope.parent = current
+    this.scopeIndex += 1
+}
+func (this: *FuncLowerContext) pop() {
+    if(!this.current) return;
+
+    var parent = this.current.parent
+    this.current = parent
+    // this.scopeIndex -= 1
+}
+func (this: *FuncLowerContext) currentBlock(): *BlockStmt {
+    if(!this.current) return null;
+    return this.current.block
 }
 
 func NewTempName(context: *FuncLowerContext) : StringBuilder {
@@ -63,7 +114,7 @@ func NewTempName(context: *FuncLowerContext) : StringBuilder {
     return name
 }
 
-func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
+func NewTempAssignment(context: *FuncLowerContext, expr: *Node) : *VarDecl {
     var name = NewTempName(context)
 
     var temp = NewVarDecl(
@@ -77,16 +128,17 @@ func NewTempAssignment(context: *FuncLowerContext, expr: *Expr) : *VarDecl {
         null,
         expr,
         context.allocator
-    )
+    ) as (*VarDecl)
+    temp.flags |= VarDeclFlags.IS_TEMPORARY
 
-    InsertTempStmt(context, temp as (*Stmt), .atEnd = true)
+    InsertTempStmt(context, temp as (*Node), .atEnd = true)
 
     return temp as (*VarDecl)
 }
 
 func NewTempEmptyAssignment(
     context: *FuncLowerContext,
-    expr: *Expr,
+    expr: *Node,
     isTernary: bool = false
 ) : *VarDecl {
     var name = NewTempName(context)
@@ -104,15 +156,16 @@ func NewTempEmptyAssignment(
         ) : null,
         null,
         context.allocator
-    )
+    ) as (*VarDecl)
+    temp.flags |= VarDeclFlags.IS_TEMPORARY
 
-    InsertTempStmt(context, temp as (*Stmt), .atEnd = true)
+    InsertTempStmt(context, temp as (*Node), .atEnd = true)
     return temp as (*VarDecl)
 }
 
 func InsertTempStmt(
     context: *FuncLowerContext,
-    stmt: *Stmt,
+    stmt: *Node,
     atEnd: bool
 ) {
 
@@ -133,10 +186,10 @@ func InsertTempStmt(
 func PushBlock(
     context: *FuncLowerContext,
     scope: *BlockScope,
-    stmt1: *Stmt,
-    stmt2: *Stmt = null
+    stmt1: *Node,
+    stmt2: *Node = null
 ) : *BlockStmt {
-    var stmts = ArrayInit<*Stmt>(2, context.allocator)
+    var stmts = ArrayInit<*Node>(2, context.allocator)
     stmts.add(stmt1)
     if(stmt2) {
         stmts.add(stmt2)
@@ -177,9 +230,9 @@ func PushBlock(
         x = object.value(_5, _6)
     }
 */
-public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) {
+public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
     if(!funcDecl.body) {
-        return;
+        return true;
     }
 
     var context = FuncLowerContext {
@@ -189,11 +242,14 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) {
         .funcDecl = funcDecl,
         .tempIndex = 0_u32,
         .current = null,
+        .scopeIndex = 0_u32,
+        .stack = ArrayInit<InternedString>(64, checker.allocator),
+        .patches = ArrayInit<Patch>(64, checker.allocator),
     }
 
     if(funcDecl.body.kind != StmtKind.FUNC_BODY_STMT) {
         var body = funcDecl.body
-        var stmts = ArrayInit<*Stmt>(1, checker.allocator)
+        var stmts = ArrayInit<*Node>(1, checker.allocator)
         stmts.add(body)
 
         funcDecl.body = NewFuncBodyStmt(
@@ -203,7 +259,22 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) {
         )
     }
 
-    funcDecl.body = FunctionLowering(&context, funcDecl.body) as (*Stmt)
+    funcDecl.body = FunctionLowering(&context, funcDecl.body) as (*Node)
+
+    if(!checker.resolveStmt(funcDecl.body)) {
+        return false
+    }
+
+    for(var i = 0; i < context.patches.size(); i+=1) {
+
+    }
+
+    // for(var i = 0; i < context.stack.size(); i+=1) {
+    //     var e = context.stack.get(i)
+    //     printf(
+    //         "%.*s\n", e.length, e.buffer
+    //     )
+    // }
 }
 
 func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
@@ -228,7 +299,17 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         case StmtKind.VAR_DECL: {
             var decl = ast as (*VarDecl)
             if(decl.expr) {
-                decl.expr = FunctionLowering(context, decl.expr) as (*Expr)
+                decl.expr = FunctionLowering(context, decl.expr) as (*Node)
+            }
+            if(!(decl.flags & VarDeclFlags.IS_TEMPORARY)) {
+                context.setVar(decl.name.str)
+                context.patches.add(
+                    Patch {
+                        .stmt = decl as (*Node),
+                        .block = context.current.block,
+                        .index = context.current.insertIndex,
+                    }
+                )
             }
             break;
         }
@@ -251,7 +332,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 scope.insertIndex = i
                 scope.noTemp = !RequiresFuncTempResult(stmt)
 
-                stmt = FunctionLowering(context, stmt) as (*Stmt)
+                stmt = FunctionLowering(context, stmt) as (*Node)
                 i = i + scope.numberOfInserts
                 body.stmts.set(i, stmt)
 
@@ -265,14 +346,14 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         case StmtKind.COMP_STMT: {
             var comp = ast as (*CompStmt)
             if(comp.evaluatedStmt) {
-                comp.evaluatedStmt = FunctionLowering(context, comp.evaluatedStmt) as (*Stmt)
+                comp.evaluatedStmt = FunctionLowering(context, comp.evaluatedStmt) as (*Node)
             }
             if(comp.end) {
                 comp.end = FunctionLowering(context, comp.end) as (*CompStmt)
             }
             for(var i = 0; i < comp.body.size(); i+=1) {
                 var s = comp.body.get(i)
-                s = FunctionLowering(context, s) as (*Stmt)
+                s = FunctionLowering(context, s) as (*Node)
                 comp.body.set(i, s)
             }
             break;
@@ -282,7 +363,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.DEFER_STMT: {
             var deferStmt = ast as (*DeferStmt)
-            deferStmt.deferedStmt = FunctionLowering(context, deferStmt.deferedStmt) as (*Stmt)
+            deferStmt.deferedStmt = FunctionLowering(context, deferStmt.deferedStmt) as (*Node)
             break;
         }
         case StmtKind.DO_WHILE_STMT: {
@@ -325,8 +406,8 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 context.allocator
             )
 
-            whileStmt.body = FunctionLowering(context, block) as (*Stmt)
-            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Expr)
+            whileStmt.body = FunctionLowering(context, block) as (*Node)
+            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Node)
             break;
         }
         case StmtKind.EMPTY_STMT: {
@@ -345,7 +426,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                     }
                 }
             */
-            var stmts = ArrayInit<*Stmt>(2, context.allocator)
+            var stmts = ArrayInit<*Node>(2, context.allocator)
             if(forStmt.body) {
                 stmts.add(forStmt.body)
             }
@@ -417,13 +498,13 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
             var block = PushBlock(context, &scope, ifStmt)
             defer context.pop()
 
-            ifStmt.cond = FunctionLowering(context, ifStmt.cond) as (*Expr)
+            ifStmt.cond = FunctionLowering(context, ifStmt.cond) as (*Node)
             {
                 var scope = BlockScope{}
                 var thenBlock = PushBlock(context, &scope, ifStmt.then)
                 defer context.pop()
 
-                ifStmt.then = FunctionLowering(context, thenBlock) as (*Stmt)
+                ifStmt.then = FunctionLowering(context, thenBlock) as (*Node)
             }
 
             if(ifStmt.elseStmt) {
@@ -431,7 +512,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 var elseBlock = PushBlock(context, &scope, ifStmt.elseStmt)
                 defer context.pop()
 
-                ifStmt.elseStmt = FunctionLowering(context, elseBlock) as (*Stmt)
+                ifStmt.elseStmt = FunctionLowering(context, elseBlock) as (*Node)
             }
 
             return block as (*Node)
@@ -458,14 +539,14 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         case StmtKind.RETURN_STMT: {
             var stmt = ast as (*ReturnStmt)
             if(stmt.expr) {
-                stmt.expr = FunctionLowering(context, stmt.expr) as (*Expr)
+                stmt.expr = FunctionLowering(context, stmt.expr) as (*Node)
             }
             break;
         }
         case StmtKind.SWITCH_CASE_STMT: {
             var caseStmt = ast as (*SwitchCaseStmt)
-            caseStmt.cond = FunctionLowering(context, caseStmt.cond) as (*Expr)
-            caseStmt.body = FunctionLowering(context, caseStmt.body) as (*Stmt)
+            caseStmt.cond = FunctionLowering(context, caseStmt.cond) as (*Node)
+            caseStmt.body = FunctionLowering(context, caseStmt.body) as (*Node)
             break;
         }
         case StmtKind.SWITCH_STMT:{
@@ -483,14 +564,14 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
             var block = PushBlock(context, &scope, switchStmt)
             defer context.pop()
 
-            switchStmt.cond = FunctionLowering(context, switchStmt.cond) as (*Expr)
+            switchStmt.cond = FunctionLowering(context, switchStmt.cond) as (*Node)
             for(var i = 0; i < switchStmt.cases.size(); i+=1) {
                 var caseStmt = switchStmt.cases.get(i)
                 caseStmt = FunctionLowering(context, caseStmt) as (*SwitchCaseStmt)
                 switchStmt.cases.set(i, caseStmt)
             }
             if(switchStmt.defaultStmt) {
-                switchStmt.defaultStmt = FunctionLowering(context, switchStmt.defaultStmt) as (*Stmt)
+                switchStmt.defaultStmt = FunctionLowering(context, switchStmt.defaultStmt) as (*Node)
             }
 
             return block as (*Node)
@@ -536,8 +617,8 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 context.allocator
             )
 
-            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Expr)
-            whileStmt.body = FunctionLowering(context, whileStmt.body) as (*Stmt)
+            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Node)
+            whileStmt.body = FunctionLowering(context, whileStmt.body) as (*Node)
             break;
         }
 
@@ -547,15 +628,15 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         ----------------------------------------*/
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = ast as (*ArrayDesignationExpr)
-            expr.index = FunctionLowering(context, expr.index) as (*Expr)
-            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            expr.index = FunctionLowering(context, expr.index) as (*Node)
+            expr.value = FunctionLowering(context, expr.value) as (*Node)
             break;
         }
         case StmtKind.ARRAY_INIT_EXPR: {
             var expr = ast as (*ArrayInitExpr)
             for(var i = 0; i < expr.values.size(); i += 1) {
                 var arg = expr.values.get(i)
-                arg = FunctionLowering(context, arg) as (*Expr)
+                arg = FunctionLowering(context, arg) as (*Node)
                 expr.values.set(i, arg)
             }
             break;
@@ -616,7 +697,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                     context.allocator
                 )
 
-                ifRight = FunctionLowering(context, ifRight) as (*Stmt)
+                ifRight = FunctionLowering(context, ifRight) as (*Node)
 
                 var ifLeft = NewIfStmt(
                     expr.startPos, expr.endPos,
@@ -626,7 +707,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                     context.allocator
                 )
 
-                ifLeft = FunctionLowering(context, ifLeft) as (*Stmt)
+                ifLeft = FunctionLowering(context, ifLeft) as (*Node)
                 InsertTempStmt(context, ifLeft, .atEnd = true)
 
                 return resultExpr as (*Node)
@@ -687,7 +768,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                     context.allocator
                 )
 
-                ifRight = FunctionLowering(context, ifRight) as (*Stmt)
+                ifRight = FunctionLowering(context, ifRight) as (*Node)
 
                 var ifLeft = NewIfStmt(
                     expr.startPos, expr.endPos,
@@ -707,13 +788,13 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                     context.allocator
                 )
 
-                ifLeft = FunctionLowering(context, ifLeft) as (*Stmt)
+                ifLeft = FunctionLowering(context, ifLeft) as (*Node)
                 InsertTempStmt(context, ifLeft, .atEnd = true)
 
                 return resultExpr as (*Node)
             } else {
-                expr.left = FunctionLowering(context, expr.left) as (*Expr)
-                expr.right = FunctionLowering(context, expr.right) as (*Expr)
+                expr.left = FunctionLowering(context, expr.left) as (*Node)
+                expr.right = FunctionLowering(context, expr.right) as (*Node)
             }
             break;
         }
@@ -722,7 +803,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.CAST_EXPR: {
             var expr = ast as (*CastExpr)
-            expr.exprToCast = FunctionLowering(context, expr.exprToCast) as (*Expr)
+            expr.exprToCast = FunctionLowering(context, expr.exprToCast) as (*Node)
             break;
         }
         case StmtKind.CHAR_EXPR: {
@@ -746,11 +827,11 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 var t1 = temp
                 t1
             */
-            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.object = FunctionLowering(context, expr.object) as (*Node)
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
                 var arg = expr.arguments.getPtr(i)
-                arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Expr)
+                arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Node)
             }
 
             if (context.current.noTemp) {
@@ -772,23 +853,36 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 context.allocator
             ) as (*Node)
         }
-        case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            var expr = ast as (*IdentifierExpr)
-            break;
-        }
         case StmtKind.GET_EXPR: {
             var expr = ast as (*GetExpr)
-            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.object = FunctionLowering(context, expr.object) as (*Node)
             expr.field = FunctionLowering(context, expr.field) as (*IdentifierExpr)
             break;
         }
         case StmtKind.GROUP_EXPR: {
             var expr = ast as (*GroupExpr)
-            expr.groupedExpr = FunctionLowering(context, expr.groupedExpr) as (*Expr)
+            expr.groupedExpr = FunctionLowering(context, expr.groupedExpr) as (*Node)
             break;
         }
+        case StmtKind.FUNC_IDENTIFIER_EXPR:
         case StmtKind.IDENTIFIER_EXPR: {
             var expr = ast as (*IdentifierExpr)
+            if (expr.type.kind == TypeSpecKind.NAME) {
+                var name = context.getVar(expr.type.name)
+                if (name.length != 0) {
+                    // printf("~%.*s vs %.*s\n",
+                    //     expr.type.name.length, expr.type.name.buffer,
+                    //     name.length, name.buffer
+                    // )
+                    context.patches.add(
+                        Patch {
+                            .stmt = expr as (*Node),
+                            .block = context.current.block,
+                            .index = context.current.insertIndex,
+                        }
+                    )
+                }
+            }
             break;
         }
         case StmtKind.INIT_EXPR: {
@@ -803,7 +897,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.INIT_ARG_EXPR: {
             var expr = ast as (*InitArgExpr)
-            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            expr.value = FunctionLowering(context, expr.value) as (*Node)
             break;
         }
         case StmtKind.NULL_EXPR: {
@@ -818,14 +912,14 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.SET_EXPR: {
             var expr = ast as (*SetExpr)
-            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.object = FunctionLowering(context, expr.object) as (*Node)
             expr.field = FunctionLowering(context, expr.field) as (*IdentifierExpr)
-            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            expr.value = FunctionLowering(context, expr.value) as (*Node)
             break;
         }
         case StmtKind.SIZE_OF_EXPR: {
             var expr = ast as (*SizeOfExpr)
-            expr.sizeOfExpr = FunctionLowering(context, expr.sizeOfExpr) as (*Expr)
+            expr.sizeOfExpr = FunctionLowering(context, expr.sizeOfExpr) as (*Node)
             break;
         }
         case StmtKind.NATIVE_STRING_EXPR: {
@@ -836,15 +930,15 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
             var expr = ast as (*SubscriptGetExpr)
-            expr.object = FunctionLowering(context, expr.object) as (*Expr)
-            expr.index = FunctionLowering(context, expr.index) as (*Expr)
+            expr.object = FunctionLowering(context, expr.object) as (*Node)
+            expr.index = FunctionLowering(context, expr.index) as (*Node)
             break;
         }
         case StmtKind.SUBSCRIPT_SET_EXPR: {
             var expr = ast as (*SubscriptSetExpr)
-            expr.object = FunctionLowering(context, expr.object) as (*Expr)
-            expr.index = FunctionLowering(context, expr.index) as (*Expr)
-            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            expr.object = FunctionLowering(context, expr.object) as (*Node)
+            expr.index = FunctionLowering(context, expr.index) as (*Node)
+            expr.value = FunctionLowering(context, expr.value) as (*Node)
             break;
         }
         case StmtKind.TERNARY_EXPR: {
@@ -903,7 +997,7 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
                 context.allocator
             )
 
-            ifStmt = FunctionLowering(context, ifStmt) as (*Stmt)
+            ifStmt = FunctionLowering(context, ifStmt) as (*Node)
             InsertTempStmt(context, ifStmt, .atEnd = true)
 
             return resultExpr as (*Node)
@@ -915,12 +1009,12 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Node) : *Node {
         case StmtKind.NAME_OF_EXPR:
         case StmtKind.TYPE_OF_EXPR: {
             var expr = ast as (*TypeOfExpr)
-            expr.typeOfExpr = FunctionLowering(context, expr.typeOfExpr) as (*Expr)
+            expr.typeOfExpr = FunctionLowering(context, expr.typeOfExpr) as (*Node)
             break;
         }
         case StmtKind.UNARY_EXPR: {
             var expr = ast as (*UnaryExpr)
-            expr.unaryExpr = FunctionLowering(context, expr.unaryExpr) as (*Expr)
+            expr.unaryExpr = FunctionLowering(context, expr.unaryExpr) as (*Node)
             break;
         }
         case StmtKind.POISON_EXPR: {

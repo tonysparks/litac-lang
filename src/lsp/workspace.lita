@@ -229,7 +229,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
             case StmtKind.TRAIT_DECL:
             case StmtKind.ENUM_DECL:
             case StmtKind.FUNC_DECL: {
-                var decl = location.node as (*Decl)
+                var decl = location.node as (*Node)
 
                 // look for the type references
                 if(decl.sym && decl.sym.type) {
@@ -288,7 +288,7 @@ public func (this: *Workspace) references(uri: *const char, position: *JsonNode,
             case StmtKind.CONST_DECL:
             case StmtKind.VAR_DECL:
             case StmtKind.PARAM_DECL: {
-                var decl = location.node as (*Decl)
+                var decl = location.node as (*Node)
                 var result = this.lsp.lita.references.getSymbolReferences(decl.sym)
                 return SrcPosToLocations(this.rootPath, &result, alloc)
             }
@@ -517,7 +517,7 @@ public func (this: *Workspace) goToDefinition(uri: *const char, position: *JsonN
             case StmtKind.FUNC_DECL: {
                 // not really necessary, as this will just point back to where the user is currently
                 // asking for the definition -- but OK.
-                var decl = location.node as (*Decl)
+                var decl = location.node as (*Node)
                 return SrcPosWithEndToLocation(decl.startPos, decl.endPos, this.rootPath, alloc)
             }
             case StmtKind.TRAIT_FIELD_DECL: {

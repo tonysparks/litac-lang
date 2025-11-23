@@ -137,7 +137,7 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
     var notes = Array<*NoteStmt>{}
     notes.init(2, p.allocator)
 
-    var declarations = Array<*Decl>{}
+    var declarations = Array<*Node>{}
     declarations.init(16, p.allocator)
 
     var moduleStmt = NewModuleStmt(pos, pos, imports, notes, declarations, p.allocator) as (*ModuleStmt)
@@ -247,7 +247,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
     }
 }
 
-func (p: *Parser) parseCompileTimeBody() : *Stmt {
+func (p: *Parser) parseCompileTimeBody() : *Node {
     var pos = p.pos()
 
     if(p.match(TokenType.IMPORT)) {
@@ -256,7 +256,7 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
             goto err;
         }
 
-        return importDecl as (*Stmt)
+        return importDecl as (*Node)
     }
     else {
         var notes = Array<*NoteStmt>{}
@@ -272,7 +272,7 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
             visibility = Visibility.PUBLIC
         }
 
-        var decl: *Decl = null
+        var decl: *Node = null
 
         if(p.match(TokenType.VAR)) {
             decl = p.varDeclaration()
@@ -303,7 +303,7 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
         }
         else if(p.match(TokenType.SEMICOLON)) {
             if(!notes.empty()) {
-                return NewNotesDecl(pos, p.pos(), notes, p.allocator) as (*Stmt)
+                return NewNotesDecl(pos, p.pos(), notes, p.allocator) as (*Node)
             }
             return null;
         }
@@ -316,9 +316,9 @@ func (p: *Parser) parseCompileTimeBody() : *Stmt {
         decl.attributes.visibility = visibility
         decl.attributes.isGlobal = true
 
-        return decl as (*Stmt);
+        return decl as (*Node);
 err:
-        return NewPoisonDecl(pos, p.pos(), p.allocator) as (*Stmt)
+        return NewPoisonDecl(pos, p.pos(), p.allocator) as (*Node)
     }
 }
 
@@ -395,7 +395,7 @@ err:
     return false
 }
 
-func (p: *Parser) varDeclaration() : *Decl {
+func (p: *Parser) varDeclaration() : *Node {
     var pos = p.prevPos()
 
     var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
@@ -409,7 +409,7 @@ func (p: *Parser) varDeclaration() : *Decl {
     }
 
     var type: *TypeSpec = null
-    var expr: *Expr = null
+    var expr: *Node = null
 
     if(p.match(TokenType.COLON)) {
         type = p.type()
@@ -435,7 +435,7 @@ err:
     return p.poisonDecl(pos)
 }
 
-func (p: *Parser) constDeclaration() : *Decl {
+func (p: *Parser) constDeclaration() : *Node {
     var decl = p.varDeclaration()
     if(decl.kind == StmtKind.VAR_DECL) {
         decl.kind = StmtKind.CONST_DECL
@@ -443,7 +443,7 @@ func (p: *Parser) constDeclaration() : *Decl {
     return decl;
 }
 
-func (p: *Parser) funcDeclaration() : *Decl {
+func (p: *Parser) funcDeclaration() : *Node {
     var pos = p.prevPos()
     p.funcLevel += 1;
 
@@ -509,7 +509,7 @@ func (p: *Parser) funcDeclaration() : *Decl {
         flags |= FuncFlags.IS_METHOD;
     }
 
-    var body: *Stmt = null;
+    var body: *Node = null;
     if(p.match(TokenType.SEMICOLON)) {
         body = NewEmptyStmt(p.prevPos(), p.pos(), p.allocator)
     }
@@ -532,19 +532,19 @@ err:
     return p.poisonDecl(pos)
 }
 
-func (p: *Parser) structDeclaration() : *Decl {
+func (p: *Parser) structDeclaration() : *Node {
     return p.aggregateDeclaration(StmtKind.STRUCT_DECL)
 }
 
-func (p: *Parser) unionDeclaration() : *Decl {
+func (p: *Parser) unionDeclaration() : *Node {
     return p.aggregateDeclaration(StmtKind.UNION_DECL)
 }
 
-func (p: *Parser) traitDeclaration() : *Decl {
+func (p: *Parser) traitDeclaration() : *Node {
     return p.aggregateDeclaration(StmtKind.TRAIT_DECL)
 }
 
-func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Decl {
+func (p: *Parser) aggregateDeclaration(kind: StmtKind) : *Node {
     var pos = p.prevPos()
 
     var flags = 0;
@@ -634,7 +634,7 @@ err:
     return p.poisonDecl(pos)
 }
 
-func (p: *Parser) enumDeclaration() : *Decl {
+func (p: *Parser) enumDeclaration() : *Node {
     var pos = p.prevPos()
 
     var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
@@ -677,7 +677,7 @@ err:
     return p.poisonDecl(pos)
 }
 
-func (p: *Parser) typedefDeclaration() : *Decl {
+func (p: *Parser) typedefDeclaration() : *Node {
     var pos = p.prevPos()
     var aliasedType = p.type()
     if(!aliasedType) {
@@ -710,7 +710,7 @@ err:
 }
 
 
-func (p: *Parser) noteDeclaration() : *Decl {
+func (p: *Parser) noteDeclaration() : *Node {
     var pos = p.prevPos()
 
     var identifier = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
@@ -781,7 +781,7 @@ func (p: *Parser) paramDeclaration() : *ParameterDecl {
         goto err;
     }
 
-    var defaultExpr: *Expr = null
+    var defaultExpr: *Node = null
     if(p.match(TokenType.EQUALS)) {
         defaultExpr = p.constExpression()
     }
@@ -798,7 +798,7 @@ err:
                             Expressions
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-public func (p: *Parser) expression() : *Expr {
+public func (p: *Parser) expression() : *Node {
     var pos = p.pos()
 
     var errorCount = p.numOfErrors()
@@ -819,21 +819,21 @@ public func (p: *Parser) expression() : *Expr {
     return expr
 }
 
-func (p: *Parser) constExpression() : *Expr {
+func (p: *Parser) constExpression() : *Node {
     var expr = p.expression()
     p.checkConstExpr(expr)
 
     return expr
 }
 
-func (p: *Parser) group() : *Expr {
+func (p: *Parser) group() : *Node {
     var pos = p.prevPos()
     var expr = p.expression()
     p.consume(TokenType.RIGHT_PAREN, ErrorCode.MISSING_RIGHT_PAREN)
     return NewGroupExpr(pos, p.pos(), expr, p.allocator)
 }
 
-func (p: *Parser) arrayInit() : *Expr {
+func (p: *Parser) arrayInit() : *Node {
     var pos = p.prevPos()
     var type = p.type()
     if(!type) {
@@ -845,7 +845,7 @@ func (p: *Parser) arrayInit() : *Expr {
         goto err;
     }
 
-    var values = Array<*Expr>{}
+    var values = Array<*Node>{}
     if(p.match(TokenType.LEFT_BRACE)) {
         if(!p.arrayArguments(&values)) {
             goto err;
@@ -858,7 +858,7 @@ err:
     return p.poisonExpr(pos)
 }
 
-func (p: *Parser) aggregateInit() : *Expr {
+func (p: *Parser) aggregateInit() : *Node {
     var pos = p.prevPos()
     var arguments = Array<*InitArgExpr>{}
     p.structArguments(&arguments)
@@ -866,7 +866,7 @@ func (p: *Parser) aggregateInit() : *Expr {
     return NewInitExpr(pos, p.pos(), null, arguments, p.allocator)
 }
 
-func (p: *Parser) sizeOf() : *Expr {
+func (p: *Parser) sizeOf() : *Node {
     var pos = p.prevPos()
 
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
@@ -874,7 +874,7 @@ func (p: *Parser) sizeOf() : *Expr {
     }
 
     var isType = p.match(TokenType.COLON)
-    var expr: *Expr = null
+    var expr: *Node = null
     var type: *TypeSpec = null
 
     var isBaseType = false
@@ -917,7 +917,7 @@ err:
 
 }
 
-func (p: *Parser) typeOf() : *Expr {
+func (p: *Parser) typeOf() : *Node {
     var pos = p.prevPos()
 
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
@@ -925,7 +925,7 @@ func (p: *Parser) typeOf() : *Expr {
     }
 
     var isType = p.match(TokenType.COLON)
-    var expr: *Expr = null
+    var expr: *Node = null
     var type: *TypeSpec = null
 
     var isBaseType = false
@@ -967,7 +967,7 @@ err:
     return p.poisonExpr(pos)
 }
 
-func (p: *Parser) nameOf() : *Expr {
+func (p: *Parser) nameOf() : *Node {
     var expr = p.typeOf()
     if (expr.kind == StmtKind.TYPE_OF_EXPR) {
         expr.kind = StmtKind.NAME_OF_EXPR
@@ -975,7 +975,7 @@ func (p: *Parser) nameOf() : *Expr {
     return expr
 }
 
-func (p: *Parser) offsetOf() : *Expr {
+func (p: *Parser) offsetOf() : *Node {
     var pos = p.prevPos()
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
@@ -1011,7 +1011,7 @@ err:
 }
 
 
-func (p: *Parser) assignment() : *Expr {
+func (p: *Parser) assignment() : *Node {
     @static var checks = []TokenType{
         TokenType.EQUALS,
         TokenType.PLUS_EQ,
@@ -1053,7 +1053,7 @@ func (p: *Parser) assignment() : *Expr {
     return expr
 }
 
-func (p: *Parser) ternary() : *Expr {
+func (p: *Parser) ternary() : *Node {
     var expr = p.or()
     var pos = p.pos()
 
@@ -1074,7 +1074,7 @@ err:
     return p.poisonExpr(pos)
 }
 
-func (p: *Parser) or() : *Expr {
+func (p: *Parser) or() : *Node {
     var expr = p.and()
     var pos = p.pos()
 
@@ -1088,7 +1088,7 @@ func (p: *Parser) or() : *Expr {
     return expr
 }
 
-func (p: *Parser) and() : *Expr {
+func (p: *Parser) and() : *Node {
     var expr = p.bitOr()
     var pos = p.pos()
 
@@ -1102,7 +1102,7 @@ func (p: *Parser) and() : *Expr {
     return expr
 }
 
-func (p: *Parser) bitOr() : *Expr {
+func (p: *Parser) bitOr() : *Node {
     var expr = p.bitXor()
     var pos = p.pos()
 
@@ -1116,7 +1116,7 @@ func (p: *Parser) bitOr() : *Expr {
     return expr
 }
 
-func (p: *Parser) bitXor() : *Expr {
+func (p: *Parser) bitXor() : *Node {
     var expr = p.bitAnd()
     var pos = p.pos()
 
@@ -1130,7 +1130,7 @@ func (p: *Parser) bitXor() : *Expr {
     return expr
 }
 
-func (p: *Parser) bitAnd() : *Expr {
+func (p: *Parser) bitAnd() : *Node {
     var expr = p.equality()
     var pos = p.pos()
 
@@ -1144,7 +1144,7 @@ func (p: *Parser) bitAnd() : *Expr {
     return expr
 }
 
-func (p: *Parser) equality() : *Expr {
+func (p: *Parser) equality() : *Node {
     @static var checks = []TokenType{
         TokenType.NOT_EQUALS,
         TokenType.EQUALS_EQUALS
@@ -1163,7 +1163,7 @@ func (p: *Parser) equality() : *Expr {
     return expr
 }
 
-func (p: *Parser) comparison() : *Expr {
+func (p: *Parser) comparison() : *Node {
     @static var checks = []TokenType{
         TokenType.GREATER_THAN,
         TokenType.GREATER_EQUALS,
@@ -1184,7 +1184,7 @@ func (p: *Parser) comparison() : *Expr {
     return expr
 }
 
-func (p: *Parser) bitShift() : *Expr {
+func (p: *Parser) bitShift() : *Node {
     @static var checks = []TokenType{
         TokenType.LSHIFT,
         TokenType.RSHIFT
@@ -1208,7 +1208,7 @@ func (p: *Parser) bitShift() : *Expr {
     return expr
 }
 
-func (p: *Parser) term() : *Expr {
+func (p: *Parser) term() : *Node {
     @static var checks = []TokenType{
         TokenType.MINUS,
         TokenType.PLUS
@@ -1227,7 +1227,7 @@ func (p: *Parser) term() : *Expr {
     return expr
 }
 
-func (p: *Parser) factor() : *Expr {
+func (p: *Parser) factor() : *Node {
     @static var checks = []TokenType{
         TokenType.SLASH,
         TokenType.STAR,
@@ -1247,7 +1247,7 @@ func (p: *Parser) factor() : *Expr {
     return expr
 }
 
-func (p: *Parser) unary() : *Expr {
+func (p: *Parser) unary() : *Node {
     @static var checks = []TokenType{
         TokenType.NOT,
         TokenType.MINUS,
@@ -1268,7 +1268,7 @@ func (p: *Parser) unary() : *Expr {
     return p.functionCall()
 }
 
-func (p: *Parser) functionCall() : *Expr {
+func (p: *Parser) functionCall() : *Node {
     var pos = p.pos()
 
     var expr = p.primary()
@@ -1328,7 +1328,7 @@ err:
     return p.poisonExpr(pos)
 }
 
-func (p: *Parser) primary() : *Expr {
+func (p: *Parser) primary() : *Node {
     var token = p.peek()
     var pos = token.pos
     if(p.match(TokenType.TRUE)) {
@@ -1403,7 +1403,7 @@ err:
     return p.poisonExpr(pos)
 }
 
-func (p: *Parser) finishFunctionCall(expr: *Expr) : *Expr {
+func (p: *Parser) finishFunctionCall(expr: *Node) : *Node {
     var pos = expr.startPos
     var arguments = Array<CallArg>{}
     if(!p.arguments(&arguments)) {
@@ -1429,7 +1429,7 @@ err:
     return p.poisonExpr(pos)
 }
 
-func (p: *Parser) cast(expr: *Expr) : *Expr {
+func (p: *Parser) cast(expr: *Node) : *Node {
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
     }
@@ -1453,7 +1453,7 @@ err:
                             Statements
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-public func (p: *Parser) statement() : *Stmt {
+public func (p: *Parser) statement() : *Node {
     var pos = p.pos()
     var errorCount = p.numOfErrors()
     var stmt = p.tryStatement()
@@ -1467,13 +1467,13 @@ public func (p: *Parser) statement() : *Stmt {
             p.allocator.free(stmt)
         }
 
-        return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
+        return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Node)
     }
 
     return stmt
 }
 
-func (p: *Parser) tryStatement() : *Stmt {
+func (p: *Parser) tryStatement() : *Node {
     var pos = p.pos()
 
     if(p.atEnd()) {
@@ -1487,7 +1487,7 @@ func (p: *Parser) tryStatement() : *Stmt {
             goto err;
         }
 
-        var decl: *Decl = null
+        var decl: *Node = null
         if(p.match(TokenType.VAR)) {
             decl = p.varDeclaration()
         }
@@ -1501,7 +1501,7 @@ func (p: *Parser) tryStatement() : *Stmt {
 
         decl.attributes.notes = notes
         decl.startPos = pos
-        return decl as (*Stmt)
+        return decl as (*Node)
     }
 
     if(p.match(TokenType.HASH)) {
@@ -1513,11 +1513,11 @@ func (p: *Parser) tryStatement() : *Stmt {
     }
 
     if(p.match(TokenType.VAR)) {
-        return p.varDeclaration() as (*Stmt)
+        return p.varDeclaration() as (*Node)
     }
 
     if(p.match(TokenType.CONST)) {
-        return p.constDeclaration() as (*Stmt)
+        return p.constDeclaration() as (*Node)
     }
 
     if(p.match(TokenType.IF)) {
@@ -1567,13 +1567,13 @@ func (p: *Parser) tryStatement() : *Stmt {
         }
     }
 
-    return p.expression() as (*Stmt)
+    return p.expression() as (*Node)
 
 err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
+func (p: *Parser) compStatement(isStaticIf: bool = false) : *Node {
     var pos = p.pos()
 
     p.preprocessorLevel += 1
@@ -1664,7 +1664,7 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
             goto err;
         }
 
-        var body = ArrayInit<*Stmt>(32, p.allocator)
+        var body = ArrayInit<*Node>(32, p.allocator)
         while(!p.atEnd()) {
             if(p.check(TokenType.HASH)) {
                 break;
@@ -1740,7 +1740,7 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
         if(end && end.kind != StmtKind.COMP_STMT) {
             goto err;
         }
-        var body = Array<*Stmt>{}
+        var body = Array<*Node>{}
         return NewCompStmt(
             pos,
             p.pos(),
@@ -1753,7 +1753,7 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
             p.allocator)
     }
     else if(type.equals(ELSE)) {
-        var body = ArrayInit<*Stmt>(32, p.allocator)
+        var body = ArrayInit<*Node>(32, p.allocator)
         while(!p.atEnd()) {
             if(p.check(TokenType.HASH)) {
                 break;
@@ -1799,10 +1799,10 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
             goto err;
         }
 
-        return NewCompStmt(pos, p.pos(), type, message.str, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
+        return NewCompStmt(pos, p.pos(), type, message.str, Array<*Node>{}, null, false, isStaticIf, p.allocator)
     }
     else if(type.equals(END)) {
-        return NewCompStmt(pos, p.pos(), type, String{}, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
+        return NewCompStmt(pos, p.pos(), type, String{}, Array<*Node>{}, null, false, isStaticIf, p.allocator)
     }
     else {
         p.errorAtToken(p.peek(), ErrorCode.INVALID_COMP_STMT)
@@ -1810,17 +1810,17 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
     }
 
 err:
-    return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
+    return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Node)
 }
 
-func (p: *Parser) blockStatement() : *Stmt {
+func (p: *Parser) blockStatement() : *Node {
     if(p.breakLevel > 0) {
         p.breakLevel -= 1
     }
 
     var pos = p.prevPos()
 
-    var stmts = Array<*Stmt>{}
+    var stmts = Array<*Node>{}
     stmts.init(16, p.allocator)
 
     do {
@@ -1845,7 +1845,7 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) ifStatement() : *Stmt {
+func (p: *Parser) ifStatement() : *Node {
     var pos = p.prevPos()
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
@@ -1860,7 +1860,7 @@ func (p: *Parser) ifStatement() : *Stmt {
 
     var then = p.statement();
 
-    var elseStmt: *Stmt = null;
+    var elseStmt: *Node = null;
     if(p.match(TokenType.ELSE)) {
         elseStmt = p.statement();
     }
@@ -1871,7 +1871,7 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) whileStatement() : *Stmt {
+func (p: *Parser) whileStatement() : *Node {
     var pos = p.prevPos()
     p.loopLevel += 1;
 
@@ -1895,7 +1895,7 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) doWhileStatement() : *Stmt {
+func (p: *Parser) doWhileStatement() : *Node {
     var pos = p.prevPos()
     p.loopLevel += 1;
     var body = p.statement();
@@ -1923,7 +1923,7 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) forStatement() : *Stmt {
+func (p: *Parser) forStatement() : *Node {
     var pos = p.prevPos()
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
@@ -1954,7 +1954,7 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) switchCaseStatement() : *Stmt {
+func (p: *Parser) switchCaseStatement() : *Node {
     var pos = p.prevPos()
 
     var cond = p.constExpression()
@@ -1963,7 +1963,7 @@ func (p: *Parser) switchCaseStatement() : *Stmt {
     }
 
     var bodyPos = p.pos()
-    var stmts = Array<*Stmt>{}
+    var stmts = Array<*Node>{}
     stmts.init(8, p.allocator)
 
     while(!p.atEnd()) {
@@ -1978,7 +1978,7 @@ func (p: *Parser) switchCaseStatement() : *Stmt {
 
         stmts.add(stmt)
     }
-    var body: *Stmt = null
+    var body: *Node = null
     if(stmts.empty()) {
         body = NewEmptyStmt(bodyPos, p.pos(), p.allocator)
     }
@@ -1990,12 +1990,12 @@ func (p: *Parser) switchCaseStatement() : *Stmt {
 }
 
 
-func (p: *Parser) switchDefaultStatement() : *Stmt {
+func (p: *Parser) switchDefaultStatement() : *Node {
     var pos = p.prevPos()
 
     var breakCount = p.breakLevel
 
-    var stmts = Array<*Stmt>{}
+    var stmts = Array<*Node>{}
     stmts.init(8, p.allocator)
 
     while(!p.atEnd()) {
@@ -2018,7 +2018,7 @@ func (p: *Parser) switchDefaultStatement() : *Stmt {
     return NewBlockStmt(pos, p.pos(), stmts, p.allocator)
 }
 
-func (p: *Parser) switchStatement() : *Stmt {
+func (p: *Parser) switchStatement() : *Node {
     var pos = p.prevPos()
     p.switchLevel += 1
     defer p.switchLevel -= 1
@@ -2038,7 +2038,7 @@ func (p: *Parser) switchStatement() : *Stmt {
     var cases = Array<*SwitchCaseStmt>{}
     cases.init(8, p.allocator)
 
-    var defaultStmt: *Stmt = null
+    var defaultStmt: *Node = null
 
     while(!p.atEnd()) {
         if(p.match(TokenType.CASE)) {
@@ -2074,7 +2074,7 @@ err:
 }
 
 
-func (p: *Parser) breakStatement() : *Stmt {
+func (p: *Parser) breakStatement() : *Node {
     var pos = p.prevPos()
 
     if(p.loopLevel < 1 && p.switchLevel < 1) {
@@ -2092,7 +2092,7 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) continueStatement() : *Stmt {
+func (p: *Parser) continueStatement() : *Node {
     var pos = p.prevPos()
 
     if(p.loopLevel < 1) {
@@ -2106,9 +2106,9 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) returnStatement() : *Stmt {
+func (p: *Parser) returnStatement() : *Node {
     var pos = p.prevPos()
-    var expr: *Expr = null
+    var expr: *Node = null
     if(!p.check(TokenType.SEMICOLON)) {
         expr = p.expression()
     }
@@ -2116,13 +2116,13 @@ func (p: *Parser) returnStatement() : *Stmt {
     return NewReturnStmt(pos, p.pos(), expr, p.allocator)
 }
 
-func (p: *Parser) deferStatement() : *Stmt {
+func (p: *Parser) deferStatement() : *Node {
     var pos = p.prevPos()
     var defered = p.statement()
     return NewDeferStmt(pos, p.pos(), defered, p.allocator)
 }
 
-func (p: *Parser) gotoStatement() : *Stmt {
+func (p: *Parser) gotoStatement() : *Node {
     var pos = p.prevPos()
     var label = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
     if(!label) {
@@ -2140,7 +2140,7 @@ err:
     return p.poisonStatement(pos)
 }
 
-func (p: *Parser) tryLabelStatement() : *Stmt {
+func (p: *Parser) tryLabelStatement() : *Node {
     var backtrack = p.current
     var pos = p.pos()
 
@@ -2641,14 +2641,14 @@ func (p: *Parser) tryGenericArguments(disambiguate: bool) : Array<GenericArg> {
     return arguments
 }
 
-func (p: *Parser) arrayArguments(arguments: *Array<*Expr>) : bool {
+func (p: *Parser) arrayArguments(arguments: *Array<*Node>) : bool {
     arguments.init(16, p.allocator)
     do {
         if(p.check(TokenType.RIGHT_BRACE)) {
             break;
         }
 
-        var expr: *Expr = null
+        var expr: *Node = null
         if(p.check(TokenType.LEFT_BRACKET)) {
             expr = p.tryArrayDesignationExpr()
         }
@@ -2671,7 +2671,7 @@ err:
     return false
 }
 
-func (p: *Parser) tryArrayDesignationExpr() : *Expr {
+func (p: *Parser) tryArrayDesignationExpr() : *Node {
     p.tryLevel += 1
     defer p.tryLevel -= 1
 
@@ -2679,7 +2679,7 @@ func (p: *Parser) tryArrayDesignationExpr() : *Expr {
     var numOfErrors = p.tryErrorCounter
     var pos = p.pos()
 
-    var designatorExpr: *Expr = null
+    var designatorExpr: *Node = null
     if(p.match(TokenType.LEFT_BRACKET)) {
         var index = p.expression()
         p.consume(TokenType.RIGHT_BRACKET, ErrorCode.MISSING_RIGHT_BRACKET)
@@ -2767,8 +2767,8 @@ func (p: *Parser) fieldStatement(aggKind: StmtKind) : FieldStmt {
                 attributes.isUsing = p.match(TokenType.USING)
                 attributes.notes = notes
 
-                var defaultExpr: *Expr = null
-                var bitFieldExpr: *Expr = null
+                var defaultExpr: *Node = null
+                var bitFieldExpr: *Node = null
 
                 var type = p.type()
                 if(!type) {
@@ -2871,7 +2871,7 @@ func (p: *Parser) noteFieldStatement() : FieldStmt {
     }
 
     var attributes = Attributes{}
-    var defaultExpr: *Expr = null
+    var defaultExpr: *Node = null
 
     var type = p.type()
     if(!type) {
@@ -2922,7 +2922,7 @@ func (p: *Parser) enumFieldEntryDecl() : *EnumFieldEntryDecl {
         .token = *identifier
     }
 
-    var value: *Expr = null
+    var value: *Node = null
     if(p.match(TokenType.EQUALS)) {
         value = p.constExpression()
     }
@@ -2954,7 +2954,7 @@ func (p: *Parser) rewindTo(backtrack: i32, numOfErrors: u64) {
 
 // account for generics, we must peek ahead to see if
 // this is a bit shift operator or generics
-func (p: *Parser) tryBitShiftRight(expr: *Expr) : *Expr {
+func (p: *Parser) tryBitShiftRight(expr: *Node) : *Node {
 
     if(!p.check(TokenType.GREATER_THAN)) {
         return null
@@ -2994,7 +2994,7 @@ func (p: *Parser) identifier() : Token {
     return name
 }
 
-func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
+func (p: *Parser) checkConstExpr(expr: *Node) : bool {
     if(!expr) {
         return false;
     }
@@ -3048,15 +3048,15 @@ func (p: *Parser) checkConstExpr(expr: *Expr) : bool {
     return false
 }
 
-func (p: *Parser) poisonStatement(pos: SrcPos) : *Stmt {
-    return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
+func (p: *Parser) poisonStatement(pos: SrcPos) : *Node {
+    return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Node)
 }
 
-func (p: *Parser) poisonExpr(pos: SrcPos) : *Expr {
+func (p: *Parser) poisonExpr(pos: SrcPos) : *Node {
     return NewPoisonExpr(p.prevPos(), p.pos(), p.allocator)
 }
 
-func (p: *Parser) poisonDecl(pos: SrcPos) : *Decl {
+func (p: *Parser) poisonDecl(pos: SrcPos) : *Node {
     return NewPoisonDecl(pos, p.pos(), p.allocator)
 }
 

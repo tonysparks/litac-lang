@@ -89,7 +89,7 @@ C:
         List list = LinkedList_to_List(&ll)   // Cast the LinkedList to List type
 */
 
-public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
+public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Node> {
     var allocator = checker.current.allocator
 
     var sb = StringBuilderInit(2048, allocator)

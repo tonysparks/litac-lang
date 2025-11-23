@@ -49,7 +49,7 @@ public struct CGen {
 
 struct CGenScope {
     parent: *CGenScope
-    defers: Array<*Stmt>
+    defers: Array<*Node>
     constDefs: Array<*const char>
     isLoop: bool
     isSwitch: bool
@@ -178,7 +178,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 }
 
 func (this: using *CGen) emitMain(sym: *Symbol) {
-    var decl = sym.decl as (*FuncDecl)
+    var decl = sym.decl.funcDecl
     this.emitFuncDeclSignature(decl, "main");
     this.currentFunc = sym.type
     defer this.currentFunc = null
@@ -288,7 +288,7 @@ func (this: using *CGen) emitPrimitiveConstDecls() {
             continue
         }
 
-        this.emitVarDecl(sym.decl as (*VarDecl))
+        this.emitVarDecl(sym.decl)
         this.emitln()
     }
 }
@@ -407,7 +407,7 @@ func (this: using *CGen) emitTraitDecls() {
     }
 }
 
-public func (this: using *CGen) emitTraitCast(expr: *Expr) : bool {
+public func (this: using *CGen) emitTraitCast(expr: *Node) : bool {
     if(!expr) {
         return false;
     }
@@ -466,14 +466,14 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
         case StmtKind.CONST_DECL:
             break;
         case StmtKind.FUNC_DECL: {
-            this.emitFuncDeclSignature(decl as (*FuncDecl), name)
+            this.emitFuncDeclSignature(decl, name)
             buf.appendStrn(";\n", 2)
             break;
         }
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.TRAIT_DECL: {
-            var aggDecl = decl as (*AggregateDecl)
+            var aggDecl = decl
             //if(!(aggDecl.flags & AggregateFlags.IS_EMBEDDED))
             {
                 this.buf.append("typedef %s %s %s;\n", aggDecl.kind == StmtKind.UNION_DECL ? "union" : "struct", name, name)
@@ -481,7 +481,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
             break;
         }
         case StmtKind.ENUM_DECL: {
-            this.emitEnumDecl(decl as (*EnumDecl))
+            this.emitEnumDecl(decl)
             break;
         }
         case StmtKind.TYPEDEF_DECL: {
@@ -644,7 +644,7 @@ func (this: using *CGen) emitDefers() {
     }
 }
 
-public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
+public func (this: using *CGen) emitLineInfo(stmt: *Node) {
     if(this.options.disableLineSync || this.inTextBlock || !stmt) {
         return;
     }
@@ -943,7 +943,7 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
     }
 }
 
-func (this: using *CGen) foreignName(decl: *Decl, defaultName: String) : String {
+func (this: using *CGen) foreignName(decl: *Node, defaultName: String) : String {
     if(!decl) {
         return defaultName
     }
@@ -1504,7 +1504,7 @@ func (this: using *CGen) emitTraitFuncCall(expr: *FuncCallExpr) {
             break
         }
         case StmtKind.GET_EXPR: {
-            var getExpr = expr.object as (*GetExpr)
+            var getExpr = expr.object.getExpr
             var type = getExpr.object.operand.typeInfo
 
             // for identifiers, we don't have to worry about side-effects
@@ -1626,7 +1626,7 @@ func (this: using *CGen) emitStaticCompStmt(s: *CompStmt) {
     }
 }
 
-public func (this: using *CGen) emitStmt(s: *Stmt) {
+public func (this: using *CGen) emitStmt(s: *Node) {
     if(!s) return;
 
     this.emitLineInfo(s)
@@ -1637,24 +1637,24 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
-            var decl = s as (*VarDecl)
+            var decl = s
             this.emitVarDecl(decl)
             return;
         }
         case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
-            var decl = s as (*AggregateDecl)
+            var decl = s
             this.emitAggregateDecl(decl)
             return;
         }
         case StmtKind.ENUM_DECL: {
-            var decl = s as (*EnumDecl)
+            var decl = s
             this.emitEnumDecl(decl)
             return;
         }
         case StmtKind.FUNC_DECL: {
-            var decl = s as (*FuncDecl)
+            var decl = s
             this.emitFuncDecl(decl)
             return;
         }
@@ -1674,7 +1674,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.BLOCK_STMT: {
-            var stmt = s as (*BlockStmt)
+            var stmt = s.blockStmt
             this.emitStrn("{", 1)
             {
                 this.pushScope(&CGenScope{})
@@ -1700,7 +1700,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.COMP_STMT: {
-            var stmt = s as (*CompStmt)
+            var stmt = s.compStmt
             if(stmt.isStatic) {
                 this.emitStaticCompStmt(stmt)
                 return;
@@ -1718,7 +1718,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.DEFER_STMT: {
-            var stmt = s as (*DeferStmt)
+            var stmt = s.deferStmt
             if(this.currentScope.defers.empty()) {
                 this.currentScope.defers.init(16, this.lita.allocator)
             }
@@ -1727,7 +1727,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.DO_WHILE_STMT: {
-            var stmt = s as (*DoWhileStmt)
+            var stmt = s.doWhileStmt
             this.emitStrn("do {", 4)
             {
                 this.pushScope(&CGenScope{.isLoop = true})
@@ -1751,7 +1751,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.FOR_STMT: {
-            var stmt = s as (*ForStmt)
+            var stmt = s.forStmt
             this.emitStrn("for(", 4)
             if(stmt.init) {
                 this.emitStmt(stmt.init)
@@ -1791,7 +1791,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.FUNC_BODY_STMT: {
-            var stmt = s as (*FuncBodyStmt)
+            var stmt = s.funcBodyStmt
             this.pushScope(&CGenScope{})
             defer this.popScope()
 
@@ -1808,14 +1808,14 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.GOTO_STMT: {
-            var stmt = s as (*GotoStmt)
+            var stmt = s.gotoStmt
             this.emitStrn("goto ", 5)
             this.emitName(stmt.label)
             this.emitStrn(";\n", 2)
             return;
         }
         case StmtKind.IF_STMT: {
-            var stmt = s as (*IfStmt)
+            var stmt = s.ifStmt
             this.emitStrn("if(", 3)
             this.emitStmt(stmt.cond)
             this.emitStrn(") {", 3)
@@ -1847,7 +1847,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.LABEL_STMT: {
-            var stmt = s as (*LabelStmt)
+            var stmt = s.labelStmt
             this.emitName(stmt.label)
             this.emitStrn(":;\n", 3)
             return;
@@ -1865,7 +1865,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.RETURN_STMT: {
-            var stmt = s as (*ReturnStmt)
+            var stmt = s.returnStmt
 
             if(stmt.expr && stmt.expr.operand.typeInfo != &VOID_TYPE && this.hasPendingDefers()) {
                 assert(this.currentFunc != null)
@@ -1894,7 +1894,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         }
 
         case StmtKind.SWITCH_CASE_STMT: {
-            var stmt = s as (*SwitchCaseStmt)
+            var stmt = s.switchCaseStmt
             this.emitStrn("case ", 5)
             this.emitStmt(stmt.cond)
             this.emitStrn(": ", 2)
@@ -1902,7 +1902,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.SWITCH_STMT: {
-            var stmt = s as (*SwitchStmt)
+            var stmt = s.switchStmt
 
             this.pushScope(&CGenScope{.isSwitch = true})
             defer this.popScope()
@@ -1923,7 +1923,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.TRAIT_FIELD_DECL: {
-            var decl = s as (*TraitFieldDecl)
+            var decl = s.traitFieldDecl
             this.emitLineInfo(decl)
 
             this.emitNotes(&decl.attributes)
@@ -1948,7 +1948,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.VAR_FIELD_DECL: {
-            var decl = s as (*VarFieldDecl)
+            var decl = s.varFieldDecl
             this.emitLineInfo(decl)
 
             this.emitNotes(&decl.attributes)
@@ -1976,7 +1976,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.WHILE_STMT: {
-            var stmt = s as (*WhileStmt)
+            var stmt = s.whileStmt
             this.emitStrn("while(", 6)
             this.emitStmt(stmt.cond)
             this.emitStrn(") {", 3)
@@ -1994,7 +1994,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         }
 
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
-            var expr = s as (*ArrayDesignationExpr)
+            var expr = s.arrayDesignationExpr
             this.emitStrn("[", 1)
             this.emitStmt(expr.index)
             this.emitStrn("] = ", 4)
@@ -2002,7 +2002,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.ARRAY_INIT_EXPR: {
-            var expr = s as (*ArrayInitExpr)
+            var expr = s.arrayInitExpr
 
             // TODO: I don't think this is needed?
             // this breaks struct initializers i.e., .TypeInfo {.params = []ParamInfo{} }
@@ -2039,7 +2039,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.BINARY_EXPR: {
-            var expr = s as (*BinaryExpr)
+            var expr = s.binaryExpr
             this.emitStmt(expr.left)
             this.emitStrn(" ", 1)
             this.emitStr(tokenText[expr.operator])
@@ -2050,7 +2050,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             break;
         }
         case StmtKind.BOOLEAN_EXPR: {
-            var expr = s as (*BooleanExpr)
+            var expr = s.booleanExpr
             this.emitStr(this.options.cPrefix)
             if(expr.boolean) {
                 this.emitStrn("true", 4)
@@ -2061,7 +2061,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.CAST_EXPR: {
-            var expr = s as (*CastExpr)
+            var expr = s.castExpr
             this.emitStrn("(", 1)
             this.emitStr(this.cType(expr.castTo.typeInfo, true))
             this.emitStrn(")", 1)
@@ -2069,7 +2069,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.CHAR_EXPR: {
-            var expr = s as (*CharExpr)
+            var expr = s.charExpr
             var value = expr.character.intValue
             if(value < 256 && value >= 0) {
                 var c = escapeStrings[value]
@@ -2086,7 +2086,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.FUNC_CALL_EXPR: {
-            var expr = s as (*FuncCallExpr)
+            var expr = s.funcCallExpr
             var objectType = expr.object.operand.typeInfo
 
             // If this is a function call on a trait, we must
@@ -2162,7 +2162,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.IDENTIFIER_EXPR: {
-            var expr = s as (*IdentifierExpr)
+            var expr = s.identifierExpr
 
             var type = expr.type.typeInfo
             var sym: *Symbol = (type) ? type.sym : expr.sym;
@@ -2178,7 +2178,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            var expr = s as (*IdentifierExpr)
+            var expr = s.identifierExpr
 
             var type = expr.type.typeInfo
             var sym: *Symbol = (type) ? type.sym : expr.sym;
@@ -2197,7 +2197,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.GET_EXPR: {
-            var expr = s as (*GetExpr)
+            var expr = s.getExpr
 
             // handled by funcCallExpr
             if(expr.flags & GetExprFlags.IS_METHOD_CALL) {
@@ -2277,19 +2277,19 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.GROUP_EXPR: {
-            var expr = s as (*GroupExpr)
+            var expr = s.groupExpr
             this.emitStrn("(", 1)
             this.emitStmt(expr.groupedExpr)
             this.emitStrn(")", 1)
             return;
         }
         case StmtKind.INIT_ARG_EXPR: {
-            var expr = s as (*InitArgExpr)
+            var expr = s.initArgExpr
             if(expr.fieldName.token.type == TokenType.IDENTIFIER) {
                 var parentExpr = expr.parent
                 assert(parentExpr && parentExpr.kind == StmtKind.INIT_EXPR)
 
-                var objectType = (parentExpr as (*InitExpr)).type.typeInfo
+                var objectType = parentExpr.initExpr.type.typeInfo
                 assert(objectType != null)
 
                 assert(IsAggregateLike(objectType))
@@ -2329,7 +2329,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.INIT_EXPR: {
-            var expr = s as (*InitExpr)
+            var expr = s.initExpr
 
             var requiresCast = false
             if(expr.parent) {
@@ -2363,7 +2363,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.NUMBER_EXPR: {
-            var expr = s as (*NumberExpr)
+            var expr = s.numberExpr
 
             var hasDecimal = false
             var isHex = false
@@ -2460,12 +2460,12 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.OFFSET_OF_EXPR: {
-            var expr = s as (*OffsetOfExpr)
+            var expr = s.offsetOfExpr
             this.emit("offsetof(%s, %.*s)", this.cType(expr.type.typeInfo), expr.field.str.length, expr.field.str.buffer)
             return;
         }
         case StmtKind.SET_EXPR: {
-            var expr = s as (*SetExpr)
+            var expr = s.setExpr
             this.emitStmt(expr.object)
 
             var objectType = expr.object.operand.typeInfo
@@ -2514,7 +2514,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var expr = s as (*SizeOfExpr)
+            var expr = s.sizeOfExpr
             this.emitStrn("sizeof(", 7)
             this.emitStmt(expr.sizeOfExpr)
             this.emitStrn(")", 1)
@@ -2523,7 +2523,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.NATIVE_STRING_EXPR:
             // fallthru
         case StmtKind.STRING_EXPR: {
-            var expr = s as (*StringExpr)
+            var expr = s.stringExpr
 
             var length = 0
             var start = 0
@@ -2618,7 +2618,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
-            var expr = s as (*SubscriptGetExpr)
+            var expr = s.subscriptGetExpr
             this.emitStmt(expr.object)
             this.emitStrn("[", 1)
             this.emitStmt(expr.index)
@@ -2626,7 +2626,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.SUBSCRIPT_SET_EXPR: {
-            var expr = s as (*SubscriptSetExpr)
+            var expr = s.subscriptSetExpr
             this.emitStmt(expr.object)
             this.emitStrn("[", 1)
             this.emitStmt(expr.index)
@@ -2637,7 +2637,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.TERNARY_EXPR: {
-            var expr = s as (*TernaryExpr)
+            var expr = s.ternaryExpr
             this.emitStrn("(", 1)
             this.emitStmt(expr.cond)
             this.emitStrn(") ? ", 4)
@@ -2647,7 +2647,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
-            var expr = s as (*TypeIdentifierExpr)
+            var expr = s.typeIdentifierExpr
             // TODO: Simplify this...
             if(expr.type.typeInfo && !expr.isBased) {
                 this.emitStr(this.cType(expr.type.typeInfo))
@@ -2663,7 +2663,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.TYPE_OF_EXPR: {
-            var expr = s as (*TypeOfExpr)
+            var expr = s.typeOfExpr
             if(expr.typeOfExpr) {
                 this.emit("%lldLL", expr.typeOfExpr.operand.typeInfo.typeid)
             }
@@ -2673,7 +2673,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.NAME_OF_EXPR: {
-            var expr = s as (*TypeOfExpr)
+            var expr = s.typeOfExpr
             var typeInfo: *TypeInfo
             if(expr.typeOfExpr) {
                 typeInfo = expr.typeOfExpr.operand.typeInfo
@@ -2685,7 +2685,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             return;
         }
         case StmtKind.UNARY_EXPR: {
-            var expr = s as (*UnaryExpr)
+            var expr = s.unaryExpr
             this.emitStr(tokenText[expr.operator])
             this.emitStrn("(", 1)
             this.emitStmt(expr.unaryExpr)

@@ -14,7 +14,42 @@
         }
     `,
     "tests": [
-{
+        {
+            "name": "Coroutine ternary operation",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(a, 1)
+                    if (x) {
+                        x = 12
+                        var x = 10
+                    } else {
+                        var y = 22
+                        var x = 33
+                        x = 22
+                    }
+
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 12
+                )
+                assert(global == 1)
+
+                global = 0
+
+            `,
+        },/*
+        {
             "name": "Coroutine ternary operation",
             "definitions": `
                 var global: i32 = 0
@@ -45,8 +80,7 @@
                 assert(global == 1)
 
             `,
-        },/*
-
+        },
         {
             "name": "Coroutine for statement empty",
             "definitions": `
