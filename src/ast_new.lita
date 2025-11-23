@@ -132,19 +132,25 @@ public func NewIdentifier(
     return identifier
 }
 
+@inline
+func NewNode(allocator: *const Allocator): *Node {
+    // TODO: Create from array now that nodes are equal sized
+    return new<Node>(allocator)
+}
+
 public func NewImportDecl(startPos: SrcPos,
                           endPos: SrcPos,
                           name: Identifier,
                           alias: Identifier,
                           isUsing: bool,
                           allocator: *const Allocator) : *Node {
-    var decl = new<ImportDecl>(allocator)
+    var decl = NewNode(allocator)
     decl.kind = StmtKind.IMPORT_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
-    decl.name = name
-    decl.alias = alias
-    decl.isUsing = isUsing
+    decl.importDecl.name = name
+    decl.importDecl.alias = alias
+    decl.importDecl.isUsing = isUsing
 
     return decl
 }
@@ -155,16 +161,16 @@ public func NewVarDecl(startPos: SrcPos,
                        type: *TypeSpec,
                        expr: *Node,
                        allocator: *const Allocator) : *Node {
-    var decl = new<VarDecl>(allocator)
+    var decl = NewNode(allocator)
     decl.kind = StmtKind.VAR_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
-    decl.name = name
-    decl.typeSpec = type
-    decl.expr = expr
+    decl.varDecl.name = name
+    decl.varDecl.typeSpec = type
+    decl.varDecl.expr = expr
 
-    decl.flags = 0
-    decl.scope = null
+    decl.varDecl.flags = 0
+    decl.varDecl.scope = null
 
     return decl
 }
@@ -178,16 +184,17 @@ public func NewFuncDecl(startPos: SrcPos,
                          returnType: *TypeSpec,
                          flags: i32,
                          allocator: *const Allocator) : *Node {
-    var decl = new<FuncDecl>(allocator)
+    var decl = NewNode(allocator)
     decl.kind = StmtKind.FUNC_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
-    decl.name = name
-    decl.genericParams = genericParams
-    decl.params = decl.node.becomeParentOf(params)
-    decl.body = decl.node.becomeParentOf(body)
-    decl.returnType = returnType
-    decl.flags = flags
+
+    decl.funcDecl.name = name
+    decl.funcDecl.genericParams = genericParams
+    decl.funcDecl.params = decl.node.becomeParentOf(params)
+    decl.funcDecl.body = decl.node.becomeParentOf(body)
+    decl.funcDecl.returnType = returnType
+    decl.funcDecl.flags = flags
 
     return decl
 }
@@ -204,6 +211,7 @@ public func NewAggregateDecl(startPos: SrcPos,
     decl.kind = kind
     decl.startPos = startPos
     decl.endPos = endPos
+
     decl.name = name
     decl.genericParams = genericParams
     decl.fields = fields

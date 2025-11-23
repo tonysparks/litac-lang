@@ -82,7 +82,7 @@ public struct Symbol {
     qualifiedName: InternedString
 
     state: SymbolState
-    decl: *Node
+    decl: *Decl
     type: *TypeInfo
 
     usingParent: *Symbol
@@ -317,10 +317,15 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
             if(!(existingSym.flags & SymbolFlags.IS_MARKED_RESET)) {
                 var decl = existingSym.decl
 
-                this.result.addError(importSrcPos, "can't import symbol '%.*s' defined in '%s:%d' because it is already defined in '%s:%d'",
+                var existingStartPos = decl.getStartPos()
+                var newStartPos = symbol.decl.getStartPos()
+
+                this.result.addError(importSrcPos,
+                    "can't import symbol '%.*s' defined in '%s:%d' because it is already defined in '%s:%d'",
                     name.length, name.buffer,
-                    symbol.decl.startPos.filename, symbol.decl.startPos.lineNumber,
-                    decl.startPos.filename, decl.startPos.lineNumber)
+                    newStartPos.filename, newStartPos.lineNumber,
+                    existingStartPos.filename, existingStartPos.lineNumber
+                )
                 return;
             }
         }
@@ -351,12 +356,13 @@ public func (this: *Scope) removeSymbol(symbol: *Symbol) {
 
 public func (this: *Scope) addSymbol(name: InternedString,
                                      module: *Module,
-                                     decl: *Node,
+                                     decl: *Decl,
                                      flags: i32) : *Symbol {
 
     var symbolStorage = &this.symbolTypes
 
-    switch(decl.kind) {
+    var declKind = decl.asNode().kind
+    switch(declKind) {
         case StmtKind.FUNC_DECL:
             symbolStorage = &this.symbolFuncs
             break;
@@ -399,23 +405,24 @@ public func (this: *Scope) addSymbol(name: InternedString,
 
         if(isError) {
             var existingSym = symbolStorage.get(name)
-            var decl = existingSym.decl
-            this.result.addError(decl.startPos, "symbol '%.*s' already defined in %s:%d",
+            var startPos = existingSym.decl.getStartPos()
+            this.result.addError(startPos,
+                "symbol '%.*s' already defined in %s:%d",
                 name.length, name.buffer,
-                existingSym.decl.startPos.filename,
-                existingSym.decl.startPos.lineNumber
+                startPos.filename,
+                startPos.lineNumber
             )
             return null;
         }
     }
 
-    var isNewType = (decl.kind == StmtKind.FUNC_DECL   ||
-                     decl.kind == StmtKind.STRUCT_DECL ||
-                     decl.kind == StmtKind.UNION_DECL  ||
-                     decl.kind == StmtKind.TRAIT_DECL  ||
-                     decl.kind == StmtKind.TYPEDEF_DECL||
-                     decl.kind == StmtKind.NOTE_DECL   ||
-                     decl.kind == StmtKind.ENUM_DECL)
+    var isNewType = (declKind == StmtKind.FUNC_DECL   ||
+                     declKind == StmtKind.STRUCT_DECL ||
+                     declKind == StmtKind.UNION_DECL  ||
+                     declKind == StmtKind.TRAIT_DECL  ||
+                     declKind == StmtKind.TYPEDEF_DECL||
+                     declKind == StmtKind.NOTE_DECL   ||
+                     declKind == StmtKind.ENUM_DECL)
 
     if(this.kind == ScopeKind.FUNC) {
         if(!isNewType) {
@@ -456,7 +463,7 @@ public func (this: *Scope) addSymbol(name: InternedString,
     }
 
     var kind = SymbolKind.VAR
-    switch(decl.kind) {
+    switch(declKind) {
         case StmtKind.TYPEDEF_DECL: {
             flags |= SymbolFlags.IS_ALIAS
             // fallthru
@@ -468,11 +475,11 @@ public func (this: *Scope) addSymbol(name: InternedString,
         case StmtKind.STRUCT_DECL: {
             kind = SymbolKind.TYPE
 
-            if(decl.kind == StmtKind.TRAIT_DECL) {
+            if(declKind == StmtKind.TRAIT_DECL) {
                 flags |= SymbolFlags.IS_TRAIT
             }
 
-            if(decl.kind == StmtKind.NOTE_DECL) {
+            if(declKind == StmtKind.NOTE_DECL) {
                 flags |= SymbolFlags.IS_NOTE
                 flags &= ~SymbolFlags.IS_TYPE
             }

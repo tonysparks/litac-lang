@@ -192,6 +192,8 @@ public struct Node {
 
     union {
         // Declarations
+        asDecl: Decl
+        asGenericDecl: GenericDecl
         importDecl: ImportDecl
         varDecl: VarDecl
         paramDecl: ParameterDecl
@@ -208,6 +210,7 @@ public struct Node {
         traitFieldDecl: TraitFieldDecl
 
         // Statements
+        asStmt: Stmt
         blockStmt: BlockStmt
         breakStmt: BreakStmt
         compStmt: CompStmt
@@ -229,6 +232,7 @@ public struct Node {
         whileStmt: WhileStmt
 
         // Expressions
+        asExpr: Expr
         arrayDesignationExpr: ArrayDesignationExpr
         arrayInitExpr: ArrayInitExpr
         binaryExpr: BinaryExpr
@@ -294,7 +298,7 @@ public func (n: *Node) becomeParentOfChildrenCallArgs(children: *Array<CallArg>)
 }
 
 public struct Decl {
-//    stmt: using Stmt
+    stmt: using Stmt
     sym: *Symbol
     name: Identifier
     attributes: Attributes
@@ -523,6 +527,15 @@ public struct WhileStmt {
 
 public struct Stmt {
     //node: using Node
+}
+
+public func (this: *Stmt) asNode() : *Node {
+    return (this as (*char) - offsetof(Node, asStmt)) as (*Node)
+}
+
+public func (this: *Stmt) getStartPos() : SrcPos {
+    var node = this.asNode()
+    return node.startPos
 }
 
 public struct ArrayDesignationExpr {
@@ -777,17 +790,17 @@ public func IsDecl(node: *Node) : bool {
     }
 }
 
-public func (d: *Node) hasNotes() : bool {
+public func (d: *Decl) hasNotes() : bool {
     if(!d) return false
     return !d.attributes.notes.empty()
 }
 
-public func (d: *Node) hasNote(name: *const char) : bool {
+public func (d: *Decl) hasNote(name: *const char) : bool {
     return d.getNote(name) != null
 }
 
 
-public func (d: *Node) getNote(name: *const char) : *NoteStmt {
+public func (d: *Decl) getNote(name: *const char) : *NoteStmt {
     if(!d) return null;
 
     if(d.attributes.notes.empty()) {
@@ -803,7 +816,7 @@ public func (d: *Node) getNote(name: *const char) : *NoteStmt {
     return null;
 }
 
-public func (d: *Node) getNoteArgument(name: *const char, arg: *const char) : *CallArg {
+public func (d: *Decl) getNoteArgument(name: *const char, arg: *const char) : *CallArg {
     var note = d.getNote(name)
     if(!note) {
         return null;
@@ -923,21 +936,17 @@ public func (expr: *Node) isConstNumberExpr() : bool {
             return true
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var sizeofExpr = expr
-            return sizeofExpr.sizeOfExpr.isConstNumberExpr()
+            return expr.sizeOfExpr.sizeOfExpr.isConstNumberExpr()
         }
         case StmtKind.GROUP_EXPR: {
-            var groupExpr = expr
-            return groupExpr.groupedExpr.isConstNumberExpr()
+            return expr.groupExpr.groupedExpr.isConstNumberExpr()
         }
         case StmtKind.BINARY_EXPR: {
-            var binExpr = expr
-            return binExpr.left.isConstNumberExpr() &&
-                   binExpr.right.isConstNumberExpr()
+            return expr.binaryExpr.left.isConstNumberExpr() &&
+                   expr.binaryExpr.right.isConstNumberExpr()
         }
         case StmtKind.UNARY_EXPR: {
-            var unaryExpr = expr
-            return unaryExpr.unaryExpr.isConstNumberExpr()
+            return expr.unaryExpr.unaryExpr.isConstNumberExpr()
         }
         default: {
             return false
@@ -962,21 +971,17 @@ public func (expr: *Node) isConstExpr() : bool {
             return true
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var sizeofExpr = expr
-            return sizeofExpr.sizeOfExpr.isConstExpr()
+            return expr.sizeOfExpr.sizeOfExpr.isConstExpr()
         }
         case StmtKind.GROUP_EXPR: {
-            var groupExpr = expr
-            return groupExpr.groupedExpr.isConstExpr()
+            return expr.groupExpr.groupedExpr.isConstExpr()
         }
         case StmtKind.BINARY_EXPR: {
-            var binExpr = expr
-            return binExpr.left.isConstExpr() &&
-                   binExpr.right.isConstExpr()
+            return expr.binaryExpr.left.isConstExpr() &&
+                   expr.binaryExpr.right.isConstExpr()
         }
         case StmtKind.UNARY_EXPR: {
-            var unaryExpr = expr
-            return unaryExpr.unaryExpr.isConstExpr()
+            return expr.unaryExpr.unaryExpr.isConstExpr()
         }
         default: {
             return false

@@ -41,96 +41,96 @@ public func (this: *TypeChecker) resolveExpr(expr: *Node) : bool {
     if(!expr) return false
 
     defer {
-        if(expr.operand.typeInfo == null) {
+        if(expr.asExpr.operand.typeInfo == null) {
             return false
         }
     }
 
     switch(expr.kind) {
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
-            return this.resolveArrayDesignationExpr(expr as (*ArrayDesignationExpr))
+            return this.resolveArrayDesignationExpr(expr)
         }
         case StmtKind.ARRAY_INIT_EXPR: {
-            return this.resolveArrayInitExpr(expr as (*ArrayInitExpr))
+            return this.resolveArrayInitExpr(expr)
         }
         case StmtKind.BINARY_EXPR: {
-            return this.resolveBinaryExpr(expr as (*BinaryExpr))
+            return this.resolveBinaryExpr(expr)
         }
         case StmtKind.BOOLEAN_EXPR: {
-            return this.resolveBooleanExpr(expr as (*BooleanExpr))
+            return this.resolveBooleanExpr(expr)
         }
         case StmtKind.CAST_EXPR: {
-            return this.resolveCastExpr(expr as (*CastExpr))
+            return this.resolveCastExpr(expr)
         }
         case StmtKind.CHAR_EXPR: {
-            return this.resolveCharExpr(expr as (*CharExpr))
+            return this.resolveCharExpr(expr)
         }
         case StmtKind.FUNC_CALL_EXPR: {
-            return this.resolveFuncCallExpr(expr as (*FuncCallExpr))
+            return this.resolveFuncCallExpr(expr)
         }
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            return this.resolveFuncIdentifierExpr(expr as (*IdentifierExpr))
+            return this.resolveFuncIdentifierExpr(expr)
         }
         case StmtKind.GET_EXPR:{
-            return this.resolveGetExpr(expr as (*GetExpr))
+            return this.resolveGetExpr(expr)
         }
         case StmtKind.GROUP_EXPR: {
-            return this.resolveGroupExpr(expr as (*GroupExpr))
+            return this.resolveGroupExpr(expr)
         }
         case StmtKind.IDENTIFIER_EXPR: {
-            return this.resolveIdentiferExpr(expr as (*IdentifierExpr))
+            return this.resolveIdentiferExpr(expr)
         }
         case StmtKind.INIT_ARG_EXPR: {
-            return this.resolveInitArgExpr(expr as (*InitArgExpr))
+            return this.resolveInitArgExpr(expr)
         }
         case StmtKind.INIT_EXPR: {
-            return this.resolveInitExpr(expr as (*InitExpr))
+            return this.resolveInitExpr(expr)
         }
         case StmtKind.NULL_EXPR: {
-            return this.resolveNullExpr(expr as (*NullExpr))
+            return this.resolveNullExpr(expr)
         }
         case StmtKind.NUMBER_EXPR: {
-            return this.resolveNumberExpr(expr as (*NumberExpr))
+            return this.resolveNumberExpr(expr)
         }
         case StmtKind.SET_EXPR: {
-            return this.resolveSetExpr(expr as (*SetExpr))
+            return this.resolveSetExpr(expr)
         }
         case StmtKind.OFFSET_OF_EXPR: {
-            return this.resolveOffsetOfExpr(expr as (*OffsetOfExpr))
+            return this.resolveOffsetOfExpr(expr)
         }
         case StmtKind.SIZE_OF_EXPR: {
-            return this.resolveSizeOfExpr(expr as (*SizeOfExpr))
+            return this.resolveSizeOfExpr(expr)
         }
         case StmtKind.STRING_EXPR: {
-            return this.resolveStringExpr(expr as (*StringExpr))
+            return this.resolveStringExpr(expr)
         }
         case StmtKind.NATIVE_STRING_EXPR: {
-            return this.resolveNativeStringExpr(expr as (*StringExpr))
+            return this.resolveNativeStringExpr(expr)
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
-            return this.resolveSubscriptGetExpr(expr as (*SubscriptGetExpr))
+            return this.resolveSubscriptGetExpr(expr)
         }
         case StmtKind.SUBSCRIPT_SET_EXPR: {
-            return this.resolveSubscriptSetExpr(expr as (*SubscriptSetExpr))
+            return this.resolveSubscriptSetExpr(expr)
         }
         case StmtKind.TERNARY_EXPR: {
-            return this.resolveTernaryExpr(expr as (*TernaryExpr))
+            return this.resolveTernaryExpr(expr)
         }
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
-            return this.resolveTypeIdentifierExpr(expr as (*TypeIdentifierExpr))
+            return this.resolveTypeIdentifierExpr(expr)
         }
         case StmtKind.NAME_OF_EXPR:
         case StmtKind.TYPE_OF_EXPR: {
-            return this.resolveTypeOfExpr(expr as (*TypeOfExpr))
+            return this.resolveTypeOfExpr(expr)
         }
         case StmtKind.UNARY_EXPR: {
-            return this.resolveUnaryExpr(expr as (*UnaryExpr))
+            return this.resolveUnaryExpr(expr)
         }
         case StmtKind.POISON_EXPR: {
             return false
         }
         default: {
-            PrintStmt(expr as (*Node))
+            PrintStmt(expr)
             assert(false)
         }
     }
@@ -138,12 +138,14 @@ public func (this: *TypeChecker) resolveExpr(expr: *Node) : bool {
 }
 
 
-func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : bool {
-    assert(expr != null)
+func (this: *TypeChecker) resolveFuncIdentifierExpr(node: *Node) : bool {
+    assert(node != null)
+
+    var expr = node.identifierExpr
 
     var type = this.resolveTypeSpec(expr.type, SearchType.FUNC)
     if(!type) {
-        this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        this.result.addError(node.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 
@@ -158,7 +160,7 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
     }
 
     if(!sym) {
-        this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        this.result.addError(node.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 
@@ -176,7 +178,7 @@ func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, suppliedArgs: *Arr
         return false
     }
 
-    var getExpr = expr.object as (*GetExpr)
+    var getExpr = expr.object.getExpr
     if(getExpr.field.operand.typeInfo.kind != TypeKind.FUNC) {
         return false
     }
@@ -283,7 +285,7 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
     return true
 }
 
-func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
+func (this: *TypeChecker) coerceFuncArg(expr: *Node,
                                         index: i32,
                                         argExpr: *Node,
                                         paramInfo: *TypeInfo,
@@ -292,7 +294,7 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
         return false
     }
 
-    var argInfo = argExpr.operand.typeInfo
+    var argInfo = argExpr.asExpr.operand.typeInfo
 
     if(argInfo.kind == TypeKind.ARRAY) {
         return true
@@ -307,7 +309,7 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
     }
 
     argExpr = this.coerceTypeWithUsing(argExpr, argInfo, paramInfo)
-    argInfo = argExpr.operand.typeInfo
+    argInfo = argExpr.asExpr.operand.typeInfo
 
     var needsAddressOf = (IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) ||
                          (IsPtr(paramInfo) && (!IsPtr(argInfo) && IsEnum(argInfo)))
@@ -315,7 +317,7 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
     // promote the argument to a pointer
     if(needsAddressOf) {
         // can't take the address of a right value
-        if(argExpr.operand.isRightValue) {
+        if(argExpr.asExpr.operand.isRightValue) {
             return true
         }
 
@@ -348,7 +350,7 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
 }
 
 
-func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
+func (this: *TypeChecker) checkNumberOfArgs(expr: *Node,
                                             funcName: InternedString,
                                             maxNumOfArgs: i32,
                                             hasVarargs: bool,
@@ -389,7 +391,8 @@ struct ParamInfo {
 func (this: *TypeChecker) inferredType(
     name: Identifier,
     paramInfo: *ParamInfo,
-    expectedType: *TypeInfo) : *TypeInfo {
+    expectedType: *TypeInfo
+) : *TypeInfo {
 
     assert(paramInfo != null)
     assert(expectedType != null)
@@ -593,22 +596,28 @@ func (this: *TypeChecker) checkInferrability(expr: *Node, type: *TypeInfo) : boo
     return true
 }
 
-func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *TypeInfo, suppliedArgs: *Array<CallArg>, isMethodCall: bool) : *TypeInfo {
+func (this: *TypeChecker) inferFuncCallExpr(
+    node: *Node,
+    funcType: *TypeInfo,
+    suppliedArgs: *Array<CallArg>,
+    isMethodCall: bool
+) : *TypeInfo {
     assert(IsFuncLike(funcType))
 
+    var expr = &node.funcCallExpr
     for(var i = 0; i < expr.arguments.size(); i += 1) {
         var arg = expr.arguments.get(i)
         if(!this.resolveExpr(arg.argExpr)) {
             goto err;
         }
 
-        if(!this.checkInferrability(arg.argExpr, arg.argExpr.operand.typeInfo)) {
+        if(!this.checkInferrability(arg.argExpr, arg.argExpr.asExpr.operand.typeInfo)) {
             goto err;
         }
     }
     var objectExpr: *Node = expr.object
     if(isMethodCall) {
-        var getExpr: *GetExpr = expr.object as (*GetExpr);
+        var getExpr: *GetExpr = &expr.object.getExpr;
         objectExpr = &getExpr.field.expr;
     }
 
@@ -616,7 +625,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         return funcType
     }
 
-    var funcExpr = objectExpr as (*IdentifierExpr);
+    var funcExpr = &objectExpr.identifierExpr;
     var nameSpec = funcExpr.type
 
     nameSpec.typeInfo = null // clear out the cached value, so it can be created with the generic types
@@ -719,7 +728,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         goto err;
     }
 
-    var type = expr.object.operand.typeInfo
+    var type = expr.object.asExpr.operand.typeInfo
 
     if(!IsFuncLike(type)) {
         goto err;
@@ -728,7 +737,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
     // if this is still a generic template, we haven't completely inferred all
     // generic parameters
     if(type.sym && type.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
-        var decl = type.sym.decl as (*GenericDecl)
+        var decl = type.sym.decl.asGenericDecl
         this.errorMissingGenericArguments(funcExpr, nameSpec.name, decl.genericParams)
         goto err;
     }
@@ -759,7 +768,11 @@ err:
     return &POISON_TYPE
 }
 
-func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *TypeInfo, suppliedArgs: *Array<CallArg>) : bool {
+func (this: *TypeChecker) checkFuncCallArgs(
+    expr: *FuncCallExpr,
+    funcType: *TypeInfo,
+    suppliedArgs: *Array<CallArg>
+) : bool {
     assert(funcType != null)
     assert(IsFuncLike(funcType))
 
@@ -789,12 +802,18 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
                 callArg.index = i
 
-                success = this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo, .allowPtrArithmetic = false) && success
+                success = this.checkTypeCompatibility(
+                    arg.startPos,
+                    p,
+                    arg.asExpr.operand.typeInfo,
+                    .allowPtrArithmetic = false
+                ) && success
+
                 arg.expectedType = p;
 
                 // don't allow for trait casting on rvalues (i.e., prevents &4)
-                if(IsTrait(p) && arg.operand.isRightValue) {
-                    this.errorRvalueAssignmentToTrait(arg, arg.operand.typeInfo, p)
+                if(IsTrait(p) && arg.asExpr.operand.isRightValue) {
+                    this.errorRvalueAssignmentToTrait(arg, arg.asExpr.operand.typeInfo, p)
                     success = false
                 }
             }
@@ -841,11 +860,11 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
                 var arg = callArg.argExpr
                 callArg.index = paramIndex
-                success = this.checkTypeCompatibility(arg.startPos, p.typeInfo, arg.operand.typeInfo, .allowPtrArithmetic = false) && success
+                success = this.checkTypeCompatibility(arg.startPos, p.typeInfo, arg.asExpr.operand.typeInfo, .allowPtrArithmetic = false) && success
                 arg.expectedType = p.typeInfo;
 
-                if(IsTrait(p.typeInfo) && arg.operand.isRightValue) {
-                    this.errorRvalueAssignmentToTrait(arg, arg.operand.typeInfo, p.typeInfo)
+                if(IsTrait(p.typeInfo) && arg.asExpr.operand.isRightValue) {
+                    this.errorRvalueAssignmentToTrait(arg, arg.asExpr.operand.typeInfo, p.typeInfo)
                     success = false
                 }
             }
@@ -904,7 +923,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
             }
 
             if(isNativeVararg && arg.argExpr) {
-                sb.append("%lu,", arg.argExpr.operand.typeInfo.typeid)
+                sb.append("%lu,", arg.argExpr.asExpr.operand.typeInfo.typeid)
             }
         }
 
@@ -912,7 +931,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
             sb.append("}}")
 
             var parser = ParserInit(
-                expr.startPos.filename,
+                expr.asNode().startPos.filename,
                 sb.buffer,
                 sb.length,
                 this.current,
@@ -934,7 +953,9 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
     return success
 }
 
-func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
+func (this: *TypeChecker) resolveFuncCallExpr(
+    expr: *FuncCallExpr
+) : bool {
     assert(expr != null)
 
     var errors = this.errors()
