@@ -913,7 +913,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                         else {
                             // HACK! this hasn't resolved yet..so we look at the raw AST
                             var strictArg = typedefDecl.getNoteArgument("foreign", "strict")
-                            if(strictArg && strictArg.argExpr && strictArg.argExpr.kind == StmtKind.BOOLEAN_EXPR) {
+                            if(strictArg && strictArg.argExpr && strictArg.argExpr.getKind() == StmtKind.BOOLEAN_EXPR) {
                                 var boolExpr = strictArg.argExpr as (*BooleanExpr)
                                 if(boolExpr.boolean) {
                                     aliasedType = this.typeCache.newAliasedForeignTypeInfo(sym, aliasedType)
@@ -937,7 +937,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     goto err;
                 }
                 default: {
-                    Info("StmtKind %.*s %d %s\n", sym.name.length, sym.name.buffer, sym.decl.kind, StmtKindAsStr(sym.decl.kind))
+                    Info("StmtKind %.*s %d %s\n", sym.name.length, sym.name.buffer, sym.decl.getKind(), StmtKindAsStr(sym.decl.getKind()))
                     assert(false)
                 }
             }

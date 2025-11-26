@@ -25,23 +25,23 @@ import "parser"
 import "lsp/references"
 import "checker_decl"
 
-public func (this: *TypeChecker) resolveConstExpr(expr: *Node) : bool {
+public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
     if(!this.resolveExpr(expr)) {
         return false
     }
 
     if(!expr.operand.isConst) {
-        this.result.addError(expr.startPos, "expected a constant expression")
+        this.result.addError(expr.getStartPos(), "expected a constant expression")
         return false;
     }
     return true
 }
 
-public func (this: *TypeChecker) resolveExpr(expr: *Node) : bool {
+public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
     if(!expr) return false
 
     defer {
-        if(expr.asExpr.operand.typeInfo == null) {
+        if(expr.operand.typeInfo == null) {
             return false
         }
     }
