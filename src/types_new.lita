@@ -133,7 +133,8 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
                                                     decl: *AggregateDecl) : *TypeInfo {
 
     var type = sym.type != null ? sym.type : this.newTypeInfo()
-    switch(decl.kind) {
+    var node = decl.asNode()
+    switch(node.kind) {
         case StmtKind.TRAIT_DECL: {
             type.kind = TypeKind.TRAIT
             break;

@@ -82,13 +82,12 @@ public func (this: *TypeChecker) resolveDecl(decl: *Node) : bool {
     return false
 }
 
-public func (this: *TypeChecker) resolveValueDecl(node: *Node) : *TypeInfo {
-    defer this.references.addTypeReferenceBySymbol(node.startPos, decl.sym)
-    var decl = node.varDecl
+public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
+    defer this.references.addTypeReferenceBySymbol(decl.getStartPos(), decl.sym)
 
-    if(!decl.expr && decl.kind == StmtKind.CONST_DECL) {
+    if(!decl.expr && decl.getKind() == StmtKind.CONST_DECL) {
         if(!decl.hasNote("foreign")) {
-            this.result.addError(node.startPos, "const declaration must have an assignment (unless it is '@foreign')")
+            this.result.addError(decl.getStartPos(), "const declaration must have an assignment (unless it is '@foreign')")
             return null
         }
     }

@@ -299,7 +299,7 @@ public func (this: *Scope) importSymbol(importSrcPos: SrcPos,
 
             // allow presedence to be set
             var isStub = symbol.decl.getNoteArgument("generated", "stub")
-            if(isStub && isStub.argExpr && isStub.argExpr.kind == StmtKind.BOOLEAN_EXPR) {
+            if(isStub && isStub.argExpr && isStub.argExpr.getKind() == StmtKind.BOOLEAN_EXPR) {
                 var boolExpr = isStub.argExpr as (*BooleanExpr)
 
                 if(boolExpr.boolean) {

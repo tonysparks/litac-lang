@@ -266,19 +266,19 @@ public func (n: *Node) setSrcPos(start: SrcPos, end: SrcPos) {
     n.endPos = end
 }
 
-public func (n: *Node) becomeParentOf(child: *Node) : *Node {
+public func (n: *Node) becomeParentOf<T>(child: T) : T {
     if(!child) return null;
 
-    child.parent = n
+    child.asNode().parent = n
     return child
 }
 
-public func (n: *Node) becomeParentOfChildren(children: *Array<*Node>) : *Array<*Node> {
+public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) : *Array<T> {
     var size = children.size()
     for(var i = 0; i < size; i += 1) {
         var child = children.get(i)
         if(child) {
-            n.becomeParentOf(child)
+            n.becomeParentOf<T>(child)
         }
     }
 
@@ -326,7 +326,7 @@ public enum VarDeclFlags {
 public struct VarDecl {
     decl: using Decl
     typeSpec: *TypeSpec
-    expr: *Node
+    expr: *Expr
 
     // related to lowered ternary operations
     flags: i32
@@ -336,7 +336,7 @@ public struct VarDecl {
 public struct ParameterDecl {
     decl: using Decl
     type: *TypeSpec
-    defaultExpr: *Node
+    defaultExpr: *Expr
     typeInfo: *TypeInfo
 }
 
@@ -344,7 +344,7 @@ public struct ParameterDecl {
 public struct FuncDecl {
     decl: using GenericDecl
     params: *ParametersStmt
-    body: *Node
+    body: *Stmt
     returnType: *TypeSpec
     flags: i32
 }
@@ -381,7 +381,7 @@ public struct PoisonDecl {
 
 public struct BlockStmt {
     stmt: using Stmt
-    stmts: Array<*Node>
+    stmts: Array<*Stmt>
 }
 
 public struct BreakStmt {
@@ -393,8 +393,8 @@ public struct CompStmt {
     type: InternedString
     expr: String
     end: *CompStmt
-    evaluatedStmt: *Node
-    body: Array<*Node>
+    evaluatedStmt: *Stmt
+    body: Array<*Stmt>
     isScriptLoad: bool
     isStatic: bool
 }
@@ -405,13 +405,13 @@ public struct ContinueStmt {
 
 public struct DeferStmt {
     stmt: using Stmt
-    deferedStmt: *Node
+    deferedStmt: *Stmt
 }
 
 public struct DoWhileStmt {
     stmt: using Stmt
-    cond: *Node
-    body: *Node
+    cond: *Expr
+    body: *Stmt
 }
 
 public struct EmptyStmt {
@@ -420,20 +420,20 @@ public struct EmptyStmt {
 
 public struct EnumFieldEntryDecl {
     decl: using Decl
-    value: *Node
+    value: *Expr
 }
 
 public struct ForStmt {
     stmt: using Stmt
-    init: *Node
-    cond: *Node
-    post: *Node
-    body: *Node
+    init: *Stmt
+    cond: *Expr
+    post: *Stmt
+    body: *Stmt
 }
 
 public struct FuncBodyStmt {
     stmt: using Stmt
-    stmts: Array<*Node>
+    stmts: Array<*Stmt>
 }
 
 public struct GotoStmt {
@@ -443,9 +443,9 @@ public struct GotoStmt {
 
 public struct IfStmt {
     stmt: using Stmt
-    cond: *Node
-    then: *Node
-    elseStmt: *Node
+    cond: *Expr
+    then: *Stmt
+    elseStmt: *Stmt
 }
 
 
@@ -459,7 +459,7 @@ public struct ModuleStmt {
     stmt: using Stmt
     imports: Array<*ImportDecl>
     notes: Array<*NoteStmt>
-    declarations: Array<*Node>
+    declarations: Array<*Decl>
     //TODO: id: ModuleId
 }
 
@@ -478,27 +478,27 @@ public struct ParametersStmt {
 
 public struct ReturnStmt {
     stmt: using Stmt
-    expr: *Node
+    expr: *Expr
 }
 
 public struct SwitchCaseStmt {
     stmt: using Stmt
-    cond: *Node
-    body: *Node
+    cond: *Expr
+    body: *Stmt
 }
 
 public struct SwitchStmt {
     stmt: using Stmt
-    cond: *Node
+    cond: *Expr
     cases: Array<*SwitchCaseStmt>
-    defaultStmt: *Node
+    defaultStmt: *Stmt
 }
 
 public struct VarFieldDecl {
     decl: using Decl
     type: *TypeSpec
-    defaultExpr: *Node
-    bitFieldExpr: *Node
+    defaultExpr: *Expr
+    bitFieldExpr: *Expr
 }
 
 public struct TraitFieldDecl {
@@ -514,14 +514,14 @@ public struct FieldStmt {
         aggregateField: *AggregateDecl
         varField: *VarFieldDecl
         traitField: *TraitFieldDecl
-        poisonField: *Node
+        poisonField: *PoisonDecl
     }
 }
 
 public struct WhileStmt {
     stmt: using Stmt
-    cond: *Node
-    body: *Node
+    cond: *Expr
+    body: *Stmt
 }
 
 
@@ -538,23 +538,28 @@ public func (this: *Stmt) getStartPos() : SrcPos {
     return node.startPos
 }
 
+public func (this: *Stmt) getKind() : StmtKind {
+    var node = this.asNode()
+    return node.kind
+}
+
 public struct ArrayDesignationExpr {
     expr: using Expr
-    index: *Node
-    value: *Node
+    index: *Expr
+    value: *Expr
 }
 
 public struct ArrayInitExpr {
     expr: using Expr
     type: *TypeSpec
-    values: Array<*Node>
+    values: Array<*Expr>
 }
 
 public struct BinaryExpr {
     expr: using Expr
-    left: *Node
+    left: *Expr
     operator: TokenType
-    right: *Node
+    right: *Expr
 
     // if this is a lowered ternary operator,
     // the source variable declaration
@@ -569,7 +574,7 @@ public struct BooleanExpr {
 public struct CastExpr {
     expr: using Expr
     castTo: *TypeSpec
-    exprToCast: *Node
+    exprToCast: *Expr
 }
 
 public struct CharExpr {
@@ -578,7 +583,7 @@ public struct CharExpr {
 }
 
 public struct CallArg {
-    argExpr: *Node
+    argExpr: *Expr
     argName: Identifier
     index: i32
     isDefault: bool = false
@@ -586,7 +591,7 @@ public struct CallArg {
 
 public struct FuncCallExpr {
     expr: using Expr
-    object: *Node
+    object: *Expr
     genericArgs: Array<GenericArg>
     arguments: Array<CallArg>
     flags: i32
@@ -607,14 +612,14 @@ public enum GetExprFlags {
 
 public struct GetExpr {
     expr: using Expr
-    object: *Node
+    object: *Expr
     field: *IdentifierExpr
     flags: i32
 }
 
 public struct GroupExpr {
     expr: using Expr
-    groupedExpr: *Node
+    groupedExpr: *Expr
 }
 
 public struct IdentifierExpr {
@@ -628,7 +633,7 @@ public struct InitArgExpr {
     expr: using Expr
     fieldName: Identifier
     argPosition: i32
-    value: *Node
+    value: *Expr
 }
 
 public struct InitExpr {
@@ -655,16 +660,16 @@ public struct OffsetOfExpr {
 
 public struct SetExpr {
     expr: using Expr
-    object: *Node
+    object: *Expr
     field: *IdentifierExpr
     operator: TokenType
-    value: *Node
+    value: *Expr
     flags: i32
 }
 
 public struct SizeOfExpr {
     expr: using Expr
-    sizeOfExpr: *Node
+    sizeOfExpr: *Expr
 }
 
 public struct StringExpr {
@@ -674,23 +679,23 @@ public struct StringExpr {
 
 public struct SubscriptGetExpr {
     expr: using Expr
-    object: *Node
-    index: *Node
+    object: *Expr
+    index: *Expr
 }
 
 public struct SubscriptSetExpr {
     expr: using Expr
-    object: *Node
-    index: *Node
+    object: *Expr
+    index: *Expr
     operator: TokenType
-    value: *Node
+    value: *Expr
 }
 
 public struct TernaryExpr {
     expr: using Expr
-    cond: *Node
-    then: *Node
-    other: *Node
+    cond: *Expr
+    then: *Expr
+    other: *Expr
 }
 
 public struct TypeIdentifierExpr {
@@ -703,14 +708,14 @@ public struct TypeIdentifierExpr {
 
 public struct TypeOfExpr {
     expr: using Expr
-    typeOfExpr: *Node
+    typeOfExpr: *Expr
     type: *TypeSpec
 }
 
 public struct UnaryExpr {
     expr: using Expr
     operator: TokenType
-    unaryExpr: *Node
+    unaryExpr: *Expr
 }
 
 public struct PoisonExpr {
@@ -911,23 +916,24 @@ public func (f: *FuncDecl) getName(name:[MAX_SYMBOL_NAME]char) : bool {
     return true
 }
 
-public func (expr: *Node) isIdentifier() : bool {
+public func (expr: *Expr) isIdentifier() : bool {
     if(!expr) {
         return false
     }
 
-    return expr.kind == StmtKind.IDENTIFIER_EXPR ||
-           expr.kind == StmtKind.FUNC_IDENTIFIER_EXPR ||
-           expr.kind == StmtKind.TYPE_IDENTIFIER_EXPR
+    var kind = expr.getKind()
+    return kind == StmtKind.IDENTIFIER_EXPR ||
+           kind == StmtKind.FUNC_IDENTIFIER_EXPR ||
+           kind == StmtKind.TYPE_IDENTIFIER_EXPR
 }
 
 
-public func (expr: *Node) isConstNumberExpr() : bool {
+public func (expr: *Expr) isConstNumberExpr() : bool {
     if(!expr) {
         return false;
     }
 
-    switch(expr.kind) {
+    switch(expr.getKind()) {
         case StmtKind.NUMBER_EXPR:
         case StmtKind.BOOLEAN_EXPR:
         case StmtKind.CHAR_EXPR:
@@ -955,7 +961,7 @@ public func (expr: *Node) isConstNumberExpr() : bool {
     return false
 }
 
-public func (expr: *Node) isConstExpr() : bool {
+public func (expr: *Expr) isConstExpr() : bool {
     if(!expr) {
         return false;
     }

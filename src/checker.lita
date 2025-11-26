@@ -131,7 +131,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
 
     for(var i = 0; i < root.ast.declarations.size(); i += 1) {
         var decl = root.ast.declarations.get(i)
-        if(decl.sym && decl.kind == StmtKind.FUNC_DECL &&
+        if(decl.sym && decl.getKind() == StmtKind.FUNC_DECL &&
            decl.sym.name.equals(MAIN)) {
             this.mainEntry = decl.sym
             this.mainEntry.flags |= SymbolFlags.IS_MAIN
@@ -514,7 +514,7 @@ func (this: *TypeChecker) createModuleSymbols(module: *Module) {
     this.resolveNotes(module.ast.notes)
 }
 
-public func (this: *TypeChecker) createDeclSymbol(decl: *Node) : *Symbol {
+public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     assert(decl != null)
 
     if(decl.sym) {
@@ -535,14 +535,14 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Node) : *Symbol {
     }
 
     var sym: *Symbol = null
-    if(decl.kind != StmtKind.FUNC_DECL) {
+    if(decl.getKind() != StmtKind.FUNC_DECL) {
         sym = this.current.symbols.addSymbol(name, this.current, decl, SymbolFlags.IS_INCOMPLETE)
         if(!sym) {
             goto err;
         }
     }
 
-    switch(decl.kind) {
+    switch(decl.getKind()) {
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
             var varDecl = decl as (*VarDecl)
@@ -597,7 +597,7 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Node) : *Symbol {
 
                 // TODO: Fix bug with aliased types function names not resolving correctly
                 if(!funcDecl.getName(buffer)) {
-                    this.result.addError(decl.startPos, "invalid function name or invalid method caller type")
+                    this.result.addError(decl.getStartPos(), "invalid function name or invalid method caller type")
                     goto err;
                 }
 
@@ -788,7 +788,7 @@ public func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
         }
 
         if(other.name.str.equals(imp.name.str)) {
-            this.result.addError(imp.startPos, "duplicate import of module '%.*s'",
+            this.result.addError(imp.getStartPos(), "duplicate import of module '%.*s'",
                 imp.name.str.length, imp.name.str.buffer)
             goto err;
         }
@@ -800,7 +800,7 @@ public func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
 
     var module = this.lita.getModule(imp.moduleId.filename)
     if(!module) {
-        this.result.addError(imp.startPos, "could not find module '%s'",
+        this.result.addError(imp.getStartPos(), "could not find module '%s'",
                 imp.moduleId.filename)
         goto err;
     }
@@ -867,7 +867,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
     }
 
     if(sym.state == SymbolState.RESOLVING) {
-        this.result.addError(sym.decl.startPos, "cyclic dependency found with '%.*s'", sym.name.length, sym.name.buffer)
+        this.result.addError(sym.decl.getStartPos(), "cyclic dependency found with '%.*s'", sym.name.length, sym.name.buffer)
         goto err;
     }
 
@@ -883,7 +883,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
 
     switch(sym.kind) {
         case SymbolKind.TYPE: {
-            switch(sym.decl.kind) {
+            switch(sym.decl.getKind()) {
                 case StmtKind.ENUM_DECL: {
                     var enumDecl = sym.decl as (*EnumDecl)
                     sym.type = this.typeCache.newEnumTypeInfo(sym, enumDecl) as (*TypeInfo)
@@ -1021,7 +1021,7 @@ public func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
 
     sym.flags &= ~SymbolFlags.IS_INCOMPLETE
 
-    switch(sym.decl.kind) {
+    switch(sym.decl.getKind()) {
         case StmtKind.NOTE_DECL:
         case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:

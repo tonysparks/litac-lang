@@ -370,7 +370,12 @@ public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport
         this.importAliases.put(*moduleName, moduleToImport)
     }
 
-    this.importModuleSymbols(importDecl.startPos, moduleToImport, moduleName, importDecl.isUsing)
+    this.importModuleSymbols(
+        importDecl.getStartPos(),
+        moduleToImport,
+        moduleName,
+        importDecl.isUsing
+    )
 }
 
 
