@@ -198,32 +198,32 @@ func (this: *SourceLookup) isTypeAtPos(type: *TypeSpec) : bool {
 }
 
 
-func (this: *SourceLookup) isDeclAtPos(decl: *Node) : bool {
+func (this: *SourceLookup) isDeclAtPos(decl: *Decl) : bool {
     if(!decl) {
         return false
     }
 
     if(this.isTokenAtPos(decl.name.token)) {
         this.result.kind = SourceLocationKind.AST
-        this.result.node = &decl.stmt.node
+        this.result.node = decl.stmt.asNode()
         PosToRange(decl.name.token.pos, &this.result.location.range)
         return true
     }
 
-    return this.isNodeAtPos(decl.node)
+    return this.isNodeAtPos(decl.asNode())
 }
 
-func (this: *SourceLookup) visitDecl(node: *Node) : bool {
+func (this: *SourceLookup) visitDecl(node: *Decl) : bool {
     if(!node) return false;
 
-    switch(node.kind) {
+    switch(node.getKind()) {
         case StmtKind.IMPORT_DECL: {
             var decl = node as (*ImportDecl)
 
             if(decl.alias.token.type == TokenType.IDENTIFIER) {
                 if(this.isTokenAtPos(decl.alias.token)) {
                     this.result.kind = SourceLocationKind.AST
-                    this.result.node = &decl.stmt.node
+                    this.result.node = decl.stmt.asNode()
                     return true
                 }
             }
@@ -421,18 +421,18 @@ func (this: *SourceLookup) visitDecl(node: *Node) : bool {
 }
 
 
-func (this: *SourceLookup) visitStmt(node: *Node) : bool {
+func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
     if(!node) return false;
 
-    if(IsExpr(node)) {
-        return this.visitExpr(node as (*Node))
+    if(IsExpr(node.asNode())) {
+        return this.visitExpr(node as (*Expr))
     }
 
-    if(IsDecl(node)) {
-        return this.visitDecl(node as (*Node))
+    if(IsDecl(node.asNode())) {
+        return this.visitDecl(node as (*Decl))
     }
 
-    switch(node.kind) {
+    switch(node.getKind()) {
         case StmtKind.BLOCK_STMT: {
             var stmt = node as (*BlockStmt)
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
@@ -608,10 +608,10 @@ func (this: *SourceLookup) visitStmt(node: *Node) : bool {
     return false
 }
 
-func (this: *SourceLookup) visitExpr(node: *Node) : bool {
+func (this: *SourceLookup) visitExpr(node: *Expr) : bool {
     if(!node) return false;
 
-    switch(node.kind) {
+    switch(node.getKind()) {
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = node as (*ArrayDesignationExpr)
             if(this.visitExpr(expr.value)) {
@@ -692,7 +692,7 @@ func (this: *SourceLookup) visitExpr(node: *Node) : bool {
             var expr = node as (*IdentifierExpr)
             if(this.isTypeAtPos(expr.type)) {
                 this.result.kind = SourceLocationKind.AST
-                this.result.node = &expr.node
+                this.result.node = expr.asNode()
                 return true
             }
             break
@@ -713,7 +713,7 @@ func (this: *SourceLookup) visitExpr(node: *Node) : bool {
                 // do the full get expression, so we know
                 // this is a field access
                 this.result.kind = SourceLocationKind.AST
-                this.result.node = &node.stmt.node
+                this.result.node = node.stmt.asNode()
                 return true
             }
             break
@@ -755,7 +755,7 @@ func (this: *SourceLookup) visitExpr(node: *Node) : bool {
             if(expr.fieldName.token.type == TokenType.IDENTIFIER) {
                 if(this.isTokenAtPos(expr.fieldName.token)) {
                     this.result.kind = SourceLocationKind.AST
-                    this.result.node = &node.stmt.node
+                    this.result.node = node.stmt.asNode()
                     return true
                 }
             }
@@ -784,7 +784,7 @@ func (this: *SourceLookup) visitExpr(node: *Node) : bool {
                 // do the full get expression, so we know
                 // this is a field access
                 this.result.kind = SourceLocationKind.AST
-                this.result.node = &node.stmt.node
+                this.result.node = node.stmt.asNode()
                 return true
             }
             if(this.visitExpr(expr.value)) {

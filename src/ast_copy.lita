@@ -123,50 +123,55 @@ public func CopyTypeSpec(spec: *TypeSpec, module: *Module) : *TypeSpec {
     return null
 }
 
-public func CopyDecl(decl: *Node, module: *Module) : *Node {
+public func CopyDecl(decl: *Decl, module: *Module) : *Decl {
     if(!decl) return null;
 
-    switch(decl.kind) {
+    switch(decl.getKind()) {
         case StmtKind.IMPORT_DECL: {
             assert(false); // don't allow
         }
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
-            var original = decl
-            var copy = NewVarDecl(original.startPos,
-                                  original.endPos,
-                                  original.name,
-                                  CopyTypeSpec(original.typeSpec, module),
-                                  CopyExpr(original.expr, module),
-                                  module.allocator)
-            if(decl.kind == StmtKind.CONST_DECL) {
+            var original = decl as (*VarDecl)
+            var copy = NewVarDecl(
+                original.getStartPos(),
+                original.getEndPos(),
+                original.name,
+                CopyTypeSpec(original.typeSpec, module),
+                CopyExpr(original.expr, module),
+                module.allocator
+            )
+
+            if(decl.getKind() == StmtKind.CONST_DECL) {
                 copy.kind = StmtKind.CONST_DECL
             }
-            return copy
+            return &copy.asDecl
         }
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.TRAIT_DECL: {
-            return CopyAggregateDecl(decl, module)
+            return CopyAggregateDecl(decl as (*AggregateDecl), module) as (*Decl)
         }
         case StmtKind.ENUM_DECL:
             assert(false) // not implemented yet??
         case StmtKind.FUNC_DECL: {
-            return CopyFuncDecl(decl, module)
+            return CopyFuncDecl(decl as (*FuncDecl), module) as (*Decl)
         }
         case StmtKind.TYPEDEF_DECL: {
-            return CopyTypedefDecl(decl, module)
+            return CopyTypedefDecl(decl as (*TypedefDecl), module) as (*Decl)
         }
         case StmtKind.PARAM_DECL: {
-            var original = decl
-            var copy = NewParameterDecl(original.startPos,
-                                        original.endPos,
-                                        original.name,
-                                        CopyTypeSpec(original.type, module),
-                                        CopyExpr(original.defaultExpr, module),
-                                        original.attributes.isUsing,
-                                        module.allocator)
-            return copy
+            var original = decl as (*ParameterDecl)
+            var copy = NewParameterDecl(
+                original.getStartPos(),
+                original.getEndPos(),
+                original.name,
+                CopyTypeSpec(original.type, module),
+                CopyExpr(original.defaultExpr, module),
+                original.attributes.isUsing,
+                module.allocator
+            )
+            return &copy.asDecl
         }
         case StmtKind.NATIVE_DECL: {
             return decl;
@@ -196,11 +201,11 @@ public func CopyCallArgs(args: *Array<CallArg>, module: *Module) : Array<CallArg
     return result
 }
 
-public func CopyExprs(exprs: *Array<*Node>, module: *Module) : Array<*Node> {
+public func CopyExprs(exprs: *Array<*Expr>, module: *Module) : Array<*Expr> {
     if(exprs.empty()) {
-        return Array<*Node>{}
+        return Array<*Expr>{}
     }
-    var result = ArrayInit<*Node>(exprs.size(), module.allocator)
+    var result = ArrayInit<*Expr>(exprs.size(), module.allocator)
     for(var i = 0; i < exprs.size(); i += 1) {
         var copy = CopyExpr(exprs.get(i), module)
         result.add(copy)
@@ -209,11 +214,11 @@ public func CopyExprs(exprs: *Array<*Node>, module: *Module) : Array<*Node> {
     return result
 }
 
-public func CopyStmts(stmts: *Array<*Node>, module: *Module) : Array<*Node> {
+public func CopyStmts(stmts: *Array<*Stmt>, module: *Module) : Array<*Stmt> {
     if(stmts.empty()) {
-        return Array<*Node>{}
+        return Array<*Stmt>{}
     }
-    var result = ArrayInit<*Node>(stmts.size(), module.allocator)
+    var result = ArrayInit<*Stmt>(stmts.size(), module.allocator)
     for(var i = 0; i < stmts.size(); i += 1) {
         var copy = CopyStmt(stmts.get(i), module)
         result.add(copy)
@@ -223,125 +228,130 @@ public func CopyStmts(stmts: *Array<*Node>, module: *Module) : Array<*Node> {
 }
 
 
-public func CopyExpr(expr: *Node, module: *Module) : *Node {
+public func CopyExpr(expr: *Expr, module: *Module) : *Expr {
     if(!expr) return null;
 
-    switch(expr.kind) {
+    switch(expr.getKind()) {
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
-            var original = expr
-            var copy = NewArrayDesignationExpr(original.startPos,
-                                               original.endPos,
-                                               CopyExpr(original.index, module),
-                                               CopyExpr(original.value, module),
-                                               module.allocator)
-            return copy
+            var original = expr as (*ArrayDesignationExpr)
+            var copy = NewArrayDesignationExpr(
+                original.getStartPos(),
+                original.getEndPos(),
+                CopyExpr(original.index, module),
+                CopyExpr(original.value, module),
+                module.allocator
+            )
+            return &copy.asExpr
         }
         case StmtKind.ARRAY_INIT_EXPR: {
-            var original = expr
-            var copy = NewArrayInitExpr(original.startPos,
-                                        original.endPos,
-                                        CopyTypeSpec(original.type, module),
-                                        CopyExprs(original.values, module),
-                                        module.allocator)
-            return copy
+            var original = expr as (*ArrayInitExpr)
+            var copy = NewArrayInitExpr(
+                original.getStartPos(),
+                original.getEndPos(),
+                CopyTypeSpec(original.type, module),
+                CopyExprs(original.values, module),
+                module.allocator
+            )
+            return &copy.asExpr
         }
         case StmtKind.BINARY_EXPR: {
-            var original = expr
-            var copy = NewBinaryExpr(original.startPos,
-                                     original.endPos,
+            var original = expr as (*BinaryExpr)
+            var copy = NewBinaryExpr(original.getStartPos(),
+                                     original.getEndPos(),
                                      CopyExpr(original.left, module),
                                      original.operator,
                                      CopyExpr(original.right, module),
                                      module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.BOOLEAN_EXPR: {
             return expr // nothing to copy
         }
         case StmtKind.CAST_EXPR: {
-            var original = expr
-            var copy = NewCastExpr(original.startPos,
-                                   original.endPos,
+            var original = expr as (*CastExpr)
+            var copy = NewCastExpr(original.getStartPos(),
+                                   original.getEndPos(),
                                    CopyExpr(original.exprToCast, module),
                                    CopyTypeSpec(original.castTo, module),
                                    module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.CHAR_EXPR: {
             return expr // nothing to copy
         }
         case StmtKind.FUNC_CALL_EXPR: {
-            var original = expr
-            var copy = NewFuncCallExpr(original.startPos,
-                                       original.endPos,
+            var original = expr as (*FuncCallExpr)
+            var copy = NewFuncCallExpr(original.getStartPos(),
+                                       original.getEndPos(),
                                        CopyExpr(original.object, module),
                                        CopyCallArgs(original.arguments, module),
                                        CopyGenericArgs(original.genericArgs, module),
                                        module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            var original = expr
-            var copy = NewIdentifierExpr(original.startPos,
-                                         original.endPos,
+            var original = expr as (*IdentifierExpr)
+            var copy = NewIdentifierExpr(original.getStartPos(),
+                                         original.getEndPos(),
                                          CopyTypeSpec(original.type, module),
                                          module.allocator)
+
             copy.kind = StmtKind.FUNC_IDENTIFIER_EXPR
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.GET_EXPR:{
-            var original = expr
-            var copy = NewGetExpr(original.startPos,
-                                  original.endPos,
+            var original = expr as (*GetExpr)
+            var copy = NewGetExpr(original.getStartPos(),
+                                  original.getEndPos(),
                                   CopyExpr(original.object, module),
-                                  CopyExpr(original.field, module),
+                                  CopyExpr(original.field, module) as (*IdentifierExpr),
                                   module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.GROUP_EXPR: {
-            var original = expr
-            var copy = NewGroupExpr(original.startPos,
-                                    original.endPos,
+            var original = expr as (*GroupExpr)
+            var copy = NewGroupExpr(original.getStartPos(),
+                                    original.getEndPos(),
                                     CopyExpr(original.groupedExpr, module),
                                     module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.IDENTIFIER_EXPR: {
-            var original = expr
-            var copy = NewIdentifierExpr(original.startPos,
-                                         original.endPos,
+            var original = expr as (*IdentifierExpr)
+            var copy = NewIdentifierExpr(original.getStartPos(),
+                                         original.getEndPos(),
                                          CopyTypeSpec(original.type, module),
                                          module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.INIT_ARG_EXPR: {
-            var original = expr
-            var copy = NewInitArgExpr(original.startPos,
-                                      original.endPos,
+            var original = expr as (*InitArgExpr)
+            var copy = NewInitArgExpr(original.getStartPos(),
+                                      original.getEndPos(),
                                       original.fieldName,
                                       original.argPosition,
                                       CopyExpr(original.value, module),
                                       module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.INIT_EXPR: {
-            var original = expr
+            var original = expr as (*InitExpr)
             var arguments = Array<*InitArgExpr>{}
             if(!original.arguments.empty()) {
                 arguments.init(original.arguments.size(), module.allocator)
             }
 
             for(var i = 0; i < original.arguments.size(); i += 1) {
-                var copy = CopyExpr(original.arguments.get(i), module)
+                var copy = CopyExpr(original.arguments.get(i), module) as (*InitArgExpr)
                 arguments.add(copy)
             }
 
-            var copy = NewInitExpr(original.startPos,
-                                   original.endPos,
+            var copy = NewInitExpr(original.getStartPos(),
+                                   original.getEndPos(),
                                    CopyTypeSpec(original.type, module),
                                    arguments,
                                    module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.NULL_EXPR: {
             return expr // nothing to copy
@@ -350,102 +360,102 @@ public func CopyExpr(expr: *Node, module: *Module) : *Node {
             return expr // nothing to copy
         }
         case StmtKind.SET_EXPR: {
-            var original = expr
-            var copy = NewSetExpr(original.startPos,
-                                  original.endPos,
+            var original = expr as (*SetExpr)
+            var copy = NewSetExpr(original.getStartPos(),
+                                  original.getEndPos(),
                                   CopyExpr(original.object, module),
-                                  CopyExpr(original.field, module),
+                                  CopyExpr(original.field, module) as (*IdentifierExpr),
                                   original.operator,
                                   CopyExpr(original.value, module),
                                   module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.OFFSET_OF_EXPR: {
-            var original = expr
-            var copy = NewOffsetOfExpr(original.startPos,
-                                       original.endPos,
+            var original = expr as (*OffsetOfExpr)
+            var copy = NewOffsetOfExpr(original.getStartPos(),
+                                       original.getEndPos(),
                                        CopyTypeSpec(original.type, module),
                                        original.field,
                                        module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var original = expr
-            var copy = NewSizeOfExpr(original.startPos,
-                                     original.endPos,
+            var original = expr as (*SizeOfExpr)
+            var copy = NewSizeOfExpr(original.getStartPos(),
+                                     original.getEndPos(),
                                      CopyExpr(original.sizeOfExpr, module),
                                      module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.NATIVE_STRING_EXPR:
         case StmtKind.STRING_EXPR: {
             return expr // nothing to copy
         }
         case StmtKind.SUBSCRIPT_GET_EXPR: {
-            var original = expr
-            var copy = NewSubscriptGetExpr(original.startPos,
-                                           original.endPos,
+            var original = expr as (*SubscriptGetExpr)
+            var copy = NewSubscriptGetExpr(original.getStartPos(),
+                                           original.getEndPos(),
                                            CopyExpr(original.object, module),
                                            CopyExpr(original.index, module),
                                            module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.SUBSCRIPT_SET_EXPR: {
-            var original = expr
-            var copy = NewSubscriptSetExpr(original.startPos,
-                                           original.endPos,
+            var original = expr as (*SubscriptSetExpr)
+            var copy = NewSubscriptSetExpr(original.getStartPos(),
+                                           original.getEndPos(),
                                            CopyExpr(original.object, module),
                                            CopyExpr(original.index, module),
                                            original.operator,
                                            CopyExpr(original.value, module),
                                            module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.TERNARY_EXPR: {
-            var original = expr
-            var copy = NewTernaryExpr(original.startPos,
-                                      original.endPos,
+            var original = expr as (*TernaryExpr)
+            var copy = NewTernaryExpr(original.getStartPos(),
+                                      original.getEndPos(),
                                       CopyExpr(original.cond, module),
                                       CopyExpr(original.then, module),
                                       CopyExpr(original.other, module),
                                       module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.TYPE_IDENTIFIER_EXPR: {
-            var original = expr
-            var copy = NewTypeIdentifierExpr(original.startPos,
-                                             original.endPos,
+            var original = expr as (*TypeIdentifierExpr)
+            var copy = NewTypeIdentifierExpr(original.getStartPos(),
+                                             original.getEndPos(),
                                              CopyTypeSpec(original.type, module),
                                              original.isBased,
                                              module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.TYPE_OF_EXPR: {
-            var original = expr
-            var copy = NewTypeOfExpr(original.startPos,
-                                     original.endPos,
+            var original = expr as (*TypeOfExpr)
+            var copy = NewTypeOfExpr(original.getStartPos(),
+                                     original.getEndPos(),
                                      CopyExpr(original.typeOfExpr, module),
                                      CopyTypeSpec(original.type, module),
                                      module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.NAME_OF_EXPR: {
-            var original = expr
-            var copy = NewNameOfExpr(original.startPos,
-                                     original.endPos,
+            var original = expr as (*TypeOfExpr)
+            var copy = NewNameOfExpr(original.getStartPos(),
+                                     original.getEndPos(),
                                      CopyExpr(original.typeOfExpr, module),
                                      CopyTypeSpec(original.type, module),
                                      module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.UNARY_EXPR: {
-            var original = expr
-            var copy = NewUnaryExpr(original.startPos,
-                                    original.endPos,
+            var original = expr as (*UnaryExpr)
+            var copy = NewUnaryExpr(original.getStartPos(),
+                                    original.getEndPos(),
                                     original.operator,
                                     CopyExpr(original.unaryExpr, module),
                                     module.allocator)
-            return copy
+            return &copy.asExpr
         }
         case StmtKind.POISON_EXPR: {
             return expr
@@ -457,94 +467,95 @@ public func CopyExpr(expr: *Node, module: *Module) : *Node {
     return null
 }
 
-public func CopyStmt(stmt: *Node, module: *Module) : *Node {
+public func CopyStmt(stmt: *Stmt, module: *Module) : *Stmt {
     if(!stmt) return null;
 
-    switch(stmt.kind) {
+    switch(stmt.getKind()) {
         case StmtKind.BLOCK_STMT: {
-            var original = stmt
-            var copy = NewBlockStmt(original.startPos,
-                                    original.endPos,
+            var original = stmt as (*BlockStmt)
+            var copy = NewBlockStmt(original.getStartPos(),
+                                    original.getEndPos(),
                                     CopyStmts(original.stmts, module),
                                     module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.BREAK_STMT: {
             return stmt; // nothing to copy
         }
         case StmtKind.COMP_STMT: {
-            var original = stmt
-            var end: *Node = null
+            var original = stmt as (*CompStmt)
+            var end: *Stmt = null
             if(original.end != null) {
                 end = &original.end.stmt
             }
 
-            var copy = NewCompStmt(original.startPos,
-                                   original.endPos,
+            var copy = NewCompStmt(original.getStartPos(),
+                                   original.getEndPos(),
                                    original.type,
                                    original.expr,
                                    CopyStmts(original.body, module),
-                                   CopyStmt(end, module),
+                                   CopyStmt(end, module) as (*CompStmt),
                                    original.isScriptLoad,
                                    original.isStatic,
                                    module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.CONTINUE_STMT: {
             return stmt // nothing to copy
         }
         case StmtKind.DEFER_STMT: {
-            var original = stmt
-            var copy = NewDeferStmt(original.startPos,
-                                    original.endPos,
+            var original = stmt as (*DeferStmt)
+            var copy = NewDeferStmt(original.getStartPos(),
+                                    original.getEndPos(),
                                     CopyStmt(original.deferedStmt, module),
                                     module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.DO_WHILE_STMT: {
-            var original = stmt
-            var copy = NewDoWhileStmt(original.startPos,
-                                    original.endPos,
+            var original = stmt as (*DoWhileStmt)
+            var copy = NewDoWhileStmt(original.getStartPos(),
+                                    original.getEndPos(),
                                     CopyExpr(original.cond, module),
                                     CopyStmt(original.body, module),
                                     module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.EMPTY_STMT: {
             return stmt; // nothing to copy
         }
         case StmtKind.FOR_STMT: {
-            var original = stmt
-            var copy = NewForStmt(original.startPos,
-                                  original.endPos,
+            var original = stmt as (*ForStmt)
+            var copy = NewForStmt(original.getStartPos(),
+                                  original.getEndPos(),
                                   CopyStmt(original.init, module),
                                   CopyExpr(original.cond, module),
                                   CopyStmt(original.post, module),
                                   CopyStmt(original.body, module),
                                   module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.FUNC_BODY_STMT: {
-            var original = stmt
-            var copy = NewBlockStmt(original.startPos,
-                                    original.endPos,
+            var original = stmt as (*FuncBodyStmt)
+            var copy = NewBlockStmt(original.getStartPos(),
+                                    original.getEndPos(),
                                     CopyStmts(original.stmts, module),
                                     module.allocator)
+
             copy.kind = StmtKind.FUNC_BODY_STMT
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.GOTO_STMT: {
             return stmt // nothing to copy
         }
         case StmtKind.IF_STMT: {
-            var original = stmt
-            var copy = NewIfStmt(original.startPos,
-                                 original.endPos,
+            var original = stmt as (*IfStmt)
+            var copy = NewIfStmt(original.getStartPos(),
+                                 original.getEndPos(),
                                  CopyExpr(original.cond, module),
                                  CopyStmt(original.then, module),
                                  CopyStmt(original.elseStmt, module),
                                  module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.LABEL_STMT: {
             return stmt // nothing to copy
@@ -556,59 +567,59 @@ public func CopyStmt(stmt: *Node, module: *Module) : *Node {
             return stmt // nothing to copy
         }
         case StmtKind.PARAMETERS_STMT: {
-            var original = stmt
+            var original = stmt as (*ParametersStmt)
             var params = Array<*ParameterDecl>{}
             if(!original.params.empty()) {
                 params.init(original.params.size(), module.allocator)
             }
             for(var i = 0; i < original.params.size(); i += 1) {
-                var copy = CopyStmt(original.params.get(i), module)
+                var copy = CopyStmt(original.params.get(i), module) as (*ParameterDecl)
                 params.add(copy)
             }
 
-            var copy = NewParametersStmt(original.startPos,
-                                         original.endPos,
+            var copy = NewParametersStmt(original.getStartPos(),
+                                         original.getEndPos(),
                                          params,
                                          original.isVararg,
                                          original.isNativeVararg,
                                          module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.RETURN_STMT: {
-            var original = stmt
-            var copy = NewReturnStmt(original.startPos,
-                                     original.endPos,
+            var original = stmt as (*ReturnStmt)
+            var copy = NewReturnStmt(original.getStartPos(),
+                                     original.getEndPos(),
                                      CopyExpr(original.expr, module),
                                      module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.SWITCH_CASE_STMT: {
-            var original = stmt
-            var copy = NewSwitchCaseStmt(original.startPos,
-                                         original.endPos,
+            var original = stmt as (*SwitchCaseStmt)
+            var copy = NewSwitchCaseStmt(original.getStartPos(),
+                                         original.getEndPos(),
                                         CopyExpr(original.cond, module),
                                         CopyStmt(original.body, module),
                                         module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.SWITCH_STMT:{
-            var original = stmt
+            var original = stmt as (*SwitchStmt)
             var cases = Array<*SwitchCaseStmt>{}
             if(!original.cases.empty()) {
                 cases.init(original.cases.size(), module.allocator)
             }
             for(var i = 0; i < original.cases.size(); i += 1) {
-                var copy = CopyStmt(original.cases.get(i), module)
+                var copy = CopyStmt(original.cases.get(i), module) as (*SwitchCaseStmt)
                 cases.add(copy)
             }
 
-            var copy = NewSwitchStmt(original.startPos,
-                                     original.endPos,
+            var copy = NewSwitchStmt(original.getStartPos(),
+                                     original.getEndPos(),
                                      CopyExpr(original.cond, module),
                                      cases,
                                      CopyStmt(original.defaultStmt, module),
                                      module.allocator)
-            return copy
+            return &copy.asStmt
         }
         case StmtKind.ENUM_FIELD_DECL:
         case StmtKind.ENUM_FIELD_ENTRY_DECL:
@@ -619,20 +630,20 @@ public func CopyStmt(stmt: *Node, module: *Module) : *Node {
             assert(false) // shouldn't reach here -- handled in CopyAggregateDecl
         }
         case StmtKind.WHILE_STMT: {
-            var original = stmt
-            var copy = NewWhileStmt(original.startPos,
-                                    original.endPos,
+            var original = stmt as (*WhileStmt)
+            var copy = NewWhileStmt(original.getStartPos(),
+                                    original.getEndPos(),
                                     CopyExpr(original.cond, module),
                                     CopyStmt(original.body, module),
                                     module.allocator)
-            return copy
+            return &copy.asStmt
         }
         default: {
-            if(IsExpr(stmt)) {
-                return CopyExpr(stmt, module)
+            if(IsExpr(stmt.asNode())) {
+                return CopyExpr(stmt as (*Expr), module) as (*Stmt)
             }
-            if(IsDecl(stmt)) {
-                return CopyDecl(stmt, module)
+            if(IsDecl(stmt.asNode())) {
+                return CopyDecl(stmt as (*Decl), module) as (*Stmt)
             }
 
             assert(false)
@@ -642,16 +653,19 @@ public func CopyStmt(stmt: *Node, module: *Module) : *Node {
     return null
 }
 
-public func CopyAggregateDecl(decl: *Node, module: *Module) : *Node {
-    var copy = NewAggregateDecl(decl.startPos,
-                                decl.endPos,
-                                decl.kind,
-                                decl.name,
-                                decl.genericParams.copy(module.allocator),
-                                Array<FieldStmt>{},
-                                decl.flags,
-                                module.allocator)
+public func CopyAggregateDecl(decl: *AggregateDecl, module: *Module) : *AggregateDecl {
+    var copyNode = NewAggregateDecl(
+        decl.getStartPos(),
+        decl.getEndPos(),
+        decl.getKind(),
+        decl.name,
+        decl.genericParams.copy(module.allocator),
+        Array<FieldStmt>{},
+        decl.flags,
+        module.allocator
+    )
 
+    var copy = &copyNode.aggDecl
     copy.attributes = decl.attributes
     copy.fields = ArrayInit<FieldStmt>(decl.fields.size(), module.allocator)
 
@@ -660,38 +674,44 @@ public func CopyAggregateDecl(decl: *Node, module: *Module) : *Node {
         switch(field.kind) {
             case StmtKind.TRAIT_FIELD_DECL: {
                 var o = field.traitField
-                var traitField = NewTraitFieldDecl(o.startPos,
-                                                  o.endPos,
-                                                  o.name,
-                                                  CopyTypeSpec(o.type, module),
-                                                  o.attributes,
-                                                  module.allocator)
+                var traitFieldNode = NewTraitFieldDecl(
+                    o.getStartPos(),
+                    o.getEndPos(),
+                    o.name,
+                    CopyTypeSpec(o.type, module),
+                    o.attributes,
+                    module.allocator
+                )
 
+                var traitField = &traitFieldNode.traitFieldDecl
                 var copyField = FieldStmt {
                     .kind = StmtKind.TRAIT_FIELD_DECL,
                     .traitField = traitField
                 }
                 copy.fields.add(copyField)
-                copy.node.becomeParentOf(traitField)
+                copyNode.becomeParentOf(traitField)
                 break
             }
             case StmtKind.VAR_FIELD_DECL: {
                 var o = field.varField
-                var varField = NewVarFieldDecl(o.startPos,
-                                               o.endPos,
-                                               o.name,
-                                               CopyTypeSpec(o.type, module),
-                                               o.attributes,
-                                               CopyExpr(o.defaultExpr, module),
-                                               CopyExpr(o.bitFieldExpr, module),
-                                               module.allocator)
+                var varFieldNode = NewVarFieldDecl(
+                    o.getStartPos(),
+                    o.getEndPos(),
+                    o.name,
+                    CopyTypeSpec(o.type, module),
+                    o.attributes,
+                    CopyExpr(o.defaultExpr, module),
+                    CopyExpr(o.bitFieldExpr, module),
+                    module.allocator
+                )
 
+                var varField = &varFieldNode.varFieldDecl
                 var copyField = FieldStmt {
                     .kind = StmtKind.VAR_FIELD_DECL,
                     .varField = varField
                 }
                 copy.fields.add(copyField)
-                copy.node.becomeParentOf(varField)
+                copyNode.becomeParentOf(varField)
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
@@ -700,7 +720,7 @@ public func CopyAggregateDecl(decl: *Node, module: *Module) : *Node {
                     .enumField = field.enumField
                 }
                 copy.fields.add(copyField)
-                copy.node.becomeParentOf(field.enumField)
+                copyNode.becomeParentOf(field.enumField)
                 break;
             }
             case StmtKind.UNION_FIELD_DECL:
@@ -711,7 +731,7 @@ public func CopyAggregateDecl(decl: *Node, module: *Module) : *Node {
                     .aggregateField = CopyAggregateDecl(aggField, module)
                 }
                 copy.fields.add(copyField)
-                copy.node.becomeParentOf(copyField.aggregateField)
+                copyNode.becomeParentOf(copyField.aggregateField)
                 break;
             }
             case StmtKind.POISON_EXPR: {
@@ -726,54 +746,69 @@ public func CopyAggregateDecl(decl: *Node, module: *Module) : *Node {
 }
 
 
-public func CopyFuncDecl(decl: *Node, module: *Module) : *Node {
-    var copy = NewFuncDecl(decl.startPos,
-                           decl.endPos,
-                           decl.name,
-                           decl.genericParams.copy(module.allocator),
-                           CopyParameters(decl.params, module),
-                           CopyStmt(decl.body, module),
-                           CopyTypeSpec(decl.returnType, module),
-                           decl.flags,
-                           module.allocator)
+public func CopyFuncDecl(decl: *FuncDecl, module: *Module) : *FuncDecl {
+    var copyNode = NewFuncDecl(
+        decl.getStartPos(),
+        decl.getEndPos(),
+        decl.name,
+        decl.genericParams.copy(module.allocator),
+        CopyParameters(decl.params, module),
+        CopyStmt(decl.body, module),
+        CopyTypeSpec(decl.returnType, module),
+        decl.flags,
+        module.allocator
+    )
+    var copy = &copyNode.funcDecl
     copy.attributes = decl.attributes
     return copy
 }
 
-public func CopyParameters(params: *Node, module: *Module) : *Node {
+public func CopyParameters(params: ParametersStmt, module: *Module) : *ParametersStmt {
     var paramDecls = Array<*ParameterDecl>{}
     paramDecls.init(params.params.size(), module.allocator)
 
     for(var i = 0; i < params.params.size(); i+=1) {
         var decl = params.params.get(i)
-        var copy = NewParameterDecl(decl.startPos,
-                                    decl.endPos,
-                                    decl.name,
-                                    CopyTypeSpec(decl.type, module),
-                                    CopyExpr(decl.defaultExpr, module),
-                                    decl.attributes.isUsing,
-                                    module.allocator)
+        var copyNode = NewParameterDecl(
+            decl.getStartPos(),
+            decl.getEndPos(),
+            decl.name,
+            CopyTypeSpec(decl.type, module),
+            CopyExpr(decl.defaultExpr, module),
+            decl.attributes.isUsing,
+            module.allocator
+        )
+
+        var copy = &copyNode.paramDecl
         copy.attributes = decl.attributes
         paramDecls.add(copy)
     }
 
-    var paramsCopy = NewParametersStmt(params.startPos,
-                                       params.endPos,
-                                       paramDecls,
-                                       params.isVararg,
-                                       params.isNativeVararg,
-                                       module.allocator)
+    var paramsCopyNode = NewParametersStmt(
+        params.getStartPos(),
+        params.getEndPos(),
+        paramDecls,
+        params.isVararg,
+        params.isNativeVararg,
+        module.allocator
+    )
+
+    var paramsCopy = &paramsCopyNode.parametersStmt
     return paramsCopy
 }
 
 
-public func CopyTypedefDecl(decl: *Node, module: *Module) : *Node {
-    var copy = NewTypedefDecl(decl.startPos,
-                              decl.endPos,
-                              decl.name,
-                              decl.genericParams.copy(module.allocator),
-                              CopyTypeSpec(decl.type, module),
-                              module.allocator)
+public func CopyTypedefDecl(decl: *TypedefDecl, module: *Module) : *TypedefDecl {
+    var copyNode = NewTypedefDecl(
+        decl.getStartPos(),
+        decl.getEndPos(),
+        decl.name,
+        decl.genericParams.copy(module.allocator),
+        CopyTypeSpec(decl.type, module),
+        module.allocator
+    )
+
+    var copy = &copyNode.typedefDecl
     copy.attributes = decl.attributes
     return copy
 }
@@ -792,22 +827,22 @@ public func AstInsertText(node: *Node, text: *const char, index: i32, module: *M
 
     Right now only FuncDecl is supported.
 """)
-public func AstInsert(node: *Node, stmt: *Node, index: i32, module: *Module, lita: *Lita) {
+public func AstInsert(node: *Node, stmt: *Stmt, index: i32, module: *Module, lita: *Lita) {
 
     switch(node.kind) {
         case StmtKind.FUNC_DECL: {
-            var funcDecl = node
+            var funcDecl = &node.funcDecl
             if(!funcDecl.body) {
-                funcDecl.body = funcDecl.node.becomeParentOf(stmt)
+                funcDecl.body = node.becomeParentOf(stmt)
             }
             else {
-                if(funcDecl.body.kind == StmtKind.FUNC_BODY_STMT) {
-                    var body = funcDecl.body
+                if(funcDecl.body.getKind() == StmtKind.FUNC_BODY_STMT) {
+                    var body = funcDecl.body as (*FuncBodyStmt)
                     body.stmts.insertAt(index, stmt)
-                    body.node.becomeParentOf(stmt)
+                    body.asNode().becomeParentOf(stmt)
                 }
                 else {
-                    var stmts = ArrayInit<*Node>(8, module.allocator)
+                    var stmts = ArrayInit<*Stmt>(8, module.allocator)
                     if(index) {
                         stmts.add(funcDecl.body)
                         stmts.add(stmt)
@@ -817,10 +852,12 @@ public func AstInsert(node: *Node, stmt: *Node, index: i32, module: *Module, lit
                         stmts.add(funcDecl.body)
                     }
 
-                    funcDecl.body = NewFuncBodyStmt(index ? funcDecl.body.startPos : stmt.startPos,
-                                                    index ? stmt.endPos : funcDecl.body.endPos,
-                                                    stmts,
-                                                    module.allocator)
+                    funcDecl.body = &NewFuncBodyStmt(
+                        index ? funcDecl.body.getStartPos() : stmt.getStartPos(),
+                        index ? stmt.getEndPos() : funcDecl.body.getEndPos(),
+                        stmts,
+                        module.allocator
+                    ).asStmt
 
                 }
             }
@@ -835,10 +872,12 @@ public func AstInsert(node: *Node, stmt: *Node, index: i32, module: *Module, lit
 }
 
 
-public func AstAddImport(lita: *Lita,
-                         checker: *TypeChecker,
-                         module: *Module,
-                         importModule: *Module) : *const char {
+public func AstAddImport(
+    lita: *Lita,
+    checker: *TypeChecker,
+    module: *Module,
+    importModule: *Module
+) : *const char {
 
     @static var moduleNameIndex: i32;
 
@@ -867,7 +906,7 @@ public func AstAddImport(lita: *Lita,
         .str = importModule.id.name,
         .token = Token {
             .type = TokenType.IDENTIFIER,
-            .pos = module.ast.startPos,
+            .pos = module.ast.getStartPos(),
             .value = Value{.str = importModule.id.name.view}
         }
     }
@@ -881,18 +920,18 @@ public func AstAddImport(lita: *Lita,
         .str = lita.strings.internCopy(sb.cStr(), sb.length),
         .token = Token {
             .type = TokenType.IDENTIFIER,
-            .pos = module.ast.startPos,
+            .pos = module.ast.getStartPos(),
             .value = Value{ .str = StringInit(sb.cStr(), sb.length)}
         }
     }
-    var importStmt = NewImportDecl(
-        module.ast.startPos,
-        module.ast.startPos,
+    var importStmt = &NewImportDecl(
+        module.ast.getStartPos(),
+        module.ast.getStartPos(),
         name,
         alias,
         false,
         lita.allocator
-    )
+    ).importDecl
 
     importStmt.moduleId = &importModule.id
     module.ast.imports.add(importStmt)

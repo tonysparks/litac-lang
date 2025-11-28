@@ -87,13 +87,14 @@ public func (this: *Preprocessor) execute(comp: *CompStmt, code: String) : bool 
 
     if(ape_has_errors(this.runtime.ape)) {
         var error = ape_get_error(this.runtime.ape, 0)
+        var startPos = comp.getStartPos()
         var pos = SrcPos {
-            .filename: comp.startPos.filename,
-            .lineStart: comp.startPos.lineStart,
-            .start: comp.startPos.start,
-            .end: comp.startPos.end,
-            .lineNumber: comp.startPos.lineNumber /*+ ape_error_get_line_number(error)*/, // doesn't work because repl mode
-            .position: comp.startPos.position /* ape_error_get_column_number(error) */
+            .filename: startPos.filename,
+            .lineStart: startPos.lineStart,
+            .start: startPos.start,
+            .end: startPos.end,
+            .lineNumber: startPos.lineNumber /*+ ape_error_get_line_number(error)*/, // doesn't work because repl mode
+            .position: startPos.position /* ape_error_get_column_number(error) */
         }
         this.lita.result.addError(pos, "error evaluating preprocessor expression: '%s' for line:\n%s", ape_error_get_message(error), ape_error_get_line(error))
         return false
@@ -127,14 +128,14 @@ func ApeGetTypeKind(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : 
 
     var element = ape_object_get_string(args[0]) as (*const char)
     if(!element) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty symbol name")
         return ape_object_make_null()
     }
 
     var elementIntern = context.pp.lita.strings.internCopy(element)
     var symbol = context.checker.current.currentScope.lookup(elementIntern)
     if(!symbol) {
-        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "no symbol found for '%s'", element)
         return ape_object_make_null()
     }
 
@@ -150,14 +151,14 @@ func ApeIsPrimitive(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : 
 
     var element = ape_object_get_string(args[0]) as (*const char)
     if(!element) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty symbol name")
         return ape_object_make_null()
     }
 
     var elementIntern = context.pp.lita.strings.internCopy(element)
     var symbol = context.checker.current.currentScope.lookup(elementIntern)
     if(!symbol) {
-        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "no symbol found for '%s'", element)
         return ape_object_make_null()
     }
 
@@ -174,14 +175,14 @@ func ApeGetSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
     var element = ape_object_get_string(args[0]) as (*const char)
     if(!element) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty symbol name")
         return ape_object_make_null()
     }
 
     var elementIntern = context.pp.lita.strings.internCopy(element)
     var symbol = context.checker.current.currentScope.lookup(elementIntern)
     if(!symbol) {
-        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "no symbol found for '%s'", element)
         return ape_object_make_null()
     }
 
@@ -200,7 +201,7 @@ func ApeGetSymbolByTypeInfo(ape: *ape_t, data: *void, argc: i32, args: *ape_obje
     var typeInfo = ape_object_get_external(typePtr) as (*TypeInfo)
 
     if(!typeInfo) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid typeInfo pointer")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid typeInfo pointer")
         return ape_object_make_null()
     }
     return context.pp.declToApe(typeInfo.sym)
@@ -215,14 +216,14 @@ func ApeGetTypeInfo(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : 
 
     var element = ape_object_get_string(args[0]) as (*const char)
     if(!element) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty symbol name")
         return ape_object_make_null()
     }
 
     var elementIntern = context.pp.lita.strings.internCopy(element)
     var symbol = context.checker.current.currentScope.lookup(elementIntern)
     if(!symbol) {
-        context.pp.lita.result.addError(context.comp.startPos, "no symbol found for '%s'", element)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "no symbol found for '%s'", element)
         return ape_object_make_null()
     }
 
@@ -355,7 +356,7 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
     var declObj = ape_object_make_map(this.runtime.ape)
 
     ape_object_set_map_value(declObj, "name", ape_object_make_stringf(this.runtime.ape, "%.*s", sym.name.length, sym.name.buffer))
-    ape_object_set_map_string(declObj, "kind", StmtKindAsStr(sym.decl.kind))
+    ape_object_set_map_string(declObj, "kind", StmtKindAsStr(sym.decl.getKind()))
     ape_object_set_map_string(declObj, "moduleFilename", sym.declared.id.filename)
 
     ape_object_set_map_value(declObj, "moduleName",
@@ -399,7 +400,8 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
 
     this.addNotes(declObj, sym.declared, sym.decl.attributes)
 
-    switch(sym.decl.kind) {
+    var declKind = sym.decl.getKind()
+    switch(declKind) {
         case StmtKind.FUNC_DECL: {
             break;
         }
@@ -407,10 +409,10 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
             var aggObj = ape_object_make_map(this.runtime.ape)
-            if(StmtKind.UNION_DECL == sym.decl.kind) {
+            if(StmtKind.UNION_DECL == declKind) {
                 ape_object_set_map_value(declObj, "unionDecl", aggObj)
             }
-            else if(StmtKind.TRAIT_DECL == sym.decl.kind) {
+            else if(StmtKind.TRAIT_DECL == declKind) {
                 ape_object_set_map_value(declObj, "traitDecl", aggObj)
             }
             else {
@@ -524,7 +526,7 @@ public func (this: *CallContext) postParse(module: *Module, moduleStmt: *ModuleS
     var emitCode = original.copy(this.pp.lita.allocator)
 
     // TODO: Memory leak with incremental compilation
-    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, module, this.pp.lita)
+    var parser = ParserInit(moduleStmt.getStartPos().filename, emitCode.buffer, emitCode.length, module, this.pp.lita)
     var stmts = parser.parseModule()
 
     if(stmts) {
@@ -562,7 +564,7 @@ func ApeError(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_ob
 
     var sb = StringBuilderInit(1024, context.pp.lita.allocator)
     var result = FormatStr(context, &sb, argc, args)
-    context.pp.lita.result.addError(context.comp.startPos, "%s", sb.cStr())
+    context.pp.lita.result.addError(context.comp.getStartPos(), "%s", sb.cStr())
     return result;
 }
 
@@ -588,7 +590,7 @@ func FormatStr(
             }
             else {
                 if(argIndex >= argc) {
-                    context.pp.lita.result.addError(context.comp.startPos, "invalid argument index, there are more format parameters than supplied function arguments")
+                    context.pp.lita.result.addError(context.comp.getStartPos(), "invalid argument index, there are more format parameters than supplied function arguments")
                     return ape_object_make_null()
                 }
 
@@ -609,7 +611,7 @@ func FormatStr(
                     buffer.append("%s", arg ? "true" : "false")
                 }
                 else {
-                    context.pp.lita.result.addError(context.comp.startPos, "invalid format parameter: '%%%c'", str[1])
+                    context.pp.lita.result.addError(context.comp.getStartPos(), "invalid format parameter: '%%%c'", str[1])
                     return ape_object_make_null()
                 }
                 argIndex += 1
@@ -643,7 +645,7 @@ func ApeGetSymbolsWithNote(ape: *ape_t, data: *void, argc: i32, args: *ape_objec
 
     var element = ape_object_get_string(args[0]) as (*const char)
     if(!element) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty note name")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty note name")
         return ape_object_make_null()
     }
 
@@ -686,19 +688,19 @@ func QueueDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t, 
 
     var moduleName = ape_object_get_string(args[0]) as (*const char)
     if(!moduleName) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty module filename")
         return ape_object_make_null()
     }
 
     var code = ape_object_get_string(args[1]) as (*const char)
     if(!code) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty code buffer")
         return ape_object_make_null()
     }
 
     var module = context.pp.lita.getModule(moduleName)
     if(!module) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid module: '%s'", moduleName)
         return ape_object_make_null()
     }
 
@@ -707,7 +709,7 @@ func QueueDeclaration(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t, 
     var original = StringInit(code)
     var emitCode = original.copy(context.pp.lita.allocator)
 
-    var parser = ParserInit(moduleStmt.startPos.filename, emitCode.buffer, emitCode.length, module, context.pp.lita)
+    var parser = ParserInit(moduleStmt.getStartPos().filename, emitCode.buffer, emitCode.length, module, context.pp.lita)
     var declarations = parser.parseModule()
 
     context.pp.declQueue.add(ScriptDecl {
@@ -740,7 +742,7 @@ func ApeGetInputModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape_o
 func ApeGetCurrentModuleFilename(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)
 
-    var moduleFilename = context.comp.startPos.filename
+    var moduleFilename = context.comp.getStartPos().filename
     var mainModule = context.pp.lita.getModule(moduleFilename)
     if(!mainModule) {
         return ape_object_make_null()
@@ -776,27 +778,28 @@ func ApeAstInsert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
     var astPtr = ape_object_get_external(args[0])
     if(!astPtr) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty ast node")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty ast node")
         return ape_object_make_null()
     }
 
     var code = ape_object_get_string(args[1]) as (*const char)
     if(!code) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty code buffer")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty code buffer")
         return ape_object_make_null()
     }
 
 
     var index = ape_object_get_number(args[2]) as (i32)
 
-    var astNode = astPtr as (*Node)
+    var astNode = astPtr as (*Stmt)
     var module = context.checker.current
 
     // TODO: Memory leak with incremental compilation...
-    var parser = ParserInit(astNode.startPos.filename, code, code.length(), module, context.pp.lita)
+    var startPos = astNode.getStartPos()
+    var parser = ParserInit(startPos.filename, code, code.length(), module, context.pp.lita)
     var stmt = parser.statement()
 
-    AstInsert(astNode, stmt, index, module, context.pp.lita)
+    AstInsert(astNode.asNode(), stmt, index, module, context.pp.lita)
     return ape_object_make_null()
 }
 
@@ -813,19 +816,19 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
     var moduleName = ape_object_get_string(args[0]) as (*const char)
     if(!moduleName) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty module filename")
         return ape_object_make_null()
     }
 
     var module = context.pp.lita.getModule(moduleName)
     if(!module) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid module: '%s'", moduleName)
         return ape_object_make_null()
     }
 
     var moduleToImport = ape_object_get_string(args[1]) as (*const char)
     if(!moduleToImport) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module to import name")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty module to import name")
         return ape_object_make_null()
     }
 
@@ -836,7 +839,7 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
 
     var importModule = context.pp.lita.getModule(moduleToImport)
     if(!importModule) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleToImport)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid module: '%s'", moduleToImport)
         return ape_object_make_null()
     }
 
@@ -860,31 +863,31 @@ func ApeSetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) 
 
     var moduleName = ape_object_get_string(args[0]) as (*const char)
     if(!moduleName) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty module filename")
         return ape_object_make_null()
     }
 
     var module = context.pp.lita.getModule(moduleName)
     if(!module) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid module: '%s'", moduleName)
         return ape_object_make_null()
     }
 
     var symbolName = ape_object_get_string(args[1]) as (*const char)
     if(!symbolName) {
-        context.pp.lita.result.addError(context.comp.startPos, "invalid empty symbol name")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "invalid empty symbol name")
         return ape_object_make_null()
     }
 
     var symbolNameIntern = context.pp.lita.strings.internCopy(symbolName)
     var sym = module.getType(symbolNameIntern)
     if(!sym) {
-        context.pp.lita.result.addError(context.comp.startPos, "can not find symbol '%s' in module: '%s'", symbolName, moduleName)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "can not find symbol '%s' in module: '%s'", symbolName, moduleName)
         return ape_object_make_null()
     }
 
     if(sym.kind != SymbolKind.FUNC) {
-        context.pp.lita.result.addError(context.comp.startPos, "can not make symbol '%s' a main entry point because it isn't a function", symbolName)
+        context.pp.lita.result.addError(context.comp.getStartPos(), "can not make symbol '%s' a main entry point because it isn't a function", symbolName)
         return ape_object_make_null()
     }
 
@@ -979,7 +982,7 @@ func ApeAssert(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_o
     var stmt = ape_object_get_bool(args[0])
     if(!stmt) {
         // TODO: Get the position of the function call...
-        context.pp.lita.result.addError(context.comp.startPos, "preprocessor assertion failure")
+        context.pp.lita.result.addError(context.comp.getStartPos(), "preprocessor assertion failure")
     }
 
     return ape_object_make_null()
@@ -990,13 +993,13 @@ public func (this: *Preprocessor) loadScript(comp: *CompStmt, filename: *String,
     var filepath = [MAX_PATH]char{0};
     var filepathStr = StringBufferInit(filepath, MAX_PATH, 0)
 
-    FilePath(comp.startPos.filename, filepath)
+    FilePath(comp.getStartPos().filename, filepath)
 
     filepathStr.adjust()
     filepathStr.append("/%.*s", filename.length, filename.buffer)
 
     if(!FileExists(filepathStr.cStr())) {
-        this.lita.result.addError(comp.startPos, "unable to locate '%.*s'", filename.length, filename.buffer)
+        this.lita.result.addError(comp.getStartPos(), "unable to locate '%.*s'", filename.length, filename.buffer)
         return false
     }
 
@@ -1006,7 +1009,7 @@ public func (this: *Preprocessor) loadScript(comp: *CompStmt, filename: *String,
     var status = ReadFile(filepathStr.cStr(), &buffer, &length, this.lita.allocator)
 
     if(status != FileStatus.Ok) {
-        this.lita.result.addError(comp.startPos, "error loading '%s'", filepathStr.cStr())
+        this.lita.result.addError(comp.getStartPos(), "error loading '%s'", filepathStr.cStr())
         return false
     }
 

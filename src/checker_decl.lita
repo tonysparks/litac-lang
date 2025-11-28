@@ -27,16 +27,16 @@ import "coroutine"
 
 import "lsp/references"
 
-public func (this: *TypeChecker) resolveDecl(decl: *Node) : bool {
+public func (this: *TypeChecker) resolveDecl(decl: *Decl) : bool {
     assert(decl != null)
 
-    switch(decl.kind) {
+    switch(decl.getKind()) {
         case StmtKind.IMPORT_DECL: {
             return true;
         }
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
-            var type = this.resolveValueDecl(decl)
+            var type = this.resolveValueDecl(decl as (*VarDecl))
             if(!type) {
                 return false
             }
@@ -45,29 +45,29 @@ public func (this: *TypeChecker) resolveDecl(decl: *Node) : bool {
             return true;
         }
         case StmtKind.NOTE_DECL: {
-            var aggDecl = decl
+            var aggDecl = decl as (*AggregateDecl)
             return this.resolveNoteDecl(aggDecl)
         }
         case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
         case StmtKind.UNION_DECL: {
-            var aggDecl = decl
+            var aggDecl = decl as (*AggregateDecl)
             return this.resolveAggregateDecl(aggDecl)
         }
         case StmtKind.ENUM_DECL: {
-            var enumDecl = decl
+            var enumDecl = decl as (*EnumDecl)
             return this.resolveEnumDecl(enumDecl)
         }
         case StmtKind.FUNC_DECL: {
-            var funcDecl = decl
+            var funcDecl = decl as (*FuncDecl)
             return this.resolveFuncDecl(funcDecl)
         }
         case StmtKind.TYPEDEF_DECL: {
-            var typedefDecl = decl
+            var typedefDecl = decl as (*TypedefDecl)
             return this.resolveTypedefDecl(typedefDecl)
         }
         case StmtKind.PARAM_DECL: {
-            var paramDecl = decl
+            var paramDecl = decl as (*ParameterDecl)
             return this.resolveParamDecl(paramDecl)
         }
         case StmtKind.NATIVE_DECL:
@@ -115,12 +115,13 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
         }
 
         var op = decl.expr.operand
-        if(decl.expr.kind == StmtKind.ARRAY_INIT_EXPR ||
-           decl.expr.kind == StmtKind.INIT_EXPR) {
+        if(decl.expr.getKind() == StmtKind.ARRAY_INIT_EXPR ||
+           decl.expr.getKind() == StmtKind.INIT_EXPR
+        ) {
             inferredType = op.typeInfo
         }
         else if(op.typeInfo.kind == TypeKind.NULL && declaredType == null) {
-            this.result.addError(decl.expr.startPos,
+            this.result.addError(decl.expr.getStartPos(),
                 "invalid variable declaration, can't infer type from 'null' for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
             return null
         }
@@ -136,7 +137,7 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
     }
 
     if(declaredType && inferredType) {
-        if(!this.checkDeclarability(decl.expr.startPos, declaredType, inferredType)) {
+        if(!this.checkDeclarability(decl.expr.getStartPos(), declaredType, inferredType)) {
             return false
         }
     }
@@ -150,14 +151,13 @@ public func (this: *TypeChecker) resolveValueDecl(decl: *VarDecl) : *TypeInfo {
             return &POISON_TYPE
         }
 
-        this.result.addError(node.startPos,
+        this.result.addError(decl.getStartPos(),
                 "invalid variable declaration, can't infer type for '%.*s' variable", decl.name.str.length, decl.name.str.buffer)
     }
     return resultType
 }
 
-func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(node: *Node, field: FieldStmt, index: i32) : bool {
-    var aggDecl = &node.aggregateDecl
+func (this: *TypeChecker) checkAnonAggregateFieldDuplicate(aggDecl: *AggregateDecl, field: FieldStmt, index: i32) : bool {
     var errors = this.errors()
     switch(field.kind) {
         case StmtKind.TRAIT_FIELD_DECL: {
@@ -231,12 +231,12 @@ func (this: *TypeChecker) errorUsingMember(aggDecl: *AggregateDecl, fieldName: I
 }
 
 func (this: *TypeChecker) errorUsingParameter(paramDecl: *ParameterDecl) {
-    this.result.addError(paramDecl.startPos, "invalid 'using' parameter '%.*s', only aggregate types (or pointer to an aggregate) are allowed",
+    this.result.addError(paramDecl.getStartPos(), "invalid 'using' parameter '%.*s', only aggregate types (or pointer to an aggregate) are allowed",
                          paramDecl.name.str.length, paramDecl.name.str.buffer)
 
 }
 
-func (this: *TypeChecker) errorDuplicateMember(aggDecl: *Node, fieldName: InternedString, pos: SrcPos) {
+func (this: *TypeChecker) errorDuplicateMember(aggDecl: *AggregateDecl, fieldName: InternedString, pos: SrcPos) {
     if(aggDecl.name.str.length) {
         this.result.addError(pos, "duplicate member '%.*s' in '%.*s'",
                                         fieldName.length, fieldName.buffer,
@@ -264,7 +264,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
                 }
 
                 if(traitField.name.str.equals(fieldName)) {
-                    this.errorDuplicateMember(aggDecl, fieldName, traitField.startPos)
+                    this.errorDuplicateMember(aggDecl, fieldName, traitField.getStartPos())
                     isValid = false
                 }
 
@@ -277,7 +277,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
                 }
 
                 if(varField.name.str.equals(fieldName)) {
-                    this.errorDuplicateMember(aggDecl, fieldName, varField.startPos)
+                    this.errorDuplicateMember(aggDecl, fieldName, varField.getStartPos())
                     isValid = false
                 }
 
@@ -289,7 +289,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
                     continue
                 }
                 if(enumField.name.str.equals(fieldName)) {
-                    this.errorDuplicateMember(aggDecl, fieldName, enumField.startPos)
+                    this.errorDuplicateMember(aggDecl, fieldName, enumField.getStartPos())
                     isValid = false
                 }
                 break;
@@ -299,7 +299,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
                 var aggField = field.aggregateField
                 if(aggField.name.token.type == TokenType.IDENTIFIER) {
                     if(aggField.name.str.equals(fieldName)) {
-                        this.errorDuplicateMember(aggDecl, fieldName, aggField.startPos)
+                        this.errorDuplicateMember(aggDecl, fieldName, aggField.getStartPos())
                         isValid = false
                     }
                 }
@@ -320,7 +320,7 @@ func (this: *TypeChecker) checkAggregateFieldDuplicate(aggDecl: *AggregateDecl, 
 }
 
 public func (this: *TypeChecker) resolveNoteDecl(noteDecl: *AggregateDecl) : bool {
-    defer this.references.addTypeReferenceBySymbol(noteDecl.startPos, noteDecl.sym)
+    defer this.references.addTypeReferenceBySymbol(noteDecl.getStartPos(), noteDecl.sym)
 
     var errors = this.errors()
 
@@ -344,7 +344,7 @@ public func (this: *TypeChecker) resolveNoteDecl(noteDecl: *AggregateDecl) : boo
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
                     }
-                    this.checkDeclarability(varField.defaultExpr.startPos, field.typeInfo, varField.defaultExpr.operand.typeInfo)
+                    this.checkDeclarability(varField.defaultExpr.getStartPos(), field.typeInfo, varField.defaultExpr.operand.typeInfo)
                 }
 
                 this.checkAggregateFieldDuplicate(noteDecl, varField.name.str, i)
@@ -366,7 +366,7 @@ public func (this: *TypeChecker) resolveNoteDecl(noteDecl: *AggregateDecl) : boo
 
 
 public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) : bool {
-    defer this.references.addTypeReferenceBySymbol(aggDecl.startPos, aggDecl.sym)
+    defer this.references.addTypeReferenceBySymbol(aggDecl.getStartPos(), aggDecl.sym)
 
     var errors = this.errors()
 
@@ -407,7 +407,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 }
 
                 if(field.typeInfo.kind != TypeKind.FUNC_PTR) {
-                    this.errorInvalidMemberForTrait(aggDecl, traitField.name.str, traitField.startPos)
+                    this.errorInvalidMemberForTrait(aggDecl, traitField.name.str, traitField.getStartPos())
                     return false
                 }
 
@@ -427,7 +427,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 }
 
                 if(isTrait && !varField.attributes.isGenerated) {
-                    this.errorInvalidMemberForTrait(aggDecl, varField.name.str, varField.startPos)
+                    this.errorInvalidMemberForTrait(aggDecl, varField.name.str, varField.getStartPos())
                     return false
                 }
 
@@ -435,7 +435,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                     if(!this.resolveExpr(varField.defaultExpr)) {
                         return false
                     }
-                    this.checkDeclarability(varField.defaultExpr.startPos, field.typeInfo, varField.defaultExpr.operand.typeInfo)
+                    this.checkDeclarability(varField.defaultExpr.getStartPos(), field.typeInfo, varField.defaultExpr.operand.typeInfo)
                 }
                 if(varField.bitFieldExpr) {
                     if(!this.resolveExpr(varField.bitFieldExpr)) {
@@ -445,7 +445,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 }
                 if(varField.attributes.isUsing) {
                     if(!IsAggregate(field.typeInfo) && !IsPtrAggregate(field.typeInfo)) {
-                        this.errorUsingMember(aggDecl, varField.name.str, varField.startPos)
+                        this.errorUsingMember(aggDecl, varField.name.str, varField.getStartPos())
                     }
                 }
 
@@ -454,7 +454,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             }
             case StmtKind.ENUM_FIELD_DECL: {
                 if(isTrait) {
-                    this.errorInvalidMemberForTrait(aggDecl, field.enumField.name.str, field.enumField.startPos)
+                    this.errorInvalidMemberForTrait(aggDecl, field.enumField.name.str, field.enumField.getStartPos())
                     return false
                 }
 
@@ -484,7 +484,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 if(isTrait) {
-                    this.errorInvalidMemberForTrait(aggDecl, field.aggregateField.name.str, field.aggregateField.startPos)
+                    this.errorInvalidMemberForTrait(aggDecl, field.aggregateField.name.str, field.aggregateField.getStartPos())
                     return false
                 }
 
@@ -503,7 +503,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
                     // build up the new Declaration Name with the appropriate generic arguments supplemented in
                     // from the parent declaration
-                    var nameSpec = NewNameTypeSpecIntern(field.aggregateField.startPos, nameStr, &module.typeSpecAllocator)
+                    var nameSpec = NewNameTypeSpecIntern(field.aggregateField.getStartPos(), nameStr, &module.typeSpecAllocator)
                     nameSpec.genericArgs.init(field.aggregateField.genericParams.size(), module.allocator)
 
                     for(var i = 0; i < field.aggregateField.genericParams.size(); i += 1) {
@@ -590,13 +590,13 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
 
         switch(field.kind) {
             case StmtKind.TRAIT_FIELD_DECL: {
-                this.lita.references.addFieldReference(field.traitField.startPos, parentTypeInfo, position)
+                this.lita.references.addFieldReference(field.traitField.getStartPos(), parentTypeInfo, position)
                 position += 1
                 break;
             }
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
-                this.lita.references.addFieldReference(field.varField.startPos, parentTypeInfo, position)
+                this.lita.references.addFieldReference(field.varField.getStartPos(), parentTypeInfo, position)
 
                 if(varField.attributes.isUsing) {
                     if(IsAggregate(field.typeInfo) || IsPtrAggregate(field.typeInfo)) {
@@ -610,14 +610,14 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
                 break;
             }
             case StmtKind.ENUM_FIELD_DECL: {
-                this.lita.references.addFieldReference(field.enumField.startPos, parentTypeInfo, position)
+                this.lita.references.addFieldReference(field.enumField.getStartPos(), parentTypeInfo, position)
                 position += 1
                 break;
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
                 if(field.aggregateField.name.token.type == TokenType.IDENTIFIER) {
-                    this.lita.references.addFieldReference(field.aggregateField.startPos, parentTypeInfo, position)
+                    this.lita.references.addFieldReference(field.aggregateField.getStartPos(), parentTypeInfo, position)
                     position += 1
                 }
                 else {
@@ -642,7 +642,7 @@ func (this: *TypeChecker) checkBitField(aggDecl: *AggregateDecl, field: *FieldSt
     if(!IsBitField(field.typeInfo)) {
         var sb = StringBuilderInit(256, this.allocator)
         field.typeInfo.toString(sb, .fullyQualify = true)
-        this.result.addError(varField.startPos,
+        this.result.addError(varField.getStartPos(),
             "only integer like fields are allowed on bit field definitions, '%.*s' is of type '%.*s'",
             varField.name.str.length, varField.name.str.buffer,
             sb.length, sb.buffer
@@ -651,7 +651,7 @@ func (this: *TypeChecker) checkBitField(aggDecl: *AggregateDecl, field: *FieldSt
     }
 
     if(!IsBitField(varField.bitFieldExpr.operand.typeInfo)) {
-        this.result.addError(varField.bitFieldExpr.startPos,
+        this.result.addError(varField.bitFieldExpr.getStartPos(),
             "the bit field definition must be an integer value for field '%.*s'",
             varField.name.str.length, varField.name.str.buffer
         )
@@ -666,7 +666,7 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
 
         var other = enumDecl.fields.get(i)
         if(other.name.str.equals(field.name.str)) {
-            this.result.addError(other.startPos, "duplicate member '%.*s'",
+            this.result.addError(other.getStartPos(), "duplicate member '%.*s'",
                                 field.name.str.length, field.name.str.buffer)
             hasDuplicates = true
         }
@@ -676,7 +676,7 @@ func (this: *TypeChecker) checkEnumFieldDuplicate(enumDecl: *EnumDecl, field: *E
 }
 
 public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
-    defer this.references.addTypeReferenceBySymbol(enumDecl.startPos, enumDecl.sym)
+    defer this.references.addTypeReferenceBySymbol(enumDecl.getStartPos(), enumDecl.sym)
 
     var errors = this.errors()
 
@@ -699,11 +699,11 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
 
             // TODO: Generate primitive constants ordering
             var typeInfo = field.value.operand.typeInfo
-            this.checkTypeCompatibility(field.value.startPos, typeInfo, &I32_TYPE)
+            this.checkTypeCompatibility(field.value.getStartPos(), typeInfo, &I32_TYPE)
         }
 
         this.checkEnumFieldDuplicate(enumDecl, field, i)
-        this.lita.references.addFieldReference(field.startPos, parentTypeInfo, i)
+        this.lita.references.addFieldReference(field.getStartPos(), parentTypeInfo, i)
     }
     return this.errors() == errors
 }
@@ -713,7 +713,7 @@ func (this: *TypeChecker) checkLabels() {
         var label = &this.labels[i]
         if(!label.defined) {
             assert(label.stmt != null)
-            this.result.addError(label.stmt.startPos, "'%.*s' label not found", label.name.length, label.name.buffer)
+            this.result.addError(label.stmt.getStartPos(), "'%.*s' label not found", label.name.length, label.name.buffer)
         }
     }
 }
@@ -721,7 +721,7 @@ func (this: *TypeChecker) checkLabels() {
 public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     var sym = funcDecl.sym
 
-    defer this.references.addTypeReferenceBySymbol(funcDecl.startPos, sym)
+    defer this.references.addTypeReferenceBySymbol(funcDecl.getStartPos(), sym)
 
     var errors = this.errors()
 
@@ -780,7 +780,7 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
 public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : bool {
     assert(paramDecl != null)
 
-    defer this.references.addTypeReferenceBySymbol(paramDecl.startPos, paramDecl.sym)
+    defer this.references.addTypeReferenceBySymbol(paramDecl.getStartPos(), paramDecl.sym)
 
     var errors = this.errors()
 
@@ -818,7 +818,7 @@ public func (this: *TypeChecker) resolveParamDecl(paramDecl: *ParameterDecl) : b
 }
 
 public func (this: *TypeChecker) resolveTypedefDecl(typedefDecl: *TypedefDecl) : bool {
-    defer this.references.addTypeReferenceBySymbol(typedefDecl.startPos, typedefDecl.sym)
+    defer this.references.addTypeReferenceBySymbol(typedefDecl.getStartPos(), typedefDecl.sym)
 
     if(!this.resolveNotes(typedefDecl.attributes.notes)) {
         return false

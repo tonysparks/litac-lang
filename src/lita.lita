@@ -290,15 +290,18 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
             return;
         }
 
-        var builtinImport = NewImportDecl(SrcPos{},
-                                        SrcPos{},
-                                        BUILTIN_IMPORT_IDENT,
-                                        Identifier {
-                                            .str = EMPTY_STR,
-                                            .token = Token{.type = TokenType.VOID}
-                                        },
-                                        false,
-                                        this.allocator) as (*ImportDecl)
+        var builtinImport = &NewImportDecl(
+            SrcPos{},
+            SrcPos{},
+            BUILTIN_IMPORT_IDENT,
+            Identifier {
+                .str = EMPTY_STR,
+                .token = Token{.type = TokenType.VOID}
+            },
+            false,
+            this.allocator
+        ).importDecl
+
         builtinImport.moduleId = &this.builtins.id
         module.ast.imports.insertAt(0, builtinImport)
     }
@@ -376,15 +379,18 @@ public func (this: *Lita) parse() : *Module {
         return null;
     }
 
-    var builtinImport = NewImportDecl(SrcPos{},
-                                      SrcPos{},
-                                      BUILTIN_IMPORT_IDENT,
-                                      Identifier {
-                                          .str = EMPTY_STR,
-                                          .token = Token{.type = TokenType.VOID}
-                                      },
-                                      false,
-                                      this.allocator) as (*ImportDecl)
+    var builtinImport = &NewImportDecl(
+        SrcPos{},
+        SrcPos{},
+        BUILTIN_IMPORT_IDENT,
+        Identifier {
+            .str = EMPTY_STR,
+            .token = Token{.type = TokenType.VOID}
+        },
+        false,
+        this.allocator
+    ).importDecl
+
     builtinImport.moduleId = &builtin.id
     root.ast.imports.insertAt(0, builtinImport)
 
@@ -693,9 +699,11 @@ public func (this: *Lita) run() : i32 {
 }
 
 
-public func FindModulePath(lita: *Lita,
-                           moduleName: String,
-                           filename: [MAX_PATH]char) : bool {
+public func FindModulePath(
+    lita: *Lita,
+    moduleName: String,
+    filename: [MAX_PATH]char
+) : bool {
 
     var path = [MAX_PATH]char{0}
     var pathStr = StringBufferInit(path, MAX_PATH, 0);
@@ -853,7 +861,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var importStmt = module.ast.imports.get(i)
-        var startPos = importStmt.asNode().startPos
+        var startPos = importStmt.getStartPos()
         if(importStmt.name.token.type == TokenType.ERROR) {
             lita.result.addError(startPos, "Could not parse import statement")
             continue

@@ -538,9 +538,34 @@ public func (this: *Stmt) getStartPos() : SrcPos {
     return node.startPos
 }
 
+public func (this: *Stmt) setStartPos(pos: SrcPos) {
+    var node = this.asNode()
+    node.startPos = pos
+}
+
+public func (this: *Stmt) getEndPos() : SrcPos {
+    var node = this.asNode()
+    return node.endPos
+}
+
+public func (this: *Stmt) setEndPos(endPos: SrcPos) {
+    var node = this.asNode()
+    node.endPos = endPos
+}
+
 public func (this: *Stmt) getKind() : StmtKind {
     var node = this.asNode()
     return node.kind
+}
+
+public func (this: *Stmt) setKind(kind: StmtKind) {
+    var node = this.asNode()
+    node.kind = kind
+}
+
+public func (this: *Stmt) getParent() : *Node {
+    var node = this.asNode()
+    return node.parent
 }
 
 public struct ArrayDesignationExpr {

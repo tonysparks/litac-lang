@@ -234,7 +234,7 @@ public func CreateTypeFromGenericTemplate(checker: *TypeChecker,
         genericSym.genericParams = genericDecl.genericParams.copy(checker.allocator)
 
         checker.current.genericSymbols.put(lookupNameStr, genericSym)
-        if(genericSym.decl.kind == StmtKind.FUNC_DECL) {
+        if(genericSym.decl.getKind() == StmtKind.FUNC_DECL) {
             checker.symbolFuncs.add(genericSym)
         }
         else {
@@ -381,7 +381,7 @@ func CreateDecl(sym: *Symbol,
 
     var genericDecl: *GenericDecl = null;
 
-    switch(sym.decl.kind) {
+    switch(sym.decl.getKind()) {
         case StmtKind.FUNC_DECL: {
             genericDecl = CreateFuncDecl(sym.decl as (*FuncDecl), genericArgs, module)
             break;
@@ -414,7 +414,7 @@ func CreateAggregateDecl(aggDecl: *AggregateDecl,
         .genericArgs = genericArgs
     }
 
-    ReplaceTypes(&template, copy.node)
+    ReplaceTypes(&template, copy)
 
     return copy as (*GenericDecl)
 }
@@ -431,7 +431,7 @@ func CreateFuncDecl(funcDecl: *FuncDecl,
         .genericArgs = genericArgs
     }
 
-    ReplaceTypes(&template, copy.node)
+    ReplaceTypes(&template, copy)
 
     return copy as (*GenericDecl)
 }
@@ -446,7 +446,7 @@ func CreateTypedefDecl(typedefDecl: *TypedefDecl,
         .genericArgs = genericArgs
     }
 
-    ReplaceTypes(&template, copy.node)
+    ReplaceTypes(&template, copy)
 
     return copy as (*GenericDecl)
 }
@@ -546,10 +546,10 @@ func (this: *Template) replaceTypeSpec(type: *TypeSpec) : *TypeSpec {
 }
 
 
-func ReplaceTypes(template: *Template, ast: *Node) : bool {
+func ReplaceTypes(template: *Template, ast: *Stmt) : bool {
     if(!ast) return true;
 
-    switch(ast.kind) {
+    switch(ast.getKind()) {
         case StmtKind.TRAIT_DECL:
         case StmtKind.UNION_DECL:
         case StmtKind.STRUCT_DECL: {
@@ -573,7 +573,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
                     case StmtKind.UNION_FIELD_DECL:
                     case StmtKind.STRUCT_FIELD_DECL: {
                         var aggField = field.aggregateField
-                        ReplaceTypes(template, aggField.node)
+                        ReplaceTypes(template, aggField)
                         break;
                     }
                     case StmtKind.POISON_EXPR: {
@@ -721,7 +721,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             var params = ast as (*ParametersStmt)
             for(var i = 0; i < params.size(); i += 1) {
                 var param = params.get(i)
-                ReplaceTypes(template, param as (*Node))
+                ReplaceTypes(template, param)
             }
             break;
         }
@@ -743,7 +743,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             ReplaceTypes(template, switchStmt.cond)
             for(var i = 0; i < switchStmt.cases.size(); i+=1) {
                 var caseStmt = switchStmt.cases.get(i)
-                ReplaceTypes(template, caseStmt as (*Node))
+                ReplaceTypes(template, caseStmt)
             }
             if(switchStmt.defaultStmt) {
                 ReplaceTypes(template, switchStmt.defaultStmt)
@@ -832,7 +832,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
         case StmtKind.GET_EXPR: {
             var expr = ast as (*GetExpr)
             ReplaceTypes(template, expr.object)
-            ReplaceTypes(template, expr.field as (*Node))
+            ReplaceTypes(template, expr.field)
             break;
         }
         case StmtKind.GROUP_EXPR: {
@@ -864,7 +864,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             }
 
             for(var i = 0; i < expr.arguments.size(); i += 1) {
-                ReplaceTypes(template, expr.arguments.get(i) as (*Node))
+                ReplaceTypes(template, expr.arguments.get(i))
             }
             break;
         }
@@ -887,7 +887,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
         case StmtKind.SET_EXPR: {
             var expr = ast as (*SetExpr)
             ReplaceTypes(template, expr.object)
-            ReplaceTypes(template, expr.field as (*Node))
+            ReplaceTypes(template, expr.field)
             ReplaceTypes(template, expr.value)
             break;
         }
@@ -943,7 +943,7 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             break;
         }
         default: {
-            printf("Statement Kind: %s\n", StmtKindAsStr(ast.kind))
+            printf("Statement Kind: %s\n", StmtKindAsStr(ast.getKind()))
             assert(false)
         }
     }

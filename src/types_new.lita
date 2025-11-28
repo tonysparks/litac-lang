@@ -23,7 +23,7 @@ public struct TypeCache {
 
 public struct ArrayEntry {
     arrayOf: *TypeInfo
-    expr: *Node
+    expr: *Expr
     length: usize
 }
 
@@ -94,7 +94,7 @@ public func (this: *TypeCache) newFuncTypeInfo(sym: *Symbol,
 
 public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
                                                 length: usize,
-                                                numOfElements: *Node,
+                                                numOfElements: *Expr,
                                                 isLengthDefined: bool) : *TypeInfo {
 
     var entry = ArrayEntry{.arrayOf = arrayOf, .expr = numOfElements, .length = length}
@@ -133,8 +133,7 @@ public func (this: *TypeCache) newAggregateTypeInfo(sym: *Symbol,
                                                     decl: *AggregateDecl) : *TypeInfo {
 
     var type = sym.type != null ? sym.type : this.newTypeInfo()
-    var node = decl.asNode()
-    switch(node.kind) {
+    switch(decl.getKind()) {
         case StmtKind.TRAIT_DECL: {
             type.kind = TypeKind.TRAIT
             break;

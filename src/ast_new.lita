@@ -148,6 +148,7 @@ public func NewImportDecl(startPos: SrcPos,
     decl.kind = StmtKind.IMPORT_DECL;
     decl.startPos = startPos
     decl.endPos = endPos
+
     decl.importDecl.name = name
     decl.importDecl.alias = alias
     decl.importDecl.isUsing = isUsing
@@ -222,24 +223,24 @@ public func NewAggregateDecl(startPos: SrcPos,
         var field = fields.get(i)
         switch(field.kind) {
             case StmtKind.ENUM_FIELD_DECL: {
-                decl.becomeParentOf(field.enumField.asNode())
+                decl.becomeParentOf(field.enumField)
                 break
             }
             case StmtKind.UNION_FIELD_DECL:
             case StmtKind.STRUCT_FIELD_DECL: {
-                decl.becomeParentOf(field.aggregateField.asNode())
+                decl.becomeParentOf(field.aggregateField)
                 break
             }
             case StmtKind.TRAIT_FIELD_DECL: {
-                decl.becomeParentOf(field.traitField.asNode())
+                decl.becomeParentOf(field.traitField)
                 break
             }
             case StmtKind.VAR_FIELD_DECL: {
-                decl.becomeParentOf(field.varField.asNode())
+                decl.becomeParentOf(field.varField)
                 break
             }
             case StmtKind.POISON_EXPR: {
-                decl.becomeParentOf(field.poisonField.asNode())
+                decl.becomeParentOf(field.poisonField)
                 break;
             }
             default: {
@@ -739,7 +740,7 @@ public func NewArrayInitExpr(startPos: SrcPos,
                 .intValue = expr.arrayInitExpr.values.size()
             }
         }
-        arrayType.numElements = NewNumberExpr(startPos, startPos, token, allocator)
+        arrayType.numElements = &NewNumberExpr(startPos, startPos, token, allocator).asExpr
     }
 
     return expr

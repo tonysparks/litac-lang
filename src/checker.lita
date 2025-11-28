@@ -46,7 +46,7 @@ const MAX_LABEL_NAME = 32;
 struct LabelInfo {
     name: InternedString
     defined: bool
-    stmt: *Node
+    stmt: *Stmt
 }
 
 struct GenericContext {
@@ -687,7 +687,7 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             break; // Ignore, as this will already have a parsing error
         }
         default: {
-            PrintStmt(decl as (*Node), 0)
+            PrintStmt(decl.asNode(), 0)
             assert(false)
         }
     }
@@ -1340,13 +1340,13 @@ public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, searchType: Se
                 }
 
                 if(!IsInteger(expr.operand.typeInfo)) {
-                    this.result.addError(expr.startPos,
+                    this.result.addError(expr.getStartPos(),
                             "array size expression must be an integer type")
                     goto err;
                 }
 
                 isLengthDefined = true
-                if(expr.kind == StmtKind.IDENTIFIER_EXPR) {
+                if(expr.getKind() == StmtKind.IDENTIFIER_EXPR) {
                     var idExpr = expr as (*IdentifierExpr)
                     if(idExpr.sym && (idExpr.sym.flags & SymbolFlags.IS_FOREIGN)) {
                         // we don't know the actual length, because this type's value is
@@ -1391,7 +1391,7 @@ err:
     return &POISON_TYPE
 }
 
-public func (this: *TypeChecker) addSymbolToScope(decl: *Node, typeInfo: *TypeInfo, scope: *Scope) : *Symbol {
+public func (this: *TypeChecker) addSymbolToScope(decl: *Decl, typeInfo: *TypeInfo, scope: *Scope) : *Symbol {
     assert(decl.name.token.type == TokenType.IDENTIFIER)
 
     var sym = scope.addSymbol(decl.name.str, this.current, decl, 0)
@@ -1399,17 +1399,17 @@ public func (this: *TypeChecker) addSymbolToScope(decl: *Node, typeInfo: *TypeIn
         sym.type = typeInfo
         this.resolveSymbol(sym)
 
-        this.lita.references.addSymbolReference(sym, decl.startPos)
+        this.lita.references.addSymbolReference(sym, decl.getStartPos())
     }
 
     return sym
 }
 
-public func (this: *TypeChecker) addSymbol(decl: *Node, typeInfo: *TypeInfo) : *Symbol {
+public func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
     return this.addSymbolToScope(decl, typeInfo, this.current.currentScope)
 }
 
-public func (this: *TypeChecker) addTypeToScope(decl: *Node, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {
+public func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {
     for(var i = 0; i < currentType.aggDecl.fields.size(); i += 1) {
         var field = currentType.aggDecl.fields.get(i)
 
@@ -1420,8 +1420,16 @@ public func (this: *TypeChecker) addTypeToScope(decl: *Node, scope: *Scope, base
                     break
                 }
 
-                var varDecl = NewVarDecl(decl.startPos, decl.endPos, decl.name, varField.type, null, this.allocator)
+                var varDeclNode = NewVarDecl(
+                    decl.getStartPos(),
+                    decl.getEndPos(),
+                    decl.name,
+                    varField.type,
+                    null,
+                    this.allocator
+                )
 
+                var varDecl = &varDeclNode.varDecl
                 varDecl.sym = scope.addSymbol(varField.name.str, this.current, varDecl, SymbolFlags.IS_USING)
                 varDecl.sym.type = field.typeInfo
                 varDecl.sym.usingParent = decl.sym
@@ -1469,7 +1477,7 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
             continue
         }
 
-        if(!this.checkNote(note.startPos, typeInfo)) {
+        if(!this.checkNote(note.getStartPos(), typeInfo)) {
             success = false
             continue
         }
@@ -1515,14 +1523,14 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
     return success
 }
 
-func (this: *TypeChecker) isBoolExpr(expr: *Node) : bool {
+func (this: *TypeChecker) isBoolExpr(expr: *Expr) : bool {
     return this.checkTruthyness(expr, expr.operand.typeInfo)
 }
 
-public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
+public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
     if(!stmt) return true;
 
-    switch(stmt.kind) {
+    switch(stmt.getKind()) {
         // --------------------------------------------------
         //          Declarations
         // --------------------------------------------------
@@ -1539,7 +1547,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
         case StmtKind.PARAM_DECL:
         case StmtKind.NATIVE_DECL:
         case StmtKind.POISON_DECL: {
-            return this.resolveDecl(stmt as (*Node))
+            return this.resolveDecl(stmt as (*Decl))
         }
 
         // --------------------------------------------------
@@ -1723,7 +1731,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
             }
 
             if(this.numOfLabels >= MAX_LABELS) {
-                this.result.addError(labelStmt.startPos, "max number of labels reached")
+                this.result.addError(labelStmt.getStartPos(), "max number of labels reached")
                 return false
             }
 
@@ -1762,11 +1770,15 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
                     hasDefault = true
                 }
                 else if(hasDefault) {
-                    var parentDecl = params.parent as (*FuncDecl)
-                    assert(parentDecl != null)
-                    assert(parentDecl.kind == StmtKind.FUNC_DECL)
-                    this.result.addError(parentDecl.startPos, "'%.*s' must have default arguments defined last",
-                                    parentDecl.name.str.length, parentDecl.name.str.buffer)
+                    var parentNode = params.asNode().parent
+                    assert(parentNode != null)
+                    assert(parentNode.kind == StmtKind.FUNC_DECL)
+
+                    var parentDecl = &parentNode.funcDecl
+                    this.result.addError(
+                        parentDecl.getStartPos(), "'%.*s' must have default arguments defined last",
+                        parentDecl.name.str.length, parentDecl.name.str.buffer
+                    )
                     return false;
                 }
 
@@ -1789,7 +1801,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
 
                 ret.expr = this.coerceTypeWithUsing(ret.expr, ret.expr.operand.typeInfo, currentFuncDecl.returnType)
 
-                this.checkTypeCompatibility(ret.expr.startPos, currentFuncDecl.returnType, ret.expr.operand.typeInfo)
+                this.checkTypeCompatibility(ret.expr.getStartPos(), currentFuncDecl.returnType, ret.expr.operand.typeInfo)
                 ret.expr.expectedType = currentFuncDecl.returnType
 
                 // If the return type is a generic type, do the type inference
@@ -1800,7 +1812,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
                 }
             }
             else {
-                this.checkTypeCompatibility(ret.startPos, currentFuncDecl.returnType, &VOID_TYPE)
+                this.checkTypeCompatibility(ret.getStartPos(), currentFuncDecl.returnType, &VOID_TYPE)
 
                 if(currentFuncDecl.returnType && currentFuncDecl.returnType.kind == TypeKind.GENERIC_PARAM) {
                     currentFuncDecl.returnType = &VOID_TYPE
@@ -1895,7 +1907,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Node) : bool {
         case StmtKind.NAME_OF_EXPR:
         case StmtKind.UNARY_EXPR:
         case StmtKind.POISON_EXPR: {
-            return this.resolveExpr(stmt as (*Node))
+            return this.resolveExpr(stmt as (*Expr))
         }
         default: {
             assert(false)

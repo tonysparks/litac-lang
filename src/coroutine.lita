@@ -203,16 +203,16 @@ public func MakeCoroutine(checker: *TypeChecker, funcDecl: *FuncDecl) {
 
     }
 
-    InjectContinuationState(
-        &context,
-        funcDecl.body as (*Node)
-    )
+    // InjectContinuationState(
+    //     &context,
+    //     funcDecl.body as (*Node)
+    // )
 }
 
 struct ContinuationContext {
 
 }
-
+/*
 func InjectContinuationState(context: *ContinuationContext, ast: *Node) {
     if(!ast) {
         return;
@@ -414,18 +414,18 @@ printf("Here: %s\n", StmtKindAsStr(ast.kind))
         }
         case StmtKind.FUNC_CALL_EXPR: {
             var expr = ast as (*FuncCallExpr)
-            /*
-            var sym = expr.object.operand.typeInfo.sym
-            if(sym.flags & SymbolFlags.IS_COROUTINE) {
-                var parent = ast.parent
 
-            }
+            // var sym = expr.object.operand.typeInfo.sym
+            // if(sym.flags & SymbolFlags.IS_COROUTINE) {
+            //     var parent = ast.parent
 
-            InjectContinuationState(context, expr.object)
+            // }
 
-            for(var i = 0; i < expr.arguments.size(); i += 1) {
-                InjectContinuationState(context, expr.arguments.get(i).argExpr)
-            }*/
+            // InjectContinuationState(context, expr.object)
+
+            // for(var i = 0; i < expr.arguments.size(); i += 1) {
+            //     InjectContinuationState(context, expr.arguments.get(i).argExpr)
+            // }
             break;
         }
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
@@ -532,4 +532,4 @@ printf("Here: %s\n", StmtKindAsStr(ast.kind))
         }
     }
 }
-
+*/

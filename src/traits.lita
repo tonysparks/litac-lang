@@ -89,7 +89,7 @@ C:
         List list = LinkedList_to_List(&ll)   // Cast the LinkedList to List type
 */
 
-public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Node> {
+public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     var allocator = checker.current.allocator
 
     var sb = StringBuilderInit(2048, allocator)
@@ -100,7 +100,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Node> {
     for(var i = 0; i < checker.symbolTraits.size(); i+=1) {
         var traitSym = checker.symbolTraits.get(i)
         assert(traitSym)
-        assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
+        assert(traitSym.decl && traitSym.decl.getKind() == StmtKind.TRAIT_DECL)
 
         var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = GetTraitName(traitSym, traitBuffer)
