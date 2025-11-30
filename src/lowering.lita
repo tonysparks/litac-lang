@@ -26,12 +26,13 @@ import "coroutine"
 
 public struct FuncLowerContext {
     allocator: *const Allocator
+    checker: *TypeChecker
     strings: *Strings
     module: *Module
 
     funcDecl: *FuncDecl
     tempIndex: u32
-
+    labelIndex: u32
 
     current: *BlockScope
 
@@ -62,6 +63,10 @@ struct BlockScope {
 }
 
 func (this: *FuncLowerContext) setVar(name: InternedString) : InternedString {
+    if (!this.current) {
+        return InternedString{}
+    }
+
     if (this.current.locals.capacity == 0) {
         this.current.locals = ArrayInit<InternedString>(16, this.allocator)
     }
@@ -73,6 +78,7 @@ func (this: *FuncLowerContext) setVar(name: InternedString) : InternedString {
     var internedName = this.strings.internCopy(sb.cStr(), sb.length)
     this.current.locals.add(internedName)
     this.stack.add(internedName)
+    printf("Added var: %.*s\n", internedName.length, internedName.buffer)
 }
 
 func (this: *FuncLowerContext) getVar(name: InternedString) : InternedString {
@@ -82,6 +88,7 @@ func (this: *FuncLowerContext) getVar(name: InternedString) : InternedString {
     while(scope != null) {
         for(var i = 0; i < scope.locals.size(); i+=1) {
             var localName = scope.locals.get(i)
+            // TODO: also check the __ to know it is our variable
             if (localName.view.startsWith(name.view)) {
                 return localName
             }
@@ -167,6 +174,32 @@ func NewTempEmptyAssignment(
 
     InsertTempStmt(context, temp, .atEnd = true)
     return temp as (*VarDecl)
+}
+
+func InsertLabel(
+    context: *FuncLowerContext,
+    parent: *Stmt
+) : bool {
+    var name = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
+    name.append("__LABEL_%d", context.labelIndex += 1)
+
+    var labelNode = NewLabelStmt(
+        parent.getStartPos(), parent.getEndPos(),
+        NewIdentifier(
+            name.cStr(),
+            parent.getStartPos(),
+            context.strings
+        ),
+        context.allocator
+    )
+
+    var labelStmt = &labelNode.asStmt
+    if(!context.checker.resolveStmt(labelStmt)) {
+        return false
+    }
+
+    InsertTempStmt(context, labelStmt, .atEnd = false)
+    return true
 }
 
 func InsertTempStmt(
@@ -265,16 +298,22 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
 // 1) CreateCoroutine Decls for Wrapper and CoroutineStack here,
 // 2) modify the funcDecl params to pass in the coStack
 // 3) finally resolve the patches
+//
+// Clean up
+// * Move to this coroutine module
+// * clean up resolveFuncDecl
 
 
     var context = FuncLowerContext {
         .allocator = checker.allocator,
+        .checker = checker,
         .strings = &checker.strings,
         .module = checker.current,
         .funcDecl = funcDecl,
         .tempIndex = 0_u32,
         .current = null,
         .scopeIndex = 0_u32,
+        .labelIndex = 1_u32,
         .stack = ArrayInit<InternedString>(64, checker.allocator),
         .patches = ArrayInit<Patch>(64, checker.allocator),
     }
@@ -301,52 +340,55 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
         return false
     }
 
+    // Parameter handling
+    // 1) inject in new Continuation parameter
+    // 2) include Patches for each parameter
     var params = funcDecl.params
-    assert(params != null)
+    {
+        assert(params != null)
+        var coIndex = 0
 
-    var coIndex = 0
+        // if this is a method, the first argument must be 'this' type
+        if(funcDecl.flags & FuncFlags.IS_METHOD) {
+            coIndex += 1
+        }
 
-    // if this is a method, the first argument must be 'this' type
-    if(funcDecl.flags & FuncFlags.IS_METHOD) {
-        coIndex += 1
-    }
-
-    var paramsNode = params.asNode()
-    var contParamType = NewTypeSpec(
-        TypeSpecKind.PTR,
-        paramsNode.startPos,
-        &checker.current.typeSpecAllocator
-    )
-    contParamType.base = NewNameTypeSpecIntern(
-        paramsNode.startPos,
-        context.strings.internString($"std::coroutine::Continuation"),
-        &checker.current.typeSpecAllocator
-    )
-
-    var coParamNode = NewParameterDecl(
-        paramsNode.startPos, paramsNode.endPos,
-        NewIdentifier(
-            "__cont",
+        var paramsNode = params.asNode()
+        var contParamType = NewTypeSpec(
+            TypeSpecKind.PTR,
             paramsNode.startPos,
-            context.strings
-        ),
-        contParamType,
-        null,
-        false,
-        context.allocator
-    )
+            &checker.current.typeSpecAllocator
+        )
+        contParamType.base = NewNameTypeSpecIntern(
+            paramsNode.startPos,
+            context.strings.internString($"std::coroutine::Continuation"),
+            &checker.current.typeSpecAllocator
+        )
 
-    var coParam = &coParamNode.paramDecl
-    if(!checker.resolveStmt(coParam)) {
-        return false
+        var coParamNode = NewParameterDecl(
+            paramsNode.startPos, paramsNode.endPos,
+            NewIdentifier(
+                "__cont",
+                paramsNode.startPos,
+                context.strings
+            ),
+            contParamType,
+            null,
+            false,
+            context.allocator
+        )
+
+        var coParam = &coParamNode.paramDecl
+        if(!checker.resolveStmt(coParam)) {
+            return false
+        }
+
+        var coParamSym = coParam.sym
+        assert(coParamSym != null)
+        coParamSym.flags |= SymbolFlags.IS_GENERATED
+
+        params.insertAt(coIndex, coParam)
     }
-
-    var coParamSym = coParam.sym
-    assert(coParamSym != null)
-    coParamSym.flags |= SymbolFlags.IS_GENERATED
-
-    params.insertAt(coIndex, coParam)
-
 
     assert(funcDecl.sym != null)
     var decls = CreateCoroutine(
@@ -357,6 +399,71 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
 
     if(!ResolveCoroutine(checker, decls)) {
         return false
+    }
+
+
+    // Inject in state machine jumps
+    {
+        var bodyStmt = funcDecl.body
+        assert(bodyStmt.getKind() == StmtKind.FUNC_BODY_STMT)
+
+        // var bodyNode = funcDecl.body.asNode()
+
+        // var localContVar = NewVarDecl(
+        //     bodyNode.startPos, bodyNode.endPos,
+        //     NewIdentifier(
+        //         "__stack",
+        //         bodyNode.startPos,
+        //         context.strings
+        //     ),
+        //     null,
+        //     expr,
+        //     context.allocator
+        // )
+
+        var sb = StringBuilderInit(1024, context.allocator)
+        sb.append(
+            """
+            {
+                var __stack = __cont.stack as (*%.*s__CoroutineStack)
+                switch(__cont.state) {
+            """, // TODO: Get GetCoroutineName
+                funcDecl.name.str.length, funcDecl.name.str.buffer
+        )
+        for(var i = 0; i < context.labelIndex; i+=1) {
+            sb.append(
+                """
+                    case %d: goto __LABEL_%d; break;
+                """, i, i
+            )
+        }
+        sb.append(
+            """
+                    default: assert(false)
+                }
+                __LABEL_0:
+            }
+            """
+        )
+
+        var parser = ParserInit(
+            "generated",
+            sb.cStr(),
+            sb.length,
+            checker.current,
+            checker.lita
+        )
+
+        parser.funcLevel += 1
+        var stmt = parser.statement()
+            printf("Here!!!\n")
+        if(stmt.getKind() != StmtKind.BLOCK_STMT) {
+            return false
+        }
+        if(!checker.resolveStmt(stmt)) {
+            return false
+        }
+       // bodyStmt.stmts.insertAt(0, )
     }
 
     var tempName = $"__cont"
@@ -467,6 +574,14 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
 
             context.push(&scope)
             defer context.pop()
+
+            if(ast.getKind() == StmtKind.FUNC_BODY_STMT) {
+                var params = context.funcDecl.params
+                for(var i = 0; i < params.size(); i+=1) {
+                    var param = params.get(i)
+                    context.setVar(param.name.str)
+                }
+            }
 
             for(var i = 0; i < body.stmts.size(); i+=1) {
                 var stmt = body.stmts.get(i)
@@ -982,6 +1097,9 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
 
             var temp = NewTempAssignment(context, expr)
 
+
+            InsertLabel(context, temp)
+
             var nameTypeSpec = NewNameTypeSpecIntern(
                 expr.getStartPos(),
                 temp.name.str,
@@ -1012,15 +1130,16 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
             if (expr.type.kind == TypeSpecKind.NAME) {
                 var name = context.getVar(expr.type.name)
                 if (name.length != 0) {
-                    // printf("~%.*s vs %.*s\n",
-                    //     expr.type.name.length, expr.type.name.buffer,
-                    //     name.length, name.buffer
-                    // )
+                    printf("~%.*s vs %.*s\n",
+                        expr.type.name.length, expr.type.name.buffer,
+                        name.length, name.buffer
+                    )
                     context.patches.add(
                         Patch {
                             .stmt = expr as (*Stmt),
                             .block = context.current.block,
                             .index = context.current.insertIndex,
+                            .name = name
                         }
                     )
                 }

@@ -164,28 +164,6 @@ func GenerateCoroutineStack(
 ) {
     sb.append("@hidden struct %.*s__CoroutineStack {\n", coName.length, coName.buffer)
 
-    // var stack = coSym.coroutine
-    // assert(stack != null)
-
-    // for(var i = 0; i < stack.scopes.size(); i += 1) {
-    //     var vars = stack.scopes.get(i)
-    //     for(var it = vars.iter(); it.hasNext();) {
-    //         var n = it.next()
-
-    //         var sym = n.value
-    //         if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
-    //             continue
-    //         }
-
-    //         sb.append("    %.*s_%d: ",
-    //             n.key.length, n.key.buffer,
-    //             i
-    //         )
-    //         sym.type.toString(sb, true)
-    //         sb.append("\n")
-    //     }
-    // }
-
     var decl = coSym.decl
     assert(decl != null)
 
