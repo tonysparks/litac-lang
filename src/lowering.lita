@@ -16,6 +16,7 @@ import "lita"
 import "ast"
 import "ast_copy"
 import "ast_new"
+import "ast_print"
 import "parser"
 import "checker"
 import "lex"
@@ -42,7 +43,7 @@ public struct FuncLowerContext {
     patches: Array<Patch>
 }
 
-struct Patch {
+public struct Patch {
     stmt: *Stmt
     block: *BlockStmt
     index: u32
@@ -235,22 +236,24 @@ func PushBlock(
         x = object.value(_5, _6)
     }
 */
-func ResolveCoroutine(this: *TypeChecker, decls: Array<*Decl>) {
+func ResolveCoroutine(this: *TypeChecker, decls: Array<*Decl>) : bool {
     this.bypassing = true
     for(var i = 0; i < decls.size(); i += 1) {
         var decl = decls.get(i)
 
         var sym = this.createDeclSymbol(decl)
         if(sym == null) {
-            continue
+            return false
         }
 
         this.resolveSymbol(sym)
         this.finishResolveSymbol(sym)
 
-        printf("Resolved sym: %.*s\n", sym.name.length, sym.name.buffer)
+        //printf("Resolved sym: %.*s\n", sym.name.length, sym.name.buffer)
     }
     this.bypassing = false
+
+    return true
 }
 
 public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
@@ -298,26 +301,76 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
         return false
     }
 
+    var params = funcDecl.params
+    assert(params != null)
+
+    var coIndex = 0
+
+    // if this is a method, the first argument must be 'this' type
+    if(funcDecl.flags & FuncFlags.IS_METHOD) {
+        coIndex += 1
+    }
+
+    var paramsNode = params.asNode()
+    var contParamType = NewTypeSpec(
+        TypeSpecKind.PTR,
+        paramsNode.startPos,
+        &checker.current.typeSpecAllocator
+    )
+    contParamType.base = NewNameTypeSpecIntern(
+        paramsNode.startPos,
+        context.strings.internString($"std::coroutine::Continuation"),
+        &checker.current.typeSpecAllocator
+    )
+
+    var coParamNode = NewParameterDecl(
+        paramsNode.startPos, paramsNode.endPos,
+        NewIdentifier(
+            "__cont",
+            paramsNode.startPos,
+            context.strings
+        ),
+        contParamType,
+        null,
+        false,
+        context.allocator
+    )
+
+    var coParam = &coParamNode.paramDecl
+    if(!checker.resolveStmt(coParam)) {
+        return false
+    }
+
+    var coParamSym = coParam.sym
+    assert(coParamSym != null)
+    coParamSym.flags |= SymbolFlags.IS_GENERATED
+
+    params.insertAt(coIndex, coParam)
+
+
     assert(funcDecl.sym != null)
     var decls = CreateCoroutine(
         checker,
-        funcDecl.sym
+        funcDecl.sym,
+        &context
     )
 
-    ResolveCoroutine(checker, decls)
+    if(!ResolveCoroutine(checker, decls)) {
+        return false
+    }
 
     var tempName = $"__cont"
 
-    var funcNode = funcDecl.asNode()
-    var continuationParamNode = NewIdentifierExpr(
-        funcNode.startPos, funcNode.endPos,
-        NewNameTypeSpecIntern(
-            funcNode.startPos,
-            context.strings.internString(tempName),
-            &checker.current.typeSpecAllocator
-        ),
-        context.allocator
-    )
+    // var funcNode = funcDecl.asNode()
+    // var continuationParamNode = NewIdentifierExpr(
+    //     funcNode.startPos, funcNode.endPos,
+    //     NewNameTypeSpecIntern(
+    //         funcNode.startPos,
+    //         context.strings.internString(tempName),
+    //         &checker.current.typeSpecAllocator
+    //     ),
+    //     context.allocator
+    // )
 
     var continuationName = context.strings.internString(tempName)
 
@@ -349,14 +402,20 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
                 context.allocator
             ).identifierExpr
         )
+
+        if(!checker.resolveStmt(patch.stmt)) {
+            return false
+        }
     }
 
-    for(var i = 0; i < context.stack.size(); i+=1) {
-        var e = context.stack.get(i)
-        printf(
-            "%.*s\n", e.length, e.buffer
-        )
-    }
+    PrintStmt(funcDecl)
+
+    // for(var i = 0; i < context.stack.size(); i+=1) {
+    //     var e = context.stack.get(i)
+    //     printf(
+    //         "%.*s\n", e.length, e.buffer
+    //     )
+    // }
 }
 
 func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {

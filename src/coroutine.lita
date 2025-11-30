@@ -20,6 +20,7 @@ import "checker"
 import "lex"
 import "module"
 import "common"
+import "lowering"
 
 // public struct ContinuationContext {
 //     funcDecl: *FuncDecl
@@ -101,29 +102,34 @@ public func (this: *CoroutineStack) print() {
    ---------------------------------------------------------------------- */
 
 
-public func CreateCoroutines(checker: *TypeChecker) : Array<*Decl> {
-    var allocator = checker.current.allocator
+// public func CreateCoroutines(checker: *TypeChecker) : Array<*Decl> {
+//     var allocator = checker.current.allocator
 
-    var sb = StringBuilderInit(2048, allocator)
-    var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
+//     var sb = StringBuilderInit(2048, allocator)
+//     var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
 
-    var result = ArrayInit<*Decl>(checker.symbolCoroutines.size(), allocator)
-    for(var i = 0; i < checker.symbolCoroutines.size(); i+=1) {
-        var coSym = checker.symbolCoroutines.get(i)
-        assert(coSym)
-        assert(coSym.decl)
-        assert(coSym.flags & SymbolFlags.IS_COROUTINE)
+//     var result = ArrayInit<*Decl>(checker.symbolCoroutines.size(), allocator)
+//     for(var i = 0; i < checker.symbolCoroutines.size(); i+=1) {
+//         var coSym = checker.symbolCoroutines.get(i)
+//         assert(coSym)
+//         assert(coSym.decl)
+//         assert(coSym.flags & SymbolFlags.IS_COROUTINE)
 
-        var coName = GetCoroutineName(coSym, nameBuffer)
-        GenerateCoroutineStack(coSym, coName, sb)
-        GenerateCoroutineWrapper(coSym, coName, sb)
-    }
+//         var coName = GetCoroutineName(coSym, nameBuffer)
+//         GenerateCoroutineStack(coSym, coName, sb)
+//         GenerateCoroutineWrapper(coSym, coName, sb)
+//     }
 
-    printf("%s\n", sb.cStr())
-    return result
-}
+//     printf("%s\n", sb.cStr())
+//     return result
+// }
 
-public func CreateCoroutine(checker: *TypeChecker, coSym: *Symbol) : Array<*Decl> {
+public func CreateCoroutine(
+    checker: *TypeChecker,
+    coSym: *Symbol,
+    context: *FuncLowerContext
+) : Array<*Decl> {
+
     assert(coSym)
     assert(coSym.decl)
     assert(coSym.flags & SymbolFlags.IS_COROUTINE)
@@ -134,10 +140,10 @@ public func CreateCoroutine(checker: *TypeChecker, coSym: *Symbol) : Array<*Decl
     var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
 
     var coName = GetCoroutineName(coSym, nameBuffer)
-    GenerateCoroutineStack(coSym, coName, sb)
-    GenerateCoroutineWrapper(coSym, coName, sb)
+    GenerateCoroutineStack(context, coSym, coName, sb)
+    GenerateCoroutineWrapper(context, coSym, coName, sb)
 
-    // printf("%s\n", sb.cStr())
+    printf("%s\n", sb.cStr())
     var parser = ParserInit(
         "generated",
         sb.cStr(),
@@ -151,37 +157,77 @@ public func CreateCoroutine(checker: *TypeChecker, coSym: *Symbol) : Array<*Decl
 }
 
 func GenerateCoroutineStack(
+    context: *FuncLowerContext,
     coSym: *Symbol,
     coName: String,
     sb: *StringBuilder
 ) {
     sb.append("@hidden struct %.*s__CoroutineStack {\n", coName.length, coName.buffer)
 
-    var stack = coSym.coroutine
-    assert(stack != null)
+    // var stack = coSym.coroutine
+    // assert(stack != null)
 
-    for(var i = 0; i < stack.scopes.size(); i += 1) {
-        var vars = stack.scopes.get(i)
-        for(var it = vars.iter(); it.hasNext();) {
-            var n = it.next()
+    // for(var i = 0; i < stack.scopes.size(); i += 1) {
+    //     var vars = stack.scopes.get(i)
+    //     for(var it = vars.iter(); it.hasNext();) {
+    //         var n = it.next()
 
-            var sym = n.value
-            if(sym.flags & SymbolFlags.IS_TEMP) {
-                continue
-            }
+    //         var sym = n.value
+    //         if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+    //             continue
+    //         }
 
-            sb.append("    %.*s_%d: ",
-                n.key.length, n.key.buffer,
-                i
-            )
+    //         sb.append("    %.*s_%d: ",
+    //             n.key.length, n.key.buffer,
+    //             i
+    //         )
+    //         sym.type.toString(sb, true)
+    //         sb.append("\n")
+    //     }
+    // }
+
+    var decl = coSym.decl
+    assert(decl != null)
+
+    var funcDecl = decl as (*FuncDecl)
+    var params = &funcDecl.params.params
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.get(i)
+
+        var sym = param.sym
+        assert(sym != null)
+
+        if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+            continue
+        }
+
+        sb.append("    %.*s_%d: ",
+            param.name.str.length, param.name.str.buffer, 0
+        )
+        sym.type.toString(sb, true)
+        sb.append("\n")
+    }
+
+
+    for(var i = 0; i < context.patches.size(); i+=1) {
+        var patch = context.patches.getPtr(i)
+        var kind = patch.stmt.getKind()
+        if(kind == StmtKind.VAR_DECL || kind == StmtKind.CONST_DECL) {
+            var decl = patch.stmt as (*VarDecl)
+            var sym = decl.sym
+            assert(sym != null)
+
+            sb.append("    %.*s: ", patch.name.length, patch.name.buffer)
             sym.type.toString(sb, true)
             sb.append("\n")
         }
     }
+
     sb.append("}\n")
 }
 
 func GenerateCoroutineWrapper(
+    context: *FuncLowerContext,
     coSym: *Symbol,
     coName: String,
     sb: *StringBuilder
@@ -201,6 +247,12 @@ func GenerateCoroutineWrapper(
         var params = &funcDecl.params.params
         for(var i = 0; i < params.size(); i+=1) {
             var param = params.get(i)
+
+            var sym = param.sym
+            assert(sym != null)
+            if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+                continue
+            }
 
             sb.append("        , stack.%.*s_%d",
                 param.name.str.length, param.name.str.buffer, 0

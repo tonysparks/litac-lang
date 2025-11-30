@@ -1,0 +1,37 @@
+import "std/mem"
+
+public typedef func(*Continuation) : ContinuationResult as SuspendFunction;
+
+
+public enum ContinuationResult {
+    RESULT_OK        = 0,
+    RESULT_ERROR     = 1,
+    RESULT_SUSPENDED = 2,
+}
+
+public struct ContinuationContext {
+    allocator: *const Allocator
+    dispatcher: *Dispatcher
+}
+
+public struct Continuation {
+    context: ContinuationContext
+
+    parent: *Continuation
+    stack: *void
+    state: u32
+    callback: SuspendFunction
+}
+
+
+public struct Dispatcher {
+
+}
+
+public func (this: *Dispatcher) submit(co: *Continuation) {
+
+}
+
+public func (this: *Dispatcher) async(co: *Continuation) {
+
+}

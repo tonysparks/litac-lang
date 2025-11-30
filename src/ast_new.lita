@@ -116,7 +116,8 @@ public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, typeAllocator: *TypeSpe
 public func NewIdentifier(
     name: *const char,
     pos: SrcPos,
-    strings: *Strings) : Identifier {
+    strings: *Strings
+) : Identifier {
 
     var str = strings.intern(name, name.length())
     var identifier = Identifier {

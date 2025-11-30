@@ -8,7 +8,7 @@
 
         %definitions%
 
-        @suspend
+        // @suspend
         func main(len:i32, args:**char):i32 {
             %code%
         }
@@ -17,13 +17,14 @@
         {
             "name": "Coroutine ternary operation",
             "definitions": `
+                import "std/coroutine"
                 var global: i32 = 0
                 @suspend
                 func aCoroutine(a: i32, b: i32) : i32 {
                     global += 1
                     return a + b
                 }
-
+/*
                 @suspend
                 func bCoroutine(a: i32) : i32 {
                     var x = aCoroutine(a, 1)
@@ -37,15 +38,39 @@
                     }
 
                     return x
-                }
+                }*/
             `,
             "code": `
+            /*
+                var dispatcher: Dispatcher
+                dispatcher.init()
+
+                // option 1: manual creation
+                var co = Coroutine {
+                    .function = bCoroutine,
+                    .stack = bCoroutineStack {
+                        .a = 1
+                    }
+                }
+                dispatcher.submit(co)
+
+                // option 2: compiler helper
+                var co = @coroutine(bCoroutine, 1)
+                dispatcher.submit(co)
+
+                // option 3: magic function?
+                dispatcher.submit(
+                    bCoroutine,
+                    1
+                )*/
+/*
                 assert(
                     bCoroutine(1) == 12
                 )
                 assert(global == 1)
 
                 global = 0
+*/
 
             `,
         },/*

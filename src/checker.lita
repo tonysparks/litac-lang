@@ -1121,6 +1121,9 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchT
             }
 
             module = this.lita.getModule(filename)
+            // TODO: This triggers the assert if the module is NOT
+            // already imported, we should probably side load the module
+            // or at least the symbols required??
         }
 
         assert(module != null)
