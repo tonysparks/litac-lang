@@ -1182,7 +1182,7 @@ func (this: *TypeChecker) resolveNativeStringExpr(expr: *StringExpr) : bool {
 
     expr.operand.typeInfo = stringBuiltin.type
     expr.operand.isConst = true
-    expr.operand.isRightValue = true
+    expr.operand.isRightValue = false
     expr.operand.val = expr.string.value
     return true
 }

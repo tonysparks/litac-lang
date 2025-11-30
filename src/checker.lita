@@ -179,6 +179,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
     }
 
     // Generate coroutine wrappers/etc
+    /*
     if(!(flags & TypeCheckerFlags.DISABLE_COROUTINE_WRAPPERS)) {
         this.enterModule(root)
         {
@@ -198,7 +199,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
             this.bypassing = false
         }
         this.leaveModule()
-    }
+    }*/
 
     if(!this.lita.result.hasErrors()) {
         var introspect = Introspect{.lita = this.lita}

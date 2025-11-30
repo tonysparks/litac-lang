@@ -101,12 +101,13 @@ public func (this: *CoroutineStack) print() {
    ---------------------------------------------------------------------- */
 
 
-public func CreateCoroutines(checker: *TypeChecker) : Array<*Node> {
+public func CreateCoroutines(checker: *TypeChecker) : Array<*Decl> {
     var allocator = checker.current.allocator
 
     var sb = StringBuilderInit(2048, allocator)
     var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
 
+    var result = ArrayInit<*Decl>(checker.symbolCoroutines.size(), allocator)
     for(var i = 0; i < checker.symbolCoroutines.size(); i+=1) {
         var coSym = checker.symbolCoroutines.get(i)
         assert(coSym)
@@ -118,7 +119,35 @@ public func CreateCoroutines(checker: *TypeChecker) : Array<*Node> {
         GenerateCoroutineWrapper(coSym, coName, sb)
     }
 
+    printf("%s\n", sb.cStr())
+    return result
+}
+
+public func CreateCoroutine(checker: *TypeChecker, coSym: *Symbol) : Array<*Decl> {
+    assert(coSym)
+    assert(coSym.decl)
+    assert(coSym.flags & SymbolFlags.IS_COROUTINE)
+
+    var allocator = checker.current.allocator
+
+    var sb = StringBuilderInit(2048, allocator)
+    var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
+
+    var coName = GetCoroutineName(coSym, nameBuffer)
+    GenerateCoroutineStack(coSym, coName, sb)
+    GenerateCoroutineWrapper(coSym, coName, sb)
+
     // printf("%s\n", sb.cStr())
+    var parser = ParserInit(
+        "generated",
+        sb.cStr(),
+        sb.length,
+        checker.current,
+        checker.lita
+    )
+
+    var stmts = parser.parseModule()
+    return stmts.declarations
 }
 
 func GenerateCoroutineStack(
@@ -137,6 +166,10 @@ func GenerateCoroutineStack(
             var n = it.next()
 
             var sym = n.value
+            if(sym.flags & SymbolFlags.IS_TEMP) {
+                continue
+            }
+
             sb.append("    %.*s_%d: ",
                 n.key.length, n.key.buffer,
                 i

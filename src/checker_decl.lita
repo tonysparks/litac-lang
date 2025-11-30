@@ -762,9 +762,10 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         if(isCoroutine) {
             LowerFuncBody(this, funcDecl)
         }
-
-        if(!this.resolveStmt(funcDecl.body)) {
-            return false
+        else {
+            if(!this.resolveStmt(funcDecl.body)) {
+                return false
+            }
         }
 
         // if(isCoroutine) {

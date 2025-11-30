@@ -103,6 +103,9 @@ public func (this: *BucketAllocator) free() {
 
 public func (this: *BucketAllocator) malloc(size: usize) : *void {
     assert(this.head != null)
+    if(size == 0) {
+        return null
+    }
 
     var headBaseAddr = this.head.mem as (usize)
     var currentAbsolutePtr = headBaseAddr + this.currentOffset

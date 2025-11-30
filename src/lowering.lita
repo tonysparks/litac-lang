@@ -21,6 +21,7 @@ import "checker"
 import "lex"
 import "module"
 import "common"
+import "coroutine"
 
 public struct FuncLowerContext {
     allocator: *const Allocator
@@ -45,6 +46,7 @@ struct Patch {
     stmt: *Stmt
     block: *BlockStmt
     index: u32
+    name: InternedString
 }
 
 
@@ -233,10 +235,34 @@ func PushBlock(
         x = object.value(_5, _6)
     }
 */
+func ResolveCoroutine(this: *TypeChecker, decls: Array<*Decl>) {
+    this.bypassing = true
+    for(var i = 0; i < decls.size(); i += 1) {
+        var decl = decls.get(i)
+
+        var sym = this.createDeclSymbol(decl)
+        if(sym == null) {
+            continue
+        }
+
+        this.resolveSymbol(sym)
+        this.finishResolveSymbol(sym)
+
+        printf("Resolved sym: %.*s\n", sym.name.length, sym.name.buffer)
+    }
+    this.bypassing = false
+}
+
 public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
     if(!funcDecl.body) {
         return true;
     }
+
+// TODO:
+// 1) CreateCoroutine Decls for Wrapper and CoroutineStack here,
+// 2) modify the funcDecl params to pass in the coStack
+// 3) finally resolve the patches
+
 
     var context = FuncLowerContext {
         .allocator = checker.allocator,
@@ -250,6 +276,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
         .patches = ArrayInit<Patch>(64, checker.allocator),
     }
 
+    //var bodyStmt: *BodyStmt = null
     if(funcDecl.body.getKind() != StmtKind.FUNC_BODY_STMT) {
         var body = funcDecl.body
         var stmts = ArrayInit<*Stmt>(1, checker.allocator)
@@ -271,16 +298,65 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
         return false
     }
 
-    for(var i = 0; i < context.patches.size(); i+=1) {
+    assert(funcDecl.sym != null)
+    var decls = CreateCoroutine(
+        checker,
+        funcDecl.sym
+    )
 
+    ResolveCoroutine(checker, decls)
+
+    var tempName = $"__cont"
+
+    var funcNode = funcDecl.asNode()
+    var continuationParamNode = NewIdentifierExpr(
+        funcNode.startPos, funcNode.endPos,
+        NewNameTypeSpecIntern(
+            funcNode.startPos,
+            context.strings.internString(tempName),
+            &checker.current.typeSpecAllocator
+        ),
+        context.allocator
+    )
+
+    var continuationName = context.strings.internString(tempName)
+
+    for(var i = 0; i < context.patches.size(); i+=1) {
+        var patch = context.patches.getPtr(i)
+        var node = patch.stmt.asNode()
+
+        // TODO: Get vs Set??
+        node.kind = StmtKind.GET_EXPR
+        node.getExpr.object = node.becomeParentOf(
+            &NewIdentifierExpr(
+                node.startPos, node.endPos,
+                NewNameTypeSpecIntern(
+                    node.startPos,
+                    continuationName,
+                    &checker.current.typeSpecAllocator
+                ),
+                context.allocator
+            ).asExpr
+        )
+        node.getExpr.field = node.becomeParentOf(
+            &NewIdentifierExpr(
+                node.startPos, node.endPos,
+                NewNameTypeSpecIntern(
+                    node.startPos,
+                    patch.name,
+                    &checker.current.typeSpecAllocator
+                ),
+                context.allocator
+            ).identifierExpr
+        )
     }
 
-    // for(var i = 0; i < context.stack.size(); i+=1) {
-    //     var e = context.stack.get(i)
-    //     printf(
-    //         "%.*s\n", e.length, e.buffer
-    //     )
-    // }
+    for(var i = 0; i < context.stack.size(); i+=1) {
+        var e = context.stack.get(i)
+        printf(
+            "%.*s\n", e.length, e.buffer
+        )
+    }
 }
 
 func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
@@ -308,12 +384,12 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
                 decl.expr = FunctionLowering(context, decl.expr) as (*Expr)
             }
             if(!(decl.flags & VarDeclFlags.IS_TEMPORARY)) {
-                context.setVar(decl.name.str)
                 context.patches.add(
                     Patch {
                         .stmt = decl as (*Stmt),
                         .block = context.current.block,
                         .index = context.current.insertIndex,
+                        .name = context.setVar(decl.name.str),
                     }
                 )
             }

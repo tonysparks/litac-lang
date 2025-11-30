@@ -15,6 +15,13 @@ public struct NativeVararg {
     numberOfArgs: i32
 }
 
+public struct Continuation {
+    stack: *void
+}
+
+public struct ContinuationResult {
+
+}
 
 /**
 ========================================================================

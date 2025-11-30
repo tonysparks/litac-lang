@@ -65,6 +65,7 @@ public enum SymbolFlags {
     IS_FROM_PREPROCESSOR    = (1<<26),
 
     IS_COROUTINE            = (1<<27),
+    IS_TEMP                 = (1<<28),
 
 }
 
@@ -508,6 +509,14 @@ public func (this: *Scope) addSymbol(name: InternedString,
         case StmtKind.CONST_DECL: {
             flags |= SymbolFlags.IS_CONSTANT
             /* fallthru */
+        }
+        case StmtKind.VAR_DECL: {
+            kind = SymbolKind.VAR
+            var varDecl = decl as (*VarDecl)
+            if(varDecl.flags & VarDeclFlags.IS_TEMPORARY) {
+                flags |= SymbolFlags.IS_TEMP
+            }
+            break
         }
         default: {
             kind = SymbolKind.VAR
