@@ -179,13 +179,21 @@ func GenerateCoroutineStack(
             continue
         }
 
-        sb.append("    %.*s_%d: ",
-            param.name.str.length, param.name.str.buffer, 0
+        sb.append("    __%.*s__%d: ",
+            param.name.str.length, param.name.str.buffer, 1
         )
         sym.type.toString(sb, true)
         sb.append("\n")
     }
 
+    if(funcDecl.returnType != null) {
+        var returnInfo = funcDecl.returnType.typeInfo
+        assert(returnInfo != null)
+
+        sb.append("    __result__0: ")
+        returnInfo.toString(sb, true)
+        sb.append("\n")
+    }
 
     for(var i = 0; i < context.patches.size(); i+=1) {
         var patch = context.patches.getPtr(i)
@@ -232,8 +240,8 @@ func GenerateCoroutineWrapper(
                 continue
             }
 
-            sb.append("        , stack.%.*s_%d",
-                param.name.str.length, param.name.str.buffer, 0
+            sb.append("        , stack.__%.*s__%d",
+                param.name.str.length, param.name.str.buffer, 1
             )
             sb.append("\n")
         }

@@ -544,8 +544,8 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
-            printf(":")
             PrintName(stmt.label.token)
+            printf(":")
             return;
         }
         case StmtKind.MODULE_STMT: {

@@ -22,6 +22,7 @@
                 @suspend
                 func aCoroutine(a: i32, b: i32) : i32 {
                     global += 1
+                    a += 2
                     return a + b
                 }
 /*
@@ -38,7 +39,8 @@
                     }
 
                     return x
-                }*/
+                }
+*/
             `,
             "code": `
             /*
