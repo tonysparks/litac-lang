@@ -23,24 +23,25 @@
                 func aCoroutine(a: i32, b: i32) : i32 {
                     global += 1
                     a += 2
+                    var x = "hello"
                     return a + b
                 }
-/*
+
                 @suspend
                 func bCoroutine(a: i32) : i32 {
                     var x = aCoroutine(a, 1)
-                    if (x) {
+                    /*if (x) {
                         x = 12
                         var x = 10
                     } else {
                         var y = 22
                         var x = 33
                         x = 22
-                    }
+                    }*/
 
                     return x
                 }
-*/
+
             `,
             "code": `
             /*

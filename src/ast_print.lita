@@ -801,16 +801,16 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.type = null
             expr.field = null
             return expr as (*Stmt)
-        }
+        }*/
         case StmtKind.SET_EXPR: {
-            var expr = new<SetExpr>(allocator)
-            expr.kind = StmtKind.SET_EXPR;
-            expr.startPos = startPos
-            expr.object = null
-            expr.field = null
-            expr.value = null
-            return expr as (*Stmt)
-        }
+            var expr = s as (*SetExpr)
+            PrintStmt(expr.object, indent)
+            printf(".")
+            PrintStmt(expr.field)
+            printf(" %s ", tokenText[expr.operator])
+            PrintStmt(expr.value)
+            return;
+        }/*
         case StmtKind.SIZE_OF_EXPR: {
             var expr = new<SizeOfExpr>(allocator)
             expr.kind = StmtKind.SIZE_OF_EXPR;

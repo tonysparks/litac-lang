@@ -200,6 +200,10 @@ func GenerateCoroutineStack(
         var kind = patch.stmt.getKind()
         if(kind == StmtKind.VAR_DECL || kind == StmtKind.CONST_DECL) {
             var decl = patch.stmt as (*VarDecl)
+            if(decl.flags & VarDeclFlags.IS_TEMPORARY) {
+                continue
+            }
+
             var sym = decl.sym
             assert(sym != null)
 

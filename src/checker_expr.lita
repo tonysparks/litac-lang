@@ -2655,13 +2655,21 @@ func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
 func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
 
+    // first look for a variable
     var sym = this.currentScope().lookup(expr.type.name)
     if(!sym) {
+        // now look for a function name
         sym = this.currentScope().lookupFunc(expr.type.name)
+
         if(!sym) {
-            this.result.addError(expr.getStartPos(), "unknown variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
-            return false
+            // finally, try a type name
+            sym = this.getTypeByName(expr.type.name)
         }
+    }
+
+    if(!sym) {
+        this.result.addError(expr.getStartPos(), "unknown variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        return false
     }
 
     // Account for Type Expressions such as sizeof(Array<i32>) which should

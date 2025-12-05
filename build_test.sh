@@ -43,7 +43,7 @@ run_tests() {
     fi
 
     echo "Running litaC tests..."
-    # valgrind --leak-check=full --show-leak-kinds=all ./litac_tests
+    # valgrind --leak-check=full --show-leak-kinds=all ./litac_tests $1
     ./litac_tests $1
     result=$?
 

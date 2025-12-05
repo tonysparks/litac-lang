@@ -46,6 +46,7 @@ public struct FuncLowerContext {
 
 public struct Patch {
     stmt: *Stmt
+    aux: *Stmt
     block: *BlockStmt
     index: u32
     name: InternedString
@@ -83,6 +84,8 @@ func (this: *FuncLowerContext) setVar(name: InternedString, makeCanonical: bool 
     this.current.locals.add(internedName)
     this.stack.add(internedName)
     printf("Added var: %.*s\n", internedName.length, internedName.buffer)
+
+    return internedName
 }
 
 func (this: *FuncLowerContext) getVar(name: InternedString) : InternedString {
@@ -229,9 +232,25 @@ func InsertTempStmt(
         index += scope.numberOfInserts
     }
     // printf("Inserting at %d\n", index)
-    scope.block.stmts.insertAt(index, stmt)
-    scope.block.asNode().becomeParentOf(stmt)
+    // scope.block.stmts.insertAt(index, stmt)
+    // scope.block.asNode().becomeParentOf(stmt)
     scope.numberOfInserts += 1
+    InsertStmt(
+        context,
+        stmt,
+        scope.block,
+        index
+    )
+}
+
+func InsertStmt(
+    context: *FuncLowerContext,
+    stmt: *Stmt,
+    block: *BlockStmt,
+    index: u32
+) {
+    block.stmts.insertAt(index as (i32), stmt)
+    block.asNode().becomeParentOf(stmt)
 }
 
 func PushBlock(
@@ -477,32 +496,116 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
             var patch = context.patches.getPtr(i)
             var node = patch.stmt.asNode()
 
-            // TODO: Get vs Set??
-            node.kind = StmtKind.GET_EXPR
-            node.getExpr.object = node.becomeParentOf(
-                &NewIdentifierExpr(
-                    node.startPos, node.endPos,
-                    NewNameTypeSpecIntern(
-                        node.startPos,
-                        continuationName,
-                        &checker.current.typeSpecAllocator
-                    ),
-                    context.allocator
-                ).asExpr
-            )
-            node.getExpr.field = node.becomeParentOf(
-                &NewIdentifierExpr(
-                    node.startPos, node.endPos,
-                    NewNameTypeSpecIntern(
-                        node.startPos,
-                        patch.name,
-                        &checker.current.typeSpecAllocator
-                    ),
-                    context.allocator
-                ).identifierExpr
-            )
+            switch(node.kind) {
+                case StmtKind.VAR_DECL:
+                case StmtKind.CONST_DECL: {
+                    var varDecl = &node.varDecl
 
+                    node.kind = StmtKind.SET_EXPR
+                    node.setExpr.object = node.becomeParentOf(
+                        &NewIdentifierExpr(
+                            node.startPos, node.endPos,
+                            NewNameTypeSpecIntern(
+                                node.startPos,
+                                continuationName,
+                                &checker.current.typeSpecAllocator
+                            ),
+                            context.allocator
+                        ).asExpr
+                    )
+                    node.setExpr.field = node.becomeParentOf(
+                        &NewIdentifierExpr(
+                            node.startPos, node.endPos,
+                            NewNameTypeSpecIntern(
+                                node.startPos,
+                                patch.name,
+                                &checker.current.typeSpecAllocator
+                            ),
+                            context.allocator
+                        ).identifierExpr
+                    )
+                    node.setExpr.value = varDecl.expr
+                    node.setExpr.operator = TokenType.EQUALS
+                    break
+                }
+                case StmtKind.RETURN_STMT: {
+                    var returnStmt = &node.returnStmt
+                    assert(returnStmt.expr != null)
+
+                    var originalExpr = returnStmt.expr.asNode()
+                    returnStmt.expr = &NewGetExpr(
+                        originalExpr.startPos, originalExpr.endPos,
+                        &NewIdentifierExpr(
+                            originalExpr.startPos, originalExpr.endPos,
+                            NewNameTypeSpecIntern(
+                                originalExpr.startPos,
+                                context.strings.internString(&$"std::coroutine::ContinuationResult"),
+                                &checker.current.typeSpecAllocator
+                            ),
+                            context.allocator
+                        ).asExpr,
+                        &NewIdentifierExpr(
+                            originalExpr.startPos, originalExpr.endPos,
+                            NewNameTypeSpecIntern(
+                                originalExpr.startPos,
+                                context.strings.internString(&$"OK"),
+                                &checker.current.typeSpecAllocator
+                            ),
+                            context.allocator
+                        ).identifierExpr,
+                        context.allocator
+                    ).asExpr
+                    break
+                }
+                case StmtKind.FUNC_CALL_EXPR: {
+                    var funcCallExpr = &node.funcCallExpr
+
+
+                    var contParam = &NewInitExpr(
+                        node.startPos, node.endPos,
+                        NewNameTypeSpecIntern(
+                            node.startPos,
+                            context.strings.internString(&$"std::coroutine::Continuation"),
+                            &checker.current.typeSpecAllocator
+                        ),
+                        Array<*InitArgExpr>{},
+                        context.allocator
+                    ).asStmt
+
+                    InsertStmt(context, contParam, patch.block, patch.index)
+                    break
+                }
+                default: {
+                    node.kind = StmtKind.GET_EXPR
+                    node.getExpr.object = node.becomeParentOf(
+                        &NewIdentifierExpr(
+                            node.startPos, node.endPos,
+                            NewNameTypeSpecIntern(
+                                node.startPos,
+                                continuationName,
+                                &checker.current.typeSpecAllocator
+                            ),
+                            context.allocator
+                        ).asExpr
+                    )
+                    node.getExpr.field = node.becomeParentOf(
+                        &NewIdentifierExpr(
+                            node.startPos, node.endPos,
+                            NewNameTypeSpecIntern(
+                                node.startPos,
+                                patch.name,
+                                &checker.current.typeSpecAllocator
+                            ),
+                            context.allocator
+                        ).identifierExpr
+                    )
+                    break;
+                }
+            }
+//PrintStmt(patch.stmt) printf("\n")
             if(!checker.resolveStmt(patch.stmt)) {
+                // printf("Here!!!\n")
+                // PrintStmt(funcDecl)
                 return false
             }
         }
@@ -510,7 +613,18 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
 
     // Convert return to ContinuationResult
     {
+        if(funcDecl.returnType != null) {
+            funcDecl.returnType = NewNameTypeSpecIntern(
+                funcDecl.getStartPos(),
+                context.strings.internString(&$"std::coroutine::ContinuationResult"),
+                &checker.current.typeSpecAllocator
+            )
 
+            if(!checker.resolveTypeSpec(funcDecl.returnType)) {
+                printf("Here!!\n")
+                return false
+            }
+        }
     }
 
     PrintStmt(funcDecl)
@@ -797,16 +911,24 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
             if(stmt.expr) {
                 var expr = FunctionLowering(context, stmt.expr) as (*Expr)
                 var varDecl = NewTempAssignment(context, expr, "result__0")
-                /*context.patches.add(
+                context.patches.add(
                     Patch {
                         .stmt = varDecl as (*Stmt),
                         .block = context.current.block,
                         .index = context.current.insertIndex,
-                        //.name = $"result__0" //context.setVar(varDecl.name.str, false),
+                        .name = context.setVar(varDecl.name.str, false),
                     }
-                )*/
+                )
 
-                stmt.expr = expr // FunctionLowering(context, stmt.expr) as (*Expr)
+                // TODO return ContinuationResult
+                stmt.expr = expr
+                context.patches.add(
+                    Patch {
+                        .stmt = stmt as (*Stmt),
+                        .block = context.current.block,
+                        .index = context.current.insertIndex,
+                    }
+                )
             }
             break;
         }
@@ -1116,15 +1238,11 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
 
             // this isn't a suspend function
             // we can skip all of this additional continuation stuff
-            if (context.current.noTemp) {
-                return expr as (*Stmt)
-            }
+            // if (context.current.noTemp) {
+            //     return expr as (*Stmt)
+            // }
 
-            // var continuationParamNode = NewInitExpr(
-            //     expr.getStartPos(),
-            //     expr.getEndPos(),
 
-            // )
 
             var temp = NewTempAssignment(context, expr)
             InsertLabel(context, temp)
@@ -1133,6 +1251,15 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
                 expr.getStartPos(),
                 temp.name.str,
                 &context.module.typeSpecAllocator
+            )
+
+            context.patches.add(
+                Patch {
+                    .stmt = expr as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex,
+                    .aux = temp as (*Stmt)
+                }
             )
 
             return &NewIdentifierExpr(
