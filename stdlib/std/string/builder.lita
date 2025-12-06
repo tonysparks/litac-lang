@@ -198,6 +198,20 @@ func Print(b: *const char, n: i32) {
     printf("'\n")
 }*/
 
+/**
+    Clears the buffer and appends
+*/
+public func (b: *StringBuilder) format(format: *const char, ...) : i32 {
+    b.clear()
+
+    var args: va_list;
+    va_start(args, format);
+    var result = b.appendArgs(format, args)
+    va_end(args)
+
+    return result
+}
+
 public func (b: *StringBuilder) delete(start: i32, end: i32) {
     if(b.length == 0) {
         return;
