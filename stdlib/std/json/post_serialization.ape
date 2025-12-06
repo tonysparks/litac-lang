@@ -110,6 +110,8 @@ fn SerializeEnum(sym) {
 
 fn DeserializeStruct(sym) {
    emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool {\n", sym.name)
+   emit("    if(!json) return true;")
+
    var isFirst = true
 
    for(field in sym.structDecl.fields) {
@@ -148,7 +150,7 @@ fn DeserializeStruct(sym) {
 
 fn DeserializeEnum(sym) {
    emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool {\n", sym.name)
-
+   emit("    if(!json) return true;")
    emit("    var value = json.asString().toString(); \n")
    var isFirst = true
    for(field in sym.enumDecl.fields) {
