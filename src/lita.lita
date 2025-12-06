@@ -652,6 +652,10 @@ public func (this: *Lita) run() : i32 {
     sb.append(" && .%s", PATH_SEPARATOR)
     sb.appendStr(&this.binaryFilename[len + 1])
 
+    for(var i = 0; i < this.options.nargs; i+=1) {
+        sb.append(" %s", this.options.args[i])
+    }
+
     return system(sb.cStr())
 #else
     var args = ArrayInit<*const char>(this.options.nargs + 2, this.allocator)

@@ -26,10 +26,11 @@ import "std/string/buffer"
 import "std/string"
 import "std/system"
 
-
 @foreign
 func rmdir(filename: *const char) : i32;
 
+@foreign
+func setenv(key: *const char, value: *const char, overwrite: i32) : i32;
 
 @foreign("PATH_MAX")
 public const MAX_PATH: i32; /* NAME_MAX=255, PATH_MAX=4096 */
@@ -151,3 +152,7 @@ public func _SystemTimeMSec() : f64 {
     return time / 1_000f64
 }
 
+@inline
+public func _SetEnv(varName: *const char, value: *const char) {
+    setenv(varName, value, 1)
+}
