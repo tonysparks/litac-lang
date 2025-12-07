@@ -1,0 +1,1752 @@
+@include("sqlite3.h");
+
+@compiler_option(
+    // .os = "linux",
+    .options = "-I{relativePath}"
+);
+
+@compiler_option(
+    // .os = "linux",
+    .options = "{relativePath}/sqlite3.c"
+);
+
+@compiler_option(
+    .os = "linux",
+    .options = "-lpthread -ldl -lm"
+);
+
+import "std/libc"
+
+
+@foreign public var sqlite3_version: *const char;
+
+@foreign
+public func sqlite3_libversion() : *const char;
+
+@foreign
+public func sqlite3_sourceid() : *const char;
+
+@foreign
+public func sqlite3_libversion_number() : i32;
+
+@foreign
+public func sqlite3_compileoption_used(p0: *const char) : i32;
+
+@foreign
+public func sqlite3_compileoption_get(p0: i32) : *const char;
+
+@foreign
+public func sqlite3_threadsafe() : i32;
+
+@foreign
+public struct sqlite3 {
+}
+public typedef i64 as sqlite_int64;
+public typedef u64 as sqlite_uint64;
+public typedef i64 as sqlite3_int64;
+public typedef u64 as sqlite3_uint64;
+
+@foreign
+public func sqlite3_close(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_close_v2(p0: *sqlite3) : i32;
+@foreign public typedef func(*void, i32, **char, **char) : i32 as sqlite3_callback;
+
+@foreign
+public func sqlite3_exec(p0: *sqlite3, p1: *const char, p2: func(*void, i32, **char, **char) : i32, p3: *void, p4: **char) : i32;
+
+@foreign
+public struct sqlite3_file {
+   pMethods: *const sqlite3_io_methods
+}
+
+@foreign
+public struct sqlite3_io_methods {
+   iVersion: i32
+   xClose: func(*sqlite3_file) : i32
+   xRead: func(*sqlite3_file, *void, i32, sqlite3_int64) : i32
+   xWrite: func(*sqlite3_file, *const void, i32, sqlite3_int64) : i32
+   xTruncate: func(*sqlite3_file, sqlite3_int64) : i32
+   xSync: func(*sqlite3_file, i32) : i32
+   xFileSize: func(*sqlite3_file, *sqlite3_int64) : i32
+   xLock: func(*sqlite3_file, i32) : i32
+   xUnlock: func(*sqlite3_file, i32) : i32
+   xCheckReservedLock: func(*sqlite3_file, *i32) : i32
+   xFileControl: func(*sqlite3_file, i32, *void) : i32
+   xSectorSize: func(*sqlite3_file) : i32
+   xDeviceCharacteristics: func(*sqlite3_file) : i32
+   xShmMap: func(*sqlite3_file, i32, i32, i32, **void) : i32
+   xShmLock: func(*sqlite3_file, i32, i32, i32) : i32
+   xShmBarrier: func(*sqlite3_file) : void
+   xShmUnmap: func(*sqlite3_file, i32) : i32
+   xFetch: func(*sqlite3_file, sqlite3_int64, i32, **void) : i32
+   xUnfetch: func(*sqlite3_file, sqlite3_int64, *void) : i32
+}
+
+@foreign
+public struct sqlite3_mutex {
+}
+
+@foreign
+public struct sqlite3_api_routines {
+}
+@foreign public typedef void as sqlite3_filename;
+
+@foreign public typedef func() : void as sqlite3_syscall_ptr;
+
+@foreign
+public struct sqlite3_vfs {
+   iVersion: i32
+   szOsFile: i32
+   mxPathname: i32
+   pNext: *sqlite3_vfs
+   zName: *const char
+   pAppData: *void
+   xOpen: func(*sqlite3_vfs, sqlite3_filename, *sqlite3_file, i32, *i32) : i32
+   xDelete: func(*sqlite3_vfs, *const char, i32) : i32
+   xAccess: func(*sqlite3_vfs, *const char, i32, *i32) : i32
+   xFullPathname: func(*sqlite3_vfs, *const char, i32, *char) : i32
+   xDlOpen: func(*sqlite3_vfs, *const char) : *void
+   xDlError: func(*sqlite3_vfs, i32, *char) : void
+   xDlSym: func(*sqlite3_vfs, *void, *const char) : func() : void
+   xDlClose: func(*sqlite3_vfs, *void) : void
+   xRandomness: func(*sqlite3_vfs, i32, *char) : i32
+   xSleep: func(*sqlite3_vfs, i32) : i32
+   xCurrentTime: func(*sqlite3_vfs, *f64) : i32
+   xGetLastError: func(*sqlite3_vfs, i32, *char) : i32
+   xCurrentTimeInt64: func(*sqlite3_vfs, *sqlite3_int64) : i32
+   xSetSystemCall: func(*sqlite3_vfs, *const char, sqlite3_syscall_ptr) : i32
+   xGetSystemCall: func(*sqlite3_vfs, *const char) : sqlite3_syscall_ptr
+   xNextSystemCall: func(*sqlite3_vfs, *const char) : *const char
+}
+
+@foreign
+public func sqlite3_initialize() : i32;
+
+@foreign
+public func sqlite3_shutdown() : i32;
+
+@foreign
+public func sqlite3_os_init() : i32;
+
+@foreign
+public func sqlite3_os_end() : i32;
+
+@foreign
+public func sqlite3_config(p0: i32, ...) : i32;
+
+@foreign
+public func sqlite3_db_config(p0: *sqlite3, p1: i32, ...) : i32;
+
+@foreign
+public struct sqlite3_mem_methods {
+   xMalloc: func(i32) : *void
+   xFree: func(*void) : void
+   xRealloc: func(*void, i32) : *void
+   xSize: func(*void) : i32
+   xRoundup: func(i32) : i32
+   xInit: func(*void) : i32
+   xShutdown: func(*void) : void
+   pAppData: *void
+}
+
+@foreign
+public func sqlite3_extended_result_codes(p0: *sqlite3, p1: i32) : i32;
+
+@foreign
+public func sqlite3_last_insert_rowid(p0: *sqlite3) : sqlite3_int64;
+
+@foreign
+public func sqlite3_set_last_insert_rowid(p0: *sqlite3, p1: sqlite3_int64) : void;
+
+@foreign
+public func sqlite3_changes(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_changes64(p0: *sqlite3) : sqlite3_int64;
+
+@foreign
+public func sqlite3_total_changes(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_total_changes64(p0: *sqlite3) : sqlite3_int64;
+
+@foreign
+public func sqlite3_interrupt(p0: *sqlite3) : void;
+
+@foreign
+public func sqlite3_is_interrupted(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_complete(p0: *const char) : i32;
+
+@foreign
+public func sqlite3_complete16(p0: *const void) : i32;
+
+@foreign
+public func sqlite3_busy_handler(p0: *sqlite3, p1: func(*void, i32) : i32, p2: *void) : i32;
+
+@foreign
+public func sqlite3_busy_timeout(p0: *sqlite3, p1: i32) : i32;
+
+@foreign
+public func sqlite3_setlk_timeout(p0: *sqlite3, p1: i32, p2: i32) : i32;
+
+@foreign
+public func sqlite3_get_table(p0: *sqlite3, p1: *const char, p2: ***char, p3: *i32, p4: *i32, p5: **char) : i32;
+
+@foreign
+public func sqlite3_free_table(p0: **char) : void;
+
+@foreign
+public func sqlite3_mprintf(p0: *const char, ...) : *char;
+
+@foreign
+public func sqlite3_vmprintf(p0: *const char, p1: va_list) : *char;
+
+@foreign
+public func sqlite3_snprintf(p0: i32, p1: *char, p2: *const char, ...) : *char;
+
+@foreign
+public func sqlite3_vsnprintf(p0: i32, p1: *char, p2: *const char, p3: va_list) : *char;
+
+@foreign
+public func sqlite3_malloc(p0: i32) : *void;
+
+@foreign
+public func sqlite3_malloc64(p0: sqlite3_uint64) : *void;
+
+@foreign
+public func sqlite3_realloc(p0: *void, p1: i32) : *void;
+
+@foreign
+public func sqlite3_realloc64(p0: *void, p1: sqlite3_uint64) : *void;
+
+@foreign
+public func sqlite3_free(p0: *void) : void;
+
+@foreign
+public func sqlite3_msize(p0: *void) : sqlite3_uint64;
+
+@foreign
+public func sqlite3_memory_used() : sqlite3_int64;
+
+@foreign
+public func sqlite3_memory_highwater(p0: i32) : sqlite3_int64;
+
+@foreign
+public func sqlite3_randomness(p0: i32, p1: *void) : void;
+
+@foreign
+public func sqlite3_set_authorizer(p0: *sqlite3, p1: func(*void, i32, *const char, *const char, *const char, *const char) : i32, p2: *void) : i32;
+
+@foreign
+public func sqlite3_trace(p0: *sqlite3, p1: func(*void, *const char) : void, p2: *void) : *void;
+
+@foreign
+public func sqlite3_profile(p0: *sqlite3, p1: func(*void, *const char, sqlite3_uint64) : void, p2: *void) : *void;
+
+@foreign
+public func sqlite3_trace_v2(p0: *sqlite3, p1: u32, p2: func(u32, *void, *void, *void) : i32, p3: *void) : i32;
+
+@foreign
+public func sqlite3_progress_handler(p0: *sqlite3, p1: i32, p2: func(*void) : i32, p3: *void) : void;
+
+@foreign
+public func sqlite3_open(p0: *const char, p1: **sqlite3) : i32;
+
+@foreign
+public func sqlite3_open16(p0: *const void, p1: **sqlite3) : i32;
+
+@foreign
+public func sqlite3_open_v2(p0: *const char, p1: **sqlite3, p2: i32, p3: *const char) : i32;
+
+@foreign
+public func sqlite3_uri_parameter(p0: sqlite3_filename, p1: *const char) : *const char;
+
+@foreign
+public func sqlite3_uri_boolean(p0: sqlite3_filename, p1: *const char, p2: i32) : i32;
+
+@foreign
+public func sqlite3_uri_int64(p0: sqlite3_filename, p1: *const char, p2: sqlite3_int64) : sqlite3_int64;
+
+@foreign
+public func sqlite3_uri_key(p0: sqlite3_filename, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_filename_database(p0: sqlite3_filename) : *const char;
+
+@foreign
+public func sqlite3_filename_journal(p0: sqlite3_filename) : *const char;
+
+@foreign
+public func sqlite3_filename_wal(p0: sqlite3_filename) : *const char;
+
+@foreign
+public func sqlite3_database_file_object(p0: *const char) : *sqlite3_file;
+
+@foreign
+public func sqlite3_create_filename(p0: *const char, p1: *const char, p2: *const char, p3: i32, p4: **const char) : sqlite3_filename;
+
+@foreign
+public func sqlite3_free_filename(p0: sqlite3_filename) : void;
+
+@foreign
+public func sqlite3_errcode(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_extended_errcode(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_errmsg(p0: *sqlite3) : *const char;
+
+@foreign
+public func sqlite3_errmsg16(p0: *sqlite3) : *const void;
+
+@foreign
+public func sqlite3_errstr(p0: i32) : *const char;
+
+@foreign
+public func sqlite3_error_offset(p0: *sqlite3) : i32;
+
+@foreign
+public struct sqlite3_stmt {
+}
+
+@foreign
+public func sqlite3_limit(p0: *sqlite3, p1: i32, p2: i32) : i32;
+
+@foreign
+public func sqlite3_prepare(p0: *sqlite3, p1: *const char, p2: i32, p3: **sqlite3_stmt, p4: **const char) : i32;
+
+@foreign
+public func sqlite3_prepare_v2(p0: *sqlite3, p1: *const char, p2: i32, p3: **sqlite3_stmt, p4: **const char) : i32;
+
+@foreign
+public func sqlite3_prepare_v3(p0: *sqlite3, p1: *const char, p2: i32, p3: u32, p4: **sqlite3_stmt, p5: **const char) : i32;
+
+@foreign
+public func sqlite3_prepare16(p0: *sqlite3, p1: *const void, p2: i32, p3: **sqlite3_stmt, p4: **const void) : i32;
+
+@foreign
+public func sqlite3_prepare16_v2(p0: *sqlite3, p1: *const void, p2: i32, p3: **sqlite3_stmt, p4: **const void) : i32;
+
+@foreign
+public func sqlite3_prepare16_v3(p0: *sqlite3, p1: *const void, p2: i32, p3: u32, p4: **sqlite3_stmt, p5: **const void) : i32;
+
+@foreign
+public func sqlite3_sql(p0: *sqlite3_stmt) : *const char;
+
+@foreign
+public func sqlite3_expanded_sql(p0: *sqlite3_stmt) : *char;
+
+@foreign
+public func sqlite3_stmt_readonly(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_stmt_isexplain(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_stmt_explain(p0: *sqlite3_stmt, p1: i32) : i32;
+
+@foreign
+public func sqlite3_stmt_busy(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public struct sqlite3_value {
+}
+
+@foreign
+public struct sqlite3_context {
+}
+
+@foreign
+public func sqlite3_bind_blob(p0: *sqlite3_stmt, p1: i32, p2: *const void, p3: i32, p4: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_bind_blob64(p0: *sqlite3_stmt, p1: i32, p2: *const void, p3: sqlite3_uint64, p4: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_bind_double(p0: *sqlite3_stmt, p1: i32, p2: f64) : i32;
+
+@foreign
+public func sqlite3_bind_int(p0: *sqlite3_stmt, p1: i32, p2: i32) : i32;
+
+@foreign
+public func sqlite3_bind_int64(p0: *sqlite3_stmt, p1: i32, p2: sqlite3_int64) : i32;
+
+@foreign
+public func sqlite3_bind_null(p0: *sqlite3_stmt, p1: i32) : i32;
+
+@foreign
+public func sqlite3_bind_text(p0: *sqlite3_stmt, p1: i32, p2: *const char, p3: i32, p4: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_bind_text16(p0: *sqlite3_stmt, p1: i32, p2: *const void, p3: i32, p4: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_bind_text64(p0: *sqlite3_stmt, p1: i32, p2: *const char, p3: sqlite3_uint64, p4: func(*void) : void, p5: u8) : i32;
+
+@foreign
+public func sqlite3_bind_value(p0: *sqlite3_stmt, p1: i32, p2: *const sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_bind_pointer(p0: *sqlite3_stmt, p1: i32, p2: *void, p3: *const char, p4: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_bind_zeroblob(p0: *sqlite3_stmt, p1: i32, p2: i32) : i32;
+
+@foreign
+public func sqlite3_bind_zeroblob64(p0: *sqlite3_stmt, p1: i32, p2: sqlite3_uint64) : i32;
+
+@foreign
+public func sqlite3_bind_parameter_count(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_bind_parameter_name(p0: *sqlite3_stmt, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_bind_parameter_index(p0: *sqlite3_stmt, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_clear_bindings(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_column_count(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_column_name(p0: *sqlite3_stmt, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_column_name16(p0: *sqlite3_stmt, p1: i32) : *const void;
+
+@foreign
+public func sqlite3_column_database_name(p0: *sqlite3_stmt, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_column_database_name16(p0: *sqlite3_stmt, p1: i32) : *const void;
+
+@foreign
+public func sqlite3_column_table_name(p0: *sqlite3_stmt, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_column_table_name16(p0: *sqlite3_stmt, p1: i32) : *const void;
+
+@foreign
+public func sqlite3_column_origin_name(p0: *sqlite3_stmt, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_column_origin_name16(p0: *sqlite3_stmt, p1: i32) : *const void;
+
+@foreign
+public func sqlite3_column_decltype(p0: *sqlite3_stmt, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_column_decltype16(p0: *sqlite3_stmt, p1: i32) : *const void;
+
+@foreign
+public func sqlite3_step(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_data_count(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_column_blob(p0: *sqlite3_stmt, p1: i32) : *const void;
+
+@foreign
+public func sqlite3_column_double(p0: *sqlite3_stmt, p1: i32) : f64;
+
+@foreign
+public func sqlite3_column_int(p0: *sqlite3_stmt, p1: i32) : i32;
+
+@foreign
+public func sqlite3_column_int64(p0: *sqlite3_stmt, p1: i32) : sqlite3_int64;
+
+@foreign
+public func sqlite3_column_text(p0: *sqlite3_stmt, p1: i32) : *const u8;
+
+@foreign
+public func sqlite3_column_text16(p0: *sqlite3_stmt, p1: i32) : *const void;
+
+@foreign
+public func sqlite3_column_value(p0: *sqlite3_stmt, p1: i32) : *sqlite3_value;
+
+@foreign
+public func sqlite3_column_bytes(p0: *sqlite3_stmt, p1: i32) : i32;
+
+@foreign
+public func sqlite3_column_bytes16(p0: *sqlite3_stmt, p1: i32) : i32;
+
+@foreign
+public func sqlite3_column_type(p0: *sqlite3_stmt, p1: i32) : i32;
+
+@foreign
+public func sqlite3_finalize(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_reset(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_create_function(p0: *sqlite3, p1: *const char, p2: i32, p3: i32, p4: *void, p5: func(*sqlite3_context, i32, **sqlite3_value) : void, p6: func(*sqlite3_context, i32, **sqlite3_value) : void, p7: func(*sqlite3_context) : void) : i32;
+
+@foreign
+public func sqlite3_create_function16(p0: *sqlite3, p1: *const void, p2: i32, p3: i32, p4: *void, p5: func(*sqlite3_context, i32, **sqlite3_value) : void, p6: func(*sqlite3_context, i32, **sqlite3_value) : void, p7: func(*sqlite3_context) : void) : i32;
+
+@foreign
+public func sqlite3_create_function_v2(p0: *sqlite3, p1: *const char, p2: i32, p3: i32, p4: *void, p5: func(*sqlite3_context, i32, **sqlite3_value) : void, p6: func(*sqlite3_context, i32, **sqlite3_value) : void, p7: func(*sqlite3_context) : void, p8: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_create_window_function(p0: *sqlite3, p1: *const char, p2: i32, p3: i32, p4: *void, p5: func(*sqlite3_context, i32, **sqlite3_value) : void, p6: func(*sqlite3_context) : void, p7: func(*sqlite3_context) : void, p8: func(*sqlite3_context, i32, **sqlite3_value) : void, p9: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_aggregate_count(p0: *sqlite3_context) : i32;
+
+@foreign
+public func sqlite3_expired(p0: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_transfer_bindings(p0: *sqlite3_stmt, p1: *sqlite3_stmt) : i32;
+
+@foreign
+public func sqlite3_global_recover() : i32;
+
+@foreign
+public func sqlite3_thread_cleanup() : void;
+
+@foreign
+public func sqlite3_memory_alarm(p0: func(*void, sqlite3_int64, i32) : void, p1: *void, p2: sqlite3_int64) : i32;
+
+@foreign
+public func sqlite3_value_blob(p0: *sqlite3_value) : *const void;
+
+@foreign
+public func sqlite3_value_double(p0: *sqlite3_value) : f64;
+
+@foreign
+public func sqlite3_value_int(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_int64(p0: *sqlite3_value) : sqlite3_int64;
+
+@foreign
+public func sqlite3_value_pointer(p0: *sqlite3_value, p1: *const char) : *void;
+
+@foreign
+public func sqlite3_value_text(p0: *sqlite3_value) : *const u8;
+
+@foreign
+public func sqlite3_value_text16(p0: *sqlite3_value) : *const void;
+
+@foreign
+public func sqlite3_value_text16le(p0: *sqlite3_value) : *const void;
+
+@foreign
+public func sqlite3_value_text16be(p0: *sqlite3_value) : *const void;
+
+@foreign
+public func sqlite3_value_bytes(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_bytes16(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_type(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_numeric_type(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_nochange(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_frombind(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_encoding(p0: *sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_value_subtype(p0: *sqlite3_value) : u32;
+
+@foreign
+public func sqlite3_value_dup(p0: *const sqlite3_value) : *sqlite3_value;
+
+@foreign
+public func sqlite3_value_free(p0: *sqlite3_value) : void;
+
+@foreign
+public func sqlite3_aggregate_context(p0: *sqlite3_context, p1: i32) : *void;
+
+@foreign
+public func sqlite3_user_data(p0: *sqlite3_context) : *void;
+
+@foreign
+public func sqlite3_context_db_handle(p0: *sqlite3_context) : *sqlite3;
+
+@foreign
+public func sqlite3_get_auxdata(p0: *sqlite3_context, p1: i32) : *void;
+
+@foreign
+public func sqlite3_set_auxdata(p0: *sqlite3_context, p1: i32, p2: *void, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_get_clientdata(p0: *sqlite3, p1: *const char) : *void;
+
+@foreign
+public func sqlite3_set_clientdata(p0: *sqlite3, p1: *const char, p2: *void, p3: func(*void) : void) : i32;
+@foreign public typedef func(*void) : void as sqlite3_destructor_type;
+
+@foreign
+public func sqlite3_result_blob(p0: *sqlite3_context, p1: *const void, p2: i32, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_result_blob64(p0: *sqlite3_context, p1: *const void, p2: sqlite3_uint64, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_result_double(p0: *sqlite3_context, p1: f64) : void;
+
+@foreign
+public func sqlite3_result_error(p0: *sqlite3_context, p1: *const char, p2: i32) : void;
+
+@foreign
+public func sqlite3_result_error16(p0: *sqlite3_context, p1: *const void, p2: i32) : void;
+
+@foreign
+public func sqlite3_result_error_toobig(p0: *sqlite3_context) : void;
+
+@foreign
+public func sqlite3_result_error_nomem(p0: *sqlite3_context) : void;
+
+@foreign
+public func sqlite3_result_error_code(p0: *sqlite3_context, p1: i32) : void;
+
+@foreign
+public func sqlite3_result_int(p0: *sqlite3_context, p1: i32) : void;
+
+@foreign
+public func sqlite3_result_int64(p0: *sqlite3_context, p1: sqlite3_int64) : void;
+
+@foreign
+public func sqlite3_result_null(p0: *sqlite3_context) : void;
+
+@foreign
+public func sqlite3_result_text(p0: *sqlite3_context, p1: *const char, p2: i32, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_result_text64(p0: *sqlite3_context, p1: *const char, p2: sqlite3_uint64, p3: func(*void) : void, p4: u8) : void;
+
+@foreign
+public func sqlite3_result_text16(p0: *sqlite3_context, p1: *const void, p2: i32, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_result_text16le(p0: *sqlite3_context, p1: *const void, p2: i32, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_result_text16be(p0: *sqlite3_context, p1: *const void, p2: i32, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_result_value(p0: *sqlite3_context, p1: *sqlite3_value) : void;
+
+@foreign
+public func sqlite3_result_pointer(p0: *sqlite3_context, p1: *void, p2: *const char, p3: func(*void) : void) : void;
+
+@foreign
+public func sqlite3_result_zeroblob(p0: *sqlite3_context, p1: i32) : void;
+
+@foreign
+public func sqlite3_result_zeroblob64(p0: *sqlite3_context, p1: sqlite3_uint64) : i32;
+
+@foreign
+public func sqlite3_result_subtype(p0: *sqlite3_context, p1: u32) : void;
+
+@foreign
+public func sqlite3_create_collation(p0: *sqlite3, p1: *const char, p2: i32, p3: *void, p4: func(*void, i32, *const void, i32, *const void) : i32) : i32;
+
+@foreign
+public func sqlite3_create_collation_v2(p0: *sqlite3, p1: *const char, p2: i32, p3: *void, p4: func(*void, i32, *const void, i32, *const void) : i32, p5: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_create_collation16(p0: *sqlite3, p1: *const void, p2: i32, p3: *void, p4: func(*void, i32, *const void, i32, *const void) : i32) : i32;
+
+@foreign
+public func sqlite3_collation_needed(p0: *sqlite3, p1: *void, p2: func(*void, *sqlite3, i32, *const char) : void) : i32;
+
+@foreign
+public func sqlite3_collation_needed16(p0: *sqlite3, p1: *void, p2: func(*void, *sqlite3, i32, *const void) : void) : i32;
+
+@foreign
+public func sqlite3_sleep(p0: i32) : i32;
+@foreign public var sqlite3_temp_directory: *char;
+@foreign public var sqlite3_data_directory: *char;
+
+@foreign
+public func sqlite3_win32_set_directory(p0: u64, p1: *void) : i32;
+
+@foreign
+public func sqlite3_win32_set_directory8(p0: u64, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_win32_set_directory16(p0: u64, p1: *const void) : i32;
+
+@foreign
+public func sqlite3_get_autocommit(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_db_handle(p0: *sqlite3_stmt) : *sqlite3;
+
+@foreign
+public func sqlite3_db_name(p0: *sqlite3, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_db_filename(p0: *sqlite3, p1: *const char) : sqlite3_filename;
+
+@foreign
+public func sqlite3_db_readonly(p0: *sqlite3, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_txn_state(p0: *sqlite3, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_next_stmt(p0: *sqlite3, p1: *sqlite3_stmt) : *sqlite3_stmt;
+
+@foreign
+public func sqlite3_commit_hook(p0: *sqlite3, p1: func(*void) : i32, p2: *void) : *void;
+
+@foreign
+public func sqlite3_rollback_hook(p0: *sqlite3, p1: func(*void) : void, p2: *void) : *void;
+
+@foreign
+public func sqlite3_autovacuum_pages(p0: *sqlite3, p1: func(*void, *const char, u32, u32, u32) : u32, p2: *void, p3: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_update_hook(p0: *sqlite3, p1: func(*void, i32, *const char, *const char, sqlite3_int64) : void, p2: *void) : *void;
+
+@foreign
+public func sqlite3_enable_shared_cache(p0: i32) : i32;
+
+@foreign
+public func sqlite3_release_memory(p0: i32) : i32;
+
+@foreign
+public func sqlite3_db_release_memory(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_soft_heap_limit64(p0: sqlite3_int64) : sqlite3_int64;
+
+@foreign
+public func sqlite3_hard_heap_limit64(p0: sqlite3_int64) : sqlite3_int64;
+
+@foreign
+public func sqlite3_soft_heap_limit(p0: i32) : void;
+
+@foreign
+public func sqlite3_table_column_metadata(p0: *sqlite3, p1: *const char, p2: *const char, p3: *const char, p4: **const char, p5: **const char, p6: *i32, p7: *i32, p8: *i32) : i32;
+
+@foreign
+public func sqlite3_load_extension(p0: *sqlite3, p1: *const char, p2: *const char, p3: **char) : i32;
+
+@foreign
+public func sqlite3_enable_load_extension(p0: *sqlite3, p1: i32) : i32;
+
+@foreign
+public func sqlite3_auto_extension(p0: func() : void) : i32;
+
+@foreign
+public func sqlite3_cancel_auto_extension(p0: func() : void) : i32;
+
+@foreign
+public func sqlite3_reset_auto_extension() : void;
+
+
+@foreign
+public struct sqlite3_module {
+   iVersion: i32
+   xCreate: func(*sqlite3, *void, i32, *const *const char, **sqlite3_vtab, **char) : i32
+   xConnect: func(*sqlite3, *void, i32, *const *const char, **sqlite3_vtab, **char) : i32
+   xBestIndex: func(*sqlite3_vtab, *sqlite3_index_info) : i32
+   xDisconnect: func(*sqlite3_vtab) : i32
+   xDestroy: func(*sqlite3_vtab) : i32
+   xOpen: func(*sqlite3_vtab, **sqlite3_vtab_cursor) : i32
+   xClose: func(*sqlite3_vtab_cursor) : i32
+   xFilter: func(*sqlite3_vtab_cursor, i32, *const char, i32, **sqlite3_value) : i32
+   xNext: func(*sqlite3_vtab_cursor) : i32
+   xEof: func(*sqlite3_vtab_cursor) : i32
+   xColumn: func(*sqlite3_vtab_cursor, *sqlite3_context, i32) : i32
+   xRowid: func(*sqlite3_vtab_cursor, *sqlite3_int64) : i32
+   xUpdate: func(*sqlite3_vtab, i32, **sqlite3_value, *sqlite3_int64) : i32
+   xBegin: func(*sqlite3_vtab) : i32
+   xSync: func(*sqlite3_vtab) : i32
+   xCommit: func(*sqlite3_vtab) : i32
+   xRollback: func(*sqlite3_vtab) : i32
+   xFindFunction: func(*sqlite3_vtab, i32, *const char, *func(*sqlite3_context, i32, **sqlite3_value) : void, **void) : i32
+   xRename: func(*sqlite3_vtab, *const char) : i32
+   xSavepoint: func(*sqlite3_vtab, i32) : i32
+   xRelease: func(*sqlite3_vtab, i32) : i32
+   xRollbackTo: func(*sqlite3_vtab, i32) : i32
+   xShadowName: func(*const char) : i32
+   xIntegrity: func(*sqlite3_vtab, *const char, *const char, i32, **char) : i32
+}
+
+@foreign
+public struct sqlite3_index_info {
+   nConstraint: i32
+   aConstraint: *sqlite3_index_constraint
+
+   nOrderBy: i32
+   aOrderBy: *sqlite3_index_orderby
+
+   aConstraintUsage: *sqlite3_index_constraint_usage
+
+   idxNum: i32
+   idxStr: *char
+   needToFreeIdxStr: i32
+   orderByConsumed: i32
+   estimatedCost: f64
+   estimatedRows: sqlite3_int64
+   idxFlags: i32
+   colUsed: sqlite3_uint64
+}
+
+@foreign
+public struct sqlite3_index_constraint {
+   iColumn: i32
+   op: u8
+   usable: u8
+   iTermOffset: i32
+}
+
+@foreign
+public struct sqlite3_index_orderby {
+   iColumn: i32
+   desc: u8
+}
+
+@foreign
+public struct sqlite3_index_constraint_usage {
+   argvIndex: i32
+   omit: u8
+}
+
+@foreign
+public func sqlite3_create_module(p0: *sqlite3, p1: *const char, p2: *const sqlite3_module, p3: *void) : i32;
+
+@foreign
+public func sqlite3_create_module_v2(p0: *sqlite3, p1: *const char, p2: *const sqlite3_module, p3: *void, p4: func(*void) : void) : i32;
+
+@foreign
+public func sqlite3_drop_modules(p0: *sqlite3, p1: **const char) : i32;
+
+@foreign
+public struct sqlite3_vtab {
+   pModule: *const sqlite3_module
+   nRef: i32
+   zErrMsg: *char
+}
+
+@foreign
+public struct sqlite3_vtab_cursor {
+   pVtab: *sqlite3_vtab
+}
+
+@foreign
+public func sqlite3_declare_vtab(p0: *sqlite3, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_overload_function(p0: *sqlite3, p1: *const char, p2: i32) : i32;
+
+@foreign
+public struct sqlite3_blob {
+}
+
+@foreign
+public func sqlite3_blob_open(p0: *sqlite3, p1: *const char, p2: *const char, p3: *const char, p4: sqlite3_int64, p5: i32, p6: **sqlite3_blob) : i32;
+
+@foreign
+public func sqlite3_blob_reopen(p0: *sqlite3_blob, p1: sqlite3_int64) : i32;
+
+@foreign
+public func sqlite3_blob_close(p0: *sqlite3_blob) : i32;
+
+@foreign
+public func sqlite3_blob_bytes(p0: *sqlite3_blob) : i32;
+
+@foreign
+public func sqlite3_blob_read(p0: *sqlite3_blob, p1: *void, p2: i32, p3: i32) : i32;
+
+@foreign
+public func sqlite3_blob_write(p0: *sqlite3_blob, p1: *const void, p2: i32, p3: i32) : i32;
+
+@foreign
+public func sqlite3_vfs_find(p0: *const char) : *sqlite3_vfs;
+
+@foreign
+public func sqlite3_vfs_register(p0: *sqlite3_vfs, p1: i32) : i32;
+
+@foreign
+public func sqlite3_vfs_unregister(p0: *sqlite3_vfs) : i32;
+
+@foreign
+public func sqlite3_mutex_alloc(p0: i32) : *sqlite3_mutex;
+
+@foreign
+public func sqlite3_mutex_free(p0: *sqlite3_mutex) : void;
+
+@foreign
+public func sqlite3_mutex_enter(p0: *sqlite3_mutex) : void;
+
+@foreign
+public func sqlite3_mutex_try(p0: *sqlite3_mutex) : i32;
+
+@foreign
+public func sqlite3_mutex_leave(p0: *sqlite3_mutex) : void;
+
+@foreign
+public struct sqlite3_mutex_methods {
+   xMutexInit: func() : i32
+   xMutexEnd: func() : i32
+   xMutexAlloc: func(i32) : *sqlite3_mutex
+   xMutexFree: func(*sqlite3_mutex) : void
+   xMutexEnter: func(*sqlite3_mutex) : void
+   xMutexTry: func(*sqlite3_mutex) : i32
+   xMutexLeave: func(*sqlite3_mutex) : void
+   xMutexHeld: func(*sqlite3_mutex) : i32
+   xMutexNotheld: func(*sqlite3_mutex) : i32
+}
+
+@foreign
+public func sqlite3_mutex_held(p0: *sqlite3_mutex) : i32;
+
+@foreign
+public func sqlite3_mutex_notheld(p0: *sqlite3_mutex) : i32;
+
+@foreign
+public func sqlite3_db_mutex(p0: *sqlite3) : *sqlite3_mutex;
+
+@foreign
+public func sqlite3_file_control(p0: *sqlite3, p1: *const char, p2: i32, p3: *void) : i32;
+
+@foreign
+public func sqlite3_test_control(p0: i32, ...) : i32;
+
+@foreign
+public func sqlite3_keyword_count() : i32;
+
+@foreign
+public func sqlite3_keyword_name(p0: i32, p1: **const char, p2: *i32) : i32;
+
+@foreign
+public func sqlite3_keyword_check(p0: *const char, p1: i32) : i32;
+
+@foreign
+public struct sqlite3_str {
+}
+
+@foreign
+public func sqlite3_str_new(p0: *sqlite3) : *sqlite3_str;
+
+@foreign
+public func sqlite3_str_finish(p0: *sqlite3_str) : *char;
+
+@foreign
+public func sqlite3_str_appendf(p0: *sqlite3_str, p1: *const char, ...) : void;
+
+@foreign
+public func sqlite3_str_vappendf(p0: *sqlite3_str, p1: *const char, p2: va_list) : void;
+
+@foreign
+public func sqlite3_str_append(p0: *sqlite3_str, p1: *const char, p2: i32) : void;
+
+@foreign
+public func sqlite3_str_appendall(p0: *sqlite3_str, p1: *const char) : void;
+
+@foreign
+public func sqlite3_str_appendchar(p0: *sqlite3_str, p1: i32, p2: char) : void;
+
+@foreign
+public func sqlite3_str_reset(p0: *sqlite3_str) : void;
+
+@foreign
+public func sqlite3_str_errcode(p0: *sqlite3_str) : i32;
+
+@foreign
+public func sqlite3_str_length(p0: *sqlite3_str) : i32;
+
+@foreign
+public func sqlite3_str_value(p0: *sqlite3_str) : *char;
+
+@foreign
+public func sqlite3_status(p0: i32, p1: *i32, p2: *i32, p3: i32) : i32;
+
+@foreign
+public func sqlite3_status64(p0: i32, p1: *sqlite3_int64, p2: *sqlite3_int64, p3: i32) : i32;
+
+@foreign
+public func sqlite3_db_status(p0: *sqlite3, p1: i32, p2: *i32, p3: *i32, p4: i32) : i32;
+
+@foreign
+public func sqlite3_stmt_status(p0: *sqlite3_stmt, p1: i32, p2: i32) : i32;
+
+@foreign
+public struct sqlite3_pcache {
+}
+
+@foreign
+public struct sqlite3_pcache_page {
+   pBuf: *void
+   pExtra: *void
+}
+
+
+@foreign
+public struct sqlite3_pcache_methods2 {
+   iVersion: i32
+   pArg: *void
+   xInit: func(*void) : i32
+   xShutdown: func(*void) : void
+   xCreate: func(i32, i32, i32) : *sqlite3_pcache
+   xCachesize: func(*sqlite3_pcache, i32) : void
+   xPagecount: func(*sqlite3_pcache) : i32
+   xFetch: func(*sqlite3_pcache, u32, i32) : *sqlite3_pcache_page
+   xUnpin: func(*sqlite3_pcache, *sqlite3_pcache_page, i32) : void
+   xRekey: func(*sqlite3_pcache, *sqlite3_pcache_page, u32, u32) : void
+   xTruncate: func(*sqlite3_pcache, u32) : void
+   xDestroy: func(*sqlite3_pcache) : void
+   xShrink: func(*sqlite3_pcache) : void
+}
+
+
+@foreign
+public struct sqlite3_pcache_methods {
+   pArg: *void
+   xInit: func(*void) : i32
+   xShutdown: func(*void) : void
+   xCreate: func(i32, i32) : *sqlite3_pcache
+   xCachesize: func(*sqlite3_pcache, i32) : void
+   xPagecount: func(*sqlite3_pcache) : i32
+   xFetch: func(*sqlite3_pcache, u32, i32) : *void
+   xUnpin: func(*sqlite3_pcache, *void, i32) : void
+   xRekey: func(*sqlite3_pcache, *void, u32, u32) : void
+   xTruncate: func(*sqlite3_pcache, u32) : void
+   xDestroy: func(*sqlite3_pcache) : void
+}
+
+@foreign
+public struct sqlite3_backup {
+}
+
+@foreign
+public func sqlite3_backup_init(p0: *sqlite3, p1: *const char, p2: *sqlite3, p3: *const char) : *sqlite3_backup;
+
+@foreign
+public func sqlite3_backup_step(p0: *sqlite3_backup, p1: i32) : i32;
+
+@foreign
+public func sqlite3_backup_finish(p0: *sqlite3_backup) : i32;
+
+@foreign
+public func sqlite3_backup_remaining(p0: *sqlite3_backup) : i32;
+
+@foreign
+public func sqlite3_backup_pagecount(p0: *sqlite3_backup) : i32;
+
+@foreign
+public func sqlite3_unlock_notify(p0: *sqlite3, p1: func(**void, i32) : void, p2: *void) : i32;
+
+@foreign
+public func sqlite3_stricmp(p0: *const char, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_strnicmp(p0: *const char, p1: *const char, p2: i32) : i32;
+
+@foreign
+public func sqlite3_strglob(p0: *const char, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_strlike(p0: *const char, p1: *const char, p2: u32) : i32;
+
+@foreign
+public func sqlite3_log(p0: i32, p1: *const char, ...) : void;
+
+@foreign
+public func sqlite3_wal_hook(p0: *sqlite3, p1: func(*void, *sqlite3, *const char, i32) : i32, p2: *void) : *void;
+
+@foreign
+public func sqlite3_wal_autocheckpoint(p0: *sqlite3, p1: i32) : i32;
+
+@foreign
+public func sqlite3_wal_checkpoint(p0: *sqlite3, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_wal_checkpoint_v2(p0: *sqlite3, p1: *const char, p2: i32, p3: *i32, p4: *i32) : i32;
+
+@foreign
+public func sqlite3_vtab_config(p0: *sqlite3, p1: i32, ...) : i32;
+
+@foreign
+public func sqlite3_vtab_on_conflict(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_vtab_nochange(p0: *sqlite3_context) : i32;
+
+@foreign
+public func sqlite3_vtab_collation(p0: *sqlite3_index_info, p1: i32) : *const char;
+
+@foreign
+public func sqlite3_vtab_distinct(p0: *sqlite3_index_info) : i32;
+
+@foreign
+public func sqlite3_vtab_in(p0: *sqlite3_index_info, p1: i32, p2: i32) : i32;
+
+@foreign
+public func sqlite3_vtab_in_first(p0: *sqlite3_value, p1: **sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_vtab_in_next(p0: *sqlite3_value, p1: **sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_vtab_rhs_value(p0: *sqlite3_index_info, p1: i32, p2: **sqlite3_value) : i32;
+
+@foreign
+public func sqlite3_stmt_scanstatus(p0: *sqlite3_stmt, p1: i32, p2: i32, p3: *void) : i32;
+
+@foreign
+public func sqlite3_stmt_scanstatus_v2(p0: *sqlite3_stmt, p1: i32, p2: i32, p3: i32, p4: *void) : i32;
+
+@foreign
+public func sqlite3_stmt_scanstatus_reset(p0: *sqlite3_stmt) : void;
+
+@foreign
+public func sqlite3_db_cacheflush(p0: *sqlite3) : i32;
+
+@foreign
+public func sqlite3_system_errno(p0: *sqlite3) : i32;
+
+@foreign
+public struct sqlite3_snapshot {
+   hidden: [48]u8
+}
+
+@foreign
+public func sqlite3_snapshot_get(p0: *sqlite3, p1: *const char, p2: **sqlite3_snapshot) : i32;
+
+@foreign
+public func sqlite3_snapshot_open(p0: *sqlite3, p1: *const char, p2: *sqlite3_snapshot) : i32;
+
+@foreign
+public func sqlite3_snapshot_free(p0: *sqlite3_snapshot) : void;
+
+@foreign
+public func sqlite3_snapshot_cmp(p0: *sqlite3_snapshot, p1: *sqlite3_snapshot) : i32;
+
+@foreign
+public func sqlite3_snapshot_recover(p0: *sqlite3, p1: *const char) : i32;
+
+@foreign
+public func sqlite3_serialize(p0: *sqlite3, p1: *const char, p2: *sqlite3_int64, p3: u32) : *u8;
+
+@foreign
+public func sqlite3_deserialize(p0: *sqlite3, p1: *const char, p2: *u8, p3: sqlite3_int64, p4: sqlite3_int64, p5: u32) : i32;
+
+@foreign public typedef void as sqlite3_rtree_dbl;
+
+@foreign
+public func sqlite3_rtree_geometry_callback(p0: *sqlite3, p1: *const char, p2: func(*sqlite3_rtree_geometry, i32, *sqlite3_rtree_dbl, *i32) : i32, p3: *void) : i32;
+
+@foreign
+public struct sqlite3_rtree_geometry {
+   pContext: *void
+   nParam: i32
+   aParam: *sqlite3_rtree_dbl
+   pUser: *void
+   xDelUser: func(*void) : void
+}
+
+@foreign
+public func sqlite3_rtree_query_callback(p0: *sqlite3, p1: *const char, p2: func(*sqlite3_rtree_query_info) : i32, p3: *void, p4: func(*void) : void) : i32;
+
+@foreign
+public struct sqlite3_rtree_query_info {
+   pContext: *void
+   nParam: i32
+   aParam: *sqlite3_rtree_dbl
+   pUser: *void
+   xDelUser: func(*void) : void
+   aCoord: *sqlite3_rtree_dbl
+   anQueue: *u32
+   nCoord: i32
+   iLevel: i32
+   mxLevel: i32
+   iRowid: sqlite3_int64
+   rParentScore: sqlite3_rtree_dbl
+   eParentWithin: i32
+   eWithin: i32
+   rScore: sqlite3_rtree_dbl
+   apSqlParam: **sqlite3_value
+}
+
+@foreign
+public struct Fts5Context {
+}
+
+@foreign public typedef func(*const Fts5ExtensionApi, *Fts5Context, *sqlite3_context, i32, **sqlite3_value) : void as fts5_extension_function;
+
+@foreign
+public struct Fts5PhraseIter {
+   a: *const u8
+   b: *const u8
+}
+
+@foreign
+public struct Fts5ExtensionApi {
+   iVersion: i32
+   xUserData: func(*Fts5Context) : *void
+   xColumnCount: func(*Fts5Context) : i32
+   xRowCount: func(*Fts5Context, *sqlite3_int64) : i32
+   xColumnTotalSize: func(*Fts5Context, i32, *sqlite3_int64) : i32
+   xTokenize: func(*Fts5Context, *const char, i32, *void, func(*void, i32, *const char, i32, i32, i32) : i32) : i32
+   xPhraseCount: func(*Fts5Context) : i32
+   xPhraseSize: func(*Fts5Context, i32) : i32
+   xInstCount: func(*Fts5Context, *i32) : i32
+   xInst: func(*Fts5Context, i32, *i32, *i32, *i32) : i32
+   xRowid: func(*Fts5Context) : sqlite3_int64
+   xColumnText: func(*Fts5Context, i32, **const char, *i32) : i32
+   xColumnSize: func(*Fts5Context, i32, *i32) : i32
+   xQueryPhrase: func(*Fts5Context, i32, *void, func(*const Fts5ExtensionApi, *Fts5Context, *void) : i32) : i32
+   xSetAuxdata: func(*Fts5Context, *void, func(*void) : void) : i32
+   xGetAuxdata: func(*Fts5Context, i32) : *void
+   xPhraseFirst: func(*Fts5Context, i32, *Fts5PhraseIter, *i32, *i32) : i32
+   xPhraseNext: func(*Fts5Context, *Fts5PhraseIter, *i32, *i32) : void
+   xPhraseFirstColumn: func(*Fts5Context, i32, *Fts5PhraseIter, *i32) : i32
+   xPhraseNextColumn: func(*Fts5Context, *Fts5PhraseIter, *i32) : void
+   xQueryToken: func(*Fts5Context, i32, i32, **const char, *i32) : i32
+   xInstToken: func(*Fts5Context, i32, i32, **const char, *i32) : i32
+   xColumnLocale: func(*Fts5Context, i32, **const char, *i32) : i32
+   xTokenize_v2: func(*Fts5Context, *const char, i32, *const char, i32, *void, func(*void, i32, *const char, i32, i32, i32) : i32) : i32
+}
+
+@foreign
+public struct Fts5Tokenizer {
+}
+
+@foreign
+public struct fts5_tokenizer_v2 {
+   iVersion: i32
+   xCreate: func(*void, **const char, i32, **Fts5Tokenizer) : i32
+   xDelete: func(*Fts5Tokenizer) : void
+   xTokenize: func(*Fts5Tokenizer, *void, i32, *const char, i32, *const char, i32, func(*void, i32, *const char, i32, i32, i32) : i32) : i32
+}
+
+
+@foreign
+public struct fts5_tokenizer {
+   xCreate: func(*void, **const char, i32, **Fts5Tokenizer) : i32
+   xDelete: func(*Fts5Tokenizer) : void
+   xTokenize: func(*Fts5Tokenizer, *void, i32, *const char, i32, func(*void, i32, *const char, i32, i32, i32) : i32) : i32
+}
+
+@foreign
+public struct fts5_api {
+   iVersion: i32
+   xCreateTokenizer: func(*fts5_api, *const char, *void, *fts5_tokenizer, func(*void) : void) : i32
+   xFindTokenizer: func(*fts5_api, *const char, **void, *fts5_tokenizer) : i32
+   xCreateFunction: func(*fts5_api, *const char, *void, fts5_extension_function, func(*void) : void) : i32
+   xCreateTokenizer_v2: func(*fts5_api, *const char, *void, *fts5_tokenizer_v2, func(*void) : void) : i32
+   xFindTokenizer_v2: func(*fts5_api, *const char, **void, **fts5_tokenizer_v2) : i32
+}
+// empty macro!!
+@foreign public const SQLITE_EXTERN: i32;
+// empty macro!!
+// empty macro!!
+// empty macro!!
+@foreign public const SQLITE_STDCALL: i32;
+// empty macro!!
+// empty macro!!
+// empty macro!!
+// empty macro!!
+@foreign public const SQLITE_VERSION: i32;
+@foreign public const SQLITE_VERSION_NUMBER: i32;
+@foreign public const SQLITE_SOURCE_ID: i32;
+@foreign public const SQLITE_OK: i32;
+@foreign public const SQLITE_ERROR: i32;
+@foreign public const SQLITE_INTERNAL: i32;
+@foreign public const SQLITE_PERM: i32;
+@foreign public const SQLITE_ABORT: i32;
+@foreign public const SQLITE_BUSY: i32;
+@foreign public const SQLITE_LOCKED: i32;
+@foreign public const SQLITE_NOMEM: i32;
+@foreign public const SQLITE_READONLY: i32;
+@foreign public const SQLITE_INTERRUPT: i32;
+@foreign public const SQLITE_IOERR: i32;
+@foreign public const SQLITE_CORRUPT: i32;
+@foreign public const SQLITE_NOTFOUND: i32;
+@foreign public const SQLITE_FULL: i32;
+@foreign public const SQLITE_CANTOPEN: i32;
+@foreign public const SQLITE_PROTOCOL: i32;
+@foreign public const SQLITE_EMPTY: i32;
+@foreign public const SQLITE_SCHEMA: i32;
+@foreign public const SQLITE_TOOBIG: i32;
+@foreign public const SQLITE_CONSTRAINT: i32;
+@foreign public const SQLITE_MISMATCH: i32;
+@foreign public const SQLITE_MISUSE: i32;
+@foreign public const SQLITE_NOLFS: i32;
+@foreign public const SQLITE_AUTH: i32;
+@foreign public const SQLITE_FORMAT: i32;
+@foreign public const SQLITE_RANGE: i32;
+@foreign public const SQLITE_NOTADB: i32;
+@foreign public const SQLITE_NOTICE: i32;
+@foreign public const SQLITE_WARNING: i32;
+@foreign public const SQLITE_ROW: i32;
+@foreign public const SQLITE_DONE: i32;
+@foreign public const SQLITE_ERROR_MISSING_COLLSEQ: i32;
+@foreign public const SQLITE_ERROR_RETRY: i32;
+@foreign public const SQLITE_ERROR_SNAPSHOT: i32;
+@foreign public const SQLITE_IOERR_READ: i32;
+@foreign public const SQLITE_IOERR_SHORT_READ: i32;
+@foreign public const SQLITE_IOERR_WRITE: i32;
+@foreign public const SQLITE_IOERR_FSYNC: i32;
+@foreign public const SQLITE_IOERR_DIR_FSYNC: i32;
+@foreign public const SQLITE_IOERR_TRUNCATE: i32;
+@foreign public const SQLITE_IOERR_FSTAT: i32;
+@foreign public const SQLITE_IOERR_UNLOCK: i32;
+@foreign public const SQLITE_IOERR_RDLOCK: i32;
+@foreign public const SQLITE_IOERR_DELETE: i32;
+@foreign public const SQLITE_IOERR_BLOCKED: i32;
+@foreign public const SQLITE_IOERR_NOMEM: i32;
+@foreign public const SQLITE_IOERR_ACCESS: i32;
+@foreign public const SQLITE_IOERR_CHECKRESERVEDLOCK: i32;
+@foreign public const SQLITE_IOERR_LOCK: i32;
+@foreign public const SQLITE_IOERR_CLOSE: i32;
+@foreign public const SQLITE_IOERR_DIR_CLOSE: i32;
+@foreign public const SQLITE_IOERR_SHMOPEN: i32;
+@foreign public const SQLITE_IOERR_SHMSIZE: i32;
+@foreign public const SQLITE_IOERR_SHMLOCK: i32;
+@foreign public const SQLITE_IOERR_SHMMAP: i32;
+@foreign public const SQLITE_IOERR_SEEK: i32;
+@foreign public const SQLITE_IOERR_DELETE_NOENT: i32;
+@foreign public const SQLITE_IOERR_MMAP: i32;
+@foreign public const SQLITE_IOERR_GETTEMPPATH: i32;
+@foreign public const SQLITE_IOERR_CONVPATH: i32;
+@foreign public const SQLITE_IOERR_VNODE: i32;
+@foreign public const SQLITE_IOERR_AUTH: i32;
+@foreign public const SQLITE_IOERR_BEGIN_ATOMIC: i32;
+@foreign public const SQLITE_IOERR_COMMIT_ATOMIC: i32;
+@foreign public const SQLITE_IOERR_ROLLBACK_ATOMIC: i32;
+@foreign public const SQLITE_IOERR_DATA: i32;
+@foreign public const SQLITE_IOERR_CORRUPTFS: i32;
+@foreign public const SQLITE_IOERR_IN_PAGE: i32;
+@foreign public const SQLITE_LOCKED_SHAREDCACHE: i32;
+@foreign public const SQLITE_LOCKED_VTAB: i32;
+@foreign public const SQLITE_BUSY_RECOVERY: i32;
+@foreign public const SQLITE_BUSY_SNAPSHOT: i32;
+@foreign public const SQLITE_BUSY_TIMEOUT: i32;
+@foreign public const SQLITE_CANTOPEN_NOTEMPDIR: i32;
+@foreign public const SQLITE_CANTOPEN_ISDIR: i32;
+@foreign public const SQLITE_CANTOPEN_FULLPATH: i32;
+@foreign public const SQLITE_CANTOPEN_CONVPATH: i32;
+@foreign public const SQLITE_CANTOPEN_DIRTYWAL: i32;
+@foreign public const SQLITE_CANTOPEN_SYMLINK: i32;
+@foreign public const SQLITE_CORRUPT_VTAB: i32;
+@foreign public const SQLITE_CORRUPT_SEQUENCE: i32;
+@foreign public const SQLITE_CORRUPT_INDEX: i32;
+@foreign public const SQLITE_READONLY_RECOVERY: i32;
+@foreign public const SQLITE_READONLY_CANTLOCK: i32;
+@foreign public const SQLITE_READONLY_ROLLBACK: i32;
+@foreign public const SQLITE_READONLY_DBMOVED: i32;
+@foreign public const SQLITE_READONLY_CANTINIT: i32;
+@foreign public const SQLITE_READONLY_DIRECTORY: i32;
+@foreign public const SQLITE_ABORT_ROLLBACK: i32;
+@foreign public const SQLITE_CONSTRAINT_CHECK: i32;
+@foreign public const SQLITE_CONSTRAINT_COMMITHOOK: i32;
+@foreign public const SQLITE_CONSTRAINT_FOREIGNKEY: i32;
+@foreign public const SQLITE_CONSTRAINT_FUNCTION: i32;
+@foreign public const SQLITE_CONSTRAINT_NOTNULL: i32;
+@foreign public const SQLITE_CONSTRAINT_PRIMARYKEY: i32;
+@foreign public const SQLITE_CONSTRAINT_TRIGGER: i32;
+@foreign public const SQLITE_CONSTRAINT_UNIQUE: i32;
+@foreign public const SQLITE_CONSTRAINT_VTAB: i32;
+@foreign public const SQLITE_CONSTRAINT_ROWID: i32;
+@foreign public const SQLITE_CONSTRAINT_PINNED: i32;
+@foreign public const SQLITE_CONSTRAINT_DATATYPE: i32;
+@foreign public const SQLITE_NOTICE_RECOVER_WAL: i32;
+@foreign public const SQLITE_NOTICE_RECOVER_ROLLBACK: i32;
+@foreign public const SQLITE_NOTICE_RBU: i32;
+@foreign public const SQLITE_WARNING_AUTOINDEX: i32;
+@foreign public const SQLITE_AUTH_USER: i32;
+@foreign public const SQLITE_OK_LOAD_PERMANENTLY: i32;
+@foreign public const SQLITE_OK_SYMLINK: i32;
+@foreign public const SQLITE_OPEN_READONLY: i32;
+@foreign public const SQLITE_OPEN_READWRITE: i32;
+@foreign public const SQLITE_OPEN_CREATE: i32;
+@foreign public const SQLITE_OPEN_DELETEONCLOSE: i32;
+@foreign public const SQLITE_OPEN_EXCLUSIVE: i32;
+@foreign public const SQLITE_OPEN_AUTOPROXY: i32;
+@foreign public const SQLITE_OPEN_URI: i32;
+@foreign public const SQLITE_OPEN_MEMORY: i32;
+@foreign public const SQLITE_OPEN_MAIN_DB: i32;
+@foreign public const SQLITE_OPEN_TEMP_DB: i32;
+@foreign public const SQLITE_OPEN_TRANSIENT_DB: i32;
+@foreign public const SQLITE_OPEN_MAIN_JOURNAL: i32;
+@foreign public const SQLITE_OPEN_TEMP_JOURNAL: i32;
+@foreign public const SQLITE_OPEN_SUBJOURNAL: i32;
+@foreign public const SQLITE_OPEN_SUPER_JOURNAL: i32;
+@foreign public const SQLITE_OPEN_NOMUTEX: i32;
+@foreign public const SQLITE_OPEN_FULLMUTEX: i32;
+@foreign public const SQLITE_OPEN_SHAREDCACHE: i32;
+@foreign public const SQLITE_OPEN_PRIVATECACHE: i32;
+@foreign public const SQLITE_OPEN_WAL: i32;
+@foreign public const SQLITE_OPEN_NOFOLLOW: i32;
+@foreign public const SQLITE_OPEN_EXRESCODE: i32;
+@foreign public const SQLITE_OPEN_MASTER_JOURNAL: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC512: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC1K: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC2K: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC4K: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC8K: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC16K: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC32K: i32;
+@foreign public const SQLITE_IOCAP_ATOMIC64K: i32;
+@foreign public const SQLITE_IOCAP_SAFE_APPEND: i32;
+@foreign public const SQLITE_IOCAP_SEQUENTIAL: i32;
+@foreign public const SQLITE_IOCAP_UNDELETABLE_WHEN_OPEN: i32;
+@foreign public const SQLITE_IOCAP_POWERSAFE_OVERWRITE: i32;
+@foreign public const SQLITE_IOCAP_IMMUTABLE: i32;
+@foreign public const SQLITE_IOCAP_BATCH_ATOMIC: i32;
+@foreign public const SQLITE_IOCAP_SUBPAGE_READ: i32;
+@foreign public const SQLITE_LOCK_NONE: i32;
+@foreign public const SQLITE_LOCK_SHARED: i32;
+@foreign public const SQLITE_LOCK_RESERVED: i32;
+@foreign public const SQLITE_LOCK_PENDING: i32;
+@foreign public const SQLITE_LOCK_EXCLUSIVE: i32;
+@foreign public const SQLITE_SYNC_NORMAL: i32;
+@foreign public const SQLITE_SYNC_FULL: i32;
+@foreign public const SQLITE_SYNC_DATAONLY: i32;
+@foreign public const SQLITE_FCNTL_LOCKSTATE: i32;
+@foreign public const SQLITE_FCNTL_GET_LOCKPROXYFILE: i32;
+@foreign public const SQLITE_FCNTL_SET_LOCKPROXYFILE: i32;
+@foreign public const SQLITE_FCNTL_LAST_ERRNO: i32;
+@foreign public const SQLITE_FCNTL_SIZE_HINT: i32;
+@foreign public const SQLITE_FCNTL_CHUNK_SIZE: i32;
+@foreign public const SQLITE_FCNTL_FILE_POINTER: i32;
+@foreign public const SQLITE_FCNTL_SYNC_OMITTED: i32;
+@foreign public const SQLITE_FCNTL_WIN32_AV_RETRY: i32;
+@foreign public const SQLITE_FCNTL_PERSIST_WAL: i32;
+@foreign public const SQLITE_FCNTL_OVERWRITE: i32;
+@foreign public const SQLITE_FCNTL_VFSNAME: i32;
+@foreign public const SQLITE_FCNTL_POWERSAFE_OVERWRITE: i32;
+@foreign public const SQLITE_FCNTL_PRAGMA: i32;
+@foreign public const SQLITE_FCNTL_BUSYHANDLER: i32;
+@foreign public const SQLITE_FCNTL_TEMPFILENAME: i32;
+@foreign public const SQLITE_FCNTL_MMAP_SIZE: i32;
+@foreign public const SQLITE_FCNTL_TRACE: i32;
+@foreign public const SQLITE_FCNTL_HAS_MOVED: i32;
+@foreign public const SQLITE_FCNTL_SYNC: i32;
+@foreign public const SQLITE_FCNTL_COMMIT_PHASETWO: i32;
+@foreign public const SQLITE_FCNTL_WIN32_SET_HANDLE: i32;
+@foreign public const SQLITE_FCNTL_WAL_BLOCK: i32;
+@foreign public const SQLITE_FCNTL_ZIPVFS: i32;
+@foreign public const SQLITE_FCNTL_RBU: i32;
+@foreign public const SQLITE_FCNTL_VFS_POINTER: i32;
+@foreign public const SQLITE_FCNTL_JOURNAL_POINTER: i32;
+@foreign public const SQLITE_FCNTL_WIN32_GET_HANDLE: i32;
+@foreign public const SQLITE_FCNTL_PDB: i32;
+@foreign public const SQLITE_FCNTL_BEGIN_ATOMIC_WRITE: i32;
+@foreign public const SQLITE_FCNTL_COMMIT_ATOMIC_WRITE: i32;
+@foreign public const SQLITE_FCNTL_ROLLBACK_ATOMIC_WRITE: i32;
+@foreign public const SQLITE_FCNTL_LOCK_TIMEOUT: i32;
+@foreign public const SQLITE_FCNTL_DATA_VERSION: i32;
+@foreign public const SQLITE_FCNTL_SIZE_LIMIT: i32;
+@foreign public const SQLITE_FCNTL_CKPT_DONE: i32;
+@foreign public const SQLITE_FCNTL_RESERVE_BYTES: i32;
+@foreign public const SQLITE_FCNTL_CKPT_START: i32;
+@foreign public const SQLITE_FCNTL_EXTERNAL_READER: i32;
+@foreign public const SQLITE_FCNTL_CKSM_FILE: i32;
+@foreign public const SQLITE_FCNTL_RESET_CACHE: i32;
+@foreign public const SQLITE_FCNTL_NULL_IO: i32;
+@foreign public const SQLITE_FCNTL_BLOCK_ON_CONNECT: i32;
+@foreign public const SQLITE_GET_LOCKPROXYFILE: i32;
+@foreign public const SQLITE_SET_LOCKPROXYFILE: i32;
+@foreign public const SQLITE_LAST_ERRNO: i32;
+@foreign public const SQLITE_ACCESS_EXISTS: i32;
+@foreign public const SQLITE_ACCESS_READWRITE: i32;
+@foreign public const SQLITE_ACCESS_READ: i32;
+@foreign public const SQLITE_SHM_UNLOCK: i32;
+@foreign public const SQLITE_SHM_LOCK: i32;
+@foreign public const SQLITE_SHM_SHARED: i32;
+@foreign public const SQLITE_SHM_EXCLUSIVE: i32;
+@foreign public const SQLITE_SHM_NLOCK: i32;
+@foreign public const SQLITE_CONFIG_SINGLETHREAD: i32;
+@foreign public const SQLITE_CONFIG_MULTITHREAD: i32;
+@foreign public const SQLITE_CONFIG_SERIALIZED: i32;
+@foreign public const SQLITE_CONFIG_MALLOC: i32;
+@foreign public const SQLITE_CONFIG_GETMALLOC: i32;
+@foreign public const SQLITE_CONFIG_SCRATCH: i32;
+@foreign public const SQLITE_CONFIG_PAGECACHE: i32;
+@foreign public const SQLITE_CONFIG_HEAP: i32;
+@foreign public const SQLITE_CONFIG_MEMSTATUS: i32;
+@foreign public const SQLITE_CONFIG_MUTEX: i32;
+@foreign public const SQLITE_CONFIG_GETMUTEX: i32;
+@foreign public const SQLITE_CONFIG_LOOKASIDE: i32;
+@foreign public const SQLITE_CONFIG_PCACHE: i32;
+@foreign public const SQLITE_CONFIG_GETPCACHE: i32;
+@foreign public const SQLITE_CONFIG_LOG: i32;
+@foreign public const SQLITE_CONFIG_URI: i32;
+@foreign public const SQLITE_CONFIG_PCACHE2: i32;
+@foreign public const SQLITE_CONFIG_GETPCACHE2: i32;
+@foreign public const SQLITE_CONFIG_COVERING_INDEX_SCAN: i32;
+@foreign public const SQLITE_CONFIG_SQLLOG: i32;
+@foreign public const SQLITE_CONFIG_MMAP_SIZE: i32;
+@foreign public const SQLITE_CONFIG_WIN32_HEAPSIZE: i32;
+@foreign public const SQLITE_CONFIG_PCACHE_HDRSZ: i32;
+@foreign public const SQLITE_CONFIG_PMASZ: i32;
+@foreign public const SQLITE_CONFIG_STMTJRNL_SPILL: i32;
+@foreign public const SQLITE_CONFIG_SMALL_MALLOC: i32;
+@foreign public const SQLITE_CONFIG_SORTERREF_SIZE: i32;
+@foreign public const SQLITE_CONFIG_MEMDB_MAXSIZE: i32;
+@foreign public const SQLITE_CONFIG_ROWID_IN_VIEW: i32;
+@foreign public const SQLITE_DBCONFIG_MAINDBNAME: i32;
+@foreign public const SQLITE_DBCONFIG_LOOKASIDE: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_FKEY: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_TRIGGER: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_FTS3_TOKENIZER: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION: i32;
+@foreign public const SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_QPSG: i32;
+@foreign public const SQLITE_DBCONFIG_TRIGGER_EQP: i32;
+@foreign public const SQLITE_DBCONFIG_RESET_DATABASE: i32;
+@foreign public const SQLITE_DBCONFIG_DEFENSIVE: i32;
+@foreign public const SQLITE_DBCONFIG_WRITABLE_SCHEMA: i32;
+@foreign public const SQLITE_DBCONFIG_LEGACY_ALTER_TABLE: i32;
+@foreign public const SQLITE_DBCONFIG_DQS_DML: i32;
+@foreign public const SQLITE_DBCONFIG_DQS_DDL: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_VIEW: i32;
+@foreign public const SQLITE_DBCONFIG_LEGACY_FILE_FORMAT: i32;
+@foreign public const SQLITE_DBCONFIG_TRUSTED_SCHEMA: i32;
+@foreign public const SQLITE_DBCONFIG_STMT_SCANSTATUS: i32;
+@foreign public const SQLITE_DBCONFIG_REVERSE_SCANORDER: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_ATTACH_CREATE: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_ATTACH_WRITE: i32;
+@foreign public const SQLITE_DBCONFIG_ENABLE_COMMENTS: i32;
+@foreign public const SQLITE_DBCONFIG_MAX: i32;
+@foreign public const SQLITE_SETLK_BLOCK_ON_CONNECT: i32;
+@foreign public const SQLITE_DENY: i32;
+@foreign public const SQLITE_IGNORE: i32;
+@foreign public const SQLITE_CREATE_INDEX: i32;
+@foreign public const SQLITE_CREATE_TABLE: i32;
+@foreign public const SQLITE_CREATE_TEMP_INDEX: i32;
+@foreign public const SQLITE_CREATE_TEMP_TABLE: i32;
+@foreign public const SQLITE_CREATE_TEMP_TRIGGER: i32;
+@foreign public const SQLITE_CREATE_TEMP_VIEW: i32;
+@foreign public const SQLITE_CREATE_TRIGGER: i32;
+@foreign public const SQLITE_CREATE_VIEW: i32;
+@foreign public const SQLITE_DELETE: i32;
+@foreign public const SQLITE_DROP_INDEX: i32;
+@foreign public const SQLITE_DROP_TABLE: i32;
+@foreign public const SQLITE_DROP_TEMP_INDEX: i32;
+@foreign public const SQLITE_DROP_TEMP_TABLE: i32;
+@foreign public const SQLITE_DROP_TEMP_TRIGGER: i32;
+@foreign public const SQLITE_DROP_TEMP_VIEW: i32;
+@foreign public const SQLITE_DROP_TRIGGER: i32;
+@foreign public const SQLITE_DROP_VIEW: i32;
+@foreign public const SQLITE_INSERT: i32;
+@foreign public const SQLITE_PRAGMA: i32;
+@foreign public const SQLITE_READ: i32;
+@foreign public const SQLITE_SELECT: i32;
+@foreign public const SQLITE_TRANSACTION: i32;
+@foreign public const SQLITE_UPDATE: i32;
+@foreign public const SQLITE_ATTACH: i32;
+@foreign public const SQLITE_DETACH: i32;
+@foreign public const SQLITE_ALTER_TABLE: i32;
+@foreign public const SQLITE_REINDEX: i32;
+@foreign public const SQLITE_ANALYZE: i32;
+@foreign public const SQLITE_CREATE_VTABLE: i32;
+@foreign public const SQLITE_DROP_VTABLE: i32;
+@foreign public const SQLITE_FUNCTION: i32;
+@foreign public const SQLITE_SAVEPOINT: i32;
+@foreign public const SQLITE_COPY: i32;
+@foreign public const SQLITE_RECURSIVE: i32;
+@foreign public const SQLITE_TRACE_STMT: i32;
+@foreign public const SQLITE_TRACE_PROFILE: i32;
+@foreign public const SQLITE_TRACE_ROW: i32;
+@foreign public const SQLITE_TRACE_CLOSE: i32;
+@foreign public const SQLITE_LIMIT_LENGTH: i32;
+@foreign public const SQLITE_LIMIT_SQL_LENGTH: i32;
+@foreign public const SQLITE_LIMIT_COLUMN: i32;
+@foreign public const SQLITE_LIMIT_EXPR_DEPTH: i32;
+@foreign public const SQLITE_LIMIT_COMPOUND_SELECT: i32;
+@foreign public const SQLITE_LIMIT_VDBE_OP: i32;
+@foreign public const SQLITE_LIMIT_FUNCTION_ARG: i32;
+@foreign public const SQLITE_LIMIT_ATTACHED: i32;
+@foreign public const SQLITE_LIMIT_LIKE_PATTERN_LENGTH: i32;
+@foreign public const SQLITE_LIMIT_VARIABLE_NUMBER: i32;
+@foreign public const SQLITE_LIMIT_TRIGGER_DEPTH: i32;
+@foreign public const SQLITE_LIMIT_WORKER_THREADS: i32;
+@foreign public const SQLITE_PREPARE_PERSISTENT: i32;
+@foreign public const SQLITE_PREPARE_NORMALIZE: i32;
+@foreign public const SQLITE_PREPARE_NO_VTAB: i32;
+@foreign public const SQLITE_PREPARE_DONT_LOG: i32;
+@foreign public const SQLITE_INTEGER: i32;
+@foreign public const SQLITE_FLOAT: i32;
+@foreign public const SQLITE_BLOB: i32;
+@foreign public const SQLITE_NULL: i32;
+@foreign public const SQLITE_TEXT: i32;
+@foreign public const SQLITE3_TEXT: i32;
+@foreign public const SQLITE_UTF8: i32;
+@foreign public const SQLITE_UTF16LE: i32;
+@foreign public const SQLITE_UTF16BE: i32;
+@foreign public const SQLITE_UTF16: i32;
+@foreign public const SQLITE_ANY: i32;
+@foreign public const SQLITE_UTF16_ALIGNED: i32;
+@foreign public const SQLITE_DETERMINISTIC: i32;
+@foreign public const SQLITE_DIRECTONLY: i32;
+@foreign public const SQLITE_SUBTYPE: i32;
+@foreign public const SQLITE_INNOCUOUS: i32;
+@foreign public const SQLITE_RESULT_SUBTYPE: i32;
+@foreign public const SQLITE_SELFORDER1: i32;
+@foreign public const SQLITE_STATIC: i32;
+@foreign public const SQLITE_TRANSIENT: i32;
+@foreign public const SQLITE_WIN32_DATA_DIRECTORY_TYPE: i32;
+@foreign public const SQLITE_WIN32_TEMP_DIRECTORY_TYPE: i32;
+@foreign public const SQLITE_TXN_NONE: i32;
+@foreign public const SQLITE_TXN_READ: i32;
+@foreign public const SQLITE_TXN_WRITE: i32;
+@foreign public const SQLITE_INDEX_SCAN_UNIQUE: i32;
+@foreign public const SQLITE_INDEX_SCAN_HEX: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_EQ: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_GT: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_LE: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_LT: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_GE: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_MATCH: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_LIKE: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_GLOB: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_REGEXP: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_NE: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_ISNOT: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_ISNOTNULL: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_ISNULL: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_IS: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_LIMIT: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_OFFSET: i32;
+@foreign public const SQLITE_INDEX_CONSTRAINT_FUNCTION: i32;
+@foreign public const SQLITE_MUTEX_FAST: i32;
+@foreign public const SQLITE_MUTEX_RECURSIVE: i32;
+@foreign public const SQLITE_MUTEX_STATIC_MAIN: i32;
+@foreign public const SQLITE_MUTEX_STATIC_MEM: i32;
+@foreign public const SQLITE_MUTEX_STATIC_MEM2: i32;
+@foreign public const SQLITE_MUTEX_STATIC_OPEN: i32;
+@foreign public const SQLITE_MUTEX_STATIC_PRNG: i32;
+@foreign public const SQLITE_MUTEX_STATIC_LRU: i32;
+@foreign public const SQLITE_MUTEX_STATIC_LRU2: i32;
+@foreign public const SQLITE_MUTEX_STATIC_PMEM: i32;
+@foreign public const SQLITE_MUTEX_STATIC_APP1: i32;
+@foreign public const SQLITE_MUTEX_STATIC_APP2: i32;
+@foreign public const SQLITE_MUTEX_STATIC_APP3: i32;
+@foreign public const SQLITE_MUTEX_STATIC_VFS1: i32;
+@foreign public const SQLITE_MUTEX_STATIC_VFS2: i32;
+@foreign public const SQLITE_MUTEX_STATIC_VFS3: i32;
+@foreign public const SQLITE_MUTEX_STATIC_MASTER: i32;
+@foreign public const SQLITE_TESTCTRL_FIRST: i32;
+@foreign public const SQLITE_TESTCTRL_PRNG_SAVE: i32;
+@foreign public const SQLITE_TESTCTRL_PRNG_RESTORE: i32;
+@foreign public const SQLITE_TESTCTRL_PRNG_RESET: i32;
+@foreign public const SQLITE_TESTCTRL_FK_NO_ACTION: i32;
+@foreign public const SQLITE_TESTCTRL_BITVEC_TEST: i32;
+@foreign public const SQLITE_TESTCTRL_FAULT_INSTALL: i32;
+@foreign public const SQLITE_TESTCTRL_BENIGN_MALLOC_HOOKS: i32;
+@foreign public const SQLITE_TESTCTRL_PENDING_BYTE: i32;
+@foreign public const SQLITE_TESTCTRL_ASSERT: i32;
+@foreign public const SQLITE_TESTCTRL_ALWAYS: i32;
+@foreign public const SQLITE_TESTCTRL_RESERVE: i32;
+@foreign public const SQLITE_TESTCTRL_JSON_SELFCHECK: i32;
+@foreign public const SQLITE_TESTCTRL_OPTIMIZATIONS: i32;
+@foreign public const SQLITE_TESTCTRL_ISKEYWORD: i32;
+@foreign public const SQLITE_TESTCTRL_GETOPT: i32;
+@foreign public const SQLITE_TESTCTRL_SCRATCHMALLOC: i32;
+@foreign public const SQLITE_TESTCTRL_INTERNAL_FUNCTIONS: i32;
+@foreign public const SQLITE_TESTCTRL_LOCALTIME_FAULT: i32;
+@foreign public const SQLITE_TESTCTRL_EXPLAIN_STMT: i32;
+@foreign public const SQLITE_TESTCTRL_ONCE_RESET_THRESHOLD: i32;
+@foreign public const SQLITE_TESTCTRL_NEVER_CORRUPT: i32;
+@foreign public const SQLITE_TESTCTRL_VDBE_COVERAGE: i32;
+@foreign public const SQLITE_TESTCTRL_BYTEORDER: i32;
+@foreign public const SQLITE_TESTCTRL_ISINIT: i32;
+@foreign public const SQLITE_TESTCTRL_SORTER_MMAP: i32;
+@foreign public const SQLITE_TESTCTRL_IMPOSTER: i32;
+@foreign public const SQLITE_TESTCTRL_PARSER_COVERAGE: i32;
+@foreign public const SQLITE_TESTCTRL_RESULT_INTREAL: i32;
+@foreign public const SQLITE_TESTCTRL_PRNG_SEED: i32;
+@foreign public const SQLITE_TESTCTRL_EXTRA_SCHEMA_CHECKS: i32;
+@foreign public const SQLITE_TESTCTRL_SEEK_COUNT: i32;
+@foreign public const SQLITE_TESTCTRL_TRACEFLAGS: i32;
+@foreign public const SQLITE_TESTCTRL_TUNE: i32;
+@foreign public const SQLITE_TESTCTRL_LOGEST: i32;
+@foreign public const SQLITE_TESTCTRL_USELONGDOUBLE: i32;
+@foreign public const SQLITE_TESTCTRL_LAST: i32;
+@foreign public const SQLITE_STATUS_MEMORY_USED: i32;
+@foreign public const SQLITE_STATUS_PAGECACHE_USED: i32;
+@foreign public const SQLITE_STATUS_PAGECACHE_OVERFLOW: i32;
+@foreign public const SQLITE_STATUS_SCRATCH_USED: i32;
+@foreign public const SQLITE_STATUS_SCRATCH_OVERFLOW: i32;
+@foreign public const SQLITE_STATUS_MALLOC_SIZE: i32;
+@foreign public const SQLITE_STATUS_PARSER_STACK: i32;
+@foreign public const SQLITE_STATUS_PAGECACHE_SIZE: i32;
+@foreign public const SQLITE_STATUS_SCRATCH_SIZE: i32;
+@foreign public const SQLITE_STATUS_MALLOC_COUNT: i32;
+@foreign public const SQLITE_DBSTATUS_LOOKASIDE_USED: i32;
+@foreign public const SQLITE_DBSTATUS_CACHE_USED: i32;
+@foreign public const SQLITE_DBSTATUS_SCHEMA_USED: i32;
+@foreign public const SQLITE_DBSTATUS_STMT_USED: i32;
+@foreign public const SQLITE_DBSTATUS_LOOKASIDE_HIT: i32;
+@foreign public const SQLITE_DBSTATUS_LOOKASIDE_MISS_SIZE: i32;
+@foreign public const SQLITE_DBSTATUS_LOOKASIDE_MISS_FULL: i32;
+@foreign public const SQLITE_DBSTATUS_CACHE_HIT: i32;
+@foreign public const SQLITE_DBSTATUS_CACHE_MISS: i32;
+@foreign public const SQLITE_DBSTATUS_CACHE_WRITE: i32;
+@foreign public const SQLITE_DBSTATUS_DEFERRED_FKS: i32;
+@foreign public const SQLITE_DBSTATUS_CACHE_USED_SHARED: i32;
+@foreign public const SQLITE_DBSTATUS_CACHE_SPILL: i32;
+@foreign public const SQLITE_DBSTATUS_MAX: i32;
+@foreign public const SQLITE_STMTSTATUS_FULLSCAN_STEP: i32;
+@foreign public const SQLITE_STMTSTATUS_SORT: i32;
+@foreign public const SQLITE_STMTSTATUS_AUTOINDEX: i32;
+@foreign public const SQLITE_STMTSTATUS_VM_STEP: i32;
+@foreign public const SQLITE_STMTSTATUS_REPREPARE: i32;
+@foreign public const SQLITE_STMTSTATUS_RUN: i32;
+@foreign public const SQLITE_STMTSTATUS_FILTER_MISS: i32;
+@foreign public const SQLITE_STMTSTATUS_FILTER_HIT: i32;
+@foreign public const SQLITE_STMTSTATUS_MEMUSED: i32;
+@foreign public const SQLITE_CHECKPOINT_PASSIVE: i32;
+@foreign public const SQLITE_CHECKPOINT_FULL: i32;
+@foreign public const SQLITE_CHECKPOINT_RESTART: i32;
+@foreign public const SQLITE_CHECKPOINT_TRUNCATE: i32;
+@foreign public const SQLITE_VTAB_CONSTRAINT_SUPPORT: i32;
+@foreign public const SQLITE_VTAB_INNOCUOUS: i32;
+@foreign public const SQLITE_VTAB_DIRECTONLY: i32;
+@foreign public const SQLITE_VTAB_USES_ALL_SCHEMAS: i32;
+@foreign public const SQLITE_ROLLBACK: i32;
+@foreign public const SQLITE_FAIL: i32;
+@foreign public const SQLITE_REPLACE: i32;
+@foreign public const SQLITE_SCANSTAT_NLOOP: i32;
+@foreign public const SQLITE_SCANSTAT_NVISIT: i32;
+@foreign public const SQLITE_SCANSTAT_EST: i32;
+@foreign public const SQLITE_SCANSTAT_NAME: i32;
+@foreign public const SQLITE_SCANSTAT_EXPLAIN: i32;
+@foreign public const SQLITE_SCANSTAT_SELECTID: i32;
+@foreign public const SQLITE_SCANSTAT_PARENTID: i32;
+@foreign public const SQLITE_SCANSTAT_NCYCLE: i32;
+@foreign public const SQLITE_SCANSTAT_COMPLEX: i32;
+@foreign public const SQLITE_SERIALIZE_NOCOPY: i32;
+@foreign public const SQLITE_DESERIALIZE_FREEONCLOSE: i32;
+@foreign public const SQLITE_DESERIALIZE_RESIZEABLE: i32;
+@foreign public const SQLITE_DESERIALIZE_READONLY: i32;
+// empty macro!!
+@foreign public const NOT_WITHIN: i32;
+@foreign public const PARTLY_WITHIN: i32;
+@foreign public const FULLY_WITHIN: i32;
+// empty macro!!
+@foreign public const FTS5_TOKENIZE_QUERY: i32;
+@foreign public const FTS5_TOKENIZE_PREFIX: i32;
+@foreign public const FTS5_TOKENIZE_DOCUMENT: i32;
+@foreign public const FTS5_TOKENIZE_AUX: i32;
+@foreign public const FTS5_TOKEN_COLOCATED: i32;

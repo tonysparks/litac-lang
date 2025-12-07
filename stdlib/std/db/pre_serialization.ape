@@ -1,0 +1,45 @@
+
+fn EmitDBFunctions(sym) {
+
+   // get the SQL insert statement
+   emit(
+    `
+    public func (this: *${sym.name}) getInsertStatement(db: *sqlite3, stmt: *sqlite3_stmt) : i32 {
+        return SQLITE_OK
+    }
+   `)
+
+   // get the SQL update statement
+   emit(
+    `
+    public func (this: *${sym.name}) getUpdateStatement(db: *sqlite3, stmt: *sqlite3_stmt) : i32 {
+        return SQLITE_OK
+    }
+   `)
+
+   // get the SQL query statement
+   emit(
+    `
+    public func (this: *${sym.name}) getQueryStatement(db: *sqlite3, stmt: *sqlite3_stmt) : i32 {
+        return SQLITE_OK
+    }
+   `)
+
+   return true
+}
+
+fn DBSymbols(sym) {
+   if(sym.kind == "STRUCT_DECL" || sym.kind == "ENUM_DECL") {
+      return EmitDBFunctions(sym)
+   }
+   return false
+}
+
+var symbols = getSymbolsByNote("table")
+for(sym in symbols) {
+   emitClear()
+
+   if(DBSymbols(sym)) {
+      addDeclaration(sym.moduleFilename, emitStr())
+   }
+}
