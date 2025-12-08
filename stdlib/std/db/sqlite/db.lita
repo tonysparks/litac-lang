@@ -23,6 +23,9 @@ public @note sql {
     query: *const char
 }
 
+public @note id {
+}
+
 /**
     Scan all symbols for Database related notes
 */

@@ -5,8 +5,17 @@ import "std/mem"
 import "std/mem/bucket_allocator"
 import "std/array"
 
-import using "std/db/sqlite"
-import using "std/db/orm"
+//import using "std/db/sqlite"
+//import using "std/db/orm"
+
+
+#precheck
+    "pre_serialization.ape"
+#end
+
+#postcheck
+    "post_serialization.ape"
+#end
 
 /*
 public @note table {

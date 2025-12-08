@@ -1,29 +1,137 @@
 
+fn getColumnName(field) {
+    if(field.notes) {
+        for(note in field.notes) {
+            if(note.name == "column") {
+                for(arg in note.arguments) {
+                    if(arg.name == "name") {
+                        return arg.value
+                    }
+                }
+            }
+        }
+    }
+    return field.name
+}
+
+fn getIdName(sym, fields) {
+    // TODO error if no @id ??
+    if(fields == null) {
+        error(`No fields defined for ${sym.name}`)
+        return null
+    }
+
+    var idField = null
+    for(field in fields) {
+        if(field.notes) {
+            for(note in field.notes) {
+                if(note.name == "id") {
+                    idField = field
+                    break
+                }
+            }
+        }
+    }
+
+    if(idField == null) {
+        error(`No @id field defined for ${sym.name}`)
+        return null
+    }
+
+    return getColumnName(idField)
+}
+
+
+fn getTableName(sym) {
+    var tableName = sym.name
+    if(sym.notes) {
+        for(note in sym.notes) {
+            if(note.name == "table") {
+                for(arg in note.arguments) {
+                    if(arg.name == "name") {
+                        return arg.value
+                    }
+                }
+            }
+        }
+    }
+    return tableName
+}
+
+
 fn EmitDBFunctions(sym) {
-
-   // get the SQL insert statement
-   emit(
-    `
-    public func (this: *${sym.name}) getInsertStatement(db: *sqlite3, stmt: *sqlite3_stmt) : i32 {
-        return SQLITE_OK
+    if(sym.kind != "STRUCT_DECL") {
+        return;
     }
-   `)
 
-   // get the SQL update statement
-   emit(
-    `
-    public func (this: *${sym.name}) getUpdateStatement(db: *sqlite3, stmt: *sqlite3_stmt) : i32 {
-        return SQLITE_OK
-    }
-   `)
+    var structDecl = sym.structDecl
 
-   // get the SQL query statement
-   emit(
-    `
-    public func (this: *${sym.name}) getQueryStatement(db: *sqlite3, stmt: *sqlite3_stmt) : i32 {
-        return SQLITE_OK
+    var tableName = getTableName(sym)
+    var idName = getIdName(sym, structDecl.fields)
+
+    // INSERT
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) getSqlInsert(): String {
+                return
+                    $"""
+                    INSERT INTO ${tableName}
+                    (`
+        )
+        emit(`\n`)
+        var isFirst = true
+        for(field in structDecl.fields) {
+            if(!isFirst) {
+                emit(`,\n`)
+            }
+            emit(`                        ${getColumnName(field)}`)
+            isFirst = false
+        }
+        emit(`\n                    ) VALUES (\n`)
+
+        isFirst = true
+        for(field in structDecl.fields) {
+            if(!isFirst) {
+                emit(`,\n`)
+            }
+            emit(`                        :${getColumnName(field)}`)
+            isFirst = false
+        }
+        emit(`\n                    );"""`)
+        emit(
+            `
+            }
+            `
+        )
     }
-   `)
+
+    // SELECT ONE
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) getSqlSelectOneById(): String {
+                return
+                    $"""
+                    SELECT`
+        )
+        emit(`\n`)
+        var isFirst = true
+        for(field in structDecl.fields) {
+            if(!isFirst) {
+                emit(`,\n`)
+            }
+            emit(`                        ${getColumnName(field)}`)
+            isFirst = false
+        }
+        emit(`\n                    FROM ${tableName} tmp`)
+        emit(`\n                    WHERE tmp.${idName} = :id;"""`)
+        emit(
+            `
+            }
+            `
+        )
+    }
 
    return true
 }
@@ -40,6 +148,7 @@ for(sym in symbols) {
    emitClear()
 
    if(DBSymbols(sym)) {
+      print(emitStr())
       addDeclaration(sym.moduleFilename, emitStr())
    }
 }
