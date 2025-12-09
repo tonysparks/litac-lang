@@ -316,6 +316,7 @@ func (this: *Preprocessor) typeInfoToApe(typeInfo: *TypeInfo) : ape_object_t {
         return ape_object_make_null()
     }
     var typeObj = ape_object_make_map(this.runtime.ape)
+    // TODO: Names are not fully qualified for non-primitives!!
     ape_object_set_map_value(typeObj, "name", ape_object_make_stringf(this.runtime.ape, "%.*s", typeInfo.name.length, typeInfo.name.buffer))
     ape_object_set_map_string(typeObj, "kind", TypeKindAsStr(typeInfo.kind))
     ape_object_set_map_bool(typeObj, "isPrimitive", IsPrimitive(typeInfo))
@@ -441,6 +442,9 @@ func (this: *Preprocessor) declToApe(sym: *Symbol) : ape_object_t {
                         // TODO: type and defaultExpr
                         if(varField.type && varField.type.typeInfo) {
                             var typeInfo = this.typeInfoToApe(varField.type.typeInfo)
+                            ape_object_set_map_value(fieldObj, "typeInfo", typeInfo)
+                        } else if(field.typeInfo) {
+                            var typeInfo = this.typeInfoToApe(field.typeInfo)
                             ape_object_set_map_value(fieldObj, "typeInfo", typeInfo)
                         }
 

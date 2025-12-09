@@ -14,7 +14,22 @@ fn getColumnName(field) {
     return field.name
 }
 
-fn getIdName(sym, fields) {
+fn getColumnType(field) {
+    if(field.notes) {
+        for(note in field.notes) {
+            if(note.name == "column") {
+                for(arg in note.arguments) {
+                    if(arg.name == "columnType") {
+                        return arg.value
+                    }
+                }
+            }
+        }
+    }
+    return null
+}
+
+fn getIdField(sym, fields) {
     // TODO error if no @id ??
     if(fields == null) {
         error(`No fields defined for ${sym.name}`)
@@ -26,21 +41,15 @@ fn getIdName(sym, fields) {
         if(field.notes) {
             for(note in field.notes) {
                 if(note.name == "id") {
-                    idField = field
-                    break
+                    return field
                 }
             }
         }
     }
 
-    if(idField == null) {
-        error(`No @id field defined for ${sym.name}`)
-        return null
-    }
-
-    return getColumnName(idField)
+    error(`No @id field defined for ${sym.name}`)
+    return null
 }
-
 
 fn getTableName(sym) {
     var tableName = sym.name
@@ -58,6 +67,57 @@ fn getTableName(sym) {
     return tableName
 }
 
+fn getColumnTypeDriverName(field) {
+    var result = getColumnType(field)
+    if(result != null) {
+        return result
+    }
+
+    var typeInfo = field.typeInfo
+    if(typeInfo == null) {
+        error(`TypeInfo is null for ${field}`)
+        println("Help!")
+        return null
+    }
+    if(typeInfo.isString) {
+        return "Text"
+    }
+
+    //if(typeInfo.isPrimitive || typeInfo.isEnum) {
+        //if(typeInfo.kind == "F64" || typeInfo.kind == "F32) {
+        //    return "Double"
+        //}
+        //if(typeInfo.kind == "I64") {
+        //    return "Int64"
+        //}
+        //return "Int32"
+    //}
+
+//    if(typeInfo.name == "std::builtin::String") {
+//        return "String"
+//    }
+//    if(typeInfo.name == "std::time::DateTime" ||
+//       typeInfo.name == "std::time::Date" ||
+//       typeInfo.name == "std::time::Time"
+//    ) {
+//        return "String"
+//    }
+
+    // TODO: Expose this thru API?
+    // TODO: UUID type
+    // TODO: JSON type
+    return "String"
+}
+
+fn isString(columnType) {
+    if(columnType == null) {
+        return false
+    }
+    if(columnType == "String" || columnType == "Text") {
+        return true
+    }
+    return false
+}
 
 fn EmitDBFunctions(sym) {
     if(sym.kind != "STRUCT_DECL") {
@@ -67,7 +127,8 @@ fn EmitDBFunctions(sym) {
     var structDecl = sym.structDecl
 
     var tableName = getTableName(sym)
-    var idName = getIdName(sym, structDecl.fields)
+    var idField = getIdField(sym, structDecl.fields)
+    var idName = getColumnName(idField)
 
     // INSERT
     {
@@ -133,12 +194,143 @@ fn EmitDBFunctions(sym) {
         )
     }
 
-   return true
+    // SELECT
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) getSqlSelect(): String {
+                return
+                    $"""
+                    SELECT`
+        )
+        emit(`\n`)
+        var isFirst = true
+        for(field in structDecl.fields) {
+            if(!isFirst) {
+                emit(`,\n`)
+            }
+            emit(`                        ${getColumnName(field)}`)
+            isFirst = false
+        }
+        emit(`\n                    FROM ${tableName} tmp"""`)
+        emit(
+            `
+            }
+            `
+        )
+    }
+
+    // DELETE ONE
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) getSqlDeleteOneById(): String {
+                return
+                    $"""
+                    DELETE`
+        )
+        emit(`\n`)
+        emit(`\n                    FROM ${tableName} tmp`)
+        emit(`\n                    WHERE tmp.${idName} = :id;"""`)
+        emit(
+            `
+            }
+            `
+        )
+    }
+
+    // DELETE
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) getSqlDelete(): String {
+                return
+                    $"""
+                    DELETE`
+        )
+        emit(`\n                    FROM ${tableName} tmp"""`)
+        emit(
+            `
+            }
+            `
+        )
+    }
+
+    // UPDATE ONE
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) getSqlUpdateOneById(): String {
+                return
+                    $"""
+                    UPDATE ${tableName}
+                    SET`
+        )
+        emit(`\n`)
+        var isFirst = true
+        for(field in structDecl.fields) {
+            if(!isFirst) {
+                emit(`,\n`)
+            }
+            emit(`                        ${getColumnName(field)} = :${getColumnName(field)}`)
+            isFirst = false
+        }
+        emit(`\n                    WHERE ${idName} = :id;"""`)
+        emit(
+            `
+            }
+            `
+        )
+    }
+
+    ////////////////////////////////////////
+    // API functions
+    ////////////////////////////////////////
+
+    // fromResultSet
+    emit(
+        `
+        public func (this: *${sym.name}) fromResultSet(
+            resultSet: *SqlResultSet,
+            fromIndex: i32,
+            sb: *StringBuilder
+        ) : i32 {
+            var len = 0
+        `
+    )
+
+    for(field in structDecl.fields) {
+        var columnType = getColumnTypeDriverName(field)
+        var columnName = getColumnName(field)
+        if(isString(columnType)) {
+            emit(
+                `
+                len = sb.append("s", resultSet.column${columnType}(fromIndex += 1))
+                this.${columnName} = sb.substring(sb.length - len, sb.length)
+                `
+            )
+        } else {
+            emit(
+                `
+                this.${columnName} = resultSet.column${columnType}(fromIndex += 1)
+                `
+            )
+        }
+    }
+
+    emit(
+        `
+            return fromIndex
+        }
+        `
+    )
+
+    return true
 }
 
 fn DBSymbols(sym) {
    if(sym.kind == "STRUCT_DECL" || sym.kind == "ENUM_DECL") {
-      return EmitDBFunctions(sym)
+      // return EmitDBFunctions(sym)
    }
    return false
 }
@@ -148,7 +340,7 @@ for(sym in symbols) {
    emitClear()
 
    if(DBSymbols(sym)) {
-      print(emitStr())
-      addDeclaration(sym.moduleFilename, emitStr())
+      //print(emitStr())
+      ///addDeclaration(sym.moduleFilename, emitStr())
    }
 }

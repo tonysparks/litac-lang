@@ -1603,8 +1603,8 @@ public struct fts5_api {
 @foreign public const SQLITE_INNOCUOUS: i32;
 @foreign public const SQLITE_RESULT_SUBTYPE: i32;
 @foreign public const SQLITE_SELFORDER1: i32;
-@foreign public const SQLITE_STATIC: i32;
-@foreign public const SQLITE_TRANSIENT: i32;
+@foreign public const SQLITE_STATIC: func(*void) : void;
+@foreign public const SQLITE_TRANSIENT: func(*void) : void;
 @foreign public const SQLITE_WIN32_DATA_DIRECTORY_TYPE: i32;
 @foreign public const SQLITE_WIN32_TEMP_DIRECTORY_TYPE: i32;
 @foreign public const SQLITE_TXN_NONE: i32;

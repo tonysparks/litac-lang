@@ -4,6 +4,7 @@ import "std/string"
 import "std/mem"
 import "std/mem/bucket_allocator"
 import "std/array"
+import "std/time"
 
 import "std/db/sqlite"
 //import "std/db/orm"
@@ -332,6 +333,20 @@ public func (this: *SqlStatement) bindString(index: i32, str: String, xDel: xDel
     return this.conn.error
 }
 
+public func (this: *SqlStatement) bindDateTime(index: i32, dateTime: DateTime, xDel: xDel = null) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var buffer:[64]char;
+    var dateString = StringBufferInit(buffer, 64, 0)
+    dateTime.isoFormat(&dateString)
+    var errorCode = sqlite3_bind_text(this.stmt, index, dateString.buffer, dateString.length, SQLITE_TRANSIENT)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
 public func (this: *SqlStatement) parameterCount() : i32 {
     return sqlite3_bind_parameter_count(this.stmt)
 }
@@ -438,6 +453,15 @@ public func (this: *SqlResultSet) columnText(column: i32) : *const char {
 
 public func (this: *SqlResultSet) columnString(column: i32) : String {
     return this.columnText(column).toString()
+}
+
+public func (this: *SqlResultSet) columnDateTime(column: i32) : DateTime {
+    var value = this.columnText(column).toString()
+    if(value.empty()) {
+        return DateTime{}
+    }
+
+    return DateTimeFromIso(value)
 }
 
 public func (this: *SqlResultSet) columnType(column: i32) : i32 {
