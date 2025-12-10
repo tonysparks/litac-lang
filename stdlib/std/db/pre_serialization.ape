@@ -73,31 +73,34 @@ fn getColumnTypeDriverName(field) {
         return result
     }
 
+    // TODO: the names are not fully qualified!!
     var typeInfo = field.typeInfo
     if(typeInfo == null) {
         error(`TypeInfo is null for ${field}`)
-        println("Help!")
         return null
     }
     if(typeInfo.isString) {
         return "Text"
     }
 
-    //if(typeInfo.isPrimitive || typeInfo.isEnum) {
-        //if(typeInfo.kind == "F64" || typeInfo.kind == "F32) {
-        //    return "Double"
-        //}
-        //if(typeInfo.kind == "I64") {
-        //    return "Int64"
-        //}
-        //return "Int32"
-    //}
+    if(typeInfo.isPrimitive || typeInfo.isEnum) {
+        if(typeInfo.kind == "F64" || typeInfo.kind == "F32") {
+            return "Double"
+        }
+        if(typeInfo.kind == "I64") {
+            return "Int64"
+        }
+        return "Int32"
+    }
 
 //    if(typeInfo.name == "std::builtin::String") {
 //        return "String"
 //    }
-//    if(typeInfo.name == "std::time::DateTime" ||
-//       typeInfo.name == "std::time::Date" ||
+      if(typeInfo.name == "DateTime") {
+        return "DateTime"
+      }
+
+//    if(typeInfo.name == "std::time::Date" ||
 //       typeInfo.name == "std::time::Time"
 //    ) {
 //        return "String"
@@ -135,33 +138,7 @@ fn EmitDBFunctions(sym) {
         emit(
             `
             public func (this: *${sym.name}) getSqlInsert(): String {
-                return
-                    $"""
-                    INSERT INTO ${tableName}
-                    (`
-        )
-        emit(`\n`)
-        var isFirst = true
-        for(field in structDecl.fields) {
-            if(!isFirst) {
-                emit(`,\n`)
-            }
-            emit(`                        ${getColumnName(field)}`)
-            isFirst = false
-        }
-        emit(`\n                    ) VALUES (\n`)
-
-        isFirst = true
-        for(field in structDecl.fields) {
-            if(!isFirst) {
-                emit(`,\n`)
-            }
-            emit(`                        :${getColumnName(field)}`)
-            isFirst = false
-        }
-        emit(`\n                    );"""`)
-        emit(
-            `
+                return $""
             }
             `
         )
@@ -172,23 +149,7 @@ fn EmitDBFunctions(sym) {
         emit(
             `
             public func (this: *${sym.name}) getSqlSelectOneById(): String {
-                return
-                    $"""
-                    SELECT`
-        )
-        emit(`\n`)
-        var isFirst = true
-        for(field in structDecl.fields) {
-            if(!isFirst) {
-                emit(`,\n`)
-            }
-            emit(`                        ${getColumnName(field)}`)
-            isFirst = false
-        }
-        emit(`\n                    FROM ${tableName} tmp`)
-        emit(`\n                    WHERE tmp.${idName} = :id;"""`)
-        emit(
-            `
+                return $""
             }
             `
         )
@@ -199,22 +160,7 @@ fn EmitDBFunctions(sym) {
         emit(
             `
             public func (this: *${sym.name}) getSqlSelect(): String {
-                return
-                    $"""
-                    SELECT`
-        )
-        emit(`\n`)
-        var isFirst = true
-        for(field in structDecl.fields) {
-            if(!isFirst) {
-                emit(`,\n`)
-            }
-            emit(`                        ${getColumnName(field)}`)
-            isFirst = false
-        }
-        emit(`\n                    FROM ${tableName} tmp"""`)
-        emit(
-            `
+                return $""
             }
             `
         )
@@ -225,15 +171,7 @@ fn EmitDBFunctions(sym) {
         emit(
             `
             public func (this: *${sym.name}) getSqlDeleteOneById(): String {
-                return
-                    $"""
-                    DELETE`
-        )
-        emit(`\n`)
-        emit(`\n                    FROM ${tableName} tmp`)
-        emit(`\n                    WHERE tmp.${idName} = :id;"""`)
-        emit(
-            `
+                return $""
             }
             `
         )
@@ -244,13 +182,7 @@ fn EmitDBFunctions(sym) {
         emit(
             `
             public func (this: *${sym.name}) getSqlDelete(): String {
-                return
-                    $"""
-                    DELETE`
-        )
-        emit(`\n                    FROM ${tableName} tmp"""`)
-        emit(
-            `
+                return $""
             }
             `
         )
@@ -261,23 +193,7 @@ fn EmitDBFunctions(sym) {
         emit(
             `
             public func (this: *${sym.name}) getSqlUpdateOneById(): String {
-                return
-                    $"""
-                    UPDATE ${tableName}
-                    SET`
-        )
-        emit(`\n`)
-        var isFirst = true
-        for(field in structDecl.fields) {
-            if(!isFirst) {
-                emit(`,\n`)
-            }
-            emit(`                        ${getColumnName(field)} = :${getColumnName(field)}`)
-            isFirst = false
-        }
-        emit(`\n                    WHERE ${idName} = :id;"""`)
-        emit(
-            `
+                return $""
             }
             `
         )
@@ -288,49 +204,30 @@ fn EmitDBFunctions(sym) {
     ////////////////////////////////////////
 
     // fromResultSet
-    emit(
-        `
-        public func (this: *${sym.name}) fromResultSet(
-            resultSet: *SqlResultSet,
-            fromIndex: i32,
-            sb: *StringBuilder
-        ) : i32 {
-            var len = 0
-        `
-    )
-
-    for(field in structDecl.fields) {
-        var columnType = getColumnTypeDriverName(field)
-        var columnName = getColumnName(field)
-        if(isString(columnType)) {
-            emit(
-                `
-                len = sb.append("s", resultSet.column${columnType}(fromIndex += 1))
-                this.${columnName} = sb.substring(sb.length - len, sb.length)
-                `
-            )
-        } else {
-            emit(
-                `
-                this.${columnName} = resultSet.column${columnType}(fromIndex += 1)
-                `
-            )
-        }
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) fromResultSet(
+                resultSet: *SqlResultSet,
+                fromIndex: i32,
+                sb: *StringBuilder
+            ) : i32 {
+                return 0
+            }
+            `
+        )
     }
 
-    emit(
-        `
-            return fromIndex
-        }
-        `
-    )
+    // bindId
+    {
+    }
 
     return true
 }
 
 fn DBSymbols(sym) {
    if(sym.kind == "STRUCT_DECL" || sym.kind == "ENUM_DECL") {
-      // return EmitDBFunctions(sym)
+      return EmitDBFunctions(sym)
    }
    return false
 }
@@ -340,7 +237,6 @@ for(sym in symbols) {
    emitClear()
 
    if(DBSymbols(sym)) {
-      //print(emitStr())
-      ///addDeclaration(sym.moduleFilename, emitStr())
+      addDeclaration(sym.moduleFilename, emitStr())
    }
 }

@@ -7,7 +7,9 @@ import "std/libc"
 
 import "std/db"
 import "std/db/sqlite"
+import "std/db/sqlite/db"
 
+/*
 public struct Team {
     id: i64
     name: String
@@ -120,7 +122,7 @@ public func (this: *Team) bindValues(
     stmt.bindString(index += 1, this.city)
     stmt.bindString(index += 1, this.state)
 }
-
+*/
 
 // ---------------------------------------------------------
 // ORM API
@@ -206,6 +208,8 @@ public func (this: *SqlConnection) queryMany<T>(
         index += 1
     }
 
+    var sb = StringBuilderInit(1024, this.allocator)
+
     var resultSet = SqlResultSet{}
     stmt.execute(&resultSet)
 
@@ -213,7 +217,7 @@ public func (this: *SqlConnection) queryMany<T>(
         result.add(T{})
 
         var row = result.lastPtr()
-        row.fromResultSet(&resultSet, -1, this.allocator)
+        row.fromResultSet(&resultSet, -1, &sb)
     }
 
     stmt.reset()
@@ -247,8 +251,9 @@ public func (this: *SqlConnection) queryOneById<T, ID>(
         }
     }
 
+    var sb = StringBuilderInit(1024, this.allocator)
     resultSet.next()
-    result.fromResultSet(&resultSet, -1, this.allocator)
+    result.fromResultSet(&resultSet, -1, &sb)
 
     return this.error
 }
@@ -291,6 +296,38 @@ public func (this: *SqlConnection) insertMany<T>(
             inserts += 1
         }
         stmt.reset()
+    }
+
+    return inserts
+}
+
+public func (this: *SqlConnection) insertOne<T>(
+    item: *T
+) : i32 {
+
+    if (this.hasError()) return 0
+
+    // TODO: Cache these prepared statements per entity type
+    var stmt = SqlStatement{}
+    defer stmt.close()
+
+    var sb = StringBuilderInit(1024, this.allocator)
+
+    var insert = item.getSqlInsert()
+    sb.append("%.*s",
+        insert.length, insert.buffer
+    )
+
+    this.prepare(
+        &stmt,
+        sb.toString()
+    )
+
+    item.bindValues(&stmt)
+
+    var inserts = 0
+    if (stmt.step() == SQLITE_DONE) {
+        inserts += 1
     }
 
     return inserts
