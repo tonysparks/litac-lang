@@ -130,22 +130,14 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
         }
     }
 
-    // allow for preprocessor scripts to create new declarations/symbols
-    // if they are created at this stage, we must do this before resolving
-    // all symbols
-    var isIncrementalBuild: bool = (root.flags & ModuleFlags.INCREMENTAL_COMPILATION) > 0
-    this.lita.preprocessor.preResolveSymbols(this, isIncrementalBuild)
-
     // if we have instrumentation enabled, we'll want to instrument all
     // functions at this stage, prior to resolving symbols
     if(this.lita.options.instrument && !this.lita.result.hasErrors()) {
         Instrument(this.lita, this)
     }
 
-    this.resolveSymbols()
-
-    // allow for creating more symbols after initial resolving of symbols
-    this.lita.preprocessor.postResolveSymbols(this, isIncrementalBuild)
+    var isIncrementalBuild: bool = (root.flags & ModuleFlags.INCREMENTAL_COMPILATION) > 0
+    this.resolveSymbols(isIncrementalBuild)
 
     // Generate trait wrappers
     if(!(flags & TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)) {
@@ -757,7 +749,7 @@ err:
 }
 
 
-func (this: *TypeChecker) resolveSymbols() {
+func (this: *TypeChecker) resolveSymbols(isIncrementalBuild: bool) {
 
     {   // Start resolving the symbol types
         for(var i = 0; i < this.symbolTypes.size(); i += 1) {
@@ -765,11 +757,18 @@ func (this: *TypeChecker) resolveSymbols() {
             this.resolveSymbol(symbol)
         }
 
+
         for(var i = 0; i < this.symbolTypes.size(); i += 1) {
             var symbol = this.symbolTypes.get(i)
             this.finishResolveSymbol(symbol)
         }
+
     }
+
+    // allow for preprocessor scripts to create new declarations/symbols
+    // if they are created at this stage, we must do this before resolving
+    // all symbols
+    this.lita.preprocessor.preResolveSymbols(this, isIncrementalBuild)
 
     {   // Resolve functions
         for(var i = 0; i < this.symbolFuncs.size(); i += 1) {
@@ -777,6 +776,7 @@ func (this: *TypeChecker) resolveSymbols() {
             this.resolveSymbol(symbol)
         }
     }
+
 
 
     {   // Resolve variables
@@ -792,6 +792,9 @@ func (this: *TypeChecker) resolveSymbols() {
             this.finishResolveSymbol(symbol)
         }
     }
+
+    // allow for creating more symbols after initial resolving of symbols
+    this.lita.preprocessor.postResolveSymbols(this, isIncrementalBuild)
 
 }
 

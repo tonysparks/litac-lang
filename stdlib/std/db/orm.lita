@@ -207,8 +207,7 @@ public func (this: *SqlConnection) queryMany<T>(
         }
         index += 1
     }
-
-    var sb = StringBuilderInit(1024, this.allocator)
+    var output = StringBuilderInit(1024, this.allocator)
 
     var resultSet = SqlResultSet{}
     stmt.execute(&resultSet)
@@ -217,7 +216,7 @@ public func (this: *SqlConnection) queryMany<T>(
         result.add(T{})
 
         var row = result.lastPtr()
-        row.fromResultSet(&resultSet, -1, &sb)
+        row.fromResultSet(&resultSet, -1, &output)
     }
 
     stmt.reset()
