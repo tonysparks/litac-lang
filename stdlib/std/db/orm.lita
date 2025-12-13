@@ -9,121 +9,6 @@ import "std/db"
 import "std/db/sqlite"
 import "std/db/sqlite/db"
 
-/*
-public struct Team {
-    id: i64
-    name: String
-    city: String
-    state: String
-}
-
-public func (this: *Team) getSqlSelectOneById() : String {
-    return
-        $"""
-        SELECT
-            t.id,
-            t.name,
-            t.city,
-            t.state
-        FROM team t
-        WHERE t.id = :ID
-        """
-}
-
-public func (this: *Team) getSqlSelect() : String {
-    return
-        $"""
-        SELECT
-            t.id,
-            t.name,
-            t.city,
-            t.state
-        FROM team t
-        """
-}
-
-public func (this: *Team) getSqlInsert() : String {
-    return
-        $"""
-        INSERT INTO team
-            (name, city, state)
-        VALUES
-            (:name, :city, :state);
-        """
-}
-
-public func (this: *Team) getSqlDeleteOneById() : String {
-    return
-        $"""
-        DELETE
-        FROM team
-        WHERE id = :id;
-        """
-}
-
-public func (this: *Team) getSqlDelete() : String {
-    return
-        $"""
-        DELETE
-        FROM team
-        """
-}
-
-
-public func (this: *Team) getSqlUpdateOneById() : String {
-    return
-        $"""
-        UPDATE team
-        SET
-            name = ?,
-            city = ?,
-            state = ?
-        WHERE
-            id = :id;
-        """
-}
-
-public func (this: *Team) fromResultSet(
-    resultSet: *SqlResultSet,
-    fromIndex: i32,
-    allocator: *const Allocator
-) : i32 {
-    this.id = resultSet.columnInt64(fromIndex += 1)
-
-    var sb = StringBuilderInit(1024, allocator)
-    var len = 0
-
-    len = sb.append("%s", resultSet.columnString(fromIndex += 1))
-    this.name = sb.substring(sb.length - len, sb.length)
-
-    len = sb.append("%s", resultSet.columnString(fromIndex += 1))
-    this.city = sb.substring(sb.length - len, sb.length)
-
-    len = sb.append("%s", resultSet.columnString(fromIndex += 1))
-    this.state = sb.substring(sb.length - len, sb.length)
-
-    return fromIndex
-}
-
-public func (this: *Team) bindId(
-    stmt: *SqlStatement,
-    id: i64,
-    fromIndex: i32
-) : i32 {
-    stmt.bindInt64(fromIndex += 1, id)
-    return fromIndex
-}
-
-public func (this: *Team) bindValues(
-    stmt: *SqlStatement
-) {
-    var index = 0
-    stmt.bindString(index += 1, this.name)
-    stmt.bindString(index += 1, this.city)
-    stmt.bindString(index += 1, this.state)
-}
-*/
-
 // ---------------------------------------------------------
 // ORM API
 // ---------------------------------------------------------
@@ -132,14 +17,15 @@ public func (this: *SqlConnection) queryMany<T>(
     result: *Array<T>,
     where: String,
     $...
-) : SqlResult {
+) : i32 {
 
-    if (this.hasError()) return this.error
+    if (this.hasError()) return 0
 
     // TODO: Cache these prepared statements per entity type
     var stmt = SqlStatement{}
     defer stmt.close()
 
+    // TODO: Handler memory much better!
     var sb = StringBuilderInit(1024, this.allocator)
     defer sb.free()
 
@@ -219,15 +105,13 @@ public func (this: *SqlConnection) queryMany<T>(
         row.fromResultSet(&resultSet, -1, &output)
     }
 
-    stmt.reset()
-
-    return this.error
+    return result.size()
 }
 
 public func (this: *SqlConnection) queryOneById<T, ID>(
     result: *T,
     id: ID
-) : SqlResult {
+) : i32 {
     // TODO: Cache these prepared statements per entity type
     var stmt = SqlStatement{}
     defer stmt.close()
@@ -243,18 +127,14 @@ public func (this: *SqlConnection) queryOneById<T, ID>(
     stmt.execute(&resultSet)
 
     if (!resultSet.hasNext()) {
-        return SqlResult {
-            .type = SqlResultType.OK,
-            .category = SqlResultCategory.EMPTY_RESULTS,
-            .description = $"Empty result"
-        }
+        return 0
     }
 
     var sb = StringBuilderInit(1024, this.allocator)
     resultSet.next()
     result.fromResultSet(&resultSet, -1, &sb)
 
-    return this.error
+    return 1
 }
 
 
@@ -401,7 +281,6 @@ public func (this: *SqlConnection) deleteById<T, ID>(
     return deletes
 }
 
-/*
 public func (this: *SqlConnection) deleteMany<T>(
     entities: *Array<T>
 ) : i32 {
@@ -425,12 +304,93 @@ public func (this: *SqlConnection) deleteMany<T>(
         sb.toString()
     )
 
-    resultType.bindId(&stmt, id, 0)
-
     var deletes = 0
-    if (stmt.step() == SQLITE_DONE) {
-        deletes += 1
+    for(var i = 0; i < entities.size(); i+=1) {
+        var row = entities.get(i)
+        row.bindIdValue(&stmt, 0)
+
+        if (stmt.step() == SQLITE_DONE) {
+            deletes += 1
+        }
+        stmt.reset()
     }
 
     return deletes
-}*/
+}
+
+
+/* ---------------------------------------------------
+   Update
+------------------------------------------------------ */
+
+public func (this: *SqlConnection) updateOne<T>(
+    entity: *T
+) : i32 {
+
+    if (this.hasError() || entity == null) return 0
+
+    // TODO: Cache these prepared statements per entity type
+    var stmt = SqlStatement{}
+    defer stmt.close()
+
+    var sb = StringBuilderInit(1024, this.allocator)
+
+    var updateSql = entity.getSqlUpdateOneById()
+    sb.append("%.*s",
+        updateSql.length, updateSql.buffer
+    )
+
+    this.prepare(
+        &stmt,
+        sb.toString()
+    )
+
+    var index = entity.bindValues(&stmt)
+    entity.bindIdValue(&stmt, index)
+
+    var updates = 0
+    if (stmt.step() == SQLITE_DONE) {
+        updates += 1
+    }
+
+    return updates
+}
+
+public func (this: *SqlConnection) updateMany<T>(
+    entities: *Array<T>
+) : i32 {
+
+    if (this.hasError() || entities == null || entities.empty()) return 0
+
+    // TODO: Cache these prepared statements per entity type
+    var stmt = SqlStatement{}
+    defer stmt.close()
+
+    var sb = StringBuilderInit(1024, this.allocator)
+
+    var entity = T{}
+    var updateSql = entity.getSqlUpdateOneById()
+    sb.append("%.*s",
+        updateSql.length, updateSql.buffer
+    )
+
+    this.prepare(
+        &stmt,
+        sb.toString()
+    )
+
+    var updates = 0
+    for(var i = 0; i < entities.size(); i+=1) {
+        var row = entities.get(i)
+
+        var index = row.bindValues(&stmt)
+        row.bindIdValue(&stmt, index)
+
+        if (stmt.step() == SQLITE_DONE) {
+            updates += 1
+        }
+        stmt.reset()
+    }
+
+    return updates
+}

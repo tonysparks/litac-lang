@@ -370,13 +370,29 @@ fn EmitDBFunctions(sym) {
         )
     }
 
+    // bindIdValue
+    {
+        var idFieldColumnType = idField.type
+        emit(
+            `
+            public func (this: *${sym.name}) bindIdValue(
+                stmt: *SqlStatement,
+                fromIndex: i32
+            ) : i32 {
+                stmt.bind${idFieldColumnType}(fromIndex += 1, this.${idField.name})
+                return fromIndex
+            }
+            `
+        )
+    }
+
     // bindValues
     {
         emit(
             `
             public func (this: *${sym.name}) bindValues(
                 stmt: *SqlStatement
-            ) {
+            ) : i32 {
                 var index = 0
             `
         )
@@ -398,6 +414,7 @@ fn EmitDBFunctions(sym) {
         }
         emit(
             `
+                return index
             }
             `
         )
