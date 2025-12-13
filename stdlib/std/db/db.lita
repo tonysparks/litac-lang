@@ -13,10 +13,6 @@ import "std/array"
     "pre_serialization.ape"
 #end
 
-#postcheck
-    "post_serialization.ape"
-#end
-
 /*
 public @note table {
     schema: *const char
