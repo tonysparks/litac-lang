@@ -400,38 +400,7 @@ public func (this: *Preprocessor) drainQueue() {
                     if(sym) {
                         // mark that this symbol was created from the pre-processor
                         sym.flags |= SymbolFlags.IS_FROM_PREPROCESSOR
-
-                        for(var it = module.importedBy.iter(); it.hasNext();) {
-                            var entry = it.next()
-                            var imp = entry.value
-
-                            imp.module.importModuleSymbol(
-                                decl.startPos,
-                                module,
-                                imp.alias,
-                                sym,
-                                sym.name,
-                                imp.isUsing
-                            )
-
-                            // if this was imported with using, make sure its
-                            // dependencies get the new symbol
-                            if(imp.isUsing) {
-                                for(var it = imp.module.importedBy.iter(); it.hasNext();) {
-                                    var entry = it.next()
-                                    var impUsing = entry.value
-
-                                    impUsing.module.importModuleSymbol(
-                                        decl.startPos,
-                                        imp.module,
-                                        impUsing.alias,
-                                        sym,
-                                        sym.name,
-                                        impUsing.isUsing
-                                    )
-                                }
-                            }
-                        }
+                        module.importPostGeneratedSymbol(sym)
 
                         if(context.resolveSymbols) {
                             context.checker.resolveSymbol(sym)

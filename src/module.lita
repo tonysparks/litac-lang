@@ -157,8 +157,8 @@ public func GetBuiltinSymbol(typeid: Typeid) : *Symbol {
 
 public func NewModule(lita: *Lita,
                       packageName: String,
-                      filename: *const char) : *Module {
-
+                      filename: *const char
+) : *Module {
     var mod = new<Module>(lita.allocator)
     mod.init(lita)
     mod.id.fromFile(lita, packageName, filename)
@@ -454,6 +454,40 @@ public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
     }
     else {
         this.symbols.importSymbol(importSrcPos, symName, symbol)
+    }
+}
+
+public func (this: *Module) importPostGeneratedSymbol(sym: *Symbol) {
+    for(var it = this.importedBy.iter(); it.hasNext();) {
+        var entry = it.next()
+        var imp = entry.value
+
+        imp.module.importModuleSymbol(
+            sym.decl.startPos,
+            this,
+            imp.alias,
+            sym,
+            sym.name,
+            imp.isUsing
+        )
+
+        // if this was imported with using, make sure its
+        // dependencies get the new symbol
+        if(imp.isUsing) {
+            for(var it = imp.module.importedBy.iter(); it.hasNext();) {
+                var entry = it.next()
+                var impUsing = entry.value
+
+                impUsing.module.importModuleSymbol(
+                    sym.decl.startPos,
+                    imp.module,
+                    impUsing.alias,
+                    sym,
+                    sym.name,
+                    impUsing.isUsing
+                )
+            }
+        }
     }
 }
 

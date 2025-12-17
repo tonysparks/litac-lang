@@ -2342,6 +2342,17 @@ func (p: *Parser) funcPtrType() : *TypeSpec {
                 }
             }
             else {
+                // Allow for parameter names
+                var rewind = p.current
+                if(p.match(TokenType.IDENTIFIER)) {
+                    // this might not be a parameter name, instead
+                    // be part of a type name, so if there is no
+                    // colon after, rewind so we can parse this as a type
+                    if(!p.match(TokenType.COLON)) {
+                        p.current = rewind
+                    }
+                }
+
                 var arg = p.type(false)
                 if(!arg) {
                     goto err;

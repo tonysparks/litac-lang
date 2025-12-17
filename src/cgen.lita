@@ -360,9 +360,6 @@ func (this: using *CGen) emitTraitForwardDecls() {
 
 
 func (this: using *CGen) emitTraitDecls() {
-    var root = this.lita.programSymbols.root
-    assert(root != null)
-
     var interfaceImpls = this.lita.programSymbols.interfaceImpls
     for(var it = interfaceImpls.iter(); it.hasNext();) {
         var entry = it.next()
@@ -371,20 +368,10 @@ func (this: using *CGen) emitTraitDecls() {
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
         var traitName = this.cTypeName(traitSym.type)
-        var module = root
 
         // we put all generated trait tables in the root module, so therefore we have to manually
         // name mangle the vtable name
-        var vtableName = [MAX_SYMBOL_NAME]char;
-        var vtableNameStr = StringBufferInit(vtableName, MAX_SYMBOL_NAME, 0)
-        var escapedName = this.escapeNameStr(traitSym.name)
-        vtableNameStr.format("%s%.*s__%.*s",
-            this.options.cPrefix,
-            module.id.name.length,
-            module.id.name.buffer,
-            escapedName.length,
-            escapedName.buffer)
-
+        var vtableName = this.getVTableName(traitSym)
         // Generate Casting functions;
         // we generate the casting functions in C code and not in lita
         // code because the Trait itself doesn't have a 'vtable' or 'this'
@@ -397,7 +384,7 @@ func (this: using *CGen) emitTraitDecls() {
                 var implName = this.cTypeName(implSym.type)
                 this.emit("%s %s__to__%s(%s* x) {", traitName, implName, traitName, implName)
                 this.emit("return (%s) {", traitName)
-                this.emit(".__vtable = %s__vtables[%d],\n", vtableNameStr.cStr(), i)
+                this.emit(".__vtable = %.*s__vtables[%d],\n", vtableName.length, vtableName.buffer, i)
                 this.emit(".__this = x")
                 this.emitStrn("}", 1)
                 this.emitStrn(";\n", 2)
@@ -405,6 +392,28 @@ func (this: using *CGen) emitTraitDecls() {
             }
         }
     }
+}
+
+public func (this: using *CGen) getVTableName(sym: *Symbol) : String {
+    var root = this.lita.programSymbols.root
+    assert(root != null)
+
+    // we put all generated trait tables in the root module, so therefore we have to manually
+    // name mangle the vtable name
+    var vtableName = [MAX_SYMBOL_NAME]char;
+    var vtableNameStr = StringBufferInit(vtableName, MAX_SYMBOL_NAME, 0)
+    var name = sym.qualifiedName
+    var module = root
+
+    vtableNameStr.format("%s%.*s__%.*s",
+        this.options.cPrefix,
+        module.id.packageName.length,
+        module.id.packageName.buffer,
+        name.length,
+        name.buffer
+    )
+    var escapedName = this.escapeNameChars(vtableNameStr.cStr())
+    return escapedName
 }
 
 public func (this: using *CGen) emitTraitCast(expr: *Expr) : bool {
@@ -515,7 +524,7 @@ public func (this: using *CGen) escapeNameStr(name: InternedString) : String {
     }
 }
 
-func (this: using *CGen) escapeNameChars(name: *const char) : String {
+internal func (this: using *CGen) escapeNameChars(name: *const char) : String {
     var sb = StringBuilderInit(256, this.allocator)
     EscapeName(name, name.length(), sb)
     return String {
@@ -1008,6 +1017,7 @@ public func (this: using *CGen) cName(sym: *Symbol) : *const char {
     sb.appendStrn(packageName.buffer, packageName.length)
     sb.appendStrn("__", 2)
     sb.appendStrn(declName.buffer, declName.length)
+
     return sb.cStrConst()
 }
 

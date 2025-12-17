@@ -301,6 +301,32 @@ public func (this: *TypeChecker) checkAssignability(
                 this.result.addErrorStr(src, sb)
                 return false
             }
+        } else {
+            var aggInfo = b.getBaseType()
+            var missingMethods = ArrayInit<FieldStmt>(16, this.allocator)
+            if(!aggInfo.implementsTrait(aTrait, this, &missingMethods)) {
+                sb.appendStrn("'", 1)
+                b.toString(sb)
+                sb.appendStr("' can't be assigned to trait '")
+                a.toString(sb)
+                sb.appendStrn("'", 1)
+
+                sb.appendStr("; as it doesn't implement all of '")
+                a.toString(sb)
+                sb.appendStr("' trait methods, could not match:\n")
+
+                for(var i = 0; i < missingMethods.size(); i+=1) {
+                    var field = missingMethods.get(i)
+                    assert(field.kind == StmtKind.TRAIT_FIELD_DECL)
+
+                    sb.append("    %s: ", field.traitField.decl.name.token.asString())
+                    field.typeInfo.toString(sb, true)
+                    sb.appendStrn("\n", 1)
+                }
+
+                this.result.addErrorStr(src, sb)
+                return false
+            }
         }
     }
 
@@ -1088,7 +1114,11 @@ func GetTypeFromModule(module: *Module, typeName: InternedString, searchType: Se
     return type
 }
 
-public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInfo) : bool {
+public func (this: *TypeChecker) implementsTrait(
+    agg: *TypeInfo,
+    iface: *TypeInfo,
+    missingMethods: *Array<FieldStmt> = null
+) : bool {
     assert(agg != null)
     assert(iface != null)
 
@@ -1130,6 +1160,7 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
         var functionName = field.traitField.decl.name.token.asString()
         var traitFn = field.typeInfo
 
+        var found = false
         for(var index = 0; index < numOfMethods; index += 1) {
             var sym = symbols[index]
             var str = sym.name.view
@@ -1145,9 +1176,14 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
             if(str.substring(start + 1, end).equalsString(functionName)) {
                 if(IsFuncImpl(traitFn, sym.type, this)) {
                     matchedCount += 1
+                    found = true
                     break;
                 }
             }
+        }
+
+        if(missingMethods && !found) {
+            missingMethods.add(field)
         }
     }
 
@@ -1163,7 +1199,6 @@ public func (this: *TypeChecker) implementsTrait(agg: *TypeInfo, iface: *TypeInf
 
     return isImpl
 }
-
 
 func (this: *TypeChecker) resolveNoteTypeSpec(spec: *TypeSpec) : *TypeInfo {
     if(!spec) {
