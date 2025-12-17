@@ -1,0 +1,708 @@
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/mem"
+import "std/mem/bucket_allocator"
+import "std/array"
+import "std/time"
+import "std/libc"
+
+import "std/db/sqlite"
+import "std/db"
+
+
+public typedef func(*void) : void as xDel;
+
+// passed in xDel means SQLite will manage the lifecyle - calling
+//  the callback for deletion
+// SQLITE_TRANSIENT means SQLite will copy the input
+// SQLITE_STATIC means we are responsible for the input
+
+public struct SqliteConnection {
+    db: *sqlite3
+    error: SqlResult
+    allocator: *const Allocator
+}
+
+public struct SqliteStatement {
+    conn: *SqliteConnection
+    stmt: *sqlite3_stmt
+    results: SqliteResultSet
+}
+
+
+public struct SqliteResultSet {
+    stmt: *SqliteStatement
+    status: i32
+    checkError: bool
+}
+
+public func Connect(
+    filename: *const char,
+    conn: *SqliteConnection,
+    flags: i32 = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+    enableWAL: bool = true,
+    allocator: *const Allocator = defaultAllocator
+) : SqlResult {
+    conn.allocator = allocator
+    //conn.errors = ArrayInit<SqlResult>(16, allocator)
+    conn.error = SqlResult {
+        .type = SqlResultType.OK,
+        .description = $""
+    }
+
+    var errorCode = sqlite3_open_v2(filename, &conn.db, flags, null)
+    if (errorCode != SQLITE_OK) {
+        conn.error = CreateError(conn, null, errorCode)
+    }
+
+    return enableWAL ? conn.enableWAL() : conn.error
+}
+
+public func ConnectReadOnly(
+    filename: *const char,
+    conn: *SqliteConnection,
+    flags: i32 = 0,
+    allocator: *const Allocator = defaultAllocator
+) : SqlResult {
+    return Connect(
+        filename,
+        conn,
+        .flags = SQLITE_OPEN_READONLY | flags,
+        .allocator = allocator
+    )
+}
+
+
+
+// -----------------------------------------------------------------
+// Connection
+//------------------------------------------------------------------
+
+public func (this: *SqliteConnection) close(): SqlResult {
+    var errorCode = sqlite3_close(this.db)
+    this.error = CreateError(this, null, errorCode)
+    return this.error
+}
+
+public func (this: *SqliteConnection) lastError() : String {
+    return this.error.description
+}
+
+public func (this: *SqliteConnection) lastResult() : SqlResult {
+    return this.error
+}
+
+public func (this: *SqliteConnection) hasError() : bool {
+    return this.error.isError()
+}
+
+public func (this: *SqliteConnection) clearError() : void {
+    this.error = SqlResult {
+        .type = SqlResultType.OK,
+        .errorCode = SQLITE_OK,
+        .description = $"OK"
+    }
+}
+
+public func (this: *SqliteConnection) execute(sql: *const char) : SqlResult {
+    if (this.hasError()) return this.error
+
+    var error: *char = null
+
+    var errorCode = sqlite3_exec(this.db, sql, null, null, &error)
+    if (errorCode != SQLITE_OK) {
+        this.error = CreateError(this, null, errorCode, error)
+    }
+
+    return this.error
+}
+
+func CreateError(
+    conn: *SqliteConnection,
+    stmt: *sqlite3_stmt,
+    errorCode: i32,
+    error: *const char = null
+) : SqlResult {
+    if(errorCode == SQLITE_OK) {
+        return SqlResult {
+            .type = SqlResultType.OK,
+            .errorCode = errorCode,
+            .description = $"OK"
+        }
+    }
+
+    if(errorCode == SQLITE_DONE) {
+        return SqlResult {
+            .type = SqlResultType.OK,
+            .errorCode = errorCode,
+            .description = $"DONE"
+        }
+    }
+
+    if(errorCode == SQLITE_ROW) {
+        return SqlResult {
+            .type = SqlResultType.OK,
+            .errorCode = errorCode,
+            .description = $"ROW"
+        }
+    }
+
+    var sb = StringBuilderInit(1024, conn.allocator)
+    var e = sqlite3_extended_errcode(conn.db)
+    sb.append("SQLite errorcode '%d' (%s): %s",
+        e,
+        sqlite3_errstr(e),
+        error ? error : sqlite3_errmsg(conn.db)
+    )
+
+    if (stmt != null) {
+        var sql = sqlite3_expanded_sql(stmt)
+        defer sqlite3_free(sql as (*void))
+
+        sb.append("\n%s", sql)
+    }
+
+    return SqlResult {
+        .type = SqlResultType.ERROR,
+        .errorCode = errorCode,
+        .description = sb.toString()
+    }
+}
+
+public func (this: *SqliteConnection) enableWAL() : SqlResult {
+    return this.execute("PRAGMA journal_mode=WAL;")
+}
+
+public func (this: *SqliteConnection) disableWAL() : SqlResult {
+    return this.execute("PRAGMA journal_mode=DELETE;")
+}
+
+public func (this: *SqliteConnection) begin() : SqlResult {
+    return this.execute("BEGIN TRANSACTION;")
+}
+
+public func (this: *SqliteConnection) commit() : SqlResult  {
+    return this.execute("COMMIT;")
+}
+
+public func (this: *SqliteConnection) rollback() : SqlResult  {
+    return this.execute("ROLLBACK;")
+}
+
+public func (this: *SqliteConnection) prepare(statement: *SqlStatement, sql: String) : SqlResult  {
+    if (this.hasError()) return this.error
+
+    var stmt = new<SqliteStatement>(this.allocator)
+    if(stmt == null) {
+        this.error = SqlResult {
+            .type = SqlResultType.ERROR,
+            .category = SqlResultCategory.OUT_OF_MEMORY,
+            .errorCode = -1,
+            .description = $"out of memory"
+        }
+        return this.error
+    }
+
+    stmt.conn = this
+    stmt.results.stmt = stmt
+    stmt.results.status = 0
+    stmt.results.checkError = false;
+    *statement = stmt
+
+    var errorCode = sqlite3_prepare_v2(this.db, sql.buffer, sql.length, &stmt.stmt, null)
+    this.error = CreateError(this, stmt.stmt, errorCode)
+
+    return this.error
+}
+
+public func (this: *SqliteConnection) release(stmt: *SqlStatement): SqlResult {
+    if(stmt == null) return this.error
+
+    stmt.close()
+    var mem = stmt.__this
+    this.allocator.free(mem)
+
+    return this.error
+}
+
+
+// -----------------------------------------------------------------
+// Statement
+//------------------------------------------------------------------
+
+
+public func (this: *SqliteStatement) bindBlob(index: i32, data: *const void, size: i32) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_blob(this.stmt, index, data, size, SQLITE_STATIC)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindBlob64(index: i32, data: *const void, size: u64) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_blob64(this.stmt, index, data, size, SQLITE_STATIC)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindFloat64(index: i32, value: f64) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_double(this.stmt, index, value)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindInt32(index: i32, value: i32) : SqlResult {
+    if (this.conn.hasError()) {
+        return this.conn.error
+    }
+
+    var errorCode = sqlite3_bind_int(this.stmt, index, value)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindInt64(index: i32, value: i64) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_int64(this.stmt, index, value)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindNull(index: i32) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_null(this.stmt, index)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindPointer(index: i32, ptr: *void, type: *const char) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_pointer(this.stmt, index, ptr, type, SQLITE_STATIC)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindText(index: i32, data: *const char, len: i32) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_text(this.stmt, index, data, len, SQLITE_STATIC)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindText64(index: i32, data: *const char, len: u64, enc: u8) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_text64(this.stmt, index, data, len, SQLITE_STATIC, enc)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindString(index: i32, str: String) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_bind_text(this.stmt, index, str.buffer, str.length, SQLITE_STATIC)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) bindDateTime(index: i32, dateTime: DateTime) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var buffer:[64]char;
+    var dateString = StringBufferInit(buffer, 64, 0)
+    dateTime.isoFormat(&dateString)
+
+    var errorCode = sqlite3_bind_text(this.stmt, index, dateString.buffer, dateString.length, SQLITE_TRANSIENT)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) parameterCount() : i32 {
+    return sqlite3_bind_parameter_count(this.stmt)
+}
+
+public func (this: *SqliteStatement) parameterName(index: i32) : *const char {
+    return sqlite3_bind_parameter_name(this.stmt, index)
+}
+
+public func (this: *SqliteStatement) parameterIndex(name: *const char) : i32 {
+    return sqlite3_bind_parameter_index(this.stmt, name)
+}
+
+public func (this: *SqliteStatement) clearBindings() : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_clear_bindings(this.stmt)
+    this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) step() : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_step(this.stmt)
+    this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) reset() : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    this.results.status = 0
+    this.results.checkError = false
+
+    var errorCode = sqlite3_reset(this.stmt)
+    this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) finalize() : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    var errorCode = sqlite3_finalize(this.stmt)
+    this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) close() : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    this.results.status = 0
+    this.results.checkError = false
+
+    var errorCode = sqlite3_finalize(this.stmt)
+    this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) execute(resultSet: *SqlResultSet) : SqlResult {
+    *resultSet = &this.results
+
+    if (this.conn.hasError()) {
+        return this.conn.error
+    }
+
+    this.results.status = SQLITE_ROW
+    this.results.checkError = false
+
+    return this.conn.error
+}
+
+// -----------------------------------------------------------------
+// Result Set
+//------------------------------------------------------------------
+
+public func (this: *SqliteResultSet) hasNext() : bool {
+    if (this.stmt.conn.hasError()) return false
+    if (this.status == SQLITE_ROW) {
+        this.status = sqlite3_step(this.stmt.stmt)
+        if (this.status != SQLITE_ROW && this.status != SQLITE_DONE) {
+            this.checkError = true
+        }
+    }
+
+    return (this.status == SQLITE_ROW || this.checkError)
+}
+
+public func (this: *SqliteResultSet) next() : SqlResult {
+    if (this.stmt.conn.hasError()) return this.stmt.conn.error
+
+    this.checkError = false
+
+    defer if (this.status != SQLITE_ROW) {
+        sqlite3_reset(this.stmt.stmt)
+    }
+
+    if (!(this.status == SQLITE_ROW || this.status == SQLITE_DONE)) {
+        this.stmt.conn.error = CreateError(this.stmt.conn, this.stmt.stmt, this.status)
+    }
+
+    return this.stmt.conn.error
+}
+
+public func (this: *SqliteResultSet) columnCount() : i32 {
+    return sqlite3_data_count(this.stmt.stmt)
+}
+
+public func (this: *SqliteResultSet) columnBlob(column: i32) : *const void {
+    return sqlite3_column_blob(this.stmt.stmt, column)
+}
+
+public func (this: *SqliteResultSet) columnDouble(column: i32) : f64 {
+    return sqlite3_column_double(this.stmt.stmt, column)
+}
+
+public func (this: *SqliteResultSet) columnInt32(column: i32) : i32 {
+    return sqlite3_column_int(this.stmt.stmt, column)
+}
+
+public func (this: *SqliteResultSet) columnInt64(column: i32) : i64 {
+    return sqlite3_column_int64(this.stmt.stmt, column)
+}
+
+public func (this: *SqliteResultSet) columnText(column: i32) : *const char {
+    return sqlite3_column_text(this.stmt.stmt, column) as (*const char)
+}
+
+public func (this: *SqliteResultSet) columnString(column: i32) : String {
+    return this.columnText(column).toString()
+}
+
+public func (this: *SqliteResultSet) columnDateTime(column: i32) : DateTime {
+    var value = this.columnText(column).toString()
+    if(value.empty()) {
+        return DateTime{}
+    }
+
+    return DateTimeFromIso(value)
+}
+
+public func (this: *SqliteResultSet) columnType(column: i32) : SqlColumnType {
+    var type = sqlite3_column_type(this.stmt.stmt, column)
+    switch(type) {
+        case SQLITE_INTEGER:
+            return SqlColumnType.INT
+        case SQLITE_FLOAT:
+            return SqlColumnType.DOUBLE
+        case SQLITE_TEXT:
+            return SqlColumnType.TEXT
+        case SQLITE_BLOB:
+            return SqlColumnType.BLOB
+        case SQLITE_NULL:
+            return SqlColumnType.NULL
+        default:
+            return SqlColumnType.UNKNOWN
+    }
+}
+
+/*
+import "std/libc"
+import "std/assert"
+
+@test
+func testDatabase() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqlConnection{};
+    defer conn.close()
+
+    Connect(
+        "teams.db",
+        &conn,
+        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+        true,
+        &allocator.allocator
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS team (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL
+        );
+        """
+    )
+
+    conn.begin()
+    conn.execute(
+        """
+        INSERT INTO
+            team (name, city, state)
+        VALUES
+            ('Green Bay Packers', 'Green Bay', 'WI'),
+            ('Chicago Bears', 'Chicago', 'IL'),
+            ('Minnesota Vikings', 'Minneapolis', 'MN'),
+            ('Detroit Lions', 'Detroit', 'MI');
+        """
+    )
+
+    if(conn.commit().isError()) {
+        var error = conn.lastError()
+        printf("Database error: '%.*s', rolling back\n", error.length, error.buffer)
+        conn.rollback()
+    }
+
+    // Query By ORM for one
+    {
+        var packers = Team{}
+        var result = conn.queryOneById(&packers, 1)
+
+        if (result.isEmptyResults()) {
+            printf("QueryOneById returned no results.\n")
+        } else if (result.isOk()) {
+            printf(
+                "QueryOneById:%ld name: '%.*s', city: '%.*s', state: '%.*s'\n",
+                packers.id,
+                packers.name.length, packers.name.buffer,
+                packers.city.length, packers.city.buffer,
+                packers.state.length, packers.state.buffer
+            )
+        } else {
+            printf("Error retrieving QueryOneById: %.*s\n",
+                result.description.length, result.description.buffer
+            )
+        }
+    }
+
+    // Query using raw SQL
+    {
+        var stmt = SqlStatement{}
+        defer stmt.close()
+
+        conn.prepare(
+            &stmt,
+            $"""
+                SELECT
+                    t.id,
+                    t.name,
+                    t.state,
+                    t.city
+                FROM team t
+                WHERE t.state = :STATE
+            """
+        )
+
+        var attempts = 0
+        var results = SqlResultSet{}
+        do {
+
+            stmt.bindString(1, $"WI")
+            stmt.execute(results)
+
+            var i = 0
+            while(results.hasNext()) {
+                results.next()
+
+                printf(
+                    "%3d) id: %ld name: '%s', city: '%s', state: '%s'\n",
+                    i += 1,
+                    results.columnInt64(0),
+                    results.columnText(1),
+                    results.columnText(2),
+                    results.columnText(3)
+                )
+            }
+
+            stmt.reset()
+            attempts += 1
+        } while(attempts < 0);
+    }
+
+    // Query via ORM for Many
+    {
+        printf("Query by queryMany\n")
+        var teams = ArrayInit<Team>(16, &allocator.allocator)
+        conn.queryMany(
+            &teams,
+            .where = $"state = :STATE and city = ?",
+            $"WI", "Green Bay"
+        )
+        printf("Results: %d\n", teams.size())
+
+        for(var i = 0; i < teams.size(); i+=1) {
+            var t = teams.getPtr(i)
+            printf("Team: id:%ld name: '%.*s' city: '%.*s' state: '%.*s'\n",
+                t.id,
+                t.name.length, t.name.buffer,
+                t.city.length, t.city.buffer,
+                t.state.length, t.state.buffer
+            )
+        }
+    }
+
+    // Insert via ORM many
+    {
+        var buc = Team {
+            .name = $"Buccaneers",
+            .city = $"Tampa Bay",
+            .state = $"FL",
+        }
+
+        var falcons = Team {
+            .name = $"Falcons",
+            .city = $"Atlanta",
+            .state = $"GA",
+        }
+
+        var newTeams = ArrayInit<Team>(2, &allocator.allocator)
+        newTeams.add(buc)
+        newTeams.add(falcons)
+
+        var numOfInserts = conn.insertMany(newTeams)
+        printf("Inserted: %d\n", numOfInserts)
+
+        var readTeams = ArrayInit<Team>(16, &allocator.allocator)
+        conn.queryMany(
+            &readTeams,
+            .where = $"state in (?, ?)",
+            $"GA", $"FL"
+        )
+
+        for(var i = 0; i < readTeams.size(); i+=1) {
+            var t = readTeams.getPtr(i)
+            printf("Team: id:%ld name: '%.*s' city: '%.*s' state: '%.*s'\n",
+                t.id,
+                t.name.length, t.name.buffer,
+                t.city.length, t.city.buffer,
+                t.state.length, t.state.buffer
+            )
+
+            var deleted = conn.deleteOne(t)
+                //conn.deleteById<Team, i64>(t.id)
+            printf("Deleted: %d\n", deleted)
+        }
+    }
+
+    if(conn.hasError()) {
+        var error = conn.lastError()
+        printf("Database error: '%.*s'\n", error.length, error.buffer)
+        conn.rollback()
+    }
+
+}*/
