@@ -6,8 +6,6 @@ import "std/mem"
 import "std/libc"
 
 import "std/db"
-// import "std/db/sqlite"
-// import "std/db/sqlite/sqlite_db"
 
 // ---------------------------------------------------------
 // ORM API
