@@ -26,10 +26,6 @@ public @note json {
     "pre_serialization.ape"
 #end
 
-#postcheck
-    "post_serialization.ape"
-#end
-
 public func DefaultMakePtrFn(type: typeid, context: *JsonContext, json: *JsonNode) : *void {
     return null;
 }

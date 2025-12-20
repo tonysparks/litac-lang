@@ -2,8 +2,10 @@
 import "std/libc"
 import "std/assert"
 import "std/string/buffer"
+import "std/string/builder"
 import "std/string"
-
+import "std/io"
+import "std/mem"
 
 @raw("""
 #include <stdlib.h>
@@ -367,6 +369,10 @@ public func GetArch() : Arch {
 
 public func GetEnv(varName: *const char) : *char {
     return getenv(varName)
+}
+
+public func SetEnv(varName: *const char, value: *const char) {
+    _SetEnv(varName, value)
 }
 
 /** TODO: Move these to IO packages... */
@@ -857,6 +863,41 @@ public func (this: *Process) close() {
     if(this.pipe) pclose(this.pipe)
 }
 
+
+@doc("""
+    returns a negative number if there was an error, otherwise returns the
+    number of environment variables loaded ( >= 0 )
+""")
+public func LoadEnv(
+    envFile: *const char,
+    allocator: *const Allocator = defaultAllocator
+) : i32 {
+    var sb = StringBuilderInit(1024, allocator)
+    defer sb.free()
+
+    var status = ReadFileFully(
+        envFile,
+        &sb
+    )
+    if(status != FileStatus.Ok) {
+        return -1
+    }
+
+    var result = 0
+    var lines = sb.toString().split($"\n")
+    while(lines.hasNext()) {
+        var line = lines.next()
+        if(line.startsWith($"#")) {
+            continue
+        }
+        var name = line.substringOf($"=").trim()
+        var value = line.substringOfAfter($"=").trim()
+        SetEnv(name.toCStr(allocator), value.toCStr(allocator))
+        result += 1
+    }
+
+    return result
+}
 
 /**
     tests

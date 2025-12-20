@@ -390,9 +390,10 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
             paramsNode.startPos,
             &checker.current.typeSpecAllocator
         )
+        var paramValue = $"std::coroutine::Continuation"
         contParamType.base = NewNameTypeSpecIntern(
             paramsNode.startPos,
-            context.strings.internString($"std::coroutine::Continuation"),
+            context.strings.internString(paramValue),
             &checker.current.typeSpecAllocator
         )
 
@@ -532,6 +533,8 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
                     var returnStmt = &node.returnStmt
                     assert(returnStmt.expr != null)
 
+                    var idName = $"std::coroutine::ContinuationResult"
+                    var ok = $"OK"
                     var originalExpr = returnStmt.expr.asNode()
                     returnStmt.expr = &NewGetExpr(
                         originalExpr.startPos, originalExpr.endPos,
@@ -539,7 +542,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
                             originalExpr.startPos, originalExpr.endPos,
                             NewNameTypeSpecIntern(
                                 originalExpr.startPos,
-                                context.strings.internString(&$"std::coroutine::ContinuationResult"),
+                                context.strings.internString(idName),
                                 &checker.current.typeSpecAllocator
                             ),
                             context.allocator
@@ -548,7 +551,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
                             originalExpr.startPos, originalExpr.endPos,
                             NewNameTypeSpecIntern(
                                 originalExpr.startPos,
-                                context.strings.internString(&$"OK"),
+                                context.strings.internString(ok),
                                 &checker.current.typeSpecAllocator
                             ),
                             context.allocator
@@ -560,12 +563,12 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
                 case StmtKind.FUNC_CALL_EXPR: {
                     var funcCallExpr = &node.funcCallExpr
 
-
+                    var idName = $"std::coroutine::Continuation"
                     var contParam = &NewInitExpr(
                         node.startPos, node.endPos,
                         NewNameTypeSpecIntern(
                             node.startPos,
-                            context.strings.internString(&$"std::coroutine::Continuation"),
+                            context.strings.internString(idName),
                             &checker.current.typeSpecAllocator
                         ),
                         Array<*InitArgExpr>{},
@@ -614,9 +617,10 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
     // Convert return to ContinuationResult
     {
         if(funcDecl.returnType != null) {
+            var resultName = $"std::coroutine::ContinuationResult"
             funcDecl.returnType = NewNameTypeSpecIntern(
                 funcDecl.getStartPos(),
-                context.strings.internString(&$"std::coroutine::ContinuationResult"),
+                context.strings.internString(resultName),
                 &checker.current.typeSpecAllocator
             )
 

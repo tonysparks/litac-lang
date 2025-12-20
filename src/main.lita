@@ -244,7 +244,8 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         }
         else {
             // we optionally can provide an input file for pkg* commands
-            if(parser.args.size() > 1 && pkgCmd != PkgCommand.PKG_RUN) {
+            var hasInputFile = (pkgCmd != PkgCommand.PKG_RUN || parser.hasOption("run"))
+            if(parser.args.size() > 1 && hasInputFile) {
                 GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
                 if(!FileExists(options.inputFile)) {
                     printf("Could not find '%s'\n", options.inputFile)

@@ -74,6 +74,9 @@ func QueryPerformanceFrequency(freq: *LARGE_INTEGER) : bool;
 @foreign
 func QueryPerformanceCounter(time: *LARGE_INTEGER);
 
+@foreign
+func _putenv_s(key: *const char, value: *const char) : i32;
+
 var systemFreq: f64;
 var systemStart: u64 = 0;
 
@@ -114,6 +117,11 @@ public func _CurrentWorkingPath() : *const char {
 public func _GetFullPathName(fileName: *const char, output: [MAX_PATH]char) : *char {
     GetFullPathNameA(fileName, MAX_PATH, output, null);
     return output
+}
+
+@inline
+public func _SetEnv(varName: *const char, value: *const char) {
+    _putenv_s(varName, value)
 }
 
 @inline

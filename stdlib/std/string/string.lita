@@ -56,6 +56,15 @@ public func (b: String) substringOf(str: String) : String {
     return b.substring(0, index)
 }
 
+public func (b: String) substringOfAfter(str: String) : String {
+    var index = b.indexOf(str)
+    if(index < 0) {
+        return String{}
+    }
+
+    return b.substring(index + str.length)
+}
+
 public func (b: String) startsWith(prefix: String, fromIndex: i32 = 0) : bool {
     if(prefix.length < 1) {
         return false
@@ -374,6 +383,9 @@ public func (b: String) get(index: i32) : char {
     return b.buffer[index]
 }
 
+public func (b: String) toCStr(allocator: *const mem::Allocator = mem::defaultAllocator) : *char {
+    return StringClone(b.buffer, b.length, allocator)
+}
 
 
 public func StringClone(original: *const char, len: i32 = -1, allocator: *const mem::Allocator = mem::defaultAllocator) : *char {

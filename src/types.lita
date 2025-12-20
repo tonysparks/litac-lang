@@ -630,10 +630,11 @@ public func (this: *TypeInfo) toString(sb: *StringBuilder, fullyQualify: bool = 
         case TypeKind.TRAIT:
         case TypeKind.ENUM: {
             if(fullyQualify && this.sym) {
-                var name = this.sym.declared.id.packageName
-                sb.append("%.*s::", name.length, name.buffer)
+                var name = this.sym.qualifiedName
+                sb.append("%.*s", name.length, name.buffer)
+            } else {
+                sb.appendStrn(this.name.buffer, this.name.length)
             }
-            sb.appendStrn(this.name.buffer, this.name.length)
             break;
         }
         case TypeKind.STR: {
@@ -2334,7 +2335,11 @@ not_found:
     }
 }
 
-public func (this: *TypeInfo) implementsTrait(iface : *TypeInfo, checker: *TypeChecker) : bool {
+public func (this: *TypeInfo) implementsTrait(
+    iface : *TypeInfo,
+    checker: *TypeChecker,
+    missingMethods: *Array<FieldStmt> = null
+) : bool {
     if(!IsAggregateLike(iface)) {
         return false
     }
@@ -2344,7 +2349,7 @@ public func (this: *TypeInfo) implementsTrait(iface : *TypeInfo, checker: *TypeC
         return false
     }
 
-    return checker.implementsTrait(this, aggIface)
+    return checker.implementsTrait(this, aggIface, missingMethods)
 }
 
 public typedef i64 as Typeid;

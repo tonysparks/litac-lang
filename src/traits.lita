@@ -120,7 +120,8 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
             traitName,
             sb,
             traitFieldBuffer,
-            impls)
+            impls
+        )
 
         GenerateVTableEntries(
             checker,
@@ -128,7 +129,8 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
             traitName,
             sb,
             traitFieldBuffer,
-            impls)
+            impls
+        )
     }
 
     // printf("Traits Source: \n%s\n", sb.cStr())
@@ -141,7 +143,8 @@ func GenerateVTable(
         traitSym: *Symbol,
         traitDecl: *AggregateDecl,
         traitName: String,
-        sb: *StringBuilder) {
+        sb: *StringBuilder
+) {
     sb.append("@hidden struct %.*s__VirtualTable", traitName.length, traitName.buffer)
     sb.append(" {\n")
 
@@ -232,12 +235,12 @@ func GenerateWrapperFunctions(
                     sb.append("    var __this = this as (*%.*s", implName.length, implName.buffer)
                 }
                 else {
-                    var moduleName = implSym.declared.id.name
-                    sb.append("    var __this = this as (*%.*s::%.*s",
-                        moduleName.length, moduleName.buffer,
-                        implName.length, implName.buffer)
+                    var name = implSym.qualifiedName
+                    sb.append("    var __this = this as (*%.*s",
+                        name.length, name.buffer
+                    )
                 }
-                PrintGenericArgs(implSym.genericArgs, sb)
+                // PrintGenericArgs(implSym.genericArgs, sb)
                 sb.append(")\n")
 
                 if(fn.returnType.kind != TypeKind.VOID) {
@@ -355,14 +358,16 @@ func FindSymbolByTypeid(symbols: Array<*Symbol>, id: Typeid) : *Symbol {
 func GetTraitName(traitSym: *Symbol, sb: *StringBuilder) : String {
 
     // if this isn't a generic generated trait, just use the symbol name
-    if(!(traitSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
-        return traitSym.name.view
-    }
+    // if(!(traitSym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
+    //     return traitSym.name.view
+    // }
+
+    var name = traitSym.qualifiedName
 
     sb.clear()
 
     // otherwise, we have to calculate the new name using the generic type arguments
-    EscapeName(traitSym.name.buffer, traitSym.name.length, sb)
+    EscapeName(name.buffer, name.length, sb)
 
     return String {
         .buffer = sb.buffer,

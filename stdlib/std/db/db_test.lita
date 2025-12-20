@@ -1,0 +1,106 @@
+
+import "std/libc"
+import "std/db/sqlite"
+
+func callback(notUsed: *void, argc: i32, argv: **char, azColName: **char) : i32 {
+    for (var i = 0; i < argc; i+=1) {
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] as (*const char) : "NULL");
+    }
+    printf("\n");
+    return 0;
+}
+
+@table(
+    .name = "team"
+)
+public struct Team {
+    @id
+    @column
+    id: i64
+
+    @column
+    name: String
+
+    @column
+    city: String
+
+    @column
+    state: String
+}
+
+@test
+func test_db() {
+    var db: *sqlite3 = null
+    var err_msg: *char = null
+
+    if (sqlite3_open(":memory:", &db)) {
+        printf("Error: %s\n", sqlite3_errmsg(db))
+        return 1
+    }
+
+      var sql_create =
+        """
+        CREATE TABLE IF NOT EXISTS team (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL
+        );
+        """
+
+
+    if (sqlite3_exec(db, sql_create, null, null, &err_msg) != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
+        return 1;
+    }
+
+       // Insert some NFL teams
+    var sql_insert =
+        """
+        INSERT INTO
+            team (name, city, state)
+        VALUES
+            ('Green Bay Packers', 'Green Bay', 'WI'),
+            ('Chicago Bears', 'Chicago', 'IL'),
+            ('Minnesota Vikings', 'Minneapolis', 'MN'),
+            ('Detroit Lions', 'Detroit', 'MI');
+        """
+
+    if (sqlite3_exec(db, sql_insert, null, null, &err_msg) != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
+        return 1;
+    }
+
+    var packers: Team
+    packers.query(db) // get one
+
+    var teams: Array<Team>
+    teams.query(db)
+
+    var repo = TeamRepoInit(db)
+    repo.queryOne()
+    repo.queryMany()
+    repo.deleteOne()
+    repo.deleteMany()
+
+    // Query for Green Bay Packers
+    var sql_query =
+        """
+            SELECT name, city, state
+            FROM team
+            WHERE name = 'Green Bay Packers';
+        """
+
+    printf("Querying for Green Bay Packers:\n");
+    if (sqlite3_exec(db, sql_query, callback, null, &err_msg) != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", err_msg);
+        sqlite3_free(err_msg);
+    }
+
+    sqlite3_close(db);
+    return 0
+}

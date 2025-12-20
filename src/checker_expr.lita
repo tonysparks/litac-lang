@@ -323,15 +323,15 @@ func (this: *TypeChecker) coerceFuncArg(
         return true
     }
 
-    if((!IsAggregateLike(paramInfo) && !IsEnum(argInfo)) || IsTraitLike(paramInfo)) {
-        return true
-    }
-
     argExpr = this.coerceTypeWithUsing(argExpr, argInfo, paramInfo)
     argInfo = argExpr.operand.typeInfo
 
     var needsAddressOf = (IsPtrAggregate(paramInfo) && (!IsPtrAggregate(argInfo) && argInfo.kind != TypeKind.NULL)) ||
                          (IsPtr(paramInfo) && (!IsPtr(argInfo) && IsEnum(argInfo)))
+
+    if(IsTraitLike(paramInfo) && !needsAddressOf) {
+        return true
+    }
 
     // promote the argument to a pointer
     if(needsAddressOf) {
