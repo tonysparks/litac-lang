@@ -235,7 +235,11 @@ func (this: *PackageManager) buildCommandArgs(
 
         if(this.options.litaOptions.testsOnly && runType == RunType.BUILD) {
             programArgs.add("-testDir")
-            programArgs.add("./test/")
+            if(this.options.litaOptions.srcPath.empty()) {
+                programArgs.add("./test/")
+            } else {
+                programArgs.add(this.options.litaOptions.srcPath)
+            }
 
             if(this.options.litaOptions.testsRegex) {
                 programArgs.add("-test")

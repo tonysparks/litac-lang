@@ -1,4 +1,6 @@
 import "std/mem"
+import "std/assert"
+import "std/libc"
 
 public typedef func(*Continuation) : ContinuationResult as SuspendFunction;
 
@@ -25,13 +27,65 @@ public struct Continuation {
 
 
 public struct Dispatcher {
-
+    allocator: *const Allocator
 }
 
-public func (this: *Dispatcher) submit(co: *Continuation) {
+public func (this: *Dispatcher) submit(
+    fn: SuspendFunction,
+    stack: *void,
+    allocator: *const Allocator = null
+) {
+    var cont = Continuation {
+        .context = ContinuationContext {
+            .allocator = allocator != null ? allocator : this.allocator,
+            .dispatcher = this
+        },
+        .parent = null,
+        .stack = stack,
+        .callback = fn,
+    }
 
+    // TODO: place on worker queue
+    var result = fn(&cont)
+    printf("First result: %d\n", result)
+    if (result == ContinuationResult.OK) {
+        result = fn(&cont)
+        printf("Second result: %d\n", result)
+    }
+    printf("Done result: %d\n", result)
 }
 
-public func (this: *Dispatcher) async(co: *Continuation) {
+/*
+ Problem, when resolving adder, we expect subber to have Cont param
+ but subber isn't patched/resolved yet!
 
+ Need to determine if suspend is on the function during forward declarations
+ in createDecl!!
+*/
+
+@suspend
+func adder(a: i32, b: i32) : i32 {
+    var r = subber(a, 1)
+   //var r = a
+    return r + b
+}
+
+@suspend
+func subber(a: i32, b: i32) : i32 {
+    return a - b
+}
+
+@test
+func testLaunchCoroutine() {
+    var dispatcher = Dispatcher{}
+    var stack = adder__CoroutineStack{
+        .__a__1 = 4,
+        .__b__1 = 2
+    }
+    var coroutine = adder__Coroutine
+    dispatcher.submit(coroutine, &stack)
+    printf("Result: %d\n", stack.__result__0)
+    //assert(stack.__result__0 == 6)
+    //future.cancel()
+    //future.await()
 }

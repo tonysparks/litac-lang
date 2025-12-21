@@ -628,6 +628,45 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 goto err;
             }
 
+            if(sym.flags & SymbolFlags.IS_COROUTINE) {
+                var index = 0
+                if(isMethod) {
+                    index+=1
+                }
+
+                var paramsNode = funcDecl.params.asNode()
+                var contParamType = NewTypeSpec(
+                    TypeSpecKind.PTR,
+                    paramsNode.startPos,
+                    &this.current.typeSpecAllocator
+                )
+                var paramValue = $"std::coroutine::Continuation"
+                contParamType.base = NewNameTypeSpecIntern(
+                    paramsNode.startPos,
+                    this.lita.strings.internString(paramValue),
+                    &this.current.typeSpecAllocator
+                )
+
+                var coParamNode = NewParameterDecl(
+                    paramsNode.startPos, paramsNode.endPos,
+                    NewIdentifier(
+                        "__cont",
+                        paramsNode.startPos,
+                        this.lita.strings
+                    ),
+                    contParamType,
+                    null,
+                    false,
+                    this.allocator
+                )
+
+                var coParam = &coParamNode.paramDecl
+                funcDecl.params.insertAt(
+                    index,
+                    coParam
+                )
+            }
+
             if(!funcDecl.genericParams.empty()) {
                 sym.flags |= SymbolFlags.IS_GENERIC_TEMPLATE
                 this.genericTemplates.add(sym)
@@ -1735,7 +1774,6 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             labelName.defined = false
 
             this.numOfLabels += 1
-
             return true;
         }
         case StmtKind.IF_STMT: {

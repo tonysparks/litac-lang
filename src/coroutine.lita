@@ -224,7 +224,8 @@ func GenerateCoroutineWrapper(
 ) {
     sb.append("@hidden func %.*s__Coroutine(cont: *Continuation) : ContinuationResult {\n", coName.length, coName.buffer)
     sb.append("    var stack = cont.stack as (*%.*s__CoroutineStack)\n", coName.length, coName.buffer)
-    sb.append("    return %.*s(cont\n", coName.length, coName.buffer)
+    sb.append("    stack.____cont__1 = cont\n")
+    sb.append("    return %.*s(\n", coName.length, coName.buffer)
 
     var stack = coSym.coroutine
     assert(stack != null)
@@ -235,6 +236,7 @@ func GenerateCoroutineWrapper(
     if(!stack.scopes.empty()) {
         var funcDecl = decl as (*FuncDecl)
         var params = &funcDecl.params.params
+        var isFirst = true
         for(var i = 0; i < params.size(); i+=1) {
             var param = params.get(i)
 
@@ -244,10 +246,16 @@ func GenerateCoroutineWrapper(
                 continue
             }
 
-            sb.append("        , stack.__%.*s__%d",
+            var comma = ' '
+            if(!isFirst) {
+                comma = ','
+            }
+            sb.append("        %c stack.__%.*s__%d",
+                comma,
                 param.name.str.length, param.name.str.buffer, 1
             )
             sb.append("\n")
+            isFirst = false
         }
     }
 

@@ -352,11 +352,26 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     if(options.srcPath.empty()) {
         var path = StringInit(options.inputFile, MAX_PATH)
-        var index = path.lastIndexOfAt($"/src/")
-        if(index > -1) {
-            StringCopy(.src = options.inputFile, .dest = options.srcPath, .size = index + 5)
+        var paths = []String {
+            $"/src/",
+            $"/stdlib/",
+            $"/test/",
         }
-        else {
+
+        var index = -1
+        for(var i = 0; i < sizeof(paths); i+=1) {
+            index = path.lastIndexOfAt(paths[i])
+            if(index > -1) {
+                StringCopy(
+                    .src = options.inputFile,
+                    .dest = options.srcPath,
+                    .size = index + paths[i].length
+                )
+                break
+            }
+        }
+
+        if(index < 0) {
             FileParent(options.inputFile, options.srcPath)
         }
     }

@@ -307,13 +307,14 @@ func ResolveCoroutine(this: *TypeChecker, decls: Array<*Decl>) : bool {
 
         var sym = this.createDeclSymbol(decl)
         if(sym == null) {
+            printf("Failed to resolve: %.*s\n", decl.name.str.length, decl.name.str.buffer)
             return false
         }
 
         this.resolveSymbol(sym)
         this.finishResolveSymbol(sym)
 
-        //printf("Resolved sym: %.*s\n", sym.name.length, sym.name.buffer)
+        printf("Resolved sym: %.*s\n", sym.name.length, sym.name.buffer)
     }
     this.bypassing = false
 
@@ -344,7 +345,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
         .tempIndex = 0_u32,
         .current = null,
         .scopeIndex = 0_u32,
-        .labelIndex = 1_u32,
+        .labelIndex = 0_u32,
         .stack = ArrayInit<InternedString>(64, checker.allocator),
         .patches = ArrayInit<Patch>(64, checker.allocator),
     }
@@ -368,13 +369,15 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
     funcDecl.body = FunctionLowering(&context, funcDecl.body)
 
     if(!checker.resolveStmt(funcDecl.body)) {
+        printf("*************************************Failed to lower!\n")
         return false
     }
-
+PrintStmt(funcDecl)
     // Parameter handling
     // 1) inject in new Continuation parameter
     // 2) include Patches for each parameter
     var params = funcDecl.params
+/*
     {
         assert(params != null)
         var coIndex = 0
@@ -421,7 +424,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
 
         params.insertAt(coIndex, coParam)
     }
-
+*/
     assert(funcDecl.sym != null)
     var decls = CreateCoroutine(
         checker,
@@ -429,10 +432,12 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
         &context
     )
 
+    var numOfLabels = checker.numOfLabels
     if(!ResolveCoroutine(checker, decls)) {
+        printf("*************************BAD\n")
         return false
     }
-
+    checker.numOfLabels = numOfLabels;
 
     // Inject in state machine jumps
     {
@@ -448,7 +453,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
             """, // TODO: Get GetCoroutineName
                 funcDecl.name.str.length, funcDecl.name.str.buffer
         )
-        for(var i = 0; i < context.labelIndex; i+=1) {
+        for(var i = 0; i <= context.labelIndex; i+=1) {
             sb.append(
                 """
                     case %d: goto __LABEL_%d; break;
@@ -481,6 +486,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
 
         stmt.setKind(StmtKind.FUNC_BODY_STMT)
         if(!checker.resolveStmt(stmt)) {
+            printf("*************************BAD\n")
             return false
         }
 
@@ -563,6 +569,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
                 case StmtKind.FUNC_CALL_EXPR: {
                     var funcCallExpr = &node.funcCallExpr
 
+                    // TODO - this needs to be allocated on the heap
                     var idName = $"std::coroutine::Continuation"
                     var contParam = &NewInitExpr(
                         node.startPos, node.endPos,
@@ -571,11 +578,13 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
                             context.strings.internString(idName),
                             &checker.current.typeSpecAllocator
                         ),
-                        Array<*InitArgExpr>{},
+                        Array<*InitArgExpr>{}, // TODO
                         context.allocator
-                    ).asStmt
+                    ).asExpr
 
-                    InsertStmt(context, contParam, patch.block, patch.index)
+                    funcCallExpr.arguments.set(0, CallArg {.argExpr = contParam})
+
+                    //InsertStmt(context, contParam, patch.block, patch.index)
                     break
                 }
                 default: {
@@ -607,8 +616,8 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
             }
 //PrintStmt(patch.stmt) printf("\n")
             if(!checker.resolveStmt(patch.stmt)) {
-                // printf("Here!!!\n")
-                // PrintStmt(funcDecl)
+                printf("*************************BAD\n")
+                PrintStmt(funcDecl)
                 return false
             }
         }
@@ -625,7 +634,7 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
             )
 
             if(!checker.resolveTypeSpec(funcDecl.returnType)) {
-                printf("Here!!\n")
+                printf("*************************BAD2\n")
                 return false
             }
         }
@@ -1240,13 +1249,20 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
                 arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Expr)
             }
 
+            var nullExpr = &NewNullExpr(
+                expr.getStartPos(),
+                expr.getEndPos(),
+                context.allocator
+            ).asExpr
+
+            // create a temporary argument for the passed in continuation
+            expr.arguments.insertAt(0, CallArg {.argExpr = nullExpr})
+
             // this isn't a suspend function
             // we can skip all of this additional continuation stuff
             // if (context.current.noTemp) {
             //     return expr as (*Stmt)
             // }
-
-
 
             var temp = NewTempAssignment(context, expr)
             InsertLabel(context, temp)
