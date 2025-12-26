@@ -710,11 +710,22 @@ public func (this: *TypeChecker) resolveEnumDecl(enumDecl: *EnumDecl) : bool {
 
 func (this: *TypeChecker) checkLabels(): bool {
     var errors = this.errors()
-    for(var i = 0; i < this.numOfLabels; i+=1) {
-        var label = &this.labels[i]
+
+    if(this.labelStack.empty()) {
+        return false
+    }
+
+    var labelStack = this.labelStack.lastPtr()
+
+    for(var i = 0; i < labelStack.numOfLabels; i+=1) {
+        var label = &labelStack.labels[i]
         if(!label.defined) {
             assert(label.stmt != null)
-            this.result.addError(label.stmt.getStartPos(), "'%.*s' label not found", label.name.length, label.name.buffer)
+            this.result.addError(
+                label.stmt.getStartPos(),
+                "'%.*s' label not found",
+                label.name.length, label.name.buffer
+            )
         }
     }
     return this.errors() == errors
@@ -758,7 +769,12 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
     }
 
     if(funcDecl.body) {
-        this.numOfLabels = 0
+        this.labelStack.add(LabelStack{})
+        defer this.labelStack.pop()
+
+        var labelStack = this.labelStack.lastPtr()
+        memset(labelStack.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
+        labelStack.numOfLabels = 0
 
         // Coroutines needs special AST modifications
         if(isCoroutine) {
@@ -771,10 +787,6 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
                 return false
             }
         }
-
-        // if(isCoroutine) {
-        //     // MakeCoroutine(this, funcDecl)
-        // }
 
         this.checkLabels()
     }

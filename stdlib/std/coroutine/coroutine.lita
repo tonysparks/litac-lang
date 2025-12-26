@@ -4,6 +4,29 @@ import "std/libc"
 
 public typedef func(*Continuation) : ContinuationResult as SuspendFunction;
 
+public func NewContinuation(
+    allocator: *const Allocator,
+    cont: Continuation
+): *Continuation {
+    var result = new<Continuation>(allocator);
+    *result = cont
+    return result
+}
+
+public func FreeContinuation(
+    cont: *Continuation
+) {
+    if(!cont) return;
+
+    var allocator = cont.context.allocator;
+    assert(allocator)
+
+    var stack = cont.stack
+    if(stack) {
+        allocator.free(stack)
+    }
+    allocator.free(cont)
+}
 
 public enum ContinuationResult {
     OK        = 0,
@@ -44,14 +67,15 @@ public func (this: *Dispatcher) submit(
         .stack = stack,
         .callback = fn,
     }
-
-    // TODO: place on worker queue
     var result = fn(&cont)
+/*
+    // TODO: place on worker queue
     printf("First result: %d\n", result)
     if (result == ContinuationResult.OK) {
         result = fn(&cont)
         printf("Second result: %d\n", result)
     }
+*/
     printf("Done result: %d\n", result)
 }
 
@@ -72,18 +96,31 @@ func adder(a: i32, b: i32) : i32 {
 
 @suspend
 func subber(a: i32, b: i32) : i32 {
+    printf("A = %d B = %d\n", a, b)
     return a - b
 }
 
 @test
 func testLaunchCoroutine() {
-    var dispatcher = Dispatcher{}
+    var dispatcher = Dispatcher{
+        .allocator = defaultAllocator
+    }
     var stack = adder__CoroutineStack{
         .__a__1 = 4,
         .__b__1 = 2
     }
     var coroutine = adder__Coroutine
-    dispatcher.submit(coroutine, &stack)
+    var cont = Continuation {
+        .context = ContinuationContext {
+            .allocator = dispatcher.allocator,
+            .dispatcher = &dispatcher
+        },
+        .parent = null,
+        .stack = &stack,
+        .callback = coroutine,
+    }
+    coroutine(&cont)
+    //dispatcher.submit(coroutine, &stack)
     printf("Result: %d\n", stack.__result__0)
     //assert(stack.__result__0 == 6)
     //future.cancel()

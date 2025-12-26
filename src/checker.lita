@@ -40,13 +40,18 @@ import "lowering"
 */
 
 // max number of labels in a function scope -- this should be enough :S
-const MAX_LABELS = 256;
-const MAX_LABEL_NAME = 32;
+internal const MAX_LABELS = 256;
+internal const MAX_LABEL_NAME = 32;
 
-struct LabelInfo {
+internal struct LabelInfo {
+    stmt: *Stmt
     name: InternedString
     defined: bool
-    stmt: *Stmt
+}
+
+internal struct LabelStack {
+    labels: [MAX_LABELS]LabelInfo
+    numOfLabels: i32
 }
 
 struct GenericContext {
@@ -81,8 +86,7 @@ public struct TypeChecker {
 
     interfaceImpls: Map<Typeid, Array<Typeid>>
 
-    labels: [MAX_LABELS]LabelInfo;
-    numOfLabels: i32
+    labelStack: Array<LabelStack>
 
     typeCache: *TypeCache
 
@@ -115,8 +119,7 @@ public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) 
 
     this.mainEntry = null
 
-    memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
-    this.numOfLabels = 0
+    this.labelStack.init(64, allocator)
 }
 
 @profile
@@ -628,10 +631,14 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
                 goto err;
             }
 
+            // special treatment for coroutines, we
+            // inject in a Continuation parameter
             if(sym.flags & SymbolFlags.IS_COROUTINE) {
+                this.symbolCoroutines.add(sym)
+
                 var index = 0
                 if(isMethod) {
-                    index+=1
+                    index += 1
                 }
 
                 var paramsNode = funcDecl.params.asNode()
@@ -782,34 +789,10 @@ public func (this: *TypeChecker) pushScope(scope: *Scope, isCoroutine: bool = fa
     if (isCoroutine) {
         this.captureScope = true
     }
-
-    if (this.captureScope) {
-        var currentFuncDecl = this.funcDeclStack.last()
-        assert(currentFuncDecl != null)
-
-        var sym = currentFuncDecl.sym
-        assert(sym != null && sym.coroutine != null)
-
-        sym.coroutine.pushScope(this.current.currentScope)
-    }
 }
 
 public func (this: *TypeChecker) popScope(isCoroutine: bool = false) {
     if(this.currentScope()) {
-        if(this.captureScope) {
-            var currentFuncDecl = this.funcDeclStack.last()
-            assert(currentFuncDecl != null)
-
-            var sym = currentFuncDecl.sym
-            assert(sym != null && sym.coroutine != null)
-
-            sym.coroutine.popScope(this.current.currentScope)
-
-            if (isCoroutine) {
-               this.symbolCoroutines.add(sym)
-            }
-        }
-
         this.current.currentScope = this.current.currentScope.parent
     }
 
@@ -907,6 +890,39 @@ func (this: *TypeChecker) resolveSymbols(isIncrementalBuild: bool) {
         }
     }
 
+    // Generate Coroutine wrappers and stacks
+    {
+        for(var i = 0; i < this.symbolCoroutines.size(); i += 1) {
+            var symbol = this.symbolCoroutines.get(i)
+            var decls = CreateCoroutineForwardDecls(this, symbol)
+
+            this.enterModule(symbol.declared)
+            defer this.leaveModule()
+
+            for(var j = 0; j < decls.size(); j += 1) {
+                var decl = decls.get(j)
+                var coSym = this.createDeclSymbol(decl)
+
+                this.resolveSymbol(coSym)
+                this.finishResolveSymbol(coSym)
+
+                // TODO: Figure out how to handle this more robustly...
+                // IDEA: If @generated, skip adding to symbols list? But what about
+                // actual implementation - how to avoid skipping that one?
+                // --> If the one in symbolStorage already exists and has @generated, you can
+                // replace with new one without @generated??? Maybe works better in reverse?
+
+                // remove the forwards from the symbols,
+                // otherwise we duplicate the definitions...
+                if(coSym.kind == SymbolKind.FUNC) {
+                    this.symbolFuncs.pop()
+                }
+                else if(coSym.kind == SymbolKind.TYPE) {
+                    this.symbolTypes.pop()
+                }
+            }
+        }
+    }
 
 
     {   // Resolve variables
@@ -1758,9 +1774,19 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 return false
             }
 
+            if(this.labelStack.empty()) {
+                this.result.addError(
+                    gotoStmt.getStartPos(),
+                    "goto only allowed in function scope"
+                )
+                return false
+            }
+
+            var labelStack = this.labelStack.lastPtr()
+
             // check to see if the label has already been created
-            for(var i = 0; i < this.numOfLabels; i+=1) {
-                var label = &this.labels[i]
+            for(var i = 0; i < labelStack.numOfLabels; i+=1) {
+                var label = &labelStack.labels[i]
                 if(gotoStmt.label.str.equals(label.name)) {
                     label.stmt = stmt
                     return true
@@ -1768,12 +1794,12 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
 
             // other create it
-            var labelName = &this.labels[this.numOfLabels]
+            var labelName = &labelStack.labels[labelStack.numOfLabels]
             labelName.name = gotoStmt.label.str
             labelName.stmt = stmt
             labelName.defined = false
 
-            this.numOfLabels += 1
+            labelStack.numOfLabels += 1
             return true;
         }
         case StmtKind.IF_STMT: {
@@ -1810,25 +1836,38 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 return false
             }
 
-            if(this.numOfLabels >= MAX_LABELS) {
-                this.result.addError(labelStmt.getStartPos(), "max number of labels reached")
+            if(this.labelStack.empty()) {
+                this.result.addError(
+                    labelStmt.getStartPos(),
+                    "labels only allowed in function scope"
+                )
                 return false
             }
 
-            for(var i = 0; i < this.numOfLabels; i+=1) {
-                var label = &this.labels[i]
+            var labelStack = this.labelStack.lastPtr()
+
+            if(labelStack.numOfLabels >= MAX_LABELS) {
+                this.result.addError(
+                    labelStmt.getStartPos(),
+                    "max number of labels reached"
+                )
+                return false
+            }
+
+            for(var i = 0; i < labelStack.numOfLabels; i+=1) {
+                var label = &labelStack.labels[i]
                 if(labelStmt.label.str.equals(label.name)) {
                     label.defined = true
                     return true
                 }
             }
 
-            var labelName = &this.labels[this.numOfLabels]
+            var labelName = &labelStack.labels[labelStack.numOfLabels]
             labelName.name = labelStmt.label.str
             labelName.defined = true
             labelName.stmt = null
 
-            this.numOfLabels += 1
+            labelStack.numOfLabels += 1
             return true;
         }
         case StmtKind.MODULE_STMT: {

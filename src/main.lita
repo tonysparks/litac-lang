@@ -359,7 +359,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         }
 
         var index = -1
-        for(var i = 0; i < sizeof(paths); i+=1) {
+        for(var i = 0; i < sizeof(paths) / sizeof(paths[0]); i+=1) {
             index = path.lastIndexOfAt(paths[i])
             if(index > -1) {
                 StringCopy(
