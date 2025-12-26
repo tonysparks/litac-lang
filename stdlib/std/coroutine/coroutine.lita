@@ -119,8 +119,8 @@ func testLaunchCoroutine() {
         .stack = &stack,
         .callback = coroutine,
     }
-    coroutine(&cont)
-    //dispatcher.submit(coroutine, &stack)
+    //coroutine(&cont)
+    dispatcher.submit(coroutine, &stack)
     printf("Result: %d\n", stack.__result__0)
     //assert(stack.__result__0 == 6)
     //future.cancel()

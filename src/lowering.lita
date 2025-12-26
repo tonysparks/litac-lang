@@ -494,11 +494,23 @@ func PatchCoroutine(
                 if(__stack == null) {
                     __stack = new<%.*s__CoroutineStack>(__cont.context.allocator)
                     __cont.stack = __stack
-                }
-                switch(__cont.state) {
             """,
             funcDecl.name.str.length, funcDecl.name.str.buffer,
             funcDecl.name.str.length, funcDecl.name.str.buffer
+        )
+        for(var i = 1; i < funcDecl.params.size(); i+=1) {
+            var param = funcDecl.params.get(i)
+            code.append(
+                "__stack.__%.*s__1 = %.*s;\n",
+                param.name.str.length, param.name.str.buffer,
+                param.name.str.length, param.name.str.buffer
+            )
+        }
+        code.append(
+            """
+                }
+                switch(__cont.state) {
+            """
         )
         for(var i = 0; i <= context.labelIndex; i+=1) {
             code.append(

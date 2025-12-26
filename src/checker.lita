@@ -1793,7 +1793,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 }
             }
 
-            // other create it
+            // otherwise create it
             var labelName = &labelStack.labels[labelStack.numOfLabels]
             labelName.name = gotoStmt.label.str
             labelName.stmt = stmt
