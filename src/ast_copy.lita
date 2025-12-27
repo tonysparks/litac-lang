@@ -585,6 +585,14 @@ public func CopyStmt(stmt: *Stmt, module: *Module) : *Stmt {
                                          module.allocator)
             return &copy.asStmt
         }
+        case StmtKind.YIELD_STMT: {
+            var original = stmt as (*ReturnStmt)
+            var copy = NewYieldStmt(original.getStartPos(),
+                                    original.getEndPos(),
+                                    CopyExpr(original.expr, module),
+                                    module.allocator)
+            return &copy.asStmt
+        }
         case StmtKind.RETURN_STMT: {
             var original = stmt as (*ReturnStmt)
             var copy = NewReturnStmt(original.getStartPos(),

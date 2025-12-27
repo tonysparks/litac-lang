@@ -536,6 +536,7 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
             }
             break
         }
+        case StmtKind.YIELD_STMT:
         case StmtKind.RETURN_STMT: {
             var stmt = node as (*ReturnStmt)
             if(this.visitExpr(stmt.expr)) {

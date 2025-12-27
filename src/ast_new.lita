@@ -1018,6 +1018,19 @@ public func NewReturnStmt(startPos: SrcPos,
     return stmt
 }
 
+public func NewYieldStmt(startPos: SrcPos,
+                         endPos: SrcPos,
+                         expr: *Expr,
+                         allocator: *const Allocator) : *Node {
+    var stmt = NewNode(allocator)
+    stmt.kind = StmtKind.YIELD_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+
+    stmt.yieldStmt.expr = stmt.becomeParentOf(expr)
+    return stmt
+}
+
 public func NewDeferStmt(startPos: SrcPos,
                          endPos: SrcPos,
                          defered: *Stmt,

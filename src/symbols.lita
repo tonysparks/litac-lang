@@ -93,8 +93,6 @@ public struct Symbol {
     flags: i32
     val: Value
 
-    coroutine: CoroutineStack
-
     // TODO: put in struct
     genericCallsiteModule: *Module
     genericArgs: Array<SymGenericArg>
@@ -402,14 +400,6 @@ public func (this: *Scope) addSymbol(name: InternedString,
         // types, as this types can be redefined by
         // the preprocessor or the compiler
         if(decl.hasNote("generated")) {
-            // var oldSym = symbolStorage.get(name)
-            // //oldSym.type.sym = null
-            // //this.module.print("At replacement")
-            // printf("Replacing:\n")
-            // PrintStmt(oldSym.decl)
-            // printf("With:\n")
-            // PrintStmt(decl)
-            // printf("\n")
             isError = false
         }
 
@@ -537,7 +527,6 @@ public func (this: *Scope) addSymbol(name: InternedString,
     if(isNewSym) {
         sym = new<Symbol>(this.allocator);
         sym.type = null
-        sym.coroutine.init()
     }
 
     sym.kind = kind

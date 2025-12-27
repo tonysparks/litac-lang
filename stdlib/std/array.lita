@@ -206,12 +206,11 @@ public func (a: *Array<T>) insertAt<T>(index: i32, element: T) : i32 {
         }
     }
 
-    a.length += 1
-
     memmove((&a.elements[index + 1]) as (*void),
             (&a.elements[index]) as (*const void),
             (a.length - index) * sizeof(:T))
 
+    a.length += 1
     a.set<T>(index, element)
     return 1
 }
@@ -229,12 +228,11 @@ public func (a: *Array<T>) insertAllAt<T>(index: i32, elements: *Array<T>) : i32
         }
     }
 
-    a.length += elements.length
-
     memmove((&a.elements[index + elements.length]) as (*void),
             (&a.elements[index]) as (*const void),
             (a.length - index) * sizeof(:T))
 
+    a.length += elements.length
     a.setAll<T>(index, elements)
     return 1
 }
@@ -414,6 +412,8 @@ func testInsertAll() {
     assert(list.get(13) == 44)
     assert(list.get(14) == 55)
     assert(list.get(15) == 33)
+
+    list.insertAllAt(0, other)
 
     for(var i = 0; i < list.size(); i+=1) {
         var x = list.get(i)

@@ -725,6 +725,7 @@ func ReplaceTypes(template: *Template, ast: *Stmt) : bool {
             }
             break;
         }
+        case StmtKind.YIELD_STMT:
         case StmtKind.RETURN_STMT: {
             var stmt = ast as (*ReturnStmt)
             if(stmt.expr) {

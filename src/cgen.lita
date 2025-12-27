@@ -1876,6 +1876,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             assert(false)
             return;
         }
+        case StmtKind.YIELD_STMT:
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
 
@@ -2026,6 +2027,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 var parentNode = expr.getParent()
                 if(parentNode) {
                     requiresCast = parentNode.kind == StmtKind.RETURN_STMT ||
+                                   parentNode.kind == StmtKind.YIELD_STMT  ||
                                    parentNode.kind == StmtKind.FUNC_CALL_EXPR;
                 }
 
@@ -2351,6 +2353,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             var parent = expr.getParent()
             if(parent) {
                 requiresCast = parent.kind == StmtKind.RETURN_STMT ||
+                               parent.kind == StmtKind.YIELD_STMT ||
                                parent.kind == StmtKind.BINARY_EXPR ||
                                parent.kind == StmtKind.SET_EXPR ||
                                parent.kind == StmtKind.FUNC_CALL_EXPR;

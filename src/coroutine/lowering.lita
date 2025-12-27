@@ -23,8 +23,9 @@ import "lex"
 import "module"
 import "common"
 import "coroutine"
+import "coroutine/patch"
 
-public struct FuncLowerContext {
+internal struct CoroutineContext {
     allocator: *const Allocator
     checker: *TypeChecker
     strings: *Strings
@@ -36,20 +37,16 @@ public struct FuncLowerContext {
 
     current: *BlockScope
 
-    //stack: Map<String, InternedString>
-    // stack: Array<InternedString>
     scopeIndex: u32
-    // numOfScopes: u32
-
     patches: Array<Patch>
 }
 
-public struct CoroutinePatch {
-    coSym: *Symbol
-    patches: Array<Patch>
-}
+// public struct CoroutinePatch {
+//     coSym: *Symbol
+//     patches: Array<Patch>
+// }
 
-public struct Patch {
+internal struct Patch {
     stmt: *Stmt       // the statement that is triggering the patch
     aux: *Stmt        // [optional] auxilary statement to give context
     ret: *Stmt        // [optional] the returned statement
@@ -58,20 +55,20 @@ public struct Patch {
     block: *BlockStmt
     index: u32
     name: InternedString
+    isResult: bool
 }
 
 
-struct BlockScope {
+internal struct BlockScope {
     parent: *BlockScope
     block: *BlockStmt
     insertIndex: i32
     numberOfInserts: i32
-    noTemp: bool
 
     locals: Array<InternedString>
 }
 
-func (this: *FuncLowerContext) setVar(name: InternedString, makeCanonical: bool = true) : InternedString {
+internal func (this: *CoroutineContext) setVar(name: InternedString, makeCanonical: bool = true) : InternedString {
     if (!this.current) {
         return InternedString{}
     }
@@ -90,13 +87,11 @@ func (this: *FuncLowerContext) setVar(name: InternedString, makeCanonical: bool 
 
     var internedName = this.strings.internCopy(sb.cStr(), sb.length)
     this.current.locals.add(internedName)
-    //this.stack.add(internedName)
-    //printf("Added var: %.*s\n", internedName.length, internedName.buffer)
 
     return internedName
 }
 
-func (this: *FuncLowerContext) getVar(name: InternedString) : InternedString {
+internal func (this: *CoroutineContext) getVar(name: InternedString) : InternedString {
     assert(this.current != null)
 
     var buffer:[MAX_SYMBOL_NAME]char
@@ -120,25 +115,25 @@ func (this: *FuncLowerContext) getVar(name: InternedString) : InternedString {
     return InternedString{}
 }
 
-func (this: *FuncLowerContext) push(scope: *BlockScope) {
+func (this: *CoroutineContext) push(scope: *BlockScope) {
     var current = this.current
     this.current = scope
     scope.parent = current
     this.scopeIndex += 1
 }
-func (this: *FuncLowerContext) pop() {
+func (this: *CoroutineContext) pop() {
     if(!this.current) return;
 
     var parent = this.current.parent
     this.current = parent
-    // this.scopeIndex -= 1
 }
-func (this: *FuncLowerContext) currentBlock(): *BlockStmt {
+
+func (this: *CoroutineContext) currentBlock(): *BlockStmt {
     if(!this.current) return null;
     return this.current.block
 }
 
-func NewIdentFromTemp(context: *FuncLowerContext, temp: *VarDecl): *Node {
+internal func NewIdentFromTemp(context: *CoroutineContext, temp: *VarDecl): *Node {
     var nameTypeSpec = NewNameTypeSpecIntern(
         temp.getStartPos(),
         temp.name.str,
@@ -153,14 +148,14 @@ func NewIdentFromTemp(context: *FuncLowerContext, temp: *VarDecl): *Node {
     )
 }
 
-func NewTempName(context: *FuncLowerContext) : StringBuilder {
+internal func NewTempName(context: *CoroutineContext) : StringBuilder {
     var name = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
     name.append("__%d", context.tempIndex += 1)
     return name
 }
 
-func NewTempAssignment(
-    context: *FuncLowerContext,
+internal func NewTempAssignment(
+    context: *CoroutineContext,
     expr: *Expr,
     varName: *const char = null,
     insert: bool = true
@@ -192,8 +187,8 @@ func NewTempAssignment(
     return temp as (*VarDecl)
 }
 
-func NewTempEmptyAssignment(
-    context: *FuncLowerContext,
+internal func NewTempEmptyAssignment(
+    context: *CoroutineContext,
     expr: *Expr,
     isTernary: bool = false
 ) : *VarDecl {
@@ -221,9 +216,10 @@ func NewTempEmptyAssignment(
     return temp as (*VarDecl)
 }
 
-func InsertLabel(
-    context: *FuncLowerContext,
-    parent: *Stmt
+internal func InsertLabel(
+    context: *CoroutineContext,
+    parent: *Stmt,
+    atEnd: bool = false
 ) : *Stmt {
     var name = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
     name.append("__LABEL_%d", context.labelIndex += 1)
@@ -243,12 +239,12 @@ func InsertLabel(
         return labelStmt
     }
 
-    InsertTempStmt(context, labelStmt, .atEnd = false)
+    InsertTempStmt(context, labelStmt, atEnd)
     return labelStmt
 }
 
-func InsertTempStmt(
-    context: *FuncLowerContext,
+internal func InsertTempStmt(
+    context: *CoroutineContext,
     stmt: *Stmt,
     atEnd: bool
 ) {
@@ -261,9 +257,7 @@ func InsertTempStmt(
     if(atEnd) {
         index += scope.numberOfInserts
     }
-    // printf("Inserting at %d\n", index)
-    // scope.block.stmts.insertAt(index, stmt)
-    // scope.block.asNode().becomeParentOf(stmt)
+
     scope.numberOfInserts += 1
     InsertStmt(
         context,
@@ -273,8 +267,8 @@ func InsertTempStmt(
     )
 }
 
-func InsertStmt(
-    context: *FuncLowerContext,
+internal func InsertStmt(
+    context: *CoroutineContext,
     stmt: *Stmt,
     block: *BlockStmt,
     index: u32
@@ -284,7 +278,7 @@ func InsertStmt(
 }
 
 func PushBlock(
-    context: *FuncLowerContext,
+    context: *CoroutineContext,
     scope: *BlockScope,
     stmt1: *Stmt,
     stmt2: *Stmt = null
@@ -309,28 +303,7 @@ func PushBlock(
     return scope.block
 }
 
-/**
-    Convert function call expressions into lowered expressions:
-
-    var x = object.value(call1(), call2()) ?
-    object.value1(call3(), call4()) :
-    object.value2(call6(), call6())
-
-    var x = undefined
-    var _1 = call1()
-    var _2 = call2()
-    var _r3 = object.value(_1, _2)
-    if (_r3) {
-        var _3 = call3()
-        var _4 = call4()
-        x = object.value(_3, _4)
-    } else {
-        var _5 = call5()
-        var _6 = call6()
-        x = object.value(_5, _6)
-    }
-*/
-func ResolveCoroutine(this: *TypeChecker, decls: Array<*Decl>) : bool {
+func ResolveCoroutineDecls(this: *TypeChecker, decls: Array<*Decl>) : bool {
     var count = this.errors()
     this.bypassing = true
     for(var i = 0; i < decls.size(); i += 1) {
@@ -338,36 +311,27 @@ func ResolveCoroutine(this: *TypeChecker, decls: Array<*Decl>) : bool {
 
         var sym = this.createDeclSymbol(decl)
         if(sym == null) {
-            //printf("Failed to resolve: %.*s\n", decl.name.str.length, decl.name.str.buffer)
             return false
         }
 
         this.resolveSymbol(sym)
         this.finishResolveSymbol(sym)
-
-        // printf("Resolved sym: %.*s\n", sym.name.length, sym.name.buffer)
     }
     this.bypassing = false
 
     return count == this.errors()
 }
 
-public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
+public func ResolveCoroutine(
+    checker: *TypeChecker,
+    funcDecl: *FuncDecl
+) : bool {
+
     if(!funcDecl.body) {
         return true;
     }
 
-// TODO:
-// 1) CreateCoroutine Decls for Wrapper and CoroutineStack here,
-// 2) modify the funcDecl params to pass in the coStack
-// 3) finally resolve the patches
-//
-// Clean up
-// * Move to this coroutine module
-// * clean up resolveFuncDecl
-
-
-    var context = FuncLowerContext {
+    var context = CoroutineContext {
         .allocator = checker.allocator,
         .checker = checker,
         .strings = &checker.strings,
@@ -396,73 +360,21 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
     }
 
     funcDecl.body = FunctionLowering(&context, funcDecl.body)
-
     if(!checker.resolveStmt(funcDecl.body)) {
         printf("*************************************Failed to lower!\n")
         return false
     }
 
-    // Parameter handling
-    // 1) inject in new Continuation parameter
-    // 2) include Patches for each parameter
     var params = funcDecl.params
 
-/*
-    {
-        assert(params != null)
-        var coIndex = 0
-
-        // if this is a method, the first argument must be 'this' type
-        if(funcDecl.flags & FuncFlags.IS_METHOD) {
-            coIndex += 1
-        }
-
-        var paramsNode = params.asNode()
-        var contParamType = NewTypeSpec(
-            TypeSpecKind.PTR,
-            paramsNode.startPos,
-            &checker.current.typeSpecAllocator
-        )
-        var paramValue = $"std::coroutine::Continuation"
-        contParamType.base = NewNameTypeSpecIntern(
-            paramsNode.startPos,
-            context.strings.internString(paramValue),
-            &checker.current.typeSpecAllocator
-        )
-
-        var coParamNode = NewParameterDecl(
-            paramsNode.startPos, paramsNode.endPos,
-            NewIdentifier(
-                "__cont",
-                paramsNode.startPos,
-                context.strings
-            ),
-            contParamType,
-            null,
-            false,
-            context.allocator
-        )
-
-        var coParam = &coParamNode.paramDecl
-        if(!checker.resolveStmt(coParam)) {
-            return false
-        }
-
-        var coParamSym = coParam.sym
-        assert(coParamSym != null)
-        coParamSym.flags |= SymbolFlags.IS_GENERATED
-
-        params.insertAt(coIndex, coParam)
-    }
-*/
     assert(funcDecl.sym != null)
-    var decls = CreateCoroutine(
+    var decls = CreateCoroutineDecls(
         checker,
         funcDecl.sym,
         &context
     )
 
-    if(!ResolveCoroutine(checker, decls)) {
+    if(!ResolveCoroutineDecls(checker, decls)) {
         printf("*************************BADxer\n")
         return false
     }
@@ -473,476 +385,29 @@ public func LowerFuncBody(checker: *TypeChecker, funcDecl: *FuncDecl) : bool {
     )
 }
 
-func PatchCoroutine(
-    context: *FuncLowerContext,
-    funcDecl: *FuncDecl
-): bool {
-    var allocator = context.allocator
-    var checker = context.checker
 
-    var code = StringBuilderInit(1024, allocator)
+/**
+    Convert function call expressions into lowered expressions:
 
-    // Inject in state machine jumps
-    {
-        assert(funcDecl.body.getKind() == StmtKind.FUNC_BODY_STMT)
-        var bodyStmt = funcDecl.body as (*BlockStmt)
+    var x = object.value(call1(), call2()) ?
+    object.value1(call3(), call4()) :
+    object.value2(call6(), call6())
 
-        code.append(
-            """
-            {
-                var __stack = __cont.stack as (*%.*s__CoroutineStack)
-                if(__stack == null) {
-                    __stack = new<%.*s__CoroutineStack>(__cont.context.allocator)
-                    __cont.stack = __stack
-            """,
-            funcDecl.name.str.length, funcDecl.name.str.buffer,
-            funcDecl.name.str.length, funcDecl.name.str.buffer
-        )
-        for(var i = 1; i < funcDecl.params.size(); i+=1) {
-            var param = funcDecl.params.get(i)
-            code.append(
-                "__stack.__%.*s__1 = %.*s;\n",
-                param.name.str.length, param.name.str.buffer,
-                param.name.str.length, param.name.str.buffer
-            )
-        }
-        code.append(
-            """
-                }
-                switch(__cont.state) {
-            """
-        )
-        for(var i = 0; i <= context.labelIndex; i+=1) {
-            code.append(
-                """
-                    case %d: goto __LABEL_%d; break;
-                """, i, i
-            )
-        }
-        code.append(
-            """
-                    default: assert(false)
-                }
-                __LABEL_0:
-            }
-            """
-        )
-        var snapshot = code.toString()
-        var parser = ParserInit(
-            "generated",
-            snapshot.buffer,
-            snapshot.length,
-            checker.current,
-            checker.lita
-        )
-
-        parser.funcLevel += 1
-        var stmt = parser.statement()
-
-        if(stmt.getKind() != StmtKind.BLOCK_STMT) {
-            return false
-        }
-
-        stmt.setKind(StmtKind.FUNC_BODY_STMT)
-
-        if(!checker.resolveStmt(stmt)) {
-            printf("*************************BADf\n")
-            return false
-        }
-
-        var newBlockStmt = stmt as (*BlockStmt)
-        bodyStmt.stmts.insertAllAt(0, newBlockStmt.stmts)
+    var x = undefined
+    var _1 = call1()
+    var _2 = call2()
+    var _r3 = object.value(_1, _2)
+    if (_r3) {
+        var _3 = call3()
+        var _4 = call4()
+        x = object.value(_3, _4)
+    } else {
+        var _5 = call5()
+        var _6 = call6()
+        x = object.value(_5, _6)
     }
-
-    // Convert locals to __stack.localVarName
-    {
-        var tempName = $"__stack"
-        var continuationName = context.strings.internString(tempName)
-
-        for(var i = 0; i < context.patches.size(); i+=1) {
-            var patch = context.patches.getPtr(i)
-            var node = patch.stmt.asNode()
-
-            switch(node.kind) {
-                case StmtKind.VAR_DECL:
-                case StmtKind.CONST_DECL: {
-                    var varDecl = &node.varDecl
-
-                    node.kind = StmtKind.SET_EXPR
-                    node.setExpr.object = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                continuationName,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).asExpr
-                    )
-                    node.setExpr.field = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                patch.name,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).identifierExpr
-                    )
-                    node.setExpr.value = varDecl.expr
-                    node.setExpr.operator = TokenType.EQUALS
-                    break
-                }
-                case StmtKind.RETURN_STMT: {
-                    var returnStmt = &node.returnStmt
-                    assert(returnStmt.expr != null)
-
-                    var idName = $"std::coroutine::ContinuationResult"
-                    var ok = $"OK"
-                    var originalExpr = returnStmt.expr.asNode()
-                    returnStmt.expr = &NewGetExpr(
-                        originalExpr.startPos, originalExpr.endPos,
-                        &NewIdentifierExpr(
-                            originalExpr.startPos, originalExpr.endPos,
-                            NewNameTypeSpecIntern(
-                                originalExpr.startPos,
-                                context.strings.internString(idName),
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).asExpr,
-                        &NewIdentifierExpr(
-                            originalExpr.startPos, originalExpr.endPos,
-                            NewNameTypeSpecIntern(
-                                originalExpr.startPos,
-                                context.strings.internString(ok),
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).identifierExpr,
-                        allocator
-                    ).asExpr
-                    break
-                }
-                case StmtKind.FUNC_CALL_EXPR: {
-                    var funcCallExpr = &node.funcCallExpr
-
-                    var typeInfo = funcCallExpr.object.operand.typeInfo
-                    assert(typeInfo)
-
-                    var sym = typeInfo.sym
-                    assert(sym)
-
-                    var tempDeclIndex = -1
-
-                    assert(patch.aux)
-                    var auxNode = patch.aux.asNode()
-                    for(var i = patch.index as (i32); i < patch.block.stmts.size(); i+=1) {
-                        var tmp = patch.block.stmts.get(i).asNode()
-                        if(tmp == auxNode) {
-                            tempDeclIndex = i
-                            break;
-                        }
-                    }
-                    assert(tempDeclIndex > -1)
-
-                    var contParamName: String//*const char = null
-                    var stackParamName: String
-
-                    /**
-                        Current issues:
-                        1) passed in continuation needs to be
-                           lowered to a temp variable, so it
-                           can be referenced later
-                        2) called continuation return value needs
-                           to be checked for ContinuationResult
-                        3) the stack continuation result needs to
-                           be looked at for the actual function value
-                           result if ContinuationResult.OK
-                    */
-                    if(!(sym.flags & SymbolFlags.IS_COROUTINE)) {
-                        funcCallExpr.arguments.removeAt(0)
-                    } else {
-                        // TODO - this needs to be allocated on the heap
-/*
-                        var idName = $"std::coroutine::Continuation"
-                        var contParam = &NewInitExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                context.strings.internString(idName),
-                                &checker.current.typeSpecAllocator
-                            ),
-                            // TODO
-                            Array<*InitArgExpr>{
-
-                            },
-                            context.allocator
-                        ).asExpr
 */
-                        contParamName = NewTempName(context).toString()
-                        // First build the Stack
-                        // TODO:
-                        /*
-                        {
-                            var initArgs = ArrayInit<*InitArgExpr>(
-                                funcCallExpr.arguments.size(),
-                                allocator
-                            )
-
-                            for(var i = 0; i < funcCallExpr.arguments.size(); i+=1) {
-                                var callArg = funcCallExpr.arguments.get(i)
-                                var initArg = NewInitArgExpr(
-                                    callArg.argExpr.getStartPos(),
-                                    callArg.argExpr.getEndPos(),
-                                    Identifier{},
-                                    i,
-                                    callArg.argExpr,
-                                    allocator
-                                )
-                                initArgs.add(&initArg.initArgExpr)
-                            }
-
-                            var mark = code.length
-                            code.append(
-                                "%.*s__CoroutineStack",
-                                typeInfo.name.length, typeInfo.name.buffer
-                            )
-
-                            var stackName = code.toString().substring(mark)
-                            var stackParam = &NewInitExpr(
-                                node.startPos, node.endPos,
-                                NewNameTypeSpecIntern(
-                                    node.startPos,
-                                    context.strings.internString(stackName),
-                                    &checker.current.typeSpecAllocator
-                                ),
-                                initArgs,
-                                allocator
-                            ).asExpr
-
-                            // TODO make local variable
-                            var temp = NewTempAssignment(context, stackParam, .insert = false)
-                            if(!checker.resolveStmt(temp)) {
-                                PrintStmt(stackParam.operand.typeInfo.sym.decl)
-                                PrintStmt(temp)
-                                checker.current.print("At failure")
-                                printf("*************************BADx1\n")
-                                return false
-                            }
-
-                            stackParamName = temp.name.str.view
-
-                            InsertStmt(context, temp, patch.block, tempDeclIndex += 1)
-                        }*/
-
-                        // Create the Continuation
-                        {
-                            var mark = code.length
-                            code.append(
-                                """
-                                NewContinuation(
-                                    __cont.context.allocator,
-                                    std::coroutine::Continuation {
-                                        .context = __cont.context,
-                                        .parent = __cont,
-                                        .stack = null,
-                                        .state = 0_u32,
-                                        .callback = %.*s__Coroutine
-                                    }
-                                )
-                                """,
-                                funcDecl.name.str.length, funcDecl.name.str.buffer
-                            )
-                            var snapshot = code.toString().substring(mark)
-                            var parser = ParserInit(
-                                "generated",
-                                snapshot.buffer,
-                                snapshot.length,
-                                checker.current,
-                                checker.lita
-                            )
-
-                            parser.funcLevel += 1
-                            var stmt = parser.statement()
-
-                            // TODO make local variable
-                            var temp = NewTempAssignment(context, stmt as (*Expr), .insert = false)
-                            if(!checker.resolveStmt(temp)) {
-                                printf("*************************BADx2\n")
-                                return false
-                            }
-
-                            contParamName = temp.name.str.view
-
-                            InsertStmt(context, temp, patch.block, tempDeclIndex += 1)
-
-                            // finally add it to the first arg call
-                            var idExpr = &NewIdentFromTemp(context, temp).asExpr
-                            if(!checker.resolveStmt(idExpr)) {
-                                printf("*************************BADy\n")
-                                return false
-                            }
-
-                            funcCallExpr.arguments.set(0, CallArg {.argExpr = idExpr})
-                        }
-                    }
-
-                    // if void return, patch up the temp assignment
-                    var retType = typeInfo.returnType
-                    if(retType != null && patch.ret) {
-                        if(retType.kind == TypeKind.VOID) {
-                            var returnNode = patch.ret.asNode();
-                            var exprNode = patch.stmt.asNode();
-                            var tempNode = patch.aux.asNode();
-
-                            tempNode.kind = StmtKind.EMPTY_STMT;
-
-                            *returnNode = *exprNode
-                        } else {
-                            assert(patch.aux.getKind() == StmtKind.VAR_DECL)
-
-                            var tempVar = &patch.aux.asNode().varDecl
-                            assert(tempVar.expr)
-
-                            var coTempResult = NewTempAssignment(context, tempVar.expr, .insert = false)
-                            if(!checker.resolveStmt(coTempResult)) {
-                                printf("*************************BADz\n")
-                                return false
-                            }
-                            InsertStmt(context, coTempResult, patch.block, tempDeclIndex += 1)
-
-                            tempVar.expr = null
-                            tempVar.typeSpec = retType.asTypeSpec(
-                                context.module, true
-                            )
-
-                            assert(patch.label && patch.label.getKind() == StmtKind.LABEL_STMT)
-                            var labelNode = patch.label.asNode()
-                            labelNode.kind = StmtKind.EMPTY_STMT // we're moving the label
-
-                            var label = &labelNode.labelStmt
-
-                            // the temp var will continue to be the "defined"
-                            // function call result, while the replaceVar will now be
-                            // the continuation result
-                            var mark = code.length
-
-                            code.append(
-                                """
-                                if(%.*s == std::coroutine::ContinuationResult.SUSPENDED) {
-                                    __cont.state += 1
-                                    return std::coroutine::ContinuationResult.SUSPENDED
-                                } else {
-                                %.*s:
-                                    __cont.state += 1
-                                    %.*s = (%.*s.stack as (*%.*s__CoroutineStack)).__result__0
-                                    FreeContinuation(%.*s)
-                                }
-                                """,
-                                coTempResult.name.str.length, coTempResult.name.str.buffer,
-                                label.label.str.length, label.label.str.buffer,
-                                tempVar.name.str.length, tempVar.name.str.buffer,
-                                contParamName.length, contParamName.buffer,
-                                //sym.qualifiedName.length, sym.qualifiedName.buffer
-                                typeInfo.name.length, typeInfo.name.buffer,
-                                contParamName.length, contParamName.buffer
-                            )
-
-                            var snapshot = code.toString().substring(mark)
-                            var parser = ParserInit(
-                                "generated",
-                                snapshot.buffer,
-                                snapshot.length,
-                                checker.current,
-                                checker.lita
-                            )
-
-                            // TODO: Issue
-                            // We need to basically forward declare all
-                            // CoroutineStack variables because when we resolve these,
-                            // we don't have the types yet in scope
-
-                            parser.funcLevel += 1
-                            var stmt = parser.statement()
-                            if(!checker.resolveStmt(stmt)) {
-                                printf("*************************BADw\n")
-                                //checker.current.print("Bad Scope")
-                                return false
-                            }
-                            InsertStmt(context, stmt, patch.block, tempDeclIndex += 1)
-                        }
-                    }
-
-                    break
-                }
-                default: {
-                    node.kind = StmtKind.GET_EXPR
-                    node.getExpr.object = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                continuationName,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).asExpr
-                    )
-                    node.getExpr.field = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                patch.name,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).identifierExpr
-                    )
-                    break;
-                }
-            }
-
-            if(!checker.resolveStmt(patch.stmt)) {
-                printf("*************************BADv\n")
-                //PrintStmt(funcDecl)
-                return false
-            }
-        }
-    }
-
-    // Convert return to ContinuationResult
-    {
-        if(funcDecl.returnType != null) {
-            var resultName = $"std::coroutine::ContinuationResult"
-            funcDecl.returnType = NewNameTypeSpecIntern(
-                funcDecl.getStartPos(),
-                context.strings.internString(resultName),
-                &checker.current.typeSpecAllocator
-            )
-
-            if(!checker.resolveTypeSpec(funcDecl.returnType)) {
-                printf("*************************BAD2\n")
-                return false
-            }
-        }
-    }
-
-    PrintStmt(funcDecl)
-    checker.current.currentScope.print("Function Scope")
-
-    // for(var i = 0; i < context.stack.size(); i+=1) {
-    //     var e = context.stack.get(i)
-    //     printf(
-    //         "%.*s\n", e.length, e.buffer
-    //     )
-    // }
-}
-
-func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
+func FunctionLowering(context: *CoroutineContext, ast: *Stmt) : *Stmt {
     if(!ast) {
         return null;
     }
@@ -1003,7 +468,6 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
             for(var i = 0; i < body.stmts.size(); i+=1) {
                 var stmt = body.stmts.get(i)
                 scope.insertIndex = i
-                scope.noTemp = !RequiresFuncTempResult(stmt)
 
                 stmt = FunctionLowering(context, stmt)
                 i = i + scope.numberOfInserts
@@ -1210,30 +674,33 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
             }
             break;
         }
+        case StmtKind.YIELD_STMT:
         case StmtKind.RETURN_STMT: {
             var stmt = ast as (*ReturnStmt)
             if(stmt.expr) {
                 var expr = FunctionLowering(context, stmt.expr) as (*Expr)
-                var varDecl = NewTempAssignment(context, expr, "result__0")
+                var varDecl = NewTempAssignment(context, expr)
                 context.patches.add(
                     Patch {
                         .stmt = varDecl as (*Stmt),
                         .block = context.current.block,
                         .index = context.current.insertIndex,
                         .name = context.setVar(varDecl.name.str, false),
+                        .isResult = true,
                     }
                 )
-
-                // TODO return ContinuationResult
                 stmt.expr = expr
-                context.patches.add(
-                    Patch {
-                        .stmt = stmt as (*Stmt),
-                        .block = context.current.block,
-                        .index = context.current.insertIndex,
-                    }
-                )
             }
+
+            var label = InsertLabel(context, stmt)
+            context.patches.add(
+                Patch {
+                    .stmt = stmt as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex,
+                    .label = label,
+                }
+            )
             break;
         }
         case StmtKind.SWITCH_CASE_STMT: {
@@ -1554,19 +1021,6 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
             var label = InsertLabel(context, temp)
 
             var idExpr = &NewIdentFromTemp(context, temp).asStmt
-            // var nameTypeSpec = NewNameTypeSpecIntern(
-            //     expr.getStartPos(),
-            //     temp.name.str,
-            //     &context.module.typeSpecAllocator
-            // )
-
-            // var idExpr = &NewIdentifierExpr(
-            //     expr.getStartPos(),
-            //     expr.getEndPos(),
-            //     nameTypeSpec,
-            //     context.allocator
-            // ).asStmt
-
             context.patches.add(
                 Patch {
                     .stmt = expr as (*Stmt),
@@ -1577,7 +1031,6 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
                     .ret = idExpr
                 }
             )
-
             return idExpr
         }
         case StmtKind.GET_EXPR: {
@@ -1597,10 +1050,6 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
             if (expr.type.kind == TypeSpecKind.NAME) {
                 var name = context.getVar(expr.type.name)
                 if (name.length != 0) {
-                    // printf("~%.*s vs %.*s\n",
-                    //     expr.type.name.length, expr.type.name.buffer,
-                    //     name.length, name.buffer
-                    // )
                     context.patches.add(
                         Patch {
                             .stmt = expr as (*Stmt),
@@ -1749,183 +1198,9 @@ func FunctionLowering(context: *FuncLowerContext, ast: *Stmt) : *Stmt {
             break;
         }
         default: {
-            printf("Statement Kind: %s\n", StmtKindAsStr(ast.getKind()))
+            // printf("Statement Kind: %s\n", StmtKindAsStr(ast.getKind()))
             assert(false)
         }
     }
     return ast
-}
-
-
-func RequiresFuncTempResult(ast: *Stmt) : bool {
-    if(!ast) {
-        return false;
-    }
-
-    switch(ast.getKind()) {
-        case StmtKind.TRAIT_DECL:
-        case StmtKind.UNION_DECL:
-        case StmtKind.STRUCT_DECL:
-        case StmtKind.FUNC_DECL:
-        case StmtKind.IMPORT_DECL:
-        case StmtKind.TYPEDEF_DECL:
-        case StmtKind.ENUM_DECL:
-        case StmtKind.PARAM_DECL:
-        case StmtKind.NATIVE_DECL:
-        case StmtKind.POISON_DECL: {
-            break;
-        }
-        case StmtKind.CONST_DECL:
-        case StmtKind.VAR_DECL: {
-            return true;
-        }
-
-        case StmtKind.FUNC_BODY_STMT:
-        case StmtKind.BLOCK_STMT:
-        case StmtKind.BREAK_STMT:
-        case StmtKind.COMP_STMT:
-        case StmtKind.CONTINUE_STMT:
-        case StmtKind.DEFER_STMT: {
-            break;
-        }
-        case StmtKind.DO_WHILE_STMT: {
-            return true;
-        }
-        case StmtKind.EMPTY_STMT: {
-            break;
-        }
-        case StmtKind.FOR_STMT: {
-            return true;
-        }
-        case StmtKind.GOTO_STMT: {
-            break;
-        }
-        case StmtKind.IF_STMT: {
-            return true;
-        }
-        case StmtKind.LABEL_STMT: {
-            break;
-        }
-        case StmtKind.MODULE_STMT: {
-            break;
-        }
-        case StmtKind.NOTE_STMT: {
-            break;
-        }
-        case StmtKind.PARAMETERS_STMT: {
-            break;
-        }
-        case StmtKind.RETURN_STMT: {
-            return true;
-        }
-        case StmtKind.SWITCH_CASE_STMT: {
-            break;
-        }
-        case StmtKind.SWITCH_STMT:{
-            return true;
-        }
-        case StmtKind.ENUM_FIELD_DECL:
-        case StmtKind.ENUM_FIELD_ENTRY_DECL:
-        case StmtKind.STRUCT_FIELD_DECL:
-        case StmtKind.UNION_FIELD_DECL:
-        case StmtKind.TRAIT_FIELD_DECL:
-        case StmtKind.VAR_FIELD_DECL: {
-            break;
-        }
-        case StmtKind.WHILE_STMT: {
-            return true;
-        }
-
-
-        /*--------------------------------------
-            Expressions
-        ----------------------------------------*/
-        case StmtKind.ARRAY_DESIGNATION_EXPR: {
-            return true;
-        }
-        case StmtKind.ARRAY_INIT_EXPR: {
-            return true;
-        }
-        case StmtKind.BINARY_EXPR: {
-            return true;
-        }
-        case StmtKind.BOOLEAN_EXPR: {
-            break;
-        }
-        case StmtKind.CAST_EXPR: {
-            return true;
-        }
-        case StmtKind.CHAR_EXPR: {
-            break;
-        }
-        case StmtKind.FUNC_CALL_EXPR: {
-            break;
-        }
-        case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            break;
-        }
-        case StmtKind.GET_EXPR: {
-            break;
-        }
-        case StmtKind.GROUP_EXPR: {
-            break;
-        }
-        case StmtKind.IDENTIFIER_EXPR: {
-            break;
-        }
-        case StmtKind.INIT_EXPR: {
-            return true;
-        }
-        case StmtKind.INIT_ARG_EXPR: {
-            break;
-        }
-        case StmtKind.NULL_EXPR: {
-            break;
-        }
-        case StmtKind.NUMBER_EXPR: {
-            break;
-        }
-        case StmtKind.OFFSET_OF_EXPR: {
-            return true;
-        }
-        case StmtKind.SET_EXPR: {
-            return true;
-        }
-        case StmtKind.SIZE_OF_EXPR: {
-            return true;
-        }
-        case StmtKind.NATIVE_STRING_EXPR: {
-            break;
-        }
-        case StmtKind.STRING_EXPR: {
-            break;
-        }
-        case StmtKind.SUBSCRIPT_GET_EXPR: {
-            break;
-        }
-        case StmtKind.SUBSCRIPT_SET_EXPR: {
-            return true;
-        }
-        case StmtKind.TERNARY_EXPR: {
-            return true;
-        }
-        case StmtKind.TYPE_IDENTIFIER_EXPR: {
-            break;
-        }
-        case StmtKind.NAME_OF_EXPR:
-        case StmtKind.TYPE_OF_EXPR: {
-            return true;
-        }
-        case StmtKind.UNARY_EXPR: {
-            return true;
-        }
-        case StmtKind.POISON_EXPR: {
-            break;
-        }
-        default: {
-            printf("Statement Kind: %s\n", StmtKindAsStr(ast.getKind()))
-            assert(false)
-        }
-    }
-    return false
 }

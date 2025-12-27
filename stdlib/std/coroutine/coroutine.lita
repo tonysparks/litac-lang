@@ -28,6 +28,7 @@ public func FreeContinuation(
     allocator.free(cont)
 }
 
+@asStr
 public enum ContinuationResult {
     OK        = 0,
     ERROR     = 1,
@@ -76,7 +77,10 @@ public func (this: *Dispatcher) submit(
         printf("Second result: %d\n", result)
     }
 */
-    printf("Done result: %d\n", result)
+    printf("Done continuation result: %s state: %d\n",
+        ContinuationResultAsStr(result),
+        cont.state
+    )
 }
 
 /*
@@ -91,12 +95,15 @@ public func (this: *Dispatcher) submit(
 func adder(a: i32, b: i32) : i32 {
     var r = subber(a, 1)
    //var r = a
+    printf("R = %d A = %d B = %d, r+b = %d\n", r, a, b, r+b)
     return r + b
 }
 
 @suspend
 func subber(a: i32, b: i32) : i32 {
     printf("A = %d B = %d\n", a, b)
+    yield b
+    yield a
     return a - b
 }
 
@@ -119,9 +126,19 @@ func testLaunchCoroutine() {
         .stack = &stack,
         .callback = coroutine,
     }
-    //coroutine(&cont)
-    dispatcher.submit(coroutine, &stack)
-    printf("Result: %d\n", stack.__result__0)
+    var status = ContinuationResult.SUSPENDED
+    var count = 0
+    do {
+        status = coroutine(&cont)
+        // dispatcher.submit(coroutine, &stack)
+        printf("Result: %d Status: %s\n",
+            stack.__result__0,
+            ContinuationResultAsStr(status)
+        )
+        count += 1
+    } while (status != ContinuationResult.OK && count < 10)
+
+
     //assert(stack.__result__0 == 6)
     //future.cancel()
     //future.await()

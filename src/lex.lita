@@ -55,6 +55,7 @@ public enum TokenType {
     BREAK,
     CONTINUE,
     RETURN,
+    YIELD,
     GOTO,
 
     SIZEOF,
@@ -181,6 +182,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.BREAK] = "break",
     [TokenType.CONTINUE] = "continue",
     [TokenType.RETURN] = "return",
+    [TokenType.YIELD] = "yield",
     [TokenType.GOTO] = "goto",
 
     [TokenType.SIZEOF] = "sizeof",
@@ -340,6 +342,7 @@ const keywordCache = [MAX_KEYWORD_CACHE]**const char {
         null
     },
     [5] = []*const char {
+        "yield",
         "trait",
         "union",
         "const",
@@ -409,6 +412,7 @@ const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
         TokenType.GOTO,
     },
     [5] = []TokenType {
+        TokenType.YIELD,
         TokenType.TRAIT,
         TokenType.UNION,
         TokenType.CONST,

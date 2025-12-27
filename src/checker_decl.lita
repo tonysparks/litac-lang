@@ -22,8 +22,8 @@ import "ast_print"
 import "checker"
 import "checker_expr"
 import "intern"
-import "lowering"
 import "coroutine"
+import "coroutine/lowering"
 
 import "lsp/references"
 
@@ -773,14 +773,13 @@ public func (this: *TypeChecker) resolveFuncDecl(funcDecl: *FuncDecl) : bool {
         defer this.labelStack.pop()
 
         var labelStack = this.labelStack.lastPtr()
-        memset(labelStack.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
-        labelStack.numOfLabels = 0
+        labelStack.clear()
 
         // Coroutines needs special AST modifications
         if(isCoroutine) {
-            printf("Start Coroutine: %.*s\n", funcDecl.name.str.length, funcDecl.name.str.buffer)
-            LowerFuncBody(this, funcDecl)
-            printf("End Coroutine: %.*s\n", funcDecl.name.str.length, funcDecl.name.str.buffer)
+            if(!ResolveCoroutine(this, funcDecl)) {
+                return false
+            }
         }
         else {
             if(!this.resolveStmt(funcDecl.body)) {

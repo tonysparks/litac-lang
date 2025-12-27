@@ -1,0 +1,269 @@
+import "std/array"
+import "std/mem"
+import "std/map"
+import "std/libc"
+import "std/hash"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/assert"
+
+import "intern"
+import "symbols"
+import "types"
+
+import "lita"
+import "ast"
+import "ast_copy"
+import "parser"
+import "checker"
+import "lex"
+import "module"
+import "common"
+import "coroutine/lowering"
+
+
+/* ----------------------------------------------------------------------
+
+ Coroutines generation:
+
+ public struct %funcName%__Stack {
+    // all stack allocated variables
+ }
+
+ public func %funcName%__Coroutine(cont: *Continuation) : ContinuationResult {
+    var stack = cont.stack as (*%funcName%__Stack)
+    return %funcName%(
+        cont,
+        // pass args
+    )
+ }
+
+   ---------------------------------------------------------------------- */
+
+public func CreateCoroutineForwardDecls(
+    checker: *TypeChecker,
+    coSym: *Symbol
+) : Array<*Decl> {
+
+    assert(coSym)
+    assert(coSym.decl)
+    assert(coSym.flags & SymbolFlags.IS_COROUTINE)
+
+    var allocator = checker.current.allocator
+
+    var sb = StringBuilderInit(2048, allocator)
+    var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
+
+    var coName = GetCoroutineName(coSym, nameBuffer)
+    GenerateCoroutineStackForwardDecl(
+        coSym,
+        coName,
+        sb
+    )
+
+    //printf("%s\n", sb.cStr())
+    var parser = ParserInit(
+        "generated",
+        sb.cStr(),
+        sb.length,
+        checker.current,
+        checker.lita
+    )
+
+    var stmts = parser.parseModule()
+    return stmts.declarations
+}
+
+func GenerateCoroutineStackForwardDecl(
+    coSym: *Symbol,
+    coName: String,
+    sb: *StringBuilder
+) {
+    sb.append("@generated @hidden public struct %.*s__CoroutineStack {\n", coName.length, coName.buffer)
+
+    var decl = coSym.decl
+    assert(decl != null)
+
+    var funcDecl = decl as (*FuncDecl)/*
+    var params = &funcDecl.params.params
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.get(i)
+
+        var sym = param.sym
+        assert(sym != null)
+
+        if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+            continue
+        }
+
+        sb.append("    __%.*s__%d: ",
+            param.name.str.length, param.name.str.buffer, 1
+        )
+        sym.type.toString(sb, true)
+        sb.append("\n")
+    }*/
+
+    if(funcDecl.returnType != null) {
+        var returnInfo = funcDecl.returnType.typeInfo
+        assert(returnInfo != null)
+
+        sb.append("    __result__0: ")
+        returnInfo.toString(sb, true)
+        sb.append("\n")
+    }
+
+    sb.append("}\n")
+}
+
+internal func CreateCoroutineDecls(
+    checker: *TypeChecker,
+    coSym: *Symbol,
+    context: *CoroutineContext
+) : Array<*Decl> {
+
+    assert(coSym)
+    assert(coSym.decl)
+    assert(coSym.flags & SymbolFlags.IS_COROUTINE)
+
+    var allocator = checker.current.allocator
+
+    var sb = StringBuilderInit(2048, allocator)
+    var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
+
+    var coName = GetCoroutineName(coSym, nameBuffer)
+    GenerateCoroutineStack(context, coSym, coName, sb)
+    GenerateCoroutineWrapper(context, coSym, coName, sb)
+
+    // printf("%s\n", sb.cStr())
+    var parser = ParserInit(
+        "generated",
+        sb.cStr(),
+        sb.length,
+        checker.current,
+        checker.lita
+    )
+
+    var stmts = parser.parseModule()
+    return stmts.declarations
+}
+
+func GenerateCoroutineStack(
+    context: *CoroutineContext,
+    coSym: *Symbol,
+    coName: String,
+    sb: *StringBuilder
+) {
+    sb.append("@generated @hidden public struct %.*s__CoroutineStack {\n", coName.length, coName.buffer)
+
+    var decl = coSym.decl
+    assert(decl != null)
+
+    var funcDecl = decl as (*FuncDecl)
+    var params = &funcDecl.params.params
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.get(i)
+
+        var sym = param.sym
+        assert(sym != null)
+
+        if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+            continue
+        }
+
+        sb.append("    __%.*s__%d: ",
+            param.name.str.length, param.name.str.buffer, 1
+        )
+        sym.type.toString(sb, true)
+        sb.append("\n")
+    }
+
+    if(funcDecl.returnType != null) {
+        var returnInfo = funcDecl.returnType.typeInfo
+        assert(returnInfo != null)
+
+        sb.append("    __result__0: ")
+        returnInfo.toString(sb, true)
+        sb.append("\n")
+    }
+
+    for(var i = 0; i < context.patches.size(); i+=1) {
+        var patch = context.patches.getPtr(i)
+        var kind = patch.stmt.getKind()
+        if(kind == StmtKind.VAR_DECL || kind == StmtKind.CONST_DECL) {
+            var decl = patch.stmt as (*VarDecl)
+            if(decl.flags & VarDeclFlags.IS_TEMPORARY) {
+                continue
+            }
+
+            var sym = decl.sym
+            assert(sym != null)
+
+            sb.append("    %.*s: ", patch.name.length, patch.name.buffer)
+            sym.type.toString(sb, true)
+            sb.append("\n")
+        }
+    }
+
+    sb.append("}\n")
+}
+
+func GenerateCoroutineWrapper(
+    context: *CoroutineContext,
+    coSym: *Symbol,
+    coName: String,
+    sb: *StringBuilder
+) {
+    sb.append("@hidden public func %.*s__Coroutine(cont: *Continuation) : ContinuationResult {\n", coName.length, coName.buffer)
+    sb.append("    var stack = cont.stack as (*%.*s__CoroutineStack)\n", coName.length, coName.buffer)
+    sb.append("    stack.____cont__1 = cont\n")
+    sb.append("    return %.*s(\n", coName.length, coName.buffer)
+
+    var decl = coSym.decl
+    assert(decl != null)
+
+    var funcDecl = decl as (*FuncDecl)
+    var params = &funcDecl.params.params
+    var isFirst = true
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.get(i)
+
+        var sym = param.sym
+        assert(sym != null)
+        if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+            continue
+        }
+
+        var comma = ' '
+        if(!isFirst) {
+            comma = ','
+        }
+        sb.append("        %c stack.__%.*s__%d",
+            comma,
+            param.name.str.length, param.name.str.buffer, 1
+        )
+        sb.append("\n")
+        isFirst = false
+    }
+
+    sb.append("    );\n")
+    sb.append("}\n")
+}
+
+func GetCoroutineName(sym: *Symbol, sb: *StringBuilder) : String {
+
+    // if this isn't a generic generated trait, just use the symbol name
+    if(!(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
+        return sym.name.view
+    }
+
+    sb.clear()
+
+    // otherwise, we have to calculate the new name using the generic type arguments
+    EscapeName(sym.name.buffer, sym.name.length, sb)
+
+    return String {
+        .buffer = sb.buffer,
+        .length = sb.length
+    }
+}

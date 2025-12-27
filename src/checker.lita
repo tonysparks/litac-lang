@@ -31,7 +31,6 @@ import "preprocessor"
 import "lsp/references"
 import "coroutine"
 
-import "lowering"
 
 /**
 ===================================================================
@@ -52,6 +51,11 @@ internal struct LabelInfo {
 internal struct LabelStack {
     labels: [MAX_LABELS]LabelInfo
     numOfLabels: i32
+}
+
+internal func (this: *LabelStack) clear() {
+    memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
+    this.numOfLabels = 0
 }
 
 struct GenericContext {
@@ -172,29 +176,6 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
         }
         this.leaveModule()
     }
-
-    // Generate coroutine wrappers/etc
-    /*
-    if(!(flags & TypeCheckerFlags.DISABLE_COROUTINE_WRAPPERS)) {
-        this.enterModule(root)
-        {
-            var decls = CreateCoroutines(this)
-            this.bypassing = true
-            for(var i = 0; i < decls.size(); i += 1) {
-                var decl = decls.get(i)
-
-                var sym = this.createDeclSymbol(decl)
-                if(sym == null) {
-                    continue
-                }
-
-                this.resolveSymbol(sym)
-                this.finishResolveSymbol(sym)
-            }
-            this.bypassing = false
-        }
-        this.leaveModule()
-    }*/
 
     if(!this.lita.result.hasErrors()) {
         var introspect = Introspect{.lita = this.lita}
@@ -1904,6 +1885,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true;
         }
+        case StmtKind.YIELD_STMT:
         case StmtKind.RETURN_STMT: {
             var ret = stmt as (*ReturnStmt)
 

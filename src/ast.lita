@@ -51,6 +51,7 @@ public enum StmtKind {
     MODULE_STMT,
     NOTE_STMT,
     PARAMETERS_STMT,
+    YIELD_STMT,
     RETURN_STMT,
     SWITCH_CASE_STMT,
     SWITCH_STMT,
@@ -227,6 +228,7 @@ public struct Node {
         noteStmt: NoteStmt
         parametersStmt: ParametersStmt
         returnStmt: ReturnStmt
+        yieldStmt: ReturnStmt
         switchCaseStmt: SwitchCaseStmt
         switchStmt: SwitchStmt
         whileStmt: WhileStmt

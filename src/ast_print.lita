@@ -598,6 +598,15 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
             return;
         }
+        case StmtKind.YIELD_STMT: {
+            var stmt = s as (*ReturnStmt)
+            Printf(indent, "yield");
+            if(stmt.expr) {
+                printf(" ")
+                PrintStmt(stmt.expr, 0)
+            }
+            return;
+        }
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
             Printf(indent, "return");

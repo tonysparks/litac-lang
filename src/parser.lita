@@ -1690,6 +1690,10 @@ func (p: *Parser) tryStatement() : *Stmt {
         return p.returnStatement()
     }
 
+    if(p.match(TokenType.YIELD)) {
+        return p.yieldStatement()
+    }
+
     if(p.match(TokenType.DEFER)) {
         return p.deferStatement()
     }
@@ -2296,6 +2300,17 @@ func (p: *Parser) returnStatement() : *Stmt {
     }
 
     var stmtNode = NewReturnStmt(pos, p.pos(), expr, p.allocator)
+    return &stmtNode.asStmt
+}
+
+func (p: *Parser) yieldStatement() : *Stmt {
+    var pos = p.prevPos()
+    var expr: *Expr = null
+    if(!p.check(TokenType.SEMICOLON)) {
+        expr = p.expression()
+    }
+
+    var stmtNode = NewYieldStmt(pos, p.pos(), expr, p.allocator)
     return &stmtNode.asStmt
 }
 
