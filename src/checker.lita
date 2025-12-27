@@ -617,42 +617,9 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             if(sym.flags & SymbolFlags.IS_COROUTINE) {
                 this.symbolCoroutines.add(sym)
 
-                var index = 0
-                if(isMethod) {
-                    index += 1
+                if(!AddContinuationParam(this, funcDecl, sym)) {
+                    goto err;
                 }
-
-                var paramsNode = funcDecl.params.asNode()
-                var contParamType = NewTypeSpec(
-                    TypeSpecKind.PTR,
-                    paramsNode.startPos,
-                    &this.current.typeSpecAllocator
-                )
-                var paramValue = $"std::coroutine::Continuation"
-                contParamType.base = NewNameTypeSpecIntern(
-                    paramsNode.startPos,
-                    this.lita.strings.internString(paramValue),
-                    &this.current.typeSpecAllocator
-                )
-
-                var coParamNode = NewParameterDecl(
-                    paramsNode.startPos, paramsNode.endPos,
-                    NewIdentifier(
-                        "__cont",
-                        paramsNode.startPos,
-                        this.lita.strings
-                    ),
-                    contParamType,
-                    null,
-                    false,
-                    this.allocator
-                )
-
-                var coParam = &coParamNode.paramDecl
-                funcDecl.params.insertAt(
-                    index,
-                    coParam
-                )
             }
 
             if(!funcDecl.genericParams.empty()) {

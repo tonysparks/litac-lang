@@ -93,10 +93,10 @@ public func (this: *Dispatcher) submit(
 
 @suspend
 func adder(a: i32, b: i32) : i32 {
-    var r = subber(a, 1)
-   //var r = a
+    var r = subber(a, 1) + subber(b, 1)
+    var z = NormalFunc(r)
     printf("R = %d A = %d B = %d, r+b = %d\n", r, a, b, r+b)
-    return r + b
+    return z + b
 }
 
 @suspend
@@ -105,6 +105,10 @@ func subber(a: i32, b: i32) : i32 {
     yield b
     yield a
     return a - b
+}
+
+func NormalFunc(x: i32) : i32 {
+    return x * 2
 }
 
 @test

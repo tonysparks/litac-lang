@@ -14,12 +14,14 @@ import "types"
 
 import "lita"
 import "ast"
+import "ast_new"
 import "ast_copy"
 import "parser"
 import "checker"
 import "lex"
 import "module"
 import "common"
+import "phase_result"
 import "coroutine/lowering"
 
 
@@ -27,7 +29,7 @@ import "coroutine/lowering"
 
  Coroutines generation:
 
- public struct %funcName%__Stack {
+ public struct %funcName%__CoroutineStack {
     // all stack allocated variables
  }
 
@@ -37,6 +39,86 @@ import "coroutine/lowering"
         cont,
         // pass args
     )
+ }
+
+ We take the following function:
+
+ @suspend
+ func MyFirstCoroutine(a: i32) : i32 {
+    var x = a + 3
+    yield x
+
+    var y = AnotherCoroutine(x)
+
+    return y
+ }
+
+ And convert to roughly the following:
+ func MyFirstCoroutine(cont: *Continuation, a: i32) : ContinuationResult {
+    var stack = cont.stack as (*MyFirstCoroutine__CoroutineStack)
+    if(!stack) {
+        stack = new<MyFirstCoroutine__CoroutineStack>(cont.context.allocator)
+        cont.stack = stack
+    }
+    switch(cont.state) {
+        case 0: goto LABEL_0; break;
+        case 1: goto LABEL_1; break;
+        case 2: goto LABEL_2; break;
+        default: assert(false)
+    }
+
+LABEL_0:
+
+    // convert local variable to be held on the 'stack' continuation
+    stack.x = a + 3
+
+    // when we encounter a suspendable statement, we increment
+    // the state counter so that when we come back to this coroutine
+    // we pick up where we left off
+    {
+        // set the result value of the function, since we change the
+        // function signature, we actually store the result in a variable
+        stack.result = stack.x
+
+        // increment the state counter, so next time we jump to LABEL_1
+        stack.state += 1
+
+        // yield suspends the coroutine
+        return ContinuationResult.SUSPENDED
+    }
+
+LABEL_1:
+
+    // Create a continuation to pass to the suspendable function
+    var temp1 = NewContinuation(
+            cont.context.allocator,
+            Continuation {
+                .context = cont.context,
+                .parent = cont,
+                .stack = null,
+                .state = 0_u32,
+                .callback = MyFirstCoroutine__Coroutine
+            }
+        )
+
+    // Call the coroutine with the newly created continuation
+    var temp2 = AnotherCoroutine(stack.x, temp1)
+
+    stack.state += 1
+
+    // if the other coroutine is suspended, we must suspend
+    // this coroutine as well
+    if(temp2 == ContinuationResult.SUSPENDED) {
+        return ContinuationResult.SUSPENDED
+    }
+
+LABEL_2:
+
+    stack.y = temp1.stack as (*AnotherCoroutine__CoroutineStack).result
+    FreeContinuation(temp1)
+
+    stack.result = stack.y
+    return ContinuationResult.OK
  }
 
    ---------------------------------------------------------------------- */
@@ -266,4 +348,66 @@ func GetCoroutineName(sym: *Symbol, sb: *StringBuilder) : String {
         .buffer = sb.buffer,
         .length = sb.length
     }
+}
+
+/**
+    Adds a continutation parameter to a coroutine
+
+    func MyCoroutine(a: i32) : i32
+
+    to
+
+    func MyCoroutine(a: i32, cont: *Continutation = null) : i32
+*/
+public func AddContinuationParam(
+    checker: *TypeChecker,
+    funcDecl: *FuncDecl,
+    coSym: *Symbol
+): bool {
+
+    if(funcDecl.params.isVararg ||
+       funcDecl.params.isNativeVararg
+    ) {
+        checker.result.addError(
+            funcDecl.getStartPos(),
+            "coroutine functions with variable arguments are currently not supported"
+        )
+        return false
+    }
+
+    var paramsNode = funcDecl.params.asNode()
+    var contParamType = NewTypeSpec(
+        TypeSpecKind.PTR,
+        paramsNode.startPos,
+        &checker.current.typeSpecAllocator
+    )
+    var paramValue = $"std::coroutine::Continuation"
+    contParamType.base = NewNameTypeSpecIntern(
+        paramsNode.startPos,
+        checker.lita.strings.internString(paramValue),
+        &checker.current.typeSpecAllocator
+    )
+
+    var coParamNode = NewParameterDecl(
+        paramsNode.startPos, paramsNode.endPos,
+        NewIdentifier(
+            "__cont",
+            paramsNode.startPos,
+            checker.lita.strings
+        ),
+        contParamType,
+        &NewNullExpr(
+            paramsNode.startPos, paramsNode.endPos,
+            checker.allocator
+        ).asExpr,
+        false,
+        checker.allocator
+    )
+
+    var coParam = &coParamNode.paramDecl
+    funcDecl.params.add(
+        coParam
+    )
+
+    return true
 }

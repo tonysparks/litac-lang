@@ -229,19 +229,16 @@ internal func PatchCoroutine(
                     var contParamName: String
                     var stackParamName: String
 
+                    var isCoroutine = (sym.flags & SymbolFlags.IS_COROUTINE)
                     /**
                         Current issues:
-                        1) passed in continuation needs to be
-                           lowered to a temp variable, so it
-                           can be referenced later
-                        2) called continuation return value needs
-                           to be checked for ContinuationResult
-                        3) the stack continuation result needs to
-                           be looked at for the actual function value
-                           result if ContinuationResult.OK
+                        1) the function result is assigned to a local temp, needs
+                           to be stored in stack
+                        2) continuation variable is stored in local temp, needs
+                           to be stored in stack
                     */
-                    if(!(sym.flags & SymbolFlags.IS_COROUTINE)) {
-                        funcCallExpr.arguments.removeAt(0)
+                    if(!isCoroutine) {
+                        // funcCallExpr.arguments.removeAt(0)
                     } else {
                         contParamName = NewTempName(context).toString()
 
@@ -293,7 +290,11 @@ internal func PatchCoroutine(
                                 return false
                             }
 
-                            funcCallExpr.arguments.set(0, CallArg {.argExpr = idExpr})
+                            // the default parameter has been injected already
+                            funcCallExpr.arguments.set(
+                                funcCallExpr.arguments.size() - 1,
+                                CallArg {.argExpr = idExpr}
+                            )
                         }
                     }
 
@@ -308,7 +309,7 @@ internal func PatchCoroutine(
                             tempNode.kind = StmtKind.EMPTY_STMT;
 
                             *returnNode = *exprNode
-                        } else {
+                        } else if(isCoroutine) {
                             assert(patch.aux.getKind() == StmtKind.VAR_DECL)
 
                             var tempVarNode = patch.aux.asNode()
@@ -319,6 +320,7 @@ internal func PatchCoroutine(
                             var coTempResult = NewTempAssignment(context, tempVar.expr, .insert = false)
                             if(!checker.resolveStmt(coTempResult)) {
                                 printf("*************************BADz\n")
+                                PrintStmt(coTempResult)
                                 return false
                             }
                             InsertStmt(context, coTempResult, patch.block, tempDeclIndex += 1)

@@ -1002,6 +1002,7 @@ func FunctionLowering(context: *CoroutineContext, ast: *Stmt) : *Stmt {
             */
             expr.object = FunctionLowering(context, expr.object) as (*Expr)
 
+/*
             var nullExpr = &NewNullExpr(
                 expr.getStartPos(),
                 expr.getEndPos(),
@@ -1011,7 +1012,7 @@ func FunctionLowering(context: *CoroutineContext, ast: *Stmt) : *Stmt {
             // create a temporary argument for the passed in continuation
             // if this isn't a continuation, we will patch this argument out
             expr.arguments.insertAt(0, CallArg {.argExpr = nullExpr})
-
+*/
             for(var i = 0; i < expr.arguments.size(); i += 1) {
                 var arg = expr.arguments.getPtr(i)
                 arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Expr)
