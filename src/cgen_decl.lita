@@ -203,7 +203,7 @@ public func (this: using *CGen) emitAggregateDecl(decl: *AggregateDecl) {
         name = ""
     }
 
-    this.emit("%s %s {", decl.kind == StmtKind.UNION_DECL ? "union" : "struct", name)
+    this.emit("%s %s {", decl.getKind() == StmtKind.UNION_DECL ? "union" : "struct", name)
     for(var i = 0; i < decl.fields.size(); i+=1) {
         var field = decl.fields.get(i)
         switch(field.kind) {

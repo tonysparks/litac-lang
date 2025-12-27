@@ -15,12 +15,24 @@ public struct NativeVararg {
     numberOfArgs: i32
 }
 
+/*
+public struct Continuation {
+    stack: *void
+}
+
+public struct ContinuationResult {
+
+}
+*/
 
 /**
 ========================================================================
 Note declarations
 ========================================================================
 */
+
+public @note suspend {
+}
 
 public @note compiler_option {
     cc: *const char = "default"

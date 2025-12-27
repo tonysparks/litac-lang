@@ -1,0 +1,60 @@
+
+
+func FirstCall(cont: *Continuation, a: i32) : ContResult {
+    var stack = cont.stack as (*FirstCall__CoroutineStack)
+    var allocator = cont.context.allocator
+	if(stack == null) {
+		cont.stack = new<FirstCall__CoroutineStack>(allocator)
+		stack = cont.stack
+		stack.__a_1 = a;
+	}
+    switch(cont.state) {
+        case 0: goto __LABEL_0; break;
+        case 1: goto __LABEL_1; break;
+    }
+
+__LABEL_0:
+    stack.__t1_2 = new<Continuation>(allocator)
+    *stack.__t1_2 = Continuation {
+        .context = cont.context,
+        .parent = cont,
+        .stack = null,
+        .state = 0_u32,
+        .callback = FirstCall__Coroutine
+    }
+
+    var t2 = SecondCall(&stack.__t1_2, 1)
+    stack.state += 1
+
+    if(t2 == ContResult.SUSPENDED) {
+        return ContResult.SUSPENDED
+    }
+
+__LABEL_1:
+    stack.__t3_2 = (stack.__t1_2.stack as (*SecondCall_CoroutineStack).__result_0
+    free(stack.__t1_2)
+
+    stack.__result_0 = stack.__t3_2 + stack.__a_1
+
+    return ContResult.DONE
+}
+
+func SecondCall(cont: *Continuation, a: i32) : ContResult {
+    var stack = cont.stack as (*SecondCall__CoroutineStack)
+    if(stack == null) {
+		cont.stack = new<SecondCall__CoroutineStack>(cont.context.allocator)
+		stack = cont.stack
+		stack.__a_1 = a;
+	}
+    switch(cont.state) {
+        case 0: goto __LABEL_0; break;
+        case 1: goto __LABEL_1; break;
+    }
+
+__LABEL_1:
+    var t1 = stack.__a_1 + 23
+    stack.__result_0 = t1
+    return ContResult.DONE
+}
+
+Submit()

@@ -171,7 +171,7 @@ public func va_arg<T>(args: va_list) : T {
 @foreign public func toupper(arg: i32) : i32;
 @foreign public func isalnum(arg: i32) : i32;
 @foreign public func isspace(arg: i32) : i32;
-@foreign public func isalpha(c: char) : bool;
+@foreign public func isalpha(c: char) : i32;
 @foreign public func atoi(str: *const char) : i32;
 
 // numbers

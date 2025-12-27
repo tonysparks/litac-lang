@@ -92,7 +92,8 @@ report:
     var sb = StringBuilderInit(1024)
     defer sb.free()
 
-    if(!lita.result.errors.empty()) {
+    var hasError = !lita.result.errors.empty()
+    if(hasError) {
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
             PrintError(lita.options.isColoredOutput, sb, lita.result.errors.get(i))
 
@@ -130,7 +131,7 @@ report:
         return lita.run()
     }
 
-    return 0
+    return hasError ? 1 : 0
 }
 
 public enum ParseStatus {
@@ -351,11 +352,26 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
     if(options.srcPath.empty()) {
         var path = StringInit(options.inputFile, MAX_PATH)
-        var index = path.lastIndexOfAt($"/src/")
-        if(index > -1) {
-            StringCopy(.src = options.inputFile, .dest = options.srcPath, .size = index + 5)
+        var paths = []String {
+            $"/src/",
+            $"/stdlib/",
+            $"/test/",
         }
-        else {
+
+        var index = -1
+        for(var i = 0; i < sizeof(paths) / sizeof(paths[0]); i+=1) {
+            index = path.lastIndexOfAt(paths[i])
+            if(index > -1) {
+                StringCopy(
+                    .src = options.inputFile,
+                    .dest = options.srcPath,
+                    .size = index + paths[i].length
+                )
+                break
+            }
+        }
+
+        if(index < 0) {
             FileParent(options.inputFile, options.srcPath)
         }
     }
