@@ -54,6 +54,17 @@ public func NewNameTypeSpecIntern(pos: SrcPos, name: InternedString, typeAllocat
     return result
 }
 
+public func NewBaseTypeSpec(
+    kind: TypeSpecKind,
+    pos: SrcPos,
+    base: *TypeSpec,
+    typeAllocator: *TypeSpecAllocator
+) : *TypeSpec {
+    var typeSpec = NewTypeSpec(kind, pos, typeAllocator)
+    typeSpec.base = base
+    return typeSpec
+}
+
 public func NewTypeSpec(kind: TypeSpecKind, pos: SrcPos, typeAllocator: *TypeSpecAllocator) : *TypeSpec {
     switch(kind) {
         case TypeSpecKind.NONE: {
@@ -120,13 +131,21 @@ public func NewIdentifier(
 ) : Identifier {
 
     var str = strings.intern(name, name.length())
+    return NewIdentifierEx(str, pos)
+}
+
+public func NewIdentifierEx(
+    name: InternedString,
+    pos: SrcPos
+) : Identifier {
+
     var identifier = Identifier {
-        .str = str,
+        .str = name,
         .token = Token {
             .type = TokenType.IDENTIFIER,
             .pos = pos,
             .value = Value {
-                .str = str.view
+                .str = name.view
             }
         }
     }

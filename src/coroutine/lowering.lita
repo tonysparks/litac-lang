@@ -41,21 +41,19 @@ internal struct CoroutineContext {
     patches: Array<Patch>
 }
 
-// public struct CoroutinePatch {
-//     coSym: *Symbol
-//     patches: Array<Patch>
-// }
-
 internal struct Patch {
     stmt: *Stmt       // the statement that is triggering the patch
     aux: *Stmt        // [optional] auxilary statement to give context
     ret: *Stmt        // [optional] the returned statement
     label: *Stmt      // [optional] the label
+    cont: *Stmt       // [optional] continuation var decl
 
     block: *BlockStmt
     index: u32
     name: InternedString
-    isResult: bool
+    isResult: bool    // is this the result of a function call
+    isPsuedo: bool    // is this a variable that should be a stack
+                      // variable but shouldn't be substituded
 }
 
 
@@ -82,7 +80,8 @@ internal func (this: *CoroutineContext) setVar(name: InternedString, makeCanonic
     if(makeCanonical) {
         sb.format("__%.*s__%d", name.length, name.buffer, this.scopeIndex)
     } else {
-        sb.format("__%.*s", name.length, name.buffer)
+        //sb.format("__%.*s", name.length, name.buffer)
+        sb.format("%.*s", name.length, name.buffer)
     }
 
     var internedName = this.strings.internCopy(sb.cStr(), sb.length)
@@ -148,6 +147,16 @@ internal func NewIdentFromTemp(context: *CoroutineContext, temp: *VarDecl): *Nod
     )
 }
 
+internal func NewGetExprFromSetExpr(context: *CoroutineContext, setExpr: *SetExpr): *Node {
+    return NewGetExpr(
+        setExpr.getStartPos(),
+        setExpr.getEndPos(),
+        setExpr.object,
+        setExpr.field,
+        context.allocator
+    )
+}
+
 internal func NewTempName(context: *CoroutineContext) : StringBuilder {
     var name = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
     name.append("__%d", context.tempIndex += 1)
@@ -157,28 +166,31 @@ internal func NewTempName(context: *CoroutineContext) : StringBuilder {
 internal func NewTempAssignment(
     context: *CoroutineContext,
     expr: *Expr,
-    varName: *const char = null,
-    insert: bool = true
+    varName: InternedString = EMPTY_STR,
+    insert: bool = true,
+    temporary: bool = true
 ) : *VarDecl {
-    if(varName == null) {
+    if(varName.view.empty()) {
         var name = NewTempName(context)
-        varName = name.cStr()
+        var str = name.toString()
+        varName = context.strings.internString(&str)
     }
 
     var tempNode = NewVarDecl(
         expr.getStartPos(),
         expr.getEndPos(),
-        NewIdentifier(
+        NewIdentifierEx(
             varName,
-            expr.getStartPos(),
-            context.strings
+            expr.getStartPos()
         ),
         null,
         expr,
         context.allocator
     )
     var temp = &tempNode.varDecl
-    temp.flags |= VarDeclFlags.IS_TEMPORARY
+    if(temporary) {
+        temp.flags |= VarDeclFlags.IS_TEMPORARY
+    }
 
     if(insert) {
         InsertTempStmt(context, temp, .atEnd = true)
@@ -190,7 +202,8 @@ internal func NewTempAssignment(
 internal func NewTempEmptyAssignment(
     context: *CoroutineContext,
     expr: *Expr,
-    isTernary: bool = false
+    typeSpec: *TypeSpec = null,
+    temporary: bool = true
 ) : *VarDecl {
     var name = NewTempName(context)
 
@@ -202,15 +215,15 @@ internal func NewTempEmptyAssignment(
             expr.getStartPos(),
             context.strings
         ),
-        !isTernary ? expr.operand.typeInfo.asTypeSpec(
-            context.module, true
-        ) : null,
+        typeSpec,
         null,
         context.allocator
     )
 
     var temp = &tempNode.varDecl
-    temp.flags |= VarDeclFlags.IS_TEMPORARY
+    if(temporary) {
+        temp.flags |= VarDeclFlags.IS_TEMPORARY
+    }
 
     InsertTempStmt(context, temp, .atEnd = true)
     return temp as (*VarDecl)
@@ -1002,36 +1015,78 @@ func FunctionLowering(context: *CoroutineContext, ast: *Stmt) : *Stmt {
             */
             expr.object = FunctionLowering(context, expr.object) as (*Expr)
 
-/*
-            var nullExpr = &NewNullExpr(
-                expr.getStartPos(),
-                expr.getEndPos(),
-                context.allocator
-            ).asExpr
-
-            // create a temporary argument for the passed in continuation
-            // if this isn't a continuation, we will patch this argument out
-            expr.arguments.insertAt(0, CallArg {.argExpr = nullExpr})
-*/
             for(var i = 0; i < expr.arguments.size(); i += 1) {
                 var arg = expr.arguments.getPtr(i)
                 arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Expr)
             }
 
-            var temp = NewTempAssignment(context, expr)
-            var label = InsertLabel(context, temp)
+            var contParamName = $"std::coroutine::Continuation"
+            var continuationVar = NewTempEmptyAssignment(
+                context,
+                expr,
+                NewBaseTypeSpec(
+                    TypeSpecKind.PTR,
+                    expr.getStartPos(),
+                    NewNameTypeSpecIntern(
+                        expr.getStartPos(),
+                        context.strings.internString(contParamName),
+                        &context.checker.current.typeSpecAllocator
+                    ),
+                    &context.checker.current.typeSpecAllocator
+                ),
+                .temporary = false
+            )
+            context.patches.add(
+                Patch {
+                    .stmt = continuationVar as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex,
+                    .name = continuationVar.name.str,
+                    .isPsuedo = true // let the funcCallExpr patching will handling this...
+                }
+            )
 
-            var idExpr = &NewIdentFromTemp(context, temp).asStmt
+            var resultVar = NewTempAssignment(
+                context,
+                expr,
+                .varName = EMPTY_STR,
+                .insert = true,
+                .temporary = false
+            )
+            var label = InsertLabel(context, resultVar)
+
+            var idExpr = &NewIdentFromTemp(context, resultVar).asStmt
+            // context.patches.add(
+            //     Patch {
+            //         .stmt = idExpr as (*Stmt),
+            //         .block = context.current.block,
+            //         .index = context.current.insertIndex,
+            //         .name = resultVar.name.str,
+            //     }
+            // )
+
+            context.patches.add(
+                Patch {
+                    .stmt = resultVar as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex,
+                    .name = resultVar.name.str,
+                    .isPsuedo = true // let the funcCallExpr patching will handling this...
+                }
+            )
+
             context.patches.add(
                 Patch {
                     .stmt = expr as (*Stmt),
                     .block = context.current.block,
                     .index = context.current.insertIndex + context.current.numberOfInserts + 1,
-                    .aux = temp as (*Stmt),
+                    .aux = resultVar as (*Stmt),
                     .label = label,
-                    .ret = idExpr
+                    .ret = idExpr,
+                    .cont = continuationVar as (*Stmt)
                 }
             )
+
             return idExpr
         }
         case StmtKind.GET_EXPR: {
@@ -1134,7 +1189,7 @@ func FunctionLowering(context: *CoroutineContext, ast: *Stmt) : *Stmt {
                 }
                 result
             */
-            var resultTemp = NewTempEmptyAssignment(context, expr.then, true)
+            var resultTemp = NewTempEmptyAssignment(context, expr.then)
             resultTemp.flags |= VarDeclFlags.IS_TERNARY
 
             var nameTypeSpec = NewNameTypeSpecIntern(

@@ -50,7 +50,7 @@ internal func PatchCoroutine(
             funcDecl.name.str.length, funcDecl.name.str.buffer,
             funcDecl.name.str.length, funcDecl.name.str.buffer
         )
-        for(var i = 1; i < funcDecl.params.size(); i+=1) {
+        for(var i = 0; i < funcDecl.params.size() - 1; i+=1) {
             var param = funcDecl.params.get(i)
             code.append(
                 "__stack.__%.*s__1 = %.*s;\n",
@@ -118,6 +118,11 @@ internal func PatchCoroutine(
         for(var i = 0; i < context.patches.size(); i+=1) {
             var patch = context.patches.getPtr(i)
             var node = patch.stmt.asNode()
+
+            if(patch.isPsuedo) {
+                continue
+            }
+
             var name = patch.name
             if(patch.isResult) {
                 name = resultName
@@ -126,39 +131,17 @@ internal func PatchCoroutine(
             switch(node.kind) {
                 case StmtKind.VAR_DECL:
                 case StmtKind.CONST_DECL: {
-                    var varDecl = &node.varDecl
-
-                    node.kind = StmtKind.SET_EXPR
-                    node.setExpr.object = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                continuationName,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).asExpr
-                    )
-                    node.setExpr.field = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                name,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).identifierExpr
-                    )
-                    node.setExpr.value = varDecl.expr
-                    node.setExpr.operator = TokenType.EQUALS
-
-                    if(!checker.resolveStmt(&node.asStmt)) {
-                        printf("*************************BADv\n")
+                    if(!PatchVarDecl(continuationName, name, checker, node)) {
                         return false
                     }
                     break
+                }
+                case StmtKind.FUNC_IDENTIFIER_EXPR:
+                case StmtKind.IDENTIFIER_EXPR: {
+                    if(!PatchIdentifier(continuationName, patch.name, checker, node)) {
+                        return false
+                    }
+                    break;
                 }
                 case StmtKind.YIELD_STMT:
                 case StmtKind.RETURN_STMT: {
@@ -226,7 +209,7 @@ internal func PatchCoroutine(
                     }
                     assert(tempDeclIndex > -1)
 
-                    var contParamName: String
+                    var contParamName: InternedString
                     var stackParamName: String
 
                     var isCoroutine = (sym.flags & SymbolFlags.IS_COROUTINE)
@@ -237,10 +220,13 @@ internal func PatchCoroutine(
                         2) continuation variable is stored in local temp, needs
                            to be stored in stack
                     */
-                    if(!isCoroutine) {
-                        // funcCallExpr.arguments.removeAt(0)
-                    } else {
-                        contParamName = NewTempName(context).toString()
+                    if(isCoroutine) {
+                        // contParamName = NewTempName(context).toString()
+                        assert(patch.cont && patch.cont.getKind() == StmtKind.VAR_DECL)
+                        var contDecl = patch.cont as (*VarDecl)
+                        contDecl.setKind(StmtKind.EMPTY_STMT)
+
+                        contParamName = contDecl.name.str
 
                         // Create the Continuation
                         {
@@ -272,19 +258,29 @@ internal func PatchCoroutine(
                             parser.funcLevel += 1
                             var stmt = parser.statement()
 
-                            // TODO make local variable
-                            var temp = NewTempAssignment(context, stmt as (*Expr), .insert = false)
+                            var temp = NewTempAssignment(
+                                context,
+                                stmt as (*Expr),
+                                .varName = contParamName,
+                                .insert = false
+                            )
+
+                            if(!PatchVarDecl(continuationName, contParamName, checker, temp.asNode())) {
+                                return false
+                            }
+
                             if(!checker.resolveStmt(temp)) {
                                 printf("*************************BADx2\n")
                                 return false
                             }
 
-                            contParamName = temp.name.str.view
+                            // contParamName = temp.name.str.view
 
                             InsertStmt(context, temp, patch.block, tempDeclIndex += 1)
 
                             // finally add it to the first arg call
-                            var idExpr = &NewIdentFromTemp(context, temp).asExpr
+                            //var idExpr = &NewIdentFromTemp(context, temp).asExpr
+                            var idExpr = &NewGetExprFromSetExpr(context, temp as (*SetExpr)).asExpr
                             if(!checker.resolveStmt(idExpr)) {
                                 printf("*************************BADy\n")
                                 return false
@@ -311,11 +307,15 @@ internal func PatchCoroutine(
                             *returnNode = *exprNode
                         } else if(isCoroutine) {
                             assert(patch.aux.getKind() == StmtKind.VAR_DECL)
+                            //assert(patch.aux.getKind() == StmtKind.SET_EXPR)
 
                             var tempVarNode = patch.aux.asNode()
                             var tempVar = &tempVarNode.varDecl
-                            assert(tempVar.expr)
+                            //var tempVar = &tempVarNode.setExpr
+                            //assert(tempVar.expr)
                             tempVarNode.kind = StmtKind.EMPTY_STMT
+                            //var tempVarName = tempVar.field.type.name
+                            var tempVarName = tempVar.name.str
 
                             var coTempResult = NewTempAssignment(context, tempVar.expr, .insert = false)
                             if(!checker.resolveStmt(coTempResult)) {
@@ -325,10 +325,18 @@ internal func PatchCoroutine(
                             }
                             InsertStmt(context, coTempResult, patch.block, tempDeclIndex += 1)
 
-                            tempVar.expr = null
-                            tempVar.typeSpec = retType.asTypeSpec(
-                                context.module, true
-                            )
+                            // tempVar.expr = null
+                            // tempVar.typeSpec = retType.asTypeSpec(
+                            //     context.module, true
+                            // )
+
+                            //if(!PatchVarDecl(continuationName, tempVarName, checker, coTempResult.asNode())) {
+                            //    return false
+                            //}
+
+                            if(!PatchIdentifier(continuationName, tempVarName, checker, patch.ret.asNode())) {
+                                return false
+                            }
 
                             assert(patch.label && patch.label.getKind() == StmtKind.LABEL_STMT)
                             var labelNode = patch.label.asNode()
@@ -349,16 +357,23 @@ internal func PatchCoroutine(
                                         return std::coroutine::ContinuationResult.SUSPENDED
                                     }
                                     %.*s:
-                                    var %.*s = (%.*s.stack as (*%.*s__CoroutineStack)).__result__0
-                                    FreeContinuation(%.*s)
+                                    %.*s.%.*s = (%*s.%.*s.stack as (*%.*s__CoroutineStack)).__result__0
+                                    FreeContinuation(%.*s.%.*s)
 
                                 }
                                 """,
                                 coTempResult.name.str.length, coTempResult.name.str.buffer,
                                 label.label.str.length, label.label.str.buffer,
-                                tempVar.name.str.length, tempVar.name.str.buffer,
+
+                                continuationName.length, continuationName.buffer,
+                                tempVarName.length, tempVarName.buffer,
+
+                                continuationName.length, continuationName.buffer,
                                 contParamName.length, contParamName.buffer,
+
                                 typeInfo.name.length, typeInfo.name.buffer,
+
+                                continuationName.length, continuationName.buffer,
                                 contParamName.length, contParamName.buffer
                             )
 
@@ -373,6 +388,7 @@ internal func PatchCoroutine(
 
                             parser.funcLevel += 1
                             var stmt = parser.statement()
+
                             if(!checker.resolveStmt(stmt)) {
                                 printf("*************************BADw\n")
                                 return false
@@ -389,34 +405,7 @@ internal func PatchCoroutine(
                     break
                 }
                 default: {
-                    node.kind = StmtKind.GET_EXPR
-                    node.getExpr.object = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                continuationName,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).asExpr
-                    )
-                    node.getExpr.field = node.becomeParentOf(
-                        &NewIdentifierExpr(
-                            node.startPos, node.endPos,
-                            NewNameTypeSpecIntern(
-                                node.startPos,
-                                patch.name,
-                                &checker.current.typeSpecAllocator
-                            ),
-                            allocator
-                        ).identifierExpr
-                    )
-                    if(!checker.resolveStmt(&node.asStmt)) {
-                        printf("*************************BADv\n")
-                        return false
-                    }
-                    break;
+                    assert(false)
                 }
             }
         }
@@ -441,4 +430,83 @@ internal func PatchCoroutine(
 
     PrintStmt(funcDecl)
     //checker.current.currentScope.print("Function Scope")
+}
+
+
+func PatchIdentifier(
+    continuationName: InternedString,
+    fieldName: InternedString,
+    checker: *TypeChecker,
+    node: *Node
+): bool {
+    node.kind = StmtKind.GET_EXPR
+    node.getExpr.object = node.becomeParentOf(
+        &NewIdentifierExpr(
+            node.startPos, node.endPos,
+            NewNameTypeSpecIntern(
+                node.startPos,
+                continuationName,
+                &checker.current.typeSpecAllocator
+            ),
+            checker.allocator
+        ).asExpr
+    )
+    node.getExpr.field = node.becomeParentOf(
+        &NewIdentifierExpr(
+            node.startPos, node.endPos,
+            NewNameTypeSpecIntern(
+                node.startPos,
+                fieldName,
+                &checker.current.typeSpecAllocator
+            ),
+            checker.allocator
+        ).identifierExpr
+    )
+    if(!checker.resolveStmt(&node.asStmt)) {
+        PrintStmt(node.asStmt)
+        printf("*************************BADv~~\n")
+        return false
+    }
+    return true
+}
+
+func PatchVarDecl(
+    continuationName: InternedString,
+    fieldName: InternedString,
+    checker: *TypeChecker,
+    node: *Node
+): bool {
+    var varDecl = &node.varDecl
+
+    node.kind = StmtKind.SET_EXPR
+    node.setExpr.object = node.becomeParentOf(
+        &NewIdentifierExpr(
+            node.startPos, node.endPos,
+            NewNameTypeSpecIntern(
+                node.startPos,
+                continuationName,
+                &checker.current.typeSpecAllocator
+            ),
+            checker.allocator
+        ).asExpr
+    )
+    node.setExpr.field = node.becomeParentOf(
+        &NewIdentifierExpr(
+            node.startPos, node.endPos,
+            NewNameTypeSpecIntern(
+                node.startPos,
+                fieldName,
+                &checker.current.typeSpecAllocator
+            ),
+            checker.allocator
+        ).identifierExpr
+    )
+    node.setExpr.value = varDecl.expr
+    node.setExpr.operator = TokenType.EQUALS
+
+    if(!checker.resolveStmt(&node.asStmt)) {
+        printf("*************************BADv\n")
+        return false
+    }
+    return true
 }

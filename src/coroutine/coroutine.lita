@@ -281,6 +281,10 @@ func GenerateCoroutineStack(
             var sym = decl.sym
             assert(sym != null)
 
+            if(sym.type.kind == TypeKind.VOID) {
+                continue
+            }
+
             sb.append("    %.*s: ", patch.name.length, patch.name.buffer)
             sym.type.toString(sb, true)
             sb.append("\n")
