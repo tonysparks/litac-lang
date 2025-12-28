@@ -147,6 +147,41 @@ internal func NewIdentFromTemp(context: *CoroutineContext, temp: *VarDecl): *Nod
     )
 }
 
+internal func NewGetExprFromName(
+    context: *CoroutineContext,
+    parent: *Stmt,
+    object: InternedString,
+    field: InternedString
+): *Node {
+    var objectTypeSpec = NewNameTypeSpecIntern(
+        parent.getStartPos(),
+        object,
+        &context.module.typeSpecAllocator
+    )
+    var fieldTypeSpec = NewNameTypeSpecIntern(
+        parent.getStartPos(),
+        field,
+        &context.module.typeSpecAllocator
+    )
+    return NewGetExpr(
+        parent.getStartPos(),
+        parent.getEndPos(),
+        &NewIdentifierExpr(
+            parent.getStartPos(),
+            parent.getEndPos(),
+            objectTypeSpec,
+            context.allocator
+        ).asExpr,
+        &NewIdentifierExpr(
+            parent.getStartPos(),
+            parent.getEndPos(),
+            fieldTypeSpec,
+            context.allocator
+        ).identifierExpr,
+        context.allocator
+    )
+}
+
 internal func NewGetExprFromSetExpr(context: *CoroutineContext, setExpr: *SetExpr): *Node {
     return NewGetExpr(
         setExpr.getStartPos(),
