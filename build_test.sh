@@ -43,8 +43,8 @@ run_tests() {
     fi
 
     echo "Running litaC tests..."
-    # valgrind --leak-check=full --show-leak-kinds=all ./litac_tests
-    ./litac_tests
+    # valgrind --leak-check=full --show-leak-kinds=all ./litac_tests $1
+    ./litac_tests $1
     result=$?
 
     echo "Result: " $result
@@ -58,4 +58,4 @@ run_tests() {
 
 export LITAC_HOME=${LITAC_HOME:-${PWD}}
 echo "Environment variable: ${LITAC_HOME}"
-run_tests
+run_tests $1

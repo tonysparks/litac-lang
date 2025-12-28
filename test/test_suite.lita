@@ -140,7 +140,19 @@ func main(len: i32, args: **char) : i32 {
     testHarness.numberOfTests = 0
     testHarness.numberOfFailures = 0
 
+    var onlyRunFirst = false
+    if(len > 1) {
+        var arg1 = args[1]
+        if(arg1.equalsString($"-onlyFirst")) {
+            onlyRunFirst = true
+        }
+    }
+
     for(var i = 0; testFiles[i] != null; i+=1) {
+        if(onlyRunFirst && i > 0) {
+            break
+        }
+
         var filename = testFiles[i]
 
         var suite = TestSuite{

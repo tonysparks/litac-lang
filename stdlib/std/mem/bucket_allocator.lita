@@ -102,33 +102,27 @@ public func (this: *BucketAllocator) free() {
 }
 
 public func (this: *BucketAllocator) malloc(size: usize) : *void {
-    //assert(this.head != null)
+    assert(this.head != null)
+    if(size == 0) {
+        return null
+    }
 
-    var currPtr = this.head.mem as (usize) + this.currentOffset
-    var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
-    offset -= this.head.mem as (usize)
+    var headBaseAddr = this.head.mem as (usize)
+    var currentAbsolutePtr = headBaseAddr + this.currentOffset
 
-    var newOffset = offset + size
-    var allocationSize:usize = newOffset - this.currentOffset
+    var alignedAbsolutePtr = alignForward(currentAbsolutePtr, LITAC_DEFAULT_ALIGNMENT)
+    var offsetRelative = alignedAbsolutePtr - headBaseAddr
+    var newRelativeOffset = offsetRelative + size
 
-/*
-    c::fprintf(c::stderr, "currentOffset: %zu newOffset: %zu, limit: %zu allocation: %zu actualAllocation: %zu\n",
-        this.currentOffset,
-        newOffset,
-        this.head.size,
-        size,
-        allocationSize)*/
+    var allocationSize = newRelativeOffset - this.currentOffset;
 
+    // doesn't fix in the current bucket, need to allocate
+    // a new bucket
+    if(newRelativeOffset > this.head.size) {
+        var newBucketSize = c::MAX(newRelativeOffset, this.bucketSize)
 
-    // check to see if there is enough room in this bucket
-    if(newOffset > this.head.size) {
-        const bucketSize = c::MAX(size, this.bucketSize)
-        //c::fprintf(c::stderr, ">>>>>Creating a new bucket of size: %zu already allocated: %zu with gross: %zu\n", bucketSize, this.totalBytesAllocated, this.totalGrossBytesAllocated)
-
-        var requestSize = sizeof(:Bucket) + bucketSize
+        var requestSize = sizeof(:Bucket) + newBucketSize
         var memory = this.decorated.alloc(requestSize) as (*u8)
-        assert(memory)
-
         if(!memory) {
             return null
         }
@@ -136,30 +130,32 @@ public func (this: *BucketAllocator) malloc(size: usize) : *void {
         var bucket = memory as (*Bucket)
         bucket.prev = this.head
         bucket.mem = memory + sizeof(:Bucket)
-        bucket.size = bucketSize
+        bucket.size = newBucketSize
 
         this.head = bucket
 
-        this.currentOffset = 0
+        headBaseAddr = this.head.mem as (usize)
+        alignedAbsolutePtr = alignForward(headBaseAddr, LITAC_DEFAULT_ALIGNMENT)
+        offsetRelative = alignedAbsolutePtr - headBaseAddr
+        newRelativeOffset = offsetRelative + size
+
+        assert(newRelativeOffset <= this.head.size)
+        allocationSize = newRelativeOffset
+
+        // update stats
         this.totalBuckets += 1
-
-        currPtr = this.head.mem as (usize)
-        offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
-        allocationSize = size + (offset - currPtr)
-
-        offset -= this.head.mem as (usize)
-        newOffset = offset + size
-
         this.totalGrossBytesAllocated += requestSize
     }
 
-    this.currentOffset = newOffset
+    assert(newRelativeOffset <= this.head.size)
+    assert(allocationSize > 0)
+
+    this.currentOffset = newRelativeOffset
     this.totalBytesAllocated += allocationSize
     this.totalAllocations += 1
-    var ptr = this.head.mem + offset
-    //c::printf("Start: %p Result: %p  offset: %zu, delta: %zu\n",
-    //    this.head.mem, ptr, offset, (ptr - this.head.mem) as (usize))
-    return ptr;
+
+    var result = this.head.mem + offsetRelative
+    return result as (*void)
 }
 
 func BucketFree(alloc: *const Allocator, ptr: *void) {

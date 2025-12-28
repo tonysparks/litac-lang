@@ -94,6 +94,30 @@ public func (a: *Array<T>) set<T>(index: i32, element: T) {
     #end
 }
 
+
+public func (a: *Array<T>) setAll<T>(index: i32, other: *Array<T>) : i32 {
+    if(!other || other.length == 0) {
+        return 0;
+    }
+
+    if(index < 0) {
+        return -1;
+    }
+
+    var result = other.length
+    if(index + other.length >= a.capacity) {
+        result -= ((index + other.length) - a.capacity)
+    }
+
+    memcpy(
+        (&a.elements[index]) as (*void),
+        (&other.elements[0]) as (*const void),
+        result * sizeof(:T)
+    )
+
+    return result
+}
+
 public func (a: *Array<T>) first<T>() : T {
     assert(a.length != 0)
 
@@ -182,13 +206,34 @@ public func (a: *Array<T>) insertAt<T>(index: i32, element: T) : i32 {
         }
     }
 
-    a.length += 1
-
     memmove((&a.elements[index + 1]) as (*void),
             (&a.elements[index]) as (*const void),
             (a.length - index) * sizeof(:T))
 
+    a.length += 1
     a.set<T>(index, element)
+    return 1
+}
+
+public func (a: *Array<T>) insertAllAt<T>(index: i32, elements: *Array<T>) : i32 {
+    assert(index >= 0 && index <= a.length)
+
+    if(index == a.length) {
+        return a.addAll(elements)
+    }
+
+    if(a.length + elements.length >= a.capacity) {
+        if(!ArrayGrow<T>(a, elements.length)) {
+            return -1
+        }
+    }
+
+    memmove((&a.elements[index + elements.length]) as (*void),
+            (&a.elements[index]) as (*const void),
+            (a.length - index) * sizeof(:T))
+
+    a.length += elements.length
+    a.setAll<T>(index, elements)
     return 1
 }
 
@@ -329,5 +374,49 @@ func QuickSort<T>(array: *Array<T>, comp: SortFunc<T>) {
         else {
             i -= 1;
         }
+    }
+}
+
+@test
+func testInsertAll() {
+    var list = ArrayInit<i32>(10)
+    for(var i = 0; i < list.capacity; i+=1) {
+        list.add(i + 1)
+    }
+
+    var other = ArrayInit<i32>(3)
+    other.add(33)
+    other.add(44)
+    other.add(55)
+    list.insertAllAt(7, other)
+
+    assert(list.get(6) == 7)
+    assert(list.get(7) == 33)
+    assert(list.get(8) == 44)
+    assert(list.get(9) == 55)
+    assert(list.get(10) == 8)
+    assert(list.size() == 13)
+
+    list.insertAllAt(12, other)
+    assert(list.size() == 16)
+    assert(list.get(11) == 9)
+    assert(list.get(12) == 33)
+    assert(list.get(13) == 44)
+    assert(list.get(14) == 55)
+    assert(list.get(15) == 10)
+
+    list.setAll(15, other)
+    assert(list.size() == 16)
+    assert(list.get(11) == 9)
+    assert(list.get(12) == 33)
+    assert(list.get(13) == 44)
+    assert(list.get(14) == 55)
+    assert(list.get(15) == 33)
+
+    list.insertAllAt(0, other)
+
+    for(var i = 0; i < list.size(); i+=1) {
+        var x = list.get(i)
+        printf("list[%d] = %d\n", i, x)
     }
 }
