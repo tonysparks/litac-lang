@@ -419,5 +419,4 @@ func testInsertAll() {
         var x = list.get(i)
         printf("list[%d] = %d\n", i, x)
     }
-
 }

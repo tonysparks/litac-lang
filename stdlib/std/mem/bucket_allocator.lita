@@ -158,55 +158,6 @@ public func (this: *BucketAllocator) malloc(size: usize) : *void {
     return result as (*void)
 }
 
-/*
-
-    var currPtr = this.head.mem as (usize) + this.currentOffset
-    var offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
-    offset -= this.head.mem as (usize)
-
-    var newOffset = offset + size
-    var allocationSize:usize = newOffset - this.currentOffset
-
-
-    // check to see if there is enough room in this bucket
-    if(newOffset > this.head.size) {
-        const bucketSize = c::MAX(size, this.bucketSize)
-
-        var requestSize = sizeof(:Bucket) + bucketSize
-        var memory = this.decorated.alloc(requestSize) as (*u8)
-        assert(memory)
-
-        if(!memory) {
-            return null
-        }
-
-        var bucket = memory as (*Bucket)
-        bucket.prev = this.head
-        bucket.mem = memory + sizeof(:Bucket)
-        bucket.size = bucketSize
-
-        this.head = bucket
-
-        this.currentOffset = 0
-        this.totalBuckets += 1
-
-        currPtr = this.head.mem as (usize)
-        offset = alignForward(currPtr, LITAC_DEFAULT_ALIGNMENT)
-        allocationSize = size + (offset - currPtr)
-
-        offset -= this.head.mem as (usize)
-        newOffset = offset + size
-
-        this.totalGrossBytesAllocated += requestSize
-    }
-
-    this.currentOffset = newOffset
-    this.totalBytesAllocated += allocationSize
-    this.totalAllocations += 1
-    var ptr = this.head.mem + offset
-    return ptr;
-}*/
-
 func BucketFree(alloc: *const Allocator, ptr: *void) {
     // DO NOTHING
 }
