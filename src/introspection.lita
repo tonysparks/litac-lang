@@ -150,7 +150,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
         assert(stmts.declarations.size() == 2)
         {
             var numDecl = stmts.declarations.get(0)
-            assert(numDecl.kind == StmtKind.CONST_DECL)
+            assert(numDecl.getKind() == StmtKind.CONST_DECL)
 
             var typeInfo = checker.resolveValueDecl(numDecl as (*VarDecl))
             assert(typeInfo != null)
@@ -163,7 +163,7 @@ public func (this: *Introspect) generate(checker: *TypeChecker) {
         }
         {
             var typesDecl = stmts.declarations.get(1)
-            assert(typesDecl.kind == StmtKind.CONST_DECL)
+            assert(typesDecl.getKind() == StmtKind.CONST_DECL)
 
             checker.bypassing = true
             var typeInfo = checker.resolveValueDecl(typesDecl as (*VarDecl))

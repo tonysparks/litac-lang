@@ -100,7 +100,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
         // the ProfileTag
         {
             var tagDecl = stmts.declarations.get(0)
-            assert(tagDecl.kind == StmtKind.ENUM_DECL)
+            assert(tagDecl.getKind() == StmtKind.ENUM_DECL)
 
             var existingDecl = module.getType(PROFILE_TAG)
             assert(existingDecl != null)
@@ -112,7 +112,7 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
         // the profileEntries
         {
             var entriesDecl = stmts.declarations.get(1)
-            assert(entriesDecl.kind == StmtKind.CONST_DECL)
+            assert(entriesDecl.getKind() == StmtKind.CONST_DECL)
 
             var existingDecl = module.getType(PROFILE_ENTRIES)
             assert(existingDecl != null)
@@ -146,21 +146,21 @@ public func Instrument(lita: *Lita, checker: *TypeChecker) {
             if(alias) {
                 sb.clear()
                 sb.append("defer %s::StopWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
+                AstInsertText(sym.decl.asNode(), StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
 
                 sb.clear()
                 sb.append("%s::StartWatch(%s::ProfileTag.%.*s__%.*s)\n", alias, alias, sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
+                AstInsertText(sym.decl.asNode(), StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
 
             }
             else {
                 sb.clear()
                 sb.append("defer StopWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
+                AstInsertText(sym.decl.asNode(), StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
 
                 sb.clear()
                 sb.append("StartWatch(ProfileTag.%.*s__%.*s)\n", sym.declared.id.name.length, sym.declared.id.name.buffer, sym.name.length, sym.name.buffer)
-                AstInsertText(sym.decl, StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
+                AstInsertText(sym.decl.asNode(), StringClone(sb.cStr(), sb.length, module.allocator), 0, module, lita)
             }
         }
     }

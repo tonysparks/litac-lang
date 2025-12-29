@@ -513,7 +513,7 @@ public func (this: Thread) destroy() {
     pthread_cancel(this.thrd);
 }
 
-public func (this: Thread) yield() {
+public func (this: Thread) yieldThread() {
     sched_yield();
 }
 

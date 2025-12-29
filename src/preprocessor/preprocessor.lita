@@ -164,7 +164,7 @@ public func (this: *Preprocessor) evaluateForModule(
     }
     else if(comp.type.equals(ELSE_ERROR)) {
         this.lita.result.addError(
-            comp.startPos, "%.*s", comp.expr.length, comp.expr.buffer)
+            comp.getStartPos(), "%.*s", comp.expr.length, comp.expr.buffer)
 
     }
     else if(comp.type.equals(IF)     ||
@@ -174,7 +174,7 @@ public func (this: *Preprocessor) evaluateForModule(
         if(comp.type.equals(ELSE) || this.eval(comp)) {
             for(var i = 0; i < comp.body.size(); i += 1) {
                 var stmt = comp.body.get(i)
-                switch(stmt.kind) {
+                switch(stmt.getKind()) {
                     case StmtKind.IMPORT_DECL: {
                         moduleStmt.imports.add(stmt as (*ImportDecl))
                         break;
@@ -192,13 +192,13 @@ public func (this: *Preprocessor) evaluateForModule(
                         var block = stmt as (*BlockStmt)
                         for(var i = 0; i < block.stmts.size(); i += 1) {
                             var s = block.stmts.get(i)
-                            if(s.kind == StmtKind.NOTE_STMT) {
+                            if(s.getKind() == StmtKind.NOTE_STMT) {
                                 moduleStmt.notes.add(s as (*NoteStmt))
                             }
                         }
                     }
                     default: {
-                        if(IsDecl(stmt)) {
+                        if(IsDecl(stmt.asNode())) {
                             moduleStmt.declarations.add(stmt as (*Decl))
                         }
                     }
@@ -213,9 +213,10 @@ public func (this: *Preprocessor) evaluateForModule(
 
 @profile
 public func (this: *Preprocessor) evaluateForFunction(
-        checker: *TypeChecker,
-        comp: *CompStmt,
-        isFirst: bool = true) : *Stmt {
+    checker: *TypeChecker,
+    comp: *CompStmt,
+    isFirst: bool = true
+) : *Stmt {
 
     assert(comp != null)
 
@@ -226,7 +227,8 @@ public func (this: *Preprocessor) evaluateForFunction(
     if(!isFirst) {
         if(comp.type.equals(IF) || comp.type.equals(STATIC_IF)) {
             this.lita.result.addError(
-                comp.startPos, "'#static_if' and '#if' are only allowed as the first statement in the preprocessor chain.")
+                comp.getStartPos(), "'#static_if' and '#if' are only allowed as the first statement in the preprocessor chain."
+            )
             return null
         }
     }
@@ -241,7 +243,7 @@ public func (this: *Preprocessor) evaluateForFunction(
        comp.type.equals(ELSE)) {
 
         if(comp.type.equals(ELSE) || this.eval(comp)) {
-            comp.evaluatedStmt = NewBlockStmt(comp.startPos, comp.endPos, comp.body, this.lita.allocator)
+            comp.evaluatedStmt = &NewBlockStmt(comp.getStartPos(), comp.getEndPos(), comp.body, this.lita.allocator).asStmt
         }
         else if(comp.end) {
             comp.evaluatedStmt = this.evaluateForFunction(checker, comp.end, false)
@@ -251,16 +253,18 @@ public func (this: *Preprocessor) evaluateForFunction(
             comp.type.equals(ELSE)) {
 
         this.lita.result.addError(
-            comp.startPos, "'#static_if' is not allowed in '#if' chains")
+            comp.getStartPos(), "'#static_if' is not allowed in '#if' chains"
+        )
         return null
     }
     else if(comp.type.equals(ELSE_ERROR)) {
         this.lita.result.addError(
-            comp.startPos, "%.*s", comp.expr.length, comp.expr.buffer)
+            comp.getStartPos(), "%.*s", comp.expr.length, comp.expr.buffer
+        )
     }
 
     if(!comp.evaluatedStmt) {
-        comp.evaluatedStmt = NewEmptyStmt(comp.startPos, comp.endPos, this.lita.allocator)
+        comp.evaluatedStmt = &NewEmptyStmt(comp.getStartPos(), comp.getEndPos(), this.lita.allocator).asStmt
     }
 
     return comp.evaluatedStmt
@@ -345,11 +349,12 @@ public func (this: *Preprocessor) drainQueue() {
                     // function for getting the canonical name
                     // of a declaration
                     var buffer = [MAX_SYMBOL_NAME]char{0};
-                    if(decl.kind == StmtKind.FUNC_DECL) {
+                    if(decl.getKind() == StmtKind.FUNC_DECL) {
                         var funcDecl = decl as (*FuncDecl)
                         if(!funcDecl.getName(buffer)) {
-                            this.lita.result.addError(context.comp.startPos,
-                                "symbol '%.*s' could not get declaration method name", decl.name.str.length, decl.name.str.buffer)
+                            this.lita.result.addError(context.comp.getStartPos(),
+                                "symbol '%.*s' could not get declaration method name", decl.name.str.length, decl.name.str.buffer
+                            )
                             continue;
                         }
                         name = this.lita.strings.internCopy(buffer)
@@ -357,8 +362,9 @@ public func (this: *Preprocessor) drainQueue() {
 
                     var sym = context.checker.getTypeByName(name)
                     if(!sym) {
-                        this.lita.result.addError(context.comp.startPos,
-                            "symbol '%.*s' not found for replacement", decl.name.str.length, decl.name.str.buffer)
+                        this.lita.result.addError(context.comp.getStartPos(),
+                            "symbol '%.*s' not found for replacement", decl.name.str.length, decl.name.str.buffer
+                        )
                         continue;
                     }
 

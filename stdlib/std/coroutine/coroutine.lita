@@ -1,0 +1,149 @@
+import "std/mem"
+import "std/assert"
+import "std/libc"
+
+public typedef func(*Continuation) : ContinuationResult as SuspendFunction;
+
+public func NewContinuation(
+    allocator: *const Allocator,
+    cont: Continuation
+): *Continuation {
+    var result = new<Continuation>(allocator);
+    *result = cont
+    return result
+}
+
+public func FreeContinuation(
+    cont: *Continuation
+) {
+    if(!cont) return;
+
+    var allocator = cont.context.allocator;
+    assert(allocator)
+
+    var stack = cont.stack
+    if(stack) {
+        allocator.free(stack)
+    }
+    allocator.free(cont)
+}
+
+@asStr
+public enum ContinuationResult {
+    OK        = 0,
+    ERROR     = 1,
+    SUSPENDED = 2,
+}
+
+public struct ContinuationContext {
+    allocator: *const Allocator
+    dispatcher: *Dispatcher
+}
+
+public struct Continuation {
+    context: ContinuationContext
+
+    parent: *Continuation
+    stack: *void
+    state: u32
+    callback: SuspendFunction
+}
+
+
+public struct Dispatcher {
+    allocator: *const Allocator
+}
+
+public func (this: *Dispatcher) submit(
+    fn: SuspendFunction,
+    stack: *void,
+    allocator: *const Allocator = null
+) {
+    var cont = Continuation {
+        .context = ContinuationContext {
+            .allocator = allocator != null ? allocator : this.allocator,
+            .dispatcher = this
+        },
+        .parent = null,
+        .stack = stack,
+        .callback = fn,
+    }
+    var result = fn(&cont)
+/*
+    // TODO: place on worker queue
+    printf("First result: %d\n", result)
+    if (result == ContinuationResult.OK) {
+        result = fn(&cont)
+        printf("Second result: %d\n", result)
+    }
+*/
+    printf("Done continuation result: %s state: %d\n",
+        ContinuationResultAsStr(result),
+        cont.state
+    )
+}
+
+/*
+ Problem, when resolving adder, we expect subber to have Cont param
+ but subber isn't patched/resolved yet!
+
+ Need to determine if suspend is on the function during forward declarations
+ in createDecl!!
+*/
+
+@suspend
+func adder(a: i32, b: i32) : i32 {
+    var r = subber(a, 1) + subber(b, 2)
+    var z = NormalFunc(r)
+    printf("R = %d A = %d B = %d, r+b = %d\n", r, a, b, r+b)
+    return z + b
+}
+
+@suspend
+func subber(a: i32, b: i32) : i32 {
+    printf("A = %d B = %d\n", a, b)
+    yield b
+    yield a
+    return a - b
+}
+
+func NormalFunc(x: i32) : i32 {
+    return x * 2
+}
+
+@test
+func testLaunchCoroutine() {
+    var dispatcher = Dispatcher{
+        .allocator = defaultAllocator
+    }
+    var stack = adder__CoroutineStack{
+        .__a__1 = 4,
+        .__b__1 = 2
+    }
+    var coroutine = adder__Coroutine
+    var cont = Continuation {
+        .context = ContinuationContext {
+            .allocator = dispatcher.allocator,
+            .dispatcher = &dispatcher
+        },
+        .parent = null,
+        .stack = &stack,
+        .callback = coroutine,
+    }
+    var status = ContinuationResult.SUSPENDED
+    var count = 0
+    do {
+        status = coroutine(&cont)
+        // dispatcher.submit(coroutine, &stack)
+        printf("Result: %d Status: %s\n",
+            stack.__result__0,
+            ContinuationResultAsStr(status)
+        )
+        count += 1
+    } while (status != ContinuationResult.OK && count < 10)
+
+
+    //assert(stack.__result__0 == 6)
+    //future.cancel()
+    //future.await()
+}

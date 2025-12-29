@@ -215,7 +215,7 @@ public func SymbolToSymbolInformation(sym: *sym::Symbol, rootPath: *const char, 
     }
 
     if(sym.decl) {
-        var location = SrcPosToLocation(sym.decl.startPos, rootPath, alloc)
+        var location = SrcPosToLocation(sym.decl.getStartPos(), rootPath, alloc)
         if(location) {
             result.put("location", location)
         }

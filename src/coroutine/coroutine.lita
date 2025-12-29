@@ -1,0 +1,417 @@
+import "std/array"
+import "std/mem"
+import "std/map"
+import "std/libc"
+import "std/hash"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/assert"
+
+import "intern"
+import "symbols"
+import "types"
+
+import "lita"
+import "ast"
+import "ast_new"
+import "ast_copy"
+import "parser"
+import "checker"
+import "lex"
+import "module"
+import "common"
+import "phase_result"
+import "coroutine/lowering"
+
+
+/* ----------------------------------------------------------------------
+
+ Coroutines generation:
+
+ public struct %funcName%__CoroutineStack {
+    // all stack allocated variables
+ }
+
+ public func %funcName%__Coroutine(cont: *Continuation) : ContinuationResult {
+    var stack = cont.stack as (*%funcName%__Stack)
+    return %funcName%(
+        cont,
+        // pass args
+    )
+ }
+
+ We take the following function:
+
+ @suspend
+ func MyFirstCoroutine(a: i32) : i32 {
+    var x = a + 3
+    yield x
+
+    var y = AnotherCoroutine(x)
+
+    return y
+ }
+
+ And convert to roughly the following:
+ func MyFirstCoroutine(cont: *Continuation, a: i32) : ContinuationResult {
+    var stack = cont.stack as (*MyFirstCoroutine__CoroutineStack)
+    if(!stack) {
+        stack = new<MyFirstCoroutine__CoroutineStack>(cont.context.allocator)
+        cont.stack = stack
+    }
+    switch(cont.state) {
+        case 0: goto LABEL_0; break;
+        case 1: goto LABEL_1; break;
+        case 2: goto LABEL_2; break;
+        default: assert(false)
+    }
+
+LABEL_0:
+
+    // convert local variable to be held on the 'stack' continuation
+    stack.x = a + 3
+
+    // when we encounter a suspendable statement, we increment
+    // the state counter so that when we come back to this coroutine
+    // we pick up where we left off
+    {
+        // set the result value of the function, since we change the
+        // function signature, we actually store the result in a variable
+        stack.result = stack.x
+
+        // increment the state counter, so next time we jump to LABEL_1
+        stack.state += 1
+
+        // yield suspends the coroutine
+        return ContinuationResult.SUSPENDED
+    }
+
+LABEL_1:
+
+    // Create a continuation to pass to the suspendable function
+    var temp1 = NewContinuation(
+            cont.context.allocator,
+            Continuation {
+                .context = cont.context,
+                .parent = cont,
+                .stack = null,
+                .state = 0_u32,
+                .callback = MyFirstCoroutine__Coroutine
+            }
+        )
+
+    // Call the coroutine with the newly created continuation
+    var temp2 = AnotherCoroutine(stack.x, temp1)
+
+    stack.state += 1
+
+    // if the other coroutine is suspended, we must suspend
+    // this coroutine as well
+    if(temp2 == ContinuationResult.SUSPENDED) {
+        return ContinuationResult.SUSPENDED
+    }
+
+LABEL_2:
+
+    stack.y = temp1.stack as (*AnotherCoroutine__CoroutineStack).result
+    FreeContinuation(temp1)
+
+    stack.result = stack.y
+    return ContinuationResult.OK
+ }
+
+   ---------------------------------------------------------------------- */
+
+public func CreateCoroutineForwardDecls(
+    checker: *TypeChecker,
+    coSym: *Symbol
+) : Array<*Decl> {
+
+    assert(coSym)
+    assert(coSym.decl)
+    assert(coSym.flags & SymbolFlags.IS_COROUTINE)
+
+    var allocator = checker.current.allocator
+
+    var sb = StringBuilderInit(2048, allocator)
+    var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
+
+    var coName = GetCoroutineName(coSym, nameBuffer)
+    GenerateCoroutineStackForwardDecl(
+        coSym,
+        coName,
+        sb
+    )
+
+    //printf("%s\n", sb.cStr())
+    var parser = ParserInit(
+        "generated",
+        sb.cStr(),
+        sb.length,
+        checker.current,
+        checker.lita
+    )
+
+    var stmts = parser.parseModule()
+    return stmts.declarations
+}
+
+func GenerateCoroutineStackForwardDecl(
+    coSym: *Symbol,
+    coName: String,
+    sb: *StringBuilder
+) {
+    sb.append("@generated @hidden public struct %.*s__CoroutineStack {\n", coName.length, coName.buffer)
+
+    var decl = coSym.decl
+    assert(decl != null)
+
+    var funcDecl = decl as (*FuncDecl)/*
+    var params = &funcDecl.params.params
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.get(i)
+
+        var sym = param.sym
+        assert(sym != null)
+
+        if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+            continue
+        }
+
+        sb.append("    __%.*s__%d: ",
+            param.name.str.length, param.name.str.buffer, 1
+        )
+        sym.type.toString(sb, true)
+        sb.append("\n")
+    }*/
+
+    if(funcDecl.returnType != null) {
+        var returnInfo = funcDecl.returnType.typeInfo
+        assert(returnInfo != null)
+
+        sb.append("    __result__0: ")
+        returnInfo.toString(sb, true)
+        sb.append("\n")
+    }
+
+    sb.append("}\n")
+}
+
+internal func CreateCoroutineDecls(
+    checker: *TypeChecker,
+    coSym: *Symbol,
+    context: *CoroutineContext
+) : Array<*Decl> {
+
+    assert(coSym)
+    assert(coSym.decl)
+    assert(coSym.flags & SymbolFlags.IS_COROUTINE)
+
+    var allocator = checker.current.allocator
+
+    var sb = StringBuilderInit(2048, allocator)
+    var nameBuffer = StringBuilderInit(MAX_SYMBOL_NAME, allocator)
+
+    var coName = GetCoroutineName(coSym, nameBuffer)
+    GenerateCoroutineStack(context, coSym, coName, sb)
+    GenerateCoroutineWrapper(context, coSym, coName, sb)
+
+    // printf("%s\n", sb.cStr())
+    var parser = ParserInit(
+        "generated",
+        sb.cStr(),
+        sb.length,
+        checker.current,
+        checker.lita
+    )
+
+    var stmts = parser.parseModule()
+    return stmts.declarations
+}
+
+func GenerateCoroutineStack(
+    context: *CoroutineContext,
+    coSym: *Symbol,
+    coName: String,
+    sb: *StringBuilder
+) {
+    sb.append("@generated @hidden public struct %.*s__CoroutineStack {\n", coName.length, coName.buffer)
+
+    var decl = coSym.decl
+    assert(decl != null)
+
+    var funcDecl = decl as (*FuncDecl)
+    var params = &funcDecl.params.params
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.get(i)
+
+        var sym = param.sym
+        assert(sym != null)
+
+        if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+            continue
+        }
+
+        sb.append("    __%.*s__%d: ",
+            param.name.str.length, param.name.str.buffer, 1
+        )
+        sym.type.toString(sb, true)
+        sb.append("\n")
+    }
+
+    if(funcDecl.returnType != null) {
+        var returnInfo = funcDecl.returnType.typeInfo
+        assert(returnInfo != null)
+
+        sb.append("    __result__0: ")
+        returnInfo.toString(sb, true)
+        sb.append("\n")
+    }
+
+    for(var i = 0; i < context.patches.size(); i+=1) {
+        var patch = context.patches.getPtr(i)
+        var kind = patch.stmt.getKind()
+        if(kind == StmtKind.VAR_DECL || kind == StmtKind.CONST_DECL) {
+            var decl = patch.stmt as (*VarDecl)
+            if(decl.flags & VarDeclFlags.IS_TEMPORARY) {
+                continue
+            }
+
+            var sym = decl.sym
+            assert(sym != null)
+
+            if(sym.type.kind == TypeKind.VOID) {
+                continue
+            }
+
+            sb.append("    %.*s: ", patch.name.length, patch.name.buffer)
+            sym.type.toString(sb, true)
+            sb.append("\n")
+        }
+    }
+
+    sb.append("}\n")
+}
+
+func GenerateCoroutineWrapper(
+    context: *CoroutineContext,
+    coSym: *Symbol,
+    coName: String,
+    sb: *StringBuilder
+) {
+    sb.append("@hidden public func %.*s__Coroutine(cont: *Continuation) : ContinuationResult {\n", coName.length, coName.buffer)
+    sb.append("    var stack = cont.stack as (*%.*s__CoroutineStack)\n", coName.length, coName.buffer)
+    sb.append("    stack.____cont__1 = cont\n")
+    sb.append("    return %.*s(\n", coName.length, coName.buffer)
+
+    var decl = coSym.decl
+    assert(decl != null)
+
+    var funcDecl = decl as (*FuncDecl)
+    var params = &funcDecl.params.params
+    var isFirst = true
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.get(i)
+
+        var sym = param.sym
+        assert(sym != null)
+        if(sym.flags & (SymbolFlags.IS_TEMP|SymbolFlags.IS_GENERATED)) {
+            continue
+        }
+
+        var comma = ' '
+        if(!isFirst) {
+            comma = ','
+        }
+        sb.append("        %c stack.__%.*s__%d",
+            comma,
+            param.name.str.length, param.name.str.buffer, 1
+        )
+        sb.append("\n")
+        isFirst = false
+    }
+
+    sb.append("    );\n")
+    sb.append("}\n")
+}
+
+func GetCoroutineName(sym: *Symbol, sb: *StringBuilder) : String {
+
+    // if this isn't a generic generated trait, just use the symbol name
+    if(!(sym.flags & SymbolFlags.IS_FROM_GENERIC_TEMPLATE)) {
+        return sym.name.view
+    }
+
+    sb.clear()
+
+    // otherwise, we have to calculate the new name using the generic type arguments
+    EscapeName(sym.name.buffer, sym.name.length, sb)
+
+    return String {
+        .buffer = sb.buffer,
+        .length = sb.length
+    }
+}
+
+/**
+    Adds a continutation parameter to a coroutine
+
+    func MyCoroutine(a: i32) : i32
+
+    to
+
+    func MyCoroutine(a: i32, cont: *Continutation = null) : i32
+*/
+public func AddContinuationParam(
+    checker: *TypeChecker,
+    funcDecl: *FuncDecl,
+    coSym: *Symbol
+): bool {
+
+    if(funcDecl.params.isVararg ||
+       funcDecl.params.isNativeVararg
+    ) {
+        checker.result.addError(
+            funcDecl.getStartPos(),
+            "coroutine functions with variable arguments are currently not supported"
+        )
+        return false
+    }
+
+    var paramsNode = funcDecl.params.asNode()
+    var contParamType = NewTypeSpec(
+        TypeSpecKind.PTR,
+        paramsNode.startPos,
+        &checker.current.typeSpecAllocator
+    )
+    var paramValue = $"std::coroutine::Continuation"
+    contParamType.base = NewNameTypeSpecIntern(
+        paramsNode.startPos,
+        checker.lita.strings.internString(paramValue),
+        &checker.current.typeSpecAllocator
+    )
+
+    var coParamNode = NewParameterDecl(
+        paramsNode.startPos, paramsNode.endPos,
+        NewIdentifier(
+            "__cont",
+            paramsNode.startPos,
+            checker.lita.strings
+        ),
+        contParamType,
+        &NewNullExpr(
+            paramsNode.startPos, paramsNode.endPos,
+            checker.allocator
+        ).asExpr,
+        false,
+        checker.allocator
+    )
+
+    var coParam = &coParamNode.paramDecl
+    funcDecl.params.add(
+        coParam
+    )
+
+    return true
+}

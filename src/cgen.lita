@@ -334,7 +334,7 @@ func (this: using *CGen) emitTraitForwardDecls() {
         var entry = it.next()
         var traitSym = this.findSymbolByTypeid(entry.key)
         assert(traitSym)
-        assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
+        assert(traitSym.decl && traitSym.decl.getKind() == StmtKind.TRAIT_DECL)
 
         var traitName = this.cTypeName(traitSym.type)
 
@@ -365,7 +365,7 @@ func (this: using *CGen) emitTraitDecls() {
         var entry = it.next()
         var traitSym = this.findSymbolByTypeid(entry.key)
         assert(traitSym)
-        assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
+        assert(traitSym.decl && traitSym.decl.getKind() == StmtKind.TRAIT_DECL)
 
         var traitName = this.cTypeName(traitSym.type)
 
@@ -470,7 +470,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
     }
 
     var name = this.cName(decl.sym)
-    switch(decl.kind) {
+    switch(decl.getKind()) {
         case StmtKind.VAR_DECL:
         case StmtKind.CONST_DECL:
             break;
@@ -485,7 +485,7 @@ func (this: using *CGen) emitTypeForwardDecl(sym: *Symbol) {
             var aggDecl = decl as (*AggregateDecl)
             //if(!(aggDecl.flags & AggregateFlags.IS_EMBEDDED))
             {
-                this.buf.append("typedef %s %s %s;\n", aggDecl.kind == StmtKind.UNION_DECL ? "union" : "struct", name, name)
+                this.buf.append("typedef %s %s %s;\n", aggDecl.getKind() == StmtKind.UNION_DECL ? "union" : "struct", name, name)
             }
             break;
         }
@@ -658,7 +658,7 @@ public func (this: using *CGen) emitLineInfo(stmt: *Stmt) {
         return;
     }
 
-    var pos = stmt.startPos
+    var pos = stmt.getStartPos()
 
     if(this.currentLine != pos.lineNumber ||
        this.currentFile != pos.filename) {
@@ -972,7 +972,7 @@ func (this: using *CGen) foreignName(decl: *Decl, defaultName: String) : String 
     }
 
     // no name and is a string, this is the alias
-    if(arg.argName.str.empty() && arg.argExpr.kind == StmtKind.STRING_EXPR) {
+    if(arg.argName.str.empty() && arg.argExpr.getKind() == StmtKind.STRING_EXPR) {
         return arg.argExpr.operand.val.str;
     }
 
@@ -1238,6 +1238,8 @@ public func (this: using *CGen) emitNotes(attributes: *Attributes, isPrelude: bo
 }
 
 func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
+    var startPos = note.getStartPos()
+
     if(note.type.name.equals(&INCLUDE)) {
         for(var i = 0; i < note.arguments.size(); i += 1) {
             var attr = note.arguments.get(i)
@@ -1292,11 +1294,11 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             // directory.
             {
                 var index = value.indexOf(relativePath)
-                if(index > -1 && note.startPos.filename != null) {
+                if(index > -1 && startPos.filename != null) {
                     var buffer = StringBuilderInit(MAX_PATH, this.lita.allocator)
                     buffer.append("%.*s", value.length, value.buffer)
 
-                    buffer.replace(index, index + relativePath.length, FileParent(note.startPos.filename, temp).toString())
+                    buffer.replace(index, index + relativePath.length, FileParent(startPos.filename, temp).toString())
                     value = buffer.toString()
                 }
             }
@@ -1376,7 +1378,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
             var value = arg.argExpr.operand.val.str
 
-            FilePath(note.startPos.filename, filename)
+            FilePath(startPos.filename, filename)
 
             filenameStr.adjust()
             filenameStr.append("/%.*s", value.length, value.buffer)
@@ -1387,7 +1389,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 //      check working directory
                 //      check lib directory
                 //printf("FilePath: '%s'\n", filename)
-                this.result.addError(note.startPos, "unable to locate file: '%.*s'", value.length, value.buffer)
+                this.result.addError(startPos, "unable to locate file: '%.*s'", value.length, value.buffer)
                 continue;
             }
 
@@ -1395,7 +1397,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             defer if(file) fclose(file)
 
             if(!file) {
-                this.result.addError(note.startPos, "unable to open file: '%s'", filename)
+                this.result.addError(startPos, "unable to open file: '%s'", filename)
                 continue;
             }
 
@@ -1430,7 +1432,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
             var value = arg.argExpr.operand.val.str
 
-            FilePath(note.startPos.filename, filename)
+            FilePath(startPos.filename, filename)
 
             filenameStr.adjust()
             filenameStr.append("/%.*s", value.length, value.buffer)
@@ -1441,7 +1443,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 //      check working directory
                 //      check lib directory
                 //printf("FilePath: '%s'\n", filename)
-                this.result.addError(note.startPos, "unable to locate file: '%.*s'", value.length, value.buffer)
+                this.result.addError(startPos, "unable to locate file: '%.*s'", value.length, value.buffer)
                 continue;
             }
             if(!this.options.disableLineSync) {
@@ -1506,7 +1508,7 @@ func (this: using *CGen) emitSymbol(sym: *Symbol) {
 }
 
 func (this: using *CGen) emitTraitFuncCall(expr: *FuncCallExpr) {
-    switch(expr.object.kind) {
+    switch(expr.object.getKind()) {
         case StmtKind.FUNC_IDENTIFIER_EXPR: {
             // var idExpr = expr.object as (*IdentifierExpr)
             this.emit("/* something here */")
@@ -1518,7 +1520,7 @@ func (this: using *CGen) emitTraitFuncCall(expr: *FuncCallExpr) {
             var type = getExpr.object.operand.typeInfo
 
             // for identifiers, we don't have to worry about side-effects
-            if(getExpr.object.kind == StmtKind.IDENTIFIER_EXPR) {
+            if(getExpr.object.getKind() == StmtKind.IDENTIFIER_EXPR) {
                 this.emitStmt(getExpr.object)
                 if(IsPtr(type)) {
                     this.emitStrn("->", 2)
@@ -1622,7 +1624,7 @@ func (this: using *CGen) emitStaticCompStmt(s: *CompStmt) {
         for(var i = 0; i < stmts.size(); i += 1) {
             var n = stmts.get(i)
             this.emitStmt(n)
-            if(IsExpr(n)) {
+            if(IsExpr(n.asNode())) {
                 this.emitStrn(";\n", 2)
             }
             else {
@@ -1641,7 +1643,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
 
     this.emitLineInfo(s)
 
-    switch(s.kind) {
+    switch(s.getKind()) {
         case StmtKind.IMPORT_DECL: {
             return;
         }
@@ -1693,7 +1695,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 for(var i = 0; i < stmt.stmts.size(); i += 1) {
                     var n = stmt.stmts.get(i)
                     this.emitStmt(n)
-                    if(IsExpr(n)) {
+                    if(IsExpr(n.asNode())) {
                         this.emitStrn(";\n", 2)
                     }
                     else {
@@ -1744,7 +1746,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 defer this.popScope()
 
                 this.emitStmt(stmt.body)
-                if(IsExpr(stmt.body)) {
+                if(IsExpr(stmt.body.asNode())) {
                     this.emitStrn(";\n", 2)
                 }
             }
@@ -1765,7 +1767,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitStrn("for(", 4)
             if(stmt.init) {
                 this.emitStmt(stmt.init)
-                if(IsExpr(stmt.init)) {
+                if(IsExpr(stmt.init.asNode())) {
                     this.emitStrn(";\n", 2)
                 }
             }
@@ -1790,7 +1792,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
 
                 this.emitStmt(stmt.body)
 
-                if(IsExpr(stmt.body)) {
+                if(IsExpr(stmt.body.asNode())) {
                     this.emitStrn(";\n", 2)
                 }
             }
@@ -1808,7 +1810,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
                 this.emitStmt(n)
-                if(IsExpr(n)) {
+                if(IsExpr(n.asNode())) {
                     this.emitStrn(";\n", 2)
                 }
                 else {
@@ -1834,7 +1836,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 defer this.popScope()
 
                 this.emitStmt(stmt.then)
-                if(IsExpr(stmt.then)) {
+                if(IsExpr(stmt.then.asNode())) {
                     this.emitStrn(";", 1)
                 }
                 this.emitStrn("\n", 1)
@@ -1847,7 +1849,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                     defer this.popScope()
 
                     this.emitStmt(stmt.elseStmt)
-                    if(IsExpr(stmt.elseStmt)) {
+                    if(IsExpr(stmt.elseStmt.asNode())) {
                         this.emitStrn(";", 1)
                     }
                 }
@@ -1874,6 +1876,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             assert(false)
             return;
         }
+        case StmtKind.YIELD_STMT:
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
 
@@ -1995,7 +1998,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 defer this.popScope()
 
                 this.emitStmt(stmt.body)
-                if(IsExpr(stmt.body)) {
+                if(IsExpr(stmt.body.asNode())) {
                     this.emitStrn(";\n", 2)
                 }
             }
@@ -2021,9 +2024,11 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             }
             else {
                 var requiresCast = false
-                if(expr.parent) {
-                    requiresCast = expr.parent.kind == StmtKind.RETURN_STMT ||
-                                   expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
+                var parentNode = expr.getParent()
+                if(parentNode) {
+                    requiresCast = parentNode.kind == StmtKind.RETURN_STMT ||
+                                   parentNode.kind == StmtKind.YIELD_STMT  ||
+                                   parentNode.kind == StmtKind.FUNC_CALL_EXPR;
                 }
 
                 if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {
@@ -2125,7 +2130,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             // default parameters use lineInfo from where
             // they are initially defined -- which is no good,
             // especially for capturing __LINE__ and __FILE__ macros...
-            var startPos = expr.startPos
+            var startPos = expr.getStartPos()
 
             var i = 0;
             for(; i < expr.arguments.size(); i+=1) {
@@ -2140,17 +2145,20 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
 
                 if(!this.emitTraitCast(arg.argExpr)) {
                     if(arg.isDefault) {
-                        var oldPos = arg.argExpr.startPos
-                        defer arg.argExpr.startPos = oldPos
+                        var oldPos = arg.argExpr.getStartPos()
+                        defer arg.argExpr.setStartPos(oldPos)
 
-                        arg.argExpr.startPos.filename = startPos.filename
-                        arg.argExpr.startPos.lineNumber = startPos.lineNumber
+                        var tempPos = oldPos
+                        tempPos.filename = startPos.filename
+                        tempPos.lineNumber = startPos.lineNumber
+
+                        arg.argExpr.setStartPos(tempPos)
 
                         this.emitStmt(arg.argExpr)
                     }
                     else {
                         this.emitStmt(arg.argExpr)
-                        startPos = arg.argExpr.startPos
+                        startPos = arg.argExpr.getStartPos()
                     }
                 }
             }
@@ -2296,10 +2304,10 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         case StmtKind.INIT_ARG_EXPR: {
             var expr = s as (*InitArgExpr)
             if(expr.fieldName.token.type == TokenType.IDENTIFIER) {
-                var parentExpr = expr.parent
-                assert(parentExpr && parentExpr.kind == StmtKind.INIT_EXPR)
+                var parentExprNode = expr.getParent()
+                assert(parentExprNode && parentExprNode.kind == StmtKind.INIT_EXPR)
 
-                var objectType = (parentExpr as (*InitExpr)).type.typeInfo
+                var objectType = (parentExprNode.initExpr).type.typeInfo
                 assert(objectType != null)
 
                 assert(IsAggregateLike(objectType))
@@ -2342,11 +2350,13 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*InitExpr)
 
             var requiresCast = false
-            if(expr.parent) {
-                requiresCast = expr.parent.kind == StmtKind.RETURN_STMT ||
-                               expr.parent.kind == StmtKind.BINARY_EXPR ||
-                               expr.parent.kind == StmtKind.SET_EXPR ||
-                               expr.parent.kind == StmtKind.FUNC_CALL_EXPR;
+            var parent = expr.getParent()
+            if(parent) {
+                requiresCast = parent.kind == StmtKind.RETURN_STMT ||
+                               parent.kind == StmtKind.YIELD_STMT ||
+                               parent.kind == StmtKind.BINARY_EXPR ||
+                               parent.kind == StmtKind.SET_EXPR ||
+                               parent.kind == StmtKind.FUNC_CALL_EXPR;
             }
 
             if(requiresCast || !expr.expectedType || expr.expectedType.kind == TypeKind.PTR) {
@@ -2374,16 +2384,17 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         case StmtKind.NUMBER_EXPR: {
             var expr = s as (*NumberExpr)
+            var startPos = expr.getStartPos()
 
             var hasDecimal = false
             var isHex = false
             var isBin = false
-            var length: usize = expr.startPos.end - expr.startPos.start
-            var start = expr.startPos.start
+            var length: usize = startPos.end - startPos.start
+            var start = startPos.start
 
             if(length > 2) {
-                var first = expr.startPos.start[0]
-                var second = tolower(expr.startPos.start[1])
+                var first = startPos.start[0]
+                var second = tolower(startPos.start[1])
                 if(first == '0' && second == 'x') {
                     isHex = true
                 }
@@ -2392,7 +2403,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
             }
 
-            for(; start != expr.startPos.end; start += 1) {
+            for(; start != startPos.end; start += 1) {
                 var c = *start
 
                 if(c == '.') {
@@ -2708,7 +2719,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
         }
         default: {
             //Panic("Unknown statement kind: %d", s.kind)
-            this.emit("<%s Not Implemented>", StmtKindAsStr(s.kind))
+            this.emit("<%s Not Implemented>", StmtKindAsStr(s.getKind()))
             assert(false)
         }
     }

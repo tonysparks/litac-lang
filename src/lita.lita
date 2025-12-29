@@ -290,15 +290,18 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
             return;
         }
 
-        var builtinImport = NewImportDecl(SrcPos{},
-                                        SrcPos{},
-                                        BUILTIN_IMPORT_IDENT,
-                                        Identifier {
-                                            .str = EMPTY_STR,
-                                            .token = Token{.type = TokenType.VOID}
-                                        },
-                                        false,
-                                        this.allocator) as (*ImportDecl)
+        var builtinImport = &NewImportDecl(
+            SrcPos{},
+            SrcPos{},
+            BUILTIN_IMPORT_IDENT,
+            Identifier {
+                .str = EMPTY_STR,
+                .token = Token{.type = TokenType.VOID}
+            },
+            false,
+            this.allocator
+        ).importDecl
+
         builtinImport.moduleId = &this.builtins.id
         module.ast.imports.insertAt(0, builtinImport)
     }
@@ -308,7 +311,11 @@ public func (this: *Lita) incrementalBuild(module: *Module) : void {
         var checker = TypeChecker{}
         checker.init(this, module.allocator)
 
-        checker.typeCheck(module, .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS)
+        checker.typeCheck(
+            module,
+            .flags = TypeCheckerFlags.DISABLE_TRAIT_WRAPPERS
+                    |TypeCheckerFlags.DISABLE_COROUTINE_WRAPPERS
+        )
 
         // Reconcile any changed symbols
         this.syncSymbols(module, &module.symbols.symbolFuncs, &this.programSymbols.symbolFuncs, SymbolKind.FUNC)
@@ -372,15 +379,18 @@ public func (this: *Lita) parse() : *Module {
         return null;
     }
 
-    var builtinImport = NewImportDecl(SrcPos{},
-                                      SrcPos{},
-                                      BUILTIN_IMPORT_IDENT,
-                                      Identifier {
-                                          .str = EMPTY_STR,
-                                          .token = Token{.type = TokenType.VOID}
-                                      },
-                                      false,
-                                      this.allocator) as (*ImportDecl)
+    var builtinImport = &NewImportDecl(
+        SrcPos{},
+        SrcPos{},
+        BUILTIN_IMPORT_IDENT,
+        Identifier {
+            .str = EMPTY_STR,
+            .token = Token{.type = TokenType.VOID}
+        },
+        false,
+        this.allocator
+    ).importDecl
+
     builtinImport.moduleId = &builtin.id
     root.ast.imports.insertAt(0, builtinImport)
 
@@ -693,9 +703,11 @@ public func (this: *Lita) run() : i32 {
 }
 
 
-public func FindModulePath(lita: *Lita,
-                           moduleName: String,
-                           filename: [MAX_PATH]char) : bool {
+public func FindModulePath(
+    lita: *Lita,
+    moduleName: String,
+    filename: [MAX_PATH]char
+) : bool {
 
     var path = [MAX_PATH]char{0}
     var pathStr = StringBufferInit(path, MAX_PATH, 0);
@@ -853,15 +865,17 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
 
     for(var i = 0; i < module.ast.imports.size(); i += 1) {
         var importStmt = module.ast.imports.get(i)
+        var startPos = importStmt.getStartPos()
         if(importStmt.name.token.type == TokenType.ERROR) {
-            lita.result.addError(importStmt.startPos, "Could not parse import statement")
+            lita.result.addError(startPos, "Could not parse import statement")
             continue
         }
 
         var filename: [MAX_PATH]char
         if(!FindModulePath(lita, importStmt.name.str.view, filename)) {
-            lita.result.addError(importStmt.startPos, "Could not find module '%.*s'",
-                    importStmt.name.str.length, importStmt.name.str.buffer)
+            lita.result.addError(startPos, "Could not find module '%.*s'",
+                    importStmt.name.str.length, importStmt.name.str.buffer
+            )
             continue
         }
 
@@ -875,7 +889,7 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
         importStmt.moduleId = &importModule.id
         lita.addModule(importModule)
 
-        ParseModule(lita, importModule, importStmt.startPos)
+        ParseModule(lita, importModule, startPos)
     }
 
     return true

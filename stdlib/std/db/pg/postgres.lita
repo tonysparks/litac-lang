@@ -1,0 +1,84 @@
+// Postgres driver
+
+@compiler_option(
+    .os = "mac",
+    .options = "-I/opt/homebrew/opt/libpq/include -L/opt/homebrew/opt/libpq/lib -lpq"
+);
+
+@cInclude("<libpq-fe.h>");
+
+@foreign
+public struct PGconn;
+
+@foreign
+public func PQfinish(conn: *PGconn);
+
+void PQreset(PGconn *conn);
+
+PGconn *PQconnectdb(const char *conninfo);
+
+PGresult *PQexecParams(PGconn *conn,
+                       const char *command,
+                       int nParams,
+                       const Oid *paramTypes,
+                       const char * const *paramValues,
+                       const int *paramLengths,
+                       const int *paramFormats,
+                       int resultFormat);
+
+PGresult *PQprepare(PGconn *conn,
+                    const char *stmtName,
+                    const char *query,
+                    int nParams,
+                    const Oid *paramTypes);
+PGresult *PQexecPrepared(PGconn *conn,
+                         const char *stmtName,
+                         int nParams,
+                         const char * const *paramValues,
+                         const int *paramLengths,
+                         const int *paramFormats,
+                         int resultFormat);
+
+PGresult *PQclosePrepared(PGconn *conn, const char *stmtName);
+ExecStatusType PQresultStatus(const PGresult *res);
+
+PGRES_EMPTY_QUERY
+The string sent to the server was empty.
+
+PGRES_COMMAND_OK
+Successful completion of a command returning no data.
+
+PGRES_TUPLES_OK
+Successful completion of a command returning data (such as a SELECT or SHOW).
+
+PGRES_COPY_OUT
+Copy Out (from server) data transfer started.
+
+PGRES_COPY_IN
+Copy In (to server) data transfer started.
+
+PGRES_BAD_RESPONSE
+The server's response was not understood.
+
+PGRES_NONFATAL_ERROR
+A nonfatal error (a notice or warning) occurred.
+
+PGRES_FATAL_ERROR
+A fatal error occurred.
+
+PGRES_COPY_BOTH
+Copy In/Out (to and from server) data transfer started. This feature is currently used only for streaming replication, so this status should not occur in ordinary applications.
+
+PGRES_SINGLE_TUPLE
+The PGresult contains a single result tuple from the current command. This status occurs only when single-row mode has been selected for the query (see Section 32.6).
+
+PGRES_TUPLES_CHUNK
+The PGresult contains several result tuples from the current command. This status occurs only when chunked mode has been selected for the query (see Section 32.6). The number of tuples will not exceed the limit passed to PQsetChunkedRowsMode.
+
+PGRES_PIPELINE_SYNC
+The PGresult represents a synchronization point in pipeline mode, requested by either PQpipelineSync or PQsendPipelineSync. This status occurs only when pipeline mode has been selected.
+
+PGRES_PIPELINE_ABORTED
+
+char *PQresStatus(ExecStatusType status);
+char *PQresultErrorMessage(const PGresult *res);
