@@ -47,6 +47,7 @@ struct LabelInfo {
 
 struct GenericContext {
     callsite: *Module
+    container: *Module
 }
 
 public enum TypeCheckerFlags {
@@ -97,6 +98,7 @@ public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) 
     this.genericParamStack.init(128, allocator)
     this.genericTemplates.init(64, allocator)
     this.genericContext.callsite = null
+    this.genericContext.container = null
 
     this.interfaceImpls.init(Array<Typeid>{}, 128, allocator, 0)
 
@@ -1047,10 +1049,17 @@ public func (this: *TypeChecker) getType(spec: *TypeSpec, searchType: SearchType
 }
 
 public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchType: SearchType = SearchType.TYPE) : *Symbol {
+    // Order of priority:
+    // 1) the current module
+    // 2) the generic context callsite (i.e., the module in whih the generic was defined)
+    // 3) if this is an aggregate, the module of the aggregate definition
     var type = GetTypeFromModule(this.current, typeName, searchType)
     if(!type) {
         if(this.genericContext.callsite) {
             type = GetTypeFromModule(this.genericContext.callsite, typeName, searchType)
+        }
+        if(!type && this.genericContext.container) {
+            type = GetTypeFromModule(this.genericContext.container, typeName, searchType)
         }
     }
 
@@ -1085,9 +1094,29 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchT
             }
 
             module = this.lita.getModule(filename)
+            if(!module) {
+                var sb = StringBuilderInit(1024, this.allocator)
+                var it = this.lita.modules.iter()
+                while(it.hasNext()) {
+                    var entry = it.next()
+                    var moduleId = entry.value
+                    sb.append("'%s' => %.*s\n",
+                        entry.key,
+                        entry.value.id.name.length, entry.value.id.name.buffer
+                    )
+                }
+
+                this.result.addError(
+                    SrcPos{},
+                    "could not resolve type: '%.*s', attempting to look at file: '%s'\n%s",
+                    typeName.length, typeName.buffer,
+                    filename,
+                    sb.cStr()
+                )
+                return null
+            }
         }
 
-        assert(module != null)
         var namePart = name.substring(index + 2)
 
         var namePartType = this.lita.strings.internCopy(namePart.buffer, namePart.length)

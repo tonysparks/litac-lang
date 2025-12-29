@@ -14,6 +14,54 @@
     `,
     "tests": [
         {
+            "name": "import alias generic type",
+            "modules": [
+                {
+                    "name" : "http_request",
+                    "program" : `
+                        import "std/array"
+
+                        public struct QueryParam {
+                            a: i32
+                        }
+
+                        public struct Query {
+                            params: Array<QueryParam>
+                        }
+
+                        public func ParseQuery(query: *Query) {
+                            query.params.init(16)
+                            query.params.add(QueryParam{.a = 0})
+                            query.params.add(QueryParam{.a = 1})
+                        }
+                        public func QueryInit() : Query {
+                            return Query{}
+                        }
+                    `
+                },
+                {
+                    "name" : "http",
+                    "program" : `
+                        import using "http_request"
+                    `
+                }
+            ],
+            "definitions": `
+                import using "http" as ring
+                import using "std/array"
+            `,
+            "code": `
+                var query = ring::QueryInit()
+                ring::ParseQuery(&query)
+
+                assert(query.params.size() == 2)
+                for(var i = 0; i < query.params.size(); i+=1) {
+                    var param = query.params.getPtr(i)
+                    assert(param.a == i)
+                }
+            `,
+        },/*
+        {
             "name": "Foreign funcPtr alias variable",
             "symbolPrefix": "litaC__",
             "definitions": `

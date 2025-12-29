@@ -56,6 +56,7 @@ public struct Module {
 
     importedBy: Map<*const char, ModuleImport>  // modules that import this module
     importAliases: Map<InternedString, *Module> // modules imported via an alias
+    usingModules: Map<u64, *Module>
 
     typeSpecAllocator: TypeSpecAllocator
     arena: ArenaAllocator
@@ -176,6 +177,9 @@ public func (this: *Module) init(lita: *Lita) {
     //this.allocator = lita.allocator
     this.typeSpecAllocator.init(this.allocator)
     this.importAliases = InternMap<*Module>(null, 16, this.allocator)
+    this.usingModules.init(
+        null, 16, this.allocator
+    )
 
     // We want these to be owned by the global allocator
     this.importedBy = StrMap<ModuleImport>(ModuleImport{}, 64, lita.allocator)
@@ -381,6 +385,10 @@ func (this: *Module) importModuleSymbols(
 
     moduleToImport.importedBy.put(this.id.filename, ModuleImport{this, moduleName, isUsing})
 
+    if(isUsing) {
+        this.usingModules.put(moduleToImport as (u64), moduleToImport)
+    }
+
     var symbols = moduleToImport.symbols;
     for(var it = symbols.symbolTypes.iter(); it.hasNext();) {
         var entry = it.next()
@@ -428,8 +436,15 @@ public func (this: *Module) importModuleSymbol(importSrcPos: SrcPos,
     }
 
     // only import symbols that are declared in the import module
+    // OR have been imported with "using"
     if(!symbol.declared.equals(moduleToImport)) {
-        if(!symbol.usingModule || !symbol.usingModule.equals(moduleToImport)) {
+
+        if(moduleToImport.usingModules.empty() || !symbol.usingModule) {
+            return;
+        }
+
+
+        if(!moduleToImport.usingModules.contains(symbol.declared as (u64))) {
             return;
         }
     }

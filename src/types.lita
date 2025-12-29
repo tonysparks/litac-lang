@@ -2214,7 +2214,11 @@ public struct MethodResult {
     name: InternedString
 }
 
-public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, methodName: InternedString) : MethodResult {
+public func (this: *TypeInfo) getMethod(
+    strings: *Strings,
+    module: *Module,
+    methodName: InternedString
+) : MethodResult {
     if(!this.sym) {
         goto not_found;
     }
@@ -2277,7 +2281,12 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
                             continue
                         }
 
-                        var result = varField.type.typeInfo.getMethod(strings, module, methodName)
+                        var result = varField.type.typeInfo.getMethod(
+                            strings,
+                            module,
+                            methodName
+                        )
+
                         if(result.symbol) {
                             return result
                         }

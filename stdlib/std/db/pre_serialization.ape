@@ -435,7 +435,7 @@ for(sym in symbols) {
    emitClear()
 
    if(DBSymbols(sym)) {
-      println(emitStr() + " in module: " + sym.moduleFilename)
+      // println(emitStr() + " in module: " + sym.moduleFilename)
       //replaceDeclaration(sym.moduleFilename, emitStr())
       addDeclaration(sym.moduleFilename, emitStr())
    }
