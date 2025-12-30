@@ -1570,7 +1570,7 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
 
     var info = objectTypeInfo.getBaseType()
     assert(info != null)
-    assert(info.kind == TypeKind.STRUCT || info.kind == TypeKind.UNION)
+    assert(IsAggregate(info))
 
     var aggInfo = info
     var field = aggInfo.getField(expr.field.type.name)
