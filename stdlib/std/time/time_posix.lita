@@ -77,6 +77,57 @@ internal func ToTM(dateTime: *DateTime, tm: *tm) : *tm {
     return tm
 }
 
+internal func DateTimeAdd(this: *DateTime, amount: i64, unit: TimeUnit) : DateTime {
+    var tm: tm;
+    ToTM(this, &tm)
+
+    switch(unit) {
+        case TimeUnit.NANOSECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount / 1_000_000_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.MILLISECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount / 1_000_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.SECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.MINUTES: {
+            var epoch = timegm(&tm)
+            epoch += amount * 60_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.HOURS: {
+            var epoch = timegm(&tm)
+            epoch += amount * 3_600_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.DAYS: {
+            tm.tm_isdst = -1
+            tm.tm_mday += amount as (i32)
+            return FromTM(&tm)
+        }
+        case TimeUnit.MONTHS: {
+            tm.tm_isdst = -1
+            tm.tm_mon += amount as (i32)
+            return FromTM(&tm)
+        }
+        case TimeUnit.YEARS: {
+            tm.tm_isdst = -1
+            tm.tm_year += amount as (i32)
+            return FromTM(&tm)
+        }
+        default: {
+            return *this
+        }
+    }
+}
+
 internal func ToEpochTime(dateTime: *DateTime) : EpochTime {
     var tm = tm {}
 

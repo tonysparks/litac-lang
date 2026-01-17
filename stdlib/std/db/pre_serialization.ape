@@ -246,6 +246,46 @@ fn EmitDBFunctions(sym) {
         )
     }
 
+    // SELECT ALIAS
+    {
+        emit(
+            `
+            public func (this: *${sym.name}) getSqlSelectWithAlias(
+                sb: *StringBuilder,
+                alias: String
+            ) {
+                sb.append(
+                    """
+                    SELECT`
+        )
+        emit(`\n`)
+
+        var isFirst = true
+        var count = 1
+        for(field in structDecl.fields) {
+            if(!isFirst) {
+                emit(`,\n`)
+            }
+            emit(`                        %%.*s.${getColumnName(field)}`)
+            isFirst = false
+            count += 1
+        }
+        emit(`\n                    FROM ${tableName} AS %%.*s.""",\n`)
+        isFirst = true
+        for(var i = 0; i < count; i++) {
+            if(!isFirst) {
+                emit(`,\n`)
+            }
+            emit(`                alias.length, alias.buffer`)
+            isFirst =false
+        }
+        emit(
+            `)
+            }
+            `
+        )
+    }
+
     // DELETE ONE
     {
         emit(
@@ -435,7 +475,7 @@ for(sym in symbols) {
    emitClear()
 
    if(DBSymbols(sym)) {
-      // println(emitStr() + " in module: " + sym.moduleFilename)
+      //println(emitStr() + " in module: " + sym.moduleFilename)
       //replaceDeclaration(sym.moduleFilename, emitStr())
       addDeclaration(sym.moduleFilename, emitStr())
    }

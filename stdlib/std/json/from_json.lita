@@ -6,6 +6,7 @@ import "std/hash";
 import "std/array";
 import "std/json"
 import "std/libc";
+import "std/time";
 
 #precheck
     fn json_get_generic_symbol(name, arg) {
@@ -167,10 +168,12 @@ public func (this: *StringBuilder) fromJson(context: *JsonContext, json: *JsonNo
     this.append("%s", json.asString())
 }
 
-// public func (this: *T) fromJson<T>(json: *JsonNode) {
-//     var value = *this
-//     value.fromJson(sb)
-// }
+public func (this: *DateTime) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = DateTimeFromIso(json.asString().toString())
+}
 
 public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *JsonNode) {
     if(!json) {

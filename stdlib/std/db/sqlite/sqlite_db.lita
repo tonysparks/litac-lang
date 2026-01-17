@@ -105,6 +105,10 @@ public func (this: *SqliteConnection) clearError() : void {
     }
 }
 
+public func (this: *SqliteConnection) setError(error: SqlResult) : void {
+    this.error = error
+}
+
 public func (this: *SqliteConnection) execute(sql: *const char) : SqlResult {
     if (this.hasError()) return this.error
 
@@ -427,6 +431,10 @@ public func (this: *SqliteStatement) execute(resultSet: *SqlResultSet) : SqlResu
     this.results.status = SQLITE_ROW
     this.results.checkError = false
 
+    return this.conn.error
+}
+
+public func (this: *SqliteStatement) release(resultSet: *SqlResultSet) : SqlResult {
     return this.conn.error
 }
 

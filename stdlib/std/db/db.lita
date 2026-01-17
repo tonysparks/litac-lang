@@ -58,6 +58,7 @@ public trait SqlConnection {
     lastResult: func(): SqlResult;
     hasError: func(): bool;
     clearError: func(): void;
+    setError: func(error: SqlResult): void;
 
     execute: func(sql: *const char): SqlResult;
 
@@ -94,6 +95,7 @@ public trait SqlStatement {
     close: func(): SqlResult
 
     execute: func(results: *SqlResultSet): SqlResult
+    release: func(results: *SqlResultSet): SqlResult
 }
 
 public enum SqlColumnType {

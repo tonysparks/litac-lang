@@ -3,6 +3,7 @@ import "std/string/buffer";
 import "std/string";
 import "std/map";
 import "std/array";
+import "std/time";
 
 public func (this: u8) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
@@ -64,10 +65,12 @@ public func (this: StringBuilder) toJson(sb: *StringBuilder) {
     sb.append("\"%.*s\"", this.length, this.buffer)
 }
 
-// public func (this: *T) toJson<T>(sb: *StringBuilder) {
-//     var value = *this
-//     value.toJson(sb)
-// }
+public func (this: DateTime) toJson(sb: *StringBuilder) {
+    if(!sb.reserve(64)) {
+        return;
+    }
+    this.isoFormat(&sb.asBuffer)
+}
 
 public func (this: *Map<K, V>) toJson<K, V>(sb: *StringBuilder) {
     if(!this) {

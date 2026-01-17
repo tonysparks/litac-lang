@@ -32,3 +32,7 @@ internal func DateTimeFormat(
 internal func _DateTimeFrom(format: String, value: String) : DateTime {
     return DateTime{}
 }
+
+internal func DateTimeAdd(this: *DateTime, amount: i64, unit: TimeUnit) : DateTime {
+    return DateTime{}
+}
