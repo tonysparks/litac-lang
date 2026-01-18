@@ -167,6 +167,11 @@ func GenerateVTable(
             sb.append(", ")
             param.toString(sb, true)
         }
+        if(fn.hasNativeVarargs) {
+            sb.append(", $...")
+        } else if(fn.hasVarargs) {
+            sb.append(", ...")
+        }
         sb.append(") : ")
         fn.returnType.toString(sb, true)
         sb.append(";\n")
@@ -222,8 +227,10 @@ func GenerateWrapperFunctions(
                 param.toString(sb, true)
             }
 
-            if(fn.hasVarargs) {
-                // TODO: do varargs passing
+            // TODO: do varargs passing
+            if(fn.hasNativeVarargs) {
+                sb.append(", $...")
+            } else if(fn.hasVarargs) {
                 sb.append(", ...")
             }
 

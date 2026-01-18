@@ -409,10 +409,13 @@ public func AsTraitFuncPtr(type: *TypeInfo, name: InternedString, typeCache: *Ty
         params.add(funcPtr.paramDecls.get(i))
     }
 
-    var result = typeCache.newFuncPtrTypeInfo(funcPtr.genericParams,
-                                              funcPtr.returnType,
-                                              params,
-                                              funcPtr.hasVarargs)
+    var result = typeCache.newFuncPtrTypeInfo(
+        funcPtr.genericParams,
+        funcPtr.returnType,
+        params,
+        funcPtr.hasVarargs,
+        funcPtr.hasNativeVarargs
+    )
 
     result.name = name
     return result
@@ -1665,7 +1668,13 @@ public func (this: *TypeInfo) asPtr(typeCache: *TypeCache) : *TypeInfo {
         var p = this.funcDecl.params.get(i)
         paramDecls.add(p.typeInfo)
     }
-    var funcPtr = typeCache.newFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.funcDecl.flags & FuncFlags.HAS_VARARGS)
+    var funcPtr = typeCache.newFuncPtrTypeInfo(
+        genericParams,
+        this.returnType,
+        paramDecls,
+        this.funcDecl.flags & FuncFlags.HAS_VARARGS,
+        this.funcDecl.flags & FuncFlags.HAS_NATIVE_VARARGS
+    )
     funcPtr.name = this.name
 
     return funcPtr
@@ -2428,6 +2437,7 @@ public struct TypeInfo {
             genericParams: Array<GenericParam>
             paramDecls: Array<*TypeInfo>
             hasVarargs: bool
+            hasNativeVarargs: bool
             isTrait: bool
         }
         // EnumTypeInfo

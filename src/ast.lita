@@ -134,7 +134,7 @@ public struct TypeSpec {
             ret: *TypeSpec
             genericParams: Array<GenericParam>
             hasVarargs: bool
-            hasNativeVararg: bool
+            hasNativeVarargs: bool
         }
     }
 }

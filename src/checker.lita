@@ -1378,7 +1378,13 @@ public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, searchType: Se
                 }
             }
             var returnType = this.resolveTypeSpec(funcPtrSpec.ret)
-            spec.typeInfo = this.typeCache.newFuncPtrTypeInfo(funcPtrSpec.genericParams, returnType, paramDecls, funcPtrSpec.hasVarargs) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newFuncPtrTypeInfo(
+                funcPtrSpec.genericParams,
+                returnType,
+                paramDecls,
+                funcPtrSpec.hasVarargs,
+                funcPtrSpec.hasNativeVarargs
+            )
             return spec.typeInfo
         }
         default: {

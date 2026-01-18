@@ -2333,8 +2333,8 @@ func (p: *Parser) funcPtrType() : *TypeSpec {
 
     if(!p.check(TokenType.RIGHT_PAREN)) {
         do {
-            spec.hasNativeVararg = p.match(TokenType.DOLLAR_VAR_ARGS)
-            if(spec.hasNativeVararg || p.match(TokenType.VAR_ARGS)) {
+            spec.hasNativeVarargs = p.match(TokenType.DOLLAR_VAR_ARGS)
+            if(spec.hasNativeVarargs || p.match(TokenType.VAR_ARGS)) {
                 spec.hasVarargs = true
                 if(!p.check(TokenType.RIGHT_PAREN)) {
                     p.errorAtToken(p.peek(), ErrorCode.INVALID_VARARG_POSITION)
