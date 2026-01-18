@@ -270,7 +270,7 @@ fn EmitDBFunctions(sym) {
             isFirst = false
             count += 1
         }
-        emit(`\n                    FROM ${tableName} AS %%.*s.""",\n`)
+        emit(`\n                    FROM ${tableName} AS %%.*s """,\n`)
         isFirst = true
         for(var i = 0; i < count; i++) {
             if(!isFirst) {

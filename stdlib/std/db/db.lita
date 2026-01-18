@@ -61,13 +61,14 @@ public trait SqlConnection {
     setError: func(error: SqlResult): void;
 
     execute: func(sql: *const char): SqlResult;
+    query: func(sql: String, results: *SqlResultSet, $...): SqlResult;
 
     begin: func(): SqlResult;
     commit: func(): SqlResult;
     rollback: func(): SqlResult;
 
     prepare: func(stmt: *SqlStatement, sql: String): SqlResult;
-    release: func(stmt: *SqlStatement): SqlResult;
+    release: func(stmt: SqlStatement): SqlResult;
 }
 
 
@@ -95,7 +96,9 @@ public trait SqlStatement {
     close: func(): SqlResult
 
     execute: func(results: *SqlResultSet): SqlResult
-    release: func(results: *SqlResultSet): SqlResult
+    release: func(results: SqlResultSet): SqlResult
+
+    connection: func(): SqlConnection
 }
 
 public enum SqlColumnType {
@@ -127,6 +130,11 @@ public trait SqlResultSet {
     columnString: func(column: i32) : String
     columnDateTime: func(column: i32) : DateTime
     columnType: func(column: i32) : SqlColumnType
+
+    statement: func(): SqlStatement
+
+    // Closes this result set, the statement and releases both
+    closeAndReleaseAll: func(): SqlResult
 }
 
 

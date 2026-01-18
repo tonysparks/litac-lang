@@ -10,7 +10,7 @@ import "std/db"
 // ---------------------------------------------------------
 // ORM API
 // ---------------------------------------------------------
-
+/*
 public func (this: *SqlConnection) queryMany<T>(
     allocator: *const Allocator,
     result: *Array<T>,
@@ -89,6 +89,11 @@ public func (this: *SqlConnection) queryMany<T>(
                 stmt.bindText(index, str, strlen(str))
                 break
             }
+            case typeof(:DateTime): {
+                var datetime = va_arg<DateTime>(list)
+                stmt.bindDateTime(index, datetime)
+                break
+            }
             default: {
                 var msg = StringBuilderInit(256, allocator)
                 msg.append("Unsupported parameter type: %lu", typeid)
@@ -117,14 +122,16 @@ public func (this: *SqlConnection) queryMany<T>(
 
     return result.size()
 }
-
-public func (this: *SqlConnection) query<T>(
+*/
+public func (this: *SqlConnection) queryMany<T>(
     allocator: *const Allocator,
     result: *Array<T>,
     alias: String,
     sql: String,
     $...
 ) : i32 {
+    assert(allocator)
+
     if (this.hasError()) return 0
 
     // TODO: Handler memory much better!
@@ -188,6 +195,11 @@ public func (this: *SqlConnection) query<T>(
                 stmt.bindText(index, str, strlen(str))
                 break
             }
+            case typeof(:DateTime): {
+                var datetime = va_arg<DateTime>(list)
+                stmt.bindDateTime(index, datetime)
+                break
+            }
             default: {
                 var msg = StringBuilderInit(256, allocator)
                 msg.append("Unsupported parameter type: %lu", typeid)
@@ -223,13 +235,11 @@ public func (this: *SqlConnection) queryOneById<T, ID>(
 ) : i32 {
     if (this.hasError()) return 0
 
-    var stmt = this.prepare(
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
         result.getSqlSelectOneById()
     )
-    if(!stmt) {
-        return 0
-    }
-
     defer stmt.close()
 
     result.bindId(&stmt, id, 0)
@@ -261,13 +271,11 @@ public func (this: *SqlConnection) insertMany<T>(
     if (this.hasError()) return 0
 
     var resultType = T{}
-    var stmt = this.prepare(
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
         resultType.getSqlInsert()
     )
-    if(!stmt) {
-        return 0
-    }
-
     defer stmt.close()
 
     var inserts = 0
@@ -275,7 +283,7 @@ public func (this: *SqlConnection) insertMany<T>(
         var item = items.get(i)
         item.bindValues(&stmt)
 
-        if (stmt.step() == SQLITE_DONE) {
+        if (stmt.step().isOk()) {
             inserts += 1
         }
         stmt.reset()
@@ -317,13 +325,11 @@ public func (this: *SqlConnection) deleteOne<T>(
 
     if (this.hasError()) return 0
 
-    var stmt = this.prepare(
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
         entity.getSqlDeleteOneById()
     )
-    if(!stmt) {
-        return 0
-    }
-
     defer stmt.close()
 
     entity.bindId(&stmt, entity.id, 0)
@@ -343,13 +349,11 @@ public func (this: *SqlConnection) deleteById<T, ID>(
     if (this.hasError()) return 0
 
     var resultType = T{}
-    var stmt = this.prepare(
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
         resultType.getSqlDeleteOneById()
     )
-    if(!stmt) {
-        return 0
-    }
-
     defer stmt.close()
 
     resultType.bindId(&stmt, id, 0)
@@ -369,13 +373,11 @@ public func (this: *SqlConnection) deleteMany<T>(
     if (this.hasError()) return 0
 
     var resultType = T{}
-    var stmt = this.prepare(
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
         resultType.getSqlDeleteOneById()
     )
-    if(!stmt) {
-        return 0
-    }
-
     defer stmt.close()
 
     var deletes = 0
@@ -403,13 +405,11 @@ public func (this: *SqlConnection) updateOne<T>(
 
     if (this.hasError() || entity == null) return 0
 
-    var stmt = this.prepare(
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
         entity.getSqlUpdateOneById()
     )
-    if(!stmt) {
-        return 0
-    }
-
     defer stmt.close()
 
     var index = entity.bindValues(&stmt)
@@ -430,13 +430,11 @@ public func (this: *SqlConnection) updateMany<T>(
     if (this.hasError() || entities == null || entities.empty()) return 0
 
     var entity = T{}
-    var stmt = this.prepare(
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
         entity.getSqlUpdateOneById()
     )
-    if(!stmt) {
-        return 0
-    }
-
     defer stmt.close()
 
     var updates = 0

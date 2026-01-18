@@ -13,6 +13,28 @@
         }
     `,
     "tests": [
+        // {
+        //     "name" : "Method Call from FunctionCall",
+        //     "definitions": `
+        //         struct DateTime {
+        //             a: i32
+        //         }
+        //         func (this: *DateTime) minus(amount: i32) : DateTime {
+        //             return DateTime {
+        //                 .a = this.a - amount
+        //             }
+        //         }
+        //         func DateTimeNow(): DateTime {
+        //             return DateTime {
+        //                 .a = 4
+        //             }
+        //         }
+        //     `,
+        //     "code": `
+        //         assert(DateTimeNow().minus(12) == -8)
+        //     `,
+        // },
+        /*
         {
             "name": "import alias generic type",
             "modules": [

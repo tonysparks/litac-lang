@@ -22,6 +22,8 @@ public struct SqliteConnection {
     db: *sqlite3
     error: SqlResult
     allocator: *const Allocator
+
+    connection: SqlConnection
 }
 
 public struct SqliteStatement {
@@ -44,6 +46,8 @@ public func Connect(
     enableWAL: bool = true,
     allocator: *const Allocator = defaultAllocator
 ) : SqlResult {
+
+    conn.connection = conn
     conn.allocator = allocator
     //conn.errors = ArrayInit<SqlResult>(16, allocator)
     conn.error = SqlResult {
@@ -78,6 +82,10 @@ public func ConnectReadOnly(
 // -----------------------------------------------------------------
 // Connection
 //------------------------------------------------------------------
+
+public func (this: *SqliteConnection) conn() : SqlConnection {
+    return this
+}
 
 public func (this: *SqliteConnection) close(): SqlResult {
     var errorCode = sqlite3_close(this.db)
@@ -120,6 +128,86 @@ public func (this: *SqliteConnection) execute(sql: *const char) : SqlResult {
     }
 
     return this.error
+}
+
+public func (this: *SqliteConnection) query(
+    sql: String,
+    resultSet: *SqlResultSet,
+    $...
+) : SqlResult {
+    if (this.hasError()) return this.error
+
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
+        sql
+    )
+
+    if(this.hasError()) {
+        return this.error
+    }
+
+    var index = 1
+
+    var list: va_list
+    va_start(list, sql)
+    var vargs = va_arg<NativeVararg>(list)
+    for(var i = 0; i < vargs.numberOfArgs; i+=1) {
+        var typeid = vargs.args[i]
+        switch(typeid) {
+            case typeof(:bool):
+            case typeof(:i8):
+            case typeof(:u8):
+            case typeof(:i16):
+            case typeof(:u16):
+            case typeof(:u32):
+            case typeof(:i32): {
+                stmt.bindInt32(index, va_arg<i32>(list))
+                break
+            }
+            case typeof(:usize):
+            case typeof(:u64):
+            case typeof(:i64): {
+                stmt.bindInt64(index, va_arg<i64>(list))
+                break
+            }
+            case typeof(:f32):
+            case typeof(:f64): {
+                stmt.bindFloat64(index, va_arg<f64>(list))
+                break
+            }
+            case typeof(:String): {
+                var str = va_arg<String>(list)
+                stmt.bindString(index, str)
+                break
+            }
+            case typeof(:*const char):
+            case typeof(""): {
+                var str = va_arg<*const char>(list)
+                stmt.bindText(index, str, strlen(str))
+                break
+            }
+            case typeof(:DateTime): {
+                var datetime = va_arg<DateTime>(list)
+                stmt.bindDateTime(index, datetime)
+                break
+            }
+            default: {
+                var msg = StringBuilderInit(256, this.allocator)
+                msg.append("Unsupported parameter type: %lu", typeid)
+                this.setError(
+                    SqlResult {
+                        .type = SqlResultType.ERROR,
+                        .description = msg.toString()
+                    }
+                )
+                return this.error
+            }
+        }
+        index += 1
+    }
+
+    return stmt.execute(resultSet)
 }
 
 func CreateError(
@@ -220,9 +308,7 @@ public func (this: *SqliteConnection) prepare(statement: *SqlStatement, sql: Str
     return this.error
 }
 
-public func (this: *SqliteConnection) release(stmt: *SqlStatement): SqlResult {
-    if(stmt == null) return this.error
-
+public func (this: *SqliteConnection) release(stmt: SqlStatement): SqlResult {
     stmt.close()
     var mem = stmt.__this
     this.allocator.free(mem)
@@ -235,6 +321,9 @@ public func (this: *SqliteConnection) release(stmt: *SqlStatement): SqlResult {
 // Statement
 //------------------------------------------------------------------
 
+public func (this: *SqliteStatement) connection(): SqlConnection {
+    return this.conn
+}
 
 public func (this: *SqliteStatement) bindBlob(index: i32, data: *const void, size: i32) : SqlResult {
     if (this.conn.hasError()) return this.conn.error
@@ -434,13 +523,23 @@ public func (this: *SqliteStatement) execute(resultSet: *SqlResultSet) : SqlResu
     return this.conn.error
 }
 
-public func (this: *SqliteStatement) release(resultSet: *SqlResultSet) : SqlResult {
+public func (this: *SqliteStatement) release(resultSet: SqlResultSet) : SqlResult {
     return this.conn.error
 }
 
 // -----------------------------------------------------------------
 // Result Set
 //------------------------------------------------------------------
+
+public func (this: *SqliteResultSet) statement() : SqlStatement {
+    return this.stmt
+}
+
+public func (this: *SqliteResultSet) closeAndReleaseAll() : SqlResult {
+    this.stmt.close()
+    this.stmt.conn.release(this.stmt)
+    return this.stmt.conn.error
+}
 
 public func (this: *SqliteResultSet) hasNext() : bool {
     if (this.stmt.conn.hasError()) return false
