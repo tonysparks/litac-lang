@@ -397,6 +397,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
                 var traitFn = field.typeInfo
                 traitFn.isTrait = true
 
+                this.checkTraitMethodNotVararg(aggDecl, field)
                 this.checkAggregateFieldDuplicate(aggDecl, traitField.name.str, i)
                 break
             }
@@ -617,6 +618,22 @@ func (this: *TypeChecker) addFieldReferences(aggDecl: *AggregateDecl, parentType
         }
     }
     return position
+}
+
+func (this: *TypeChecker) checkTraitMethodNotVararg(aggDecl: *AggregateDecl, field: *FieldStmt) {
+    var varField = field.varField
+
+    if(field.typeInfo.kind != TypeKind.FUNC_PTR) {
+        return;
+    }
+
+    if(field.typeInfo.hasVarargs || field.typeInfo.hasNativeVarargs) {
+        this.result.addError(varField.startPos,
+            "trait method: '%.*s' contains variable arguments which are currently not supported in trait functions",
+            varField.name.str.length, varField.name.str.buffer
+        )
+        return;
+    }
 }
 
 func (this: *TypeChecker) checkBitField(aggDecl: *AggregateDecl, field: *FieldStmt) {

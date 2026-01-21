@@ -13,27 +13,73 @@
         }
     `,
     "tests": [
-        // {
-        //     "name" : "Method Call from FunctionCall",
-        //     "definitions": `
-        //         struct DateTime {
-        //             a: i32
-        //         }
-        //         func (this: *DateTime) minus(amount: i32) : DateTime {
-        //             return DateTime {
-        //                 .a = this.a - amount
-        //             }
-        //         }
-        //         func DateTimeNow(): DateTime {
-        //             return DateTime {
-        //                 .a = 4
-        //             }
-        //         }
-        //     `,
-        //     "code": `
-        //         assert(DateTimeNow().minus(12) == -8)
-        //     `,
-        // },
+        {
+            "name" : "Trait method contains var arg",
+            "definitions": `
+                import "std/libc"
+                struct DateTime {
+                    a: i32
+                }
+                func (this: *DateTime) minus(amount: i32, $...) : i32 {
+                    var list: va_list
+                    va_start(list, amount)
+                    var vargs = va_arg<NativeVararg>(list)
+                    var a = va_arg<i32>(list)
+                    var b = va_arg<i32>(list)
+                    va_end(list)
+                    return this.a + amount + a + b
+                }
+
+                trait DateTrait {
+                    minus: func(amount: i32, $...) : i32;
+                }
+            `,
+            "code": `
+                var this = DateTime{.a = 4}
+                var r = this.minus(2, 4_i32, 8_i32)
+                //printf("%d\n", r)
+                assert(r == 18)
+
+                var date: DateTrait = &this
+                var r2 = date.minus(2, 2, 2)
+                assert(r2 == 10)
+            `,
+            "error": "trait method: 'minus' contains variable arguments which are currently not supported in trait functions"
+        },
+        {
+            "name" : "Trait native var args",
+            "disabled": true,
+            "definitions": `
+                import "std/libc"
+                struct DateTime {
+                    a: i32
+                }
+                func (this: *DateTime) minus(amount: i32, $...) : i32 {
+                    var list: va_list
+                    va_start(list, amount)
+                    var vargs = va_arg<NativeVararg>(list)
+                    var a = va_arg<i32>(list)
+                    var b = va_arg<i32>(list)
+                    va_end(list)
+                    return this.a + amount + a + b
+                }
+
+                trait DateTrait {
+                    minus: func(amount: i32, $...) : i32;
+                }
+            `,
+            "code": `
+                var this = DateTime{.a = 4}
+                var r = this.minus(2, 4_i32, 8_i32)
+                //printf("%d\n", r)
+                assert(r == 18)
+
+                var date: DateTrait = &this
+                var r2 = date.minus(2, 2, 2)
+                assert(r2 == 10)
+            `,
+        },
+
         /*
         {
             "name": "import alias generic type",

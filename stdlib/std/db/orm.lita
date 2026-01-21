@@ -159,6 +159,8 @@ public func (this: *SqlConnection) queryMany<T>(
 
     var list: va_list
     va_start(list, sql)
+    defer va_end(list)
+
     var vargs = va_arg<NativeVararg>(list)
     for(var i = 0; i < vargs.numberOfArgs; i+=1) {
         var typeid = vargs.args[i]

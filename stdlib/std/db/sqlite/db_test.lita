@@ -1,5 +1,6 @@
 
 import "std/libc"
+import "std/db"
 import "std/db/sqlite"
 
 func callback(notUsed: *void, argc: i32, argv: **char, azColName: **char) : i32 {
@@ -28,17 +29,27 @@ public struct Team {
     state: String
 }
 
+import "std/libc"
+import "std/assert"
+
 @test
-func test_db() {
-    var db: *sqlite3 = null
-    var err_msg: *char = null
+func testDatabase() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
 
-    if (sqlite3_open(":memory:", &db)) {
-        printf("Error: %s\n", sqlite3_errmsg(db))
-        return 1
-    }
+    var conn = SqlConnection{};
+    defer conn.close()
 
-      var sql_create =
+    Connect(
+        "teams.db",
+        &conn,
+        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+        true,
+        &allocator.allocator
+    )
+
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS team (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,17 +58,10 @@ func test_db() {
             state TEXT NOT NULL
         );
         """
+    )
 
-
-    if (sqlite3_exec(db, sql_create, null, null, &err_msg) != SQLITE_OK) {
-        fprintf(stderr, "SQL error: %s\n", err_msg);
-        sqlite3_free(err_msg);
-        sqlite3_close(db);
-        return 1;
-    }
-
-       // Insert some NFL teams
-    var sql_insert =
+    conn.begin()
+    conn.execute(
         """
         INSERT INTO
             team (name, city, state)
@@ -67,40 +71,149 @@ func test_db() {
             ('Minnesota Vikings', 'Minneapolis', 'MN'),
             ('Detroit Lions', 'Detroit', 'MI');
         """
+    )
 
-    if (sqlite3_exec(db, sql_insert, null, null, &err_msg) != SQLITE_OK) {
-        fprintf(stderr, "SQL error: %s\n", err_msg);
-        sqlite3_free(err_msg);
-        sqlite3_close(db);
-        return 1;
+    if(conn.commit().isError()) {
+        var error = conn.lastError()
+        printf("Database error: '%.*s', rolling back\n", error.length, error.buffer)
+        conn.rollback()
     }
 
-    var packers: Team
-    packers.query(db) // get one
+    // Query By ORM for one
+    {
+        var packers = Team{}
+        var result = conn.queryOneById(&packers, 1)
 
-    var teams: Array<Team>
-    teams.query(db)
-
-    var repo = TeamRepoInit(db)
-    repo.queryOne()
-    repo.queryMany()
-    repo.deleteOne()
-    repo.deleteMany()
-
-    // Query for Green Bay Packers
-    var sql_query =
-        """
-            SELECT name, city, state
-            FROM team
-            WHERE name = 'Green Bay Packers';
-        """
-
-    printf("Querying for Green Bay Packers:\n");
-    if (sqlite3_exec(db, sql_query, callback, null, &err_msg) != SQLITE_OK) {
-        fprintf(stderr, "SQL error: %s\n", err_msg);
-        sqlite3_free(err_msg);
+        if (result.isEmptyResults()) {
+            printf("QueryOneById returned no results.\n")
+        } else if (result.isOk()) {
+            printf(
+                "QueryOneById:%ld name: '%.*s', city: '%.*s', state: '%.*s'\n",
+                packers.id,
+                packers.name.length, packers.name.buffer,
+                packers.city.length, packers.city.buffer,
+                packers.state.length, packers.state.buffer
+            )
+        } else {
+            printf("Error retrieving QueryOneById: %.*s\n",
+                result.description.length, result.description.buffer
+            )
+        }
     }
 
-    sqlite3_close(db);
-    return 0
+    // Query using raw SQL
+    {
+        var stmt = SqlStatement{}
+        defer stmt.close()
+
+        conn.prepare(
+            &stmt,
+            $"""
+                SELECT
+                    t.id,
+                    t.name,
+                    t.state,
+                    t.city
+                FROM team t
+                WHERE t.state = :STATE
+            """
+        )
+
+        var attempts = 0
+        var results = SqlResultSet{}
+        do {
+
+            stmt.bindString(1, $"WI")
+            stmt.execute(results)
+
+            var i = 0
+            while(results.hasNext()) {
+                results.next()
+
+                printf(
+                    "%3d) id: %ld name: '%s', city: '%s', state: '%s'\n",
+                    i += 1,
+                    results.columnInt64(0),
+                    results.columnText(1),
+                    results.columnText(2),
+                    results.columnText(3)
+                )
+            }
+
+            stmt.reset()
+            attempts += 1
+        } while(attempts < 0);
+    }
+
+    // Query via ORM for Many
+    {
+        printf("Query by queryMany\n")
+        var teams = ArrayInit<Team>(16, &allocator.allocator)
+        conn.queryMany(
+            &teams,
+            .where = $"state = :STATE and city = ?",
+            $"WI", "Green Bay"
+        )
+        printf("Results: %d\n", teams.size())
+
+        for(var i = 0; i < teams.size(); i+=1) {
+            var t = teams.getPtr(i)
+            printf("Team: id:%ld name: '%.*s' city: '%.*s' state: '%.*s'\n",
+                t.id,
+                t.name.length, t.name.buffer,
+                t.city.length, t.city.buffer,
+                t.state.length, t.state.buffer
+            )
+        }
+    }
+
+    // Insert via ORM many
+    {
+        var buc = Team {
+            .name = $"Buccaneers",
+            .city = $"Tampa Bay",
+            .state = $"FL",
+        }
+
+        var falcons = Team {
+            .name = $"Falcons",
+            .city = $"Atlanta",
+            .state = $"GA",
+        }
+
+        var newTeams = ArrayInit<Team>(2, &allocator.allocator)
+        newTeams.add(buc)
+        newTeams.add(falcons)
+
+        var numOfInserts = conn.insertMany(newTeams)
+        printf("Inserted: %d\n", numOfInserts)
+
+        var readTeams = ArrayInit<Team>(16, &allocator.allocator)
+        conn.queryMany(
+            &readTeams,
+            .where = $"state in (?, ?)",
+            $"GA", $"FL"
+        )
+
+        for(var i = 0; i < readTeams.size(); i+=1) {
+            var t = readTeams.getPtr(i)
+            printf("Team: id:%ld name: '%.*s' city: '%.*s' state: '%.*s'\n",
+                t.id,
+                t.name.length, t.name.buffer,
+                t.city.length, t.city.buffer,
+                t.state.length, t.state.buffer
+            )
+
+            var deleted = conn.deleteOne(t)
+                //conn.deleteById<Team, i64>(t.id)
+            printf("Deleted: %d\n", deleted)
+        }
+    }
+
+    if(conn.hasError()) {
+        var error = conn.lastError()
+        printf("Database error: '%.*s'\n", error.length, error.buffer)
+        conn.rollback()
+    }
+
 }

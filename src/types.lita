@@ -1576,6 +1576,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
             result.ret = funcInfo.returnType.asTypeSpec(module, fullyQualify)
             result.args = args
             result.hasVarargs = funcInfo.hasVarargs
+            result.hasNativeVarargs = funcInfo.hasNativeVarargs
             result.genericParams = funcInfo.genericParams
             return result
         }

@@ -790,13 +790,20 @@ public func (this: using *CGen) cType(type: *TypeInfo,
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
             }
-            for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
+            var i = 0;
+            for(; i < funcInfo.paramDecls.size(); i += 1) {
                 if(i > 0 || funcInfo.isTrait) {
                     params.appendStrn(",", 1)
                 }
 
                 var param = funcInfo.paramDecls.get(i)
                 params.appendStr(this.cType(param, isCast, true))
+            }
+            if(funcInfo.hasNativeVarargs || funcInfo.hasVarargs) {
+                if(i > 0 || funcInfo.isTrait) {
+                    params.appendStrn(",", 1)
+                }
+                params.appendStrn("...", 3)
             }
 
             sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, isCast, decay),
@@ -930,13 +937,20 @@ public func (this: using *CGen) cTypeDecl(type: *TypeInfo,
             if(funcInfo.isTrait) {
                 params.appendStrn("void*", 5)
             }
-            for(var i = 0; i < funcInfo.paramDecls.size(); i += 1) {
+            var i = 0;
+            for(; i < funcInfo.paramDecls.size(); i += 1) {
                 if(i > 0 || funcInfo.isTrait) {
                     params.appendStrn(",", 1)
                 }
 
                 var param = funcInfo.paramDecls.get(i)
                 params.appendStr(this.cType(param, false, true))
+            }
+            if(funcInfo.hasNativeVarargs || funcInfo.hasVarargs) {
+                if(i > 0 || funcInfo.isTrait) {
+                    params.appendStrn(",", 1)
+                }
+                params.appendStrn("...", 3)
             }
 
             sb.append("%s (*%s)(%s)", this.cType(funcInfo.returnType, false, decay), name, params.cStrConst())

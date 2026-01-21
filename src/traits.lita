@@ -221,7 +221,8 @@ func GenerateWrapperFunctions(
 
             sb.append("@hidden func __%.*s_%.*s_wrapper", implEscapedName.length, implEscapedName.buffer, field.traitField.name.str.length, field.traitField.name.str.buffer)
             sb.append("(this: *void")
-            for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+            var p = 0;
+            for(; p < fn.paramDecls.size(); p += 1) {
                 var param = fn.paramDecls.get(p)
                 sb.append(", _%d: ", p)
                 param.toString(sb, true)
@@ -250,6 +251,17 @@ func GenerateWrapperFunctions(
                 // PrintGenericArgs(implSym.genericArgs, sb)
                 sb.append(")\n")
 
+                var hasVarargs = fn.hasNativeVarargs || fn.hasVarargs
+                if(hasVarargs) {
+                    sb.append(
+                    """
+                        var __list: va_list;
+                        va_start(__list, _%d);
+                        defer va_end(__list);
+                    """, p-1
+                    )
+                }
+
                 if(fn.returnType.kind != TypeKind.VOID) {
                     sb.append("    return ")
                 }
@@ -257,10 +269,11 @@ func GenerateWrapperFunctions(
                     sb.append("    ")
                 }
 
+
                 sb.append("__this.%.*s", field.traitField.name.str.length, field.traitField.name.str.buffer)
 
                 sb.append("(")
-                for(var p = 0; p < fn.paramDecls.size(); p += 1) {
+                for(p = 0; p < fn.paramDecls.size(); p += 1) {
                     if(p > 0) {
                         sb.append(", ")
                     }
