@@ -4,7 +4,7 @@ import "std/string"
 import "std/array"
 import "std/mem"
 import "std/libc"
-
+import "std/time"
 import "std/db"
 
 // ---------------------------------------------------------
@@ -246,14 +246,14 @@ public func (this: *SqlConnection) queryOneById<T, ID>(
 
     result.bindId(&stmt, id, 0)
 
-    var resultSet: *SqlResultSet = null
+    var resultSet: SqlResultSet
     stmt.execute(&resultSet)
 
     if (!resultSet.hasNext()) {
         return 0
     }
 
-    var sb = StringBuilderInit(1024, this.allocator)
+    var sb = StringBuilderInit(1024, this.getAllocator())
     resultSet.next()
     result.fromResultSet(&resultSet, -1, &sb)
 

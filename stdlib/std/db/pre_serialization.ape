@@ -378,7 +378,7 @@ fn EmitDBFunctions(sym) {
             if(isString(columnType)) {
                 emit(
                 `
-                len = sb.append("s", resultSet.column${columnType}(fromIndex += 1))
+                len = sb.append("%%s", resultSet.column${columnType}(fromIndex += 1))
                 this.${columnName} = sb.substring(sb.length - len, sb.length)
                 `
                 )

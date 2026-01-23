@@ -5,6 +5,7 @@ import "std/mem"
 import "std/mem/bucket_allocator"
 import "std/array"
 import "std/time"
+import "std/libc"
 //import using "std/db/sqlite"
 //import using "std/db/orm"
 
@@ -52,7 +53,7 @@ public struct SqlResult {
 }
 
 public trait SqlConnection {
-    close: func(): SqlResult;
+    getAllocator: func(): *const Allocator
 
     lastError: func(): String;
     lastResult: func(): SqlResult;
@@ -61,7 +62,9 @@ public trait SqlConnection {
     setError: func(error: SqlResult): void;
 
     execute: func(sql: *const char): SqlResult;
-    query: func(sql: String, results: *SqlResultSet, $...): SqlResult;
+    // TODO: This stupid compiler author needs to figure out
+    // how to get var args working for traits...idiot
+    //query: func(sql: String, results: *SqlResultSet, $...): SqlResult;
 
     begin: func(): SqlResult;
     commit: func(): SqlResult;
@@ -69,6 +72,7 @@ public trait SqlConnection {
 
     prepare: func(stmt: *SqlStatement, sql: String): SqlResult;
     release: func(stmt: SqlStatement): SqlResult;
+    close: func(): SqlResult;
 }
 
 
@@ -152,11 +156,11 @@ public func (this: SqlResult) isEmptyResults() : bool {
 }
 
 public func (this: *SqlConnection) query(
-    sql: String,
     resultSet: *SqlResultSet,
+    sql: String,
     $...
 ) : SqlResult {
-    if (this.hasError()) return this.error
+    if (this.hasError()) return this.lastResult()
 
     var stmt: SqlStatement;
     this.prepare(
@@ -165,7 +169,7 @@ public func (this: *SqlConnection) query(
     )
 
     if(this.hasError()) {
-        return this.error
+        return this.lastResult()
     }
 
     var index = 1
@@ -216,15 +220,16 @@ public func (this: *SqlConnection) query(
                 break
             }
             default: {
-                var msg = StringBuilderInit(256, this.allocator)
-                msg.append("Unsupported parameter type: %lu", typeid)
+                // TODO: Make this more descriptive error message
+                //var msg = StringBuilderInit(256, defaultAllocator/*this.allocator*/)
+                //msg.append("Unsupported parameter type: %s", nameof(typeid))
                 this.setError(
                     SqlResult {
                         .type = SqlResultType.ERROR,
-                        .description = msg.toString()
+                        .description = $"Unsupported parameter type"
                     }
                 )
-                return this.error
+                return this.lastResult()
             }
         }
         index += 1

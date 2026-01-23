@@ -87,6 +87,10 @@ public func (this: *SqliteConnection) conn() : SqlConnection {
     return this
 }
 
+public func (this: *SqliteConnection) getAllocator() : *const Allocator {
+    return this.allocator
+}
+
 public func (this: *SqliteConnection) close(): SqlResult {
     var errorCode = sqlite3_close(this.db)
     this.error = CreateError(this, null, errorCode)

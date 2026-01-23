@@ -163,8 +163,8 @@ func testDateTime() {
     var sb = StringBuilderInit(1024)
     dateTime.isoFormat(sb)
     printf("DateTime: %.*s\n", sb.length, sb.buffer)
-    printf("Now: %lu\n", now)
-    printf("Converted: %lu\n", dateTime.toEpochTime())
+    printf("Now: %lld\n", now)
+    printf("Converted: %lld\n", dateTime.toEpochTime())
 
     assert(dateTime.toEpochTime() == now)
 
