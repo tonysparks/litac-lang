@@ -1870,6 +1870,54 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitStrn("\n", 1)
             return;
         }
+        case StmtKind.POST_ELSE_STMT: {
+            var stmt = s as (*PostElseStmt)
+
+            if(stmt.cond.kind == StmtKind.VAR_DECL ||
+               stmt.cond.kind == StmtKind.CONST_DECL
+            ) {
+                var varDecl = stmt.cond as (*VarDecl)
+                assert(varDecl.sym != null)
+
+                this.emitStmt(stmt.cond)
+                this.emitStrn("\n", 1)
+
+                var name = this.cName(varDecl.sym)
+                this.emit("if(%s) {", name)
+                {
+                    this.pushScope(&CGenScope{})
+                    defer this.popScope()
+
+                    this.emitStmt(stmt.post)
+                    if(IsExpr(stmt.post)) {
+                        this.emitStrn(";", 1)
+                    }
+                    this.emitStrn("}", 1)
+                }
+
+            }
+            else if(IsExpr(stmt.cond)) {
+                this.emitStrn("if(", 3)
+                this.emitStmt(stmt.cond)
+                this.emitStrn(") {", 3)
+                {
+
+                    this.pushScope(&CGenScope{})
+                    defer this.popScope()
+
+                    this.emitStmt(stmt.post)
+                    if(IsExpr(stmt.post)) {
+                        this.emitStrn(";", 1)
+                    }
+                    this.emitStrn("}", 1)
+                }
+
+            } else {
+                assert(false)
+            }
+            this.emitStrn("\n", 1)
+            return;
+        }
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
             this.emitName(stmt.label)

@@ -1449,6 +1449,7 @@ err:
     return p.poisonExpr(expr.startPos)
 }
 
+
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Statements
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
@@ -1513,11 +1514,19 @@ func (p: *Parser) tryStatement() : *Stmt {
     }
 
     if(p.match(TokenType.VAR)) {
-        return p.varDeclaration() as (*Stmt)
+        var stmt = p.varDeclaration() as (*Stmt)
+        if(p.match(TokenType.QUESTION_COLON)) {
+            return p.postElseStatement(stmt)
+        }
+        return stmt
     }
 
     if(p.match(TokenType.CONST)) {
-        return p.constDeclaration() as (*Stmt)
+        var stmt = p.constDeclaration() as (*Stmt)
+        if(p.match(TokenType.QUESTION_COLON)) {
+            return p.postElseStatement(stmt)
+        }
+        return stmt
     }
 
     if(p.match(TokenType.IF)) {
@@ -1567,10 +1576,27 @@ func (p: *Parser) tryStatement() : *Stmt {
         }
     }
 
-    return p.expression() as (*Stmt)
+    var stmt = p.expression() as (*Stmt)
+    if(p.match(TokenType.QUESTION_COLON)) {
+        return p.postElseStatement(stmt)
+    }
+    return stmt
 
 err:
     return p.poisonStatement(pos)
+}
+
+func (p: *Parser) postElseStatement(stmt: *Stmt) : *Stmt {
+    var pos = p.pos()
+
+    var postStmt = p.statement()
+    return NewPostElseStmt(
+        pos,
+        p.pos(),
+        stmt,
+        postStmt,
+        p.allocator
+    )
 }
 
 func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
@@ -1850,7 +1876,6 @@ func (p: *Parser) ifStatement() : *Stmt {
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
     }
-
 
     var cond = p.expression()
 

@@ -501,6 +501,18 @@ func (this: *SourceLookup) visitStmt(node: *Stmt) : bool {
             }
             break
         }
+        case StmtKind.POST_ELSE_STMT: {
+            var stmt = node as (*PostElseStmt)
+            if(this.visitStmt(stmt.cond)) {
+                return true
+            }
+
+            if(this.visitStmt(stmt.post)) {
+                return true
+            }
+
+            break
+        }
         case StmtKind.MODULE_STMT: {
             var stmt = node as (*ModuleStmt)
             for(var i = 0; i < stmt.imports.size(); i += 1) {

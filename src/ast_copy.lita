@@ -546,6 +546,17 @@ public func CopyStmt(stmt: *Stmt, module: *Module) : *Stmt {
                                  module.allocator)
             return copy
         }
+        case StmtKind.POST_ELSE_STMT: {
+            var original = stmt as (*PostElseStmt)
+            var copy = NewPostElseStmt(
+                original.startPos,
+                original.endPos,
+                CopyStmt(original.cond, module),
+                CopyStmt(original.post, module),
+                module.allocator
+            )
+            return copy
+        }
         case StmtKind.LABEL_STMT: {
             return stmt // nothing to copy
         }

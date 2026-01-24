@@ -47,6 +47,7 @@ public enum StmtKind {
     FUNC_BODY_STMT,
     GOTO_STMT,
     IF_STMT,
+    POST_ELSE_STMT,
     LABEL_STMT,
     MODULE_STMT,
     NOTE_STMT,
@@ -368,6 +369,11 @@ public struct IfStmt {
     elseStmt: *Stmt
 }
 
+public struct PostElseStmt {
+    stmt: using Stmt
+    cond: *Stmt
+    post: *Stmt
+}
 
 public struct LabelStmt {
     stmt: using Stmt
