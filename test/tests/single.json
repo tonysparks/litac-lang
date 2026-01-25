@@ -97,6 +97,122 @@
                 //assert(doSomethingElse(0) == 12)
             `,
         },
+        {
+            "name" : "Post else with non bool expression",
+            "definitions": `
+                func DoSomething(): String {
+                    return $"Hello"
+                }
+            `,
+            "code": `
+                var x = DoSomething() ?: assert(false);
+            `,
+            "error": "'String' can't be coerced to boolean"
+        },
+        {
+            "name" : "Post else with illegal expr",
+            "definitions": `
+                func DoSomething(): String {
+                    return $"Hello"
+                }
+            `,
+            "code": `
+                switch(1) { default: {}} ?: assert(false);
+            `,
+            "error": "must either be a var or const declaration or expression before the ?:"
+        },
+        {
+            "name" : "Post else with generics",
+            "definitions": `
+                func DoSomething<T>(a : T): T {
+                    return a
+                }
+            `,
+            "code": `
+                var count = 0
+                DoSomething(1_i32) ?: {
+                    count += 1
+                };
+                assert(count == 1)
+            `,
+        },
+        {
+            "name" : "Post else with generics with bad type",
+            "definitions": `
+                func DoSomething<T>(a : T): T {
+                    return a
+                }
+            `,
+            "code": `
+                DoSomething($"Hello") ?: {
+                    assert(false)
+                };
+                assert(false)
+            `,
+            "error": "'String' can't be coerced to boolean"
+        },
+        {
+            "name" : "Normal usage",
+            "definitions": `
+                enum Status {
+                    OK,
+                    ERROR1,
+                    ERROR2,
+                    ERROR3,
+                }
+                func DoSomething(a : i32): Status {
+                    switch(a) {
+                        case 1: {
+                            return Status.ERROR1
+                        }
+                        case 2: {
+                            return Status.ERROR2
+                        }
+                        default: {
+                            return Status.OK
+                        }
+                    }
+                }
+                func DoAgain(a: i32): Status {
+                    var result = DoSomething(a)
+                        ?: return result
+
+                    return Status.ERROR3
+                }
+            `,
+            "code": `
+                var count = 0
+                var result = DoAgain(0) ?: {
+                    count += 1
+                };
+                assert(result == Status.ERROR3)
+                assert(count == 1)
+
+                result = DoAgain(1) ?: {
+                    count += 1
+                };
+                assert(result == Status.ERROR1)
+                assert(count == 2)
+
+                result = DoAgain(2) ?: {
+                    count += 1
+                };
+                assert(result == Status.ERROR2)
+                assert(count == 3)
+            `,
+        },
+        {
+            "name" : "Post else with binary expr non boolean",
+            "definitions": `
+
+            `,
+            "code": `
+                var x = $"Hello"
+                x = $"bye" ?: assert(false)
+                assert(false)
+            `,
+            "error": "'String' can't be coerced to boolean"
+        },
         /*
         {
             "name": "import alias generic type",

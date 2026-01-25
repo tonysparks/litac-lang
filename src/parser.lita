@@ -1471,6 +1471,10 @@ public func (p: *Parser) statement() : *Stmt {
         return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
     }
 
+    if(p.match(TokenType.QUESTION_COLON)) {
+        return p.postElseStatement(stmt)
+    }
+
     return stmt
 }
 
@@ -1514,19 +1518,11 @@ func (p: *Parser) tryStatement() : *Stmt {
     }
 
     if(p.match(TokenType.VAR)) {
-        var stmt = p.varDeclaration() as (*Stmt)
-        if(p.match(TokenType.QUESTION_COLON)) {
-            return p.postElseStatement(stmt)
-        }
-        return stmt
+        return p.varDeclaration() as (*Stmt)
     }
 
     if(p.match(TokenType.CONST)) {
-        var stmt = p.constDeclaration() as (*Stmt)
-        if(p.match(TokenType.QUESTION_COLON)) {
-            return p.postElseStatement(stmt)
-        }
-        return stmt
+        return p.constDeclaration() as (*Stmt)
     }
 
     if(p.match(TokenType.IF)) {
@@ -1576,11 +1572,7 @@ func (p: *Parser) tryStatement() : *Stmt {
         }
     }
 
-    var stmt = p.expression() as (*Stmt)
-    if(p.match(TokenType.QUESTION_COLON)) {
-        return p.postElseStatement(stmt)
-    }
-    return stmt
+    return p.expression() as (*Stmt)
 
 err:
     return p.poisonStatement(pos)

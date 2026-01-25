@@ -1897,9 +1897,9 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
 
             }
             else if(IsExpr(stmt.cond)) {
-                this.emitStrn("if(", 3)
+                this.emitStrn("if((", 4)
                 this.emitStmt(stmt.cond)
-                this.emitStrn(") {", 3)
+                this.emitStrn(")) {", 4)
                 {
 
                     this.pushScope(&CGenScope{})
