@@ -1,0 +1,290 @@
+public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : PkgStatus {
+    if(!pm.pkg) {
+        return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
+    }
+
+    if(!pm.pkg.json) {
+        return PkgStatus.ERROR_PARSING_PKG_JSON
+    }
+
+    var preBuildCommand = pm.pkg.json.get("pre_build_command")
+    if(preBuildCommand) {
+        var status = pm.build(preBuildCommand, options, RunType.PRE_BUILD)
+        if(status != PkgStatus.OK) {
+            return status
+        }
+
+        var status = pm.build(preBuildCommand, options, RunType.PRE_BUILD)
+            ?: return status
+
+        // converted to
+        var status = pm.build(preBuildCommand, options, RunType.PRE_BUILD)
+        if(!status) {
+            [statement]
+            status = PkgStatus.BLAH
+            or
+            return status
+            or
+            logger.error("...")
+        }
+    }
+}
+
+
+// primitive type errors
+
+// 1) opaque type,
+/// relatively small in size, up to 16 bytes or 8 bytes
+struct Error {
+    data: any  // typeid(8) + ptr(8)
+    // or
+    data: *void // (8)
+}
+
+// 2) standard structure
+/// not robust, only captures some use cases -> can be very large
+struct Error {
+    description: *const char // (8)
+    code: i64 // (8)
+    // [optional?]
+    line: i64
+    file: *const char
+}
+
+// 3) opaque with some standard
+struct Error {
+    code: i64
+    data: *void
+}
+
+enum ResultKind {
+    VALUE,
+    ERROR
+}
+
+
+struct Result<T> {
+    kind: u8 // either value or error
+    union {
+        value: T
+        error: Error
+    }
+}
+
+struct Either<A, B> {
+    union {
+        a: A
+        b: B
+    }
+    kind: u8 // either 1 for A or 2 for B
+}
+
+// usize?Error =>
+struct Result<usize> {
+    union {
+        value: usize
+        error: Error
+    }
+    kind: u8
+}
+
+// 1) bubble up
+// 2) log and bubble up
+// 3) catch and handle
+
+func ReadFully(filename: *const char, buffer: Buffer, length: *usize) : usize ? Error {
+    if (filename == null) {
+        return Error {
+            .code = IOError.NoFileName,
+            .data = "No file name provided"
+        }
+        // converted to:
+        return Result<usize> {
+            .error = Error {
+                .code = IOError.NoFileName,
+                .data = "No file name provided"
+            },
+            .kind = ResultKind.ERROR
+        }
+    }
+
+    if(!open(filename)) {
+        // Who manages this memory???
+        var sb = StringBuilderInit(256, allocator) // error allocator?
+        sb.append("Unable to open file '%s'", filename)
+        return Error {
+            .code = IOError.FileNotFound,
+            .data = sb.cStr()
+        }
+    }
+
+    ...
+
+    return length
+    // converted to:
+    return Result<usize> {
+        .value = length,
+        .kind = ResultKind.VALUE
+    }
+}
+
+    try expr [else] stmt =>
+
+
+    // 1) bubble up
+    func ReadConfig() : Config ? Error {
+        var buffer = ...
+        var length: usize = 0
+
+        // bubble up
+        var length: usize = try ReadFileFully(
+            "some/file.txt",
+            buffer,
+            &length
+        )
+        // converted to
+        var tmp: usize ? Error = ReadFileFully(..)
+        if (tmp.kind == ResultKind.ERROR) {
+            return tmp.error
+        }
+        var length = tmp.value
+    }
+
+    // 2) log and bubble up
+    var x = try ReadFileFully(
+      "some/file.txt",
+      buffer,
+      &length
+    ) else {
+        // value and error, but since this is error, only error is visible
+        logger.info(error)
+    }
+    // converted to
+    var tmp: usize ? Error = ReadFileFully(..)
+    if (tmp.kind == ResultKind.ERROR) {
+        logger.info(tmp.error)
+        return tmp.error
+    }
+    var length = tmp.value
+
+
+    // 3) catch and handle
+    var tmp: usize ? Error = ReadFileFully(..)
+    if (tmp.empty()) {
+        logger.info(tmp.error)
+        length = 0
+        buffer = ..
+        tmp.value = Result.of(0)
+    }
+    var length = tmp.value
+
+    //
+    var x = try ReadFileFully(
+      "some/file.txt",
+      buffer,
+      &length
+    ) else {
+        logger.info(error)
+        length = 0
+        buffer = ...
+        continue 0
+    }
+
+
+    // 1) bubble up
+    // 2) log and bubble up
+    // 3) catch and handle
+
+    func ReadFully(filename: *const char, buffer: Buffer, length: *usize) : usize | Error {
+        if (filename == null) {
+            return Error {..}
+        }
+
+        if(!open(filename)) {
+            return Error {..}
+        }
+
+        ...
+
+        return length
+    }
+
+    try expr [else] stmt =>
+
+
+    // 1) bubble up
+    var tmp: usize | Error = ReadFileFully(..)
+    if (tmp.empty()) {
+        return tmp.error
+    }
+    var length = tmp.value
+
+    //
+    func ReadConfig() : Config | Error {
+        var buffer = ...
+        var length: usize = 0
+
+        // bubble up
+        var length: usize = try ReadFileFully(
+            "some/file.txt",
+            buffer,
+            &length
+        )
+    }
+
+
+
+
+
+    // 2) log and bubble up
+    var tmp: usize | Error = ReadFileFully(..)
+    if (tmp.empty()) {
+        logger.info(tmp.error)
+        return tmp.error
+    }
+    var length = tmp.value
+
+    //
+    var x = try ReadFileFully(
+      "some/file.txt",
+      buffer,
+      &length
+    ) else {
+        // value and error, but since this is error, only error is visible
+        logger.info(error)
+    }
+
+
+    // 3) catch and handle
+    var tmp: usize | Error = ReadFileFully(..)
+    if (tmp.empty()) {
+        logger.info(tmp.error)
+        length = 0
+        buffer = ..
+        tmp.value = Result.of(0)
+    }
+    var length = tmp.value
+
+    //
+    var x = try ReadFileFully(
+      "some/file.txt",
+      buffer,
+      &length
+    ) else {
+        logger.info(error)
+        length = 0
+        buffer = ...
+        continue Result.of(0)
+    }
+
+
+var x = match ReadFileFully(
+    "some/file.txt",
+    buffer,
+    &length
+) {
+    // all matches, if non exhaustive then what?
+    usize: // do nothing
+    e: Error:
+        return e
+}

@@ -1449,6 +1449,7 @@ err:
     return p.poisonExpr(expr.startPos)
 }
 
+
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Statements
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
@@ -1468,6 +1469,10 @@ public func (p: *Parser) statement() : *Stmt {
         }
 
         return NewPoisonExpr(pos, p.pos(), p.allocator) as (*Stmt)
+    }
+
+    if(p.match(TokenType.QUESTION_COLON)) {
+        return p.postElseStatement(stmt)
     }
 
     return stmt
@@ -1571,6 +1576,19 @@ func (p: *Parser) tryStatement() : *Stmt {
 
 err:
     return p.poisonStatement(pos)
+}
+
+func (p: *Parser) postElseStatement(stmt: *Stmt) : *Stmt {
+    var pos = p.pos()
+
+    var postStmt = p.statement()
+    return NewPostElseStmt(
+        pos,
+        p.pos(),
+        stmt,
+        postStmt,
+        p.allocator
+    )
 }
 
 func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
@@ -1850,7 +1868,6 @@ func (p: *Parser) ifStatement() : *Stmt {
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
     }
-
 
     var cond = p.expression()
 

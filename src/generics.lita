@@ -708,6 +708,12 @@ func ReplaceTypes(template: *Template, ast: *Node) : bool {
             }
             break;
         }
+        case StmtKind.POST_ELSE_STMT: {
+            var postStmt = ast as (*PostElseStmt)
+            ReplaceTypes(template, postStmt.cond)
+            ReplaceTypes(template, postStmt.post)
+            break;
+        }
         case StmtKind.LABEL_STMT: {
             break;
         }

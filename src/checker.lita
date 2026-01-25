@@ -1721,6 +1721,40 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true
         }
+        case StmtKind.POST_ELSE_STMT: {
+            var postStmt = stmt as (*PostElseStmt)
+            if(!this.resolveStmt(postStmt.cond)) {
+                return false
+            }
+
+            if(!this.resolveStmt(postStmt.post)) {
+                return false
+            }
+
+            var cond: *Expr = null
+            if(postStmt.cond.kind == StmtKind.VAR_DECL ||
+               postStmt.cond.kind == StmtKind.CONST_DECL) {
+                var varDecl = postStmt.cond as (*VarDecl)
+                cond = varDecl.expr
+            }
+            else if(IsExpr(postStmt.cond)) {
+                cond = postStmt.cond as (*Expr)
+            }
+
+            if(!cond) {
+                this.result.addError(
+                    postStmt.cond.startPos,
+                    "must either be a var or const declaration or expression before the ?:"
+                )
+                return false
+            }
+
+            // this condition must be a boolean
+            if(!this.isBoolExpr(cond)) {
+                return false
+            }
+            return true
+        }
         case StmtKind.LABEL_STMT: {
             var labelStmt = stmt as (*LabelStmt)
             if(labelStmt.label.token.type != TokenType.IDENTIFIER) {

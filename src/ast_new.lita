@@ -861,6 +861,22 @@ public func NewIfStmt(startPos: SrcPos,
     return stmt as (*Stmt)
 }
 
+public func NewPostElseStmt(
+    startPos: SrcPos,
+    endPos: SrcPos,
+    cond: *Stmt,
+    post: *Stmt,
+    allocator: *const Allocator
+): *Stmt {
+    var stmt = new<PostElseStmt>(allocator)
+    stmt.kind = StmtKind.POST_ELSE_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.cond = stmt.node.becomeParentOf(cond)
+    stmt.post = stmt.node.becomeParentOf(post)
+    return stmt as (*Stmt)
+}
+
 
 public func NewWhileStmt(startPos: SrcPos,
                          endPos: SrcPos,
