@@ -71,6 +71,17 @@ public enum Month {
     December,
 }
 
+public enum TimeUnit {
+    NANOSECONDS,
+    MILLISECONDS,
+    SECONDS,
+    MINUTES,
+    HOURS,
+    DAYS,
+    MONTHS,
+    YEARS,
+}
+
 public enum DateTimeStatus {
     OK,
     INVALID_INPUT_FORMAT,
@@ -98,6 +109,14 @@ public func (this: *DateTime) format(format: String, output: *StringBuffer) : Da
         format,
         output
     )
+}
+
+public func (this: *DateTime) add(amount: i32, unit: TimeUnit) : DateTime {
+    return os::DateTimeAdd(this, amount, unit)
+}
+
+public func (this: *DateTime) minus(amount: i32, unit: TimeUnit) : DateTime {
+    return os::DateTimeAdd(this, -amount, unit)
 }
 
 public func (this: *DateTime) compare(other: *DateTime) : i32 {
@@ -144,8 +163,8 @@ func testDateTime() {
     var sb = StringBuilderInit(1024)
     dateTime.isoFormat(sb)
     printf("DateTime: %.*s\n", sb.length, sb.buffer)
-    printf("Now: %lu\n", now)
-    printf("Converted: %lu\n", dateTime.toEpochTime())
+    printf("Now: %lld\n", now)
+    printf("Converted: %lld\n", dateTime.toEpochTime())
 
     assert(dateTime.toEpochTime() == now)
 

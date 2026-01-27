@@ -26,10 +26,10 @@ struct tm {
 }
 
 @foreign
-typedef i64 as time_t;
+typedef void as time_t;
 
 @foreign
-func gmtime_r(time: *time_t, result: *tm) : *tm;
+func gmtime(time: *time_t) : *tm;
 
 @foreign
 func time(sec: *time_t) : time_t;
@@ -44,10 +44,9 @@ func strftime(s: *char, max: usize, format: *const char, tm: *const tm) : usize;
 func strptime(s: *const char, format: *const char, tm: *const tm) : *char;
 
 internal func ToDateTime(epoch: EpochTime) : DateTime {
-    var tm = tm{}
-    gmtime_r(&epoch, &tm)
+    var tm = gmtime((&epoch) as (*time_t))
 
-    return FromTM(&tm)
+    return FromTM(tm)
 }
 
 @inline
@@ -77,6 +76,57 @@ internal func ToTM(dateTime: *DateTime, tm: *tm) : *tm {
     return tm
 }
 
+internal func DateTimeAdd(this: *DateTime, amount: i64, unit: TimeUnit) : DateTime {
+    var tm: tm;
+    ToTM(this, &tm)
+
+    switch(unit) {
+        case TimeUnit.NANOSECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount / 1_000_000_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.MILLISECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount / 1_000_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.SECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.MINUTES: {
+            var epoch = timegm(&tm)
+            epoch += amount * 60_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.HOURS: {
+            var epoch = timegm(&tm)
+            epoch += amount * 3_600_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.DAYS: {
+            tm.tm_isdst = -1
+            tm.tm_mday += amount as (i32)
+            return FromTM(&tm)
+        }
+        case TimeUnit.MONTHS: {
+            tm.tm_isdst = -1
+            tm.tm_mon += amount as (i32)
+            return FromTM(&tm)
+        }
+        case TimeUnit.YEARS: {
+            tm.tm_isdst = -1
+            tm.tm_year += amount as (i32)
+            return FromTM(&tm)
+        }
+        default: {
+            return *this
+        }
+    }
+}
+
 internal func ToEpochTime(dateTime: *DateTime) : EpochTime {
     var tm = tm {}
 
@@ -85,8 +135,8 @@ internal func ToEpochTime(dateTime: *DateTime) : EpochTime {
 }
 
 internal func _Now() : EpochTime {
-    var time = time(null)
-    return time as (EpochTime)
+    var now = time(null)
+    return now as (EpochTime)
 }
 
 internal func _DateTimeNow() : DateTime {

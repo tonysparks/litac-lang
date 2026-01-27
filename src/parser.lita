@@ -1586,6 +1586,7 @@ err:
     return p.poisonExpr(expr.getStartPos())
 }
 
+
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                             Statements
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
@@ -1606,6 +1607,10 @@ public func (p: *Parser) statement() : *Stmt {
 
         var stmtNode = NewPoisonExpr(pos, p.pos(), p.allocator)
         return &stmtNode.asStmt
+    }
+
+    if(p.match(TokenType.QUESTION_COLON)) {
+        return p.postElseStatement(stmt)
     }
 
     return stmt
@@ -1713,6 +1718,20 @@ func (p: *Parser) tryStatement() : *Stmt {
 
 err:
     return p.poisonStatement(pos)
+}
+
+func (p: *Parser) postElseStatement(stmt: *Stmt) : *Stmt {
+    var pos = p.pos()
+
+    var postStmt = p.statement()
+    var node = NewPostElseStmt(
+        pos,
+        p.pos(),
+        stmt,
+        postStmt,
+        p.allocator
+    )
+    return &node.asStmt
 }
 
 func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
@@ -2025,7 +2044,6 @@ func (p: *Parser) ifStatement() : *Stmt {
     if(!p.consume(TokenType.LEFT_PAREN, ErrorCode.MISSING_LEFT_PAREN)) {
         goto err;
     }
-
 
     var cond = p.expression()
 
@@ -2534,8 +2552,8 @@ func (p: *Parser) funcPtrType() : *TypeSpec {
 
     if(!p.check(TokenType.RIGHT_PAREN)) {
         do {
-            spec.hasNativeVararg = p.match(TokenType.DOLLAR_VAR_ARGS)
-            if(spec.hasNativeVararg || p.match(TokenType.VAR_ARGS)) {
+            spec.hasNativeVarargs = p.match(TokenType.DOLLAR_VAR_ARGS)
+            if(spec.hasNativeVarargs || p.match(TokenType.VAR_ARGS)) {
                 spec.hasVarargs = true
                 if(!p.check(TokenType.RIGHT_PAREN)) {
                     p.errorAtToken(p.peek(), ErrorCode.INVALID_VARARG_POSITION)

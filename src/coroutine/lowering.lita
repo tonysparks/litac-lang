@@ -703,6 +703,11 @@ func FunctionLowering(context: *CoroutineContext, ast: *Stmt) : *Stmt {
 
             return block as (*Stmt)
         }
+        case StmtKind.POST_ELSE_STMT: {
+            var postElseStmt = ast as (*PostElseStmt)
+            // TODO lowering
+            break;
+        }
         case StmtKind.LABEL_STMT: {
             break;
         }

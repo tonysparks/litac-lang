@@ -5,8 +5,7 @@ import "std/mem"
 import "std/mem/bucket_allocator"
 import "std/array"
 import "std/time"
-//import using "std/db/sqlite"
-//import using "std/db/orm"
+import "std/libc"
 
 
 #precheck
@@ -52,21 +51,26 @@ public struct SqlResult {
 }
 
 public trait SqlConnection {
-    close: func(): SqlResult;
+    getAllocator: func(): *const Allocator
 
     lastError: func(): String;
     lastResult: func(): SqlResult;
     hasError: func(): bool;
     clearError: func(): void;
+    setError: func(error: SqlResult): void;
 
     execute: func(sql: *const char): SqlResult;
+    // TODO: This stupid compiler author needs to figure out
+    // how to get var args working for traits...idiot
+    //query: func(sql: String, results: *SqlResultSet, $...): SqlResult;
 
     begin: func(): SqlResult;
     commit: func(): SqlResult;
     rollback: func(): SqlResult;
 
     prepare: func(stmt: *SqlStatement, sql: String): SqlResult;
-    release: func(stmt: *SqlStatement): SqlResult;
+    release: func(stmt: SqlStatement): SqlResult;
+    close: func(): SqlResult;
 }
 
 
@@ -94,6 +98,9 @@ public trait SqlStatement {
     close: func(): SqlResult
 
     execute: func(results: *SqlResultSet): SqlResult
+    release: func(results: SqlResultSet): SqlResult
+
+    connection: func(): SqlConnection
 }
 
 public enum SqlColumnType {
@@ -125,6 +132,11 @@ public trait SqlResultSet {
     columnString: func(column: i32) : String
     columnDateTime: func(column: i32) : DateTime
     columnType: func(column: i32) : SqlColumnType
+
+    statement: func(): SqlStatement
+
+    // Closes this result set, the statement and releases both
+    closeAndReleaseAll: func(): SqlResult
 }
 
 
@@ -139,4 +151,87 @@ public func (this: SqlResult) isOk() : bool {
 public func (this: SqlResult) isEmptyResults() : bool {
     return this.type == SqlResultType.OK &&
            this.category == SqlResultCategory.EMPTY_RESULTS
+}
+
+public func (this: *SqlConnection) query(
+    resultSet: *SqlResultSet,
+    sql: String,
+    $...
+) : SqlResult {
+    if (this.hasError()) return this.lastResult()
+
+    var stmt: SqlStatement;
+    this.prepare(
+        &stmt,
+        sql
+    )
+
+    if(this.hasError()) {
+        return this.lastResult()
+    }
+
+    var index = 1
+
+    var list: va_list
+    va_start(list, sql)
+    defer va_end(list)
+
+    var vargs = va_arg<NativeVararg>(list)
+    for(var i = 0; i < vargs.numberOfArgs; i+=1) {
+        var typeid = vargs.args[i]
+        switch(typeid) {
+            case typeof(:bool):
+            case typeof(:i8):
+            case typeof(:u8):
+            case typeof(:i16):
+            case typeof(:u16):
+            case typeof(:u32):
+            case typeof(:i32): {
+                stmt.bindInt32(index, va_arg<i32>(list))
+                break
+            }
+            case typeof(:usize):
+            case typeof(:u64):
+            case typeof(:i64): {
+                stmt.bindInt64(index, va_arg<i64>(list))
+                break
+            }
+            case typeof(:f32):
+            case typeof(:f64): {
+                stmt.bindFloat64(index, va_arg<f64>(list))
+                break
+            }
+            case typeof(:String): {
+                var str = va_arg<String>(list)
+                stmt.bindString(index, str)
+                break
+            }
+            case typeof(:*const char):
+            case typeof(""): {
+                var str = va_arg<*const char>(list)
+                stmt.bindText(index, str, strlen(str))
+                break
+            }
+            case typeof(:DateTime): {
+                var datetime = va_arg<DateTime>(list)
+                stmt.bindDateTime(index, datetime)
+                break
+            }
+            default: {
+                // TODO: Make this more descriptive error message
+                //var msg = StringBuilderInit(256, defaultAllocator/*this.allocator*/)
+                //msg.append("Unsupported parameter type: %s", nameof(typeid))
+                this.setError(
+                    SqlResult {
+                        .type = SqlResultType.ERROR,
+                        .description = $"Unsupported parameter type"
+                    }
+                )
+                return this.lastResult()
+            }
+        }
+        index += 1
+    }
+
+    return stmt.execute(resultSet)
 }

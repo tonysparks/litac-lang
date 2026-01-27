@@ -1,0 +1,218 @@
+{
+    "description": "Post Else Stmt",
+    "disabled": false,
+    "includeTypeInfos": true,
+    "program": `
+        @include("assert.h");
+        @foreign func assert(e:bool):void;
+
+        %definitions%
+
+        func main(len:i32, args:**char):i32 {
+            %code%
+        }
+    `,
+    "tests": [
+        {
+            "name" : "Implement post else",
+            "definitions": `
+
+            `,
+            "code": `
+                var this = 4 ?: this = 10;
+                assert(this == 10)
+
+                var a = 0 ?: a = 4
+                assert(a == 0)
+
+                0 ?: assert(false)
+                1 ?: assert(true)
+
+                var count = 0
+                var ax = 1
+                var bx = 0
+                ax + bx ?: {
+                    assert(true)
+                    count += 1
+                }
+                assert(count == 1);
+
+                (ax + 3) as (i32) ?: {
+                    count += 1
+                }
+                assert(count == 2)
+
+                var xx = 23 + 2 / 3 ?: {
+                    count += 1
+                }
+                assert(count == 3)
+            `,
+        },
+        {
+            "name" : "Post else with defer",
+            "definitions": `
+                import "std/libc"
+                func doSomething(x: i32) : i32 {
+                    return x
+                }
+                func doSomethingElse(x: i32, y: [2]i32) : i32 {
+
+                    defer {
+                        y[0] = 1
+                    }
+
+                    x ?: return x+10
+
+                    defer {
+                        y[1] = 1
+                    }
+
+                    return x-10
+                }
+            `,
+            "code": `
+                {
+                    var x = 10
+                    var xx = [2]i32{}
+                    var y = doSomethingElse(x, xx)
+                    //printf("y = %d, [0] = %d [1] = %d\n", y, xx[0], xx[1])
+                    assert(y == 20)
+                    assert(xx[0] == 1)
+                    assert(xx[1] == 0)
+                }
+                {
+                    var x = 0
+                    var xx = [2]i32{}
+                    var y = doSomethingElse(x, xx)
+                    //printf("y = %d, [0] = %d [1] = %d\n", y, xx[0], xx[1])
+                    assert(y == -10)
+                    assert(xx[0] == 1)
+                    assert(xx[1] == 1)
+                }
+                {
+                    var x = doSomething(0) ?: assert(false)
+                    var y = doSomething(1) ?: y = 11
+                    assert(y == 11)
+                }
+                //assert(doSomethingElse(0) == 12)
+            `,
+        },
+        {
+            "name" : "Post else with non bool expression",
+            "definitions": `
+                func DoSomething(): String {
+                    return $"Hello"
+                }
+            `,
+            "code": `
+                var x = DoSomething() ?: assert(false);
+            `,
+            "error": "'String' can't be coerced to boolean"
+        },
+        {
+            "name" : "Post else with illegal expr",
+            "definitions": `
+                func DoSomething(): String {
+                    return $"Hello"
+                }
+            `,
+            "code": `
+                switch(1) { default: {}} ?: assert(false);
+            `,
+            "error": "must either be a var or const declaration or expression before the ?:"
+        },
+        {
+            "name" : "Post else with generics",
+            "definitions": `
+                func DoSomething<T>(a : T): T {
+                    return a
+                }
+            `,
+            "code": `
+                var count = 0
+                DoSomething(1_i32) ?: {
+                    count += 1
+                };
+                assert(count == 1)
+            `,
+        },
+        {
+            "name" : "Post else with generics with bad type",
+            "definitions": `
+                func DoSomething<T>(a : T): T {
+                    return a
+                }
+            `,
+            "code": `
+                DoSomething($"Hello") ?: {
+                    assert(false)
+                };
+                assert(false)
+            `,
+            "error": "'String' can't be coerced to boolean"
+        },
+        {
+            "name" : "Normal usage",
+            "definitions": `
+                enum Status {
+                    OK,
+                    ERROR1,
+                    ERROR2,
+                    ERROR3,
+                }
+                func DoSomething(a : i32): Status {
+                    switch(a) {
+                        case 1: {
+                            return Status.ERROR1
+                        }
+                        case 2: {
+                            return Status.ERROR2
+                        }
+                        default: {
+                            return Status.OK
+                        }
+                    }
+                }
+                func DoAgain(a: i32): Status {
+                    var result = DoSomething(a)
+                        ?: return result
+
+                    return Status.ERROR3
+                }
+            `,
+            "code": `
+                var count = 0
+                var result = DoAgain(0) ?: {
+                    count += 1
+                };
+                assert(result == Status.ERROR3)
+                assert(count == 1)
+
+                result = DoAgain(1) ?: {
+                    count += 1
+                };
+                assert(result == Status.ERROR1)
+                assert(count == 2)
+
+                result = DoAgain(2) ?: {
+                    count += 1
+                };
+                assert(result == Status.ERROR2)
+                assert(count == 3)
+            `,
+        },
+        {
+            "name" : "Post else with binary expr non boolean",
+            "definitions": `
+
+            `,
+            "code": `
+                var x = $"Hello"
+                x = $"bye" ?: assert(false)
+                assert(false)
+            `,
+            "error": "'String' can't be coerced to boolean"
+        },
+    ]
+
+}

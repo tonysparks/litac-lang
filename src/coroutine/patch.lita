@@ -455,6 +455,7 @@ internal func PatchCoroutine(
 
     PrintStmt(funcDecl)
     //checker.current.currentScope.print("Function Scope")
+    return true
 }
 
 

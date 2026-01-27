@@ -1640,7 +1640,7 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
 
     var info = objectTypeInfo.getBaseType()
     assert(info != null)
-    assert(info.kind == TypeKind.STRUCT || info.kind == TypeKind.UNION)
+    assert(IsAggregate(info))
 
     var aggInfo = info
     var field = aggInfo.getField(expr.field.type.name)
@@ -1807,9 +1807,19 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
         }
 
         if(funcSym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
+            var hasCallsite = type.sym && type.sym.genericCallsiteModule
+            var previousContainer = this.genericContext.container
+
+            if(hasCallsite) {
+                this.genericContext.container = type.sym.genericCallsiteModule
+            }
+
+            defer if(hasCallsite) {
+                this.genericContext.container = previousContainer
+            }
+
             var typeInfo = this.resolveTypeSpec(expr.field.type, SearchType.FUNC)
             if(!typeInfo) {
-                // TODO: mark an error?
                 return false;
             }
 
@@ -1826,7 +1836,11 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
     // in which case, we want to check the callsite module in addition to the template
     // declaration module
     if(!methodResult.symbol && this.genericContext.callsite) {
-        methodResult = type.getMethod(this.lita.strings, this.genericContext.callsite, expr.field.type.name)
+        methodResult = type.getMethod(
+            this.lita.strings,
+            this.genericContext.callsite,
+            expr.field.type.name
+        )
     }
 
     var funcSym = methodResult.symbol

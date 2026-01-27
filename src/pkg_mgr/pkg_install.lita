@@ -43,6 +43,7 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
         var pkgPath = StringBufferInit(temp, MAX_PATH, 0)
         pkgPath.format("%s/%s", CurrentWorkingPath(), pm.options.pkgDir)
 
+        printf("Cleaning directory: '%s'\n", pkgPath.cStr())
         var status = cleanPackageDirectory(pm, pkgPath.cStr())
         if(status != PkgStatus.OK) {
             return status
@@ -160,11 +161,15 @@ func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
 
     var buffer = [MAX_PATH]char;
     var packageRoot = StringBufferInit(buffer, MAX_PATH, 0)
-    packageRoot.format("%s/%s/", CurrentWorkingPath(), pm.options.pkgDir)
+    packageRoot.format("%s/%s", CurrentWorkingPath(), pm.options.pkgDir)
 
     // Do not delete files outside of the package root directory
     if(!path.toString().startsWith(packageRoot.toString())) {
-        return PkgStatus.OK
+        pm.errors.append(
+            "unable to delete out of package root directory: '%s'\n",
+            packageRoot.cStr()
+        )
+        return PkgStatus.ERROR_CLEANING_PKG
     }
 
     var file: FileHandle;

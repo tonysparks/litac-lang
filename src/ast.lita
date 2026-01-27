@@ -47,6 +47,7 @@ public enum StmtKind {
     FUNC_BODY_STMT,
     GOTO_STMT,
     IF_STMT,
+    POST_ELSE_STMT,
     LABEL_STMT,
     MODULE_STMT,
     NOTE_STMT,
@@ -136,7 +137,7 @@ public struct TypeSpec {
             ret: *TypeSpec
             genericParams: Array<GenericParam>
             hasVarargs: bool
-            hasNativeVararg: bool
+            hasNativeVarargs: bool
         }
     }
 }
@@ -223,6 +224,7 @@ public struct Node {
         funcBodyStmt: FuncBodyStmt
         gotoStmt: GotoStmt
         ifStmt: IfStmt
+        postElseStmt: PostElseStmt
         labelStmt: LabelStmt
         moduleStmt: ModuleStmt // Move to declarations
         noteStmt: NoteStmt
@@ -450,6 +452,11 @@ public struct IfStmt {
     elseStmt: *Stmt
 }
 
+public struct PostElseStmt {
+    stmt: using Stmt
+    cond: *Stmt
+    post: *Stmt
+}
 
 public struct LabelStmt {
     stmt: using Stmt

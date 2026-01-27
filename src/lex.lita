@@ -89,6 +89,7 @@ public enum TokenType {
     COLON_COLON,
     DOUBLE_QUOTE,
     DOLLAR_QUOTE,
+    QUESTION_COLON,
 
     LESS_THAN,
     LESS_EQUALS,
@@ -217,6 +218,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.COLON_COLON] = "::",
     [TokenType.DOUBLE_QUOTE] = "\"",
     [TokenType.DOLLAR_QUOTE] = "$\"",
+    [TokenType.QUESTION_COLON] = "?:",
 
     [TokenType.LESS_THAN] = "<",
     [TokenType.LESS_EQUALS] = "<=",
@@ -1387,6 +1389,10 @@ func (l: *Lexer) scanSymbol() : Token {
         }
         case '?': {
             l.token.type = TokenType.QUESTION_MARK
+            if(l.stream[0] == ':') {
+                l.nextChar()
+                l.token.type = TokenType.QUESTION_COLON
+            }
             break;
         }
         case ',': {

@@ -127,6 +127,7 @@ public func (this: *Socket) setSocketOpt(option: SocketOption, value: *const voi
 
 @generated(.stub = true)
 public func (this: *Socket) handle() : i32 {
+    return 0
 }
 
 @generated(.stub = true)

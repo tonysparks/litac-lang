@@ -542,6 +542,15 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             printf("\n")
             return;
         }
+        case StmtKind.POST_ELSE_STMT: {
+            var stmt = s as (*PostElseStmt)
+            PrintStmt(stmt.cond, 0)
+            printf("\n")
+            Printf(indent, "?: \n")
+            PrintStmt(stmt.post, indent+1)
+            printf("\n")
+            return;
+        }
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
             PrintName(stmt.label.token)

@@ -115,10 +115,13 @@ public func (this: *TypeCache) newArrayTypeInfo(arrayOf: *TypeInfo,
     return type;
 }
 
-public func (this: *TypeCache) newFuncPtrTypeInfo(genericParams: Array<GenericParam>,
-                                                  returnType: *TypeInfo,
-                                                  paramDecls: Array<*TypeInfo>,
-                                                  hasVarargs: bool) : *TypeInfo {
+public func (this: *TypeCache) newFuncPtrTypeInfo(
+    genericParams: Array<GenericParam>,
+    returnType: *TypeInfo,
+    paramDecls: Array<*TypeInfo>,
+    hasVarargs: bool,
+    hasNativeVarargs: bool
+) : *TypeInfo {
 // TODO: implement cache
     var type = this.newTypeInfo()
     type.kind = TypeKind.FUNC_PTR
@@ -126,6 +129,7 @@ public func (this: *TypeCache) newFuncPtrTypeInfo(genericParams: Array<GenericPa
     type.returnType = returnType
     type.paramDecls = paramDecls
     type.hasVarargs = hasVarargs
+    type.hasNativeVarargs = hasNativeVarargs
     return type;
 }
 

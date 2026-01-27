@@ -60,6 +60,7 @@ internal func (this: *LabelStack) clear() {
 
 struct GenericContext {
     callsite: *Module
+    container: *Module
 }
 
 public enum TypeCheckerFlags {
@@ -114,6 +115,7 @@ public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) 
     this.genericParamStack.init(128, allocator)
     this.genericTemplates.init(64, allocator)
     this.genericContext.callsite = null
+    this.genericContext.container = null
 
     this.interfaceImpls.init(Array<Typeid>{}, 128, allocator, 0)
 
@@ -1115,10 +1117,17 @@ public func (this: *TypeChecker) getType(spec: *TypeSpec, searchType: SearchType
 }
 
 public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchType: SearchType = SearchType.TYPE) : *Symbol {
+    // Order of priority:
+    // 1) the current module
+    // 2) the generic context callsite (i.e., the module in whih the generic was defined)
+    // 3) if this is an aggregate, the module of the aggregate definition
     var type = GetTypeFromModule(this.current, typeName, searchType)
     if(!type) {
         if(this.genericContext.callsite) {
             type = GetTypeFromModule(this.genericContext.callsite, typeName, searchType)
+        }
+        if(!type && this.genericContext.container) {
+            type = GetTypeFromModule(this.genericContext.container, typeName, searchType)
         }
     }
 
@@ -1153,12 +1162,29 @@ public func (this: *TypeChecker) getTypeByName(typeName: InternedString, searchT
             }
 
             module = this.lita.getModule(filename)
-            // TODO: This triggers the assert if the module is NOT
-            // already imported, we should probably side load the module
-            // or at least the symbols required??
+            if(!module) {
+                var sb = StringBuilderInit(1024, this.allocator)
+                var it = this.lita.modules.iter()
+                while(it.hasNext()) {
+                    var entry = it.next()
+                    var moduleId = entry.value
+                    sb.append("'%s' => %.*s\n",
+                        entry.key,
+                        entry.value.id.name.length, entry.value.id.name.buffer
+                    )
+                }
+
+                this.result.addError(
+                    SrcPos{},
+                    "could not resolve type: '%.*s', attempting to look at file: '%s'\n%s",
+                    typeName.length, typeName.buffer,
+                    filename,
+                    sb.cStr()
+                )
+                return null
+            }
         }
 
-        assert(module != null)
         var namePart = name.substring(index + 2)
 
         var namePartType = this.lita.strings.internCopy(namePart.buffer, namePart.length)
@@ -1420,7 +1446,13 @@ public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, searchType: Se
                 }
             }
             var returnType = this.resolveTypeSpec(funcPtrSpec.ret)
-            spec.typeInfo = this.typeCache.newFuncPtrTypeInfo(funcPtrSpec.genericParams, returnType, paramDecls, funcPtrSpec.hasVarargs) as (*TypeInfo)
+            spec.typeInfo = this.typeCache.newFuncPtrTypeInfo(
+                funcPtrSpec.genericParams,
+                returnType,
+                paramDecls,
+                funcPtrSpec.hasVarargs,
+                funcPtrSpec.hasNativeVarargs
+            )
             return spec.typeInfo
         }
         default: {
@@ -1775,6 +1807,42 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 if(!this.resolveStmt(ifStmt.elseStmt)) {
                     return false
                 }
+            }
+            return true
+        }
+        case StmtKind.POST_ELSE_STMT: {
+            var postStmt = stmt as (*PostElseStmt)
+            if(!this.resolveStmt(postStmt.cond)) {
+                return false
+            }
+
+            if(!this.resolveStmt(postStmt.post)) {
+                return false
+            }
+
+            var cond: *Expr = null
+            var condKind = postStmt.cond.getKind()
+            if(condKind == StmtKind.VAR_DECL ||
+               condKind == StmtKind.CONST_DECL
+            ) {
+                var varDecl = postStmt.cond as (*VarDecl)
+                cond = varDecl.expr
+            }
+            else if(IsExpr(postStmt.cond.asNode())) {
+                cond = postStmt.cond as (*Expr)
+            }
+
+            if(!cond) {
+                this.result.addError(
+                    postStmt.cond.getStartPos(),
+                    "must either be a var or const declaration or expression before the ?:"
+                )
+                return false
+            }
+
+            // this condition must be a boolean
+            if(!this.isBoolExpr(cond)) {
+                return false
             }
             return true
         }

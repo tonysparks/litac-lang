@@ -409,10 +409,13 @@ public func AsTraitFuncPtr(type: *TypeInfo, name: InternedString, typeCache: *Ty
         params.add(funcPtr.paramDecls.get(i))
     }
 
-    var result = typeCache.newFuncPtrTypeInfo(funcPtr.genericParams,
-                                              funcPtr.returnType,
-                                              params,
-                                              funcPtr.hasVarargs)
+    var result = typeCache.newFuncPtrTypeInfo(
+        funcPtr.genericParams,
+        funcPtr.returnType,
+        params,
+        funcPtr.hasVarargs,
+        funcPtr.hasNativeVarargs
+    )
 
     result.name = name
     return result
@@ -1573,6 +1576,7 @@ public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = f
             result.ret = funcInfo.returnType.asTypeSpec(module, fullyQualify)
             result.args = args
             result.hasVarargs = funcInfo.hasVarargs
+            result.hasNativeVarargs = funcInfo.hasNativeVarargs
             result.genericParams = funcInfo.genericParams
             return result
         }
@@ -1665,7 +1669,13 @@ public func (this: *TypeInfo) asPtr(typeCache: *TypeCache) : *TypeInfo {
         var p = this.funcDecl.params.get(i)
         paramDecls.add(p.typeInfo)
     }
-    var funcPtr = typeCache.newFuncPtrTypeInfo(genericParams, this.returnType, paramDecls, this.funcDecl.flags & FuncFlags.HAS_VARARGS)
+    var funcPtr = typeCache.newFuncPtrTypeInfo(
+        genericParams,
+        this.returnType,
+        paramDecls,
+        this.funcDecl.flags & FuncFlags.HAS_VARARGS,
+        this.funcDecl.flags & FuncFlags.HAS_NATIVE_VARARGS
+    )
     funcPtr.name = this.name
 
     return funcPtr
@@ -2214,7 +2224,11 @@ public struct MethodResult {
     name: InternedString
 }
 
-public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, methodName: InternedString) : MethodResult {
+public func (this: *TypeInfo) getMethod(
+    strings: *Strings,
+    module: *Module,
+    methodName: InternedString
+) : MethodResult {
     if(!this.sym) {
         goto not_found;
     }
@@ -2277,7 +2291,12 @@ public func (this: *TypeInfo) getMethod(strings: *Strings, module: *Module, meth
                             continue
                         }
 
-                        var result = varField.type.typeInfo.getMethod(strings, module, methodName)
+                        var result = varField.type.typeInfo.getMethod(
+                            strings,
+                            module,
+                            methodName
+                        )
+
                         if(result.symbol) {
                             return result
                         }
@@ -2419,6 +2438,7 @@ public struct TypeInfo {
             genericParams: Array<GenericParam>
             paramDecls: Array<*TypeInfo>
             hasVarargs: bool
+            hasNativeVarargs: bool
             isTrait: bool
         }
         // EnumTypeInfo
