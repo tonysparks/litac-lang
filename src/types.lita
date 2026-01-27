@@ -1483,7 +1483,7 @@ public func IsFuncImpl(traitFn: *TypeInfo, fn: *TypeInfo, checker: *TypeChecker)
 }
 
 public func (this: *TypeInfo) asTypeSpec(module: *Module, fullyQualify: bool = false) : *TypeSpec {
-    var pos = (this.sym) ? this.sym.decl.startPos : SrcPos{};
+    var pos = (this.sym) ? this.sym.decl.getStartPos() : SrcPos{};
     var allocator = &module.typeSpecAllocator
 
     switch(this.kind) {

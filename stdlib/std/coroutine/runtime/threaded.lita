@@ -1,0 +1,105 @@
+import "std/thread"
+import "std/thread/pool"
+import "std/thread/future"
+import "std/mem"
+import "std/libc"
+
+import "std/coroutine"
+
+public struct ThreadedDispatcher {
+    pool: ThreadPool
+}
+
+internal struct DispatcherTaskContext {
+    cont: Continuation
+    future: *Future
+}
+
+public func (this: *ThreadedDispatcher) init(
+    allocator: *const Allocator,
+    minThreads: u32,
+    maxThreads: u32
+) {
+    minThreads = MIN(minThreads, 1)
+    this.pool.init(
+        .minThreads = minThreads,
+        .maxThreads = maxThreads,
+        .createThread = CreateThread {
+            .callback = ThreadContextCallback,
+            .arg = this,
+        }
+    )
+    this.pool.start()
+}
+
+public func (this: *ThreadedDispatcher) destroy() {
+    this.pool.stop(true)
+    this.pool.destroy()
+}
+
+public func (this: *ThreadedDispatcher) submit(
+    fn: SuspendFunction,
+    stack: *void,
+    allocator: *const Allocator = null,
+    future: *Future
+): bool {
+    if(!stack || !future) {
+        return false
+    }
+
+    if(future.init() != ThreadStatus.OK) {
+        return false
+    }
+
+    allocator = allocator ? allocator : this.allocator
+
+    var context = new<DispatcherTaskContext>(allocator)
+    if(!context) {
+        return false
+    }
+
+    context.future = future
+    context.cont = Continuation {
+        .context = ContinuationContext {
+            .allocator = allocator,
+            .dispatcher = this
+        },
+        .parent = null,
+        .stack = stack,
+        .callback = fn,
+    }
+
+    this.pool.submit(DispatcherTask, context)
+}
+
+func ThreadContextCallback(arg: *void) : ThreadContext {
+    return arg as (ThreadContext)
+}
+
+func DispatcherTask(
+    threadContext: ThreadContext,
+    taskContext: TaskContext
+) : TaskStatus {
+
+    var dispatcher = threadContext as (*ThreadedDispatcher)
+    var context = taskContext as (*Continuation)
+
+    var result = context.cond.callback(context.cond)
+    switch(result) {
+        case ContinuationResult.SUSPENDED: {
+            // ??
+            break;
+        }
+        case ContinuationResult.ERROR: {
+            // ??
+            break;
+        }
+        case ContinuationResult.OK: {
+            //context.future.set(context.cond.)
+            break;
+        }
+    }
+
+
+    return TaskStatus.OK
+}

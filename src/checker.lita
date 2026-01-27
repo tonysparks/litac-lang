@@ -29,6 +29,9 @@ import "checker_expr"
 import "intern"
 import "preprocessor"
 import "lsp/references"
+import "coroutine"
+
+
 /**
 ===================================================================
     Type Checker
@@ -36,13 +39,23 @@ import "lsp/references"
 */
 
 // max number of labels in a function scope -- this should be enough :S
-const MAX_LABELS = 256;
-const MAX_LABEL_NAME = 32;
+internal const MAX_LABELS = 256;
+internal const MAX_LABEL_NAME = 32;
 
-struct LabelInfo {
+internal struct LabelInfo {
+    stmt: *Stmt
     name: InternedString
     defined: bool
-    stmt: *Stmt
+}
+
+internal struct LabelStack {
+    labels: [MAX_LABELS]LabelInfo
+    numOfLabels: i32
+}
+
+internal func (this: *LabelStack) clear() {
+    memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
+    this.numOfLabels = 0
 }
 
 struct GenericContext {
@@ -51,7 +64,8 @@ struct GenericContext {
 }
 
 public enum TypeCheckerFlags {
-    DISABLE_TRAIT_WRAPPERS = (1<<0),
+    DISABLE_TRAIT_WRAPPERS        = (1<<0),
+    DISABLE_COROUTINE_WRAPPERS    = (1<<1),
 }
 
 public struct TypeChecker {
@@ -66,6 +80,7 @@ public struct TypeChecker {
     symbolTypes: Array<*Symbol>     // all types from all modules
     symbolFuncs: Array<*Symbol>
     symbolTraits: Array<*Symbol>
+    symbolCoroutines: Array<*Symbol>
     mainEntry: *Symbol // main entry point to the program
 
     symbolNotes: Array<*Symbol>
@@ -76,14 +91,14 @@ public struct TypeChecker {
 
     interfaceImpls: Map<Typeid, Array<Typeid>>
 
-    labels: [MAX_LABELS]LabelInfo;
-    numOfLabels: i32
+    labelStack: Array<LabelStack>
 
     typeCache: *TypeCache
 
     randomNameIndex: u32
 
     bypassing: bool // if the checker should bypass imported modules and look at all modules
+    captureScope: bool // capture scopes if in coroutine
 }
 
 public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) {
@@ -95,6 +110,8 @@ public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) 
     this.symbolTypes.init(256, allocator)
     this.symbolFuncs.init(256, allocator)
     this.symbolTraits.init(64, allocator)
+    this.symbolCoroutines.init(256, allocator)
+
     this.genericParamStack.init(128, allocator)
     this.genericTemplates.init(64, allocator)
     this.genericContext.callsite = null
@@ -108,8 +125,7 @@ public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) 
 
     this.mainEntry = null
 
-    memset(this.labels, 0, MAX_LABELS * sizeof(:LabelInfo))
-    this.numOfLabels = 0
+    this.labelStack.init(64, allocator)
 }
 
 @profile
@@ -124,7 +140,7 @@ public func (this: *TypeChecker) typeCheck(root: *Module, flags: i32 = 0) : Prog
 
     for(var i = 0; i < root.ast.declarations.size(); i += 1) {
         var decl = root.ast.declarations.get(i)
-        if(decl.sym && decl.kind == StmtKind.FUNC_DECL &&
+        if(decl.sym && decl.getKind() == StmtKind.FUNC_DECL &&
            decl.sym.name.equals(MAIN)) {
             this.mainEntry = decl.sym
             this.mainEntry.flags |= SymbolFlags.IS_MAIN
@@ -524,14 +540,14 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
     }
 
     var sym: *Symbol = null
-    if(decl.kind != StmtKind.FUNC_DECL) {
+    if(decl.getKind() != StmtKind.FUNC_DECL) {
         sym = this.current.symbols.addSymbol(name, this.current, decl, SymbolFlags.IS_INCOMPLETE)
         if(!sym) {
             goto err;
         }
     }
 
-    switch(decl.kind) {
+    switch(decl.getKind()) {
         case StmtKind.CONST_DECL:
         case StmtKind.VAR_DECL: {
             var varDecl = decl as (*VarDecl)
@@ -586,7 +602,7 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
 
                 // TODO: Fix bug with aliased types function names not resolving correctly
                 if(!funcDecl.getName(buffer)) {
-                    this.result.addError(decl.startPos, "invalid function name or invalid method caller type")
+                    this.result.addError(decl.getStartPos(), "invalid function name or invalid method caller type")
                     goto err;
                 }
 
@@ -596,6 +612,16 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             sym = this.current.symbols.addSymbol(name, this.current, decl, SymbolFlags.IS_INCOMPLETE)
             if(!sym) {
                 goto err;
+            }
+
+            // special treatment for coroutines, we
+            // inject in a Continuation parameter
+            if(sym.flags & SymbolFlags.IS_COROUTINE) {
+                this.symbolCoroutines.add(sym)
+
+                if(!AddContinuationParam(this, funcDecl, sym)) {
+                    goto err;
+                }
             }
 
             if(!funcDecl.genericParams.empty()) {
@@ -676,7 +702,7 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
             break; // Ignore, as this will already have a parsing error
         }
         default: {
-            PrintStmt(decl as (*Stmt), 0)
+            PrintStmt(decl.asNode(), 0)
             assert(false)
         }
     }
@@ -706,15 +732,24 @@ public func (this: *TypeChecker) currentScope() : *Scope {
     return this.current.currentScope
 }
 
-public func (this: *TypeChecker) pushScope(scope: *Scope) {
+public func (this: *TypeChecker) pushScope(scope: *Scope, isCoroutine: bool = false) {
     scope.init(ScopeKind.FUNC, this.currentScope(), this.result, this.current, this.current.allocator)
     this.current.currentScope = scope
+
+    if (isCoroutine) {
+        this.captureScope = true
+    }
 }
 
-public func (this: *TypeChecker) popScope() {
+public func (this: *TypeChecker) popScope(isCoroutine: bool = false) {
     if(this.currentScope()) {
         this.current.currentScope = this.current.currentScope.parent
     }
+
+    if (isCoroutine) {
+        this.captureScope = false
+    }
+
 }
 
 public func (this: *TypeChecker) isGenericParamType(name: *TypeSpec) : bool {
@@ -744,7 +779,7 @@ public func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
         }
 
         if(other.name.str.equals(imp.name.str)) {
-            this.result.addError(imp.startPos, "duplicate import of module '%.*s'",
+            this.result.addError(imp.getStartPos(), "duplicate import of module '%.*s'",
                 imp.name.str.length, imp.name.str.buffer)
             goto err;
         }
@@ -756,7 +791,7 @@ public func (this: *TypeChecker) createImportSymbols(imp: *ImportDecl) {
 
     var module = this.lita.getModule(imp.moduleId.filename)
     if(!module) {
-        this.result.addError(imp.startPos, "could not find module '%s'",
+        this.result.addError(imp.getStartPos(), "could not find module '%s'",
                 imp.moduleId.filename)
         goto err;
     }
@@ -805,6 +840,39 @@ func (this: *TypeChecker) resolveSymbols(isIncrementalBuild: bool) {
         }
     }
 
+    // Generate Coroutine wrappers and stacks
+    {
+        for(var i = 0; i < this.symbolCoroutines.size(); i += 1) {
+            var symbol = this.symbolCoroutines.get(i)
+            var decls = CreateCoroutineForwardDecls(this, symbol)
+
+            this.enterModule(symbol.declared)
+            defer this.leaveModule()
+
+            for(var j = 0; j < decls.size(); j += 1) {
+                var decl = decls.get(j)
+                var coSym = this.createDeclSymbol(decl)
+
+                this.resolveSymbol(coSym)
+                this.finishResolveSymbol(coSym)
+
+                // TODO: Figure out how to handle this more robustly...
+                // IDEA: If @generated, skip adding to symbols list? But what about
+                // actual implementation - how to avoid skipping that one?
+                // --> If the one in symbolStorage already exists and has @generated, you can
+                // replace with new one without @generated??? Maybe works better in reverse?
+
+                // remove the forwards from the symbols,
+                // otherwise we duplicate the definitions...
+                if(coSym.kind == SymbolKind.FUNC) {
+                    this.symbolFuncs.pop()
+                }
+                else if(coSym.kind == SymbolKind.TYPE) {
+                    this.symbolTypes.pop()
+                }
+            }
+        }
+    }
 
 
     {   // Resolve variables
@@ -834,7 +902,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
     }
 
     if(sym.state == SymbolState.RESOLVING) {
-        this.result.addError(sym.decl.startPos, "cyclic dependency found with '%.*s'", sym.name.length, sym.name.buffer)
+        this.result.addError(sym.decl.getStartPos(), "cyclic dependency found with '%.*s'", sym.name.length, sym.name.buffer)
         goto err;
     }
 
@@ -850,7 +918,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
 
     switch(sym.kind) {
         case SymbolKind.TYPE: {
-            switch(sym.decl.kind) {
+            switch(sym.decl.getKind()) {
                 case StmtKind.ENUM_DECL: {
                     var enumDecl = sym.decl as (*EnumDecl)
                     sym.type = this.typeCache.newEnumTypeInfo(sym, enumDecl) as (*TypeInfo)
@@ -880,7 +948,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                         else {
                             // HACK! this hasn't resolved yet..so we look at the raw AST
                             var strictArg = typedefDecl.getNoteArgument("foreign", "strict")
-                            if(strictArg && strictArg.argExpr && strictArg.argExpr.kind == StmtKind.BOOLEAN_EXPR) {
+                            if(strictArg && strictArg.argExpr && strictArg.argExpr.getKind() == StmtKind.BOOLEAN_EXPR) {
                                 var boolExpr = strictArg.argExpr as (*BooleanExpr)
                                 if(boolExpr.boolean) {
                                     aliasedType = this.typeCache.newAliasedForeignTypeInfo(sym, aliasedType)
@@ -904,7 +972,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
                     goto err;
                 }
                 default: {
-                    Info("StmtKind %.*s %d %s\n", sym.name.length, sym.name.buffer, sym.decl.kind, StmtKindAsStr(sym.decl.kind))
+                    Info("StmtKind %.*s %d %s\n", sym.name.length, sym.name.buffer, sym.decl.getKind(), StmtKindAsStr(sym.decl.getKind()))
                     assert(false)
                 }
             }
@@ -988,7 +1056,7 @@ public func (this: *TypeChecker) finishResolveSymbol(sym: *Symbol) {
 
     sym.flags &= ~SymbolFlags.IS_INCOMPLETE
 
-    switch(sym.decl.kind) {
+    switch(sym.decl.getKind()) {
         case StmtKind.NOTE_DECL:
         case StmtKind.TRAIT_DECL:
         case StmtKind.STRUCT_DECL:
@@ -1343,13 +1411,13 @@ public func (this: *TypeChecker) resolveTypeSpec(spec: *TypeSpec, searchType: Se
                 }
 
                 if(!IsInteger(expr.operand.typeInfo)) {
-                    this.result.addError(expr.startPos,
+                    this.result.addError(expr.getStartPos(),
                             "array size expression must be an integer type")
                     goto err;
                 }
 
                 isLengthDefined = true
-                if(expr.kind == StmtKind.IDENTIFIER_EXPR) {
+                if(expr.getKind() == StmtKind.IDENTIFIER_EXPR) {
                     var idExpr = expr as (*IdentifierExpr)
                     if(idExpr.sym && (idExpr.sym.flags & SymbolFlags.IS_FOREIGN)) {
                         // we don't know the actual length, because this type's value is
@@ -1400,18 +1468,22 @@ err:
     return &POISON_TYPE
 }
 
-public func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
+public func (this: *TypeChecker) addSymbolToScope(decl: *Decl, typeInfo: *TypeInfo, scope: *Scope) : *Symbol {
     assert(decl.name.token.type == TokenType.IDENTIFIER)
 
-    var sym = this.current.currentScope.addSymbol(decl.name.str, this.current, decl, 0)
+    var sym = scope.addSymbol(decl.name.str, this.current, decl, 0)
     if(sym) {
         sym.type = typeInfo
         this.resolveSymbol(sym)
 
-        this.lita.references.addSymbolReference(sym, decl.startPos)
+        this.lita.references.addSymbolReference(sym, decl.getStartPos())
     }
 
     return sym
+}
+
+public func (this: *TypeChecker) addSymbol(decl: *Decl, typeInfo: *TypeInfo) : *Symbol {
+    return this.addSymbolToScope(decl, typeInfo, this.current.currentScope)
 }
 
 public func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, baseType: *TypeInfo, currentType: *TypeInfo) {
@@ -1425,8 +1497,16 @@ public func (this: *TypeChecker) addTypeToScope(decl: *Decl, scope: *Scope, base
                     break
                 }
 
-                var varDecl = NewVarDecl(decl.startPos, decl.endPos, decl.name, varField.type, null, this.allocator)
+                var varDeclNode = NewVarDecl(
+                    decl.getStartPos(),
+                    decl.getEndPos(),
+                    decl.name,
+                    varField.type,
+                    null,
+                    this.allocator
+                )
 
+                var varDecl = &varDeclNode.varDecl
                 varDecl.sym = scope.addSymbol(varField.name.str, this.current, varDecl, SymbolFlags.IS_USING)
                 varDecl.sym.type = field.typeInfo
                 varDecl.sym.usingParent = decl.sym
@@ -1474,7 +1554,7 @@ public func (this: *TypeChecker) resolveNotes(notes: *Array<*NoteStmt>) : bool {
             continue
         }
 
-        if(!this.checkNote(note.startPos, typeInfo)) {
+        if(!this.checkNote(note.getStartPos(), typeInfo)) {
             success = false
             continue
         }
@@ -1527,7 +1607,7 @@ func (this: *TypeChecker) isBoolExpr(expr: *Expr) : bool {
 public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
     if(!stmt) return true;
 
-    switch(stmt.kind) {
+    switch(stmt.getKind()) {
         // --------------------------------------------------
         //          Declarations
         // --------------------------------------------------
@@ -1674,23 +1754,32 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 return false
             }
 
+            if(this.labelStack.empty()) {
+                this.result.addError(
+                    gotoStmt.getStartPos(),
+                    "goto only allowed in function scope"
+                )
+                return false
+            }
+
+            var labelStack = this.labelStack.lastPtr()
+
             // check to see if the label has already been created
-            for(var i = 0; i < this.numOfLabels; i+=1) {
-                var label = &this.labels[i]
+            for(var i = 0; i < labelStack.numOfLabels; i+=1) {
+                var label = &labelStack.labels[i]
                 if(gotoStmt.label.str.equals(label.name)) {
                     label.stmt = stmt
                     return true
                 }
             }
 
-            // other create it
-            var labelName = &this.labels[this.numOfLabels]
+            // otherwise create it
+            var labelName = &labelStack.labels[labelStack.numOfLabels]
             labelName.name = gotoStmt.label.str
             labelName.stmt = stmt
             labelName.defined = false
 
-            this.numOfLabels += 1
-
+            labelStack.numOfLabels += 1
             return true;
         }
         case StmtKind.IF_STMT: {
@@ -1732,18 +1821,20 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
 
             var cond: *Expr = null
-            if(postStmt.cond.kind == StmtKind.VAR_DECL ||
-               postStmt.cond.kind == StmtKind.CONST_DECL) {
+            var condKind = postStmt.cond.getKind()
+            if(condKind == StmtKind.VAR_DECL ||
+               condKind == StmtKind.CONST_DECL
+            ) {
                 var varDecl = postStmt.cond as (*VarDecl)
                 cond = varDecl.expr
             }
-            else if(IsExpr(postStmt.cond)) {
+            else if(IsExpr(postStmt.cond.asNode())) {
                 cond = postStmt.cond as (*Expr)
             }
 
             if(!cond) {
                 this.result.addError(
-                    postStmt.cond.startPos,
+                    postStmt.cond.getStartPos(),
                     "must either be a var or const declaration or expression before the ?:"
                 )
                 return false
@@ -1761,25 +1852,38 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 return false
             }
 
-            if(this.numOfLabels >= MAX_LABELS) {
-                this.result.addError(labelStmt.startPos, "max number of labels reached")
+            if(this.labelStack.empty()) {
+                this.result.addError(
+                    labelStmt.getStartPos(),
+                    "labels only allowed in function scope"
+                )
                 return false
             }
 
-            for(var i = 0; i < this.numOfLabels; i+=1) {
-                var label = &this.labels[i]
+            var labelStack = this.labelStack.lastPtr()
+
+            if(labelStack.numOfLabels >= MAX_LABELS) {
+                this.result.addError(
+                    labelStmt.getStartPos(),
+                    "max number of labels reached"
+                )
+                return false
+            }
+
+            for(var i = 0; i < labelStack.numOfLabels; i+=1) {
+                var label = &labelStack.labels[i]
                 if(labelStmt.label.str.equals(label.name)) {
                     label.defined = true
                     return true
                 }
             }
 
-            var labelName = &this.labels[this.numOfLabels]
+            var labelName = &labelStack.labels[labelStack.numOfLabels]
             labelName.name = labelStmt.label.str
             labelName.defined = true
             labelName.stmt = null
 
-            this.numOfLabels += 1
+            labelStack.numOfLabels += 1
             return true;
         }
         case StmtKind.MODULE_STMT: {
@@ -1801,17 +1905,22 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                     hasDefault = true
                 }
                 else if(hasDefault) {
-                    var parentDecl = params.parent as (*FuncDecl)
-                    assert(parentDecl != null)
-                    assert(parentDecl.kind == StmtKind.FUNC_DECL)
-                    this.result.addError(parentDecl.startPos, "'%.*s' must have default arguments defined last",
-                                    parentDecl.name.str.length, parentDecl.name.str.buffer)
+                    var parentNode = params.asNode().parent
+                    assert(parentNode != null)
+                    assert(parentNode.kind == StmtKind.FUNC_DECL)
+
+                    var parentDecl = &parentNode.funcDecl
+                    this.result.addError(
+                        parentDecl.getStartPos(), "'%.*s' must have default arguments defined last",
+                        parentDecl.name.str.length, parentDecl.name.str.buffer
+                    )
                     return false;
                 }
 
             }
             return true;
         }
+        case StmtKind.YIELD_STMT:
         case StmtKind.RETURN_STMT: {
             var ret = stmt as (*ReturnStmt)
 
@@ -1828,7 +1937,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
 
                 ret.expr = this.coerceTypeWithUsing(ret.expr, ret.expr.operand.typeInfo, currentFuncDecl.returnType)
 
-                this.checkTypeCompatibility(ret.expr.startPos, currentFuncDecl.returnType, ret.expr.operand.typeInfo)
+                this.checkTypeCompatibility(ret.expr.getStartPos(), currentFuncDecl.returnType, ret.expr.operand.typeInfo)
                 ret.expr.expectedType = currentFuncDecl.returnType
 
                 // If the return type is a generic type, do the type inference
@@ -1839,7 +1948,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
                 }
             }
             else {
-                this.checkTypeCompatibility(ret.startPos, currentFuncDecl.returnType, &VOID_TYPE)
+                this.checkTypeCompatibility(ret.getStartPos(), currentFuncDecl.returnType, &VOID_TYPE)
 
                 if(currentFuncDecl.returnType && currentFuncDecl.returnType.kind == TypeKind.GENERIC_PARAM) {
                     currentFuncDecl.returnType = &VOID_TYPE

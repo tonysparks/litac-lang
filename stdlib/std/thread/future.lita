@@ -1,0 +1,76 @@
+
+
+public struct Future {
+    mutex: Mutex
+    cond: Cond
+    ready: bool
+
+    result: *void
+}
+
+public func (this: *Future) init() : ThreadStatus {
+    var status = this.mutex.init()
+    if(status != ThreadStatus.OK) {
+        return status
+    }
+
+    status = this.cond.init()
+    if(status != ThreadStatus.OK) {
+        return status
+    }
+
+    this.ready = false
+    this.result = null
+}
+
+public func (this: *Future) set(result: *void) : ThreadStatus {
+    var status = this.mutex.lock()
+    defer this.mutex.unlock()
+
+    if(status != ThreadStatus.OK) {
+        return status
+    }
+
+    this.result = result
+    this.ready = true
+
+    status = this.cond.broadcast()
+    if(status != ThreadStatus.OK) {
+        return status
+    }
+}
+
+public func (this: *Future) wait() : ThreadStatus {
+    var status = this.mutex.lock()
+    defer this.mutex.unlock()
+
+    if(status != ThreadStatus.OK) {
+        return status
+    }
+
+    while(!this.ready) {
+        status = this.cond.wait(&this.mutex)
+        if(status != ThreadStatus.OK) {
+            return status
+        }
+    }
+}
+
+public func (this: *Future) get(result: **void) : ThreadStatus {
+    var status = this.mutex.lock()
+    defer this.mutex.unlock()
+
+    if(status != ThreadStatus.OK) {
+        return status
+    }
+
+    while(!this.ready) {
+        status = this.cond.wait(&this.mutex)
+        if(status != ThreadStatus.OK) {
+            return status
+        }
+    }
+
+    ;*result = this.result
+    return status
+}

@@ -1,0 +1,1302 @@
+import "std/array"
+import "std/mem"
+import "std/map"
+import "std/libc"
+import "std/hash"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/assert"
+
+import "intern"
+import "symbols"
+import "types"
+
+import "lita"
+import "ast"
+import "ast_copy"
+import "ast_new"
+import "ast_print"
+import "parser"
+import "checker"
+import "lex"
+import "module"
+import "common"
+import "coroutine"
+import "coroutine/patch"
+
+internal struct CoroutineContext {
+    allocator: *const Allocator
+    checker: *TypeChecker
+    strings: *Strings
+    module: *Module
+
+    funcDecl: *FuncDecl
+    tempIndex: u32
+    labelIndex: u32
+
+    current: *BlockScope
+
+    scopeIndex: u32
+    patches: Array<Patch>
+}
+
+internal struct Patch {
+    stmt: *Stmt       // the statement that is triggering the patch
+    aux: *Stmt        // [optional] auxilary statement to give context
+    ret: *Stmt        // [optional] the returned statement
+    label: *Stmt      // [optional] the label
+    cont: *Stmt       // [optional] continuation var decl
+
+    block: *BlockStmt
+    index: u32
+    name: InternedString
+    isResult: bool    // is this the result of a function call
+    isPsuedo: bool    // is this a variable that should be a stack
+                      // variable but shouldn't be substituded
+}
+
+
+internal struct BlockScope {
+    parent: *BlockScope
+    block: *BlockStmt
+    insertIndex: i32
+    numberOfInserts: i32
+
+    locals: Array<InternedString>
+}
+
+internal func (this: *CoroutineContext) setVar(name: InternedString, makeCanonical: bool = true) : InternedString {
+    if (!this.current) {
+        return InternedString{}
+    }
+
+    if (this.current.locals.capacity == 0) {
+        this.current.locals = ArrayInit<InternedString>(16, this.allocator)
+    }
+
+    var buffer: [MAX_SYMBOL_NAME]char;
+    var sb = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
+    if(makeCanonical) {
+        sb.format("__%.*s__%d", name.length, name.buffer, this.scopeIndex)
+    } else {
+        //sb.format("__%.*s", name.length, name.buffer)
+        sb.format("%.*s", name.length, name.buffer)
+    }
+
+    var internedName = this.strings.internCopy(sb.cStr(), sb.length)
+    this.current.locals.add(internedName)
+
+    return internedName
+}
+
+internal func (this: *CoroutineContext) getVar(name: InternedString) : InternedString {
+    assert(this.current != null)
+
+    var buffer:[MAX_SYMBOL_NAME]char
+    var nameTemplate = StringBufferInit(buffer, MAX_SYMBOL_NAME, 0)
+    nameTemplate.format("__%.*s__", name.length, name.buffer)
+    var formattedName = nameTemplate.toString()
+
+    var scope = this.current
+    while(scope != null) {
+        for(var i = 0; i < scope.locals.size(); i+=1) {
+            var localName = scope.locals.get(i)
+
+            if (localName.view.startsWith(formattedName)) {
+                return localName
+            }
+        }
+
+        scope = scope.parent
+    }
+
+    return InternedString{}
+}
+
+func (this: *CoroutineContext) push(scope: *BlockScope) {
+    var current = this.current
+    this.current = scope
+    scope.parent = current
+    this.scopeIndex += 1
+}
+func (this: *CoroutineContext) pop() {
+    if(!this.current) return;
+
+    var parent = this.current.parent
+    this.current = parent
+}
+
+func (this: *CoroutineContext) currentBlock(): *BlockStmt {
+    if(!this.current) return null;
+    return this.current.block
+}
+
+internal func NewIdentFromTemp(context: *CoroutineContext, temp: *VarDecl): *Node {
+    var nameTypeSpec = NewNameTypeSpecIntern(
+        temp.getStartPos(),
+        temp.name.str,
+        &context.module.typeSpecAllocator
+    )
+
+    return NewIdentifierExpr(
+        temp.getStartPos(),
+        temp.getEndPos(),
+        nameTypeSpec,
+        context.allocator
+    )
+}
+
+internal func NewGetExprFromName(
+    context: *CoroutineContext,
+    parent: *Stmt,
+    object: InternedString,
+    field: InternedString
+): *Node {
+    var objectTypeSpec = NewNameTypeSpecIntern(
+        parent.getStartPos(),
+        object,
+        &context.module.typeSpecAllocator
+    )
+    var fieldTypeSpec = NewNameTypeSpecIntern(
+        parent.getStartPos(),
+        field,
+        &context.module.typeSpecAllocator
+    )
+    return NewGetExpr(
+        parent.getStartPos(),
+        parent.getEndPos(),
+        &NewIdentifierExpr(
+            parent.getStartPos(),
+            parent.getEndPos(),
+            objectTypeSpec,
+            context.allocator
+        ).asExpr,
+        &NewIdentifierExpr(
+            parent.getStartPos(),
+            parent.getEndPos(),
+            fieldTypeSpec,
+            context.allocator
+        ).identifierExpr,
+        context.allocator
+    )
+}
+
+internal func NewGetExprFromSetExpr(context: *CoroutineContext, setExpr: *SetExpr): *Node {
+    return NewGetExpr(
+        setExpr.getStartPos(),
+        setExpr.getEndPos(),
+        setExpr.object,
+        setExpr.field,
+        context.allocator
+    )
+}
+
+internal func NewTempName(context: *CoroutineContext) : StringBuilder {
+    var name = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
+    name.append("__%d", context.tempIndex += 1)
+    return name
+}
+
+internal func NewTempAssignment(
+    context: *CoroutineContext,
+    expr: *Expr,
+    varName: InternedString = EMPTY_STR,
+    insert: bool = true,
+    temporary: bool = true
+) : *VarDecl {
+    if(varName.view.empty()) {
+        var name = NewTempName(context)
+        var str = name.toString()
+        varName = context.strings.internString(&str)
+    }
+
+    var tempNode = NewVarDecl(
+        expr.getStartPos(),
+        expr.getEndPos(),
+        NewIdentifierEx(
+            varName,
+            expr.getStartPos()
+        ),
+        null,
+        expr,
+        context.allocator
+    )
+    var temp = &tempNode.varDecl
+    if(temporary) {
+        temp.flags |= VarDeclFlags.IS_TEMPORARY
+    }
+
+    if(insert) {
+        InsertTempStmt(context, temp, .atEnd = true)
+    }
+
+    return temp as (*VarDecl)
+}
+
+internal func NewTempEmptyAssignment(
+    context: *CoroutineContext,
+    expr: *Expr,
+    typeSpec: *TypeSpec = null,
+    temporary: bool = true
+) : *VarDecl {
+    var name = NewTempName(context)
+
+    var tempNode = NewVarDecl(
+        expr.getStartPos(),
+        expr.getEndPos(),
+        NewIdentifier(
+            name.cStr(),
+            expr.getStartPos(),
+            context.strings
+        ),
+        typeSpec,
+        null,
+        context.allocator
+    )
+
+    var temp = &tempNode.varDecl
+    if(temporary) {
+        temp.flags |= VarDeclFlags.IS_TEMPORARY
+    }
+
+    InsertTempStmt(context, temp, .atEnd = true)
+    return temp as (*VarDecl)
+}
+
+internal func InsertLabel(
+    context: *CoroutineContext,
+    parent: *Stmt,
+    atEnd: bool = false
+) : *Stmt {
+    var name = StringBuilderInit(MAX_SYMBOL_NAME, context.allocator)
+    name.append("__LABEL_%d", context.labelIndex += 1)
+
+    var labelNode = NewLabelStmt(
+        parent.getStartPos(), parent.getEndPos(),
+        NewIdentifier(
+            name.cStr(),
+            parent.getStartPos(),
+            context.strings
+        ),
+        context.allocator
+    )
+
+    var labelStmt = &labelNode.asStmt
+    if(!context.checker.resolveStmt(labelStmt)) {
+        return labelStmt
+    }
+
+    InsertTempStmt(context, labelStmt, atEnd)
+    return labelStmt
+}
+
+internal func InsertTempStmt(
+    context: *CoroutineContext,
+    stmt: *Stmt,
+    atEnd: bool
+) {
+
+    // TODO: This does right to left ordering of parameters
+    // we probably want left to right even though this
+    // isn't standard in C
+    var scope = context.current
+    var index = scope.insertIndex// + scope.numberOfInserts
+    if(atEnd) {
+        index += scope.numberOfInserts
+    }
+
+    scope.numberOfInserts += 1
+    InsertStmt(
+        context,
+        stmt,
+        scope.block,
+        index
+    )
+}
+
+internal func InsertStmt(
+    context: *CoroutineContext,
+    stmt: *Stmt,
+    block: *BlockStmt,
+    index: u32
+) {
+    block.stmts.insertAt(index as (i32), stmt)
+    block.asNode().becomeParentOf(stmt)
+}
+
+func PushBlock(
+    context: *CoroutineContext,
+    scope: *BlockScope,
+    stmt1: *Stmt,
+    stmt2: *Stmt = null
+) : *BlockStmt {
+    var stmts = ArrayInit<*Stmt>(2, context.allocator)
+    stmts.add(stmt1)
+    if(stmt2) {
+        stmts.add(stmt2)
+    }
+
+    var blockNode = NewBlockStmt(
+        stmt1.getStartPos(), stmt1.getEndPos(),
+        stmts,
+        context.allocator
+    )
+
+    scope.block = &blockNode.blockStmt
+    scope.insertIndex = 0
+    scope.numberOfInserts = 0
+
+    context.push(scope)
+    return scope.block
+}
+
+func ResolveCoroutineDecls(this: *TypeChecker, decls: Array<*Decl>) : bool {
+    var count = this.errors()
+    this.bypassing = true
+    for(var i = 0; i < decls.size(); i += 1) {
+        var decl = decls.get(i)
+
+        var sym = this.createDeclSymbol(decl)
+        if(sym == null) {
+            return false
+        }
+
+        this.resolveSymbol(sym)
+        this.finishResolveSymbol(sym)
+    }
+    this.bypassing = false
+
+    return count == this.errors()
+}
+
+public func ResolveCoroutine(
+    checker: *TypeChecker,
+    funcDecl: *FuncDecl
+) : bool {
+
+    if(!funcDecl.body) {
+        return true;
+    }
+
+    var context = CoroutineContext {
+        .allocator = checker.allocator,
+        .checker = checker,
+        .strings = &checker.strings,
+        .module = checker.current,
+        .funcDecl = funcDecl,
+        .tempIndex = 0_u32,
+        .current = null,
+        .scopeIndex = 0_u32,
+        .labelIndex = 0_u32,
+        .patches = ArrayInit<Patch>(64, checker.allocator),
+    }
+
+    if(funcDecl.body.getKind() != StmtKind.FUNC_BODY_STMT) {
+        var body = funcDecl.body
+        var stmts = ArrayInit<*Stmt>(1, checker.allocator)
+        stmts.add(body)
+
+        var bodyNode = NewFuncBodyStmt(
+            body.getStartPos(),
+            body.getEndPos(),
+            stmts,
+            checker.allocator
+        )
+
+        funcDecl.body = &bodyNode.asStmt
+    }
+
+    funcDecl.body = FunctionLowering(&context, funcDecl.body)
+    if(!checker.resolveStmt(funcDecl.body)) {
+        printf("*************************************Failed to lower!\n")
+        return false
+    }
+
+    var params = funcDecl.params
+
+    assert(funcDecl.sym != null)
+    var decls = CreateCoroutineDecls(
+        checker,
+        funcDecl.sym,
+        &context
+    )
+
+    if(!ResolveCoroutineDecls(checker, decls)) {
+        printf("*************************BADxer\n")
+        return false
+    }
+
+    return PatchCoroutine(
+        &context,
+        funcDecl
+    )
+}
+
+
+/**
+    Convert function call expressions into lowered expressions:
+
+    var x = object.value(call1(), call2()) ?
+    object.value1(call3(), call4()) :
+    object.value2(call6(), call6())
+
+    var x = undefined
+    var _1 = call1()
+    var _2 = call2()
+    var _r3 = object.value(_1, _2)
+    if (_r3) {
+        var _3 = call3()
+        var _4 = call4()
+        x = object.value(_3, _4)
+    } else {
+        var _5 = call5()
+        var _6 = call6()
+        x = object.value(_5, _6)
+    }
+*/
+func FunctionLowering(context: *CoroutineContext, ast: *Stmt) : *Stmt {
+    if(!ast) {
+        return null;
+    }
+
+    switch(ast.getKind()) {
+        case StmtKind.TRAIT_DECL:
+        case StmtKind.UNION_DECL:
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.FUNC_DECL:
+        case StmtKind.IMPORT_DECL:
+        case StmtKind.TYPEDEF_DECL:
+        case StmtKind.ENUM_DECL:
+        case StmtKind.PARAM_DECL:
+        case StmtKind.NATIVE_DECL:
+        case StmtKind.POISON_DECL: {
+            break;
+        }
+        case StmtKind.CONST_DECL:
+        case StmtKind.VAR_DECL: {
+            var decl = ast as (*VarDecl)
+            if(decl.expr) {
+                decl.expr = FunctionLowering(context, decl.expr) as (*Expr)
+            }
+            if(!(decl.flags & VarDeclFlags.IS_TEMPORARY)) {
+                context.patches.add(
+                    Patch {
+                        .stmt = decl as (*Stmt),
+                        .block = context.current.block,
+                        .index = context.current.insertIndex,
+                        .name = context.setVar(decl.name.str),
+                    }
+                )
+            }
+            break;
+        }
+
+        case StmtKind.FUNC_BODY_STMT:
+        case StmtKind.BLOCK_STMT: {
+            var body = ast as (*BlockStmt)
+
+            var scope = BlockScope {
+                .block = body,
+                .insertIndex = 0,
+                .numberOfInserts = 0,
+            }
+
+            context.push(&scope)
+            defer context.pop()
+
+            if(ast.getKind() == StmtKind.FUNC_BODY_STMT) {
+                var params = context.funcDecl.params
+                for(var i = 0; i < params.size(); i+=1) {
+                    var param = params.get(i)
+                    context.setVar(param.name.str)
+                }
+            }
+
+            for(var i = 0; i < body.stmts.size(); i+=1) {
+                var stmt = body.stmts.get(i)
+                scope.insertIndex = i
+
+                stmt = FunctionLowering(context, stmt)
+                i = i + scope.numberOfInserts
+                body.stmts.set(i, stmt)
+
+                scope.numberOfInserts = 0
+            }
+            break;
+        }
+        case StmtKind.BREAK_STMT: {
+            break;
+        }
+        case StmtKind.COMP_STMT: {
+            var comp = ast as (*CompStmt)
+            if(comp.evaluatedStmt) {
+                comp.evaluatedStmt = FunctionLowering(context, comp.evaluatedStmt)
+            }
+            if(comp.end) {
+                comp.end = FunctionLowering(context, comp.end) as (*CompStmt)
+            }
+            for(var i = 0; i < comp.body.size(); i+=1) {
+                var s = comp.body.get(i)
+                s = FunctionLowering(context, s)
+                comp.body.set(i, s)
+            }
+            break;
+        }
+        case StmtKind.CONTINUE_STMT: {
+            break;
+        }
+        case StmtKind.DEFER_STMT: {
+            var deferStmt = ast as (*DeferStmt)
+            deferStmt.deferedStmt = FunctionLowering(context, deferStmt.deferedStmt)
+            break;
+        }
+        case StmtKind.DO_WHILE_STMT: {
+            var whileStmt = ast as (*DoWhileStmt)
+            /*
+                convert to:
+
+                do {
+                    body
+                    if(cond)
+                        continue
+                    else
+                        break
+                } while(true);
+            */
+
+            var cond = whileStmt.cond
+
+            var ifStmt = &NewIfStmt(
+                cond.getStartPos(), cond.getEndPos(),
+                cond,
+                &NewContinueStmt(
+                    cond.getStartPos(), cond.getEndPos(),
+                    context.allocator
+                ).asStmt,
+                &NewBreakStmt(
+                    cond.getStartPos(), cond.getEndPos(),
+                    context.allocator
+                ).asStmt,
+                context.allocator
+            ).asStmt
+
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, whileStmt.body, ifStmt)
+            defer context.pop()
+
+            whileStmt.cond = &NewBooleanExpr(
+                cond.getStartPos(), cond.getEndPos(),
+                true,
+                context.allocator
+            ).asExpr
+
+            whileStmt.body = FunctionLowering(context, block)
+            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Expr)
+            break;
+        }
+        case StmtKind.EMPTY_STMT: {
+            break;
+        }
+        case StmtKind.FOR_STMT: {
+            var forStmt = ast as (*ForStmt)
+            /*
+                lowered to:
+
+                {
+                    init
+                    while(cond) {
+                        body
+                        post
+                    }
+                }
+            */
+            var stmts = ArrayInit<*Stmt>(2, context.allocator)
+            if(forStmt.body) {
+                stmts.add(forStmt.body)
+            }
+            if(forStmt.post) {
+                stmts.add(forStmt.post)
+            }
+
+            var whileBodyNode = NewBlockStmt(
+                forStmt.getStartPos(), forStmt.getEndPos(),
+                stmts,
+                context.allocator
+            )
+            var whileBody = &whileBodyNode.asStmt
+
+            var cond = forStmt.cond ? forStmt.cond : &NewBooleanExpr(
+                forStmt.getStartPos(), forStmt.getEndPos(),
+                true,
+                context.allocator
+            ).asExpr
+
+            var whileStmt = &NewWhileStmt(
+                forStmt.getStartPos(), forStmt.getEndPos(),
+                cond,
+                whileBody,
+                context.allocator
+            ).asStmt
+
+            var initStmt = forStmt.init ? forStmt.init : &NewEmptyStmt(
+                forStmt.getStartPos(), forStmt.getEndPos(),
+                context.allocator
+            ).asStmt
+
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, initStmt, whileStmt)
+            defer context.pop()
+
+            return FunctionLowering(context, block)
+        }
+        case StmtKind.GOTO_STMT: {
+            break;
+        }
+        case StmtKind.IF_STMT: {
+            var ifStmt = ast as (*IfStmt)
+
+            /*
+                Lower to:
+
+                {
+                if(cond)
+                    {body}
+                else
+                    {other}
+                }
+
+                which if else's get modified to:
+
+                {
+                    if(cond)
+                        {body}
+                    else
+                        {
+                            if(cond)
+                                {body}
+                            else
+                                {other}
+                        }
+                }
+            */
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, ifStmt)
+            defer context.pop()
+
+            ifStmt.cond = FunctionLowering(context, ifStmt.cond) as (*Expr)
+            {
+                var scope = BlockScope{}
+                var thenBlock = PushBlock(context, &scope, ifStmt.then)
+                defer context.pop()
+
+                ifStmt.then = FunctionLowering(context, thenBlock)
+            }
+
+            if(ifStmt.elseStmt) {
+                var scope = BlockScope{}
+                var elseBlock = PushBlock(context, &scope, ifStmt.elseStmt)
+                defer context.pop()
+
+                ifStmt.elseStmt = FunctionLowering(context, elseBlock)
+            }
+
+            return block as (*Stmt)
+        }
+        case StmtKind.POST_ELSE_STMT: {
+            var postElseStmt = ast as (*PostElseStmt)
+            // TODO lowering
+            break;
+        }
+        case StmtKind.LABEL_STMT: {
+            break;
+        }
+        case StmtKind.MODULE_STMT: {
+            break;
+        }
+        case StmtKind.NOTE_STMT: {
+            break;
+        }
+        case StmtKind.PARAMETERS_STMT: {
+            var params = ast as (*ParametersStmt)
+            for(var i = 0; i < params.size(); i += 1) {
+                var param = params.get(i)
+
+                param = FunctionLowering(context, param) as (*ParameterDecl)
+                params.set(i, param)
+            }
+            break;
+        }
+        case StmtKind.YIELD_STMT:
+        case StmtKind.RETURN_STMT: {
+            var stmt = ast as (*ReturnStmt)
+            if(stmt.expr) {
+                var expr = FunctionLowering(context, stmt.expr) as (*Expr)
+                var varDecl = NewTempAssignment(context, expr)
+                context.patches.add(
+                    Patch {
+                        .stmt = varDecl as (*Stmt),
+                        .block = context.current.block,
+                        .index = context.current.insertIndex,
+                        .name = context.setVar(varDecl.name.str, false),
+                        .isResult = true,
+                    }
+                )
+                stmt.expr = expr
+            }
+
+            var label = InsertLabel(context, stmt)
+            context.patches.add(
+                Patch {
+                    .stmt = stmt as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex,
+                    .label = label,
+                }
+            )
+            break;
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            var caseStmt = ast as (*SwitchCaseStmt)
+            caseStmt.cond = FunctionLowering(context, caseStmt.cond) as (*Expr)
+            caseStmt.body = FunctionLowering(context, caseStmt.body)
+            break;
+        }
+        case StmtKind.SWITCH_STMT:{
+            var switchStmt = ast as (*SwitchStmt)
+            /*
+                lowered to
+
+                {
+                    switch(cond) {
+                        case c1: stmt
+                    }
+                }
+            */
+            var scope = BlockScope{}
+            var block = PushBlock(context, &scope, switchStmt)
+            defer context.pop()
+
+            switchStmt.cond = FunctionLowering(context, switchStmt.cond) as (*Expr)
+            for(var i = 0; i < switchStmt.cases.size(); i+=1) {
+                var caseStmt = switchStmt.cases.get(i)
+                caseStmt = FunctionLowering(context, caseStmt) as (*SwitchCaseStmt)
+                switchStmt.cases.set(i, caseStmt)
+            }
+            if(switchStmt.defaultStmt) {
+                switchStmt.defaultStmt = FunctionLowering(context, switchStmt.defaultStmt)
+            }
+
+            return block as (*Stmt)
+        }
+        case StmtKind.ENUM_FIELD_DECL:
+        case StmtKind.ENUM_FIELD_ENTRY_DECL:
+        case StmtKind.STRUCT_FIELD_DECL:
+        case StmtKind.UNION_FIELD_DECL:
+        case StmtKind.TRAIT_FIELD_DECL:
+        case StmtKind.VAR_FIELD_DECL: {
+            // TODO: Is this needed??
+            break;
+        }
+        case StmtKind.WHILE_STMT: {
+            var whileStmt = ast as (*WhileStmt)
+
+            /*
+                Convert to:
+                while(true) {
+                    if(cond)
+                        body
+                    else
+                        break;
+                }
+            */
+
+            var cond = whileStmt.cond
+
+            whileStmt.cond = &NewBooleanExpr(
+                cond.getStartPos(), cond.getEndPos(),
+                true,
+                context.allocator
+            ).asExpr
+
+            whileStmt.body = &NewIfStmt(
+                cond.getStartPos(), cond.getEndPos(),
+                cond,
+                whileStmt.body,
+                &NewBreakStmt(
+                    cond.getStartPos(), cond.getEndPos(),
+                    context.allocator
+                ).asStmt,
+                context.allocator
+            ).asStmt
+
+            whileStmt.cond = FunctionLowering(context, whileStmt.cond) as (*Expr)
+            whileStmt.body = FunctionLowering(context, whileStmt.body)
+            break;
+        }
+
+
+        /*--------------------------------------
+            Expressions
+        ----------------------------------------*/
+        case StmtKind.ARRAY_DESIGNATION_EXPR: {
+            var expr = ast as (*ArrayDesignationExpr)
+            expr.index = FunctionLowering(context, expr.index) as (*Expr)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            break;
+        }
+        case StmtKind.ARRAY_INIT_EXPR: {
+            var expr = ast as (*ArrayInitExpr)
+            for(var i = 0; i < expr.values.size(); i += 1) {
+                var arg = expr.values.get(i)
+                arg = FunctionLowering(context, arg) as (*Expr)
+                expr.values.set(i, arg)
+            }
+            break;
+        }
+        case StmtKind.BINARY_EXPR: {
+            var expr = ast as (*BinaryExpr)
+            /*
+                left && right
+
+                lowered to:
+
+                var result = false
+                var t1 = left
+                if (t1) {
+                    var t2 = right
+                    if (t2) {
+                        result = true
+                    }
+                }
+            */
+            if(expr.operator == TokenType.AND) {
+                var result = NewTempAssignment(
+                    context,
+                    &NewBooleanExpr(
+                        expr.getStartPos(), expr.getEndPos(),
+                        false,
+                        context.allocator
+                    ).asExpr
+                )
+
+                var nameTypeSpec = NewNameTypeSpecIntern(
+                    expr.getStartPos(),
+                    result.name.str,
+                    &context.module.typeSpecAllocator
+                )
+
+                var resultExpr = &NewIdentifierExpr(
+                    expr.getStartPos(), expr.getEndPos(),
+                    nameTypeSpec,
+                    context.allocator
+                ).asExpr
+
+                var ifRight = &NewIfStmt(
+                    expr.getStartPos(), expr.getEndPos(),
+                    expr.right,
+                    &NewBinaryExpr(
+                        expr.getStartPos(), expr.getEndPos(),
+                        resultExpr,
+                        TokenType.EQUALS,
+                        &NewBooleanExpr(
+                            expr.getStartPos(), expr.getEndPos(),
+                            true,
+                            context.allocator
+                        ).asExpr,
+                        context.allocator
+                    ).asStmt,
+                    null,
+                    context.allocator
+                ).asStmt
+
+                ifRight = FunctionLowering(context, ifRight)
+
+                var ifLeft = &NewIfStmt(
+                    expr.getStartPos(), expr.getEndPos(),
+                    expr.left,
+                    ifRight,
+                    null,
+                    context.allocator
+                ).asStmt
+
+                ifLeft = FunctionLowering(context, ifLeft)
+                InsertTempStmt(context, ifLeft, .atEnd = true)
+
+                return resultExpr as (*Stmt)
+            }
+            /*
+                left || right
+
+                lowered to:
+
+                var result = false
+                var t1 = left
+                if (t1) {
+                    result = true
+                } else {
+                    var t2 = right
+                    if (t2) {
+                        result = true
+                    }
+                }
+            */
+            else if(expr.operator == TokenType.OR) {
+                var result = NewTempAssignment(
+                    context,
+                    &NewBooleanExpr(
+                        expr.getStartPos(), expr.getEndPos(),
+                        false,
+                        context.allocator
+                    ).asExpr
+                )
+
+                var nameTypeSpec = NewNameTypeSpecIntern(
+                    expr.getStartPos(),
+                    result.name.str,
+                    &context.module.typeSpecAllocator
+                )
+
+                var resultExpr = &NewIdentifierExpr(
+                    expr.getStartPos(), expr.getEndPos(),
+                    nameTypeSpec,
+                    context.allocator
+                ).asExpr
+
+                var ifRight = &NewIfStmt(
+                    expr.getStartPos(), expr.getEndPos(),
+                    expr.right,
+                    &NewBinaryExpr(
+                        expr.getStartPos(), expr.getEndPos(),
+                        resultExpr,
+                        TokenType.EQUALS,
+                        &NewBooleanExpr(
+                            expr.getStartPos(), expr.getEndPos(),
+                            true,
+                            context.allocator
+                        ).asExpr,
+                        context.allocator
+                    ).asStmt,
+                    null,
+                    context.allocator
+                ).asStmt
+
+                ifRight = FunctionLowering(context, ifRight)
+
+                var ifLeft = &NewIfStmt(
+                    expr.getStartPos(), expr.getEndPos(),
+                    expr.left,
+                    &NewBinaryExpr(
+                        expr.getStartPos(), expr.getEndPos(),
+                        resultExpr,
+                        TokenType.EQUALS,
+                        &NewBooleanExpr(
+                            expr.getStartPos(), expr.getEndPos(),
+                            true,
+                            context.allocator
+                        ).asExpr,
+                        context.allocator
+                    ).asStmt,
+                    ifRight,
+                    context.allocator
+                ).asStmt
+
+                ifLeft = FunctionLowering(context, ifLeft)
+                InsertTempStmt(context, ifLeft, .atEnd = true)
+
+                return resultExpr as (*Stmt)
+            } else {
+                expr.left = FunctionLowering(context, expr.left) as (*Expr)
+                expr.right = FunctionLowering(context, expr.right) as (*Expr)
+            }
+            break;
+        }
+        case StmtKind.BOOLEAN_EXPR: {
+            break;
+        }
+        case StmtKind.CAST_EXPR: {
+            var expr = ast as (*CastExpr)
+            expr.exprToCast = FunctionLowering(context, expr.exprToCast) as (*Expr)
+            break;
+        }
+        case StmtKind.CHAR_EXPR: {
+            break;
+        }
+        case StmtKind.FUNC_CALL_EXPR: {
+            var expr = ast as (*FuncCallExpr)
+            /*
+                Lowered to
+
+                var t1 = call()
+                t1
+
+                ordering:
+
+                expr.object
+                a1
+                a2
+                ...
+
+                var t1 = temp
+                t1
+
+                Coroutine:
+
+
+                var t0 = Continuation {
+                    .stack = X__CoroutineStack{
+                        .param1__1 = a1,
+                        .param2__1 = a2,
+                    }
+                }
+                var t1 = callWrapper(&t0)
+                LABEL__X:
+                t1
+            */
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                var arg = expr.arguments.getPtr(i)
+                arg.argExpr = FunctionLowering(context, arg.argExpr) as (*Expr)
+            }
+
+            var contParamName = $"std::coroutine::Continuation"
+            var continuationVar = NewTempEmptyAssignment(
+                context,
+                expr,
+                NewBaseTypeSpec(
+                    TypeSpecKind.PTR,
+                    expr.getStartPos(),
+                    NewNameTypeSpecIntern(
+                        expr.getStartPos(),
+                        context.strings.internString(contParamName),
+                        &context.checker.current.typeSpecAllocator
+                    ),
+                    &context.checker.current.typeSpecAllocator
+                ),
+                .temporary = false
+            )
+            context.patches.add(
+                Patch {
+                    .stmt = continuationVar as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex,
+                    .name = continuationVar.name.str,
+                    .isPsuedo = true // let the funcCallExpr patching will handling this...
+                }
+            )
+
+            var resultVar = NewTempAssignment(
+                context,
+                expr,
+                .varName = EMPTY_STR,
+                .insert = true,
+                .temporary = false
+            )
+            var label = InsertLabel(context, resultVar)
+
+            var idExpr = &NewIdentFromTemp(context, resultVar).asStmt
+            // context.patches.add(
+            //     Patch {
+            //         .stmt = idExpr as (*Stmt),
+            //         .block = context.current.block,
+            //         .index = context.current.insertIndex,
+            //         .name = resultVar.name.str,
+            //     }
+            // )
+
+            context.patches.add(
+                Patch {
+                    .stmt = resultVar as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex,
+                    .name = resultVar.name.str,
+                    .isPsuedo = true // let the funcCallExpr patching will handling this...
+                }
+            )
+
+            context.patches.add(
+                Patch {
+                    .stmt = expr as (*Stmt),
+                    .block = context.current.block,
+                    .index = context.current.insertIndex + context.current.numberOfInserts + 1,
+                    .aux = resultVar as (*Stmt),
+                    .label = label,
+                    .ret = idExpr,
+                    .cont = continuationVar as (*Stmt)
+                }
+            )
+
+            return idExpr
+        }
+        case StmtKind.GET_EXPR: {
+            var expr = ast as (*GetExpr)
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.field = FunctionLowering(context, expr.field) as (*IdentifierExpr)
+            break;
+        }
+        case StmtKind.GROUP_EXPR: {
+            var expr = ast as (*GroupExpr)
+            expr.groupedExpr = FunctionLowering(context, expr.groupedExpr) as (*Expr)
+            break;
+        }
+        case StmtKind.FUNC_IDENTIFIER_EXPR:
+        case StmtKind.IDENTIFIER_EXPR: {
+            var expr = ast as (*IdentifierExpr)
+            if (expr.type.kind == TypeSpecKind.NAME) {
+                var name = context.getVar(expr.type.name)
+                if (name.length != 0) {
+                    context.patches.add(
+                        Patch {
+                            .stmt = expr as (*Stmt),
+                            .block = context.current.block,
+                            .index = context.current.insertIndex,
+                            .name = name
+                        }
+                    )
+                }
+            }
+            break;
+        }
+        case StmtKind.INIT_EXPR: {
+            var expr = ast as (*InitExpr)
+
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                var arg = expr.arguments.get(i)
+                arg = FunctionLowering(context, arg) as (*InitArgExpr)
+                expr.arguments.set(i, arg)
+            }
+            break;
+        }
+        case StmtKind.INIT_ARG_EXPR: {
+            var expr = ast as (*InitArgExpr)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            break;
+        }
+        case StmtKind.NULL_EXPR: {
+            break;
+        }
+        case StmtKind.NUMBER_EXPR: {
+            break;
+        }
+        case StmtKind.OFFSET_OF_EXPR: {
+            var expr = ast as (*OffsetOfExpr)
+            break;
+        }
+        case StmtKind.SET_EXPR: {
+            var expr = ast as (*SetExpr)
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.field = FunctionLowering(context, expr.field) as (*IdentifierExpr)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            break;
+        }
+        case StmtKind.SIZE_OF_EXPR: {
+            var expr = ast as (*SizeOfExpr)
+            expr.sizeOfExpr = FunctionLowering(context, expr.sizeOfExpr) as (*Expr)
+            break;
+        }
+        case StmtKind.NATIVE_STRING_EXPR: {
+            break;
+        }
+        case StmtKind.STRING_EXPR: {
+            break;
+        }
+        case StmtKind.SUBSCRIPT_GET_EXPR: {
+            var expr = ast as (*SubscriptGetExpr)
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.index = FunctionLowering(context, expr.index) as (*Expr)
+            break;
+        }
+        case StmtKind.SUBSCRIPT_SET_EXPR: {
+            var expr = ast as (*SubscriptSetExpr)
+            expr.object = FunctionLowering(context, expr.object) as (*Expr)
+            expr.index = FunctionLowering(context, expr.index) as (*Expr)
+            expr.value = FunctionLowering(context, expr.value) as (*Expr)
+            break;
+        }
+        case StmtKind.TERNARY_EXPR: {
+            var expr = ast as (*TernaryExpr)
+            /*
+                var x = cond ? then : other
+
+                lowered to
+
+                var result
+                if (cond) {
+                    result = then
+                } else {
+                    result = other
+                }
+                result
+            */
+            var resultTemp = NewTempEmptyAssignment(context, expr.then)
+            resultTemp.flags |= VarDeclFlags.IS_TERNARY
+
+            var nameTypeSpec = NewNameTypeSpecIntern(
+                expr.getStartPos(),
+                resultTemp.name.str,
+                &context.module.typeSpecAllocator
+            )
+
+            var resultExpr = &NewIdentifierExpr(
+                expr.getStartPos(), expr.getEndPos(),
+                nameTypeSpec,
+                context.allocator
+            ).asExpr
+
+            var thenExprNode = NewBinaryExpr(
+                expr.getStartPos(), expr.getEndPos(),
+                resultExpr,
+                TokenType.EQUALS,
+                expr.then,
+                context.allocator
+            )
+
+            // mark this as a ternary lowering declaration
+            var binExpr = &thenExprNode.binaryExpr
+            binExpr.ternaryDecl = resultTemp
+
+            var ifStmt = &NewIfStmt(
+                expr.getStartPos(), expr.getEndPos(),
+                expr.cond,
+                thenExprNode.asStmt,
+                &NewBinaryExpr(
+                    expr.getStartPos(), expr.getEndPos(),
+                    resultExpr,
+                    TokenType.EQUALS,
+                    expr.other,
+                    context.allocator
+                ).asStmt,
+                context.allocator
+            ).asStmt
+
+            ifStmt = FunctionLowering(context, ifStmt)
+            InsertTempStmt(context, ifStmt, .atEnd = true)
+
+            return resultExpr as (*Stmt)
+        }
+        case StmtKind.TYPE_IDENTIFIER_EXPR: {
+            var expr = ast as (*TypeIdentifierExpr)
+            break;
+        }
+        case StmtKind.NAME_OF_EXPR:
+        case StmtKind.TYPE_OF_EXPR: {
+            var expr = ast as (*TypeOfExpr)
+            expr.typeOfExpr = FunctionLowering(context, expr.typeOfExpr) as (*Expr)
+            break;
+        }
+        case StmtKind.UNARY_EXPR: {
+            var expr = ast as (*UnaryExpr)
+            expr.unaryExpr = FunctionLowering(context, expr.unaryExpr) as (*Expr)
+            break;
+        }
+        case StmtKind.POISON_EXPR: {
+            break;
+        }
+        default: {
+            // printf("Statement Kind: %s\n", StmtKindAsStr(ast.getKind()))
+            assert(false)
+        }
+    }
+    return ast
+}

@@ -23,6 +23,7 @@ import "error_codes"
 import "intern"
 import "parser"
 import "lsp/references"
+import "checker_decl"
 
 public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
     if(!this.resolveExpr(expr)) {
@@ -30,7 +31,7 @@ public func (this: *TypeChecker) resolveConstExpr(expr: *Expr) : bool {
     }
 
     if(!expr.operand.isConst) {
-        this.result.addError(expr.startPos, "expected a constant expression")
+        this.result.addError(expr.getStartPos(), "expected a constant expression")
         return false;
     }
     return true
@@ -45,7 +46,7 @@ public func (this: *TypeChecker) resolveExpr(expr: *Expr) : bool {
         }
     }
 
-    switch(expr.kind) {
+    switch(expr.getKind()) {
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             return this.resolveArrayDesignationExpr(expr as (*ArrayDesignationExpr))
         }
@@ -142,7 +143,7 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
 
     var type = this.resolveTypeSpec(expr.type, SearchType.FUNC)
     if(!type) {
-        this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        this.result.addError(expr.getStartPos(), "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 
@@ -157,11 +158,11 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
     }
 
     if(!sym) {
-        this.result.addError(expr.startPos, "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        this.result.addError(expr.getStartPos(), "unknown function '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 
-    //this.lita.references.addTypeReferenceBySymbol(expr.startPos, sym)
+    //this.lita.references.addTypeReferenceBySymbol(expr.getStartPos(), sym)
 
     expr.operand.typeInfo = sym.type
     expr.operand.isRightValue = true
@@ -171,7 +172,7 @@ func (this: *TypeChecker) resolveFuncIdentifierExpr(expr: *IdentifierExpr) : boo
 
 func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, suppliedArgs: *Array<CallArg>) : bool {
     assert(expr != null)
-    if(expr.object.kind != StmtKind.GET_EXPR) {
+    if(expr.object.getKind() != StmtKind.GET_EXPR) {
         return false
     }
 
@@ -189,9 +190,11 @@ func (this: *TypeChecker) isMethodSyntax(expr: *FuncCallExpr, suppliedArgs: *Arr
     return true
 }
 
-public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
-                                              sourceType: *TypeInfo,
-                                              targetType: *TypeInfo) : *Expr {
+public func (this: *TypeChecker) coerceTypeWithUsing(
+    expr: *Expr,
+    sourceType: *TypeInfo,
+    targetType: *TypeInfo
+) : *Expr {
 
     if(!IsAggregateLike(targetType)) {
         return expr
@@ -232,11 +235,25 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
         //field.varField.name.str.copyTo(name, field.varField.name.str.length)
         var name = field.varField.name.str
 
-        var nameTypeSpec = NewNameTypeSpecIntern(expr.startPos, name, &module.typeSpecAllocator)
-        var idExpr = NewIdentifierExpr(expr.startPos, expr.endPos, nameTypeSpec, module.allocator) as (*IdentifierExpr)
+        var nameTypeSpec = NewNameTypeSpecIntern(expr.getStartPos(), name, &module.typeSpecAllocator)
+        var idExprNode = NewIdentifierExpr(
+            expr.getStartPos(),
+            expr.getEndPos(),
+            nameTypeSpec,
+            module.allocator
+        )
 
-        var parentExpr = expr.parent
-        expr = NewGetExpr(expr.startPos, expr.endPos, expr, idExpr, module.allocator)
+        var exprNode = NewGetExpr(
+            expr.getStartPos(),
+            expr.getEndPos(),
+            expr,
+            &idExprNode.identifierExpr,
+            module.allocator
+        )
+
+        expr = &exprNode.asExpr
+
+        var parentExpr = expr.getParent()
         if(parentExpr) {
             parentExpr.becomeParentOf(expr)
         }
@@ -250,9 +267,11 @@ public func (this: *TypeChecker) coerceTypeWithUsing(expr: *Expr,
     return expr
 }
 
-func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
-                                         funcType: *TypeInfo,
-                                         suppliedArgs: *Array<CallArg>) : bool {
+func (this: *TypeChecker) coerceFuncArgs(
+    expr: *FuncCallExpr,
+    funcType: *TypeInfo,
+    suppliedArgs: *Array<CallArg>
+) : bool {
 
     assert(IsFuncLike(funcType))
 
@@ -282,11 +301,14 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
     return true
 }
 
-func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
-                                        index: i32,
-                                        argExpr: *Expr,
-                                        paramInfo: *TypeInfo,
-                                        suppliedArgs: *Array<CallArg>) : bool {
+func (this: *TypeChecker) coerceFuncArg(
+    expr: *FuncCallExpr,
+    index: i32,
+    argExpr: *Expr,
+    paramInfo: *TypeInfo,
+    suppliedArgs: *Array<CallArg>
+) : bool {
+
     if(!this.resolveExpr(argExpr)) {
         return false
     }
@@ -318,41 +340,50 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
             return true
         }
 
-        var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
-        argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.BAND, groupExpr, this.allocator)
+        var groupExprNode = NewGroupExpr(argExpr.getStartPos(), argExpr.getEndPos(), argExpr, this.allocator)
+        var argExprNode = NewUnaryExpr(argExpr.getStartPos(), argExpr.getEndPos(), TokenType.BAND, &groupExprNode.asExpr, this.allocator)
+
+        argExpr = &argExprNode.asExpr
         if(!this.resolveExpr(argExpr)) {
             return false
         }
     }
     else if(IsAggregate(paramInfo) && IsPtrAggregate(argInfo)) {
-        var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
-        argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.STAR, groupExpr, this.allocator)
+        var groupExprNode = NewGroupExpr(argExpr.getStartPos(), argExpr.getEndPos(), argExpr, this.allocator)
+        var argExprNode = NewUnaryExpr(argExpr.getStartPos(), argExpr.getEndPos(), TokenType.STAR, &groupExprNode.asExpr, this.allocator)
+
+        argExpr = &argExprNode.asExpr
         if(!this.resolveExpr(argExpr)) {
             return false
         }
     }
     // promote the function to a function ptr
     else if (paramInfo.kind == TypeKind.FUNC_PTR && argInfo.kind == TypeKind.FUNC) {
-        var groupExpr = NewGroupExpr(argExpr.startPos, argExpr.endPos, argExpr, this.allocator)
-        argExpr = NewUnaryExpr(argExpr.startPos, argExpr.endPos, TokenType.BAND, groupExpr, this.allocator)
+        var groupExprNode = NewGroupExpr(argExpr.getStartPos(), argExpr.getEndPos(), argExpr, this.allocator)
+        var argExprNode = NewUnaryExpr(argExpr.getStartPos(), argExpr.getEndPos(), TokenType.BAND, &groupExprNode.asExpr, this.allocator)
+
+        argExpr = &argExprNode.asExpr
         if(!this.resolveExpr(argExpr)) {
             return false
         }
     }
 
-    expr.node.becomeParentOf(argExpr)
+    expr.asNode().becomeParentOf(argExpr)
     var callArg = suppliedArgs.getPtr(index)
     callArg.argExpr = argExpr
     return true
 }
 
 
-func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
-                                            funcName: InternedString,
-                                            maxNumOfArgs: i32,
-                                            hasVarargs: bool,
-                                            numberOfSuppliedArgs: i32,
-                                            numberOfDefaultArgs: i32) : bool {
+func (this: *TypeChecker) checkNumberOfArgs(
+    expr: *FuncCallExpr,
+    funcName: InternedString,
+    maxNumOfArgs: i32,
+    hasVarargs: bool,
+    numberOfSuppliedArgs: i32,
+    numberOfDefaultArgs: i32
+) : bool {
+
     assert(expr != null)
 
     if(maxNumOfArgs == numberOfSuppliedArgs) {
@@ -364,7 +395,7 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
         return true
     }
     if(minNumOfArgs > numberOfSuppliedArgs) {
-        this.result.addError(expr.startPos, "'%.*s' called with too few arguments", funcName.length, funcName.buffer)
+        this.result.addError(expr.getStartPos(), "'%.*s' called with too few arguments", funcName.length, funcName.buffer)
         return false
     }
 
@@ -373,7 +404,7 @@ func (this: *TypeChecker) checkNumberOfArgs(expr: *FuncCallExpr,
     }
 
     if(maxNumOfArgs < numberOfSuppliedArgs) {
-        this.result.addError(expr.startPos, "'%.*s' called with too many arguments", funcName.length, funcName.buffer)
+        this.result.addError(expr.getStartPos(), "'%.*s' called with too many arguments", funcName.length, funcName.buffer)
         return false
     }
 
@@ -388,7 +419,8 @@ struct ParamInfo {
 func (this: *TypeChecker) inferredType(
     name: Identifier,
     paramInfo: *ParamInfo,
-    expectedType: *TypeInfo) : *TypeInfo {
+    expectedType: *TypeInfo
+) : *TypeInfo {
 
     assert(paramInfo != null)
     assert(expectedType != null)
@@ -592,7 +624,12 @@ func (this: *TypeChecker) checkInferrability(expr: *Expr, type: *TypeInfo) : boo
     return true
 }
 
-func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *TypeInfo, suppliedArgs: *Array<CallArg>, isMethodCall: bool) : *TypeInfo {
+func (this: *TypeChecker) inferFuncCallExpr(
+    expr: *FuncCallExpr,
+    funcType: *TypeInfo,
+    suppliedArgs: *Array<CallArg>,
+    isMethodCall: bool
+) : *TypeInfo {
     assert(IsFuncLike(funcType))
 
     for(var i = 0; i < expr.arguments.size(); i += 1) {
@@ -611,7 +648,7 @@ func (this: *TypeChecker) inferFuncCallExpr(expr: *FuncCallExpr, funcType: *Type
         objectExpr = &getExpr.field.expr;
     }
 
-    if(objectExpr.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+    if(objectExpr.getKind() != StmtKind.FUNC_IDENTIFIER_EXPR) {
         return funcType
     }
 
@@ -758,7 +795,12 @@ err:
     return &POISON_TYPE
 }
 
-func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *TypeInfo, suppliedArgs: *Array<CallArg>) : bool {
+func (this: *TypeChecker) checkFuncCallArgs(
+    expr: *FuncCallExpr,
+    funcType: *TypeInfo,
+    suppliedArgs: *Array<CallArg>
+) : bool {
+
     assert(funcType != null)
     assert(IsFuncLike(funcType))
 
@@ -788,7 +830,13 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
                 callArg.index = i
 
-                success = this.checkTypeCompatibility(arg.startPos, p, arg.operand.typeInfo, .allowPtrArithmetic = false) && success
+                success = this.checkTypeCompatibility(
+                    arg.getStartPos(),
+                    p,
+                    arg.operand.typeInfo,
+                    .allowPtrArithmetic = false
+                ) && success
+
                 arg.expectedType = p;
 
                 // don't allow for trait casting on rvalues (i.e., prevents &4)
@@ -840,7 +888,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
 
                 var arg = callArg.argExpr
                 callArg.index = paramIndex
-                success = this.checkTypeCompatibility(arg.startPos, p.typeInfo, arg.operand.typeInfo, .allowPtrArithmetic = false) && success
+                success = this.checkTypeCompatibility(arg.getStartPos(), p.typeInfo, arg.operand.typeInfo, .allowPtrArithmetic = false) && success
                 arg.expectedType = p.typeInfo;
 
                 if(IsTrait(p.typeInfo) && arg.operand.isRightValue) {
@@ -911,7 +959,7 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
             sb.append("}}")
 
             var parser = ParserInit(
-                expr.startPos.filename,
+                expr.getStartPos().filename,
                 sb.buffer,
                 sb.length,
                 this.current,
@@ -933,7 +981,10 @@ func (this: *TypeChecker) checkFuncCallArgs(expr: *FuncCallExpr, funcType: *Type
     return success
 }
 
-func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
+func (this: *TypeChecker) resolveFuncCallExpr(
+    expr: *FuncCallExpr
+) : bool {
+
     assert(expr != null)
 
     var errors = this.errors()
@@ -945,6 +996,14 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
     if(!IsFuncLike(objectType)){
         this.errorNonFuncType(expr.object, objectType)
         return false
+    }
+
+    if(!this.captureScope) {
+        var sym = objectType.sym
+        if(sym && (sym.flags & SymbolFlags.IS_COROUTINE) > 0) {
+            this.errorSuspendFuncInNonSuspendScope(expr, sym)
+            return false
+        }
     }
 
     var isMethod = false
@@ -992,11 +1051,11 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
         // The thought here is that if this is a function pointer, which don't have
         // a name, get assigned the name on invocation -- this name becomes relavent for
         // error output
-        if(expr.object.kind == StmtKind.FUNC_IDENTIFIER_EXPR) {
+        if(expr.object.getKind() == StmtKind.FUNC_IDENTIFIER_EXPR) {
             var idExpr = expr.object as (*IdentifierExpr)
             funcPtr.name = idExpr.type.name
         }
-        else if(expr.object.kind == StmtKind.GET_EXPR) {
+        else if(expr.object.getKind() == StmtKind.GET_EXPR) {
             var getExpr = expr.object as (*GetExpr)
             funcPtr.name = getExpr.field.type.name
         }
@@ -1050,7 +1109,7 @@ func (this: *TypeChecker) resolveFuncCallExpr(expr: *FuncCallExpr) : bool {
 
     suppliedArgs.sort(CallArgSort)
 
-    expr.arguments = *expr.node.becomeParentOfChildrenCallArgs(suppliedArgs)
+    expr.arguments = *expr.asNode().becomeParentOfChildrenCallArgs(suppliedArgs)
     expr.operand.typeInfo = returnType
     expr.operand.isRightValue = true
     return errors == this.errors()
@@ -1123,7 +1182,7 @@ func (this: *TypeChecker) resolveNativeStringExpr(expr: *StringExpr) : bool {
 
     expr.operand.typeInfo = stringBuiltin.type
     expr.operand.isConst = true
-    expr.operand.isRightValue = true
+    expr.operand.isRightValue = false
     expr.operand.val = expr.string.value
     return true
 }
@@ -1178,7 +1237,7 @@ func (this: *TypeChecker) resolveSubscriptSetExpr(expr: *SubscriptSetExpr) : boo
         return false
     }
 
-    if(!this.checkTypeCompatibility(expr.value.startPos, baseObj, expr.value.operand.typeInfo)) {
+    if(!this.checkTypeCompatibility(expr.value.getStartPos(), baseObj, expr.value.operand.typeInfo)) {
         return false
     }
 
@@ -1299,8 +1358,17 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
         }
 
         if(!byName && !(!hasNamedArgs && byPos)) {
-            var arg = NewInitArgExpr(expr.startPos, expr.endPos, field.varField.name, position, field.varField.defaultExpr, this.allocator) as (*InitArgExpr)
-            expr.node.becomeParentOf(arg)
+            var argNode = NewInitArgExpr(
+                expr.getStartPos(),
+                expr.getEndPos(),
+                field.varField.name,
+                position,
+                field.varField.defaultExpr,
+                this.allocator
+            )
+
+            var arg = &argNode.initArgExpr
+            expr.asNode().becomeParentOf(arg)
             defaultArgs.add(arg)
         }
     }
@@ -1327,7 +1395,7 @@ func (this: *TypeChecker) addInitArgumentsReferences(type: *TypeInfo, expr: *Ini
                 var fieldName = arg.fieldName.str
                 var fieldResult = aggInfo.getFieldPosition(fieldName)
                 if(fieldResult.aggInfo) {
-                    this.lita.references.addFieldReference(arg.startPos,
+                    this.lita.references.addFieldReference(arg.getStartPos(),
                                                            fieldResult.aggInfo,
                                                            fieldResult.position)
                 }
@@ -1341,15 +1409,17 @@ func IsDecayable(arg: *InitArgExpr) : bool {
         return false
     }
 
+    var kind = arg.value.getKind()
     if(IsArray(arg.value.operand.typeInfo) &&
-       (arg.value.kind == StmtKind.ARRAY_INIT_EXPR ||
-        arg.value.kind == StmtKind.INIT_EXPR)
+       (kind == StmtKind.ARRAY_INIT_EXPR ||
+        kind == StmtKind.INIT_EXPR)
     ) {
         return true
     }
 
-    if(arg.value.kind == StmtKind.ARRAY_INIT_EXPR ||
-       arg.value.kind == StmtKind.STRING_EXPR) {
+    if(kind == StmtKind.ARRAY_INIT_EXPR ||
+       kind == StmtKind.STRING_EXPR
+    ) {
         return true
     }
 
@@ -1384,7 +1454,7 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
                 }
             }
 
-            this.checkAssignability(arg.startPos, field.typeInfo, arg.operand.typeInfo, IsDecayable(arg))
+            this.checkAssignability(arg.getStartPos(), field.typeInfo, arg.operand.typeInfo, IsDecayable(arg))
             arg.expectedType = field.typeInfo
             arg.value.expectedType = field.typeInfo
 
@@ -1399,7 +1469,7 @@ func (this: *TypeChecker) checkInitArguments(type: *TypeInfo, expr: *InitExpr) :
         for(var i = 0; i < expr.arguments.size(); i += 1) {
             var arg = expr.arguments.get(i)
 
-            this.checkAssignability(arg.startPos, arrayInfo.arrayOf, arg.operand.typeInfo, IsDecayable(arg))
+            this.checkAssignability(arg.getStartPos(), arrayInfo.arrayOf, arg.operand.typeInfo, IsDecayable(arg))
             arg.expectedType = arrayInfo.arrayOf
             arg.value.expectedType = arrayInfo.arrayOf
 
@@ -1503,7 +1573,7 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
     }
 
     if(!IsAggregate(type) && type.kind != TypeKind.ARRAY) {
-        this.result.addError(expr.startPos, "only struct, union or array can use initialization syntax")
+        this.result.addError(expr.getStartPos(), "only struct, union or array can use initialization syntax")
         return false
     }
 
@@ -1602,7 +1672,7 @@ func (this: *TypeChecker) resolveSetExpr(expr: *SetExpr) : bool {
         return false
     }
 
-    return this.checkTypeCompatibility(expr.startPos, field.typeInfo, expr.value.operand.typeInfo)
+    return this.checkTypeCompatibility(expr.getStartPos(), field.typeInfo, expr.value.operand.typeInfo)
 }
 
 func (this: *TypeChecker) resolveTernaryExpr(expr: *TernaryExpr) : bool {
@@ -1614,7 +1684,7 @@ func (this: *TypeChecker) resolveTernaryExpr(expr: *TernaryExpr) : bool {
 
     var condType = expr.cond.operand.typeInfo
     if(!IsBooleanable(condType)) {
-        this.result.addError(expr.cond.startPos, "must be a boolean expression")
+        this.result.addError(expr.cond.getStartPos(), "must be a boolean expression")
         return false
     }
 
@@ -1630,7 +1700,7 @@ func (this: *TypeChecker) resolveTernaryExpr(expr: *TernaryExpr) : bool {
     expr.operand.typeInfo = expr.then.operand.typeInfo
     expr.operand.isRightValue = true
 
-    return this.checkTypeCompatibility(expr.startPos, expr.then.operand.typeInfo, expr.other.operand.typeInfo)
+    return this.checkTypeCompatibility(expr.getStartPos(), expr.then.operand.typeInfo, expr.other.operand.typeInfo)
 }
 
 func (this: *TypeChecker) resolveTypeIdentifierExpr(expr: *TypeIdentifierExpr) : bool {
@@ -1794,7 +1864,7 @@ func (this: *TypeChecker) checkMethodExpr(expr: *GetExpr, type: *TypeInfo) : boo
             }
         }
 
-        this.lita.references.addTypeReferenceByTypeInfo(expr.field.startPos, typeInfo)
+        this.lita.references.addTypeReferenceByTypeInfo(expr.field.getStartPos(), typeInfo)
 
         expr.field.operand.typeInfo = typeInfo
         expr.operand.typeInfo = typeInfo
@@ -1892,7 +1962,8 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
             // a trait function pointer
             if(field.kind == StmtKind.TRAIT_FIELD_DECL &&
                aggInfo.kind == TypeKind.TRAIT &&
-               expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+               expr.field.getKind() != StmtKind.FUNC_IDENTIFIER_EXPR
+            ) {
                 var funcPtr = AsTraitFuncPtr(field.typeInfo, expr.field.type.name, this.typeCache) as (*TypeInfo)
                 expr.field.operand.typeInfo = funcPtr
                 expr.operand.typeInfo = funcPtr
@@ -1918,7 +1989,8 @@ func (this: *TypeChecker) resolveGetExpr(expr: *GetExpr) : bool {
             // a trait function pointer
             if(field.kind == StmtKind.TRAIT_FIELD_DECL &&
                fieldResult.aggInfo.kind == TypeKind.TRAIT &&
-               expr.field.kind != StmtKind.FUNC_IDENTIFIER_EXPR) {
+               expr.field.getKind() != StmtKind.FUNC_IDENTIFIER_EXPR
+            ) {
                 var funcPtr = AsTraitFuncPtr(field.typeInfo, expr.field.type.name, this.typeCache) as (*TypeInfo)
                 expr.field.operand.typeInfo = funcPtr
                 expr.operand.typeInfo = funcPtr
@@ -1999,7 +2071,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                     type.toString(sb)
                     sb.appendStr("' is not a pointer type")
 
-                    this.result.addErrorStr(expr.unaryExpr.startPos, sb)
+                    this.result.addErrorStr(expr.unaryExpr.getStartPos(), sb)
                     return false
                 }
 
@@ -2012,7 +2084,7 @@ func (this: *TypeChecker) resolveUnaryExpr(expr: *UnaryExpr) : bool {
                 expr.operand.isRightValue = true
             }
             else if(expr.unaryExpr.operand.isRightValue) {
-                this.result.addError(expr.unaryExpr.startPos, "lvalue required as unary '&' operand")
+                this.result.addError(expr.unaryExpr.getStartPos(), "lvalue required as unary '&' operand")
                 return false
             }
             else {
@@ -2050,7 +2122,7 @@ func (this: *TypeChecker) resolveCastExpr(expr: *CastExpr) : bool {
 
     expr.operand.typeInfo = typeInfo
 
-    if(!this.checkCastability(expr.startPos, expr.exprToCast.operand.typeInfo, typeInfo)) {
+    if(!this.checkCastability(expr.getStartPos(), expr.exprToCast.operand.typeInfo, typeInfo)) {
         return false
     }
 
@@ -2070,19 +2142,19 @@ func (this: *TypeChecker) resolveArrayDesignationExpr(expr: *ArrayDesignationExp
     }
 
     if(!expr.index.isConstNumberExpr()) {
-        this.result.addError(expr.index.startPos, "array designation must be indexed by a number")
+        this.result.addError(expr.index.getStartPos(), "array designation must be indexed by a number")
         return false
     }
 
-    if(expr.index.kind == StmtKind.IDENTIFIER_EXPR) {
+    if(expr.index.getKind() == StmtKind.IDENTIFIER_EXPR) {
         var idExpr = expr.index as (*IdentifierExpr)
         if(idExpr.sym != null && !(idExpr.sym.flags & SymbolFlags.IS_CONSTANT)) {
-            this.result.addError(expr.index.startPos, "'%.*s' must be a constant", idExpr.sym.name.length, idExpr.sym.name.buffer)
+            this.result.addError(expr.index.getStartPos(), "'%.*s' must be a constant", idExpr.sym.name.length, idExpr.sym.name.buffer)
             return false
         }
     }
 
-    if(!this.checkTypeCompatibility(expr.startPos, &USIZE_TYPE, expr.index.operand.typeInfo)) {
+    if(!this.checkTypeCompatibility(expr.getStartPos(), &USIZE_TYPE, expr.index.operand.typeInfo)) {
         return false
     }
 
@@ -2123,7 +2195,7 @@ func (this: *TypeChecker) resolveArrayInitExpr(expr: *ArrayInitExpr) : bool {
             }
 
             if(value.operand.typeInfo) {
-                success = this.checkTypeCompatibility(value.startPos, arrayOf, value.operand.typeInfo) && success
+                success = this.checkTypeCompatibility(value.getStartPos(), arrayOf, value.operand.typeInfo) && success
 
                 // don't allow for trait casting on rvalues (i.e., prevents &4)
                 if(IsTrait(arrayOf) && value.operand.isRightValue) {
@@ -2143,6 +2215,41 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
 
     var errors = this.errors()
 
+    // this is a lowered ternary operation
+    // all the tomfoolery here is due to not knowing the
+    // type of the temp variable assignment, with normal ternary
+    // this type information can be inferred, but since there is
+    // no assignment NOR type declaration, we must do this hack below
+    if(expr.ternaryDecl) {
+        assert(expr.operator == TokenType.EQUALS)
+
+        if(!this.resolveExpr(expr.right)) {
+            goto err;
+        }
+
+        this.current.flags |= ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
+        defer {
+            this.current.flags &= ~ModuleFlags.IGNORE_DUPLICATE_SYMBOLS
+        }
+
+        var rightType = expr.right.operand.typeInfo
+        expr.ternaryDecl.typeSpec = rightType.asTypeSpec(
+            this.current, true
+        )
+
+        var typeInfo = this.resolveValueDecl(expr.ternaryDecl)
+        if (!typeInfo) {
+            return false
+        }
+
+        assert(expr.ternaryDecl.scope)
+        this.addSymbolToScope(
+            expr.ternaryDecl,
+            typeInfo,
+            expr.ternaryDecl.scope
+        )
+    }
+
     if(!this.resolveExpr(expr.left)) {
         goto err;
     }
@@ -2150,6 +2257,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
     if(!this.resolveExpr(expr.right)) {
         goto err;
     }
+
 
     var leftType = expr.left.operand.typeInfo
     var rightType = expr.right.operand.typeInfo
@@ -2165,7 +2273,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
             expr.right.expectedType = leftType
 
             this.checkConstant(expr.left)
-            this.checkAssignability(expr.right.startPos, leftType, rightType)
+            this.checkAssignability(expr.right.getStartPos(), leftType, rightType)
             this.checkRightValue(expr.left)
             break;
         }
@@ -2176,7 +2284,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
         case TokenType.LSHIFT_EQ:
         case TokenType.RSHIFT_EQ:
             this.checkConstant(expr.left)
-            this.checkAssignability(expr.right.startPos, leftType, rightType)
+            this.checkAssignability(expr.right.getStartPos(), leftType, rightType)
             this.checkRightValue(expr.left)
             // fallthru
         case TokenType.BAND:
@@ -2228,7 +2336,7 @@ func (this: *TypeChecker) resolveBinaryExpr(expr: *BinaryExpr) : bool {
         case TokenType.MUL_EQ:
         case TokenType.DIV_EQ:
             this.checkConstant(expr.left)
-            this.checkAssignability(expr.right.startPos, leftType, rightType)
+            this.checkAssignability(expr.right.getStartPos(), leftType, rightType)
             // fallthru
         case TokenType.MINUS:
         case TokenType.PLUS:
@@ -2271,7 +2379,7 @@ func (this: *TypeChecker) errorRvalueAssignmentToTrait(expr: *Expr, type: *TypeI
     typeTrait.toString(sb)
     sb.appendStrn("'", 1)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {
@@ -2283,7 +2391,7 @@ func (this: *TypeChecker) errorNonIndexableType(expr: *Expr, type: *TypeInfo) {
     type.toString(sb)
     sb.appendStrn("'", 1)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorSetIndexingConstType(expr: *Expr, type: *TypeInfo) {
@@ -2295,7 +2403,7 @@ func (this: *TypeChecker) errorSetIndexingConstType(expr: *Expr, type: *TypeInfo
     type.toString(sb)
     sb.appendStrn("'", 1)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorIndexType(expr: *Expr, type: *TypeInfo) {
@@ -2308,7 +2416,7 @@ func (this: *TypeChecker) errorIndexType(expr: *Expr, type: *TypeInfo) {
     sb.appendStrn("'", 1)
     sb.appendStr(" invalid index value")
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorNonAggregateType(expr: *Expr, type: *TypeInfo) {
@@ -2321,7 +2429,7 @@ func (this: *TypeChecker) errorNonAggregateType(expr: *Expr, type: *TypeInfo) {
     sb.appendStrn("'", 1)
     sb.appendStr(" must be an aggregate type")
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
@@ -2334,7 +2442,18 @@ func (this: *TypeChecker) errorNonFuncType(expr: *Expr, type: *TypeInfo) {
     sb.appendStrn("'", 1)
     sb.appendStr(" must be function type")
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
+}
+
+func (this: *TypeChecker) errorSuspendFuncInNonSuspendScope(expr: *Expr, sym: *Symbol) {
+    assert(expr != null)
+    assert(sym != null)
+
+    var sb = StringBuilderInit(256, this.allocator)
+    sb.append("'%.*s'", sym.name.length, sym.name.buffer)
+    sb.appendStr(" is a suspend function, which can only be invoked within another suspend function")
+
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *const char) {
@@ -2346,7 +2465,7 @@ func (this: *TypeChecker) errorOperand(expr: *Expr, type: *TypeInfo, side: *cons
     type.toString(sb)
     sb.appendStrn("'", 1)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field: InternedString) {
@@ -2358,7 +2477,7 @@ func (this: *TypeChecker) errorEnumFieldSet(expr: *Expr, type: *TypeInfo, field:
     type.toString(sb)
     sb.append("' field '%.*s'", field.length, field.buffer)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 public func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, field: InternedString) {
@@ -2371,7 +2490,7 @@ public func (this: *TypeChecker) errorNoField(expr: *Expr, type: *TypeInfo, fiel
     sb.appendStrn("'", 1)
     sb.append(" does not have field '%.*s'", field.length, field.buffer)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorNoFieldAt(expr: *Expr, type: *TypeInfo, position: i32) {
@@ -2384,7 +2503,7 @@ func (this: *TypeChecker) errorNoFieldAt(expr: *Expr, type: *TypeInfo, position:
     sb.appendStrn("'", 1)
     sb.append(" does not have a field at index '%d'", position)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field: InternedString) {
@@ -2397,13 +2516,13 @@ func (this: *TypeChecker) errorNoFieldAccess(expr: *Expr, type: *TypeInfo, field
     sb.appendStrn("'", 1)
     sb.append(" can't be accessed with field '%.*s'", field.length, field.buffer)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorInferGenericParameter(expr: *Expr, param: *GenericParam) {
     assert(expr != null)
     assert(param != null)
-    this.result.addError(expr.startPos, "unable to infer generic parameter '%.*s'", param.name.str.length, param.name.str.buffer)
+    this.result.addError(expr.getStartPos(), "unable to infer generic parameter '%.*s'", param.name.str.length, param.name.str.buffer)
 }
 
 func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Array<GenericParam>, details: *const char = null) {
@@ -2425,7 +2544,7 @@ func (this: *TypeChecker) errorInferGenericParameters(expr: *Expr, params: *Arra
         sb.append(" due to %s", details)
     }
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: InternedString, genericParams: *Array<GenericParam>) {
@@ -2443,7 +2562,7 @@ func (this: *TypeChecker) errorMissingGenericArguments(expr: *Expr, typeName: In
     }
     sb.appendStrn("]", 1)
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Expr) {
@@ -2452,7 +2571,7 @@ func (this: *TypeChecker) errorFixedArgumentAfterNamed(arg: *Expr) {
     var sb = StringBuilderInit(128, this.allocator)
     sb.appendStr("Named argument specifications must appear after all fixed arguments have been specified")
 
-    this.result.addErrorStr(arg.startPos, sb)
+    this.result.addErrorStr(arg.getStartPos(), sb)
 }
 
 
@@ -2462,7 +2581,7 @@ func (this: *TypeChecker) errorNamedArgumentsForFuncPtr(expr: *Expr) {
     var sb = StringBuilderInit(128, this.allocator)
     sb.appendStr("Named arguments are not allowed on function pointers")
 
-    this.result.addErrorStr(expr.startPos, sb)
+    this.result.addErrorStr(expr.getStartPos(), sb)
 }
 
 func (this: *TypeChecker) errorInvalidNamedArgument(pos: SrcPos, name: *InternedString, funcInfo: *TypeInfo) {
@@ -2490,19 +2609,19 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     assert(expr != null)
 
     var sym: *Symbol = null
-    if(expr.kind == StmtKind.IDENTIFIER_EXPR) {
+    if(expr.getKind() == StmtKind.IDENTIFIER_EXPR) {
         var idExpr = expr as (*IdentifierExpr)
         sym = idExpr.sym
 
         if(sym && (sym.flags & SymbolFlags.IS_TYPE)) {
-            this.result.addError(expr.startPos, "can't reassign type '%.*s'", sym.name.length, sym.name.buffer)
+            this.result.addError(expr.getStartPos(), "can't reassign type '%.*s'", sym.name.length, sym.name.buffer)
             return false
         }
     }
 
     if(!sym) {
         if(!expr.operand.typeInfo) {
-            this.result.addError(expr.startPos, "no type information")
+            this.result.addError(expr.getStartPos(), "no type information")
             return false;
         }
 
@@ -2515,7 +2634,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     }
 
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
-        this.result.addError(expr.startPos, "can't reassign constant variable '%.*s'", sym.name.length, sym.name.buffer)
+        this.result.addError(expr.getStartPos(), "can't reassign constant variable '%.*s'", sym.name.length, sym.name.buffer)
         return false
     }
 
@@ -2532,7 +2651,7 @@ internal func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo)
         type.toString(sb)
         sb.appendStr("' can't be coerced to boolean")
 
-        this.result.addErrorStr(expr.startPos, sb)
+        this.result.addErrorStr(expr.getStartPos(), sb)
         return false
     }
     return true
@@ -2541,7 +2660,7 @@ internal func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo)
 func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
     assert(expr != null)
     if(expr.operand.isRightValue) {
-        this.result.addError(expr.startPos, "rvalue can't be assigned to")
+        this.result.addError(expr.getStartPos(), "rvalue can't be assigned to")
         return false
     }
     return true
@@ -2550,13 +2669,21 @@ func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
 func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     assert(expr != null)
 
+    // first look for a variable
     var sym = this.currentScope().lookup(expr.type.name)
     if(!sym) {
+        // now look for a function name
         sym = this.currentScope().lookupFunc(expr.type.name)
+
         if(!sym) {
-            this.result.addError(expr.startPos, "unknown variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
-            return false
+            // finally, try a type name
+            sym = this.getTypeByName(expr.type.name)
         }
+    }
+
+    if(!sym) {
+        this.result.addError(expr.getStartPos(), "unknown variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        return false
     }
 
     // Account for Type Expressions such as sizeof(Array<i32>) which should
@@ -2566,7 +2693,7 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE && !expr.type.genericArgs.empty()) {
         typeInfo = this.resolveTypeSpec(expr.type)
         if(!typeInfo || typeInfo == &POISON_TYPE) {
-            this.result.addError(expr.startPos, "unknown type '%s'", expr.type.name)
+            this.result.addError(expr.getStartPos(), "unknown type '%s'", expr.type.name)
             return false
         }
         sym = typeInfo.sym
@@ -2576,11 +2703,11 @@ func (this: *TypeChecker) resolveIdentiferExpr(expr: *IdentifierExpr) : bool {
     expr.operand.typeInfo = typeInfo
 
     if(!expr.operand.typeInfo) {
-        this.result.addError(expr.startPos, "unknown type or variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
+        this.result.addError(expr.getStartPos(), "unknown type or variable '%.*s'", expr.type.name.length, expr.type.name.buffer)
         return false
     }
 
-    this.lita.references.addSymbolReference(sym, expr.startPos)
+    this.lita.references.addSymbolReference(sym, expr.getStartPos())
 
     // if we are able to determine the constant of this symbol,
     // make sure this expression contains the constant

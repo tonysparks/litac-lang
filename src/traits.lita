@@ -100,7 +100,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     for(var i = 0; i < checker.symbolTraits.size(); i+=1) {
         var traitSym = checker.symbolTraits.get(i)
         assert(traitSym)
-        assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
+        assert(traitSym.decl && traitSym.decl.getKind() == StmtKind.TRAIT_DECL)
 
         var traitDecl = traitSym.decl as (*AggregateDecl)
         var traitName = GetTraitName(traitSym, traitBuffer)
@@ -393,10 +393,4 @@ func GetTraitName(traitSym: *Symbol, sb: *StringBuilder) : String {
         .buffer = sb.buffer,
         .length = sb.length
     }
-}
-
-func Parse(sb: *StringBuilder, checker: *TypeChecker, decls: *Array<*Decl>) {
-    var parser = ParserInit("generated", sb.cStr(), sb.length, checker.current, checker.lita)
-    var stmts = parser.parseModule()
-    decls.addAll(stmts.declarations)
 }

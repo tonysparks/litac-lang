@@ -850,7 +850,7 @@ public func (thr: Thread) join(res: *i32) : ThreadStatus {
     return ThreadStatus.SUCCESS;
 }
 
-public func (thr: Thread) yield() {
+public func (thr: Thread) yieldThread() {
     Sleep(0)
 }
 

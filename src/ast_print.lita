@@ -98,7 +98,7 @@ func Printf(indent: i32, format: *const char, ...) {
 public func PrintStmt(s: *Stmt, indent: i32 = 0) {
     if(!s) return;
 
-    switch(s.kind) {
+    switch(s.getKind()) {
         case StmtKind.IMPORT_DECL: {
             var decl = s as (*ImportDecl)
             Printf(0, "import '")
@@ -120,7 +120,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 }
             }
 
-            if(decl.kind == StmtKind.CONST_DECL) {
+            if(decl.getKind() == StmtKind.CONST_DECL) {
                 Printf(indent, "const ")
             }
             else {
@@ -419,7 +419,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
                 PrintStmt(n, indent+1)
-                if(IsExpr(n)) {
+                if(IsExpr(n.asNode())) {
                     printf(";\n")
                 }
                 else {
@@ -510,7 +510,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             for(var i = 0; i < stmt.stmts.size(); i += 1) {
                 var n = stmt.stmts.get(i)
                 PrintStmt(n, indent+1)
-                if(IsExpr(n)) {
+                if(IsExpr(n.asNode())) {
                     printf(";\n")
                 }
                 else {
@@ -553,8 +553,8 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
         }
         case StmtKind.LABEL_STMT: {
             var stmt = s as (*LabelStmt)
-            printf(":")
             PrintName(stmt.label.token)
+            printf(":")
             return;
         }
         case StmtKind.MODULE_STMT: {
@@ -607,6 +607,15 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             }
             return;
         }
+        case StmtKind.YIELD_STMT: {
+            var stmt = s as (*ReturnStmt)
+            Printf(indent, "yield");
+            if(stmt.expr) {
+                printf(" ")
+                PrintStmt(stmt.expr, 0)
+            }
+            return;
+        }
         case StmtKind.RETURN_STMT: {
             var stmt = s as (*ReturnStmt)
             Printf(indent, "return");
@@ -615,29 +624,39 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
                 PrintStmt(stmt.expr, 0)
             }
             return;
+        }
+        case StmtKind.SWITCH_CASE_STMT: {
+            var stmt = s as (*SwitchCaseStmt)
+            Printf(indent, "case ")
+            PrintStmt(stmt.cond, 0)
+            printf(":\n")
+            PrintStmt(stmt.body, indent + 2)
+            return;
+        }
+        case StmtKind.SWITCH_STMT: {
+            var stmt = s as (*SwitchStmt)
+            Printf(indent, "switch(")
+            PrintStmt(stmt.cond, 0)
+            printf(") {\n")
+
+            for(var i = 0; i < stmt.cases.size(); i+=1) {
+                var caseStmt = stmt.cases.get(i)
+                PrintStmt(caseStmt, indent + 1)
+                printf("\n")
+            }
+            if(stmt.defaultStmt) {
+                Printf(indent + 1, "default:\n")
+                PrintStmt(stmt.defaultStmt, indent+2)
+            }
+            printf("\n")
+            Printf(indent, "}")
+            return;
         }/*
         case StmtKind.STRUCT_FIELD_STMT: {
             var stmt = new<AggregateFieldStmt>(allocator)
             stmt.kind = StmtKind.STRUCT_FIELD_STMT;
             stmt.startPos = startPos
             stmt.decl = null
-            return stmt as (*Stmt)
-        }
-        case StmtKind.SWITCH_CASE_STMT: {
-            var stmt = new<SwitchCaseStmt>(allocator)
-            stmt.kind = StmtKind.SWITCH_CASE_STMT;
-            stmt.startPos = startPos
-            stmt.cond = null
-            stmt.body = null
-            return stmt as (*Stmt)
-        }
-        case StmtKind.SWITCH_STMT: {
-            var stmt = new<SwitchStmt>(allocator)
-            stmt.kind = StmtKind.SWITCH_STMT;
-            stmt.startPos = startPos
-            stmt.cond = null
-            stmt.stmts.init(16, allocator)
-            stmt.defaultStmt = null
             return stmt as (*Stmt)
         }
         case StmtKind.UNION_FIELD_STMT: {
@@ -716,37 +735,33 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             var expr = s as (*BooleanExpr)
             Printf(indent, "%s", expr.boolean ? "true" : "false")
             return;
-        }/*
+        }
         case StmtKind.CAST_EXPR: {
-            var expr = new<CastExpr>(allocator)
-            expr.kind = StmtKind.CAST_EXPR;
-            expr.startPos = startPos
-            expr.castTo = null
-            expr.exprToCast = null
-            return expr as (*Stmt)
-        }*/
+            var expr = s as (*CastExpr)
+            PrintStmt(expr.exprToCast, indent)
+            printf(" as (")
+            PrintTypeSpec(expr.castTo)
+            printf(")")
+            return;
+        }
         case StmtKind.CHAR_EXPR: {
             var expr = s as (*CharExpr)
             Printf(indent, "'%c'", expr.character.intValue as (char))
             return;
-        }/*
-        case StmtKind.FUNC_CALL_EXPR: {
-            var expr = new<FuncCallExpr>(allocator)
-            expr.kind = StmtKind.FUNC_CALL_EXPR;
-            expr.startPos = startPos
-            expr.object = null
-            expr.arguments.init(16, allocator)
-            return expr as (*Stmt)
         }
-        case StmtKind.FUNC_IDENTIFIER_EXPR: {
-            var expr = new<IdentifierExpr>(allocator)
-            expr.kind = StmtKind.FUNC_IDENTIFIER_EXPR;
-            expr.startPos = startPos
-            expr.genericArgs.init(2, allocator)
-            expr.type = null
-            //expr.sym///
-            return expr as (*Stmt)
-        }*/
+        case StmtKind.FUNC_CALL_EXPR: {
+            var expr = s as (*FuncCallExpr)
+            PrintStmt(expr.object, indent)
+            Printf(0, "(\n")
+            Printf(indent+2, "")
+            for(var i = 0; i < expr.arguments.size(); i += 1) {
+                var arg = expr.arguments.getPtr(i)
+                PrintStmt(arg.argExpr, indent+2)
+                printf(",\n")
+            }
+            Printf(indent+1, ")")
+            return;
+        }
         case StmtKind.GET_EXPR: {
             var expr = s as (*GetExpr)
             PrintStmt(expr.object, indent)
@@ -761,6 +776,7 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             Printf(0, ")")
             return;
         }
+        case StmtKind.FUNC_IDENTIFIER_EXPR:
         case StmtKind.IDENTIFIER_EXPR: {
             var expr = s as (*IdentifierExpr)
             Printf(indent, "%.*s", expr.type.name.length, expr.type.name.buffer)
@@ -774,16 +790,20 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.argPosition = 0
             expr.value = null
             return expr as (*Stmt)
-        }
-        case StmtKind.INIT_EXPR: {
-            var expr = new<InitExpr>(allocator)
-            expr.kind = StmtKind.INIT_EXPR;
-            expr.startPos = startPos
-            expr.genericArgs.init(2, allocator)
-            expr.type = null
-            expr.arguments.init(8, allocator)
-            return expr as (*Stmt)
         }*/
+        case StmtKind.INIT_EXPR: {
+            var expr = s as (*InitExpr)
+            PrintTypeSpec(expr.type)
+            printf(" {\n")
+            Printf(indent+2, "")
+            for(var i = 0; i < expr.arguments.size(); i+=1) {
+                var arg = expr.arguments.get(i)
+                PrintStmt(arg.value, indent+2)
+                printf(",\n")
+            }
+            Printf(indent, "}")
+            return;
+        }
         case StmtKind.NULL_EXPR: {
             printf("null")
             return;
@@ -810,16 +830,16 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.type = null
             expr.field = null
             return expr as (*Stmt)
-        }
+        }*/
         case StmtKind.SET_EXPR: {
-            var expr = new<SetExpr>(allocator)
-            expr.kind = StmtKind.SET_EXPR;
-            expr.startPos = startPos
-            expr.object = null
-            expr.field = null
-            expr.value = null
-            return expr as (*Stmt)
-        }
+            var expr = s as (*SetExpr)
+            PrintStmt(expr.object, indent)
+            printf(".")
+            PrintStmt(expr.field)
+            printf(" %s ", tokenText[expr.operator])
+            PrintStmt(expr.value)
+            return;
+        }/*
         case StmtKind.SIZE_OF_EXPR: {
             var expr = new<SizeOfExpr>(allocator)
             expr.kind = StmtKind.SIZE_OF_EXPR;
@@ -875,21 +895,20 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             expr.typeOfExpr = null
             expr.type = null
             return expr as (*Stmt);
-        }
-        case StmtKind.UNARY_EXPR: {
-            var expr = new<UnaryExpr>(allocator)
-            expr.kind = StmtKind.UNARY_EXPR;
-            expr.startPos = startPos
-            expr.unaryExpr = null
-            return expr as (*Stmt);
         }*/
+        case StmtKind.UNARY_EXPR: {
+            var expr = s as (*UnaryExpr)
+            printf("%s", tokenText[expr.operator])
+            PrintStmt(expr.unaryExpr, 0)
+            return;
+        }
         case StmtKind.POISON_EXPR: {
             Printf(indent, "<poison_expr>")
             return;
         }
         default: {
             //Panic("Unknown statement kind: %d", s.kind)
-            Printf(indent, "<%s:%d Not Implemented>", StmtKindAsStr(s.kind), s.kind)
+            Printf(indent, "<%s:%d Not Implemented>", StmtKindAsStr(s.getKind()), s.getKind())
             return;
         }
     }

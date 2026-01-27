@@ -364,6 +364,11 @@ func RunTest(suite: *TestSuite, test: *Test) : TestResult {
     var options = new<LitaOptions>()
     defer defaultAllocator.free(options)
 
+    // DELETE ME
+    options.disableLineSync = true
+    options.cFormat = true
+    // DELETE ME
+
     options.checkerOnly = false
     options.cOutputOnly = false
     options.showProfileInfo = false

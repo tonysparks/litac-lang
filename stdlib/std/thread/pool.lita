@@ -134,7 +134,7 @@ func (this: *ThreadPool) addTaskThread() : ThreadStatus {
     The current design gives each TaskThread a queue of Tasks.  As of right now, there is
     no task stealing and tasks get assigned in a round-robin fashion
 """)
-public func (this: *ThreadPool) submit(task: TaskFn, arg: *void = null) : void /*Future?*/ {
+public func (this: *ThreadPool) submit(task: TaskFn, arg: *void = null) : bool /*Future?*/ {
     assert(this.started.get())
 
     //printf("Submit.task start\n")
@@ -171,7 +171,8 @@ public func (this: *ThreadPool) submit(task: TaskFn, arg: *void = null) : void /
 
     assert(threadToUse != null)
 
-    threadToUse.addTask(this, task, arg)
+    var task = threadToUse.addTask(this, task, arg)
+    return task != null
     //printf("Submit.task end\n")
 }
 
@@ -269,6 +270,10 @@ func (this: *TaskThread) addTask(pool: *ThreadPool, task: TaskFn, arg: *void = n
     this.state.set(TaskThreadState.WORKING)
 
     var newTask = new<Task>(pool.allocator)
+    if(!newTask) {
+        return null
+    }
+
     newTask.fn = task
     newTask.arg = arg
     newTask.prev = null

@@ -52,6 +52,7 @@ public enum StmtKind {
     MODULE_STMT,
     NOTE_STMT,
     PARAMETERS_STMT,
+    YIELD_STMT,
     RETURN_STMT,
     SWITCH_CASE_STMT,
     SWITCH_STMT,
@@ -105,6 +106,7 @@ public enum FuncFlags {
     HAS_VARARGS         = (1<<0),
     IS_METHOD           = (1<<1),
     HAS_NATIVE_VARARGS  = (1<<2),
+    IS_COROUTINE        = (1<<3),
 }
 
 public enum AggregateFlags {
@@ -189,6 +191,78 @@ public struct Node {
     parent: *Node
     startPos: SrcPos
     endPos: SrcPos
+
+    union {
+        // Declarations
+        asDecl: Decl
+        asGenericDecl: GenericDecl
+        importDecl: ImportDecl
+        varDecl: VarDecl
+        paramDecl: ParameterDecl
+        funcDecl: FuncDecl
+        aggDecl: AggregateDecl
+        enumDecl: EnumDecl
+        typedefDecl: TypedefDecl
+        nativeDecl: NativeDecl
+        notesDecl: NotesDecl
+        poisonDecl: PoisonDecl
+        // Field Stmts Declarations
+        enumFieldEntryDecl: EnumFieldEntryDecl
+        varFieldDecl: VarFieldDecl
+        traitFieldDecl: TraitFieldDecl
+
+        // Statements
+        asStmt: Stmt
+        blockStmt: BlockStmt
+        breakStmt: BreakStmt
+        compStmt: CompStmt
+        continueStmt: ContinueStmt
+        deferStmt: DeferStmt
+        doWhileStmt: DoWhileStmt
+        emptyStmt: EmptyStmt
+        forStmt: ForStmt
+        funcBodyStmt: FuncBodyStmt
+        gotoStmt: GotoStmt
+        ifStmt: IfStmt
+        postElseStmt: PostElseStmt
+        labelStmt: LabelStmt
+        moduleStmt: ModuleStmt // Move to declarations
+        noteStmt: NoteStmt
+        parametersStmt: ParametersStmt
+        returnStmt: ReturnStmt
+        yieldStmt: ReturnStmt
+        switchCaseStmt: SwitchCaseStmt
+        switchStmt: SwitchStmt
+        whileStmt: WhileStmt
+
+        // Expressions
+        asExpr: Expr
+        arrayDesignationExpr: ArrayDesignationExpr
+        arrayInitExpr: ArrayInitExpr
+        binaryExpr: BinaryExpr
+        booleanExpr: BooleanExpr
+        castExpr: CastExpr
+        charExpr: CharExpr
+        funcCallExpr: FuncCallExpr
+        getExpr: GetExpr
+        groupExpr: GroupExpr
+        identifierExpr: IdentifierExpr
+        initArgExpr: InitArgExpr
+        initExpr: InitExpr
+        nullExpr: NullExpr
+        numberExpr: NumberExpr
+        offsetOfExpr: OffsetOfExpr
+        setExpr: SetExpr
+        sizeOfExpr: SizeOfExpr
+        stringExpr: StringExpr
+        subscriptGetExpr: SubscriptGetExpr
+        subscriptSetExpr: SubscriptSetExpr
+        ternaryExpr: TernaryExpr
+        typeIdentifierExpr: TypeIdentifierExpr
+        typeOfExpr: TypeOfExpr
+        unaryExpr: UnaryExpr
+        poisonExpr: PoisonExpr
+    }
 }
 
 public func (n: *Node) setSrcPos(start: SrcPos, end: SrcPos) {
@@ -196,10 +270,10 @@ public func (n: *Node) setSrcPos(start: SrcPos, end: SrcPos) {
     n.endPos = end
 }
 
-public func (n: *Node) becomeParentOf<T>(child: *T) : *T {
+public func (n: *Node) becomeParentOf<T>(child: T) : T {
     if(!child) return null;
 
-    child.parent = n as (*Node)
+    child.asNode().parent = n
     return child
 }
 
@@ -208,7 +282,7 @@ public func (n: *Node) becomeParentOfChildren<T>(children: *Array<T>) : *Array<T
     for(var i = 0; i < size; i += 1) {
         var child = children.get(i)
         if(child) {
-            n.becomeParentOf(child)
+            n.becomeParentOf<T>(child)
         }
     }
 
@@ -247,11 +321,20 @@ public struct ImportDecl {
     moduleId: *ModuleId
 }
 
+public enum VarDeclFlags {
+    IS_TERNARY   = (1<<0),
+    IS_TEMPORARY = (1<<1),
+}
+
 // For var or const declarations
 public struct VarDecl {
     decl: using Decl
     typeSpec: *TypeSpec
     expr: *Expr
+
+    // related to lowered ternary operations
+    flags: i32
+    scope: *Scope
 }
 
 public struct ParameterDecl {
@@ -440,7 +523,7 @@ public struct FieldStmt {
         aggregateField: *AggregateDecl
         varField: *VarFieldDecl
         traitField: *TraitFieldDecl
-        poisonField: *Expr
+        poisonField: *PoisonDecl
     }
 }
 
@@ -452,7 +535,46 @@ public struct WhileStmt {
 
 
 public struct Stmt {
-    node: using Node
+    //node: using Node
+}
+
+public func (this: *Stmt) asNode() : *Node {
+    return (this as (*char) - offsetof(Node, asStmt)) as (*Node)
+}
+
+public func (this: *Stmt) getStartPos() : SrcPos {
+    var node = this.asNode()
+    return node.startPos
+}
+
+public func (this: *Stmt) setStartPos(pos: SrcPos) {
+    var node = this.asNode()
+    node.startPos = pos
+}
+
+public func (this: *Stmt) getEndPos() : SrcPos {
+    var node = this.asNode()
+    return node.endPos
+}
+
+public func (this: *Stmt) setEndPos(endPos: SrcPos) {
+    var node = this.asNode()
+    node.endPos = endPos
+}
+
+public func (this: *Stmt) getKind() : StmtKind {
+    var node = this.asNode()
+    return node.kind
+}
+
+public func (this: *Stmt) setKind(kind: StmtKind) {
+    var node = this.asNode()
+    node.kind = kind
+}
+
+public func (this: *Stmt) getParent() : *Node {
+    var node = this.asNode()
+    return node.parent
 }
 
 public struct ArrayDesignationExpr {
@@ -472,6 +594,10 @@ public struct BinaryExpr {
     left: *Expr
     operator: TokenType
     right: *Expr
+
+    // if this is a lowered ternary operator,
+    // the source variable declaration
+    ternaryDecl: *VarDecl
 }
 
 public struct BooleanExpr {
@@ -506,7 +632,8 @@ public struct FuncCallExpr {
 }
 
 public enum FuncCallExprFlags {
-    HAS_NATIVE_VARARG = (1<<0)
+    HAS_NATIVE_VARARG = (1<<0),
+    USED_AS_STMT      = (1<<1),
 }
 
 public enum GetExprFlags {
@@ -828,9 +955,10 @@ public func (expr: *Expr) isIdentifier() : bool {
         return false
     }
 
-    return expr.kind == StmtKind.IDENTIFIER_EXPR ||
-           expr.kind == StmtKind.FUNC_IDENTIFIER_EXPR ||
-           expr.kind == StmtKind.TYPE_IDENTIFIER_EXPR
+    var kind = expr.getKind()
+    return kind == StmtKind.IDENTIFIER_EXPR ||
+           kind == StmtKind.FUNC_IDENTIFIER_EXPR ||
+           kind == StmtKind.TYPE_IDENTIFIER_EXPR
 }
 
 
@@ -839,7 +967,7 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
         return false;
     }
 
-    switch(expr.kind) {
+    switch(expr.getKind()) {
         case StmtKind.NUMBER_EXPR:
         case StmtKind.BOOLEAN_EXPR:
         case StmtKind.CHAR_EXPR:
@@ -848,17 +976,17 @@ public func (expr: *Expr) isConstNumberExpr() : bool {
             return true
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var sizeofExpr = expr as (*SizeOfExpr)
-            return sizeofExpr.sizeOfExpr.isConstNumberExpr()
+            var sizeOfExpr = expr as (*SizeOfExpr)
+            return sizeOfExpr.sizeOfExpr.isConstNumberExpr()
         }
         case StmtKind.GROUP_EXPR: {
             var groupExpr = expr as (*GroupExpr)
             return groupExpr.groupedExpr.isConstNumberExpr()
         }
         case StmtKind.BINARY_EXPR: {
-            var binExpr = expr as (*BinaryExpr)
-            return binExpr.left.isConstNumberExpr() &&
-                   binExpr.right.isConstNumberExpr()
+            var binaryExpr = expr as (*BinaryExpr)
+            return binaryExpr.left.isConstNumberExpr() &&
+                   binaryExpr.right.isConstNumberExpr()
         }
         case StmtKind.UNARY_EXPR: {
             var unaryExpr = expr as (*UnaryExpr)
@@ -876,7 +1004,7 @@ public func (expr: *Expr) isConstExpr() : bool {
         return false;
     }
 
-    switch(expr.kind) {
+    switch(expr.getKind()) {
         case StmtKind.NUMBER_EXPR:
         case StmtKind.BOOLEAN_EXPR:
         case StmtKind.CHAR_EXPR:
@@ -887,17 +1015,17 @@ public func (expr: *Expr) isConstExpr() : bool {
             return true
         }
         case StmtKind.SIZE_OF_EXPR: {
-            var sizeofExpr = expr as (*SizeOfExpr)
-            return sizeofExpr.sizeOfExpr.isConstExpr()
+            var sizeOfExpr = expr as (*SizeOfExpr)
+            return sizeOfExpr.sizeOfExpr.isConstExpr()
         }
         case StmtKind.GROUP_EXPR: {
             var groupExpr = expr as (*GroupExpr)
             return groupExpr.groupedExpr.isConstExpr()
         }
         case StmtKind.BINARY_EXPR: {
-            var binExpr = expr as (*BinaryExpr)
-            return binExpr.left.isConstExpr() &&
-                   binExpr.right.isConstExpr()
+            var binaryExpr = expr as (*BinaryExpr)
+            return binaryExpr.left.isConstExpr() &&
+                   binaryExpr.right.isConstExpr()
         }
         case StmtKind.UNARY_EXPR: {
             var unaryExpr = expr as (*UnaryExpr)

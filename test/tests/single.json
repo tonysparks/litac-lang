@@ -8,260 +8,789 @@
 
         %definitions%
 
+        // @suspend
         func main(len:i32, args:**char):i32 {
             %code%
         }
     `,
     "tests": [
         {
-            "name" : "Implement post else",
+            "name": "Coroutine ternary operation",
             "definitions": `
-
-            `,
-            "code": `
-                var this = 4 ?: this = 10;
-                assert(this == 10)
-
-                var a = 0 ?: a = 4
-                assert(a == 0)
-
-                0 ?: assert(false)
-                1 ?: assert(true)
-
-                var count = 0
-                var ax = 1
-                var bx = 0
-                ax + bx ?: {
-                    assert(true)
-                    count += 1
+                import "std/coroutine"
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    a += 2
+                    var x = "hello"
+                    return a + b
                 }
-                assert(count == 1);
 
-                (ax + 3) as (i32) ?: {
-                    count += 1
-                }
-                assert(count == 2)
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(a, 1)
+                    /*if (x) {
+                        x = 12
+                        var x = 10
+                    } else {
+                        var y = 22
+                        var x = 33
+                        x = 22
+                    }*/
 
-                var xx = 23 + 2 / 3 ?: {
-                    count += 1
-                }
-                assert(count == 3)
-            `,
-        },
-        {
-            "name" : "Post else with defer",
-            "definitions": `
-                import "std/libc"
-                func doSomething(x: i32) : i32 {
                     return x
                 }
-                func doSomethingElse(x: i32, y: [2]i32) : i32 {
 
-                    defer {
-                        y[0] = 1
-                    }
+            `,
+            "code": `
+            /*
+                var dispatcher: Dispatcher
+                dispatcher.init()
 
-                    x ?: return x+10
-
-                    defer {
-                        y[1] = 1
-                    }
-
-                    return x-10
-                }
-            `,
-            "code": `
-                {
-                    var x = 10
-                    var xx = [2]i32{}
-                    var y = doSomethingElse(x, xx)
-                    //printf("y = %d, [0] = %d [1] = %d\n", y, xx[0], xx[1])
-                    assert(y == 20)
-                    assert(xx[0] == 1)
-                    assert(xx[1] == 0)
-                }
-                {
-                    var x = 0
-                    var xx = [2]i32{}
-                    var y = doSomethingElse(x, xx)
-                    //printf("y = %d, [0] = %d [1] = %d\n", y, xx[0], xx[1])
-                    assert(y == -10)
-                    assert(xx[0] == 1)
-                    assert(xx[1] == 1)
-                }
-                {
-                    var x = doSomething(0) ?: assert(false)
-                    var y = doSomething(1) ?: y = 11
-                    assert(y == 11)
-                }
-                //assert(doSomethingElse(0) == 12)
-            `,
-        },
-        {
-            "name" : "Post else with non bool expression",
-            "definitions": `
-                func DoSomething(): String {
-                    return $"Hello"
-                }
-            `,
-            "code": `
-                var x = DoSomething() ?: assert(false);
-            `,
-            "error": "'String' can't be coerced to boolean"
-        },
-        {
-            "name" : "Post else with illegal expr",
-            "definitions": `
-                func DoSomething(): String {
-                    return $"Hello"
-                }
-            `,
-            "code": `
-                switch(1) { default: {}} ?: assert(false);
-            `,
-            "error": "must either be a var or const declaration or expression before the ?:"
-        },
-        {
-            "name" : "Post else with generics",
-            "definitions": `
-                func DoSomething<T>(a : T): T {
-                    return a
-                }
-            `,
-            "code": `
-                var count = 0
-                DoSomething(1_i32) ?: {
-                    count += 1
-                };
-                assert(count == 1)
-            `,
-        },
-        {
-            "name" : "Post else with generics with bad type",
-            "definitions": `
-                func DoSomething<T>(a : T): T {
-                    return a
-                }
-            `,
-            "code": `
-                DoSomething($"Hello") ?: {
-                    assert(false)
-                };
-                assert(false)
-            `,
-            "error": "'String' can't be coerced to boolean"
-        },
-        {
-            "name" : "Normal usage",
-            "definitions": `
-                enum Status {
-                    OK,
-                    ERROR1,
-                    ERROR2,
-                    ERROR3,
-                }
-                func DoSomething(a : i32): Status {
-                    switch(a) {
-                        case 1: {
-                            return Status.ERROR1
-                        }
-                        case 2: {
-                            return Status.ERROR2
-                        }
-                        default: {
-                            return Status.OK
-                        }
+                // option 1: manual creation
+                var co = Coroutine {
+                    .function = bCoroutine,
+                    .stack = bCoroutineStack {
+                        .a = 1
                     }
                 }
-                func DoAgain(a: i32): Status {
-                    var result = DoSomething(a)
-                        ?: return result
+                dispatcher.submit(co)
 
-                    return Status.ERROR3
-                }
-            `,
-            "code": `
-                var count = 0
-                var result = DoAgain(0) ?: {
-                    count += 1
-                };
-                assert(result == Status.ERROR3)
-                assert(count == 1)
+                // option 2: compiler helper
+                var co = @coroutine(bCoroutine, 1)
+                dispatcher.submit(co)
 
-                result = DoAgain(1) ?: {
-                    count += 1
-                };
-                assert(result == Status.ERROR1)
-                assert(count == 2)
+                // option 3: magic function?
+                dispatcher.submit(
+                    bCoroutine,
+                    1
+                )*/
+/*
+                assert(
+                    bCoroutine(1) == 12
+                )
+                assert(global == 1)
 
-                result = DoAgain(2) ?: {
-                    count += 1
-                };
-                assert(result == Status.ERROR2)
-                assert(count == 3)
-            `,
-        },
-        {
-            "name" : "Post else with binary expr non boolean",
-            "definitions": `
+                global = 0
+*/
 
-            `,
-            "code": `
-                var x = $"Hello"
-                x = $"bye" ?: assert(false)
-                assert(false)
-            `,
-            "error": "'String' can't be coerced to boolean"
-        },
-        /*
-        {
-            "name": "import alias generic type",
-            "modules": [
-                {
-                    "name" : "http_request",
-                    "program" : `
-                        import "std/array"
-
-                        public struct QueryParam {
-                            a: i32
-                        }
-
-                        public struct Query {
-                            params: Array<QueryParam>
-                        }
-
-                        public func ParseQuery(query: *Query) {
-                            query.params.init(16)
-                            query.params.add(QueryParam{.a = 0})
-                            query.params.add(QueryParam{.a = 1})
-                        }
-                        public func QueryInit() : Query {
-                            return Query{}
-                        }
-                    `
-                },
-                {
-                    "name" : "http",
-                    "program" : `
-                        import using "http_request"
-                    `
-                }
-            ],
-            "definitions": `
-                import using "http" as ring
-                import using "std/array"
-            `,
-            "code": `
-                var query = ring::QueryInit()
-                ring::ParseQuery(&query)
-
-                assert(query.params.size() == 2)
-                for(var i = 0; i < query.params.size(); i+=1) {
-                    var param = query.params.getPtr(i)
-                    assert(param.a == i)
-                }
             `,
         },/*
+        {
+            "name": "Coroutine ternary operation",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(a, 1)
+                        ? aCoroutine(a, 1) : 11
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 2
+                )
+                assert(global == 2)
+
+                global = 0
+
+                assert(
+                    bCoroutine(-1) == 11
+                )
+                assert(global == 1)
+
+            `,
+        },
+        {
+            "name": "Coroutine for statement empty",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var total = 0
+                    var y = 0
+                    for(;;) {
+                        total += aCoroutine(1, a)
+                        break
+                    }
+                    return total
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 1
+                )
+                assert(global == 1)
+
+                global = 0
+
+
+            `,
+        },
+        {
+            "name": "Coroutine get/set[] expr",
+            "definitions": `
+                struct TestStruct {
+                    a:i32
+                }
+
+                var global: i32 = 0
+                var order: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x:[2]TestStruct
+                    x[0].a = aCoroutine(1, a+1)
+                    x[1] = TestStruct {
+                        .a = aCoroutine(1, a+2)
+                    }
+                    var y:[2]i32;
+                    y[0] = aCoroutine(1, a+3)
+
+                    return global
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 2
+                )
+            `,
+        },
+        {
+            "name": "Coroutine set expr",
+            "definitions": `
+                struct TestStruct {
+                    a:i32
+                }
+
+                var global: i32 = 0
+                var order: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = TestStruct {}
+                    x.a = aCoroutine(1, a)
+                    return x.a
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 1
+                )
+            `,
+        },
+        {
+            "name": "Coroutine call with coroutine args",
+            "definitions": `
+                var global: i32 = 0
+                var order: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(
+                        aCoroutine(1, a+1),
+                        aCoroutine(1, a+2)
+                    )
+                    return global
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 0
+                )
+                assert(order == 3)
+            `,
+        },
+        {
+            "name": "Coroutine init expression",
+            "definitions": `
+                var global: i32 = 0
+                var order: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(1, a+1) + aCoroutine(1, a+2)
+                    return global
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == -1
+                )
+                assert(order == 2)
+            `,
+        },
+        {
+            "name": "Coroutine init expression",
+            "definitions": `
+                import "std/libc"
+                var global: i32 = 0
+                var order: i32 = 0
+                struct TestStruct {
+                    a: i32
+                    b: i32
+                }
+
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    if (order % 2 == 0)
+                        global += b
+                    else
+                        global -= b
+                    order += 1
+                    return a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(1, a+1)
+                    var y = aCoroutine(2, a+2)
+                    var t = TestStruct {
+                        .a = aCoroutine(3, a+3),
+                        .b = aCoroutine(5, a+5),
+                    }
+                    aCoroutine(6, a+6)
+                    return global
+                }
+            `,
+            "code": `
+                //printf("%d\n",
+
+                // this runs init expressions from bottom to top!!
+                // if reversed this should be 3
+                assert(
+                    bCoroutine(0) == 3
+                )
+                assert(order == 5)
+            `,
+        },
+        {
+            "name": "Coroutine for statement",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var total = 0
+                    var y = 0
+                    for(
+                        var x = aCoroutine(a, 0);
+                        (y = aCoroutine(0, a) + x) < 2;
+                        //aCoroutine(0, a);
+                        x+=1
+                    ) {
+                        total += aCoroutine(1, a)
+                    }
+                    return total
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 2
+                )
+                assert(global == 6)
+
+                global = 0
+
+                assert(
+                    bCoroutine(10) == 0
+                )
+                assert(global == 2)
+
+                global = 0
+
+            `,
+        },
+        {
+            "name": "Coroutine goto statement",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    if(aCoroutine(a, 1) > 1) {
+                        goto end2
+                    }
+
+                    goto end1
+                    if(aCoroutine(a, 1)) {
+                        goto end3
+                    }
+
+                    end3: return -1
+                    end2: return 2
+                    end1: return 1
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(3) == 2
+                )
+                assert(global == 1)
+
+                global = 0
+
+                assert(
+                    bCoroutine(0) == 1
+                )
+                assert(global == 1)
+
+                global = 0
+            `,
+        },
+        {
+            "name": "Coroutine do while statement",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    do {
+                        x += 1
+                    } while(aCoroutine(a, x) < 3)
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(3) == 1
+                )
+                assert(global == 1)
+
+                global = 0
+
+                assert(
+                    bCoroutine(0) == 3
+                )
+                assert(global == 3)
+
+                global = 0
+            `,
+        },
+        {
+            "name": "Coroutine switch statement",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    switch(aCoroutine(a, 1)) {
+                        case 0: aCoroutine(a, 1); x = 1 break;
+                        case 1: x = aCoroutine(a, 1); break;
+                        default:
+                            aCoroutine(a, 1); x = 3 break;
+                    }
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(0) == 1
+                )
+                assert(global == 2)
+
+                global = 0
+
+                assert(
+                    bCoroutine(-1) == 1
+                )
+                assert(global == 2)
+
+                global = 0
+
+                assert(
+                    bCoroutine(55) == 3
+                )
+                assert(global == 2)
+
+            `,
+        },
+        {
+            "name": "Coroutine ternary operation",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = aCoroutine(a, 1)
+                        ? aCoroutine(a, 1) : 11
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 2
+                )
+                assert(global == 2)
+
+                global = 0
+
+                assert(
+                    bCoroutine(-1) == 11
+                )
+                assert(global == 1)
+
+            `,
+        },
+        {
+            "name": "Coroutine ternary operation grouping",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = (aCoroutine(a, 1)
+                        ? aCoroutine(a, 1) : 11)
+                        + 1
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 3
+                )
+                assert(global == 2)
+
+                global = 0
+
+                assert(
+                    bCoroutine(-1) == 12
+                )
+                assert(global == 1)
+
+            `,
+        },
+        {
+            "name": "Coroutine if with AND stmt",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 2 &&
+                        aCoroutine(a, 1) > 4
+                    ) {
+                        x = 11
+                    } else x = 22
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 22
+                )
+                assert(global == 1)
+
+                global = 0
+
+                assert(
+                    bCoroutine(5) == 11
+                )
+                assert(global == 2)
+
+            `,
+        },
+        {
+            "name": "Coroutine if with OR stmt",
+            "definitions": `
+                var global: i32 = 0
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    global += 1
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 4 ||
+                        aCoroutine(a, 1) > 2
+                    ) {
+                        x = 11
+                    } else x = 22
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 22
+                )
+                assert(global == 2)
+
+                global = 0
+
+                assert(
+                    bCoroutine(5) == 11
+                )
+                assert(global == 1)
+
+            `,
+        },
+        {
+            "name": "Coroutine if while stmt",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 4) {
+                        while(x < a) {
+                            x+=1
+                        }
+                    } else x = 22
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 22
+                )
+                assert(
+                    bCoroutine(2) == 22
+                )
+                assert(
+                    bCoroutine(3) == 22
+                )
+                assert(
+                    bCoroutine(4) == 4
+                )
+            `,
+        },
+        {
+            "name": "Coroutine if else stmt",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 4) {
+                        x = 3
+                    } else if (aCoroutine(a, 1) > 3) {
+                        x = 2
+                    }
+                    else if (aCoroutine(a, 1) > 2) {
+                        x = 1
+                    }
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 0
+                )
+                assert(
+                    bCoroutine(2) == 1
+                )
+                assert(
+                    bCoroutine(3) == 2
+                )
+                assert(
+                    bCoroutine(4) == 3
+                )
+            `,
+        },
+        {
+            "name": "Coroutine if stmt",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    if (aCoroutine(a, 1) > 2) {
+                        x += 1
+                    }
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 0
+                )
+                assert(
+                    bCoroutine(2) == 1
+                )
+            `,
+        },
+        {
+            "name": "Coroutine while loop",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b - a
+                }
+
+                @suspend
+                func bCoroutine(a: i32) : i32 {
+                    var x = 0
+                    while(aCoroutine(a, x) < a) {
+                        x += 1
+                    }
+                    return x
+                }
+            `,
+            "code": `
+                assert(
+                    bCoroutine(1) == 1
+                )
+                assert(
+                    bCoroutine(2) == 2
+                )
+                assert(
+                    bCoroutine(3) == 3
+                )
+                assert(
+                    bCoroutine(0) == 0
+                )
+            `,
+        },
+/*
+        {
+            "name": "Coroutine Symbols",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: f32) : bool {
+                    var x = a + 1
+                    if (x == 2) {
+                        var innerY = x + 3
+                        while (innerY) {
+                            innerY -= 1
+                            if (innerY < 0) {
+                                var xxx = 3
+                                break
+                            }
+                        }
+                    } else {
+                        var innerY = b
+                        var xxx = "hello world"
+                    }
+
+                    var result = (x > 3);
+                    return result
+                }
+            `,
+            "code": `
+                var r = aCoroutine(3, 4)
+            `,
+        },
+
+        {
+            "name": "Coroutine called in a non Coroutine",
+            "definitions": `
+                @suspend
+                func aCoroutine(a: i32, b: i32) : i32 {
+                    return a + b
+                }
+
+                func nonCoroutine() : i32 {
+                    return aCoroutine(4, 6)
+                }
+            `,
+            "code": `
+                var r = nonCoroutine()
+            `,
+        },*/
+
+        /*
         {
             "name": "Foreign funcPtr alias variable",
             "symbolPrefix": "litaC__",
