@@ -6,8 +6,6 @@ import "std/mem/bucket_allocator"
 import "std/array"
 import "std/time"
 import "std/libc"
-//import using "std/db/sqlite"
-//import using "std/db/orm"
 
 
 #precheck
