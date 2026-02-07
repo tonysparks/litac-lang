@@ -1,0 +1,239 @@
+import "std/map"
+import "std/assert"
+import "std/hash"
+import "std/string"
+
+@test
+func testMapInitAndEmpty() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = -1, .initialSize = 16)
+    defer m.free()
+    assert(m.empty())
+    assert(m.size() == 0)
+}
+
+@test
+func testMapPutAndGet() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    m.put(2, 20)
+    m.put(3, 30)
+    assert(m.size() == 3)
+    assert(m.get(1) == 10)
+    assert(m.get(2) == 20)
+    assert(m.get(3) == 30)
+}
+
+@test
+func testMapPutOverwrite() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    m.put(2, 20)
+    var r = m.put(1, 100)
+    assert(r == 0)
+    assert(m.size() == 2)
+    assert(m.get(1) == 100)
+    assert(m.get(2) == 20)
+}
+
+@test
+func testMapGetMissingReturnsEmptyValue() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = -999, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    assert(m.get(1) == 10)
+    assert(m.get(42) == -999)
+    assert(m.get(0) == -999)
+}
+
+@test
+func testMapContains() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    assert(!m.contains(1))
+    m.put(1, 10)
+    m.put(2, 20)
+    assert(m.contains(1))
+    assert(m.contains(2))
+    assert(!m.contains(3))
+}
+
+@test
+func testMapRemove() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    m.put(2, 20)
+    m.put(3, 30)
+    var v = m.remove(2)
+    assert(v == 20)
+    assert(m.size() == 2)
+    assert(m.get(1) == 10)
+    assert(m.get(2) == 0)
+    assert(m.get(3) == 30)
+    assert(!m.contains(2))
+}
+
+@test
+func testMapRemoveMissingReturnsEmptyValue() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = -1, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    var v = m.remove(99)
+    assert(v == -1)
+    assert(m.size() == 1)
+}
+
+@test
+func testMapGetPtr() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    m.put(2, 20)
+    var p = m.getPtr(2)
+    assert(p != null)
+    assert(p[0] == 20)
+    p[0] = 21
+    assert(m.get(2) == 21)
+}
+
+@test
+func testMapGetPtrMissingReturnsNull() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    var p = m.getPtr(99)
+    assert(p == null)
+}
+
+@test
+func testMapClear() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    m.put(2, 20)
+    m.put(3, 30)
+    assert(m.size() == 3)
+    m.clear()
+    assert(m.empty())
+    assert(m.size() == 0)
+    assert(m.get(1) == 0)
+    assert(m.get(2) == 0)
+    assert(!m.contains(1))
+}
+
+@test
+func testMapIterator() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(1, 10)
+    m.put(2, 20)
+    m.put(3, 30)
+    var count: i32 = 0
+    var sumKeys: i32 = 0
+    var sumVals: i32 = 0
+    var iter = m.iter()
+    while(iter.hasNext()) {
+        var e = iter.next()
+        count += 1
+        sumKeys += e.key
+        sumVals += e.value
+    }
+    assert(count == 3)
+    assert(sumKeys == 6)
+    assert(sumVals == 60)
+}
+
+@test
+func testMapIteratorEmpty() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    var iter = m.iter()
+    assert(!iter.hasNext())
+}
+
+@test
+func testMapGrow() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 4)
+    defer m.free()
+    for(var i = 0; i < 20; i += 1) {
+        m.put(i, i * 10)
+    }
+    assert(m.size() == 20)
+    for(var i = 0; i < 20; i += 1) {
+        assert(m.get(i) == i * 10)
+    }
+}
+
+@test
+func testMapPutNewReturnsOne() {
+    var m = Map<i32, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    var r1 = m.put(1, 10)
+    var r2 = m.put(2, 20)
+    assert(r1 == 1)
+    assert(r2 == 1)
+}
+
+@test
+func testStringMapPutAndGet() {
+    var m = StringMap<i32>(0, 16)
+    defer m.free()
+    var k1 = StringInit("one", 3)
+    var k2 = StringInit("two", 3)
+    var k3 = StringInit("three", 5)
+    m.put(k1, 1)
+    m.put(k2, 2)
+    m.put(k3, 3)
+    assert(m.size() == 3)
+    assert(m.get(k1) == 1)
+    assert(m.get(k2) == 2)
+    assert(m.get(k3) == 3)
+}
+
+@test
+func testStringMapContainsAndRemove() {
+    var m = StringMap<i32>(0, 16)
+    defer m.free()
+    var k1 = StringInit("a", 1)
+    var k2 = StringInit("b", 1)
+    m.put(k1, 1)
+    m.put(k2, 2)
+    assert(m.contains(k1))
+    assert(m.contains(k2))
+    var v = m.remove(k1)
+    assert(v == 1)
+    assert(m.size() == 1)
+    assert(!m.contains(k1))
+    assert(m.get(k1) == 0)
+    assert(m.get(k2) == 2)
+}
+
+@test
+func testMapI64Keys() {
+    var m = Map<i64, i32>{}
+    m.init(.emptyValue = 0, .initialSize = 16)
+    defer m.free()
+    m.put(100 as (i64), 1)
+    m.put(200 as (i64), 2)
+    m.put(300 as (i64), 3)
+    assert(m.size() == 3)
+    assert(m.get(100 as (i64)) == 1)
+    assert(m.get(200 as (i64)) == 2)
+    assert(m.get(300 as (i64)) == 3)
+}

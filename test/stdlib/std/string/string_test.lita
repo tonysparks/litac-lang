@@ -1,0 +1,198 @@
+import "std/string"
+import "std/assert"
+import "std/libc"
+import "std/mem"
+
+@test
+func testStringInitNull() {
+    var s = StringInit(null)
+    assert(s.buffer == null)
+    assert(s.length == 0)
+    assert(s.empty())
+    assert(s.size() == 0)
+}
+
+@test
+func testStringInitFromCStr() {
+    var s = StringInit("hello")
+    assert(s.length == 5)
+    assert(!s.empty())
+    assert(s.size() == 5)
+    assert(s.equalsString("hello"))
+}
+
+@test
+func testStringInitWithLength() {
+    var s = StringInit("hello world", 5)
+    assert(s.length == 5)
+    assert(s.equalsString("hello"))
+}
+
+@test
+func testStringGet() {
+    var s = StringInit("abc")
+    assert(s.get(0) == 'a')
+    assert(s.get(1) == 'b')
+    assert(s.get(2) == 'c')
+    assert(s.get(-1) == '\0')
+    assert(s.get(3) == '\0')
+}
+
+@test
+func testStringHash() {
+    var a = StringInit("hello")
+    var b = StringInit("hello")
+    assert(a.hash() == b.hash())
+    var c = StringInit("world")
+    assert(a.hash() != c.hash())
+}
+
+@test
+func testStringSubstring() {
+    var s = StringInit("hello world")
+    var sub = s.substring(0, 5)
+    assert(sub.length == 5)
+    assert(sub.equalsString("hello"))
+    sub = s.substring(6, 11)
+    assert(sub.equalsString("world"))
+    sub = s.substring(2, 4)
+    assert(sub.equalsString("ll"))
+}
+
+@test
+func testStringSubstringOf() {
+    var s = StringInit("hello world")
+    var sub = s.substringOf(StringInit(" "))
+    assert(sub.equalsString("hello"))
+    sub = s.substringOf(StringInit("xyz"))
+    assert(sub.empty())
+}
+
+@test
+func testStringSubstringOfAfter() {
+    var s = StringInit("hello world")
+    var sub = s.substringOfAfter(StringInit(" "))
+    assert(sub.equalsString("world"))
+}
+
+@test
+func testStringCopyTo() {
+    var s = StringInit("hi")
+    var buf = [8]char{0}
+    var n = s.copyTo(buf, 8)
+    assert(n == 2)
+    assert(buf[0] == 'h')
+    assert(buf[1] == 'i')
+    assert(buf[2] == '\0')
+}
+
+@test
+func testStringCopyToTruncate() {
+    var s = StringInit("hello")
+    var buf = [4]char{0}
+    var n = s.copyTo(buf, 3, true)
+    assert(n == 3)
+    assert(buf[0] == 'h')
+    assert(buf[1] == 'e')
+    assert(buf[2] == 'l')
+    assert(buf[3] == '\0')
+}
+
+@test
+func testStringCopy() {
+    var s = StringInit("copy me")
+    var c = s.copy()
+    defer defaultAllocator.free(c.buffer as (*void))
+    assert(c.length == s.length)
+    assert(c.equalsString("copy me"))
+    assert(c.buffer != s.buffer)
+}
+
+// @test
+// func testStringForEach() {
+//     var s = StringInit("ab")
+//     var chars = [4]char{0}
+//     var i: i32 = 0
+//     s.forEach(func(c: char) : bool {
+//         chars[i] = c
+//         i += 1
+//         return false
+//     })
+//     assert(i == 2)
+//     assert(chars[0] == 'a')
+//     assert(chars[1] == 'b')
+// }
+
+// @test
+// func testStringForEachBreak() {
+//     var s = StringInit("abc")
+//     var count: i32 = 0
+//     s.forEach(func(c: char) : bool {
+//         count += 1
+//         return c == 'b'
+//     })
+//     assert(count == 2)
+// }
+
+@test
+func testStringEndIndexOf() {
+    var s = StringInit("hello world")
+    assert(s.endIndexOf(StringInit("world")) == 11)
+    assert(s.endIndexOf(StringInit("hello")) == 5)
+}
+
+@test
+func testStringClone() {
+    var orig = "clone me"
+    var c = StringClone(orig)
+    defer defaultAllocator.free(c as (*void))
+    assert(c != null)
+    assert(StringEqual(c, "clone me"))
+}
+
+@test
+func testStringEqual() {
+    assert(StringEqual("a", "a"))
+    assert(!StringEqual("a", "b"))
+    assert(StringEqual(null, null))
+    assert(!StringEqual("a", null))
+    assert(!StringEqual(null, "a"))
+}
+
+@test
+func testStringEqualLen() {
+    assert(StringEqualLen("abc", "abc", 3))
+    assert(!StringEqualLen("abc", "abd", 3))
+    assert(StringEqualLen("abcd", "abce", 3))
+}
+
+@test
+func testConstCharLength() {
+    var p = "hello"
+    assert(p.length() == 5)
+}
+
+@test
+func testConstCharEmpty() {
+    var p = ""
+    assert(p.empty())
+    p = "x"
+    assert(!p.empty())
+}
+
+@test
+func testConstCharToString() {
+    var p = "hello"
+    var s = p.toString()
+    assert(s.length == 5)
+    assert(s.equalsString("hello"))
+}
+
+@test
+func testConstCharHashEquals() {
+    var a = "hello"
+    var b = "hello"
+    assert(a.hash() == b.hash())
+    assert(a.equals(b))
+    assert(!a.equals("world"))
+}
