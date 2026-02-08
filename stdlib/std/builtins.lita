@@ -197,6 +197,21 @@ public @note packed {
 #precheck
     // if we are testing only, create a new main entry point
     if(TESTING) {
+        fn isDisabled(sym) {
+            if(sym.notes) {
+                for(note in sym.notes) {
+                    if(note.name == "test" && note.arguments != null) {
+                        for(arg in note.arguments) {
+                            if(arg.name == "disabled") {
+                                return arg.value
+                            }
+                        }
+                    }
+                }
+            }
+            return false
+        }
+
         var moduleName = getInputModuleFilename()
 
         emitClear()
@@ -205,14 +220,18 @@ public @note packed {
         emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
         for(sym in getSymbolsToTest("test")) {
             emit("  __lita_test_printf(\"Testing '%s'\\\\n\")\n", sym.name)
-            var alias = addImport(moduleName, sym.moduleFilename)
-            if(alias) {
-                emit("  %s::%s()\n", alias, sym.name)
+            if(isDisabled(sym)) {
+                emit("  __lita_test_printf(\"Disabled '%s'!\\\\n\")\n", sym.name)
+            } else {
+                var alias = addImport(moduleName, sym.moduleFilename)
+                if(alias) {
+                    emit("  %s::%s()\n", alias, sym.name)
+                }
+                else {
+                    emit("  %s()\n", sym.name)
+                }
+                emit("  __lita_test_printf(\"Passed '%s'!\\\\n\")\n", sym.name)
             }
-            else {
-                emit("  %s()\n", sym.name)
-            }
-            emit("  __lita_test_printf(\"Passed '%s'!\\\\n\")\n", sym.name)
         }
         emit("  return 0; }")
 

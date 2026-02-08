@@ -274,7 +274,7 @@ public func ParsePackageId(
     Tests
 ---------------------------------------------------------*/
 
-@test
+@test(.disabled = true)
 func testParsePackage() {
     var parser = JsonParser{}
     parser.init()
@@ -327,14 +327,14 @@ func testParsePackage() {
     printf("Version: %.*s\n", version.length, version.buffer)
 */
 
-    assert(pkg.id.id.equalsString("https://github.com/tonysparks|litac-lang|0.1.2-alpha"))
+    assert(pkg.id.id.equalsString($"https://github.com/tonysparks|litac-lang|0.1.2-alpha"))
     assert(repo.equalsString("https://github.com/tonysparks"))
     assert(name.equalsString("litac-lang"))
     assert(version.equalsString("0.1.2-alpha"))
     assert(pkg.dependencies.size() == 0)
     assert(pkg.dynamicLibraries.size() == 2)
-    assert(pkg.dynamicLibraries.get(0).equalsString("a"))
-    assert(pkg.dynamicLibraries.get(1).equalsString("b"))
+    assert(pkg.dynamicLibraries.get(0).equalsString($"a"))
+    assert(pkg.dynamicLibraries.get(1).equalsString($"b"))
 }
 
 

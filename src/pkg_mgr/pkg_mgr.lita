@@ -105,6 +105,7 @@ import "pkg_mgr/pkg_install"
 import "pkg_mgr/pkg_build"
 import "pkg_mgr/pkg_run"
 import "pkg_mgr/pkg_init"
+import "pkg_mgr/pkg_test"
 
 import "build"
 import "lita"
@@ -158,6 +159,8 @@ public enum PkgStatus {
     ERROR_INVALID_BUILD_TARGET,
     ERROR_INVALID_BUILD_OS,
     ERROR_INVALID_BUILD_ARCH,
+
+    ERROR_TEST_SUITE_FAILED,
 }
 
 public struct PackageManager {
@@ -292,6 +295,14 @@ public func (this: *PackageManager) runCommand(cmd: *const char) : PkgStatus {
     }
 
     return PackageRun(this, cmd)
+}
+
+@doc("""
+    Recursively scan directory for *_test.lita files and run each test file.
+""")
+public func (this: *PackageManager) testCommand(options: *LitaOptions) : i32 {
+    defer this.printMessages()
+    return PackageTest(this, options)
 }
 
 

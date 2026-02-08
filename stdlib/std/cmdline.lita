@@ -147,6 +147,13 @@ public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
     return CmdParserStatus.OK
 }
 
+public func (p: *CmdParser) printErrors(sb: *StringBuilder) {
+    if(p.status == CmdParserStatus.OK) {
+        return;
+    }
+    sb.append("%s", p.errors)
+}
+
 public func (p: *CmdParser) printHelp(sb: *StringBuilder) {
     if(p.header) {
         sb.append("%s\n", p.header)

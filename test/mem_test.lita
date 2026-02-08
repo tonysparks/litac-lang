@@ -1,6 +1,7 @@
 import "std/mem"
 import "std/mem/bucket_allocator"
 import "std/mem/linear_allocator"
+import "std/io"
 import "std/system"
 import "std/libc"
 
@@ -26,7 +27,7 @@ func timeRandomAllocations(allocator: *const Allocator, chunkSizes: *usize, len:
     return (endTime - startTime)
 }
 
-//@test
+@test
 func equalAllocations() {
     const SIZE = 1 * GiB
     const MAX_CHUNK_SIZE = 2 * KiB

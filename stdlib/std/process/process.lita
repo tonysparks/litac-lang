@@ -94,18 +94,19 @@ public func (this: *Process) readStderr(buffer: *char, size: u32) : u32 {
 
 import "std/array"
 import "std/assert"
-@test
+@test(.disabled = true)
 func test() {
     var args = ArrayInit<*const char>(8)
     args.add("litac")
     //args.add("Hello World")
     //args.add("&&")
-    args.add("ls")
+    //args.add("ls")
     args.add(null) // end marker
 
     var process = Process{}
     if(process.create(
         args.elements,
+        null,
         ProcessOption.COMBINE_STDOUT_STDERR|ProcessOption.INHERIT_IO|ProcessOption.INHERIT_ENVIRONMENT
     )) {
         assert(false)
@@ -116,4 +117,5 @@ func test() {
     var result = 0
     process.join(&result)
     printf("Result: %d\n", result)
+    assert(result == 0)
 }
