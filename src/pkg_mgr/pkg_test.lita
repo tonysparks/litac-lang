@@ -25,7 +25,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         scanDirStr.format("%s/src", options.projectPath)
 
         var status = FindTestFiles(scanDirStr.toString(), &allFiles, pm.allocator)
-            ?: return status
+        if(status != PkgStatus.OK) return status
     }
     // look in the test folder
     {
@@ -34,7 +34,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         scanDirStr.format("%s/test", options.projectPath)
 
         var status = FindTestFiles(scanDirStr.toString(), &allFiles, pm.allocator)
-            ?: return status
+        if(status != PkgStatus.OK) return status
     }
 
     var testPaths = ArrayInit<*char>(allFiles.size(), pm.allocator)
@@ -126,7 +126,8 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
 }
 
 func FindTestFiles(scanDirStr: String, allFiles: *Array<String>, allocator: *const Allocator):PkgStatus {
-    var status = ListFiles(scanDirStr, allFiles, ListFileFlags.RECURSE_DIRECTORIES, allocator) ?: {
+    var status = ListFiles(scanDirStr, allFiles, ListFileFlags.RECURSE_DIRECTORIES, allocator)
+    if(status != FileStatus.Ok) {
         printf(
             "pkg-test: could not scan directory '%.*s', error: %s\n",
             scanDirStr.length, scanDirStr.buffer,
