@@ -1,5 +1,6 @@
 import "std/string/builder"
 import "std/libc"
+import "std/terminal"
 
 import "phase_result"
 import "lex"
@@ -110,57 +111,6 @@ public const errorCodeText = []*const char {
     [ErrorCode.MAX_NUM_ERROR_CODES] = ""
 }
 
-/*
-colors: windows
-0=black
-1=blue
-2=green
-
-colors: ansci
-0=black
-1=red
-2=green
-3=yellow
-4=blue
-5=magenta
-6=cyan
-7=white
-
-38;5;c  // standard color foreground
-38;2;r;g;b  // rgb color foreground
-
-48;5;c  // background
-48;2;r;g;b
-*/
-@asStr
-public enum ConsoleColors {
-    @asStr("\x1b[0m")
-    CLEAR,
-
-    @asStr("\x1b[38;5;0m")
-    BLACK,
-
-    @asStr("\x1b[38;5;1m")
-    RED,
-
-    @asStr("\x1b[38;5;2m")
-    GREEN,
-
-    @asStr("\x1b[38;5;3m")
-    YELLOW,
-
-    @asStr("\x1b[38;5;4m")
-    BLUE,
-
-    @asStr("\x1b[38;5;5m")
-    MAGENTA,
-
-    @asStr("\x1b[38;5;6m")
-    CYAN,
-
-    @asStr("\x1b[38;5;7m")
-    WHITE,
-}
 
 public func PrintError(useColors: bool, sb: *StringBuilder, error: PhaseError) {
     if(!error.pos.lineStart) {

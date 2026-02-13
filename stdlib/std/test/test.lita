@@ -1,0 +1,175 @@
+import "std/array"
+import "std/mem"
+import "std/string"
+import "std/string/builder"
+import "std/libc"
+import "std/terminal"
+
+@include("<setjmp.h>");
+
+@foreign
+public struct jmp_buf;
+
+@foreign
+func longjmp(env: jmp_buf, result: i32);
+
+@foreign
+public func setjmp(env: jmp_buf) : i32;
+
+public var testSuite = TestSuite{}
+
+public struct AssertEntry {
+    filename: *const char
+    lineNumber: usize
+    errorMessage: *const char
+}
+
+public struct TestSuite {
+    allocator: *const Allocator
+    testCases: Array<TestCase>
+    currentCase: *TestCase
+    env: jmp_buf        // jump to the next test
+}
+
+public func (this: *TestSuite) init(allocator: *const Allocator = defaultAllocator) {
+    this.allocator = allocator
+    this.testCases = ArrayInit<TestCase>(64, allocator)
+}
+
+public func (this: *TestSuite) free() {
+    for(var i = 0; i < this.testCases.size(); i+=1) {
+        var t = this.testCases.get(i)
+        t.free()
+    }
+    this.testCases.free()
+}
+
+public func (this: *TestSuite) enterTest() : *TestCase {
+    this.testCases.add(
+        TestCase{}
+    )
+    this.currentCase = this.testCases.lastPtr()
+    this.currentCase.init(this)
+    return this.currentCase
+}
+
+public struct TestCase {
+    testSuite: *TestSuite
+    errors: Array<AssertEntry>
+}
+
+public func (this: *TestCase) init(testSuite: *TestSuite) {
+    this.testSuite = testSuite
+    this.errors = ArrayInit<AssertEntry>(32, testSuite.allocator)
+}
+
+public func (this: *TestCase) free() {
+    this.errors.free()
+}
+
+public func (this: *TestCase) reset() {
+    this.errors.clear()
+}
+
+
+public func (this: *TestCase) print(name: *const char) {
+    var resultText =
+        this.errors.empty() ? "SUCCESS" : "FAILED"
+
+    var dots = $"..............................................................."
+    var nDots = MAX(0, dots.length - name.length() - resultText.length())
+
+    var resultColor =
+        this.errors.empty() ? ConsoleColors.GREEN : ConsoleColors.RED
+
+    printf(
+        "Testing '%s'",
+        name
+    )
+    printf(
+        "%.*s",
+        nDots,
+        dots.buffer
+    )
+    printf(
+        "%s%s%s\n",
+        ConsoleColorsAsStr(resultColor),
+        resultText,
+        ConsoleColorsAsStr(ConsoleColors.CLEAR)
+    )
+    for(var i = 0; i < this.errors.size(); i +=1) {
+        printf("%s\n", this.errors.get(i).errorMessage)
+    }
+}
+
+
+public func AssertCStr(
+    expected: *const char,
+    actual: *const char,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    Assert(
+        StringEqual(expected, actual),
+        filename,
+        lineNumber
+    )
+}
+
+
+public func AssertFloat<F>(
+    expected: F,
+    actual: F,
+    tolerance: F = 0.01f64,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    const r = ABS(expected - actual)
+    Assert(
+        r <= tolence,
+        filename,
+        lineNumber
+    )
+}
+
+
+public func Assert(
+    cond: bool,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    if(!testSuite.allocator) {
+        testSuite.init(defaultAllocator)
+        testSuite.enterTest()
+    }
+
+    if(!cond) {
+        var sb = StringBuilderInit(256, testSuite.allocator)
+        sb.append(
+            "%s:%zu: Assertion failed",
+            filename,
+            lineNumber
+        )
+        testSuite.currentCase.errors.add(
+            AssertEntry {
+                .filename = filename,
+                .lineNumber = lineNumber,
+                .errorMessage = sb.cStr()
+            }
+        )
+        // jump to the next test case, we've failed this one
+        longjmp(testSuite.env, 1)
+    }
+}
+
+@test
+func TestTheTest() {
+    AssertCStr("a", "a")
+    AssertCStr("bz", "bz")
+}
+
+@test
+func TestTheTest2() {
+    AssertCStr("a", "a")
+    AssertCStr("b", "b")
+}

@@ -1,3 +1,7 @@
+#if TESTING
+import "std/test"
+#end
+
 public typedef u64 as typeid;
 
 public struct any {
@@ -216,22 +220,30 @@ public @note packed {
 
         emitClear()
         var testFunctionName = "__LitaTestMain"
+
+        //addImportByName(moduleName, "std/test")
         emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
         emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
+        emit("   testSuite.init()\n")
+
+        var i = 0
         for(sym in getSymbolsToTest("test")) {
-            emit("  __lita_test_printf(\"Testing '%s'\\\\n\")\n", sym.name)
             if(isDisabled(sym)) {
                 emit("  __lita_test_printf(\"Disabled '%s'!\\\\n\")\n", sym.name)
             } else {
+                emit("   var __testCase%d = testSuite.enterTest()\n", i)
+                emit("   if(setjmp(testSuite.env) == 0) {\n")
                 var alias = addImport(moduleName, sym.moduleFilename)
                 if(alias) {
-                    emit("  %s::%s()\n", alias, sym.name)
+                    emit("    %s::%s()\n", alias, sym.name)
                 }
                 else {
-                    emit("  %s()\n", sym.name)
+                    emit("    %s()\n", sym.name)
                 }
-                emit("  __lita_test_printf(\"Passed '%s'!\\\\n\")\n", sym.name)
+                emit("  }")
+                emit("   __testCase%d.print(\"%s\")\n", i, sym.name)
             }
+            i = i + 1
         }
         emit("  return 0; }")
 

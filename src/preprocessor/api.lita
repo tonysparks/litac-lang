@@ -61,6 +61,7 @@ public func (this: *Preprocessor) registerApi() {
     ape_set_native_function(this.runtime.ape, "addDeclaration", ApeAddDeclaration, &this.callContext)
     ape_set_native_function(this.runtime.ape, "replaceDeclaration", ApeReplaceDeclaration, &this.callContext)
     ape_set_native_function(this.runtime.ape, "addImport", ApeAddImport, &this.callContext)
+    ape_set_native_function(this.runtime.ape, "addImportByName", ApeAddImportByName, &this.callContext)
     ape_set_native_function(this.runtime.ape, "flushDeclarations", ApeFlushDeclarations, &this.callContext)
 
     ape_set_native_function(this.runtime.ape, "assert", ApeAssert, &this.callContext)
@@ -853,6 +854,48 @@ func ApeAddImport(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ap
     return ape_object_make_string(ape, alias)
 }
 
+func ApeAddImportByName(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
+    //@static var moduleNameIndex: i32;
+
+    var context = data as (*CallContext)
+    if(!ape_check_argsx(ape, true, argc, args, ape_object_type.APE_OBJECT_STRING, ape_object_type.APE_OBJECT_STRING)) {
+        context.logErrors()
+        return ape_object_make_null()
+    }
+
+
+    var moduleName = ape_object_get_string(args[0]) as (*const char)
+    if(!moduleName) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module filename")
+        return ape_object_make_null()
+    }
+
+    var module = context.pp.lita.getModule(moduleName)
+    if(!module) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleName)
+        return ape_object_make_null()
+    }
+
+    var moduleToImport = ape_object_get_string(args[1]) as (*const char)
+    if(!moduleToImport) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid empty module to import name")
+        return ape_object_make_null()
+    }
+
+    var importModule = context.pp.lita.getModuleByName(moduleToImport)
+    if(!importModule) {
+        context.pp.lita.result.addError(context.comp.startPos, "invalid module: '%s'", moduleToImport)
+        return ape_object_make_null()
+    }
+
+    var alias = AstAddImport(context.pp.lita, context.checker, module, importModule)
+    if(!alias) {
+        // this is already being imported and doesn't have an alias
+        return ape_object_make_null()
+    }
+
+    return ape_object_make_string(ape, alias)
+}
 
 func ApeSetMainSymbol(ape: *ape_t, data: *void, argc: i32, args: *ape_object_t) : ape_object_t {
     var context = data as (*CallContext)

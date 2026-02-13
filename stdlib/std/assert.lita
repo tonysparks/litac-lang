@@ -2,166 +2,18 @@ import "std/string"
 import "std/libc"
 // import "std/thread"
 
-@include("assert.h");
-@foreign public func assert(e:bool):void;
-
-// all out of bort license plates!
-func bort() {
-    #if true
-        //ThreadPrintStackTrace(stderr)
-        abort()
-    #end
-}
-
-public func assertStr(
-    expected: *const char,
-    actual: *const char,
-    filename: *const char = __FILE__,
-    lineNumber: usize = __LINE__): void {
-
-    if(expected == actual) {
-        return;
+#if TESTING
+    import "std/test"
+    public func assert(
+        cond: bool,
+        filename: *const char = __FILE__,
+        lineNumber: usize = __LINE__
+    ) {
+        Assert(cond, filename, lineNumber)
     }
-
-    if(expected == null || actual == null || !StringEqual(expected, actual)) {
-        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%s' to equal actual: '%s'\n", filename, lineNumber, expected, actual)
-        bort()
-    }
-}
-
-public func assertString(
-    expected: String,
-    actual: String,
-    filename: *const char = __FILE__,
-    lineNumber: usize = __LINE__): void {
-
-    if(!expected.equals(actual)) {
-        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%.*s' to equal actual: '%.*s'\n",
-            filename,
-            lineNumber,
-            expected.length,  expected.buffer,
-            actual.length, actual.buffer
-        )
-        bort()
-    }
-}
-
-public func assertFloat<F>(
-    expected: F,
-    actual: F,
-    tolerance: F = 0.01f64,
-    filename: *const char = __FILE__,
-    lineNumber: usize = __LINE__): void {
-
-    const r = ABS(expected - actual)
-    if(r > tolerance) {
-        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%f' to equal actual: '%f'\n",
-            filename,
-            lineNumber,
-            expected,
-            actual
-        )
-        bort()
-    }
-}
-
-public func assertEq<N>(
-    expected: N,
-    actual: N,
-    filename: *const char = __FILE__,
-    lineNumber: usize = __LINE__): void {
-
-    if(expected != actual) {
-        fprintf(stderr, "%s:%zu: Assertion failed: expected: '%d' to equal actual: '%d'\n",
-            filename,
-            lineNumber,
-            expected,
-            actual
-        )
-        bort()
-    }
-}
-
-@test
-func testAssertEqualsStr() {
-    assertStr("x", "x")
-    assertStr("x", "y")
-}
-
-@test
-func testAssertEqualsString() {
-    assertString(StringInit("x"), StringInit("x"))
-    assertString(StringInit("x"), StringInit("y"))
-}
-
-@test
-func testAssertEqualsF32() {
-    assertFloat(0.1f, 0.1f)
-    assertFloat(0.1f, 0.2f)
-}
-
-@test
-func testAssertEqualsF64() {
-    assertFloat(0.1, 0.1)
-    assertFloat(0.1, 0.2)
-}
-
-/*
-import "std/libc"
-
-public enum ResultType {
-    RESULT = 0,
-    ERROR = 1,
-}
-
-public struct Result<T, E> {
-    type: ResultType
-    union <T, E> {
-        result: T
-        error: E
-    }
-}
-
-public func (this: *Result<T,E>) isError<T,E>() : bool {
-    return this.type == ResultType.ERROR
-}
-
-public func (this: *Result<T,E>) isResult<T,E>() : bool {
-    return this.type == ResultType.RESULT
-}
-
-public func NewResult<T, E>(result: T, error: E) : Result<T, E> {
-    if(error) {
-        return Result<T, E> {
-            .type = ResultType.ERROR,
-            .error = error,
-        }
-    }
-    return Result<T, E> {
-        .type = ResultType.RESULT,
-        .result = result,
-    }
-}
+#else
+    @include("assert.h");
+    @foreign public func assert(e:bool):void;
+#end
 
 
-public func Error<T, E>(error: E) : Result<T, E> {
-    return Result<T, E> {
-        .type = ResultType.ERROR,
-        .error = error
-    }
-}
-public func Ok<T, E>(result: T) : Result<T, E> {
-    return Result<T, E> {
-        .type = ResultType.RESULT,
-        .result = result,
-    }
-}
-
-@test
-func testResult() {
-    var result = NewResult(.result = 4, .error = 0)
-    assert(result.result == 4)
-    printf("Result: %d IsError: %d IsResult: %d\n", result.result, result.isError(), result.isResult())
-
-    var r = Error<i32, i32>(1)
-}*/

@@ -8,10 +8,10 @@ import "std/process" as sub
 import "std/system"
 import "std/libc"
 import "std/mem"
+import "std/terminal"
 
 import "pkg_mgr"
 import "lita"
-import "error_codes"
 
 public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
     var startTime = SystemTimeMSec()
@@ -66,32 +66,14 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
             path
         )
         var result = system(cmd.cStr())
-
-/*
-        var argv = ArrayInit<*const char>(16, pm.allocator)
-        defer argv.free()
-        argv.add("litac")
-        argv.add("-colors")
-        argv.add("-pkg-build")
-        argv.add("-testFile")
-        argv.add("-run")
-        argv.add(path as (*const char))
-        argv.add(null)
-
-        var proc = sub::Process{}
-        if(proc.create(argv.elements, null, sub::ProcessOption.COMBINE_STDOUT_STDERR | sub::ProcessOption.INHERIT_ENVIRONMENT) != 0) {
-            printf("pkg-test: failed to run process for %s\n", path)
-            failed += 1
-            continue
-        }
-        defer proc.destroy()
-
-        var result: i32 = 0
-        proc.join(&result)
-*/
-
         if(result != 0) {
-            printf("pkg-test: %s failed with exit code %d\n", path, result)
+            printf(
+                "pkg-test: %s %sfailed%s with exit code %d\n",
+                path,
+                ConsoleColorsAsStr(ConsoleColors.RED),
+                ConsoleColorsAsStr(ConsoleColors.CLEAR),
+                result
+            )
             failed += 1
         }
     }
