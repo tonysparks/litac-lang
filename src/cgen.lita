@@ -137,7 +137,7 @@ public func (this: using *CGen) emitProgram(module: *Module) {
 
     for(var i = 0; i < declarations.size(); i += 1) {
         var sym = declarations.get(i)
-        assert(sym.decl)
+        assert(sym.decl != null)
 
         if(sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE) {
             continue
@@ -333,7 +333,7 @@ func (this: using *CGen) emitTraitForwardDecls() {
     for(var it = interfaceImpls.iter(); it.hasNext();) {
         var entry = it.next()
         var traitSym = this.findSymbolByTypeid(entry.key)
-        assert(traitSym)
+        assert(traitSym != null)
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
         var traitName = this.cTypeName(traitSym.type)
@@ -344,7 +344,7 @@ func (this: using *CGen) emitTraitForwardDecls() {
         {
             for(var i = 0; i < entry.value.size(); i += 1) {
                 var implSym = this.findSymbolByTypeid(entry.value.get(i))
-                assert(implSym)
+                assert(implSym != null)
 
                 var implName = this.cTypeName(implSym.type)
                 this.emit("%s %s__to__%s(%s* x);\n",
@@ -364,7 +364,7 @@ func (this: using *CGen) emitTraitDecls() {
     for(var it = interfaceImpls.iter(); it.hasNext();) {
         var entry = it.next()
         var traitSym = this.findSymbolByTypeid(entry.key)
-        assert(traitSym)
+        assert(traitSym != null)
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
         var traitName = this.cTypeName(traitSym.type)
@@ -379,7 +379,7 @@ func (this: using *CGen) emitTraitDecls() {
         {
             for(var i = 0; i < entry.value.size(); i += 1) {
                 var implSym = this.findSymbolByTypeid(entry.value.get(i))
-                assert(implSym)
+                assert(implSym != null)
 
                 var implName = this.cTypeName(implSym.type)
                 this.emit("%s %s__to__%s(%s* x) {", traitName, implName, traitName, implName)
@@ -2638,7 +2638,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                             var escapedChar = escapeChars[n]
                             if(escapedChar) {
                                 var chars = escapeChars[n]
-                                assert(chars)
+                                assert(chars != null)
                                 buf.appendStr(chars)
                                 i += 2
                                 continue

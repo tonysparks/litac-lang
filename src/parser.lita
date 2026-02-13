@@ -169,7 +169,7 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
     }
     else if(p.match(TokenType.HASH)) {
         var compStmt = p.compStatement()
-        assert(compStmt)
+        assert(compStmt != null)
 
         if(!compStmt || compStmt.kind != StmtKind.COMP_STMT) {
             // TODO: Mark error?

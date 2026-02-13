@@ -1176,7 +1176,7 @@ public func (this: *TypeChecker) implementsTrait(
     for(var i = 0; i < numOfTraitFns; i += 1) {
         var field = iface.aggDecl.fields.get(i)
 
-        assert(field.typeInfo)
+        assert(field.typeInfo != null)
         if (field.typeInfo.kind != TypeKind.FUNC_PTR) {
             numOfTraitFns -= 1
             continue

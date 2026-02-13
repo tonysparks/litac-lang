@@ -271,7 +271,7 @@ public func JsonEscapeString(buf: *StringBuilder, string: *const char, length: i
             var escapedChar = escapeChars[n]
             if(escapedChar) {
                 var chars = escapeChars[n]
-                assert(chars)
+                assert(chars != null)
                 buf.appendStr(chars)
                 i += 1
                 continue

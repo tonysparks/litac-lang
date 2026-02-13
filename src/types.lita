@@ -1438,8 +1438,8 @@ public func (this: *TypeInfo) canCastTo(castTo: *TypeInfo, checker: *TypeChecker
 }
 
 public func IsFuncImpl(traitFn: *TypeInfo, fn: *TypeInfo, checker: *TypeChecker) : bool {
-    assert(traitFn)
-    assert(fn)
+    assert(traitFn != null)
+    assert(fn != null)
 
     if(fn.kind != TypeKind.FUNC) {
         return false

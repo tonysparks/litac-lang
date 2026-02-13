@@ -44,7 +44,7 @@ public func (this: *BucketAllocator) init(decorated: *const Allocator, bucketSiz
 
     var requestSize = sizeof(:Bucket) + bucketSize
     var memory = decorated.alloc(requestSize) as (*u8)
-    assert(memory)
+    assert(memory != null)
 
     this.buckets = memory as (*Bucket)
     this.buckets.mem = memory + sizeof(:Bucket)
