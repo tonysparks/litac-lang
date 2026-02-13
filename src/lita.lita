@@ -108,6 +108,7 @@ public enum PkgCommand {
     PKG_RUN,
     PKG_INIT,
     PKG_BUILD,
+    PKG_TEST,
 }
 
 public struct PkgOptions {
@@ -244,11 +245,39 @@ public func (lita: *Lita) addModule(module: *Module) {
 }
 
 public func (lita: *Lita) getModule(filename: *const char) : *Module {
-    @static var filenameKey = [MAX_PATH]char{0}
+    var filenameKey = [MAX_PATH]char{0}
     GetFilenameKey(filename, filenameKey)
 
     return lita.modules.get(filenameKey)
 }
+
+@doc("Extremely slow, this is a linear probe")
+public func (lita: *Lita) getModuleByName(name: *const char) : *Module {
+    var buffer = [MAX_PATH]char{0}
+
+    var modulePath = name.toString()
+    var packageName = ToModuleName(modulePath)
+
+    for(var it = lita.modules.iter(); it.hasNext();) {
+        var entry = it.next()
+        var pkgName = entry.value.id.packageName.view
+        printf("Checking: %.*s\n", pkgName.length, pkgName.buffer)
+        if(pkgName.equals(packageName)) {
+            return entry.value
+        }
+    }
+    return LoadModule(
+        lita,
+        modulePath,
+        SrcPos{
+            .filename = "<compiler script>",
+            .lineStart = "",
+            .start = "",
+            .end = "",
+        }
+    )
+}
+
 
 public func (lita: *Lita) startCapture(type: MetricType) {
     var metric = &lita.metrics[type]
@@ -858,29 +887,41 @@ func ParseModule(lita: *Lita, module: *Module, pos: SrcPos) : bool {
             continue
         }
 
-        var filename: [MAX_PATH]char
-        if(!FindModulePath(lita, importStmt.name.str.view, filename)) {
-            lita.result.addError(importStmt.startPos, "Could not find module '%.*s'",
-                    importStmt.name.str.length, importStmt.name.str.buffer)
-            continue
-        }
+        var importModule = LoadModule(
+            lita,
+            importStmt.name.str.view,
+            importStmt.startPos
+        )
 
-        var importModule = lita.getModule(filename)
         if(importModule) {
             importStmt.moduleId = &importModule.id
-            continue;
         }
 
-        importModule = NewModule(lita, importStmt.name.str.view, filename)
-        importStmt.moduleId = &importModule.id
-        lita.addModule(importModule)
-
-        ParseModule(lita, importModule, importStmt.startPos)
     }
 
     return true
 }
 
+public func LoadModule(lita: *Lita, packageName: String, srcPos: SrcPos): *Module {
+    var filename: [MAX_PATH]char
+    if(!FindModulePath(lita, packageName, filename)) {
+        lita.result.addError(srcPos, "Could not find module '%.*s'",
+                packageName.length, packageName.buffer
+        )
+        return null
+    }
+
+    var importModule = lita.getModule(filename)
+    if(importModule) {
+        return importModule
+    }
+
+    importModule = NewModule(lita, packageName, filename)
+    lita.addModule(importModule)
+
+    ParseModule(lita, importModule, srcPos)
+    return importModule
+}
 
 public func GetPackageName(srcPath: *const char, inputFile: *const char) : String {
 

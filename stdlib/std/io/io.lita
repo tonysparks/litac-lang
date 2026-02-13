@@ -4,7 +4,7 @@ import "std/string/builder"
 import "std/string/buffer"
 import "std/libc"
 import "std/limits"
-import "std/system"
+//import "std/system"
 
 #postparse
 const USE_WINDOWS = false;
@@ -211,6 +211,10 @@ public func ReadFileFullyStr(
     fileName: String,
     buffer: *StringBuilder
 ) : FileStatus {
+    // TODO: fix compiler bug with unknown variable from std/system
+    // due to circular dependency with importing using system_os
+    const MAX_PATH = 256;
+    
     var path:[MAX_PATH]char;
     var strPath = StringBufferInit(path, MAX_PATH, 0)
     strPath.format("%.*s", fileName.length, fileName.buffer)

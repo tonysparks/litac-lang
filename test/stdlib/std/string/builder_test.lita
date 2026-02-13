@@ -1,0 +1,220 @@
+import "std/string"
+import "std/string/builder"
+import "std/assert"
+import "std/libc"
+
+@test
+func testStringBuilderInitEmpty() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    assert(sb.empty())
+    assert(sb.size() == 0)
+    assert(sb.remaining() >= 32)
+}
+
+@test
+func testStringBuilderAppendStr() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    var n = sb.appendStr("hello")
+    assert(n == 5)
+    assert(sb.size() == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBuilderAppendStrn() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    var n = sb.appendStrn("hello world", 5)
+    assert(n == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBuilderAppendString() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    var s = StringInit("hello")
+    var n = sb.appendString(s)
+    assert(n == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBuilderAppendChar() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    sb.appendChar('a')
+    sb.appendChar('b')
+    sb.appendChar('c')
+    assert(sb.size() == 3)
+    assert(sb.cStr().equals("abc"))
+}
+
+@test
+func testStringBuilderAppendFormat() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.append("x=%d y=%s", 42, "ok")
+    assert(sb.cStr().equals("x=42 y=ok"))
+}
+
+@test
+func testStringBuilderAppendI32() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    sb.appendI32(-99)
+    sb.appendI32(100)
+    assert(sb.cStr().equals("-99100"))
+}
+
+@test
+func testStringBuilderAppendI64() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    sb.appendI64(12345 as (i64))
+    assert(sb.cStr().equals("12345"))
+}
+
+@test
+func testStringBuilderClear() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    sb.appendStr("hello")
+    assert(sb.size() == 5)
+    sb.clear()
+    assert(sb.empty())
+    assert(sb.size() == 0)
+    assert(sb.cStr().equals(""))
+}
+
+@test
+func testStringBuilderDelete() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("hello world")
+    sb.delete(5, 11)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBuilderDeleteMiddle() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("abcdef")
+    sb.delete(2, 4)
+    assert(sb.cStr().equals("abef"))
+}
+
+@test
+func testStringBuilderContains() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("hello world")
+    assert(sb.contains(StringInit("world")))
+    assert(sb.contains(StringInit("hello")))
+    assert(!sb.contains(StringInit("xyz")))
+}
+
+@test
+func testStringBuilderIndexOf() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("hello world")
+    assert(sb.indexOf(StringInit("world")) == 6)
+    assert(sb.indexOf(StringInit("hello")) == 0)
+    assert(sb.indexOf(StringInit("xyz")) == -1)
+}
+
+@test
+func testStringBuilderReplace() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("hello world")
+    sb.replace(6, 11, StringInit("there"))
+    assert(sb.cStr().equals("hello there"))
+}
+
+@test
+func testStringBuilderInsert() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("helloworld")
+    sb.insert(5, " ")
+    assert(sb.cStr().equals("hello world"))
+}
+
+@test
+func testStringBuilderGet() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    sb.appendStr("ab")
+    assert(sb.get(0) == 'a')
+    assert(sb.get(1) == 'b')
+    assert(sb.get(-1) == '\0')
+    assert(sb.get(2) == '\0')
+}
+
+@test
+func testStringBuilderCopyTo() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    sb.appendStr("hi")
+    var buf = [8]char{0}
+    var n = sb.copyTo(buf, 8)
+    assert(n == 2)
+    assert(buf[0] == 'h')
+    assert(buf[1] == 'i')
+    assert(buf[2] == '\0')
+}
+
+@test
+func testStringBuilderReserve() {
+    var sb = StringBuilderInit(8)
+    defer sb.free()
+    sb.appendStr("ab")
+    var ok = sb.reserve(100)
+    assert(ok)
+    assert(sb.remaining() >= 100)
+}
+
+@test
+func testStringBuilderGrow() {
+    var sb = StringBuilderInit(2)
+    defer sb.free()
+    sb.appendStr("hello")
+    assert(sb.size() == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBuilderFormat() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("prefix ")
+    sb.format("%d %s", 1, "x")
+    assert(sb.cStr().equals("1 x"))
+}
+
+// @test
+// func testStringBuilderForEach() {
+//     var sb = StringBuilderInit(32)
+//     defer sb.free()
+//     sb.appendStr("ab")
+//     var count: i32 = 0
+//     sb.forEach(func(c: char) : bool {
+//         count += 1
+//         return false
+//     })
+//     assert(count == 2)
+// }
+
+@test
+func testStringBuilderTrim() {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    sb.appendStr("  xy z  ")
+    sb.trim()
+    assert(sb.cStr().equals("xy z"))
+}

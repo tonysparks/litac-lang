@@ -67,12 +67,16 @@ public func RunLitac(options: *LitaOptions) : i32 {
         return 0;
     }
 
+    var hasError = false
+
     var root = lita.parse()
     if(!root) {
+        hasError = true
         goto report
     }
 
     if(!lita.typeCheck(root)) {
+        hasError = true
         goto report
     }
 
@@ -81,6 +85,7 @@ public func RunLitac(options: *LitaOptions) : i32 {
     }
 
     if(!lita.transpile(root)) {
+        hasError = true
         goto report;
     }
 
@@ -92,7 +97,7 @@ report:
     var sb = StringBuilderInit(1024)
     defer sb.free()
 
-    var hasError = !lita.result.errors.empty()
+    hasError = hasError || !lita.result.errors.empty()
     if(hasError) {
         for(var i = 0; i < lita.result.errors.size(); i += 1) {
             PrintError(lita.options.isColoredOutput, sb, lita.result.errors.get(i))
@@ -175,6 +180,7 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     parser.addOption("pkg-run",        '\0', "Runs a script defined in the `commands` section in this projects `pkg.json`.  The argument passed of this option is used to run the `commands.{option}` command", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("pkg-init",       '\0', "Initializes a new LitaC package project", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("pkg-build",      '\0', "Builds the LitaC package", 0, null);
+    parser.addOption("pkg-test",       '\0', "Recursively scan for *_test.lita files and run each. Optionally pass a directory to scan (default: current directory).", 0, null);
     parser.addOption("release",        '\0', "Marks builds in release mode", 0, null);
     parser.addOption("proxy",          '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null);
     parser.addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null);
@@ -227,6 +233,11 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
     if(parser.hasOption("pkg-build")) {
         options.pkgOptions.pkgCmd = PkgCommand.PKG_BUILD
         options.pkgOptions.isRelease = parser.hasOption("release")
+    }
+
+    if(parser.hasOption("pkg-test")) {
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_TEST
+        options.testsOnly = true
     }
 
     options.languageServer = parser.hasOption("languageServer")
@@ -434,6 +445,8 @@ err_print:
         var sb = StringBuilderInit()
         defer sb.free()
 
+        parser.printErrors(sb)
+        sb.append("\n\n")
         parser.printHelp(sb)
         printf("%s", sb.cStr())
     }
@@ -481,6 +494,9 @@ func HandlePkgCommand(options: *LitaOptions) : i32 {
         }
         case PkgCommand.PKG_BUILD: {
             return RunPkgBuild(options, &pm)
+        }
+        case PkgCommand.PKG_TEST: {
+            return RunPkgTest(options, &pm)
         }
         default:
             return 0;
@@ -566,4 +582,8 @@ func RunPkgBuild(options: *LitaOptions, pm: *PackageManager) : i32 {
         return 1;
     }
     return 0;
+}
+
+func RunPkgTest(options: *LitaOptions, pm: *PackageManager) : i32 {
+    return pm.testCommand(options)
 }

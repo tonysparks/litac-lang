@@ -1,3 +1,91 @@
+
+I'm working on a custom programming language, in the standard library I have stdlib/std/array whih is a dynamic array implementation.  Can you write a test suite for it in the test/stdlib/std folder (which doesn't exist) in a array_test.lita file?
+
+/*
+Async
+*/
+func DoSomeIO(io: *IORuntime) {
+    var openFileFuture = Future{}
+    AsyncFileOpen(io, "some/file.txt", &openFileFuture)
+    //openFileFuture.await(10, TimeUnit.SECONDS)
+
+    //var data = openFileFuture.get()
+}
+
+struct Future {
+    result: *void
+    op: IOOperation
+    onCompleted: func(result: *void) : void;
+}
+
+typedef func(cont: *Continuation) : CoroutineResult as Coroutine;
+trait Dispatch {
+    submit: func(co: *Coroutine) : Future
+}
+trait IORuntime {
+    execute: func(op: IOOperation, future: *Future) : Status
+    poll: func() : Status
+}
+
+
+func AsyncFileOpen(
+    io: *Runtime,
+    filename: *const char,
+    future: *Future
+ ) : Status {
+    future.op = IOOperation {
+        .opcode = FILEOPEN,
+        .fileOpen = FileOpenOp {
+            .filename = filename,
+            .ops = READ_WRITE
+            .fileHandle = FileHandle {
+            }
+        }
+    }
+    return io.execute(op, future)
+}
+
+struct IOUringRuntime {
+    ring: io_uring
+    ///
+}
+
+func (this: *IOUringRuntime) execute(
+    op: IOOperation,
+    future: *Future
+): Status {
+    var sqe = uring_sqe(this.ring)
+    switch(op.opcode) {
+        case FILEOPEN: {
+            uring_sqe_userdata(sqe, future)
+            uring_prep_fileopen(sqe, op.fileOpen.filename, op.fileOpen.ops)
+            break;
+        }
+        ...
+    }
+
+    uring_submit(&this.ring)
+}
+
+func (this: *IOUringRuntime) poll(): Status {
+    var qbe = uring_wait(&this.ring)
+    var result = uring_qbe_userdata(qbe) as (*Future)
+    switch(result.op.opcode) {
+        case FILEOPEN: {
+            var fd = qbe.res // the file descriptor
+            result.op.fileOpen.fileHandle.fd = fd
+            result.future.onCompleted(
+
+            )
+            break
+        }
+    }
+}
+
+/*
+Error handling
+*/
+
 public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : PkgStatus {
     if(!pm.pkg) {
         return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND

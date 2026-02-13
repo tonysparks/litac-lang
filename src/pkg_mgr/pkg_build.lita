@@ -95,7 +95,9 @@ func (this: *PackageManager) build(
     }
 
     // TODO: Recursively build dependencies too...
-    RunLitac(litaOptions)
+    if(RunLitac(litaOptions) != 0) {
+        return PkgStatus.ERROR_RUNNING_COMMAND
+    }
     return PkgStatus.OK
 }
 

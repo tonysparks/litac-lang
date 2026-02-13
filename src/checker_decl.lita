@@ -321,7 +321,7 @@ public func (this: *TypeChecker) resolveNoteDecl(noteDecl: *AggregateDecl) : boo
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 field.typeInfo = this.resolveTypeSpec(varField.type)
-                assert(field.typeInfo)
+                assert(field.typeInfo != null)
 
                 if(varField.defaultExpr) {
                     if(!this.resolveExpr(varField.defaultExpr)) {
@@ -383,7 +383,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
 
                 var traitField = field.traitField
                 field.typeInfo = this.resolveTypeSpec(traitField.type)
-                assert(field.typeInfo)
+                assert(field.typeInfo != null)
 
                 if(!this.resolveNotes(traitField.attributes.notes)) {
                     return false
@@ -404,7 +404,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
             case StmtKind.VAR_FIELD_DECL: {
                 var varField = field.varField
                 field.typeInfo = this.resolveTypeSpec(varField.type)
-                assert(field.typeInfo)
+                assert(field.typeInfo != null)
 
                 if(!this.resolveNotes(varField.attributes.notes)) {
                     return false

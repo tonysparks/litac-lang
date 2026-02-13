@@ -56,7 +56,7 @@ public func (a: *Array<T>) add<T>(element: T) : i32 {
 
     assert(a.length < a.capacity)
     assert(a.capacity > 0)
-    assert(a.elements)
+    assert(a.elements != null)
 
     #if (getTypeKind("element") == "ARRAY")
         memcpy(&a.elements[a.length], element as (*void), sizeof(:T));

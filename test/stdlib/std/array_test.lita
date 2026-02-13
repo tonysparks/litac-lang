@@ -1,0 +1,367 @@
+import "std/array"
+import "std/assert"
+
+@test
+func testArrayInitDefault() {
+    var a = ArrayInit<i32>()
+    defer a.free()
+    assert(a.empty())
+    assert(a.size() == 0)
+    assert(a.capacity >= 16)
+}
+
+@test
+func testArrayInitWithSize() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    assert(a.empty())
+    assert(a.size() == 0)
+    assert(a.capacity == 8)
+}
+
+@test
+func testAddAndGet() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(10)
+    a.add(20)
+    a.add(30)
+    assert(a.size() == 3)
+    assert(a.get(0) == 10)
+    assert(a.get(1) == 20)
+    assert(a.get(2) == 30)
+}
+
+@test
+func testPush() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.push(1)
+    a.push(2)
+    assert(a.size() == 2)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+}
+
+@test
+func testSet() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    a.set(1, 99)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 99)
+    assert(a.get(2) == 3)
+}
+
+@test
+func testFirstAndLast() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(10)
+    a.add(20)
+    a.add(30)
+    assert(a.first() == 10)
+    assert(a.last() == 30)
+}
+
+@test
+func testFirstPtrAndLastPtr() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(10)
+    a.add(20)
+    var firstPtr = a.firstPtr()
+    var lastPtr = a.lastPtr()
+    assert(firstPtr != null)
+    assert(lastPtr != null)
+    assert(firstPtr[0] == 10)
+    assert(lastPtr[0] == 20)
+}
+
+@test
+func testPop() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(10)
+    a.add(20)
+    a.add(30)
+    var v = a.pop()
+    assert(v == 30)
+    assert(a.size() == 2)
+    assert(a.last() == 20)
+    v = a.pop()
+    assert(v == 20)
+    assert(a.size() == 1)
+    assert(a.first() == 10)
+}
+
+@test
+func testRemoveAt() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    a.add(4)
+    a.add(5)
+    var v = a.removeAt(2)
+    assert(v == 3)
+    assert(a.size() == 4)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+    assert(a.get(2) == 4)
+    assert(a.get(3) == 5)
+}
+
+@test
+func testInsertAtEnd() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.insertAt(2, 3)
+    assert(a.size() == 3)
+    assert(a.get(2) == 3)
+}
+
+@test
+func testInsertAtMiddle() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.add(4)
+    a.add(5)
+    a.insertAt(2, 3)
+    assert(a.size() == 5)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+    assert(a.get(2) == 3)
+    assert(a.get(3) == 4)
+    assert(a.get(4) == 5)
+}
+
+@test
+func testInsertAtFront() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    a.add(2)
+    a.add(3)
+    a.insertAt(0, 1)
+    assert(a.size() == 3)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+    assert(a.get(2) == 3)
+}
+
+@test
+func testAddAll() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    var other = ArrayInit<i32>(4)
+    defer other.free()
+    other.add(3)
+    other.add(4)
+    other.add(5)
+    var n = a.addAll(other)
+    assert(n == 3)
+    assert(a.size() == 5)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+    assert(a.get(2) == 3)
+    assert(a.get(3) == 4)
+    assert(a.get(4) == 5)
+}
+
+@test
+func testInsertAllAt() {
+    var a = ArrayInit<i32>(16)
+    defer a.free()
+    for(var i = 0; i < 5; i += 1) {
+        a.add(i + 1)
+    }
+    var other = ArrayInit<i32>(4)
+    defer other.free()
+    other.add(100)
+    other.add(101)
+    other.add(102)
+    a.insertAllAt(2, other)
+    assert(a.size() == 8)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+    assert(a.get(2) == 100)
+    assert(a.get(3) == 101)
+    assert(a.get(4) == 102)
+    assert(a.get(5) == 3)
+    assert(a.get(6) == 4)
+    assert(a.get(7) == 5)
+}
+
+@test
+func testSetAll() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    a.add(4)
+    a.add(5)
+    var other = ArrayInit<i32>(2)
+    defer other.free()
+    other.add(99)
+    other.add(98)
+    var n = a.setAll(1, other)
+    assert(n == 2)
+    assert(a.size() == 5)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 99)
+    assert(a.get(2) == 98)
+    assert(a.get(3) == 4)
+    assert(a.get(4) == 5)
+}
+
+@test
+func testReserve() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    assert(a.capacity == 4)
+    var r = a.reserve(32)
+    assert(r == 32)
+    assert(a.capacity == 32)
+    assert(a.size() == 0)
+    a.add(1)
+    assert(a.get(0) == 1)
+}
+
+@test
+func testSwap() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(10)
+    a.add(20)
+    a.add(30)
+    a.swap(0, 2)
+    assert(a.get(0) == 30)
+    assert(a.get(1) == 20)
+    assert(a.get(2) == 10)
+}
+
+@test
+func testClear() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    assert(a.size() == 3)
+    a.clear()
+    assert(a.empty())
+    assert(a.size() == 0)
+}
+
+@test
+func testCopy() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    var b = a.copy()
+    defer b.free()
+    assert(b.size() == a.size())
+    assert(b.get(0) == 1)
+    assert(b.get(1) == 2)
+    assert(b.get(2) == 3)
+    a.set(0, 99)
+    assert(b.get(0) == 1)
+}
+
+// @test
+// func testForEach() {
+//     var a = ArrayInit<i32>(4)
+//     defer a.free()
+//     a.add(1)
+//     a.add(2)
+//     a.add(3)
+//     var sum: i32 = 0
+//     a.forEach(func(x: i32) : bool {
+//         sum += x
+//         return false
+//     })
+//     assert(sum == 6)
+// }
+
+// @test
+// func testForEachBreak() {
+//     var a = ArrayInit<i32>(4)
+//     defer a.free()
+//     a.add(1)
+//     a.add(2)
+//     a.add(3)
+//     var count: i32 = 0
+//     a.forEach(func(x: i32) : bool {
+//         count += 1
+//         return x == 2
+//     })
+//     assert(count == 2)
+// }
+
+func sortCmp(a: i32, b: i32) : i32 {
+    return a - b
+}
+
+@test
+func testSort() {
+    var a = ArrayInit<i32>(16)
+    defer a.free()
+    a.add(3)
+    a.add(1)
+    a.add(4)
+    a.add(1)
+    a.add(5)
+    a.add(9)
+    a.add(2)
+    a.add(6)
+    a.sort(sortCmp)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 1)
+    assert(a.get(2) == 2)
+    assert(a.get(3) == 3)
+    assert(a.get(4) == 4)
+    assert(a.get(5) == 5)
+    assert(a.get(6) == 6)
+    assert(a.get(7) == 9)
+}
+
+@test
+func testGrowBeyondCapacity() {
+    var a = ArrayInit<i32>(2)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    a.add(4)
+    a.add(5)
+    assert(a.size() == 5)
+    assert(a.capacity >= 5)
+    assert(a.get(0) == 1)
+    assert(a.get(4) == 5)
+}
+
+@test
+func testGetPtr() {
+    var a = ArrayInit<i32>(4)
+    defer a.free()
+    a.add(10)
+    a.add(20)
+    var p = a.getPtr(1)
+    assert(p != null)
+    assert(p[0] == 20)
+    p[0] = 21
+    assert(a.get(1) == 21)
+}

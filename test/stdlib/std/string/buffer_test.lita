@@ -1,0 +1,195 @@
+import "std/string"
+import "std/string/buffer"
+import "std/assert"
+import "std/libc"
+import "std/mem"
+
+@test
+func testCString() {
+    var buf = []char {'h','e','l','l','o','\0'}
+    var sb = CString(buf)
+    assert(sb.length == 5)
+    assert(sb.capacity == 5)
+    assert(!sb.empty())
+    assert(sb.size() == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBufferInit() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    assert(sb.capacity == 64)
+    assert(sb.length == 0)
+    assert(sb.empty())
+    sb.appendStr("hi")
+    assert(sb.size() == 2)
+    assert(sb.cStr().equals("hi"))
+}
+
+@test
+func testStringBufferFormat() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    var n = sb.format("x=%d", 42)
+    assert(n >= 0)
+    assert(sb.cStr().equals("x=42"))
+}
+
+@test
+func testStringBufferAppend() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.format("a")
+    sb.append("b%d", 2)
+    assert(sb.cStr().equals("ab2"))
+}
+
+@test
+func testStringBufferAppendStr() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("hello")
+    assert(sb.size() == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBufferAppendStrn() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStrn("hello world", 5)
+    assert(sb.size() == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBufferSetStrn() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.setStrn("hello", 5)
+    assert(sb.length == 5)
+    assert(sb.cStr().equals("hello"))
+    sb.setStrn("xy", 2)
+    assert(sb.length == 2)
+    assert(sb.cStr().equals("xy"))
+}
+
+@test
+func testStringBufferAppendChar() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendChar('a')
+    sb.appendChar('b')
+    sb.appendChar('c')
+    assert(sb.size() == 3)
+    assert(sb.cStr().equals("abc"))
+}
+
+@test
+func testStringBufferSubstring() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("hello world")
+    var sub = sb.substring(0, 5)
+    assert(sub.equalsString("hello"))
+    sub = sb.substring(6, 11)
+    assert(sub.equalsString("world"))
+}
+
+@test
+func testStringBufferClear() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("hello")
+    assert(sb.size() == 5)
+    sb.clear()
+    assert(sb.empty())
+    assert(sb.size() == 0)
+}
+
+@test
+func testStringBufferToLower() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("HELLO")
+    sb.toLower()
+    assert(sb.cStr().equals("hello"))
+}
+
+@test
+func testStringBufferToUpper() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("hello")
+    sb.toUpper()
+    assert(sb.cStr().equals("HELLO"))
+}
+
+@test
+func testStringBufferRemaining() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    assert(sb.remaining() == 64)
+    sb.appendStr("hi")
+    assert(sb.remaining() == 62)
+}
+
+@test
+func testStringBufferToString() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("hello")
+    var s = sb.toString()
+    assert(s.length == 5)
+    assert(s.equalsString("hello"))
+}
+
+@test
+func testStringBufferCopy() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("copy me")
+    var c = sb.copy()
+    defer defaultAllocator.free(c.buffer as (*void))
+    assert(c.length == 7)
+    assert(c.capacity == 7)
+    assert(c.cStr().equals("copy me"))
+    assert(c.buffer != sb.buffer)
+}
+
+@test
+func testStringBufferHash() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStr("hello")
+    var h = sb.hash()
+    assert(h != 0)
+}
+
+@test
+func testStringBufferEquals() {
+    var a = [64]char{0}
+    var b = [64]char{0}
+    var sba = StringBufferInit(a, 64)
+    var sbb = StringBufferInit(b, 64)
+    sba.appendStr("hello")
+    sbb.appendStr("hello")
+    assert(sba.equals(sbb))
+    sbb.clear()
+    sbb.appendStr("world")
+    assert(!sba.equals(sbb))
+}
+
+@test
+func testStringBufferAdjust() {
+    var storage = [64]char{0}
+    storage[0] = 'a'
+    storage[1] = 'b'
+    storage[2] = 'c'
+    storage[3] = '\0'
+    var sb = StringBufferInit(storage, 64, 0)
+    sb.adjust()
+    assert(sb.length == 3)
+    assert(sb.cStr().equals("abc"))
+}

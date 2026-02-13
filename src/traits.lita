@@ -99,7 +99,7 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
 
     for(var i = 0; i < checker.symbolTraits.size(); i+=1) {
         var traitSym = checker.symbolTraits.get(i)
-        assert(traitSym)
+        assert(traitSym != null)
         assert(traitSym.decl && traitSym.decl.kind == StmtKind.TRAIT_DECL)
 
         var traitDecl = traitSym.decl as (*AggregateDecl)
@@ -352,7 +352,7 @@ func PrintGenericArgs(genericArgs: *Array<SymGenericArg>, sb: *StringBuilder) {
         }
 
         var genArg = genericArgs.get(x)
-        assert(genArg.type)
+        assert(genArg.type != null)
         genArg.type.toString(sb, true)
     }
     if(genericArgs.size() > 0) {
