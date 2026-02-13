@@ -87,7 +87,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
     )
 
     printf(
-        "pkg-test: %d/%d test file(s) %spassed%s\n",
+        "pkg-test: %d/%d test file(s) %spassed%s ✅\n",
         testPaths.size()-failed,
         testPaths.size(),
         ConsoleColorsAsStr(ConsoleColors.GREEN),
@@ -96,7 +96,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
 
     if(failed > 0) {
         printf(
-            "pkg-test: %d test file(s) %sfailed%s\n",
+            "pkg-test: %d test file(s) %sfailed%s ❌\n",
             failed,
             ConsoleColorsAsStr(ConsoleColors.RED),
             ConsoleColorsAsStr(ConsoleColors.CLEAR)
