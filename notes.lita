@@ -1,5 +1,53 @@
 
-I'm working on a custom programming language, in the standard library I have stdlib/std/array whih is a dynamic array implementation.  Can you write a test suite for it in the test/stdlib/std folder (which doesn't exist) in a array_test.lita file?
+
+// CLI interface
+
+// Build from pkg.json OR from single supplied file
+litac build
+
+build
+    -run
+    -cPrefix
+    -cFormat
+    -checkerOnly
+    -cOnly
+    -profile
+    -disableLine
+    -debug
+    -instrument
+    -srcDir
+    -output
+    -outputDir
+    -types
+    -release
+    -buildCmd
+    -strict
+    -tcc
+    -lib
+
+test
+    -file
+    -func
+    -package
+    -testDir
+
+version
+
+doc
+
+run
+
+init
+
+lsp
+
+install
+
+ global options:
+ -colors
+ -verbose
+ -maxMemory
+ --
 
 /*
 Async

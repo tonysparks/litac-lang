@@ -57,11 +57,11 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
     var failed = 0
     for(var i = 0; i < testPaths.size(); i += 1) {
         var path = testPaths.get(i)
-        printf("pkg-test: running '%s'\n", path)
+        printf("test: running '%s'\n", path)
 
         var cmd = StringBuilderInit(256, pm.allocator)
         cmd.append(
-            "cd %s && litac -colors -pkg-build -run -testFile %s",
+            "cd %s && litac test -file \"%s\"",
             options.projectPath,
             path
         )

@@ -367,7 +367,7 @@ public func (this: *TypeChecker) resolveAggregateDecl(aggDecl: *AggregateDecl) :
         return false
     }
 
-    const isTrait = aggDecl.sym.flags & SymbolFlags.IS_TRAIT
+    const isTrait = (aggDecl.sym.flags & SymbolFlags.IS_TRAIT) > 0
     const module = this.current
 
     if(isTrait && !(aggDecl.sym.flags & SymbolFlags.IS_GENERIC_TEMPLATE)) {

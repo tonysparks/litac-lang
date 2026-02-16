@@ -36,7 +36,7 @@ import "tcc/libtcc"
 
 
 public const MAX_PREFIX_SIZE = 32
-public const LITA_VERSION = "0.1.6-alpha"
+public const LITA_VERSION = "0.1.8-alpha"
 
 public struct Lita {
     allocator: *const Allocator
@@ -668,7 +668,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
 public func (this: *Lita) run() : i32 {
     // TODO: Fix this -- the process library doesn't support specifying the command
     // path on Linux based systems, for now we will do this horrible hack work around
-#static_if defined(__linux__)
+#static_if !defined(_WIN32)
     var sb = StringBuilderInit(256, this.allocator)
     defer sb.free()
 
@@ -717,6 +717,7 @@ public func (this: *Lita) run() : i32 {
 
     var result = 0
     process.join(&result)
+
     return result
 #end
 }

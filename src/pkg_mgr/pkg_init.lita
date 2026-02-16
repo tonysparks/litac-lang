@@ -47,7 +47,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
+                "build",
                 "-run"
             ],
             "presentation": {
@@ -69,7 +69,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
+                "build",
                 "-release",
                 "-run"
             ],
@@ -92,9 +92,8 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
-                "-run",
-                "-testFile",
+                "test",
+                "-file",
                 "${file}"
             ],
             "presentation": {
@@ -116,10 +115,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
-                "-run",
-                "-test",
-                ".*"
+                "test",
             ],
             "presentation": {
                 "echo": true,

@@ -109,6 +109,7 @@ import "pkg_mgr/pkg_test"
 
 import "build"
 import "lita"
+import "main"
 
 public struct PackageOptions {
     projectPath: *const char
@@ -223,8 +224,23 @@ public func (this: *PackageManager) initCommand(options: PackageInitOptions) : P
 @doc("""
     Initializes a new LitaC project, writing out scaffolding files
 """)
-public func (this: *PackageManager) buildCommand(options: PackageBuildOptions) : PkgStatus {
+public func (this: *PackageManager) buildCommand(
+    options: PackageBuildOptions
+) : PkgStatus {
     defer this.printMessages()
+
+    var litaOptions = this.options.litaOptions
+    // See if we're running the build command for a non-pkg
+    // source file
+    if (!this.hasProjectPkg()) {
+        if(litaOptions.inputFile.empty()) {
+            this.errors.append(
+                "Missing an input file.  Either create a 'pkg.json' project package file (via the 'init' command) or supply a .lita source file."
+            )
+            return 1;
+        }
+        return RunLitac(litaOptions)
+    }
 
     var status = this.readProjectPkg()
     if(status != PkgStatus.OK) {
@@ -246,8 +262,9 @@ public func (this: *PackageManager) installCommand(options: PackageInstallOption
     }
 
     printf("Found '%s/pkg.json' with %d package dependencies.\n",
-        CurrentWorkingPath(),
-        this.pkg.dependencies.size())
+        this.options.projectPath,
+        this.pkg.dependencies.size()
+    )
 
     if(!this.pkg.dependencies.empty()) {
         for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
@@ -305,15 +322,25 @@ public func (this: *PackageManager) testCommand(options: *LitaOptions) : i32 {
     return PackageTest(this, options)
 }
 
+public func (this: *PackageManager) hasProjectPkg(): bool {
+    // HACK: clean this up... this relies on backtracking
+    // on state...
+    var errorCount = this.errors.length
+    defer this.errors.length = errorCount
 
+    return this.readProjectPkg() == PkgStatus.OK
+}
 func (this: *PackageManager) readProjectPkg() : PkgStatus {
     var temp:[MAX_PATH]char;
 
     var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
-    pkgDef.format("%s/pkg.json", CurrentWorkingPath())
+    pkgDef.format("%s/pkg.json", this.options.projectPath)
 
     if(!FileExists(pkgDef.cStr())) {
-        this.errors.append("could not find '%s'\n", pkgDef.cStr())
+        this.errors.append(
+            "could not find 'pkg.json' in '%s'\n",
+            this.options.projectPath
+        )
         return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
     }
 
@@ -324,8 +351,8 @@ func (this: *PackageManager) readProjectPkg() : PkgStatus {
 
     // TODO: Get the actual /src directory -- this can be taken off of
     // LitaOptions..
-    var pkgPath = StringBufferInit(this.pkg.path, MAX_PATH, 0)
-    pkgPath.format("%s/src", CurrentWorkingPath())
+    var pkgPath = StringBufferInit(this.pkg.path, MAX_PATH, pkgDef.length)
+    pkgPath.format("%s/src", this.options.projectPath)
     pkgPath.cStr()
 
     return PkgStatus.OK

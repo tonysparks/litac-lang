@@ -5,6 +5,7 @@ import "std/string/builder"
 import "std/string/buffer"
 import "std/string"
 import "std/libc" as c
+import "std/assert"
 
 const MAX_MESSAGE_SIZE = 256
 
@@ -31,12 +32,25 @@ public struct Option {
     flags: i32
 }
 
-public struct CmdParser {
+public struct Cmd {
+    name: *const char
+    description: *const char
     options: Array<Option>
+    hasArg: bool
+    argValue: *const char
+}
+
+public struct CmdParser {
+    allocator: *const Allocator
+    //options: Array<Option>
+    commands: Array<Cmd>
     args: Array<*const char>
     errors: [MAX_MESSAGE_SIZE]char
     status: CmdParserStatus
     header: *const char
+
+    defaultCmd: *Cmd
+    cmd: *Cmd
 }
 
 public func CmdParserInit(allocator: *const Allocator = defaultAllocator) : CmdParser {
@@ -47,35 +61,92 @@ public func CmdParserInit(allocator: *const Allocator = defaultAllocator) : CmdP
 }
 
 public func (p: *CmdParser) init(allocator: *const Allocator = defaultAllocator) {
-    p.options = ArrayInit<Option>(16, allocator)
+    p.allocator = allocator
     p.args = ArrayInit<*const char>(16, allocator)
+    p.commands = ArrayInit<Cmd>(16, allocator)
     p.status = CmdParserStatus.OK
+
+    // add the default command for global flags
+    p.defaultCmd = p.addCommand("", "")
+    p.cmd = null
 }
 
 public func (p: *CmdParser) free() {
-    p.options.free()
+    for(var i = 0; i < p.commands.size(); i+=1) {
+        var cmd = p.commands.getPtr(i)
+        cmd.options.free()
+    }
+    p.commands.free()
     p.args.free()
 }
 
-public func (p: *CmdParser) addOption(longName: *const char,
-                                      shortName: char,
-                                      description: *const char,
-                                      flags: i32,
-                                      defaultValue: *const char) {
-
-    p.options.add(Option {
-        .name = longName,
-        .shortName = shortName,
-        .description = description,
-        .value = null,
-        .flags = flags,
-        .defaultValue = defaultValue
-    })
+public func (p: *CmdParser) addCommand(
+    name: *const char,
+    description: *const char,
+    hasArg: bool = false
+): *Cmd {
+    p.commands.add(
+        Cmd{
+            .name = name,
+            .description = description,
+            .options = ArrayInit<Option>(16, p.allocator),
+            .hasArg = hasArg,
+            .argValue = null,
+        }
+    )
+    return p.commands.lastPtr()
 }
 
-public func (p: *CmdParser) getOption(longName: *const char) : *Option {
-    for(var i = 0; i < p.options.size(); i += 1) {
-        var opt = &p.options.elements[i]
+public func (this: *Cmd) addOption(
+    longName: *const char,
+    shortName: char,
+    description: *const char,
+    flags: i32,
+    defaultValue: *const char
+): *Cmd {
+    assert(this != null)
+    this.options.add(
+        Option {
+            .name = longName,
+            .shortName = shortName,
+            .description = description,
+            .value = null,
+            .flags = flags,
+            .defaultValue = defaultValue
+        }
+    )
+    return this
+}
+
+public func (p: *CmdParser) addOption(
+    longName: *const char,
+    shortName: char,
+    description: *const char,
+    flags: i32,
+    defaultValue: *const char
+): *CmdParser {
+    p.defaultCmd.addOption(
+        longName,
+        shortName,
+        description,
+        flags,
+        defaultValue
+    )
+    return p
+}
+
+
+public func (p: *CmdParser) hasCmd(): bool {
+    return p.cmd != null
+}
+
+public func (p: *CmdParser) getCmd(): *Cmd {
+    return p.cmd
+}
+
+public func (this: *Cmd) getOption(longName: *const char) : *Option {
+    for(var i = 0; i < this.options.size(); i += 1) {
+        var opt = &this.options.elements[i]
         if(opt.name.equals(longName)) {
             return opt
         }
@@ -84,9 +155,13 @@ public func (p: *CmdParser) getOption(longName: *const char) : *Option {
     return null
 }
 
-public func (p: *CmdParser) getOptionShort(shortName: char) : *Option {
-    for(var i = 0; i < p.options.size(); i += 1) {
-        var opt = &p.options.elements[i]
+public func (p: *CmdParser) getOption(longName: *const char) : *Option {
+    return p.defaultCmd.getOption(longName)
+}
+
+public func (this: *Cmd) getOptionShort(shortName: char) : *Option {
+    for(var i = 0; i < this.options.size(); i += 1) {
+        var opt = &this.options.elements[i]
         if(opt.shortName == shortName) {
             return opt
         }
@@ -95,8 +170,28 @@ public func (p: *CmdParser) getOptionShort(shortName: char) : *Option {
     return null
 }
 
+public func (p: *CmdParser) getOptionShort(shortName: char) : *Option {
+    if(p.defaultCmd == null) return null
+    return p.defaultCmd.getOptionShort(shortName)
+}
+
+public func (this: *Cmd) hasOption(longName: *const char) : bool {
+    var opt = this.getOption(longName)
+    if(!opt) {
+        return false
+    }
+
+    return opt.flags & OptionFlag.IS_USED
+}
+
 public func (p: *CmdParser) hasOption(longName: *const char) : bool {
-    var opt = p.getOption(longName)
+    if(p.defaultCmd == null) return false
+    return p.defaultCmd.hasOption(longName)
+}
+
+
+public func (this: *Cmd) hasOptionShort(shortName: char) : bool {
+    var opt = this.getOptionShort(shortName)
     if(!opt) {
         return false
     }
@@ -105,24 +200,57 @@ public func (p: *CmdParser) hasOption(longName: *const char) : bool {
 }
 
 public func (p: *CmdParser) hasOptionShort(shortName: char) : bool {
-    var opt = p.getOptionShort(shortName)
-    if(!opt) {
-        return false
-    }
+    if(p.defaultCmd == null) return false
+    return p.defaultCmd.hasOptionShort(shortName)
+}
 
-    return opt.flags & OptionFlag.IS_USED
+public func (this: *Cmd) hasArgValue(): bool {
+    return this != null && this.hasArg && this.argValue != null
+}
+
+public func (this: *Cmd) getArgValue(): *const char {
+    return this.argValue
 }
 
 public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
+    var i = 1;
+    var activeCmd = p.defaultCmd
+
+    if(argc > 1) {
+        p.args.add(argv[0])
+        var potentialCmd = argv[i]
+        for(var index = 0; index < p.commands.size(); index+=1) {
+            var cmd = p.commands.getPtr(index)
+            if(cmd.name.equals(potentialCmd)) {
+                p.cmd = cmd
+                activeCmd = cmd
+                i += 1
+                break
+            }
+        }
+
+        if(argc > 2 && p.cmd && p.cmd.hasArg) {
+            activeCmd.argValue = argv[i]
+            i += 1
+        }
+    }
+
     // TODO: Account for required arguments
-    for(var i = 0; i < argc; i+=1) {
+    for(; i < argc; i+=1) {
         var arg = argv[i]
         var len = arg.length()
-
+        
         var opt: *Option = null;
         if(len && arg[0] == '-') {
             var normalizedArg = arg + 1
-            opt = len < 3 ? p.getOptionShort(normalizedArg[0]) : p.getOption(normalizedArg)
+            opt = len < 3 ?
+                activeCmd.getOptionShort(normalizedArg[0]) : activeCmd.getOption(normalizedArg)
+
+            // this could be default option
+            if(!opt) {
+                opt = len < 3 ?
+                    p.getOptionShort(normalizedArg[0]) : p.getOption(normalizedArg)
+            }
         }
 
         if(opt) {
@@ -162,39 +290,118 @@ public func (p: *CmdParser) printHelp(sb: *StringBuilder) {
     var name: [256]char;
     var nameStr = StringBufferInit(name, 256, 0);
 
-    for(var i = 0; i < p.options.size(); i += 1) {
-        var opt = &p.options.elements[i]
-        if(opt.flags & OptionFlag.HAS_ARGUMENT) {
-            nameStr.format("%s <arg>", opt.name)
-            if(opt.shortName != '\0') {
-                sb.append("    -%c, -%-16s", opt.shortName, nameStr.cStr())
-            }
-            else {
-                sb.append("    -%-20s", nameStr.cStr())
-            }
+    for(var c = 0; c < p.commands.size(); c+=1) {
+        var cmd = p.commands.getPtr(c)
+
+        if(cmd.hasArg) {
+            var padding = 24 - $" <arg>".length - cmd.name.length()
+            sb.append("%s <arg>%-*s %s\n", cmd.name, padding, "", cmd.description)
         }
         else {
-            if(opt.shortName != '\0') {
-                sb.append("    -%c, -%-16s", opt.shortName, opt.name)
-            }
-            else {
-                sb.append("    -%-20s", opt.name)
-            }
+            var padding = 24 //- leftLen
+            sb.append("%-*s %s\n", padding, cmd.name, cmd.description)
         }
-
-        var it = opt.description
-        while(*it) {
-            var c = *it
-            defer it+=1
-
-            if(c == '\n') {
-                sb.append("\n%25s", "")
+        for(var i = 0; i < cmd.options.size(); i += 1) {
+            var opt = &cmd.options.elements[i]
+            if(opt.flags & OptionFlag.HAS_ARGUMENT) {
+                nameStr.format("%s <arg>", opt.name)
+                if(opt.shortName != '\0') {
+                    sb.append("    -%c, -%-16s", opt.shortName, nameStr.cStr())
+                }
+                else {
+                    sb.append("    -%-20s", nameStr.cStr())
+                }
             }
             else {
-                sb.append("%c", c)
+                if(opt.shortName != '\0') {
+                    sb.append("    -%c, -%-16s", opt.shortName, opt.name)
+                }
+                else {
+                    sb.append("    -%-20s", opt.name)
+                }
             }
 
+            var it = opt.description
+            while(*it) {
+                var c = *it
+                defer it+=1
+
+                if(c == '\n') {
+                    sb.append("\n%25s", "")
+                }
+                else {
+                    sb.append("%c", c)
+                }
+
+            }
+            sb.append("\n")
         }
         sb.append("\n")
     }
+}
+
+@test
+func ParseArgsWithCommands() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Compile and build")
+        .addOption("lib", '\0', "stuff", 0, null)
+        .addOption("debug", '\0', "stuff", 0, null)
+
+    parser.addCommand("test", "Compile and build then test")
+        .addOption("file", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("func", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
+
+    parser.addCommand("run", "run command", true)
+
+    parser
+        .addOption("colors", '\0', "stuff", 0, null)
+        .addOption("maxMemory", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
+
+    var args = []*const char {
+        "./litac",
+        "build",
+        "-lib",
+        "-colors",
+        "-maxMemory",
+        "1KiB"
+    };
+    var n = 6
+
+    var sb = StringBuilderInit(1024)
+    parser.printHelp(sb)
+    assert(
+$"""
+    -colors              stuff
+    -maxMemory <arg>     stuff
+
+build                    Compile and build
+    -lib                 stuff
+    -debug               stuff
+
+test                     Compile and build then test
+    -file <arg>          stuff
+    -func <arg>          stuff
+
+run <arg>                run command
+""".trim().equals(sb.toString().trim())
+    )
+    c::printf("%s\n", sb.cStr())
+
+    assert(parser.parse(n, args as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasOption("colors"))
+    assert(parser.hasOption("maxMemory"))
+    var maxMem = parser.getOption("maxMemory")
+    assert(maxMem != null)
+    assert(maxMem.value.equals("1KiB"))
+
+    assert(parser.hasCmd())
+    var cmd = parser.getCmd()
+    assert(cmd != null)
+    assert(cmd.name.equals("build"))
+    assert(cmd.hasOption("lib"))
+    assert(cmd.hasOption("debug") == false)
+    assert(cmd.hasOption("does-not-exist") == false)
+
 }

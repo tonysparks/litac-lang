@@ -90,6 +90,8 @@ func (this: *PackageManager) build(
         return PkgStatus.OK
     }
 
+    // TODO: This doesn't take existing defaults correctly
+    // need to account for missing flags modifying existing values...
     if(ParseArgs(args.n, args.args, litaOptions) != ParseStatus.OK) {
         return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
     }
@@ -127,6 +129,7 @@ func (this: *PackageManager) buildCommandArgs(
 
     var programArgs = ArrayInit<*const char>(64, this.allocator)
     programArgs.add("litac")
+    programArgs.add("build")
 
     if(buildSection) {
         var script = buildSection.get("script")
@@ -236,7 +239,7 @@ func (this: *PackageManager) buildCommandArgs(
         }
 
         if(this.options.litaOptions.testsOnly && runType == RunType.BUILD) {
-            programArgs.add("-testDir")
+            /*programArgs.add("-testDir")
             if(this.options.litaOptions.srcPath.empty()) {
                 programArgs.add("./test/")
             } else {
@@ -249,7 +252,7 @@ func (this: *PackageManager) buildCommandArgs(
             }
             else {
                 programArgs.add("-testFile")
-            }
+            }*/
 
             mainFile = "./test/main_test.lita"
         }
@@ -263,6 +266,12 @@ func (this: *PackageManager) buildCommandArgs(
 
     args.n = programArgs.size()
     args.args = programArgs.elements as (**char)
+
+//////
+for(var i = 0; i < args.n; i+=1) {
+    printf("Arg: %d %s\n", i, args.args[i])
+}
+//////
 
     return PkgStatus.OK
 }

@@ -1,0 +1,8 @@
+import "test_suite"
+import "std/assert"
+
+@test
+func compilerTestSuite() {
+    RunTests(0, []*char{})
+    //assert(RunTests(0, null) == 0)
+}
