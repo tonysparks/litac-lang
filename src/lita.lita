@@ -151,6 +151,7 @@ public struct LitaOptions {
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include
     testFileOnly: bool             // if we should only test the supplied file only
+    testPackage: *const char       // if we're testing a package
     testPath: [MAX_PATH]char       // directory for tests
 
     typeOption: TypeInfoOption     // type generation option

@@ -994,7 +994,6 @@ func ApeGetSymbolsToTest(ape: *ape_t, data: *void, argc: i32, args: *ape_object_
                         }
 
                         value.copyTo(buffer, value.length)
-
                         if(pattern.match(buffer, &matchlength) > -1) {
                             var declObj = context.pp.declToApe(sym)
                             ape_object_add_array_value(results, declObj)

@@ -254,7 +254,7 @@ func (this: *PackageManager) buildCommandArgs(
                 programArgs.add("-testFile")
             }*/
 
-            mainFile = "./test/main_test.lita"
+            //mainFile = "./test/main_test.lita"
         }
     }
 
@@ -268,9 +268,9 @@ func (this: *PackageManager) buildCommandArgs(
     args.args = programArgs.elements as (**char)
 
 //////
-for(var i = 0; i < args.n; i+=1) {
-    printf("Arg: %d %s\n", i, args.args[i])
-}
+// for(var i = 0; i < args.n; i+=1) {
+//     printf("Arg: %d %s\n", i, args.args[i])
+// }
 //////
 
     return PkgStatus.OK

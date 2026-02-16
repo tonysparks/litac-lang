@@ -198,7 +198,8 @@ public @note packed {
     matches the options.testsRegex or options.testFileOnly options
 
 */
-#precheck
+//#precheck
+#postcheck
     // if we are testing only, create a new main entry point
     if(TESTING) {
         fn isDisabled(sym) {

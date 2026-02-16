@@ -402,14 +402,19 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
 
             if(cmd.hasOption("file")) {
                 options.testFileOnly = true
+                StringCopy(
+                    .src = cmd.getOption("file").value,
+                    .dest = options.inputFile,
+                    .size = MAX_PATH
+                )
             }
 
             if(cmd.hasOption("package")) {
-                // TODO
+                options.testPackage = cmd.getOption("package").value
             }
 
             // flag to go to the test sub command
-            if(!options.testFileOnly && options.testsRegex == null) {
+            if(!options.testFileOnly) {
                 options.pkgOptions.pkgCmd = PkgCommand.PKG_TEST
             } else {
                 options.run = true
@@ -637,6 +642,5 @@ func RunPkgTest(options: *LitaOptions, pm: *PackageManager) : i32 {
     if(buildResult != 0) {
         return buildResult
     }
-    printf("Done building!\n")
     return pm.testCommand(options)
 }
