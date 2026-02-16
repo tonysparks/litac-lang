@@ -99,6 +99,7 @@ import "std/string/buffer"
 import "std/assert"
 import "std/string/builder"
 import "std/string"
+import "std/terminal"
 
 import "pkg_mgr/pkg"
 import "pkg_mgr/pkg_install"
@@ -205,11 +206,20 @@ public func (this: *PackageManager) free() {
 
 func (this: *PackageManager) printMessages() {
     if(this.warnings.length > 0) {
-        printf("Warning: %s\n", this.warnings.cStr())
+        printf(
+            "%swarning%s: %s\n",
+            ConsoleColorsAsStr(ConsoleColors.YELLOW),
+            ConsoleColorsAsStr(ConsoleColors.CLEAR),
+            this.warnings.cStr()
+        )
     }
 
     if(this.errors.length > 0) {
-        printf("Error: %s\n", this.errors.cStr())
+        printf("%serror%s: %s\n",
+            ConsoleColorsAsStr(ConsoleColors.RED),
+            ConsoleColorsAsStr(ConsoleColors.CLEAR),
+            this.errors.cStr()
+        )
     }
 }
 

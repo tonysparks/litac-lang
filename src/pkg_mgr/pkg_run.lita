@@ -18,6 +18,9 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
 
     var commands = pm.pkg.json.get("commands")
     if(!commands) {
+        pm.errors.append(
+            "no 'commands' section found in pkg.json"
+        )
         return PkgStatus.ERROR_COMMAND_NOT_DEFINED
     }
 
@@ -39,6 +42,10 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
     }
 
     if(!cmdScript) {
+        pm.errors.append(
+            "no '%s' in 'commands' found in pkg.json",
+            cmd
+        )
         return PkgStatus.ERROR_COMMAND_NOT_DEFINED
     }
 
@@ -77,6 +84,10 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
         scriptStr.append(" \"%s\"", options.args[i])
     }
 
+    if(system(scriptStr.cStr()) != 0) {
+        return PkgStatus.ERROR_RUNNING_COMMAND
+    }
+/*
     var process = SystemExec(scriptStr.cStr())
     if(!process.pipe) {
         return PkgStatus.ERROR_RUNNING_COMMAND
@@ -88,6 +99,7 @@ public func PackageRun(pm: *PackageManager, cmd: *const char) : PkgStatus {
         fwrite(buffer, sizeof(:char), bytesRead as (i32), stdout)
         fflush(stdout)
     }
+*/
 
     return PkgStatus.OK
 }
