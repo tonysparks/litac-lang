@@ -150,6 +150,8 @@ public enum PkgStatus {
     ERROR_OPENING_LOCAL_FILE_PKG,
     ERROR_READING_LOCAL_FILE_PKG,
     ERROR_WRITING_LOCAL_FILE_PKG,
+    ERROR_OPENING_BUILD_FILE,
+    ERROR_WRITING_BUILD_FILE,
     ERROR_FINALIZING_LOCAL_FILE_PKG,
     ERROR_PARSING_PKG_JSON,
     ERROR_READING_PKG_FILE,
@@ -203,6 +205,9 @@ public func (this: *PackageManager) free() {
     this.pkg = null
 }
 
+internal func (this: *PackageManager) isVerbose(): bool {
+    return this.options.litaOptions.isVerbose
+}
 
 func (this: *PackageManager) printMessages() {
     if(this.warnings.length > 0) {
@@ -271,19 +276,26 @@ public func (this: *PackageManager) installCommand(options: PackageInstallOption
         return status;
     }
 
-    printf("Found '%s/pkg.json' with %d package dependencies.\n",
-        this.options.projectPath,
-        this.pkg.dependencies.size()
-    )
+    if(this.isVerbose()) {
+        printf("Found '%s/pkg.json' with %d package dependencies.\n",
+            this.options.projectPath,
+            this.pkg.dependencies.size()
+        )
 
-    if(!this.pkg.dependencies.empty()) {
-        for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
-            var dep = this.pkg.dependencies.getPtr(i)
-            printf("Installing '%s'\n", dep.pkgId.id)
+        if(!this.pkg.dependencies.empty()) {
+            for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
+                var dep = this.pkg.dependencies.getPtr(i)
+                printf("Will install '%s'\n", dep.pkgId.id)
+            }
         }
     }
 
-    return PackageInstall(this, options)
+    status = PackageInstall(this, options)
+    if(status != PkgStatus.OK) {
+        return status
+    }
+
+    return this.writeBuildFile()
 }
 
 @doc("""
@@ -307,6 +319,40 @@ public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : Pkg
 
         buildFile.pkgPaths.add(StringClone(fullPkgPath.buffer, fullPkgPath.length, this.allocator))
     }
+    return PkgStatus.OK
+}
+
+public func (this: *PackageManager) writeBuildFile() : PkgStatus {
+    var buildFile = BuildFile{}
+    defer buildFile.free()
+
+    var status = this.createBuildFile(&buildFile)
+    if(status != PkgStatus.OK) {
+        return status;
+    }
+
+    var temp: [MAX_PATH]char;
+    var build = StringBufferInit(temp, MAX_PATH, 0)
+    build.format("%s/.build.json", this.options.projectPath)
+
+    var file = File{}
+    defer file.close()
+    if(file.open(build.cStr(), FileOpenOp.WRITE) != FileStatus.Ok) {
+        this.errors.append(
+            "unable to open '%s' for writing",
+            build.cStr()
+        )
+        return PkgStatus.ERROR_OPENING_BUILD_FILE
+    }
+
+    if(!buildFile.writeTo(&file)) {
+        this.errors.append(
+            "unable to write to '%s'",
+            build.cStr()
+        )
+        return PkgStatus.ERROR_WRITING_BUILD_FILE
+    }
+
     return PkgStatus.OK
 }
 

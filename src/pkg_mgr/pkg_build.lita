@@ -239,7 +239,8 @@ func (this: *PackageManager) buildCommandArgs(
         }
 
         if(this.options.litaOptions.testsOnly && runType == RunType.BUILD) {
-            /*programArgs.add("-testDir")
+            /*
+            programArgs.add("-testDir")
             if(this.options.litaOptions.srcPath.empty()) {
                 programArgs.add("./test/")
             } else {
@@ -252,9 +253,10 @@ func (this: *PackageManager) buildCommandArgs(
             }
             else {
                 programArgs.add("-testFile")
-            }*/
+            }
 
-            //mainFile = "./test/main_test.lita"
+            mainFile = "./test/main_test.lita"
+            */
         }
     }
 
@@ -288,6 +290,8 @@ func ContainsOption(option: *const char, programArgs: *Array<*const char>) : boo
 
 
 func (this: *PackageManager) buildWithScript(script: *JsonNode) : PkgStatus {
+
+    /*
     var process = sys::SystemExec(script.asString())
     if(!process.pipe) {
         return PkgStatus.ERROR_RUNNING_COMMAND
@@ -301,6 +305,10 @@ func (this: *PackageManager) buildWithScript(script: *JsonNode) : PkgStatus {
     var bytesRead = -1_i64
     while((bytesRead = process.readOutput(buffer, BUFFER_SIZE)) > 0) {
         printf("%.*s", bytesRead as (i32), buffer)
+    }
+    */
+    if(system(script.asString()) != 0) {
+        return PkgStatus.ERROR_RUNNING_COMMAND
     }
     return PkgStatus.OK
 }
