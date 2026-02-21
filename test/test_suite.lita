@@ -13,6 +13,8 @@ import "std/string/builder"
 import "std/string"
 import "std/string/buffer"
 import "std/system"
+import "std/assert"
+import "std/test" as test
 
 import "../src/lita"
 import "../src/phase_result"
@@ -61,6 +63,11 @@ enum TestResult {
     LOADING_ERROR,
     OUTPUT_MISMATCH,
     ERROR_MISMATCH,
+}
+
+struct TestCallbackData {
+    suite: *TestSuite
+    test: *Test
 }
 
 const testHarness = TestHarness{}
@@ -251,6 +258,15 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
             else {
                 testHarness.numberOfTests += 1
 
+                var dynamicTestData = new<TestCallbackData>()
+                dynamicTestData.suite = suite
+                dynamicTestData.test = test
+
+                testSuite.addDynamicTest(
+                    .name = test.name,
+                    .userData = dynamicTestData,
+                    .testFn = TestCallback
+                )/*
                 var startTime = SystemTimeMSec()
                 var result = RunTest(suite, test)
                 var deltaTime = SystemTimeMSec() - startTime
@@ -276,7 +292,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
                         }
                         default: {}
                     }
-                }
+                }*/
             }
         }
     }
@@ -329,6 +345,12 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
         output.modules.length = 0
     }
     return output
+}
+
+func TestCallback(userData: *void) : void {
+    var callbackData = userData as (*TestCallbackData)
+    var result = RunTest(callbackData.suite, callbackData.test)
+    assert(result == TestResult.SUCCESS)
 }
 
 func RunTest(suite: *TestSuite, test: *Test) : TestResult {
