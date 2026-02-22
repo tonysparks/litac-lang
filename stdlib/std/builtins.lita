@@ -296,6 +296,9 @@ public @note packed {
         emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
         emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
         emit("   testSuite.init(); defer testSuite.free(); \n")
+        emit("   var isJsonFormated = %d; \n", IS_JSON_FORMAT)
+        //println(IS_JSON_FORMAT)
+        //emit("   var isJsonFormated = false; \n")
 
         var i = 0
         for(sym in getSymbolsToTest("test")) {
@@ -312,7 +315,7 @@ public @note packed {
                     emit("    %s()\n", sym.name)
                 }
                 emit("  }")
-                emit("   __testCase%d.print(\"%s\")\n", i, sym.name)
+                emit("   __testCase%d.print(\"%s\", isJsonFormated)\n", i, sym.name)
             }
             i = i + 1
         }
@@ -323,7 +326,7 @@ public @note packed {
         emit("        if(setjmp(testSuite.env) == 0) {\n")
         emit("            testSuite.executeDynamicTest()\n")
         emit("        }\n")
-        emit("        testSuite.printDynamicTest()\n")
+        emit("        testSuite.printDynamicTest(isJsonFormated)\n")
         emit("    }\n")
         emit("    return 0; }")
 

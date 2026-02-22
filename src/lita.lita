@@ -10,6 +10,10 @@ import "std/string/builder"
 import "std/string"
 import "std/string/buffer"
 import "std/process" as sub
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+
 
 import "symbols"
 import "preprocessor"
@@ -153,6 +157,7 @@ public struct LitaOptions {
     testFileOnly: bool             // if we should only test the supplied file only
     testPackage: *const char       // if we're testing a package
     testPath: [MAX_PATH]char       // directory for tests
+    isJsonFormat: bool             // if we should output messages in json structure format
 
     typeOption: TypeInfoOption     // type generation option
 
@@ -241,6 +246,29 @@ public func (lita: *Lita) free() {
     // TODO: clear module allocators
 }
 
+public func (lita: *Lita) printf(format: *const char, ...) {
+    var args: va_list
+    va_start(args, format)
+
+    if(lita.options.isJsonFormat) {
+        var sb = StringBuilderInit(1024, lita.allocator)
+        sb.appendArgs(format, args)
+
+        var msgNode = CreateJsonObject(lita.allocator)
+        msgNode.putStr("type", "MESSAGE")
+        msgNode.putStr("message", sb.cStr())
+
+        sb = sb.slice()
+        msgNode.print(&sb)
+        printf("%s", sb.cStr())
+    }
+    else {
+        vfprintf(stdout, format, args)
+        fflush(stdout)
+    }
+    va_end(args)
+}
+
 public func (lita: *Lita) addModule(module: *Module) {
     lita.modules.put(module.id.filenameKey, module)
 }
@@ -262,7 +290,7 @@ public func (lita: *Lita) getModuleByName(name: *const char) : *Module {
     for(var it = lita.modules.iter(); it.hasNext();) {
         var entry = it.next()
         var pkgName = entry.value.id.packageName.view
-        printf("Checking: %.*s\n", pkgName.length, pkgName.buffer)
+        // printf("Checking: %.*s\n", pkgName.length, pkgName.buffer)
         if(pkgName.equals(packageName)) {
             return entry.value
         }
@@ -432,7 +460,7 @@ public func (this: *Lita) typeCheck(module: *Module, flags: i32 = 0) : bool {
 public func (this: *Lita) transpile(module: *Module) : bool {
 
     if(!Mkdir(this.options.outputPath)) {
-        printf("Unable to create directory: '%s'", this.options.outputPath)
+        this.printf("Unable to create directory: '%s'", this.options.outputPath)
         return false
     }
 
@@ -548,7 +576,7 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
             tcc_set_options(state, ccOptions.cStr())
 
             if(this.options.isVerbose) {
-                printf("Options: '%s'\n", ccOptions.cStr())
+                this.printf("Options: '%s'\n", ccOptions.cStr())
             }
         }
     }
@@ -603,7 +631,7 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
     this.applyCompilerOptions(commandStr)
 
     if(this.options.isVerbose) {
-        printf("Running command: '%s'\n", commandStr.cStr())
+        this.printf("Running command: '%s'\n", commandStr.cStr())
     }
 
     if(system(commandStr.cStrConst()) == 0) {

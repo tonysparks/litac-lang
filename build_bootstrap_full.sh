@@ -30,7 +30,7 @@ if [ $? -gt 0 ]; then
     return 1
 fi
 
-cp -f "${wd}/bin/output/a.c" "${wd}/bootstrap/${SOURCE_FILE}"
+cp -f "${wd}/bin/litac.c" "${wd}/bootstrap/${SOURCE_FILE}"
 if [ $? -gt 0 ]; then
     return 1
 fi

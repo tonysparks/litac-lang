@@ -14,6 +14,9 @@ import "std/string/builder"
 import "std/profile"
 import "std/http"
 import "std/assert"
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
 
 import "lex"
 import "lita"
@@ -100,13 +103,22 @@ report:
 
     hasError = hasError || !lita.result.errors.empty()
     if(hasError) {
-        for(var i = 0; i < lita.result.errors.size(); i += 1) {
-            PrintError(lita.options.isColoredOutput, sb, lita.result.errors.get(i))
-
-            printf("%s\n", sb.cStr())
-            sb.clear()
+        if(options.isJsonFormat) {
+            lita.result.errors.toJson(sb)
+            printf(
+                "{ \"type\": \"COMPILATION_MESSAGE\", \"errors\" : %s }\n",
+                sb.cStr()
+            )
         }
-        printf("Total errors: %d\n", lita.result.errors.size())
+        else {
+            for(var i = 0; i < lita.result.errors.size(); i += 1) {
+                PrintError(lita.options.isColoredOutput, sb, lita.result.errors.get(i))
+
+                printf("%s\n", sb.cStr())
+                sb.clear()
+            }
+            printf("Total errors: %d\n", lita.result.errors.size())
+        }
     }
 
     if(options.showProfileInfo) {
@@ -203,6 +215,7 @@ public func ParseArgs(
         .addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null)
         .addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null)
         .addOption("tcc",            '\0', "Use tcc to compile.  This ignores buildCmd/strictBuildCmd", 0, null)
+        .addOption("json",           '\0', "Output messages in json format", 0, null)
 
     parser.addCommand("install", "Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.\nIf successful, creates a build.json which is used for building this LitaC project.")
         .addOption("force",          '\0', "Forces a full clean install of all packages.", 0, null)
@@ -290,6 +303,10 @@ public func ParseArgs(
     if(cmd.name.equals("build") || cmd.name.equals("test")) {
         options.pkgOptions.pkgCmd = PkgCommand.PKG_BUILD
         options.pkgOptions.isRelease |= cmd.hasOption("release")
+        options.isJsonFormat |= cmd.hasOption("json")
+        if(options.isJsonFormat) {
+            options.isColoredOutput = false
+        }
 
         options.checkerOnly |= cmd.hasOption("checkerOnly")
         options.cOutputOnly |= cmd.hasOption("cOnly")

@@ -281,6 +281,18 @@ public func (s: StringBuffer) cStrConst() : *const char {
     return s.buffer as (*const char)
 }
 
+public func (s: StringBuffer) slice() : StringBuffer {
+    if(s.length >= s.capacity || s.length < 0) {
+        return StringBuffer{}
+    }
+
+    return StringBuffer {
+        .buffer = &s.buffer[s.length],
+        .length = 0,
+        .capacity = s.remaining()
+    }
+}
+
 @inline
 public func (s: StringBuffer) toString() : String {
     return String {

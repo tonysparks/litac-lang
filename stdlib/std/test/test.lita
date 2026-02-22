@@ -5,6 +5,11 @@ import "std/string/builder"
 import "std/libc"
 import "std/assert"
 import "std/terminal"
+import "std/system"
+
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
 
 @include("<setjmp.h>");
 
@@ -38,6 +43,7 @@ public struct TestSuite {
 public struct TestCase {
     testSuite: *TestSuite
     errors: Array<AssertEntry>
+    startTime: f64
 
     name: *const char
     userData: *void
@@ -73,6 +79,7 @@ public func (this: *TestSuite) enterTest() : *TestCase {
     )
     this.currentCase = this.testCases.lastPtr()
     this.currentCase.init(this)
+    this.currentCase.startTime = SystemTimeMSec()
     return this.currentCase
 }
 
@@ -100,6 +107,8 @@ public func (this: *TestSuite) enterDynamicTest() : *TestCase {
         return null
     }
     this.currentCase = this.dynamicTestCases.getPtr(this.index)
+    this.currentCase.startTime = SystemTimeMSec()
+
     this.index += 1
     return this.currentCase
 }
@@ -115,12 +124,12 @@ public func (this: *TestSuite) executeDynamicTest() {
     }
 }
 
-public func (this: *TestSuite) printDynamicTest() {
+public func (this: *TestSuite) printDynamicTest(isJsonFormat: bool) {
     if(!this.currentCase || !this.currentCase.testFn) {
         return;
     }
 
-    this.currentCase.print(this.currentCase.name)
+    this.currentCase.print(this.currentCase.name, isJsonFormat)
 }
 
 
@@ -152,34 +161,73 @@ public func (this: *TestCase) addError(
     )
 }
 
+@json
+internal enum TestStatus {
+    SUCCESS,
+    FAILED,
+    DISABLED
+}
 
-public func (this: *TestCase) print(name: *const char) {
-    var resultText =
-        this.errors.empty() ? "SUCCESS" : "FAILED"
+@json
+internal struct TestInfo {
+    type: *const char
+    name: *const char
+    status: TestStatus
+    errors: Array<*const char>
+    durationMSec: f64
+}
 
-    var dots = $"..............................................................."
-    var nDots = MAX(0, dots.length - name.length() - resultText.length())
+public func (this: *TestCase) print(name: *const char, isJson: bool = false) {
+    var durationMSec = SystemTimeMSec() - this.startTimex;
 
-    var resultColor =
-        this.errors.empty() ? ConsoleColors.GREEN : ConsoleColors.RED
+    if(isJson) {
+        var errors = ArrayInit<*const char>(this.errors.size() + 1, this.testSuite.allocator)
+        for(var i = 0; i < this.errors.size(); i +=1) {
+            errors.add(this.errors.get(i).errorMessage)
+        }
+        var testInfo = TestInfo {
+            .type = "TEST_RESULT",
+            .name = name,
+            .status = this.errors.empty() ? TestStatus.SUCCESS : TestStatus.FAILED,
+            .errors = errors,
+            .durationMSec = durationMSec
+        }
 
-    printf(
-        "Testing '%s'",
-        name
-    )
-    printf(
-        "%.*s",
-        nDots,
-        dots.buffer
-    )
-    printf(
-        "%s%s%s\n",
-        ConsoleColorsAsStr(resultColor),
-        resultText,
-        ConsoleColorsAsStr(ConsoleColors.CLEAR)
-    )
-    for(var i = 0; i < this.errors.size(); i +=1) {
-        printf("%s\n", this.errors.get(i).errorMessage)
+        var sb = StringBuilderInit(1024, this.testSuite.allocator)
+        testInfo.toJson(sb)
+        printf(
+            "%s\n",
+            sb.cStr()
+        )
+    }
+    else {
+        var resultText =
+            this.errors.empty() ? "SUCCESS" : "FAILED"
+
+        var dots = $"..............................................................."
+        var nDots = MAX(0, dots.length - name.length() - resultText.length())
+
+        var resultColor =
+            this.errors.empty() ? ConsoleColors.GREEN : ConsoleColors.RED
+
+        printf(
+            "Testing '%s'",
+            name
+        )
+        printf(
+            "%.*s",
+            nDots,
+            dots.buffer
+        )
+        printf(
+            "%s%s%s\n",
+            ConsoleColorsAsStr(resultColor),
+            resultText,
+            ConsoleColorsAsStr(ConsoleColors.CLEAR)
+        )
+        for(var i = 0; i < this.errors.size(); i +=1) {
+            printf("%s\n", this.errors.get(i).errorMessage)
+        }
     }
 }
 

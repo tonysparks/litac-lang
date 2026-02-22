@@ -193,3 +193,15 @@ func testStringBufferAdjust() {
     assert(sb.length == 3)
     assert(sb.cStr().equals("abc"))
 }
+
+
+@test
+func testStringBufferSlice() {
+    var storage = [32]char{0}
+    var sb = StringBufferInit(storage, 32, 0)
+    sb.format("Hello World")
+    var sb2 = sb.slice()
+    sb2.format("bye world")
+    assert(sb2.toString().equals($"bye world"))
+    assert(sb.toString().equals($"Hello World"))
+}

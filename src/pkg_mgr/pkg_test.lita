@@ -80,7 +80,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
 
         var cmd = StringBuilderInit(256, pm.allocator)
         cmd.append(
-            "cd %s && litac test",
+            "cd %s && litac test -json",
             options.projectPath
         )
 

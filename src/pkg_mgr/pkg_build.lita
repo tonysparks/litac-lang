@@ -72,10 +72,12 @@ func (this: *PackageManager) build(
     var litaOptions = new<LitaOptions>()
     defer defaultAllocator.free(litaOptions)
 
+    // TODO: Reverse this order of overriding,
+    // we should actually take command line as the precedence..
+
     // copy over all other command line options to
     // this execution
     memcpy(litaOptions, this.options.litaOptions, sizeof(:LitaOptions))
-
 
     var args = CommandArgs{}
     var result = this.buildCommandArgs(buildCommand, options, &args, runType)
