@@ -190,70 +190,6 @@ public @note packed {
     }
 #end
 
-/**
-    Create a test main if we are in testing mode
-
-    This will replace the current 'main' entry point of the program with a new
-    function '__LitaTestMain()' which will call each @test method that either
-    matches the options.testsRegex or options.testFileOnly options
-
-*/
-#precheck
-    // if we are testing only, create a new main entry point
-    if(TESTING) {
-        fn isDisabled(sym) {
-            if(sym.notes) {
-                for(note in sym.notes) {
-                    if(note.name == "test" && note.arguments != null) {
-                        for(arg in note.arguments) {
-                            if(arg.name == "disabled") {
-                                return arg.value
-                            }
-                        }
-                    }
-                }
-            }
-            return false
-        }
-
-        var moduleName = getInputModuleFilename()
-
-        emitClear()
-        var testFunctionName = "__LitaTestMain"
-
-        //addImportByName(moduleName, "std/test")
-        emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
-        emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
-        emit("   testSuite.init()\n")
-
-        var i = 0
-        for(sym in getSymbolsToTest("test")) {
-            if(isDisabled(sym)) {
-                emit("  __lita_test_printf(\"Disabled '%s'!\\\\n\")\n", sym.name)
-            } else {
-                emit("   var __testCase%d = testSuite.enterTest()\n", i)
-                emit("   if(setjmp(testSuite.env) == 0) {\n")
-                var alias = addImport(moduleName, sym.moduleFilename)
-                if(alias) {
-                    emit("    %s::%s()\n", alias, sym.name)
-                }
-                else {
-                    emit("    %s()\n", sym.name)
-                }
-                emit("  }")
-                emit("   __testCase%d.print(\"%s\")\n", i, sym.name)
-            }
-            i = i + 1
-        }
-        emit("  return 0; }")
-
-        addDeclaration(moduleName, emitStr())
-        flushDeclarations()
-
-        setMainSymbol(moduleName, testFunctionName)
-
-    }
-#end
 
 /**
     Compiler script to inject module init and destroy functions; these
@@ -280,8 +216,13 @@ public @note packed {
     }
 */
 #precheck
-    var mainSym = getMainSymbol()
-    if(mainSym) {
+    fn InjectModuleInitializers() {
+        var mainSym = getMainSymbol()
+        if(!mainSym) {
+            println("No main entry symbol found.  Unable to inject module initializers")
+            return;
+        }
+
         for(sym in getSymbolsByNote("module_destroy")) {
             if(sym.kind == "FUNC_DECL" && sym.isPublic) {
                 var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
@@ -313,5 +254,98 @@ public @note packed {
             }
         }
     }
+
+    if(!TESTING) {
+        InjectModuleInitializers()
+    }
 #end
 
+
+/**
+    Create a test main if we are in testing mode
+
+    This will replace the current 'main' entry point of the program with a new
+    function '__LitaTestMain()' which will call each @test method that either
+    matches the options.testsRegex or options.testFileOnly options
+
+*/
+//#precheck
+#postcheck
+    fn CreateTests() {
+        fn isDisabled(sym) {
+            if(sym.notes) {
+                for(note in sym.notes) {
+                    if(note.name == "test" && note.arguments != null) {
+                        for(arg in note.arguments) {
+                            if(arg.name == "disabled") {
+                                return arg.value
+                            }
+                        }
+                    }
+                }
+            }
+            return false
+        }
+
+        var moduleName = getInputModuleFilename()
+
+        emitClear()
+        var testFunctionName = "__LitaTestMain"
+
+        //addImportByName(moduleName, "std/test")
+        emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
+        emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
+        emit("   testSuite.init(); defer testSuite.free(); \n")
+        //emit("   var isJsonFormated = %d; \n", IS_JSON_FORMAT)
+        emit("   var isJsonFormated = false; \n")
+
+        var i = 0
+        for(sym in getSymbolsToTest("test")) {
+            if(isDisabled(sym)) {
+                emit("  __lita_test_printf(\"Disabled '%s'!\\\\n\")\n", sym.name)
+            } else {
+                emit("   var __testCase%d = testSuite.enterTest()\n", i)
+                emit("   if(setjmp(testSuite.env) == 0) {\n")
+                var alias = addImport(moduleName, sym.moduleFilename)
+                if(alias) {
+                    emit("    %s::%s()\n", alias, sym.name)
+                }
+                else {
+                    emit("    %s()\n", sym.name)
+                }
+                emit("  }")
+                emit("   __testCase%d.print(\"%s\", isJsonFormated)\n", i, sym.name)
+            }
+            i = i + 1
+        }
+        emit("    for(;;) {\n")
+        emit("        var test = testSuite.enterDynamicTest();\n")
+        emit("        if(!test) break;\n")
+        emit("        if(!test.testFn) continue;\n")
+        emit("        if(setjmp(testSuite.env) == 0) {\n")
+        emit("            testSuite.executeDynamicTest()\n")
+        emit("        }\n")
+        emit("        testSuite.printDynamicTest(isJsonFormated)\n")
+        emit("    }\n")
+        emit("    return 0; }")
+
+        addDeclaration(moduleName, emitStr())
+        flushDeclarations()
+
+        setMainSymbol(moduleName, testFunctionName)
+
+        // TODO: This doesn't work because the
+        // injected in code is not resolved and errors
+        // out in codegen
+
+        //println("HERE!!")
+        //InjectModuleInitializers()
+        //println("HERE??")
+
+    }
+
+    // if we are testing only, create a new main entry point
+    if(TESTING) {
+        CreateTests()
+    }
+#end

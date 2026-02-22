@@ -1,26 +1,39 @@
 import "std/array"
 import "std/string/builder"
+import "std/string"
 import "std/mem"
 import "std/libc"
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
 
 import "lex"
 import "common"
 
+@json
 public enum ErrorType {
     WARN,
     ERROR
 }
 
+@json
 public struct PhaseError {
     type: ErrorType
     message: *const char
     pos: SrcPos
 }
 
+@json
 public struct PhaseResult {
+    @json(.ignore = true)
     allocator: *const Allocator
+
     errors: Array<PhaseError>
+
+    @json(.ignore = true)
     enabled: bool
+
+    @json(.ignore = true)
     isReadable: bool
 }
 

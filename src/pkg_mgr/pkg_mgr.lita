@@ -99,6 +99,7 @@ import "std/string/buffer"
 import "std/assert"
 import "std/string/builder"
 import "std/string"
+import "std/terminal"
 
 import "pkg_mgr/pkg"
 import "pkg_mgr/pkg_install"
@@ -109,6 +110,7 @@ import "pkg_mgr/pkg_test"
 
 import "build"
 import "lita"
+import "main"
 
 public struct PackageOptions {
     projectPath: *const char
@@ -148,6 +150,8 @@ public enum PkgStatus {
     ERROR_OPENING_LOCAL_FILE_PKG,
     ERROR_READING_LOCAL_FILE_PKG,
     ERROR_WRITING_LOCAL_FILE_PKG,
+    ERROR_OPENING_BUILD_FILE,
+    ERROR_WRITING_BUILD_FILE,
     ERROR_FINALIZING_LOCAL_FILE_PKG,
     ERROR_PARSING_PKG_JSON,
     ERROR_READING_PKG_FILE,
@@ -201,14 +205,26 @@ public func (this: *PackageManager) free() {
     this.pkg = null
 }
 
+internal func (this: *PackageManager) isVerbose(): bool {
+    return this.options.litaOptions.isVerbose
+}
 
 func (this: *PackageManager) printMessages() {
     if(this.warnings.length > 0) {
-        printf("Warning: %s\n", this.warnings.cStr())
+        printf(
+            "%swarning%s: %s\n",
+            ConsoleColorsAsStr(ConsoleColors.YELLOW),
+            ConsoleColorsAsStr(ConsoleColors.CLEAR),
+            this.warnings.cStr()
+        )
     }
 
     if(this.errors.length > 0) {
-        printf("Error: %s\n", this.errors.cStr())
+        printf("%serror%s: %s\n",
+            ConsoleColorsAsStr(ConsoleColors.RED),
+            ConsoleColorsAsStr(ConsoleColors.CLEAR),
+            this.errors.cStr()
+        )
     }
 }
 
@@ -223,8 +239,23 @@ public func (this: *PackageManager) initCommand(options: PackageInitOptions) : P
 @doc("""
     Initializes a new LitaC project, writing out scaffolding files
 """)
-public func (this: *PackageManager) buildCommand(options: PackageBuildOptions) : PkgStatus {
+public func (this: *PackageManager) buildCommand(
+    options: PackageBuildOptions
+) : PkgStatus {
     defer this.printMessages()
+
+    var litaOptions = this.options.litaOptions
+    // See if we're running the build command for a non-pkg
+    // source file
+    if (!this.hasProjectPkg()) {
+        if(litaOptions.inputFile.empty()) {
+            this.errors.append(
+                "Missing an input file.  Either create a 'pkg.json' project package file (via the 'init' command) or supply a .lita source file."
+            )
+            return 1;
+        }
+        return RunLitac(litaOptions)
+    }
 
     var status = this.readProjectPkg()
     if(status != PkgStatus.OK) {
@@ -245,18 +276,26 @@ public func (this: *PackageManager) installCommand(options: PackageInstallOption
         return status;
     }
 
-    printf("Found '%s/pkg.json' with %d package dependencies.\n",
-        CurrentWorkingPath(),
-        this.pkg.dependencies.size())
+    if(this.isVerbose()) {
+        printf("Found '%s/pkg.json' with %d package dependencies.\n",
+            this.options.projectPath,
+            this.pkg.dependencies.size()
+        )
 
-    if(!this.pkg.dependencies.empty()) {
-        for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
-            var dep = this.pkg.dependencies.getPtr(i)
-            printf("Installing '%s'\n", dep.pkgId.id)
+        if(!this.pkg.dependencies.empty()) {
+            for(var i = 0; i < this.pkg.dependencies.size(); i+=1) {
+                var dep = this.pkg.dependencies.getPtr(i)
+                printf("Will install '%s'\n", dep.pkgId.id)
+            }
         }
     }
 
-    return PackageInstall(this, options)
+    status = PackageInstall(this, options)
+    if(status != PkgStatus.OK) {
+        return status
+    }
+
+    return this.writeBuildFile()
 }
 
 @doc("""
@@ -283,6 +322,40 @@ public func (this: *PackageManager) createBuildFile(buildFile: *BuildFile) : Pkg
     return PkgStatus.OK
 }
 
+public func (this: *PackageManager) writeBuildFile() : PkgStatus {
+    var buildFile = BuildFile{}
+    defer buildFile.free()
+
+    var status = this.createBuildFile(&buildFile)
+    if(status != PkgStatus.OK) {
+        return status;
+    }
+
+    var temp: [MAX_PATH]char;
+    var build = StringBufferInit(temp, MAX_PATH, 0)
+    build.format("%s/.build.json", this.options.projectPath)
+
+    var file = File{}
+    defer file.close()
+    if(file.open(build.cStr(), FileOpenOp.WRITE) != FileStatus.Ok) {
+        this.errors.append(
+            "unable to open '%s' for writing",
+            build.cStr()
+        )
+        return PkgStatus.ERROR_OPENING_BUILD_FILE
+    }
+
+    if(!buildFile.writeTo(&file)) {
+        this.errors.append(
+            "unable to write to '%s'",
+            build.cStr()
+        )
+        return PkgStatus.ERROR_WRITING_BUILD_FILE
+    }
+
+    return PkgStatus.OK
+}
+
 @doc("""
     Run a command from the pkg.json:commands[{argument}]
 """)
@@ -305,15 +378,25 @@ public func (this: *PackageManager) testCommand(options: *LitaOptions) : i32 {
     return PackageTest(this, options)
 }
 
+public func (this: *PackageManager) hasProjectPkg(): bool {
+    // HACK: clean this up... this relies on backtracking
+    // on state...
+    var errorCount = this.errors.length
+    defer this.errors.length = errorCount
 
+    return this.readProjectPkg() == PkgStatus.OK
+}
 func (this: *PackageManager) readProjectPkg() : PkgStatus {
     var temp:[MAX_PATH]char;
 
     var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
-    pkgDef.format("%s/pkg.json", CurrentWorkingPath())
+    pkgDef.format("%s/pkg.json", this.options.projectPath)
 
     if(!FileExists(pkgDef.cStr())) {
-        this.errors.append("could not find '%s'\n", pkgDef.cStr())
+        this.errors.append(
+            "could not find 'pkg.json' in '%s'\n",
+            this.options.projectPath
+        )
         return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
     }
 
@@ -324,8 +407,8 @@ func (this: *PackageManager) readProjectPkg() : PkgStatus {
 
     // TODO: Get the actual /src directory -- this can be taken off of
     // LitaOptions..
-    var pkgPath = StringBufferInit(this.pkg.path, MAX_PATH, 0)
-    pkgPath.format("%s/src", CurrentWorkingPath())
+    var pkgPath = StringBufferInit(this.pkg.path, MAX_PATH, pkgDef.length)
+    pkgPath.format("%s/src", this.options.projectPath)
     pkgPath.cStr()
 
     return PkgStatus.OK

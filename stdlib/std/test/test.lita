@@ -3,7 +3,13 @@ import "std/mem"
 import "std/string"
 import "std/string/builder"
 import "std/libc"
+import "std/assert"
 import "std/terminal"
+import "std/system"
+
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
 
 @include("<setjmp.h>");
 
@@ -29,11 +35,28 @@ public struct TestSuite {
     testCases: Array<TestCase>
     currentCase: *TestCase
     env: jmp_buf        // jump to the next test
+
+    dynamicTestCases: Array<TestCase>
+    index: i32
 }
+
+public struct TestCase {
+    testSuite: *TestSuite
+    errors: Array<AssertEntry>
+    startTime: f64
+
+    name: *const char
+    userData: *void
+    testFn: func(testCase: *TestCase, userData: *void) : void;
+    cleanupFn: func(testCase: *TestCase, userData: *void) : void;
+}
+
 
 public func (this: *TestSuite) init(allocator: *const Allocator = defaultAllocator) {
     this.allocator = allocator
     this.testCases = ArrayInit<TestCase>(64, allocator)
+    this.dynamicTestCases = ArrayInit<TestCase>(64, allocator)
+    this.index = 0
 }
 
 public func (this: *TestSuite) free() {
@@ -42,6 +65,12 @@ public func (this: *TestSuite) free() {
         t.free()
     }
     this.testCases.free()
+
+    for(var i = 0; i < this.dynamicTestCases.size(); i+=1) {
+        var t = this.dynamicTestCases.get(i)
+        t.free()
+    }
+    this.dynamicTestCases.free()
 }
 
 public func (this: *TestSuite) enterTest() : *TestCase {
@@ -50,13 +79,60 @@ public func (this: *TestSuite) enterTest() : *TestCase {
     )
     this.currentCase = this.testCases.lastPtr()
     this.currentCase.init(this)
+    this.currentCase.startTime = SystemTimeMSec()
     return this.currentCase
 }
 
-public struct TestCase {
-    testSuite: *TestSuite
-    errors: Array<AssertEntry>
+
+public func (this: *TestSuite) addDynamicTest(
+    name: *const char,
+    userData: *void,
+    testFn: func(testCase: *TestCase, userData: *void) : void,
+    cleanupFn: func(testCase: *TestCase, userData: *void) : void = null
+) : *TestCase {
+    this.dynamicTestCases.add(
+        TestCase{}
+    )
+    var testCase = this.dynamicTestCases.lastPtr()
+    testCase.init(this)
+    testCase.name = name
+    testCase.userData = userData
+    testCase.testFn = testFn
+    testCase.cleanupFn = cleanupFn
+    return testCase
 }
+
+public func (this: *TestSuite) enterDynamicTest() : *TestCase {
+    if(this.index >= this.dynamicTestCases.size() || this.index < 0) {
+        return null
+    }
+    this.currentCase = this.dynamicTestCases.getPtr(this.index)
+    this.currentCase.startTime = SystemTimeMSec()
+
+    this.index += 1
+    return this.currentCase
+}
+
+public func (this: *TestSuite) executeDynamicTest() {
+    if(!this.currentCase || !this.currentCase.testFn) {
+        return;
+    }
+
+    this.currentCase.testFn(this.currentCase, this.currentCase.userData)
+    if(this.currentCase.cleanupFn) {
+        this.currentCase.cleanupFn(this.currentCase, this.currentCase.userData)
+    }
+}
+
+public func (this: *TestSuite) printDynamicTest(isJsonFormat: bool) {
+    if(!this.currentCase || !this.currentCase.testFn) {
+        return;
+    }
+
+    this.currentCase.print(this.currentCase.name, isJsonFormat)
+}
+
+
 
 public func (this: *TestCase) init(testSuite: *TestSuite) {
     this.testSuite = testSuite
@@ -71,34 +147,87 @@ public func (this: *TestCase) reset() {
     this.errors.clear()
 }
 
-
-public func (this: *TestCase) print(name: *const char) {
-    var resultText =
-        this.errors.empty() ? "SUCCESS" : "FAILED"
-
-    var dots = $"..............................................................."
-    var nDots = MAX(0, dots.length - name.length() - resultText.length())
-
-    var resultColor =
-        this.errors.empty() ? ConsoleColors.GREEN : ConsoleColors.RED
-
-    printf(
-        "Testing '%s'",
-        name
+public func (this: *TestCase) addError(
+    error: *const char,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    this.errors.add(
+        AssertEntry {
+            .filename = filename,
+            .lineNumber = lineNumber,
+            .errorMessage = error
+        }
     )
-    printf(
-        "%.*s",
-        nDots,
-        dots.buffer
-    )
-    printf(
-        "%s%s%s\n",
-        ConsoleColorsAsStr(resultColor),
-        resultText,
-        ConsoleColorsAsStr(ConsoleColors.CLEAR)
-    )
-    for(var i = 0; i < this.errors.size(); i +=1) {
-        printf("%s\n", this.errors.get(i).errorMessage)
+}
+
+@json
+internal enum TestStatus {
+    SUCCESS,
+    FAILED,
+    DISABLED
+}
+
+@json
+internal struct TestInfo {
+    type: *const char
+    name: *const char
+    status: TestStatus
+    errors: Array<*const char>
+    durationMSec: f64
+}
+
+public func (this: *TestCase) print(name: *const char, isJson: bool = false) {
+    var durationMSec = SystemTimeMSec() - this.startTime;
+
+    if(isJson) {
+        var errors = ArrayInit<*const char>(this.errors.size() + 1, this.testSuite.allocator)
+        for(var i = 0; i < this.errors.size(); i +=1) {
+            errors.add(this.errors.get(i).errorMessage)
+        }
+        var testInfo = TestInfo {
+            .type = "TEST_RESULT",
+            .name = name,
+            .status = this.errors.empty() ? TestStatus.SUCCESS : TestStatus.FAILED,
+            .errors = errors,
+            .durationMSec = durationMSec
+        }
+
+        var sb = StringBuilderInit(1024, this.testSuite.allocator)
+        testInfo.toJson(sb)
+        printf(
+            "%s\n",
+            sb.cStr()
+        )
+    }
+    else {
+        var resultText =
+            this.errors.empty() ? "SUCCESS" : "FAILED"
+
+        var dots = $"..............................................................."
+        var nDots = MAX(0, dots.length - name.length() - resultText.length())
+
+        var resultColor =
+            this.errors.empty() ? ConsoleColors.GREEN : ConsoleColors.RED
+
+        printf(
+            "Testing '%s'",
+            name
+        )
+        printf(
+            "%.*s",
+            nDots,
+            dots.buffer
+        )
+        printf(
+            "%s%s%s\n",
+            ConsoleColorsAsStr(resultColor),
+            resultText,
+            ConsoleColorsAsStr(ConsoleColors.CLEAR)
+        )
+        for(var i = 0; i < this.errors.size(); i +=1) {
+            printf("%s\n", this.errors.get(i).errorMessage)
+        }
     }
 }
 
@@ -160,16 +289,4 @@ public func Assert(
         // jump to the next test case, we've failed this one
         longjmp(testSuite.env, 1)
     }
-}
-
-@test
-func TestTheTest() {
-    AssertCStr("a", "a")
-    AssertCStr("bz", "bz")
-}
-
-@test
-func TestTheTest2() {
-    AssertCStr("a", "a")
-    AssertCStr("b", "b")
 }

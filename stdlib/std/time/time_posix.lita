@@ -6,12 +6,12 @@ import "std/time"
 @raw("""
 #include <time.h>
 
-typedef struct tm tm;
+typedef struct tm tm_time;
 """);
 
 @cFile("strptime.c");
 
-@foreign
+@foreign("tm_time")
 struct tm {
     tm_sec: i32   // Seconds (0-60, allows leap seconds)
     tm_min: i32   // Minutes (0-59)

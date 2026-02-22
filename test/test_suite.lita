@@ -13,6 +13,8 @@ import "std/string/builder"
 import "std/string"
 import "std/string/buffer"
 import "std/system"
+import "std/assert"
+import "std/test" as test
 
 import "../src/lita"
 import "../src/phase_result"
@@ -63,10 +65,19 @@ enum TestResult {
     ERROR_MISMATCH,
 }
 
+struct TestCallbackData {
+    suite: *TestSuite
+    test: *Test
+}
+
 const testHarness = TestHarness{}
 const lita = Lita{}
 
 func main(len: i32, args: **char) : i32 {
+    return RunTests(len, args)
+}
+
+public func RunTests(len: i32, args: **char): i32 {
     SystemInit()
 
     var options = LitaOptions{
@@ -78,53 +89,53 @@ func main(len: i32, args: **char) : i32 {
     var startTime = SystemTimeMSec()
 
     var testFiles = []*const char {
-        // "../test/tests/misc.json", json syntax error
+        // "../../test/tests/misc.json", json syntax error
 
-        "../test/tests/single.json",
-        "../test/tests/nameof.json",
-        "../test/tests/native_arg_args.json",
-        "../test/tests/random.json",
-        "../test/tests/number_types.json",
-        "../test/tests/visibility_modifiers.json",
-        "../test/tests/to_json.json",
-        "../test/tests/from_json.json",
-        "../test/tests/static_if.json",
-        "../test/tests/bugs.json",
-        "../test/tests/bucket_allocator.json",
-        "../test/tests/stack_allocator.json",
-        "../test/tests/unicode_support.json",
-        "../test/tests/func_named_args.json",
-        "../test/tests/traits.json",
-        "../test/tests/typeof.json",
-        "../test/tests/strings.json",
-        "../test/tests/using.json",
-        "../test/tests/notes.json",
-        "../test/tests/foreign_type.json",
-        "../test/tests/arena.json",
-        "../test/tests/alias.json",
-        "../test/tests/enums.json",
-        "../test/tests/compile_time_stmt.json",
-        "../test/tests/consts.json",
-        "../test/tests/aggregates.json",
-        "../test/tests/json.json",
-        "../test/tests/map.json",
-        "../test/tests/offsetof.json",
-        "../test/tests/sizeof.json",
-        "../test/tests/type_checker.json",
-        "../test/tests/string_view.json",
-        "../test/tests/string_buffer.json",
-        "../test/tests/stmts.json",
-        "../test/tests/array.json",
-        "../test/tests/methods.json",
-        "../test/tests/defer.json",
-        "../test/tests/declarations.json",
-        "../test/tests/arrays.json",
-        "../test/tests/var_decl.json",
-        "../test/tests/syntax_errors.json",
-        "../test/tests/generics.json",
-        "../test/tests/generics_inference.json",
-        "../test/tests/generics_constraints.json",
-        "../test/tests/post_else.json",
+        "../../test/tests/single.json",
+        "../../test/tests/nameof.json",
+        "../../test/tests/native_arg_args.json",
+        "../../test/tests/random.json",
+        "../../test/tests/number_types.json",
+        "../../test/tests/visibility_modifiers.json",
+        "../../test/tests/to_json.json",
+        "../../test/tests/from_json.json",
+        "../../test/tests/static_if.json",
+        "../../test/tests/bugs.json",
+        "../../test/tests/bucket_allocator.json",
+        "../../test/tests/stack_allocator.json",
+        "../../test/tests/unicode_support.json",
+        "../../test/tests/func_named_args.json",
+        "../../test/tests/traits.json",
+        "../../test/tests/typeof.json",
+        "../../test/tests/strings.json",
+        "../../test/tests/using.json",
+        "../../test/tests/notes.json",
+        "../../test/tests/foreign_type.json",
+        "../../test/tests/arena.json",
+        "../../test/tests/alias.json",
+        "../../test/tests/enums.json",
+        "../../test/tests/compile_time_stmt.json",
+        "../../test/tests/consts.json",
+        "../../test/tests/aggregates.json",
+        "../../test/tests/json.json",
+        "../../test/tests/map.json",
+        "../../test/tests/offsetof.json",
+        "../../test/tests/sizeof.json",
+        "../../test/tests/type_checker.json",
+        "../../test/tests/string_view.json",
+        "../../test/tests/string_buffer.json",
+        "../../test/tests/stmts.json",
+        "../../test/tests/array.json",
+        "../../test/tests/methods.json",
+        "../../test/tests/defer.json",
+        "../../test/tests/declarations.json",
+        "../../test/tests/arrays.json",
+        "../../test/tests/var_decl.json",
+        "../../test/tests/syntax_errors.json",
+        "../../test/tests/generics.json",
+        "../../test/tests/generics_inference.json",
+        "../../test/tests/generics_constraints.json",
+        "../../test/tests/post_else.json",
         null
     }
 
@@ -247,6 +258,15 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
             else {
                 testHarness.numberOfTests += 1
 
+                var dynamicTestData = new<TestCallbackData>()
+                dynamicTestData.suite = suite
+                dynamicTestData.test = test
+
+                testSuite.addDynamicTest(
+                    .name = test.name,
+                    .userData = dynamicTestData,
+                    .testFn = TestCallback
+                )/*
                 var startTime = SystemTimeMSec()
                 var result = RunTest(suite, test)
                 var deltaTime = SystemTimeMSec() - startTime
@@ -272,7 +292,7 @@ func RunTestSuite(suite: *TestSuite, filename: *const char) : i32 {
                         }
                         default: {}
                     }
-                }
+                }*/
             }
         }
     }
@@ -325,6 +345,12 @@ func CreateTest(suite: *TestSuite, testNode: *JsonNode, output: *Test) : *Test {
         output.modules.length = 0
     }
     return output
+}
+
+func TestCallback(userData: *void) : void {
+    var callbackData = userData as (*TestCallbackData)
+    var result = RunTest(callbackData.suite, callbackData.test)
+    assert(result == TestResult.SUCCESS)
 }
 
 func RunTest(suite: *TestSuite, test: *Test) : TestResult {

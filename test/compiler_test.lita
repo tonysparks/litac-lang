@@ -1,0 +1,522 @@
+
+import "std/libc"
+import "std/json"
+import "std/io"
+import "std/array"
+import "std/mem"
+import "std/mem/linear_allocator"
+import "std/map"
+import "std/hash"
+import "std/string/builder"
+import "std/string"
+import "std/string/buffer"
+import "std/system"
+import "std/assert"
+import "std/test" as test
+
+import "../src/lita"
+import "../src/phase_result"
+import "../src/error_codes"
+import "../src/intern"
+import "../src/symbols"
+//import "test_suite"
+
+
+@test(.disabled = true)
+func fullCompilerTestSuite() {
+    //RunTests(0, []*char{})
+}
+
+
+@test("singleOnly")
+func firstTestInCompilerTestSuite() {
+    // RunTests(2,
+    //     []*char{
+    //         "" as (*char),
+    //         "-onlyFirst" as (*char)
+    //     }
+    // )
+}
+
+struct TestSuite {
+    allocator: *const Allocator
+    linearAllocator: *LinearAllocator
+
+    filename: *const char
+    buffer: StringBuilder
+    description: *const char
+    disabled: bool
+    programTemplate: *const char
+    buildCmd: *const char
+    includeTypeInfo: bool
+    tests: Array<Test>
+}
+
+struct TestModule {
+    name: *const char
+    code: *const char
+}
+
+struct Test {
+    programText: StringBuilder
+    name: *const char
+    buildCmd: *const char
+
+    modules: Array<TestModule>
+    symbolPrefix: *const char
+    //definitions: *const char
+    //code: *const char
+    disabled: bool
+    expectedOutput: *const char
+    expectedErrorOutput: *const char
+}
+
+enum TestResult {
+    SUCCESS,
+    LOADING_ERROR,
+    OUTPUT_MISMATCH,
+    ERROR_MISMATCH,
+}
+
+struct TestCallbackData {
+    suite: *TestSuite
+    test: *Test
+}
+
+func TestCallback(testCase: *test::TestCase, userData: *void) : void {
+    var callbackData = userData as (*TestCallbackData)
+    var result = RunTest(testCase, callbackData.suite, callbackData.test)
+    assert(result == TestResult.SUCCESS)
+}
+
+// func TestCleanupCallback(testCase: *test::TestCase, userData: *void) : void {
+//     var callbackData = userData as (*TestCallbackData)
+//     // TODO: attach to suite, so we can run tests in parallel...
+//     //linearAllocator.clear()
+//     printf("Deallocating!!\n")
+// }
+
+const linearAllocator = LinearAllocator{}
+
+var testFiles = []*const char {
+    // "../../test/tests/misc.json", json syntax error
+
+    "../../test/tests/single.json",
+    "../../test/tests/nameof.json",
+    "../../test/tests/native_arg_args.json",
+    "../../test/tests/random.json",
+    "../../test/tests/number_types.json",
+    "../../test/tests/visibility_modifiers.json",
+    "../../test/tests/to_json.json",
+    "../../test/tests/from_json.json",
+    "../../test/tests/static_if.json",
+    "../../test/tests/bugs.json",
+    "../../test/tests/bucket_allocator.json",
+    "../../test/tests/stack_allocator.json",
+    "../../test/tests/unicode_support.json",
+    "../../test/tests/func_named_args.json",
+    "../../test/tests/traits.json",
+    "../../test/tests/typeof.json",
+    "../../test/tests/strings.json",
+    "../../test/tests/using.json",
+    "../../test/tests/notes.json",
+    "../../test/tests/foreign_type.json",
+    "../../test/tests/arena.json",
+    "../../test/tests/alias.json",
+    "../../test/tests/enums.json",
+    "../../test/tests/compile_time_stmt.json",
+    "../../test/tests/consts.json",
+    "../../test/tests/aggregates.json",
+    "../../test/tests/json.json",
+    "../../test/tests/map.json",
+    "../../test/tests/offsetof.json",
+    "../../test/tests/sizeof.json",
+    "../../test/tests/type_checker.json",
+    "../../test/tests/string_view.json",
+    "../../test/tests/string_buffer.json",
+    "../../test/tests/stmts.json",
+    "../../test/tests/array.json",
+    "../../test/tests/methods.json",
+    "../../test/tests/defer.json",
+    "../../test/tests/declarations.json",
+    "../../test/tests/arrays.json",
+    "../../test/tests/var_decl.json",
+    "../../test/tests/syntax_errors.json",
+    "../../test/tests/generics.json",
+    "../../test/tests/generics_inference.json",
+    "../../test/tests/generics_constraints.json",
+    "../../test/tests/post_else.json",
+    null
+}
+
+@test
+func testSuiteSetup() {
+    var memSize = 50 * MiB
+    var mem = defaultAllocator.alloc(memSize)
+    linearAllocator.init(mem, memSize)
+
+    var allocator = &linearAllocator.allocator
+
+    for(var i = 0; testFiles[i] != null; i+=1) {
+        // if(onlyRunFirst && i > 0) {
+        //     break
+        // }
+
+        var filename = testFiles[i]
+        var suite = new<TestSuite>(allocator)
+        ;*suite = TestSuite{
+            .allocator = allocator,
+            .linearAllocator = &linearAllocator,
+            .disabled = false,
+            .filename = filename,
+            .buffer = StringBuilderInit(1 * MiB as (i32), allocator),
+            .description = null,
+            .buildCmd = null,
+            .includeTypeInfo = false,
+            .programTemplate = """
+            @include("assert.h");
+            @foreign func assert(e:bool):void;
+
+            %definitions%
+
+            func main(len:i32, args:**char):i32 {
+                %code%
+            }
+            """
+        }
+
+        if(!BuildTestSuite(suite)) {
+            continue
+        }
+    }
+}
+
+
+func BuildTestSuite(
+    suite: *TestSuite
+) : i32 {
+    var data:*char;
+    var length: usize;
+    if(ReadFile(suite.filename, &data, &length, suite.allocator) != FileStatus.Ok) {
+        goto err;
+    }
+
+    var parser = JsonParser{}
+    parser.init(suite.allocator)
+
+    var node = parser.parseJson(data)
+    if(!node) {
+        if(parser.hasError()) {
+            printf("Test Json Syntax error: '%s' in file '%s'\n", parser.errorMsg, suite.filename)
+        }
+        goto err;
+    }
+
+    suite.description = node.getStr("description", suite.description)
+    suite.disabled = node.getBool("disabled", false)
+    suite.programTemplate = node.getStr("program", suite.programTemplate)
+    suite.buildCmd = node.getStr("buildCmd", null)
+    suite.includeTypeInfo = node.getBool("includeTypeInfos", false)
+
+    var tests = node.getArray("tests")
+    if(!tests) {
+        printf("No tests found for '%s'\n", suite.filename)
+        goto err;
+    }
+
+    if(suite.disabled) {
+        printf("Tests disabled for '%s'\n", suite.filename)
+        return 1
+    }
+
+    var filename = suite.filename.toString()
+    filename = filename.substring(filename.lastIndexOfAt($"/"))
+
+    suite.tests.init(tests.size(), suite.allocator)
+    for(var i = 0; i < tests.size(); i += 1) {
+        var testNode = tests.at(i)
+        if(!testNode) {
+            continue
+        }
+
+        var test = CreateTest(suite, testNode, &suite.tests.elements[i])
+
+        var dynamicTestData = new<TestCallbackData>()
+        assert(dynamicTestData != null)
+
+        dynamicTestData.suite = suite
+        dynamicTestData.test = test
+
+        var name = StringBuilderInit(256, suite.allocator)
+        name.append(
+            "%.*s :: %s",
+            filename.length, filename.buffer,
+            test != null ? test.name : "<error creating test>"
+        )
+        testSuite.addDynamicTest(
+            .name = name.cStr(),
+            .userData = dynamicTestData,
+            .testFn = TestCallback
+            //.cleanupFn = TestCleanupCallback
+        )
+    }
+    return 1
+
+err:
+    return 0
+}
+
+func CreateTest(
+    suite: *TestSuite,
+    testNode: *JsonNode,
+    output: *Test
+) : *Test {
+
+    var programText = StringBuilderInit(2048, suite.allocator)
+    programText.append("%s\n", suite.programTemplate)
+
+    const defsTemplate = "%definitions%"
+    var defsLen = defsTemplate.length()
+    var defsIndex = programText.indexOf(defsTemplate.toString())
+    if(defsIndex > -1) {
+        programText.replace(defsIndex, defsIndex + defsLen, testNode.getStr("definitions", "").toString())
+    }
+
+    const codeTemplate = "%code%"
+    var codeLen = codeTemplate.length()
+    var codeIndex = programText.indexOf(codeTemplate.toString())
+    if(codeIndex > -1) {
+        programText.replace(codeIndex, codeIndex + codeLen, testNode.getStr("code", "").toString())
+    }
+
+    output.programText = programText
+    output.name = testNode.getStr("name", "")
+    output.expectedOutput = testNode.getStr("output", null)
+    output.expectedErrorOutput = testNode.getStr("error", null)
+    output.disabled = testNode.getBool("disabled", false)
+    output.buildCmd = testNode.getStr("buildCmd", null)
+    output.symbolPrefix = testNode.getStr("symbolPrefix", null)
+
+    var modules = testNode.getArray("modules")
+    if(modules) {
+        output.modules.init(modules.size(), suite.allocator)
+        for(var i = 0; i < modules.size(); i += 1) {
+            var module = modules.at(i)
+            var m = TestModule {
+                .name = module.getStr("name", ""),
+                .code = module.getStr("program", "")
+            }
+            output.modules.add(m)
+        }
+
+    }
+    else {
+        output.modules.length = 0
+    }
+    return output
+}
+
+
+func RunTest(testCase: *TestCase, suite: *TestSuite, test: *Test) : TestResult {
+    var currentOffset = suite.linearAllocator.currentOffset;
+    defer suite.linearAllocator.currentOffset = currentOffset;
+
+    if(test == null) {
+        var sb = StringBuilderInit(256, suite.allocator)
+        sb.append("Unable to load test: '%s'", testCase.name)
+        testCase.addError(sb.cStr())
+
+        return TestResult.LOADING_ERROR
+    }
+
+    suite.buffer.clear() // clear previous run
+
+    if(suite.disabled || test.disabled) {
+        return TestResult.SUCCESS
+    }
+
+    // TODO: should make random or based on file name of suite,
+    // so tests can be run in parellel
+    var tmpSrcFile = "test_output/lita_test.lita"
+    Mkdir("test_output")
+
+    if(WriteFile(tmpSrcFile, test.programText.cStrConst(), test.programText.length) != FileStatus.Ok) {
+        var sb = StringBuilderInit(256, suite.allocator)
+        sb.append("Unable to write out to file '%s'", tmpSrcFile)
+        testCase.addError(sb.cStr())
+
+        return TestResult.LOADING_ERROR
+    }
+
+    var moduleFilename = [260]char {};
+    var moduleFilenameStr = StringBufferInit(moduleFilename, 260, 0)
+    for(var i = 0; i < test.modules.size(); i += 1) {
+        var m = test.modules.get(i)
+        var moduleName = StringInit(m.name)
+
+        // make sub directories
+        if(moduleName.contains($"/")) {
+            var path = moduleName.substring(0, moduleName.lastIndexOfAt($"/"))
+
+            moduleFilenameStr.clear()
+            moduleFilenameStr.format("test_output/%.*s", path.length, path.buffer)
+            Mkdirs(moduleFilenameStr.cStr())
+        }
+
+        moduleFilenameStr.clear()
+        moduleFilenameStr.format("test_output/%s.lita", m.name)
+
+
+        if(WriteFile(moduleFilenameStr.cStr(), m.code, m.code.length()) != FileStatus.Ok) {
+            var sb = StringBuilderInit(256, suite.allocator)
+            sb.append("Unable to write out to file '%s'", moduleFilenameStr.cStr())
+            testCase.addError(sb.cStr())
+
+            return TestResult.LOADING_ERROR
+        }
+    }
+
+    var options = new<LitaOptions>(suite.allocator)
+
+    options.checkerOnly = false
+    options.cOutputOnly = false
+    options.showProfileInfo = false
+    options.run = false // we run outselves
+    options.cFormat = false
+    if(suite.includeTypeInfo) {
+        options.typeOption = TypeInfoOption.ALL
+    }
+    if(test.symbolPrefix) {
+        memcpy(.dest = options.cPrefix, .src = test.symbolPrefix , .num = MAX_PREFIX_SIZE)
+    }
+    //options.maxMemory = 1024 * 1024 * 50
+    //options.isDebug = true
+    if(test.buildCmd) {
+        options.compileCmd = test.buildCmd
+    }
+    else {
+        if(suite.buildCmd) {
+            options.compileCmd = suite.buildCmd
+        }
+        else {
+            options.compileCmd = "clang %input% -o %output% -D_CRT_SECURE_NO_WARNINGS"
+        }
+    }
+
+
+    StringCopy(tmpSrcFile, options.inputFile, MAX_PATH)
+    StringCopy(GetEnv("LITAC_HOME"), options.litaPath, MAX_PATH)
+
+    var outputFile = "test"
+    StringCopy(outputFile, options.outputFile, MAX_PATH)
+
+    var outputPath = "test_output"
+    var outputPathBuffer = StringBufferInit(options.outputPath, MAX_PATH, 0)
+    outputPathBuffer.format("%s", outputPath)
+    var len = options.outputPath.length()
+    if(len > 0) {
+        if(options.outputPath[len-1] != '/') {
+            outputPathBuffer.append("/")
+        }
+    }
+
+    FilePath(options.inputFile, options.srcPath)
+
+    var lita = Lita{}
+    lita.init(options)
+    defer lita.free()
+
+    var root = lita.parse()
+    if(!root) {
+        goto report
+    }
+
+    if(!lita.typeCheck(root)) {
+        goto report
+    }
+
+    if(!lita.transpile(root)) {
+        goto err
+    }
+
+    lita.runCaptureOutput(suite.buffer)
+
+    if(test.expectedOutput) {
+        if(!test.expectedOutput.equals(suite.buffer.cStr())) {
+            goto err
+        }
+    }
+    else if(suite.buffer.length) {
+        goto err
+    }
+
+report:
+
+    if(!lita.result.errors.empty()) {
+        suite.buffer.clear() // clear program output
+
+        for(var i = 0; i < lita.result.errors.size(); i += 1) {
+            PrintError(lita.options.isColoredOutput, suite.buffer, lita.result.errors.get(i))
+            suite.buffer.append("\n")
+        }
+        suite.buffer.append("Total errors: %d\n", lita.result.errors.size())
+
+        if(test.expectedErrorOutput) {
+            if(suite.buffer.contains(test.expectedErrorOutput.toString())) {
+                return TestResult.SUCCESS
+            }
+            else {
+                return TestResult.ERROR_MISMATCH
+            }
+        }
+
+        goto err
+    }
+    else if(test.expectedErrorOutput) {
+        return TestResult.ERROR_MISMATCH
+    }
+
+
+    return TestResult.SUCCESS
+
+err:
+    return TestResult.OUTPUT_MISMATCH
+}
+
+
+public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
+    var path: [MAX_PATH]char;
+    FilePath(this.binaryFilename, path)
+
+    var len = path.length()
+    sb.appendStrn("cd ", 3)
+    sb.appendStrn(path, len)
+    sb.append(" && .%s%s 2>&1", PATH_SEPARATOR, &this.binaryFilename[len + 1])
+
+    var process = SystemExec(sb.cStr())
+    if(!process.pipe) {
+        return "failed to spawn test"
+    }
+    defer process.close()
+
+    sb.clear()
+
+    var buffer = [1024]char{};
+    var bytesRead = -1_i64
+    while((bytesRead = process.readOutput(buffer, 1024)) > 0) {
+        sb.appendStr(buffer)
+    }
+
+    return sb.cStrConst()
+}
+// TODO: Doesn't work due to bug...
+// @module_init
+// public func InitTestHarness() {
+//     //SystemInit()
+//     printf("Init\n")
+// }
+
+// @module_destroy
+// public func DestroyTestHarness() {
+//     printf("Destroy\n")
+// }

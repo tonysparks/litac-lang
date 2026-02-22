@@ -72,10 +72,12 @@ func (this: *PackageManager) build(
     var litaOptions = new<LitaOptions>()
     defer defaultAllocator.free(litaOptions)
 
+    // TODO: Reverse this order of overriding,
+    // we should actually take command line as the precedence..
+
     // copy over all other command line options to
     // this execution
     memcpy(litaOptions, this.options.litaOptions, sizeof(:LitaOptions))
-
 
     var args = CommandArgs{}
     var result = this.buildCommandArgs(buildCommand, options, &args, runType)
@@ -90,6 +92,8 @@ func (this: *PackageManager) build(
         return PkgStatus.OK
     }
 
+    // TODO: This doesn't take existing defaults correctly
+    // need to account for missing flags modifying existing values...
     if(ParseArgs(args.n, args.args, litaOptions) != ParseStatus.OK) {
         return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
     }
@@ -127,6 +131,7 @@ func (this: *PackageManager) buildCommandArgs(
 
     var programArgs = ArrayInit<*const char>(64, this.allocator)
     programArgs.add("litac")
+    programArgs.add("build")
 
     if(buildSection) {
         var script = buildSection.get("script")
@@ -236,6 +241,7 @@ func (this: *PackageManager) buildCommandArgs(
         }
 
         if(this.options.litaOptions.testsOnly && runType == RunType.BUILD) {
+            /*
             programArgs.add("-testDir")
             if(this.options.litaOptions.srcPath.empty()) {
                 programArgs.add("./test/")
@@ -252,6 +258,7 @@ func (this: *PackageManager) buildCommandArgs(
             }
 
             mainFile = "./test/main_test.lita"
+            */
         }
     }
 
@@ -263,6 +270,12 @@ func (this: *PackageManager) buildCommandArgs(
 
     args.n = programArgs.size()
     args.args = programArgs.elements as (**char)
+
+//////
+// for(var i = 0; i < args.n; i+=1) {
+//     printf("Arg: %d %s\n", i, args.args[i])
+// }
+//////
 
     return PkgStatus.OK
 }
@@ -279,6 +292,8 @@ func ContainsOption(option: *const char, programArgs: *Array<*const char>) : boo
 
 
 func (this: *PackageManager) buildWithScript(script: *JsonNode) : PkgStatus {
+
+    /*
     var process = sys::SystemExec(script.asString())
     if(!process.pipe) {
         return PkgStatus.ERROR_RUNNING_COMMAND
@@ -292,6 +307,10 @@ func (this: *PackageManager) buildWithScript(script: *JsonNode) : PkgStatus {
     var bytesRead = -1_i64
     while((bytesRead = process.readOutput(buffer, BUFFER_SIZE)) > 0) {
         printf("%.*s", bytesRead as (i32), buffer)
+    }
+    */
+    if(system(script.asString()) != 0) {
+        return PkgStatus.ERROR_RUNNING_COMMAND
     }
     return PkgStatus.OK
 }

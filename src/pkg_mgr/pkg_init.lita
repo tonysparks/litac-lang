@@ -47,7 +47,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
+                "build",
                 "-run"
             ],
             "presentation": {
@@ -69,7 +69,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
+                "build",
                 "-release",
                 "-run"
             ],
@@ -92,9 +92,8 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
-                "-run",
-                "-testFile",
+                "test",
+                "-file",
                 "${file}"
             ],
             "presentation": {
@@ -116,10 +115,7 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
             "type": "shell",
             "command": "litac",
             "args": [
-                "-pkg-build",
-                "-run",
-                "-test",
-                ".*"
+                "test",
             ],
             "presentation": {
                 "echo": true,
@@ -142,6 +138,10 @@ public func PackageInit(pm: *PackageManager, options: PackageInitOptions) : PkgS
         path.format("%s/.vscode/tasks.json", pm.options.projectPath)
         if(!FileExists(path.cStr())) {
             if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                pm.errors.append(
+                    "unable to write to file: '%s'",
+                    path.cStr()
+                )
                 return PkgStatus.ERROR_INIT_PACKAGE
             }
         }
@@ -162,6 +162,10 @@ func main(len: i32, args: **char) : i32 {
         path.format("%s/src/main.lita", pm.options.projectPath)
         if(!FileExists(path.cStr())) {
             if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                pm.errors.append(
+                    "unable to write to file: '%s'",
+                    path.cStr()
+                )
                 return PkgStatus.ERROR_INIT_PACKAGE
             }
         }
@@ -184,6 +188,10 @@ func test() {
         path.format("%s/test/main_test.lita", pm.options.projectPath)
         if(!FileExists(path.cStr())) {
             if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                pm.errors.append(
+                    "unable to write to file: '%s'",
+                    path.cStr()
+                )
                 return PkgStatus.ERROR_INIT_PACKAGE
             }
         }
@@ -222,6 +230,10 @@ func test() {
         path.format("%s/pkg.json", pm.options.projectPath)
         if(!FileExists(path.cStr())) {
             if(WriteFile(path.cStr(), sb.buffer, sb.length) != FileStatus.Ok) {
+                pm.errors.append(
+                    "unable to write to file: '%s'",
+                    path.cStr()
+                )
                 return PkgStatus.ERROR_INIT_PACKAGE
             }
         }

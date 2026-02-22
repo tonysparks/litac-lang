@@ -13,6 +13,10 @@ import "std/string"
 import "std/string/builder"
 import "std/profile"
 import "std/http"
+import "std/assert"
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
 
 import "lex"
 import "lita"
@@ -99,13 +103,22 @@ report:
 
     hasError = hasError || !lita.result.errors.empty()
     if(hasError) {
-        for(var i = 0; i < lita.result.errors.size(); i += 1) {
-            PrintError(lita.options.isColoredOutput, sb, lita.result.errors.get(i))
-
-            printf("%s\n", sb.cStr())
-            sb.clear()
+        if(options.isJsonFormat) {
+            lita.result.errors.toJson(sb)
+            printf(
+                "{ \"type\": \"COMPILATION_MESSAGE\", \"errors\" : %s }\n",
+                sb.cStr()
+            )
         }
-        printf("Total errors: %d\n", lita.result.errors.size())
+        else {
+            for(var i = 0; i < lita.result.errors.size(); i += 1) {
+                PrintError(lita.options.isColoredOutput, sb, lita.result.errors.get(i))
+
+                printf("%s\n", sb.cStr())
+                sb.clear()
+            }
+            printf("Total errors: %d\n", lita.result.errors.size())
+        }
     }
 
     if(options.showProfileInfo) {
@@ -145,63 +158,92 @@ public enum ParseStatus {
     TERMINATE,
 }
 
-public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus {
+public func ParseArgs(
+    n: i32,
+    args: **char,
+    options: *LitaOptions,
+    useSuppliedOptionIfNotDefined: bool = false
+) : ParseStatus {
     var parser = CmdParserInit()
     defer parser.free()
 
-    parser.header = "<usage> litac [options] [source file to compile]\nOPTIONS:";
-    parser.addOption("languageServer", '\0', "Start the LitaC language server", 0, null);
-    parser.addOption("lib",            '\0', "The LitaC library path", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("cPrefx",         '\0', "The symbol prefix to use on the generated C code output", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("cFormat",        '\0', "Formats the C output", 0, null);
-    parser.addOption("run",            '\0', "Runs the program after a successful compile", 0, null);
-    parser.addOption("checkerOnly",    '\0', "Only runs the type checker, does not compile", 0, null);
-    parser.addOption("cOnly",          '\0', "Only creates the C output file, does not cimple the generated C code", 0, null);
-    parser.addOption("profile",        '\0', "Reports profile metrics of the compiler", 0, null);
-    parser.addOption("disableLine",    '\0', "Disables #line dorective in C output", 0, null);
-    parser.addOption("debug",          '\0', "Enables debug mode", 0, null);
-    parser.addOption("verbose",        '\0', "Enables verbose output", 0, null);
-    parser.addOption("colors",         '\0', "Enables console colors for output", 0, null);
-    parser.addOption("instrument",     '\0', "Enables profile instrumentation of @profile annotated functions", 0, null);
-    parser.addOption("srcDir",         '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("doc",            '\0', "Generates document output", 0, null);
-    parser.addOption("docDir",         '\0', "Directory where the generated documents are written to, defaults to './output'", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("docAll",         '\0', "Includes non-public types in the documentation generation", 0, null);
-    parser.addOption("output",         'o', "The name of the compiled binary", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("outputDir",      '\0', "The directory in which the C ouput files are stored", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("version",        'v', "Displays the LitaC version", 0, null);
-    parser.addOption("help",           'h', "Displays this help", 0, null);
-    parser.addOption("types",          't', "Includes TypeInfo for reflection\n<arg> can be:\nall       Means all types will have reflection values\ntagged    Means only basic types and types annotated with @typeinfo will have reflection values", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("test",           '\0', "Runs functions annotated with @test\n<arg> is a regex of which tests should be run", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("testFile",       '\0', "Runs functions annotated with @test in the supplied source file only", 0, null);
-    parser.addOption("testDir",        '\0', "Specifies the source code test directory", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("pkg-install",    '\0', "Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.\nIf successful, creates a build.json which is used for building this LitaC project.", 0, null);
-    parser.addOption("force",          '\0', "Forces a full clean install of all packages.  Must be ran with `pkg-install` option, otherwise will be ignored.", 0, null);
-    parser.addOption("pkg-run",        '\0', "Runs a script defined in the `commands` section in this projects `pkg.json`.  The argument passed of this option is used to run the `commands.{option}` command", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("pkg-init",       '\0', "Initializes a new LitaC package project", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("pkg-build",      '\0', "Builds the LitaC package", 0, null);
-    parser.addOption("pkg-test",       '\0', "Recursively scan for *_test.lita files and run each. Optionally pass a directory to scan (default: current directory).", 0, null);
-    parser.addOption("release",        '\0', "Marks builds in release mode", 0, null);
-    parser.addOption("proxy",          '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null);
-    parser.addOption("tcc",            '\0', "Use tcc to compile.  This ignores buildCmd/strictBuildCmd", 0, null);
-    parser.addOption("maxMemory",      '\0', "The max amount of memory allowed for allocation. NOTE: This is a temporary option", OptionFlag.HAS_ARGUMENT, null);
-    parser.addOption("--",             '\0', "Signals any arguments after are to be passed to the compile program when -run is set", 0, null)
+    parser.header = "<usage> litac [command] [options]\nCOMMANDS:";
+
+    parser.addCommand("build", "Builds the LitaC package")
+        .addOption("run",            '\0', "Runs the program after a successful compile", 0, null)
+        .addOption("lib",            '\0', "The LitaC library path", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("profile",        '\0', "Reports profile metrics of the compiler", 0, null)
+        .addOption("disableLine",    '\0', "Disables #line dorective in C output", 0, null)
+        .addOption("instrument",     '\0', "Enables profile instrumentation of @profile annotated functions", 0, null)
+        .addOption("srcDir",         '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("output",         'o', "The name of the compiled binary", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("outputDir",      '\0', "The directory in which the C ouput files are stored", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("types",          't', "Includes TypeInfo for reflection\n<arg> can be:\nall       Means all types will have reflection values\ntagged    Means only basic types and types annotated with @typeinfo will have reflection values", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("debug",          '\0', "Enables debug mode", 0, null)
+        .addOption("release",        '\0', "Marks builds in release mode", 0, null)
+        .addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null)
+        .addOption("tcc",            '\0', "Use tcc to compile.  This ignores buildCmd/strictBuildCmd", 0, null)
+        .addOption("checkerOnly",    '\0', "Only runs the type checker, does not compile", 0, null)
+        .addOption("cOnly",          '\0', "Only creates the C output file, does not cimple the generated C code", 0, null)
+        .addOption("cFormat",        '\0', "Formats the C output", 0, null)
+        .addOption("cPrefx",         '\0', "The symbol prefix to use on the generated C code output", OptionFlag.HAS_ARGUMENT, null)
+
+
+    parser.addCommand("lsp", "Start the LitaC language server")
+
+    parser.addCommand("doc", "Generates document output")
+        .addOption("docDir",         '\0', "Directory where the generated documents are written to, defaults to './output'", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("all",            '\0', "Includes non-public types in the documentation generation", 0, null)
+
+    parser.addCommand("test", "Recursively scan for *_test.lita files and run each. Optionally pass a directory to scan (default: current directory).")
+        .addOption("file",           '\0', "Runs functions annotated with @test in the supplied source file only", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("package",        '\0', "Runs functions annotated with @test in the supplied source package only", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("regex",          '\0', "Runs functions annotated with @test matching the supplied regex expression.  Can use used with -file -package or default for filtering", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("testDir",        '\0', "Specifies the source code test directory", OptionFlag.HAS_ARGUMENT, null)
+        // build flags
+        .addOption("lib",            '\0', "The LitaC library path", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("profile",        '\0', "Reports profile metrics of the compiler", 0, null)
+        .addOption("disableLine",    '\0', "Disables #line dorective in C output", 0, null)
+        .addOption("instrument",     '\0', "Enables profile instrumentation of @profile annotated functions", 0, null)
+        .addOption("srcDir",         '\0', "Specifies the source code directory, defaults to the parent folder of the supplied source file", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("output",         'o', "The name of the compiled binary", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("outputDir",      '\0', "The directory in which the C ouput files are stored", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("types",          't', "Includes TypeInfo for reflection\n<arg> can be:\nall       Means all types will have reflection values\ntagged    Means only basic types and types annotated with @typeinfo will have reflection values", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("debug",          '\0', "Enables debug mode", 0, null)
+        .addOption("release",        '\0', "Marks builds in release mode", 0, null)
+        .addOption("buildCmd",       'b',  "The underlying C compiler build and compile command.  Variables will be substituted if found:\n%output%\tThe executable name\n%input%\tThe file(s) generated.\n%options%\tThe generated @compiler_option's if -strict option is enabled. \nOtherwise, the LitaC compiler will append any @compiler_option flags to this command.", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("strict",         '\0', "The LitaC compiler will not modify the `buildCmd` option (for applying @compiler_option), instead it will store the generated @compiler_options in the %options% substitution variable.", 0, null)
+        .addOption("tcc",            '\0', "Use tcc to compile.  This ignores buildCmd/strictBuildCmd", 0, null)
+        .addOption("json",           '\0', "Output messages in json format", 0, null)
+
+    parser.addCommand("install", "Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.\nIf successful, creates a build.json which is used for building this LitaC project.")
+        .addOption("force",          '\0', "Forces a full clean install of all packages.", 0, null)
+
+    parser.addCommand("command", "Runs a script defined in the `commands` section in this projects `pkg.json`.  The argument passed of this option is used to run the `commands.{option}` command", true)
+
+    parser.addCommand("init", "Initializes a new LitaC package project, the input argument is the name of the package", true)
+
+    // Global options
+    parser.addOption("version",      'v', "Displays the LitaC version", 0, null)
+    parser.addOption("help",         'h', "Displays this help", 0, null)
+    parser.addOption("verbose",      '\0', "Enables verbose output", 0, null)
+    parser.addOption("colors",       '\0', "Disables console colors for output", 0, null)
+    parser.addOption("proxy",        '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null)
+    parser.addOption("maxMemory",    '\0', "The max amount of memory allowed for allocation. NOTE: This is a temporary option", OptionFlag.HAS_ARGUMENT, null)
+    parser.addOption("--",           '\0', "Signals any arguments after are to be passed to the compile program when -run is set", 0, null)
 
     if(parser.parse(n, args) != CmdParserStatus.OK) {
         goto err_print;
     }
-
 
     if(parser.hasOption("version")) {
         printf("Version: %s\n", LITA_VERSION)
         goto terminate;
     }
 
-    if(parser.hasOption("colors")) {
-        options.isColoredOutput = true
-    }
+    options.isColoredOutput = !parser.hasOption("colors")
+    options.isVerbose |= parser.hasOption("verbose")
 
     if(parser.hasOption("help")) {
         {
@@ -213,80 +255,6 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         }
         goto terminate;
     }
-
-    options.pkgOptions.pkgCmd = PkgCommand.PKG_NONE
-    if(parser.hasOption("pkg-install")) {
-        options.pkgOptions.pkgCmd = PkgCommand.PKG_INSTALL
-        options.pkgOptions.forceClean = parser.hasOption("force")
-    }
-
-    if(parser.hasOption("pkg-run")) {
-        options.pkgOptions.pkgCmd = PkgCommand.PKG_RUN
-        options.pkgOptions.pkgRunCmdArg = parser.getOption("pkg-run").value
-    }
-
-    if(parser.hasOption("pkg-init")) {
-        options.pkgOptions.pkgCmd = PkgCommand.PKG_INIT
-        options.pkgOptions.pkgName = parser.getOption("pkg-init").value
-    }
-
-    if(parser.hasOption("pkg-build")) {
-        options.pkgOptions.pkgCmd = PkgCommand.PKG_BUILD
-        options.pkgOptions.isRelease = parser.hasOption("release")
-    }
-
-    if(parser.hasOption("pkg-test")) {
-        options.pkgOptions.pkgCmd = PkgCommand.PKG_TEST
-        options.testsOnly = true
-    }
-
-    options.languageServer = parser.hasOption("languageServer")
-    if(!options.languageServer) {
-        var pkgCmd = options.pkgOptions.pkgCmd
-
-        // if we are not running a pkg* command, we must have an input file
-        if(pkgCmd == PkgCommand.PKG_NONE) {
-            if(parser.args.size() < 2) {
-                printf("Missing input file\n")
-                goto err;
-            }
-
-            GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
-        }
-        else {
-            // we optionally can provide an input file for pkg* commands
-            var hasInputFile = (pkgCmd != PkgCommand.PKG_RUN || parser.hasOption("run"))
-            if(parser.args.size() > 1 && hasInputFile) {
-                var inputFile = parser.args.get(1)
-
-                // make sure we are not passing in program arguments
-                if(!inputFile.equals("--")) {
-                    GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
-                    if(!FileExists(options.inputFile)) {
-                        printf("Could not find '%s'\n", options.inputFile)
-                        goto err;
-                    }
-                }
-            }
-        }
-    }
-
-    var lib:*const char = GetEnv("LITAC_HOME")
-    if(!lib) lib = LITAC_HOME_DEFAULT;
-
-    GetAbsolutePath("", lib, options.litaPath)
-
-    options.checkerOnly = parser.hasOption("checkerOnly")
-    options.cOutputOnly = parser.hasOption("cOnly")
-    options.showProfileInfo = parser.hasOption("profile")
-    options.run = parser.hasOption("run")
-    options.isDebug = parser.hasOption("debug")
-    options.cFormat = parser.hasOption("cFormat")
-    options.instrument = parser.hasOption("instrument")
-    options.disableLineSync = parser.hasOption("disableLine")
-    options.isVerbose = parser.hasOption("verbose")
-    options.isTcc = parser.hasOption("tcc")
-    options.isStrict = parser.hasOption("strict")
 
     if(parser.hasOption("maxMemory")) {
         var memoryStr = parser.getOption("maxMemory").value
@@ -310,117 +278,230 @@ public func ParseArgs(n: i32, args: **char, options: *LitaOptions) : ParseStatus
         options.maxMemory = 300 * MiB
     }
 
-    options.typeOption = TypeInfoOption.NONE
-    if(parser.hasOption("types")) {
-        var opt = parser.getOption("types").value
-        if(opt.equals("all")) {
-            options.typeOption = TypeInfoOption.ALL
-        }
-        else if(opt.equals("tagged")) {
-            options.typeOption = TypeInfoOption.TAGGED
-        }
-    }
-
-    if(parser.hasOption("test")) {
-        options.testsRegex = parser.getOption("test").value
-        options.testsOnly = true
-    }
-
-    if(parser.hasOption("testFile")) {
-        options.testFileOnly = true
-        options.testsOnly = true
-    }
-
     if(parser.hasOption("proxy")) {
         options.proxy = parser.getOption("proxy").value
     }
 
-    if(parser.hasOption("buildCmd")) {
-        options.compileCmd = parser.getOption("buildCmd").value
+    var lib:*const char = GetEnv("LITAC_HOME")
+    if(!lib) lib = LITAC_HOME_DEFAULT;
+
+    GetAbsolutePath("", lib, options.litaPath)
+
+    StringCopy(.src = CurrentWorkingPath(), .dest = options.projectPath, .size = MAX_PATH)
+
+    options.pkgOptions.pkgCmd = PkgCommand.PKG_NONE
+    if(!parser.hasCmd()) {
+        if(parser.args.size() < 2) {
+            goto err_print;
+        }
+        printf("Missing or invalid command argument\n")
+        goto err;
     }
-    else {
-        options.compileCmd = BUILD_CMD_DEFAULT;
-    }
 
-    var cPrefix = parser.hasOption("cPrefix") ? parser.getOption("cPrefix").value : "litaC_"
-    StringCopy(.src = cPrefix, .dest = options.cPrefix, .size = MAX_PREFIX_SIZE)
+    var cmd = parser.getCmd()
 
-    var outputFile = parser.hasOption("output") ? parser.getOption("output").value : OUTPUT_NAME_DEFAULT
-    StringCopy(.src = outputFile, .dest = options.outputFile, .size = MAX_PATH)
-
-    var outputPath = parser.hasOption("outputDir") ? parser.getOption("outputDir").value : OUTPUT_DIR_DEFAULT
-    StringCopy(.src = outputPath, .dest = options.outputPath, .size = MAX_PATH)
-
-    var len = options.outputPath.length()
-    if(len > 0) {
-        if(options.outputPath[len-1] != '/') {
-            strcat(options.outputPath, "/")
+    if(cmd.name.equals("build") || cmd.name.equals("test")) {
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_BUILD
+        options.pkgOptions.isRelease |= cmd.hasOption("release")
+        options.isJsonFormat |= cmd.hasOption("json")
+        if(options.isJsonFormat) {
+            options.isColoredOutput = false
         }
 
-        var output = [MAX_PATH]char{0}
-        GetAbsolutePath(CurrentWorkingPath(), options.outputPath, output)
-        StringCopy(.src = output, .dest = options.outputPath, .size = MAX_PATH)
-    }
+        options.checkerOnly |= cmd.hasOption("checkerOnly")
+        options.cOutputOnly |= cmd.hasOption("cOnly")
+        options.showProfileInfo |= cmd.hasOption("profile")
+        options.run |= cmd.hasOption("run")
+        options.isDebug |= cmd.hasOption("debug")
+        options.cFormat |= cmd.hasOption("cFormat")
+        options.instrument |= cmd.hasOption("instrument")
+        options.disableLineSync |= cmd.hasOption("disableLine")
+        options.isTcc |= cmd.hasOption("tcc")
+        options.isStrict |= cmd.hasOption("strict")
 
-    if(parser.hasOption("srcDir")) {
-        StringCopy(.src = parser.getOption("srcDir").value, .dest = options.srcPath, .size = MAX_PATH)
-    }
-
-    if(options.srcPath.empty()) {
-        var path = StringInit(options.inputFile, MAX_PATH)
-        var paths = []String {
-            $"/src/",
-            $"/stdlib/",
-            $"/test/",
-        }
-
-        var index = -1
-        for(var i = 0; i < sizeof(paths) / sizeof(paths[0]); i+=1) {
-            index = path.lastIndexOfAt(paths[i])
-            if(index > -1) {
-                StringCopy(
-                    .src = options.inputFile,
-                    .dest = options.srcPath,
-                    .size = index + paths[i].length
-                )
-                break
+        options.typeOption = TypeInfoOption.NONE
+        if(cmd.hasOption("types")) {
+            var opt = cmd.getOption("types").value
+            if(opt.equals("all")) {
+                options.typeOption = TypeInfoOption.ALL
+            }
+            else if(opt.equals("tagged")) {
+                options.typeOption = TypeInfoOption.TAGGED
             }
         }
 
-        if(index < 0) {
-            FileParent(options.inputFile, options.srcPath)
+        if(cmd.hasOption("buildCmd")) {
+            options.compileCmd = cmd.getOption("buildCmd").value
         }
-    }
 
-    if(parser.hasOption("testDir")) {
-        StringCopy(.src = parser.getOption("testDir").value, .dest = options.testPath, .size = MAX_PATH)
+        if(!options.compileCmd) {
+            options.compileCmd = BUILD_CMD_DEFAULT;
+        }
+
+        var cPrefix = cmd.hasOption("cPrefix") ? cmd.getOption("cPrefix").value : options.cPrefix
+        if(cPrefix.empty()) cPrefix = "litaC_"
+        StringCopy(.src = cPrefix, .dest = options.cPrefix, .size = MAX_PREFIX_SIZE)
+
+        var outputFile = cmd.hasOption("output") ? cmd.getOption("output").value : options.outputFile
+        if(outputFile.empty()) outputFile = OUTPUT_NAME_DEFAULT
+        StringCopy(.src = outputFile, .dest = options.outputFile, .size = MAX_PATH)
+
+        var outputPath = cmd.hasOption("outputDir") ? cmd.getOption("outputDir").value : options.outputPath
+        if(outputPath.empty()) outputPath = OUTPUT_DIR_DEFAULT
+        StringCopy(.src = outputPath, .dest = options.outputPath, .size = MAX_PATH)
+
+        var len = options.outputPath.length()
+        if(len > 0) {
+            if(options.outputPath[len-1] != '/') {
+                strcat(options.outputPath, "/")
+            }
+
+            var output = [MAX_PATH]char{0}
+            GetAbsolutePath(CurrentWorkingPath(), options.outputPath, output)
+            StringCopy(.src = output, .dest = options.outputPath, .size = MAX_PATH)
+        }
+
+        // we optionally can provide an input file for build/test commands
+        if(parser.args.size() > 1) {
+            var inputFile = parser.args.get(1)
+
+            // make sure we are not passing in program arguments
+            if(!inputFile.equals("--")) {
+                GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
+                if(!FileExists(options.inputFile)) {
+                    printf("Could not find '%s'\n", options.inputFile)
+                    goto err;
+                }
+            }
+        }
+
+        if(cmd.hasOption("srcDir")) {
+            StringCopy(.src = cmd.getOption("srcDir").value, .dest = options.srcPath, .size = MAX_PATH)
+        }
+
+        if(options.srcPath.empty()) {
+            var path = StringInit(options.inputFile, MAX_PATH)
+            var paths = []String {
+                $"/src/",
+                $"/stdlib/",
+                $"/test/",
+            }
+
+            var index = -1
+            for(var i = 0; i < sizeof(paths) / sizeof(paths[0]); i+=1) {
+                index = path.lastIndexOfAt(paths[i])
+                if(index > -1) {
+                    StringCopy(
+                        .src = options.inputFile,
+                        .dest = options.srcPath,
+                        .size = index + paths[i].length
+                    )
+                    break
+                }
+            }
+
+            if(index < 0) {
+                FileParent(options.inputFile, options.srcPath)
+            }
+        }
+
+        // if there is no source path
+        if(!options.srcPath.empty()) {
+            FileParent(options.srcPath, options.projectPath)
+        }
+
+        if(options.projectPath.empty()) {
+            StringCopy(.src = CurrentWorkingPath(), .dest = options.projectPath, .size = MAX_PATH)
+        }
+
+        if(cmd.hasOption("lib")) {
+            StringCopy(.src = cmd.getOption("lib").value, .dest = options.libPath, .size = MAX_PATH)
+        }
+
+        // Handle test specific configurations
+        if(cmd.name.equals("test")) {
+            options.testsOnly = true
+
+            if(cmd.hasOption("regex")) {
+                options.testsRegex = cmd.getOption("regex").value
+            }
+
+            if(cmd.hasOption("file")) {
+                options.testFileOnly = true
+                StringCopy(
+                    .src = cmd.getOption("file").value,
+                    .dest = options.inputFile,
+                    .size = MAX_PATH
+                )
+            }
+
+            if(cmd.hasOption("package")) {
+                options.testPackage = cmd.getOption("package").value
+            }
+
+            // flag to go to the test sub command
+            if(!options.testFileOnly) {
+                options.pkgOptions.pkgCmd = PkgCommand.PKG_TEST
+            } else {
+                options.run = true
+            }
+
+            if(cmd.hasOption("testDir")) {
+                StringCopy(
+                    .src = cmd.getOption("testDir").value,
+                    .dest = options.testPath,
+                    .size = MAX_PATH
+                )
+            }
+            else {
+                StringCopy(.src = "./test", .dest = options.testPath, .size = MAX_PATH)
+            }
+        }
+
+        // sanitize paths
+        TrimPath(options.projectPath)
+        TrimPath(options.srcPath)
+        TrimPath(options.libPath)
+        TrimPath(options.litaPath)
+        TrimPath(options.testPath)
+    }
+    else if(cmd.name.equals("install")) {
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_INSTALL
+        options.pkgOptions.forceClean = cmd.hasOption("force")
+    }
+    else if(cmd.name.equals("command")) {
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_RUN
+        if(!cmd.hasArgValue()) {
+            printf("Missing command to run.\n")
+            goto err;
+        }
+
+        options.pkgOptions.pkgRunCmdArg = cmd.getArgValue()
+    }
+    else if(cmd.name.equals("init")) {
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_INIT
+        if(!cmd.hasArgValue()) {
+            printf("Missing project name argument.\n")
+            goto err;
+        }
+
+        options.pkgOptions.pkgName = cmd.getArgValue()
+    }
+    else if(cmd.name.equals("doc")) {
+        // TODO
+        //options.pkgOptions.pkgCmd = PkgCommand.PKG_TEST
+        //options.testsOnly = true
+        printf("Sorry, not implemented yet.")
+        goto err;
+    }
+    else if(cmd.name.equals("lsp")) {
+        // TODO
+        options.languageServer = true
     }
     else {
-        StringCopy(.src = "/test", .dest = options.testPath, .size = MAX_PATH)
+        // We forgot to implement something!
+        assert(false)
     }
-
-    // if there is no source path
-    if(options.srcPath.empty()) {
-        StringCopy(.src = CurrentWorkingPath(), .dest = options.projectPath, .size = MAX_PATH)
-    }
-    else {
-        FileParent(options.srcPath, options.projectPath)
-    }
-
-    if(options.projectPath.empty()) {
-        StringCopy(.src = ".", .dest = options.projectPath, .size = 2)
-    }
-
-    if(parser.hasOption("lib")) {
-        StringCopy(.src = parser.getOption("lib").value, .dest = options.libPath, .size = MAX_PATH)
-    }
-
-    // sanitize paths
-    TrimPath(options.projectPath)
-    TrimPath(options.srcPath)
-    TrimPath(options.libPath)
-    TrimPath(options.litaPath)
-    TrimPath(options.testPath)
 
     // determine if we need to collect arguments
     if(options.run || options.pkgOptions.pkgCmd == PkgCommand.PKG_RUN) {
@@ -513,47 +594,15 @@ func RunPkgInstall(options: *LitaOptions, pm: *PackageManager) : i32 {
         }
     })
     if(status != PkgStatus.OK) {
-        printf("Error installing packages:\nErrorCode: %s - %s\n",
-            PkgStatusAsStr(status), pm.errors.cStr())
         return 1;
     }
 
-    var buildFile = BuildFile{}
-    defer buildFile.free()
-
-    status = pm.createBuildFile(&buildFile)
-    if(status != PkgStatus.OK) {
-        printf("Error creating build.json:\nErrorCode: %s - %s\n",
-            PkgStatusAsStr(status), pm.errors.cStr())
-        return 1;
-    }
-
-    var temp: [MAX_PATH]char;
-    var build = StringBufferInit(temp, MAX_PATH, 0)
-    build.format("%s/.build.json", options.projectPath)
-
-    var file = File{}
-    file.open(build.cStr(), FileOpenOp.WRITE)
-    defer file.close()
-
-    printf("Writing '%s'.\n", build.cStr())
-    if(!buildFile.writeTo(&file)) {
-        printf("Error writing out build.json\n")
-        return 1;
-    }
-
-    printf("Success.\n")
     return 0;
 }
 
 func RunPkgCommand(options: *LitaOptions, pm: *PackageManager) : i32 {
     var status = pm.runCommand(options.pkgOptions.pkgRunCmdArg)
     if(status != PkgStatus.OK) {
-        printf("Error running pkg command: '%s'\nErrorCode: %s %s\n",
-            options.pkgOptions.pkgRunCmdArg,
-            PkgStatusAsStr(status),
-            pm.errors.cStr()
-        )
         return 1;
     }
     return 0;
@@ -565,25 +614,27 @@ func RunPkgInit(options: *LitaOptions, pm: *PackageManager) : i32 {
         .name = options.pkgOptions.pkgName
     })
     if(status != PkgStatus.OK) {
-        printf("Error running pkg init:\nErrorCode: %s - %s\n",
-            PkgStatusAsStr(status), pm.errors.cStr())
         return 1;
     }
     return 0;
 }
 
 func RunPkgBuild(options: *LitaOptions, pm: *PackageManager) : i32 {
-    var status = pm.buildCommand(PackageBuildOptions {
-        .isRelease = options.pkgOptions.isRelease
-    })
+    var status = pm.buildCommand(
+        PackageBuildOptions {
+            .isRelease = options.pkgOptions.isRelease
+        }
+    )
     if(status != PkgStatus.OK) {
-        printf("Error running pkg build:\nErrorCode: %s - %s\n",
-            PkgStatusAsStr(status), pm.errors.cStr())
         return 1;
     }
     return 0;
 }
 
 func RunPkgTest(options: *LitaOptions, pm: *PackageManager) : i32 {
+    var buildResult = RunPkgBuild(options, pm)
+    if(buildResult != 0) {
+        return buildResult
+    }
     return pm.testCommand(options)
 }

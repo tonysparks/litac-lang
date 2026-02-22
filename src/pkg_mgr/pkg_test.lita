@@ -54,49 +54,79 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         return PkgStatus.OK
     }
 
+    var testPackage = $""
+    var buffer = [MAX_PATH]char{0}
+    if(options.testPackage != null) {
+        var bufferStr = StringBufferInit(buffer, MAX_PATH, 0)
+        bufferStr.format("%s/%s", options.projectPath, options.testPackage)
+        testPackage = bufferStr.toString()
+    }
+
     var failed = 0
+    var successful = 0
+
     for(var i = 0; i < testPaths.size(); i += 1) {
         var path = testPaths.get(i)
-        printf("pkg-test: running '%s'\n", path)
+
+        if(!testPackage.empty()) {
+            var pathStr = path.toString()
+
+            if(!pathStr.startsWith(testPackage)) {
+                continue
+            }
+        }
+
+        printf("Running '%s'\n", path)
 
         var cmd = StringBuilderInit(256, pm.allocator)
         cmd.append(
-            "cd %s && litac -colors -pkg-build -run -testFile %s",
-            options.projectPath,
+            "cd %s && litac test -json",
+            options.projectPath
+        )
+
+        if(options.testsRegex != null) {
+            cmd.append(" -regex \"%s\"", options.testsRegex)
+        }
+
+        cmd.append(
+            " -file \"%s\"",
             path
         )
+
         var result = system(cmd.cStr())
         if(result != 0) {
             printf(
-                "pkg-test: %s %sfailed%s with exit code %d\n",
+                "Test %s %sfailed%s with exit code %d\n",
                 path,
                 ConsoleColorsAsStr(ConsoleColors.RED),
                 ConsoleColorsAsStr(ConsoleColors.CLEAR),
                 result
             )
             failed += 1
+        } else {
+            successful += 1
         }
     }
 
     var totalTime = SystemTimeMSec() - startTime
 
     printf(
-        "pkg-test: %d test file(s) ran in %.3f seconds\n",
-        testPaths.size(),
+        "%d test file(s) ran in %.3f seconds\n",
+        successful,
         totalTime
     )
 
     printf(
-        "pkg-test: %d/%d test file(s) %spassed%s ✅\n",
-        testPaths.size()-failed,
-        testPaths.size(),
+        "%d/%d test file(s) %spassed%s ✅\n",
+        successful,
+        successful+failed,
         ConsoleColorsAsStr(ConsoleColors.GREEN),
         ConsoleColorsAsStr(ConsoleColors.CLEAR)
     )
 
     if(failed > 0) {
         printf(
-            "pkg-test: %d test file(s) %sfailed%s ❌\n",
+            "%d test file(s) %sfailed%s ❌\n",
             failed,
             ConsoleColorsAsStr(ConsoleColors.RED),
             ConsoleColorsAsStr(ConsoleColors.CLEAR)
@@ -111,7 +141,7 @@ func FindTestFiles(scanDirStr: String, allFiles: *Array<String>, allocator: *con
     var status = ListFiles(scanDirStr, allFiles, ListFileFlags.RECURSE_DIRECTORIES, allocator)
     if(status != FileStatus.Ok) {
         printf(
-            "pkg-test: could not scan directory '%.*s', error: %s\n",
+            "Could not scan directory '%.*s', error: %s\n",
             scanDirStr.length, scanDirStr.buffer,
             FileStatusAsStr(status)
         )
