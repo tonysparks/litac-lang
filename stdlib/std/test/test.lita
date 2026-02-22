@@ -178,7 +178,7 @@ internal struct TestInfo {
 }
 
 public func (this: *TestCase) print(name: *const char, isJson: bool = false) {
-    var durationMSec = SystemTimeMSec() - this.startTimex;
+    var durationMSec = SystemTimeMSec() - this.startTime;
 
     if(isJson) {
         var errors = ArrayInit<*const char>(this.errors.size() + 1, this.testSuite.allocator)
