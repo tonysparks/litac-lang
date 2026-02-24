@@ -547,20 +547,19 @@ func TrimPath(path: [MAX_PATH]char) {
 }
 
 func HandlePkgCommand(options: *LitaOptions) : i32 {
-    var size: usize = options.maxMemory > 0
-        ? options.maxMemory
-        : 1024 * 1024 * 1024;
-
-    var linearAllocator = LinearAllocator{}
-    linearAllocator.init(defaultAllocator.alloc(size), size)
-    defer defaultAllocator.free(linearAllocator.mem)
+    var bucketAllocator = BucketAllocator{}
+    bucketAllocator.init(
+        defaultAllocator,
+        1 * MiB
+    )
+    defer bucketAllocator.free()
 
     var pm = PackageManager{};
     pm.init(PackageOptions{
         .projectPath = options.projectPath,
         .litaOptions = options,
 
-    }, linearAllocator.allocator)
+    }, bucketAllocator.allocator)
     defer pm.free()
 
     switch(options.pkgOptions.pkgCmd) {
