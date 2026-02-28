@@ -13,7 +13,7 @@
         "debug": {
             "mac": {
                 "default": {
-                    "cc": "gcc",
+                    "cc": "clang",
                     "cc_options": [
                         "-std=gnu11",
                         "-g",
@@ -23,8 +23,9 @@
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
+                        "-debug",
                         "-cFormat",
-                        "-disableLine",
+                        //"-disableLine",
                         "-verbose",
                         "-maxMemory",
                         "1GiB",

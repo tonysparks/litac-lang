@@ -18,7 +18,7 @@ error_compiling() {
 build_litac() {
     echo "Running bootstrapped litaC..."
 
-    ./bootstrap/litacc build -profile -cFormat -verbose
+    ./bootstrap/litacc build -profile
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
@@ -27,7 +27,7 @@ build_litac() {
     echo "Running litaC inception!..."
 
     #valgrind --leak-check=full --show-leak-kinds=all ./litac -disableLine -verbose -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
-    ./bin/litac build -profile
+    ./bin/litac build -profile -debug
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
