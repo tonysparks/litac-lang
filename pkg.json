@@ -23,7 +23,7 @@
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
-                        "-debug",
+                        //"-debug",
                         "-cFormat",
                         //"-disableLine",
                         "-verbose",

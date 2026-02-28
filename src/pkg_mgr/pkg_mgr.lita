@@ -116,6 +116,10 @@ public struct PackageOptions {
     projectPath: *const char
     pkgDir: *const char = ".pkgs"       // the .pkgs directory
     litaOptions: *LitaOptions
+
+    // command line arguments
+    cmdArgCount: i32
+    cmdArgs: **char
 }
 
 
@@ -128,6 +132,7 @@ public struct PackageInitOptions {
 
 public struct PackageBuildOptions {
     isRelease: bool = false
+    isTest: bool = false
 }
 
 public struct PackageInstallOptions {

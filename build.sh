@@ -27,7 +27,7 @@ build_litac() {
     echo "Running litaC inception!..."
 
     #valgrind --leak-check=full --show-leak-kinds=all ./litac -disableLine -verbose -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
-    ./bin/litac build -profile -debug
+    ./bin/litac build -profile -outputDir "./bin/output/" -output "litac_inception"
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;

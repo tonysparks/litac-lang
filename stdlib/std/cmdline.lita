@@ -13,6 +13,8 @@ public enum CmdParserStatus {
     OK,
     MISSING_ARGUMENT,
     MISSING_REQUIRED,
+
+    ERROR_MERGING_ARGS,
 }
 
 public enum OptionFlag {
@@ -51,6 +53,10 @@ public struct CmdParser {
 
     defaultCmd: *Cmd
     cmd: *Cmd
+
+    cmdArgCount: i32
+    cmdArgs: **char
+
 }
 
 public func CmdParserInit(allocator: *const Allocator = defaultAllocator) : CmdParser {
@@ -212,7 +218,97 @@ public func (this: *Cmd) getArgValue(): *const char {
     return this.argValue
 }
 
+@doc(
+    """
+    Apply the supplied program arguments over this,
+    meaning these new args will take precedence.
+
+    If they are not the same command, this will error
+    """
+)
+public func (p: *CmdParser) merge(argc: i32, argv: **char) : CmdParserStatus {
+
+    var otherParser = CmdParser{}
+    otherParser.init(p.allocator)
+    defer otherParser.free()
+
+    for(var i = 0; i < p.commands.size(); i+=1) {
+        var cmd = p.commands.getPtr(i)
+        var newCmd: *Cmd = null
+
+        if(i == 0) {
+            newCmd = otherParser.defaultCmd
+        } else {
+            newCmd = otherParser.addCommand(
+                cmd.name,
+                cmd.description,
+                cmd.hasArg
+            )
+        }
+        assert(newCmd != null)
+
+        for(var j = 0; j < cmd.options.size(); j+=1) {
+            var option = cmd.options.getPtr(j)
+
+            newCmd.addOption(
+                option.name,
+                option.shortName,
+                option.description,
+                option.flags & ~OptionFlag.IS_USED,
+                option.defaultValue
+            )
+        }
+    }
+
+    var status = otherParser.parse(argc, argv)
+    if(status != CmdParserStatus.OK) {
+        return status
+    }
+
+    var thisCmd = p.getCmd()
+    var otherCmd = otherParser.getCmd()
+
+    if((thisCmd != null && otherCmd == null) ||
+       (thisCmd == null && otherCmd != null)
+    ) {
+        return CmdParserStatus.ERROR_MERGING_ARGS
+    }
+
+    // copy over command arguments and options
+    if(thisCmd != null && otherCmd != null) {
+        if(!thisCmd.name.equals(otherCmd.name)) {
+            return CmdParserStatus.ERROR_MERGING_ARGS
+        }
+
+        if(thisCmd.hasArg && otherCmd.argValue != null) {
+            thisCmd.argValue = otherCmd.argValue
+        }
+
+        for(var i = 0; i < thisCmd.options.size(); i+=1) {
+            var thisOption = thisCmd.options.getPtr(i)
+            var otherOption = otherCmd.options.getPtr(i)
+            if(otherOption.flags & OptionFlag.IS_USED) {
+                thisOption.value = otherOption.value
+                thisOption.flags |= OptionFlag.IS_USED
+            }
+        }
+    }
+
+    for(var i = 0; i < p.defaultCmd.options.size(); i+=1) {
+        var thisOption = p.defaultCmd.options.getPtr(i)
+        var otherOption = otherParser.defaultCmd.options.getPtr(i)
+        if(otherOption.flags & OptionFlag.IS_USED) {
+            thisOption.value = otherOption.value
+            thisOption.flags |= OptionFlag.IS_USED
+        }
+    }
+    return CmdParserStatus.OK
+}
+
 public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
+    p.cmdArgCount = argc
+    p.cmdArgs = argv
+
     var i = 1;
     var activeCmd = p.defaultCmd
 
@@ -239,7 +335,7 @@ public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
     for(; i < argc; i+=1) {
         var arg = argv[i]
         var len = arg.length()
-        
+
         var opt: *Option = null;
         if(len && arg[0] == '-') {
             var normalizedArg = arg + 1
@@ -275,6 +371,16 @@ public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
     return CmdParserStatus.OK
 }
 
+public func (p: *CmdParser) printAll() {
+    var sb = StringBuilderInit(1024, p.allocator)
+    defer sb.free()
+
+    p.printErrors(sb)
+    sb.append("\n\n")
+    p.printHelp(sb)
+    c::printf("%s", sb.cStr())
+}
+
 public func (p: *CmdParser) printErrors(sb: *StringBuilder) {
     if(p.status == CmdParserStatus.OK) {
         return;
@@ -295,12 +401,27 @@ public func (p: *CmdParser) printHelp(sb: *StringBuilder) {
 
         if(cmd.hasArg) {
             var padding = 24 - $" <arg>".length - cmd.name.length()
-            sb.append("%s <arg>%-*s %s\n", cmd.name, padding, "", cmd.description)
+            sb.append("%s <arg>%-*s ", cmd.name, padding, "")
         }
         else {
             var padding = 24 //- leftLen
-            sb.append("%-*s %s\n", padding, cmd.name, cmd.description)
+            sb.append("%-*s ", padding, cmd.name)
         }
+
+        var it = cmd.description
+        while(*it) {
+            var c = *it
+            defer it+=1
+
+            if(c == '\n') {
+                sb.append("\n%25s", "")
+            }
+            else {
+                sb.append("%c", c)
+            }
+        }
+        sb.append("\n")
+
         for(var i = 0; i < cmd.options.size(); i += 1) {
             var opt = &cmd.options.elements[i]
             if(opt.flags & OptionFlag.HAS_ARGUMENT) {
@@ -403,5 +524,20 @@ run <arg>                run command
     assert(cmd.hasOption("lib"))
     assert(cmd.hasOption("debug") == false)
     assert(cmd.hasOption("does-not-exist") == false)
+
+    // Test overrides
+    {
+
+        var args = []*const char {
+            "./litac",
+            "build",
+            "-lib",
+            "-colors",
+            "-maxMemory",
+            "1KiB"
+        };
+        var n = 6
+        assert(parser.merge(n, args as (**char)) == CmdParserStatus.OK)
+    }
 
 }

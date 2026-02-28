@@ -49,5 +49,5 @@ bootstrap/output/**
 .build.json
 *.dSYM*
 .DS_Store
-
+bin/file_test
 bin/profile.data.txt

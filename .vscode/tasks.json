@@ -112,6 +112,8 @@
             "command": "litac",
             "args": [
                 "test",
+                "-output",
+                "file_test",
                 "-file",
                 "${file}"
             ],

@@ -92,11 +92,43 @@ func (this: *PackageManager) build(
         return PkgStatus.OK
     }
 
-    // TODO: This doesn't take existing defaults correctly
-    // need to account for missing flags modifying existing values...
-    if(ParseArgs(args.n, args.args, litaOptions) != ParseStatus.OK) {
+    // parse out the configured pkg command arguments,
+    // and allow for user supplied argument flags to override
+    var parser = CmdParserInit()
+    BuildArgs(&parser)
+    defer parser.free()
+
+    if(parser.parse(args.n, args.args) != CmdParserStatus.OK) {
+        parser.printAll()
         return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
     }
+
+    // If we are testing, we must replace the command
+    // from build to test
+    if(this.options.cmdArgCount > 1) {
+        this.options.cmdArgs[1] = "build" as (*char)
+    }
+
+    if(parser.merge(
+            this.options.cmdArgCount,
+            this.options.cmdArgs
+        ) != CmdParserStatus.OK
+    ) {
+        parser.printAll()
+        return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
+    }
+
+
+    if(ApplyArgs(parser, litaOptions) != ParseStatus.OK) {
+        return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
+    }
+
+
+    // TODO: This doesn't take existing defaults correctly
+    // need to account for missing flags modifying existing values...
+    // if(ParseArgs(args.n, args.args, litaOptions) != ParseStatus.OK) {
+    //     return PkgStatus.ERROR_PARSING_BUILD_OPTIONS
+    // }
 
     // TODO: Recursively build dependencies too...
     if(RunLitac(litaOptions) != 0) {
