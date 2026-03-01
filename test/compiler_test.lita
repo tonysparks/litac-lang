@@ -30,12 +30,12 @@ func fullCompilerTestSuite() {
 
 @test("singleOnly")
 func firstTestInCompilerTestSuite() {
-    // RunTests(2,
-    //     []*char{
-    //         "" as (*char),
-    //         "-onlyFirst" as (*char)
-    //     }
-    // )
+    RunTestSuite(.singleOnly = true)
+}
+
+@test
+func testSuiteSetup() {
+    RunTestSuite(.singleOnly = false)
 }
 
 struct TestSuite {
@@ -149,8 +149,7 @@ var testFiles = []*const char {
     null
 }
 
-@test
-func testSuiteSetup() {
+func RunTestSuite(singleOnly: bool) {
     var memSize = 50 * MiB
     var mem = defaultAllocator.alloc(memSize)
     linearAllocator.init(mem, memSize)
@@ -158,9 +157,9 @@ func testSuiteSetup() {
     var allocator = &linearAllocator.allocator
 
     for(var i = 0; testFiles[i] != null; i+=1) {
-        // if(onlyRunFirst && i > 0) {
-        //     break
-        // }
+        if(singleOnly && i > 0) {
+            break
+        }
 
         var filename = testFiles[i]
         var suite = new<TestSuite>(allocator)

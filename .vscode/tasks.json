@@ -113,7 +113,7 @@
             "args": [
                 "test",
                 "-output",
-                "file_test",
+                "litac_test_file",
                 "-file",
                 "${file}"
             ],

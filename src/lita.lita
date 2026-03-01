@@ -251,16 +251,17 @@ public func (lita: *Lita) printf(format: *const char, ...) {
     va_start(args, format)
 
     if(lita.options.isJsonFormat) {
-        var sb = StringBuilderInit(1024, lita.allocator)
-        sb.appendArgs(format, args)
+        var message = StringBuilderInit(1024, lita.allocator)
+        message.appendArgs(format, args)
 
         var msgNode = CreateJsonObject(lita.allocator)
         msgNode.putStr("type", "MESSAGE")
-        msgNode.putStr("message", sb.cStr())
+        msgNode.putStr("message", message.cStr())
 
-        sb = sb.slice()
+        //sb = sb.slice()
+        var sb = StringBuilderInit(1024, lita.allocator)
         msgNode.print(&sb)
-        printf("%s", sb.cStr())
+        printf("%s\n", sb.cStr())
     }
     else {
         vfprintf(stdout, format, args)

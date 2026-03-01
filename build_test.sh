@@ -14,11 +14,10 @@ error_tests() {
 run_tests() {
     echo "Running litaC tests..."
     # valgrind --leak-check=full --show-leak-kinds=all ./litac_tests $1
-    # ./litac_tests $1
     if [ -n "$1" ]; then
-        ./bin/litac test -regex "singleOnly" -file "./test/compiler_test.lita"
+        ./bin/litac test -regex "singleOnly" -file "./test/compiler_test.lita" -output "litac_tests"
     else
-        ./bin/litac test
+        ./bin/litac test -output "litac_tests"
     fi
 
     result=$?

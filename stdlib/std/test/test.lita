@@ -65,6 +65,7 @@ public struct TestCase {
     testSuite: *TestSuite
     errors: Array<AssertEntry>
     startTime: f64
+    isDisabled: bool
 
     name: *const char
     userData: *void
@@ -152,7 +153,7 @@ public func (this: *TestSuite) printDynamicTest(isJsonFormat: bool) {
         return;
     }
 
-    this.currentCase.print(this.currentCase.name, isJsonFormat)
+    this.currentCase.printResults(this.currentCase.name, isJsonFormat)
 }
 
 public func (this: *TestCase) init(testSuite: *TestSuite) {
@@ -182,7 +183,10 @@ public func (this: *TestCase) addError(
     )
 }
 
-public func (this: *TestCase) print(name: *const char, isJson: bool = false) {
+public func (this: *TestCase) printResults(
+    name: *const char,
+    isJson: bool
+) {
     var durationMSec = SystemTimeMSec() - this.startTime;
 
     if(isJson) {
@@ -190,10 +194,15 @@ public func (this: *TestCase) print(name: *const char, isJson: bool = false) {
         for(var i = 0; i < this.errors.size(); i +=1) {
             errors.add(this.errors.get(i).errorMessage)
         }
+        var status = this.errors.empty() ? TestStatus.SUCCESS : TestStatus.FAILED
+        if(this.isDisabled) {
+            status = TestStatus.DISABLED
+        }
+
         var testInfo = TestInfoMessage {
             .type = "TEST_RESULT",
             .name = name,
-            .status = this.errors.empty() ? TestStatus.SUCCESS : TestStatus.FAILED,
+            .status = status,
             .errors = errors,
             .durationMSec = durationMSec
         }

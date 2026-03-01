@@ -172,10 +172,10 @@ func ProcessTestOutput(
     process: *sub::Process
 ): TestOutput {
 
-    const bufferSize = (2 * KiB);
+    const bufferSize = 16;
     var buffer: [bufferSize]char;
 
-    var sb = StringBuilderInit(bufferSize as (i32), pm.allocator)
+    var sb = StringBuilderInit(2 * KiB as (i32), pm.allocator)
     defer sb.free()
 
     var parser = JsonParserInit(pm.allocator)
@@ -186,81 +186,101 @@ func ProcessTestOutput(
         .numberOfFailed = 0
     }
 
-    while(true) {
+    var doneReading = false
+    while(!doneReading) {
         var len = process.readStdout(buffer, bufferSize as (u32))
-        if(len < 1 && sb.empty()) {
-            break
+        if(len < 1) {
+            doneReading = true
         }
 
-        sb.append("%*s", len, buffer)
+        sb.append("%.*s", len, buffer)
 
+        var bufferStr = sb.toString()
+        var index = bufferStr.indexOf($"\n")
         // test to see if this message is truncated
-        if(!sb.toString().endsWith($"\n")) {
+        if(index < 0) {
+            continue
+        }
+        defer {
+            sb.delete(0, index + 1)
+        }
+
+        var line = bufferStr.substring(0, index).trim()
+
+        // only attempt to parse out json objects
+        if(!line.startsWith($"{")) {
+            printf("%.*s\n", line.length, line.buffer)
             continue
         }
 
-        defer sb.clear()
+        // TODO: fix me, memory copy
+        var json = line.toCStr(pm.allocator)
+        var node = parser.parseJson(json)
+        defer node.free()
 
-        var lines = sb.toString().split($"\n")
-        while(lines.hasNext()) {
-            var line = lines.next().trim()
+        if(!node.isObject()) {
+            continue
+        }
 
-            // only attempt to parse out json objects
-            if(!line.startsWith($"{")) {
-                fwrite(line.buffer, sizeof(:char), line.length, stdout)
-                continue
+        var type = node.getStr("type")
+        if(type.equals("TEST_RESULT")) {
+            var name = node.getStr("name")
+            var status = node.getStr("status")
+            var time = node.getFloat("durationMSec")
+            var errors = node.getArray("errors")
+
+            var isDisabled = status.equals("DISABLED")
+            var isSuccess = status.equals("SUCCESS")
+            var isFailure = status.equals("FAILED")
+
+            var result = "⏸️"
+            if(isSuccess) {
+                result = "✅"
+                output.numberOfPassed += 1
+            }
+            if(isFailure) {
+                output.numberOfFailed += 1
+                result = "❌"
             }
 
-            // TODO: fix me, memory copy
-            var json = line.toCStr(pm.allocator)
-            var node = parser.parseJson(json)
-            defer node.free()
+            var dots = $"..............................................................."
+            var nDots = MAX(0, dots.length - name.length())
+            printf("%s", name)
+            printf(
+                "%.*s",
+                nDots,
+                dots.buffer
+            )
+            printf("(%.4f) %s\n", time, result)
 
-            if(!node.isObject()) {
-                continue
-            }
-
-            var type = node.getStr("type")
-            if(type.equals("TEST_RESULT")) {
-                var name = node.getStr("name")
-                var status = node.getStr("status")
-                var time = node.getFloat("durationMSec")
-                var errors = node.getArray("errors")
-
-                var isSuccess = status.equals("SUCCESS")
-                if(isSuccess) {
-                    output.numberOfPassed += 1
-                } else {
-                    output.numberOfFailed += 1
+            if(errors != null && !errors.empty()) {
+                for(var i = 0; i < errors.size(); i+=1) {
+                    var error = errors.at(i)
+                    printf("%s\n", error.asString())
                 }
+            }
+        }
+        else if(type.equals("COMPILATION_MESSAGE")) {
+            var errors = node.getArray("errors")
+            for(var i = 0; i < errors.size(); i += 1) {
+                var error = errors.at(i)
+                var pos = error.getObject("pos")
 
-                var result = isSuccess ? "✅" : "❌"
-                var dots = $"..............................................................."
-                var nDots = MAX(0, dots.length - name.length())
-                printf("%s", name)
+                var filename = pos != null ? pos.getStr("filename") : "<unknown>";
+                var lineNumber = pos != null ? pos.getInt("lineNumber") : 0;
                 printf(
-                    "%.*s",
-                    nDots,
-                    dots.buffer
+                    "%s:%d: %serror%s %s\n",
+                    filename,
+                    lineNumber,
+                    ConsoleColorsAsStr(ConsoleColors.RED),
+                    error.getStr("message"),
+                    ConsoleColorsAsStr(ConsoleColors.CLEAR)
                 )
-                printf("(%.4f) %s\n", time, result)
-
-                if(errors != null && !errors.empty()) {
-                    // TODO
-                    for(var i = 0; i < errors.size(); i+=1) {
-                        var error = errors.at(i)
-                        printf("%s\n", error.asString())
-                    }
-                }
-
             }
-            else if(type.equals("COMPILATION_MESSAGE")) {
-                var errors = node.getArray("errors")
-                // TODO
-            }
-            else if(type.equals("MESSAGE")) {
-                printf("%s\n", node.getStr("message"))
-            }
+        }
+        else if(type.equals("MESSAGE")) {
+            var message = node.getStr("message").toString().trim()
+            printf("%.*s\n", message.length, message.buffer)
         }
     }
 

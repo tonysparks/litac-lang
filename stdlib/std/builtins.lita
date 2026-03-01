@@ -301,11 +301,13 @@ public @note packed {
 
         var i = 0
         for(sym in getSymbolsToTest("test")) {
-            if(isDisabled(sym)) {
-                emit("  __lita_test_printf(\"Disabled '%s'!\\\\n\")\n", sym.name)
-            } else {
-                emit("   var __testCase%d = testSuite.enterTest()\n", i)
-                emit("   if(setjmp(testSuite.env) == 0) {\n")
+            emit("   var __testCase%d = testSuite.enterTest()\n", i)
+            var disabled = isDisabled(sym)
+            if(disabled) {
+                emit("    __testCase%d.isDisabled = true\n", i)
+            }
+            emit("   if(setjmp(testSuite.env) == 0) {\n")
+            if(!disabled) {
                 var alias = addImport(moduleName, sym.moduleFilename)
                 if(alias) {
                     emit("    %s::%s()\n", alias, sym.name)
@@ -313,9 +315,10 @@ public @note packed {
                 else {
                     emit("    %s()\n", sym.name)
                 }
-                emit("  }")
-                emit("   __testCase%d.print(\"%s\", isJsonFormated)\n", i, sym.name)
             }
+            emit("  }")
+            emit("   __testCase%d.printResults(\"%s\", isJsonFormated)\n", i, sym.name)
+
             i = i + 1
         }
         emit("    for(;;) {\n")

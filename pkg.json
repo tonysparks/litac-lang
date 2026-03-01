@@ -30,7 +30,7 @@
                         "-maxMemory",
                         "1GiB",
                         "-outputDir",
-                        "./bin/",
+                        "./bin/output/",
                         "-output",
                         "litac"
                     ]
@@ -54,7 +54,7 @@
                         "-maxMemory",
                         "1GiB",
                         "-outputDir",
-                        "./bin/",
+                        "./bin/output/",
                         "-output",
                         "litac"
                     ]
@@ -78,7 +78,7 @@
                         "-maxMemory",
                         "1GiB",
                         "-outputDir",
-                        "./bin/",
+                        "./bin/output/",
                         "-output",
                         "litac"
                     ]
