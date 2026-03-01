@@ -10,6 +10,10 @@ import "std/libc"
 import "std/mem"
 import "std/terminal"
 
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+
 import "pkg_mgr"
 import "lita"
 
@@ -62,6 +66,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         testPackage = bufferStr.toString()
     }
 
+    var filesTested = 0
     var failed = 0
     var successful = 0
 
@@ -75,25 +80,45 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
                 continue
             }
         }
+        filesTested += 1
 
         printf("Running '%s'\n", path)
-
-        var cmd = StringBuilderInit(256, pm.allocator)
-        cmd.append(
-            "cd %s && litac test -json",
-            options.projectPath
-        )
-
+        var args = ArrayInit<*const char>(16, pm.allocator)
+        args.add("litac")
+        args.add("test")
+        args.add("-json")
         if(options.testsRegex != null) {
-            cmd.append(" -regex \"%s\"", options.testsRegex)
+            args.add("-regex")
+            args.add(options.testsRegex)
         }
+        args.add("-file")
+        args.add(path)
+        args.add(null)
 
-        cmd.append(
-            " -file \"%s\"",
-            path
-        )
+        var testProcess = sub::Process{}
+        if(testProcess.create(
+            args.elements,
+            null,
+            sub::ProcessOption.INHERIT_ENVIRONMENT|
+            sub::ProcessOption.COMBINE_STDOUT_STDERR
+        ) < 0) {
+            printf(
+                "Test %s %sfailed%s unable to launch 'litac' command\n",
+                path,
+                ConsoleColorsAsStr(ConsoleColors.RED),
+                ConsoleColorsAsStr(ConsoleColors.CLEAR)
+            )
+            continue
+        }
+        defer testProcess.destroy()
 
-        var result = system(cmd.cStr())
+        var testResults = ProcessTestOutput(pm, &testProcess)
+        failed += testResults.numberOfFailed
+        successful += testResults.numberOfPassed
+
+        var result = 0
+        testProcess.join(&result)
+
         if(result != 0) {
             printf(
                 "Test %s %sfailed%s with exit code %d\n",
@@ -102,9 +127,9 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
                 ConsoleColorsAsStr(ConsoleColors.CLEAR),
                 result
             )
-            failed += 1
+            //failed += 1
         } else {
-            successful += 1
+            //successful += 1
         }
     }
 
@@ -112,12 +137,12 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
 
     printf(
         "%d test file(s) ran in %.3f seconds\n",
-        successful,
+        filesTested,
         totalTime
     )
 
     printf(
-        "%d/%d test file(s) %spassed%s ✅\n",
+        "%d/%d tests %spassed%s ✅\n",
         successful,
         successful+failed,
         ConsoleColorsAsStr(ConsoleColors.GREEN),
@@ -126,7 +151,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
 
     if(failed > 0) {
         printf(
-            "%d test file(s) %sfailed%s ❌\n",
+            "%d tests %sfailed%s ❌\n",
             failed,
             ConsoleColorsAsStr(ConsoleColors.RED),
             ConsoleColorsAsStr(ConsoleColors.CLEAR)
@@ -135,6 +160,111 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
     }
 
     return PkgStatus.OK
+}
+
+struct TestOutput {
+    numberOfPassed: i32
+    numberOfFailed: i32
+}
+
+func ProcessTestOutput(
+    pm: *PackageManager,
+    process: *sub::Process
+): TestOutput {
+
+    const bufferSize = (2 * KiB);
+    var buffer: [bufferSize]char;
+
+    var sb = StringBuilderInit(bufferSize as (i32), pm.allocator)
+    defer sb.free()
+
+    var parser = JsonParserInit(pm.allocator)
+    defer parser.free()
+
+    var output = TestOutput {
+        .numberOfPassed = 0,
+        .numberOfFailed = 0
+    }
+
+    while(true) {
+        var len = process.readStdout(buffer, bufferSize as (u32))
+        if(len < 1 && sb.empty()) {
+            break
+        }
+
+        sb.append("%*s", len, buffer)
+
+        // test to see if this message is truncated
+        if(!sb.toString().endsWith($"\n")) {
+            continue
+        }
+
+        defer sb.clear()
+
+        var lines = sb.toString().split($"\n")
+        while(lines.hasNext()) {
+            var line = lines.next().trim()
+
+            // only attempt to parse out json objects
+            if(!line.startsWith($"{")) {
+                fwrite(line.buffer, sizeof(:char), line.length, stdout)
+                continue
+            }
+
+            // TODO: fix me, memory copy
+            var json = line.toCStr(pm.allocator)
+            var node = parser.parseJson(json)
+            defer node.free()
+
+            if(!node.isObject()) {
+                continue
+            }
+
+            var type = node.getStr("type")
+            if(type.equals("TEST_RESULT")) {
+                var name = node.getStr("name")
+                var status = node.getStr("status")
+                var time = node.getFloat("durationMSec")
+                var errors = node.getArray("errors")
+
+                var isSuccess = status.equals("SUCCESS")
+                if(isSuccess) {
+                    output.numberOfPassed += 1
+                } else {
+                    output.numberOfFailed += 1
+                }
+
+                var result = isSuccess ? "✅" : "❌"
+                var dots = $"..............................................................."
+                var nDots = MAX(0, dots.length - name.length())
+                printf("%s", name)
+                printf(
+                    "%.*s",
+                    nDots,
+                    dots.buffer
+                )
+                printf("(%.4f) %s\n", time, result)
+
+                if(errors != null && !errors.empty()) {
+                    // TODO
+                    for(var i = 0; i < errors.size(); i+=1) {
+                        var error = errors.at(i)
+                        printf("%s\n", error.asString())
+                    }
+                }
+
+            }
+            else if(type.equals("COMPILATION_MESSAGE")) {
+                var errors = node.getArray("errors")
+                // TODO
+            }
+            else if(type.equals("MESSAGE")) {
+                printf("%s\n", node.getStr("message"))
+            }
+        }
+    }
+
+    return output
 }
 
 func FindTestFiles(scanDirStr: String, allFiles: *Array<String>, allocator: *const Allocator):PkgStatus {

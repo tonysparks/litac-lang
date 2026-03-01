@@ -11,6 +11,7 @@ import "std/json"
 import "std/json/from_json"
 import "std/json/to_json"
 
+
 @include("<setjmp.h>");
 
 @foreign
@@ -23,6 +24,26 @@ func longjmp(env: jmp_buf, result: i32);
 public func setjmp(env: jmp_buf) : i32;
 
 public var testSuite = TestSuite{}
+
+/**
+    Common message protocol for testing harness
+*/
+
+@json
+public enum TestStatus {
+    SUCCESS,
+    FAILED,
+    DISABLED
+}
+
+@json
+public struct TestInfoMessage {
+    type: *const char
+    name: *const char
+    status: TestStatus
+    errors: Array<*const char>
+    durationMSec: f64
+}
 
 public struct AssertEntry {
     filename: *const char
@@ -52,7 +73,9 @@ public struct TestCase {
 }
 
 
-public func (this: *TestSuite) init(allocator: *const Allocator = defaultAllocator) {
+public func (this: *TestSuite) init(
+    allocator: *const Allocator = defaultAllocator
+) {
     this.allocator = allocator
     this.testCases = ArrayInit<TestCase>(64, allocator)
     this.dynamicTestCases = ArrayInit<TestCase>(64, allocator)
@@ -132,8 +155,6 @@ public func (this: *TestSuite) printDynamicTest(isJsonFormat: bool) {
     this.currentCase.print(this.currentCase.name, isJsonFormat)
 }
 
-
-
 public func (this: *TestCase) init(testSuite: *TestSuite) {
     this.testSuite = testSuite
     this.errors = ArrayInit<AssertEntry>(32, testSuite.allocator)
@@ -161,22 +182,6 @@ public func (this: *TestCase) addError(
     )
 }
 
-@json
-internal enum TestStatus {
-    SUCCESS,
-    FAILED,
-    DISABLED
-}
-
-@json
-internal struct TestInfo {
-    type: *const char
-    name: *const char
-    status: TestStatus
-    errors: Array<*const char>
-    durationMSec: f64
-}
-
 public func (this: *TestCase) print(name: *const char, isJson: bool = false) {
     var durationMSec = SystemTimeMSec() - this.startTime;
 
@@ -185,7 +190,7 @@ public func (this: *TestCase) print(name: *const char, isJson: bool = false) {
         for(var i = 0; i < this.errors.size(); i +=1) {
             errors.add(this.errors.get(i).errorMessage)
         }
-        var testInfo = TestInfo {
+        var testInfo = TestInfoMessage {
             .type = "TEST_RESULT",
             .name = name,
             .status = this.errors.empty() ? TestStatus.SUCCESS : TestStatus.FAILED,

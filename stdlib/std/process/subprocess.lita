@@ -18,7 +18,8 @@ public enum subprocess_option_e {
   subprocess_option_inherit_environment = 0x2,
 
   // Enable asynchronous reading of stdout/stderr before it has completed.
-  subprocess_option_enable_async = 0x4
+  subprocess_option_enable_async = 0x4,
+  subprocess_option_search_user_path = 0x10
 };
 
 
