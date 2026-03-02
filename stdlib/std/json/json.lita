@@ -902,6 +902,7 @@ public func (p: *JsonParser) free() {
 public func (p: *JsonParser) parseJson(buffer: *const char) : *JsonNode {
     p.stream = buffer
     p.lineStart = p.stream
+    p.status = JsonParserStatus.OK
 
     p.buffer.clear()
     p.nextToken()

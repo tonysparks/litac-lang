@@ -15,6 +15,7 @@
                 "default": {
                     "cc": "clang",
                     "cc_options": [
+                        //"-fsanitize=address,undefined",
                         "-std=gnu11",
                         "-g",
                         "%input%",

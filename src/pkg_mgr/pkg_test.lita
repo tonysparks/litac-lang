@@ -99,8 +99,9 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         if(testProcess.create(
             args.elements,
             null,
-            sub::ProcessOption.INHERIT_ENVIRONMENT|
-            sub::ProcessOption.COMBINE_STDOUT_STDERR
+            sub::ProcessOption.INHERIT_ENVIRONMENT
+            //|
+            //sub::ProcessOption.COMBINE_STDOUT_STDERR
         ) < 0) {
             printf(
                 "Test %s %sfailed%s unable to launch 'litac' command\n",
@@ -127,9 +128,6 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
                 ConsoleColorsAsStr(ConsoleColors.CLEAR),
                 result
             )
-            //failed += 1
-        } else {
-            //successful += 1
         }
     }
 
@@ -201,6 +199,7 @@ func ProcessTestOutput(
         if(index < 0) {
             continue
         }
+
         defer {
             sb.delete(0, index + 1)
         }
@@ -218,7 +217,8 @@ func ProcessTestOutput(
         var node = parser.parseJson(json)
         defer node.free()
 
-        if(!node.isObject()) {
+        if(node == null || !node.isObject()) {
+            //printf(">> '''%.*s'''\n", line.length, line.buffer)
             continue
         }
 
