@@ -6,14 +6,11 @@ del ".\bin\litac.*" /q
 
 echo Running bootstrapped litaC...
 
-bootstrap\litacc.exe -help
-bootstrap\litacc.exe build -verbose -debug -profile -outputDir "./bin"
+bootstrap\litacc.exe build -profile -outputDir "./bin"
 if errorlevel 1 (
     goto error_compiling
 )
-dir .\
-dir .\bootstrap
-dir .\bin
+
 echo Running litaC inception!...
 bin\litac.exe build -profile -output "litac_inception"
 if errorlevel 1 (
