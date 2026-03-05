@@ -213,6 +213,7 @@ public func (this: *TestCase) printResults(
             "%s\n",
             sb.cStr()
         )
+        fflush(stdout)
     }
     else {
         var resultText =
@@ -242,6 +243,7 @@ public func (this: *TestCase) printResults(
         for(var i = 0; i < this.errors.size(); i +=1) {
             printf("%s\n", this.errors.get(i).errorMessage)
         }
+        fflush(stdout)
     }
 }
 

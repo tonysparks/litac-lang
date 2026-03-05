@@ -170,7 +170,7 @@ func ProcessTestOutput(
     process: *sub::Process
 ): TestOutput {
 
-    const bufferSize = 16;
+    const bufferSize = 256;
     var buffer: [bufferSize]char;
 
     var sb = StringBuilderInit(2 * KiB as (i32), pm.allocator)
