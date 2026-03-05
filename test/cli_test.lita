@@ -1,0 +1,242 @@
+/**
+    CLI Command Test Suite
+
+    Tests the three main litac CLI commands:
+      - init:        Creates a new project scaffold
+      - build:       Compiles the project
+      - build -run:  Compiles and runs the project (expects "Hello World" output)
+      - test:        Runs the project's test suite
+
+    Output files are placed under bin/test_output/hello_world_test/
+*/
+import "std/libc"
+import "std/assert"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/io"
+import "std/system"
+import "std/array"
+import "std/process" as proc
+import "std/mem"
+
+const TEST_PROJECT_NAME = "hello_world_test"
+const TEST_OUTPUT_SUBDIR = "bin/test_output"
+
+// Fills buf with the absolute path to the test project directory.
+func GetTestProjectDir(buf: *StringBuffer) {
+    var cwd = CurrentWorkingPath()
+    buf.format("%s/%s/%s", cwd, TEST_OUTPUT_SUBDIR, TEST_PROJECT_NAME)
+}
+
+/**
+    Runs a CLI command in the given working directory and captures
+    combined stdout/stderr into `output`.
+    Returns the process exit code, or -1 if the process could not be launched.
+*/
+func RunCliCommand(
+    args: *Array<*const char>,
+    cwd: *const char,
+    output: *StringBuilder
+) : i32 {
+    var process = proc::Process{}
+    if(process.create(
+        args.elements,
+        cwd,
+        proc::ProcessOption.COMBINE_STDOUT_STDERR | proc::ProcessOption.INHERIT_ENVIRONMENT
+    ) < 0) {
+        output.append("ERROR: failed to launch process\n")
+        return -1
+    }
+    defer process.destroy()
+
+    const BUFFER_SIZE = 1024
+    var buffer: [BUFFER_SIZE]char;
+    var doneReading = false
+    while(!doneReading) {
+        var len = process.readStdout(buffer, BUFFER_SIZE as (u32))
+        if(len < 1) {
+            doneReading = true
+        }
+        if(len > 0) {
+            output.append("%.*s", len, buffer)
+        }
+    }
+
+    var result = 0
+    process.join(&result)
+    return result
+}
+
+/**
+    Ensures the test project exists by running `litac init` inside the project
+    directory.  Because `PackageInit` skips files that already exist, this is
+    safe to call multiple times.
+*/
+func EnsureProjectInitialized(projectDir: *const char) {
+    Mkdirs(projectDir)
+
+    var output = StringBuilderInit(1024)
+    defer output.free()
+
+    var args = ArrayInit<*const char>(8)
+    defer args.free()
+    args.add("litac")
+    args.add("init")
+    args.add(TEST_PROJECT_NAME)
+    args.add(null)
+
+    RunCliCommand(&args, projectDir, &output)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+/**
+    litac init <name>
+    ─────────────────
+    Creates the standard project scaffold under the current working directory:
+      pkg.json, src/main.lita, test/main_test.lita, bin/, src/, test/
+*/
+@test("cli_init_creates_project_structure")
+func testInitCommand() {
+    var projectDirBuf = [MAX_PATH]char{0}
+    var projectDir = StringBufferInit(projectDirBuf, MAX_PATH, 0)
+    GetTestProjectDir(&projectDir)
+
+    // Create the target directory so that init populates it.
+    Mkdirs(projectDir.cStr())
+
+    var output = StringBuilderInit(4096)
+    defer output.free()
+
+    var args = ArrayInit<*const char>(8)
+    defer args.free()
+    args.add("litac")
+    args.add("init")
+    args.add(TEST_PROJECT_NAME)
+    args.add(null)
+
+    var result = RunCliCommand(&args, projectDir.cStr(), &output)
+    assert(result == 0)
+
+    // Verify every expected file/directory was created.
+    var checkBuf = [MAX_PATH]char{0}
+    var check = StringBufferInit(checkBuf, MAX_PATH, 0)
+
+    check.format("%s/pkg.json", projectDir.cStr())
+    assert(FileExists(check.cStr()))
+
+    check.format("%s/src/main.lita", projectDir.cStr())
+    assert(FileExists(check.cStr()))
+
+    check.format("%s/test/main_test.lita", projectDir.cStr())
+    assert(FileExists(check.cStr()))
+
+    check.format("%s/bin", projectDir.cStr())
+    assert(FileExists(check.cStr()))
+
+    check.format("%s/src", projectDir.cStr())
+    assert(FileExists(check.cStr()))
+
+    check.format("%s/test", projectDir.cStr())
+    assert(FileExists(check.cStr()))
+
+    check.format("%s/.vscode/tasks.json", projectDir.cStr())
+    assert(FileExists(check.cStr()))
+}
+
+/**
+    litac build
+    ───────────
+    Compiles the project and produces a binary in ./bin/.
+*/
+@test("cli_build_compiles_project")
+func testBuildCommand() {
+    var projectDirBuf = [MAX_PATH]char{0}
+    var projectDir = StringBufferInit(projectDirBuf, MAX_PATH, 0)
+    GetTestProjectDir(&projectDir)
+
+    EnsureProjectInitialized(projectDir.cStr())
+
+    var output = StringBuilderInit(4096)
+    defer output.free()
+
+    var args = ArrayInit<*const char>(8)
+    defer args.free()
+    args.add("litac")
+    args.add("build")
+    args.add(null)
+
+    var result = RunCliCommand(&args, projectDir.cStr(), &output)
+    assert(result == 0)
+
+    // The binary name comes from pkg.json's "name" field, which is set to
+    // TEST_PROJECT_NAME by `litac init`.
+    var binBuf = [MAX_PATH]char{0}
+    var bin = StringBufferInit(binBuf, MAX_PATH, 0)
+    bin.format("%s/bin/%s", projectDir.cStr(), TEST_PROJECT_NAME)
+    assert(FileExists(bin.cStr()))
+}
+
+/**
+    litac build -run
+    ────────────────
+    Compiles and immediately runs the project.  The default main.lita produced
+    by `litac init` prints "Hello World", so we verify that appears in the
+    combined output.
+*/
+@test("cli_build_run_outputs_hello_world")
+func testBuildRunCommand() {
+    var projectDirBuf = [MAX_PATH]char{0}
+    var projectDir = StringBufferInit(projectDirBuf, MAX_PATH, 0)
+    GetTestProjectDir(&projectDir)
+
+    EnsureProjectInitialized(projectDir.cStr())
+
+    var output = StringBuilderInit(4096)
+    defer output.free()
+
+    var args = ArrayInit<*const char>(8)
+    defer args.free()
+    args.add("litac")
+    args.add("build")
+    args.add("-run")
+    args.add(null)
+
+    var result = RunCliCommand(&args, projectDir.cStr(), &output)
+    if(result != 0) {
+        printf("litac build -run failed (exit code %d):\n%s\n", result, output.cStr())
+    }
+    assert(result == 0)
+    assert(output.contains($"Hello World"))
+}
+
+/**
+    litac test
+    ──────────
+    Recursively scans for *_test.lita files and runs all @test-annotated
+    functions.  The scaffold created by `litac init` ships with a passing
+    test, so the suite should exit cleanly.
+*/
+@test("cli_test_passes_for_initialized_project")
+func testTestCommand() {
+    var projectDirBuf = [MAX_PATH]char{0}
+    var projectDir = StringBufferInit(projectDirBuf, MAX_PATH, 0)
+    GetTestProjectDir(&projectDir)
+
+    EnsureProjectInitialized(projectDir.cStr())
+
+    var output = StringBuilderInit(4096)
+    defer output.free()
+
+    var args = ArrayInit<*const char>(8)
+    defer args.free()
+    args.add("litac")
+    args.add("test")
+    args.add(null)
+
+    var result = RunCliCommand(&args, projectDir.cStr(), &output)
+    assert(result == 0)
+}
