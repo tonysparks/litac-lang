@@ -10,6 +10,8 @@ bootstrap\litacc.exe build -verbose -debug -profile -outputDir "./bin"
 if errorlevel 1 (
     goto error_compiling
 )
+dir .\
+dir .\bootstrap
 dir .\bin
 echo Running litaC inception!...
 bin\litac.exe build -profile -output "litac_inception"
