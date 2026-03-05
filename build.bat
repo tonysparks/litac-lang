@@ -12,7 +12,7 @@ if errorlevel 1 (
 )
 
 echo Running litaC inception!...
-bin\litac build -profile -output "litac_inception"
+bin\litac.exe build -profile -output "litac_inception"
 if errorlevel 1 (
     goto error_compiling
 )
