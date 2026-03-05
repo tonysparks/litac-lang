@@ -6,6 +6,7 @@ del ".\bin\litac.*" /q
 
 echo Running bootstrapped litaC...
 
+bootstrap\litacc.exe -help
 bootstrap\litacc.exe build -verbose -debug -profile -outputDir "./bin"
 if errorlevel 1 (
     goto error_compiling
