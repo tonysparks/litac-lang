@@ -67,9 +67,9 @@
                     "cc_options": [
                         "-std=c11",
                         "-g",
-                        "%%input%%",
+                        "%input%",
                         "-o",
-                        "%%output%%",
+                        "%output%",
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
@@ -145,9 +145,9 @@
                         "-O3",
                         "-march=native",
                         "-mtune=native",
-                        "%%input%%",
+                        "%input%",
                         "-o",
-                        "%%output%%",
+                        "%output%",
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [

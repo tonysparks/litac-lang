@@ -5,8 +5,10 @@ del ".\bin\litacc.*" /q
 del ".\bin\litac.*" /q
 
 echo Running bootstrapped litaC...
+copy "bootstrap\litacc.exe" "bin"
 
-bootstrap\litacc.exe build -profile -outputDir "./bin"
+
+bin\litacc.exe build -profile -outputDir "./bin"
 if errorlevel 1 (
     goto error_compiling
 )

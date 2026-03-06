@@ -13,7 +13,7 @@ if errorlevel 1 (
     goto end
 )
 
-cp "%wd%\bin\litac.c" "%wd%\bootstrap"
+copy "%wd%\bin\litac.c" "%wd%\bootstrap"
 move /y "%wd%\bootstrap\litac.c" "%wd%\bootstrap\litac_windows.c"
 if errorlevel 1 (
     goto end
