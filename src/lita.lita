@@ -714,7 +714,7 @@ public func (this: *Lita) run() : i32 {
     for(var i = 0; i < this.options.nargs; i+=1) {
         sb.append(" %s", this.options.args[i])
     }
-
+printf("Executing: '%s'\n", sb.cStr())
     return system(sb.cStr())
 /*
 #else
