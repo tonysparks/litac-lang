@@ -76,7 +76,8 @@ public struct TestCase {
 
 public func (this: *TestSuite) init(
     allocator: *const Allocator = defaultAllocator
-) {
+) {    
+    SystemInit() // TODO: fix module_init with tests!!
     this.allocator = allocator
     this.testCases = ArrayInit<TestCase>(64, allocator)
     this.dynamicTestCases = ArrayInit<TestCase>(64, allocator)

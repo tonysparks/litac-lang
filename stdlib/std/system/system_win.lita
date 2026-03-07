@@ -173,9 +173,9 @@ public func _FileDelete(filename: *const char) : bool {
 
 @inline
 @no_profile
-public func _SystemTimeMSec() : f64 {
+public func _SystemTimeMSec() : f64 {    
     var time: LARGE_INTEGER;
-    QueryPerformanceCounter(&time);
+    QueryPerformanceCounter(&time);    
     assert(systemFreq != 0)
 
     return ((time.QuadPart - systemStart) as (f64) / systemFreq) / 1_000.0;

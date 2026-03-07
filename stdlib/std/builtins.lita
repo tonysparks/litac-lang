@@ -294,7 +294,7 @@ public @note packed {
 
         //addImportByName(moduleName, "std/test")
         emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
-        emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
+        emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)        
         emit("   testSuite.init(); defer testSuite.free(); \n")
         emit("   var isJsonFormated = %d; \n", IS_JSON_FORMAT)
         //emit("   var isJsonFormated = false; \n")
@@ -305,7 +305,7 @@ public @note packed {
             var disabled = isDisabled(sym)
             if(disabled) {
                 emit("    __testCase%d.isDisabled = true\n", i)
-            }
+            }            
             emit("   if(setjmp(testSuite.env) == 0) {\n")
             if(!disabled) {
                 var alias = addImport(moduleName, sym.moduleFilename)
