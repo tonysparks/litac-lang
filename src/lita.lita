@@ -698,7 +698,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
 public func (this: *Lita) run() : i32 {
     // TODO: Fix this -- the process library doesn't support specifying the command
     // path on Linux based systems, for now we will do this horrible hack work around
-#static_if !defined(_WIN32)
+//#static_if !defined(_WIN32)
     var sb = StringBuilderInit(256, this.allocator)
     defer sb.free()
 
@@ -716,6 +716,7 @@ public func (this: *Lita) run() : i32 {
     }
 
     return system(sb.cStr())
+/*
 #else
     var args = ArrayInit<*const char>(this.options.nargs + 2, this.allocator)
 
@@ -750,6 +751,7 @@ public func (this: *Lita) run() : i32 {
 
     return result
 #end
+*/
 }
 
 
