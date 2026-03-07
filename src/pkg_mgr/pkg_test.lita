@@ -67,6 +67,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
     }
 
     var filesTested = 0
+    var filesFailed = 0
     var failed = 0
     var successful = 0
 
@@ -109,6 +110,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
                 ConsoleColorsAsStr(ConsoleColors.RED),
                 ConsoleColorsAsStr(ConsoleColors.CLEAR)
             )
+            filesFailed += 1
             continue
         }
         defer testProcess.destroy()
@@ -128,6 +130,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
                 ConsoleColorsAsStr(ConsoleColors.CLEAR),
                 result
             )
+            filesFailed += 1
         }
     }
 
@@ -138,6 +141,15 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         filesTested,
         totalTime
     )
+
+    if(filesFailed > 0) {
+        printf(
+            "%d test file(s) %sfailed%s ❌\n",
+            failed,
+            ConsoleColorsAsStr(ConsoleColors.RED),
+            ConsoleColorsAsStr(ConsoleColors.CLEAR)
+        )
+    }
 
     printf(
         "%d/%d tests %spassed%s ✅\n",
@@ -154,6 +166,9 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
             ConsoleColorsAsStr(ConsoleColors.RED),
             ConsoleColorsAsStr(ConsoleColors.CLEAR)
         )
+    }
+
+    if(failed > 0 || filesFailed > 0) {
         return PkgStatus.ERROR_TEST_SUITE_FAILED
     }
 
