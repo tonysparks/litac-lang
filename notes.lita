@@ -424,3 +424,58 @@ var x = match ReadFileFully(
     e: Error:
         return e
 }
+
+
+// resolveMethodName returns an interned symbol name for a method, resolving any
+// typedef alias on the first parameter to its underlying type name so that
+// method lookup (which uses the resolved TypeInfo) finds the right symbol.
+// For example:
+//   typedef i64 as EpochTime
+//   func (this: EpochTime) foo()   →  "i64_foo"   (not "EpochTime_foo")
+func (this: *TypeChecker) resolveMethodName(
+    funcDecl: *FuncDecl,
+    rawBuffer: [MAX_SYMBOL_NAME]char
+) : InternedString {
+    if(funcDecl.params.empty()) {
+        return this.lita.strings.internCopy(rawBuffer)
+    }
+
+    var first = funcDecl.params.first()
+    if(!first || !first.type) {
+        return this.lita.strings.internCopy(rawBuffer)
+    }
+
+    var typeSpec = first.type.getBaseType()
+    if(!typeSpec || typeSpec.kind != TypeSpecKind.NAME) {
+        return this.lita.strings.internCopy(rawBuffer)
+    }
+
+    // Follow the typedef alias chain to the underlying type name.
+    var typeName = typeSpec.name
+    var resolved = this.current.getType(typeName)
+    while(resolved != null &&
+          (resolved.flags & SymbolFlags.IS_ALIAS) &&
+          resolved.decl != null &&
+          resolved.decl.kind == StmtKind.TYPEDEF_DECL) {
+        var typedefDecl = resolved.decl as (*TypedefDecl)
+        if(!typedefDecl.type || typedefDecl.type.kind != TypeSpecKind.NAME) {
+            break
+        }
+        typeName = typedefDecl.type.name
+        resolved = this.current.getType(typeName)
+    }
+
+    // If the name is unchanged there is nothing to fix.
+    if(typeName.equals(typeSpec.name)) {
+        return this.lita.strings.internCopy(rawBuffer)
+    }
+
+    // Rebuild the method name: "{underlyingTypeName}_{methodName}"
+    var newBuffer = [MAX_SYMBOL_NAME]char{0}
+    var nb = StringBufferInit(newBuffer, MAX_SYMBOL_NAME, 0)
+    nb.format("%.*s_%.*s",
+        typeName.length, typeName.buffer,
+        funcDecl.name.str.length, funcDecl.name.str.buffer)
+
+    return this.lita.strings.internCopy(newBuffer)
+}
