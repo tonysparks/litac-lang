@@ -373,12 +373,19 @@ __declspec(dllimport) unsigned long __stdcall WaitForMultipleObjects(
     unsigned long, void *const *, int, unsigned long);
 __declspec(dllimport) int __stdcall GetOverlappedResult(void *, LPOVERLAPPED,
                                                         unsigned long *, int);
+/* Only declare these if <windows.h> hasn't already been included.
+   processthreadsapi.h (pulled in by windows.h) declares them with SIZE_T /
+   PSIZE_T which can differ from subprocess_size_t on x86, causing conflicting-
+   type errors.  When _WINDOWS_ is defined the SDK declarations are already
+   visible and correct, so we skip our manual versions. */
+#ifndef _WINDOWS_
 __declspec(dllimport) int __stdcall InitializeProcThreadAttributeList(
     void *, unsigned long, unsigned long, subprocess_size_t *);
 __declspec(dllimport) int __stdcall UpdateProcThreadAttribute(
     void *, unsigned long, subprocess_size_t, void *, subprocess_size_t,
     void *, subprocess_size_t *);
 __declspec(dllimport) void __stdcall DeleteProcThreadAttributeList(void *);
+#endif
 
 #if defined(_DLL)
 #define SUBPROCESS_DLLIMPORT __declspec(dllimport)

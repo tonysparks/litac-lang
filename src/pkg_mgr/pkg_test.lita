@@ -101,8 +101,6 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
             args.elements,
             null,
             sub::ProcessOption.INHERIT_ENVIRONMENT
-            //|
-            //sub::ProcessOption.COMBINE_STDOUT_STDERR
         ) < 0) {
             printf(
                 "Test %s %sfailed%s unable to launch 'litac' command\n",
