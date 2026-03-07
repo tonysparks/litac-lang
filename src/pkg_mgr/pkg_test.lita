@@ -145,7 +145,7 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
     if(filesFailed > 0) {
         printf(
             "%d test file(s) %sfailed%s ❌\n",
-            failed,
+            filesFailed,
             ConsoleColorsAsStr(ConsoleColors.RED),
             ConsoleColorsAsStr(ConsoleColors.CLEAR)
         )

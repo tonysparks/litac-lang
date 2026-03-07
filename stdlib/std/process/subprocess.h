@@ -312,6 +312,13 @@ struct subprocess_startup_info_s {
   void *hStdError;
 };
 
+/* Extended STARTUPINFO used with EXTENDED_STARTUPINFO_PRESENT so that
+   CreateProcess inherits only the explicitly listed handles. */
+struct subprocess_startup_info_ex_s {
+  struct subprocess_startup_info_s StartupInfo;
+  void *lpAttributeList;
+};
+
 struct subprocess_overlapped_s {
   uintptr_t Internal;
   uintptr_t InternalHigh;
@@ -366,6 +373,12 @@ __declspec(dllimport) unsigned long __stdcall WaitForMultipleObjects(
     unsigned long, void *const *, int, unsigned long);
 __declspec(dllimport) int __stdcall GetOverlappedResult(void *, LPOVERLAPPED,
                                                         unsigned long *, int);
+__declspec(dllimport) int __stdcall InitializeProcThreadAttributeList(
+    void *, unsigned long, unsigned long, subprocess_size_t *);
+__declspec(dllimport) int __stdcall UpdateProcThreadAttribute(
+    void *, unsigned long, subprocess_size_t, void *, subprocess_size_t,
+    void *, subprocess_size_t *);
+__declspec(dllimport) void __stdcall DeleteProcThreadAttributeList(void *);
 
 #if defined(_DLL)
 #define SUBPROCESS_DLLIMPORT __declspec(dllimport)
@@ -737,19 +750,68 @@ int subprocess_create_ex(const char *const commandLine[], int options,
 
   commandLineCombined[len] = '\0';
 
-  if (!CreateProcessA(
-          SUBPROCESS_NULL,
-          commandLineCombined, // command line
-          SUBPROCESS_NULL,     // process security attributes
-          SUBPROCESS_NULL,     // primary thread security attributes
-          1,                   // handles are inherited
-          flags,               // creation flags
-          used_environment,    // used environment
-          process_cwd,         // use specified current directory
-          SUBPROCESS_PTR_CAST(LPSTARTUPINFOA,
-                              &startInfo), // STARTUPINFO pointer
-          SUBPROCESS_PTR_CAST(LPPROCESS_INFORMATION, &processInfo))) {
-    return -1;
+  /* Restrict handle inheritance to only stdin/stdout/stderr using
+     PROC_THREAD_ATTRIBUTE_HANDLE_LIST. Without this restriction, every
+     grandchild process spawned by the child inherits all inheritable handles
+     from the parent (including pipe write-ends belonging to ancestor
+     processes). That causes ReadFile on those ancestor pipes to block forever
+     because the grandchild holds the write end open even after the child has
+     exited, so EOF is never delivered. */
+  {
+    const unsigned long extendedStartupInfoPresent = 0x00080000;
+    const subprocess_size_t procThreadAttributeHandleList = 0x00020002;
+    struct subprocess_startup_info_ex_s startInfoEx;
+    void *handle_list[3];
+    int handle_count = 0;
+    subprocess_size_t attr_list_size = 0;
+    void *attr_list;
+    int create_result;
+
+    handle_list[handle_count++] = startInfo.hStdInput;
+    handle_list[handle_count++] = startInfo.hStdOutput;
+    if (startInfo.hStdError != startInfo.hStdOutput) {
+      handle_list[handle_count++] = startInfo.hStdError;
+    }
+
+    /* First call with NULL determines the required buffer size. */
+    InitializeProcThreadAttributeList(SUBPROCESS_NULL, 1, 0, &attr_list_size);
+    attr_list = _alloca(attr_list_size);
+    if (!InitializeProcThreadAttributeList(attr_list, 1, 0, &attr_list_size)) {
+      return -1;
+    }
+
+    if (!UpdateProcThreadAttribute(
+            attr_list, 0, procThreadAttributeHandleList, handle_list,
+            SUBPROCESS_CAST(subprocess_size_t, handle_count) * sizeof(void *),
+            SUBPROCESS_NULL, SUBPROCESS_NULL)) {
+      DeleteProcThreadAttributeList(attr_list);
+      return -1;
+    }
+
+    memset(&startInfoEx, 0, sizeof(startInfoEx));
+    startInfoEx.StartupInfo = startInfo;
+    startInfoEx.StartupInfo.cb =
+        SUBPROCESS_CAST(unsigned long, sizeof(startInfoEx));
+    startInfoEx.lpAttributeList = attr_list;
+
+    create_result = CreateProcessA(
+        SUBPROCESS_NULL,
+        commandLineCombined,                /* command line */
+        SUBPROCESS_NULL,                    /* process security attributes */
+        SUBPROCESS_NULL,                    /* primary thread security attributes */
+        1,                                  /* handles are inherited */
+        flags | extendedStartupInfoPresent, /* creation flags */
+        used_environment,                   /* used environment */
+        process_cwd,                        /* use specified current directory */
+        SUBPROCESS_PTR_CAST(LPSTARTUPINFOA,
+                            &startInfoEx.StartupInfo), /* STARTUPINFO pointer */
+        SUBPROCESS_PTR_CAST(LPPROCESS_INFORMATION, &processInfo));
+
+    DeleteProcThreadAttributeList(attr_list);
+
+    if (!create_result) {
+      return -1;
+    }
   }
 
   out_process->hProcess = processInfo.hProcess;
