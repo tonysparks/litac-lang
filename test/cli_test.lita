@@ -43,12 +43,17 @@ func RunCliCommand(
     if(process.create(
         args.elements,
         cwd,
-        proc::ProcessOption.COMBINE_STDOUT_STDERR | proc::ProcessOption.INHERIT_ENVIRONMENT
+        proc::ProcessOption.COMBINE_STDOUT_STDERR |
+        proc::ProcessOption.ENABLE_ASYNC |
+        proc::ProcessOption.INHERIT_ENVIRONMENT
     ) < 0) {
         output.append("ERROR: failed to launch process\n")
         return -1
     }
     defer process.destroy()
+
+    var result = 0
+    process.join(&result)
 
     const BUFFER_SIZE = 1024
     var buffer: [BUFFER_SIZE]char;
@@ -62,9 +67,6 @@ func RunCliCommand(
             output.append("%.*s", len, buffer)
         }
     }
-
-    var result = 0
-    process.join(&result)
     return result
 }
 
