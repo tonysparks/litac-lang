@@ -373,19 +373,23 @@ __declspec(dllimport) unsigned long __stdcall WaitForMultipleObjects(
     unsigned long, void *const *, int, unsigned long);
 __declspec(dllimport) int __stdcall GetOverlappedResult(void *, LPOVERLAPPED,
                                                         unsigned long *, int);
-/* Only declare these if <windows.h> hasn't already been included.
-   processthreadsapi.h (pulled in by windows.h) declares them with SIZE_T /
-   PSIZE_T which can differ from subprocess_size_t on x86, causing conflicting-
-   type errors.  When _WINDOWS_ is defined the SDK declarations are already
-   visible and correct, so we skip our manual versions. */
-#ifndef _WINDOWS_
-__declspec(dllimport) int __stdcall InitializeProcThreadAttributeList(
-    void *, unsigned long, unsigned long, subprocess_size_t *);
-__declspec(dllimport) int __stdcall UpdateProcThreadAttribute(
-    void *, unsigned long, subprocess_size_t, void *, subprocess_size_t,
-    void *, subprocess_size_t *);
-__declspec(dllimport) void __stdcall DeleteProcThreadAttributeList(void *);
+/* SIZE_T / ULONG_PTR equivalent: pointer-width unsigned integer.
+   subprocess_size_t (= size_t or unsigned int) does NOT match SIZE_T on x86
+   Windows (unsigned long), causing "conflicting types" errors when
+   processthreadsapi.h is also in scope.  Define an exact match instead. */
+#ifdef _WIN64
+typedef unsigned __int64 subprocess_ulong_ptr_t;
+#else
+typedef unsigned long subprocess_ulong_ptr_t;
 #endif
+/* These declarations are compatible with processthreadsapi.h regardless of
+   include order, so no guard is required. */
+__declspec(dllimport) int __stdcall InitializeProcThreadAttributeList(
+    void *, unsigned long, unsigned long, subprocess_ulong_ptr_t *);
+__declspec(dllimport) int __stdcall UpdateProcThreadAttribute(
+    void *, unsigned long, subprocess_ulong_ptr_t, void *,
+    subprocess_ulong_ptr_t, void *, subprocess_ulong_ptr_t *);
+__declspec(dllimport) void __stdcall DeleteProcThreadAttributeList(void *);
 
 #if defined(_DLL)
 #define SUBPROCESS_DLLIMPORT __declspec(dllimport)
@@ -770,7 +774,7 @@ int subprocess_create_ex(const char *const commandLine[], int options,
     struct subprocess_startup_info_ex_s startInfoEx;
     void *handle_list[3];
     int handle_count = 0;
-    subprocess_size_t attr_list_size = 0;
+    subprocess_ulong_ptr_t attr_list_size = 0;
     void *attr_list;
     int create_result;
 
@@ -789,7 +793,7 @@ int subprocess_create_ex(const char *const commandLine[], int options,
 
     if (!UpdateProcThreadAttribute(
             attr_list, 0, procThreadAttributeHandleList, handle_list,
-            SUBPROCESS_CAST(subprocess_size_t, handle_count) * sizeof(void *),
+            SUBPROCESS_CAST(subprocess_ulong_ptr_t, handle_count) * sizeof(void *),
             SUBPROCESS_NULL, SUBPROCESS_NULL)) {
       DeleteProcThreadAttributeList(attr_list);
       return -1;
