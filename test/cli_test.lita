@@ -20,13 +20,12 @@ import "std/array"
 import "std/process" as proc
 import "std/mem"
 
-const TEST_PROJECT_NAME = "hello_world_test"
-const TEST_OUTPUT_SUBDIR = "bin/test_output"
+const TEST_PROJECT_NAME = "output"
 
 // Fills buf with the absolute path to the test project directory.
 func GetTestProjectDir(buf: *StringBuffer) {
     var cwd = CurrentWorkingPath()
-    buf.format("%s/%s/%s", cwd, TEST_OUTPUT_SUBDIR, TEST_PROJECT_NAME)
+    buf.format("%s", cwd)
 }
 
 /**
@@ -43,7 +42,7 @@ func RunCliCommand(
     if(process.create(
         args.elements,
         cwd,
-        proc::ProcessOption.COMBINE_STDOUT_STDERR |
+        //proc::ProcessOption.COMBINE_STDOUT_STDERR |
         proc::ProcessOption.ENABLE_ASYNC |
         proc::ProcessOption.INHERIT_ENVIRONMENT
     ) < 0) {

@@ -76,7 +76,7 @@ public struct TestCase {
 
 public func (this: *TestSuite) init(
     allocator: *const Allocator = defaultAllocator
-) {    
+) {
     SystemInit() // TODO: fix module_init with tests!!
     this.allocator = allocator
     this.testCases = ArrayInit<TestCase>(64, allocator)
@@ -192,6 +192,8 @@ public func (this: *TestCase) printResults(
 
     if(isJson) {
         var errors = ArrayInit<*const char>(this.errors.size() + 1, this.testSuite.allocator)
+        defer errors.free()
+
         for(var i = 0; i < this.errors.size(); i +=1) {
             errors.add(this.errors.get(i).errorMessage)
         }
@@ -209,6 +211,8 @@ public func (this: *TestCase) printResults(
         }
 
         var sb = StringBuilderInit(1024, this.testSuite.allocator)
+        defer sb.free()
+
         testInfo.toJson(sb)
         printf(
             "%s\n",
