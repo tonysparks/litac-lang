@@ -336,7 +336,6 @@ struct subprocess_overlapped_s {
 __declspec(dllimport) unsigned long __stdcall GetLastError(void);
 __declspec(dllimport) int __stdcall SetHandleInformation(void *, unsigned long,
                                                          unsigned long);
-__declspec(dllimport) void *__stdcall GetStdHandle(unsigned long);
 __declspec(dllimport) int __stdcall CreatePipe(void **, void **,
                                                LPSECURITY_ATTRIBUTES,
                                                unsigned long);
@@ -738,30 +737,17 @@ int subprocess_create_ex(const char *const commandLine[], int options,
 
   commandLineCombined[len] = '\0';
 
-  /* Prevent grandchild handle leaks: mark this process's inherited STD
-     handles as non-inheritable before calling CreateProcess.  Without this,
-     when the child spawns grandchildren with bInheritHandles=1, they inherit
-     the write end of ancestor pipes, keeping those pipes open forever and
-     causing ReadFile on the ancestor side to block (no EOF). */
-  {
-    const unsigned long handleFlagInherit = 0x00000001;
-    void *h;
-    /* STD_INPUT_HANDLE = -10, STD_OUTPUT_HANDLE = -11, STD_ERROR_HANDLE = -12 */
-    h = GetStdHandle((unsigned long)-10);
-    if (h && h != SUBPROCESS_PTR_CAST(void *, SUBPROCESS_CAST(subprocess_intptr_t, -1)))
-      SetHandleInformation(h, handleFlagInherit, 0);
-    h = GetStdHandle((unsigned long)-11);
-    if (h && h != SUBPROCESS_PTR_CAST(void *, SUBPROCESS_CAST(subprocess_intptr_t, -1)))
-      SetHandleInformation(h, handleFlagInherit, 0);
-    h = GetStdHandle((unsigned long)-12);
-    if (h && h != SUBPROCESS_PTR_CAST(void *, SUBPROCESS_CAST(subprocess_intptr_t, -1)))
-      SetHandleInformation(h, handleFlagInherit, 0);
-  }
-
   if (!CreateProcessA(
-          SUBPROCESS_NULL, commandLineCombined, SUBPROCESS_NULL,
-          SUBPROCESS_NULL, 1, flags, used_environment, process_cwd,
-          SUBPROCESS_PTR_CAST(LPSTARTUPINFOA, &startInfo),
+          SUBPROCESS_NULL,
+          commandLineCombined, // command line
+          SUBPROCESS_NULL,     // process security attributes
+          SUBPROCESS_NULL,     // primary thread security attributes
+          1,                   // handles are inherited
+          flags,               // creation flags
+          used_environment,    // used environment
+          process_cwd,         // use specified current directory
+          SUBPROCESS_PTR_CAST(LPSTARTUPINFOA,
+                              &startInfo), // STARTUPINFO pointer
           SUBPROCESS_PTR_CAST(LPPROCESS_INFORMATION, &processInfo))) {
     return -1;
   }
