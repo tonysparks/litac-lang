@@ -177,7 +177,11 @@ func testBuildCommand() {
     // TEST_PROJECT_NAME by `litac init`.
     var binBuf = [MAX_PATH]char{0}
     var bin = StringBufferInit(binBuf, MAX_PATH, 0)
+#static_if defined(_WIN32) || defined(_WIN64)
+    bin.format("%s/bin/%s.exe", projectDir.cStr(), TEST_PROJECT_NAME)
+#else
     bin.format("%s/bin/%s", projectDir.cStr(), TEST_PROJECT_NAME)
+#end
     assert(FileExists(bin.cStr()))
 }
 
