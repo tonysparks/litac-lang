@@ -5,7 +5,7 @@ del ".\bin\litac_tests.*" /q
 
 
 echo "Running litaC tests..."
-bin\litac test -output "litac_tests"
+litac test -output "litac_tests"
 
 if errorlevel 1 (
     goto error_tests
