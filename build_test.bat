@@ -3,6 +3,7 @@ if [%LITAC_HOME%] == [] goto error_exit
 
 del ".\bin\litac_tests.*" /q
 
+copy bin\*.dll bin\output
 
 echo "Running litaC tests..."
 litac test -output "litac_tests"
