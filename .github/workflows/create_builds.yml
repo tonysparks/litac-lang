@@ -63,6 +63,7 @@ jobs:
         run: |
           echo Testing LitaC Compiler
           export set LITAC_HOME=$GITHUB_WORKSPACE
+          export PATH="$PATH:$LITAC_HOME/bin"
           sh $GITHUB_WORKSPACE/build_test.sh
 
       # Commit the litac_linux.c generated file
@@ -111,6 +112,7 @@ jobs:
         run: |
           echo Testing LitaC Compiler
           set LITAC_HOME=%GITHUB_WORKSPACE%
+          set PATH=%PATH%;%LITAC_HOME%\bin
           %GITHUB_WORKSPACE%/build_test.bat
 
       # Commit the litac_windows.c generated file
@@ -167,6 +169,7 @@ jobs:
         run: |
           echo Testing LitaC Compiler
           export set LITAC_HOME=$GITHUB_WORKSPACE
+          export PATH="$PATH:$LITAC_HOME/bin"
           sh $GITHUB_WORKSPACE/build_test.sh
 
       # Commit the litac_mac.c generated file

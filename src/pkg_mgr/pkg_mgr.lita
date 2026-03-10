@@ -253,17 +253,24 @@ public func (this: *PackageManager) buildCommand(
     // See if we're running the build command for a non-pkg
     // source file
     if (!this.hasProjectPkg()) {
-        if(litaOptions.inputFile.empty()) {
-            this.errors.append(
-                "Missing an input file.  Either create a 'pkg.json' project package file (via the 'init' command) or supply a .lita source file."
-            )
-            return 1;
+        // we're wanting to run with an input file
+        if(!litaOptions.inputFile.empty()) {
+            return RunLitac(litaOptions)
         }
-        return RunLitac(litaOptions)
     }
 
     var status = this.readProjectPkg()
     if(status != PkgStatus.OK) {
+        if(status == PkgStatus.ERROR_PARSING_PKG_JSON) {
+            this.errors.append(
+                "The existing 'pkg.json' project package file was found but was unable to be parsed."
+            )
+        }
+        if(status == PkgStatus.ERROR_NO_PROJECT_PKG_FOUND) {
+            this.errors.append(
+                "Missing an input file.  Either create a 'pkg.json' project package file (via the 'init' command) or supply a .lita source file."
+            )
+        }
         return status;
     }
 

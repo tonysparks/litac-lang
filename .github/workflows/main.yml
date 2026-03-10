@@ -71,6 +71,7 @@ jobs:
         run: |
           echo Testing LitaC Compiler
           export set LITAC_HOME=$GITHUB_WORKSPACE
+          export PATH="$PATH:$LITAC_HOME/bin"
           sh $GITHUB_WORKSPACE/build_test.sh
 
   # Build for windows
@@ -116,6 +117,7 @@ jobs:
         run: |
           echo Testing LitaC Compiler
           set LITAC_HOME=%GITHUB_WORKSPACE%
+          set PATH=%PATH%;%LITAC_HOME%\bin
           %GITHUB_WORKSPACE%/build_test.bat
 
   # Build for macos
@@ -168,4 +170,5 @@ jobs:
         run: |
           echo Testing LitaC Compiler
           export set LITAC_HOME=$GITHUB_WORKSPACE
+          export PATH="$PATH:$LITAC_HOME/bin"
           sh $GITHUB_WORKSPACE/build_test.sh

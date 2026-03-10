@@ -210,19 +210,30 @@ func test() {
         // TARGET (debug|release|default)
         "default" : {
             // OS (linux|mac|windows|default)
+
+            // WINDOWS
+            "windows" : {
+                // ARCH (x86|x64|arm32|arm64|default)
+                "default" : {
+                    "cc" : "clang",
+                    "cc_options" : "-std=c11 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
+                    "lita_options" : ""
+                }
+            },
+
+            // default (mac|linux)
             "default" : {
                 // ARCH (x86|x64|arm32|arm64|default)
                 "default" : {
                     "cc" : "clang",
-                    "cc_options" : "-std=c99 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
+                    "cc_options" : "-std=gnu11 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
                     "lita_options" : ""
                 }
             }
         }
     },
 
-    "dependencies": [],
-
+    "dependencies": []
 }
 """ // TODO: Json escape strings...
         , options.name, options.version, options.type, options.repo)
