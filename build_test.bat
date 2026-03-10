@@ -6,7 +6,7 @@ del ".\bin\litac_tests.*" /q
 copy bin\*.dll bin\output
 
 echo "Running litaC tests..."
-litac test -output "litac_tests"
+bin\litac_inception test -output "litac_tests"
 
 if errorlevel 1 (
     goto error_tests
