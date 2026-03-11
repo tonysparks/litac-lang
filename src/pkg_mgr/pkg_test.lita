@@ -94,6 +94,8 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         }
         args.add("-file")
         args.add(path)
+        args.add("-output")
+        args.add("test_file")
         args.add(null)
 
         var testProcess = sub::Process{}
