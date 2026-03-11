@@ -500,7 +500,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
 
     sb.clear()
 
-    var buffer = [1024]char{};
+    var buffer = [1024*2]char{};
     var bytesRead = -1_i64
     while((bytesRead = process.readOutput(buffer, 1024)) > 0) {
         sb.appendStr(buffer)

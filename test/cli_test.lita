@@ -51,7 +51,6 @@ func RunCliCommand(
     }
     defer process.destroy()
 
-
     const BUFFER_SIZE = 1024
     var buffer: [BUFFER_SIZE]char;
     var doneReading = false
