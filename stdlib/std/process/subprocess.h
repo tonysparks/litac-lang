@@ -742,7 +742,7 @@ int subprocess_create_ex(const char *const commandLine[], int options,
           commandLineCombined, // command line
           SUBPROCESS_NULL,     // process security attributes
           SUBPROCESS_NULL,     // primary thread security attributes
-          1,                   // handles are inherited
+          0,                   // handles are inherited
           flags,               // creation flags
           used_environment,    // used environment
           process_cwd,         // use specified current directory
