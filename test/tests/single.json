@@ -51,7 +51,7 @@ import "std/libc"
                 assert(count == 3)*/
             `,
             "output" :"Hello World"
-        },/*
+        },
         {
             "name" : "Post else with defer",
             "definitions": `

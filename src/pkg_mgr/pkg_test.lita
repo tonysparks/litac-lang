@@ -186,7 +186,7 @@ func ProcessTestOutput(
     process: *sub::Process
 ): TestOutput {
 
-    const bufferSize = 256;
+    const bufferSize = 1024;
     var buffer: [bufferSize]char;
 
     var sb = StringBuilderInit(2 * KiB as (i32), pm.allocator)
@@ -209,96 +209,98 @@ func ProcessTestOutput(
 
         sb.append("%.*s", len, buffer)
 
+        // drain ALL complete lines from sb before reading more data
         var bufferStr = sb.toString()
         var index = bufferStr.indexOf($"\n")
-        // test to see if this message is truncated
-        if(index < 0) {
-            continue
-        }
+        while(index >= 0) {
+            var line = bufferStr.substring(0, index).trim()
 
-        defer {
+            // only attempt to parse out json objects
+            if(!line.startsWith($"{")) {
+                printf("%.*s\n", line.length, line.buffer)
+                sb.delete(0, index + 1)
+                bufferStr = sb.toString()
+                index = bufferStr.indexOf($"\n")
+                continue
+            }
+
+            // TODO: fix me, memory copy
+            var json = line.toCStr(pm.allocator)
             sb.delete(0, index + 1)
-        }
+            bufferStr = sb.toString()
+            index = bufferStr.indexOf($"\n")
 
-        var line = bufferStr.substring(0, index).trim()
+            var node = parser.parseJson(json)
+            defer node.free()
 
-        // only attempt to parse out json objects
-        if(!line.startsWith($"{")) {
-            printf("%.*s\n", line.length, line.buffer)
-            continue
-        }
-
-        // TODO: fix me, memory copy
-        var json = line.toCStr(pm.allocator)
-        var node = parser.parseJson(json)
-        defer node.free()
-
-        if(node == null || !node.isObject()) {
-            //printf(">> '''%.*s'''\n", line.length, line.buffer)
-            continue
-        }
-
-        var type = node.getStr("type")
-        if(type.equals("TEST_RESULT")) {
-            var name = node.getStr("name")
-            var status = node.getStr("status")
-            var time = node.getFloat("durationMSec")
-            var errors = node.getArray("errors")
-
-            var isDisabled = status.equals("DISABLED")
-            var isSuccess = status.equals("SUCCESS")
-            var isFailure = status.equals("FAILED")
-
-            var result = "⏸️"
-            if(isSuccess) {
-                result = "✅"
-                output.numberOfPassed += 1
-            }
-            if(isFailure) {
-                output.numberOfFailed += 1
-                result = "❌"
+            if(node == null || !node.isObject()) {
+                continue
             }
 
-            var dots = $"..............................................................."
-            var nDots = MAX(0, dots.length - name.length())
-            printf("%s", name)
-            printf(
-                "%.*s",
-                nDots,
-                dots.buffer
-            )
-            printf("(%.4f) %s\n", time, result)
+            var type = node.getStr("type")
+            if(type.equals("TEST_RESULT")) {
+                var name = node.getStr("name")
+                var status = node.getStr("status")
+                var time = node.getFloat("durationMSec")
+                var errors = node.getArray("errors")
 
-            if(errors != null && !errors.empty()) {
-                for(var i = 0; i < errors.size(); i+=1) {
-                    var error = errors.at(i)
-                    printf("%s\n", error.asString())
+                var isDisabled = status.equals("DISABLED")
+                var isSuccess = status.equals("SUCCESS")
+                var isFailure = status.equals("FAILED")
+
+                var result = "⏸️"
+                if(isSuccess) {
+                    result = "✅"
+                    output.numberOfPassed += 1
+                }
+                if(isFailure) {
+                    output.numberOfFailed += 1
+                    result = "❌"
+                }
+
+                var dots = $"..............................................................."
+                var nDots = MAX(0, dots.length - name.length())
+                printf("%s", name)
+                printf(
+                    "%.*s",
+                    nDots,
+                    dots.buffer
+                )
+                printf("(%.4f) %s\n", time, result)
+
+                if(errors != null && !errors.empty()) {
+                    for(var i = 0; i < errors.size(); i+=1) {
+                        var error = errors.at(i)
+                        printf("%s\n", error.asString())
+                    }
                 }
             }
-        }
-        else if(type.equals("COMPILATION_MESSAGE")) {
-            var errors = node.getArray("errors")
-            for(var i = 0; i < errors.size(); i += 1) {
-                var error = errors.at(i)
-                var pos = error.getObject("pos")
+            else if(type.equals("COMPILATION_MESSAGE")) {
+                var errors = node.getArray("errors")
+                for(var i = 0; i < errors.size(); i += 1) {
+                    var error = errors.at(i)
+                    var pos = error.getObject("pos")
 
-                var filename = pos != null ? pos.getStr("filename") : "<unknown>";
-                var lineNumber = pos != null ? pos.getInt("lineNumber") : 0;
-                printf(
-                    "%s:%d: %serror%s %s\n",
-                    filename,
-                    lineNumber,
-                    ConsoleColorsAsStr(ConsoleColors.RED),
-                    error.getStr("message"),
-                    ConsoleColorsAsStr(ConsoleColors.CLEAR)
-                )
+                    var filename = pos != null ? pos.getStr("filename") : "<unknown>";
+                    var lineNumber = pos != null ? pos.getInt("lineNumber") : 0;
+                    printf(
+                        "%s:%d: %serror%s %s\n",
+                        filename,
+                        lineNumber,
+                        ConsoleColorsAsStr(ConsoleColors.RED),
+                        error.getStr("message"),
+                        ConsoleColorsAsStr(ConsoleColors.CLEAR)
+                    )
+                }
+            }
+            else if(type.equals("MESSAGE")) {
+                var message = node.getStr("message").toString().trim()
+                printf("%.*s\n", message.length, message.buffer)
             }
         }
-        else if(type.equals("MESSAGE")) {
-            var message = node.getStr("message").toString().trim()
-            printf("%.*s\n", message.length, message.buffer)
-        }
     }
+
+    printf("Remaining: '%.*s'\n", sb.length, sb.buffer)
 
     return output
 }

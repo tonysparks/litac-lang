@@ -146,7 +146,7 @@ var testFiles = []*const char {
 }
 
 func RunTestSuite(singleOnly: bool) {
-    var memSize = 50 * MiB
+    var memSize = 150 * MiB
     var mem = defaultAllocator.alloc(memSize)
     linearAllocator.init(mem, memSize)
 
@@ -378,7 +378,7 @@ func RunTest(testCase: *TestCase, suite: *TestSuite, test: *Test) : TestResult {
     options.showProfileInfo = false
     options.run = false // we run outselves
     options.cFormat = false
-    options.isVerbose = true
+    options.isVerbose = false
     if(suite.includeTypeInfo) {
         options.typeOption = TypeInfoOption.ALL
     }
@@ -438,7 +438,7 @@ func RunTest(testCase: *TestCase, suite: *TestSuite, test: *Test) : TestResult {
     lita.runCaptureOutput(suite.buffer)
 
     if(test.expectedOutput) {
-        printf("Suite output: %s\n", suite.buffer.cStr())
+        //printf("Suite output: %s\n", suite.buffer.cStr())
         if(!test.expectedOutput.equals(suite.buffer.cStr())) {
             goto err
         }
@@ -492,8 +492,8 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
     args.add("./test_output/dynamic_test")
     args.add(null)
 
-    printf("PWD: %s\n", CurrentWorkingPath())
-    printf("Executing: %s => %s => %s\n", args.get(0), path, this.binaryFilename)
+    //printf("PWD: %s\n", CurrentWorkingPath())
+    //printf("Executing: %s => %s => %s\n", args.get(0), path, this.binaryFilename)
 
     var testProcess = sub::Process{}
     if(testProcess.create(
@@ -502,7 +502,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
         sub::ProcessOption.ENABLE_ASYNC |
         sub::ProcessOption.INHERIT_ENVIRONMENT
     ) < 0) {
-        printf("HERE!!!!!!!!!!!!!!!!!!!!!!\n")
+        //printf("HERE!!!!!!!!!!!!!!!!!!!!!!\n")
         return "failed to spawn test"
     }
     defer testProcess.destroy()
@@ -512,8 +512,8 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
     var buffer = [1024]char{};
     var bytesRead = -1_i64
     while((bytesRead = testProcess.readStdout(buffer, 1024)) > 0) {
-        printf("Bytes read: %d %s\n", bytesRead, buffer)
-        sb.appendStr(buffer)
+        //printf("Bytes read: %d %s\n", bytesRead, buffer)
+        sb.appendStrn(buffer, bytesRead as (i32))
     }
     var result = 0
     testProcess.join(&result)
