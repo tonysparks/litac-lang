@@ -755,7 +755,7 @@ int subprocess_create_ex(const char *const commandLine[], int options,
   }
 
   if(!SetHandleInformation(startInfo.hStdError, handleFlagInherit, handleFlagInherit)) {
-    return -1
+    return -1;
   }
 
   if (!CreateProcessA(
@@ -773,16 +773,16 @@ int subprocess_create_ex(const char *const commandLine[], int options,
     return -1;
   }
 
-  if(!SetHandleInformation(startInfo.hStdInput, handleFlagInherit, 0) {
+  if(!SetHandleInformation(startInfo.hStdInput, handleFlagInherit, 0)) {
     return -1;
   }
 
-  if(!SetHandleInformation(startInfo.hStdOutput, handleFlagInherit, 0) {
+  if(!SetHandleInformation(startInfo.hStdOutput, handleFlagInherit, 0)) {
     return -1;
   }
 
-  if(!SetHandleInformation(startInfo.hStdError, handleFlagInherit, 0) {
-    return -1
+  if(!SetHandleInformation(startInfo.hStdError, handleFlagInherit, 0)) {
+    return -1;
   }
 
   out_process->hProcess = processInfo.hProcess;
