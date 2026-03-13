@@ -323,8 +323,6 @@ func ProcessTestOutput(
         }
     }
 
-    printf("Remaining: '%.*s'\n", sb.length, sb.buffer)
-
     return output
 }
 
