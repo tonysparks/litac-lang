@@ -475,7 +475,7 @@ int subprocess_create_named_pipe_helper(void **rd, void **wr) {
 
   *wr = CreateFileA(name, genericWrite, SUBPROCESS_NULL,
                     SUBPROCESS_PTR_CAST(LPSECURITY_ATTRIBUTES, &saAttr),
-                    openExisting, fileAttributeNormal, SUBPROCESS_NULL);
+                    openExisting, fileAttributeNormal | fileFlagOverlapped, SUBPROCESS_NULL);
 
   if (invalidHandleValue == *wr) {
     return -1;
