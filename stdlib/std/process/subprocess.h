@@ -462,7 +462,7 @@ int subprocess_create_named_pipe_helper(void **rd, void **wr) {
 
   *rd =
       CreateNamedPipeA(name, pipeAccessInbound | fileFlagOverlapped,
-                       pipeTypeByte | pipeWait, 1, 4096, 4096, SUBPROCESS_NULL,
+                       pipeTypeByte | pipeWait, 1, 4096*2, 4096*2, SUBPROCESS_NULL,
                        SUBPROCESS_PTR_CAST(LPSECURITY_ATTRIBUTES, &saAttr));
 
   if (invalidHandleValue == *rd) {
