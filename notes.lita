@@ -479,3 +479,10 @@ func (this: *TypeChecker) resolveMethodName(
 
     return this.lita.strings.internCopy(newBuffer)
 }
+
+// things to work on the plane:
+// 1) doc generation
+// 2) http server for macos/windows
+// 3) SSE support for http server
+// 4) move http server to stdlib
+// 5) allocator rampage with chained expressions

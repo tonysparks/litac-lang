@@ -287,10 +287,17 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
                                         argExpr: *Expr,
                                         paramInfo: *TypeInfo,
                                         suppliedArgs: *Array<CallArg>) : bool {
-    if(!this.resolveExpr(argExpr)) {
-        return false
-    }
 
+    // check if we've already processed this
+    // argument, this can happend with chained
+    // method calls
+    var isMethodArgumentResolved = index == 0 && argExpr.operand.typeInfo != null
+    if(!isMethodArgumentResolved) {
+        if(!this.resolveExpr(argExpr)) {
+            return false
+        }
+    }
+    
     var argInfo = argExpr.operand.typeInfo
 
     if(argInfo.kind == TypeKind.ARRAY) {
