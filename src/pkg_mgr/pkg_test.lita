@@ -84,6 +84,22 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         filesTested += 1
 
         printf("Running '%s'\n", path)
+        var args = StringBuilderInit(256, pm.allocator)
+        defer args.free()
+
+        var testProcess = SystemExec(args.cStr())
+        if(!testProcess.pipe) {
+            printf(
+                "Test %s %sfailed%s unable to launch 'litac' command\n",
+                path,
+                ConsoleColorsAsStr(ConsoleColors.RED),
+                ConsoleColorsAsStr(ConsoleColors.CLEAR)
+            )
+            filesFailed += 1
+            continue
+        }
+        defer testProcess.close()
+    /*
         var args = ArrayInit<*const char>(16, pm.allocator)
         args.add("litac")
         args.add("test")
@@ -115,13 +131,13 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
             continue
         }
         defer testProcess.destroy()
-
+*/
         var testResults = ProcessTestOutput(pm, &testProcess)
         failed += testResults.numberOfFailed
         successful += testResults.numberOfPassed
 
         var result = 0
-        testProcess.join(&result)
+        //testProcess.join(&result)
 
         if(result != 0) {
             printf(
@@ -183,7 +199,7 @@ struct TestOutput {
 
 func ProcessTestOutput(
     pm: *PackageManager,
-    process: *sub::Process
+    process: *Process//sub::Process
 ): TestOutput {
 
     const bufferSize = 1024;
@@ -202,7 +218,8 @@ func ProcessTestOutput(
 
     var doneReading = false
     while(!doneReading) {
-        var len = process.readStdout(buffer, bufferSize as (u32))
+        //var len = process.readStdout(buffer, bufferSize as (u32))
+        var len = process.readOutput(buffer, bufferSize)
         if(len < 1) {
             doneReading = true
         }
