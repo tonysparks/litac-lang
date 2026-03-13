@@ -85,6 +85,12 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
 
         printf("Running '%s'\n", path)
         var args = StringBuilderInit(256, pm.allocator)
+        args.append("litac test -json ")
+        if(options.testsRegex != null) {
+            args.append("-regex")
+            args.append(" %s", options.testsRegex)
+        }
+        args.append("-file \"%s\" -output test_file", path)
         defer args.free()
 
         var testProcess = SystemExec(args.cStr())
