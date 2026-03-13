@@ -482,6 +482,7 @@ err:
 
 
 public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
+/*
     var path: [MAX_PATH]char;
     sb.append("%s/%s", CurrentWorkingPath(), this.binaryFilename)
 
@@ -521,8 +522,8 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
     //     printf("Result: %d\n", result)
     // }
     return sb.cStrConst()
-
-    /*var path: [MAX_PATH]char;
+*/
+    var path: [MAX_PATH]char;
     FilePath(this.binaryFilename, path)
 
     var len = path.length()
@@ -545,7 +546,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
     }
 
     return sb.cStrConst()
-    */
+    
 }
 // TODO: Doesn't work due to bug...
 // @module_init
