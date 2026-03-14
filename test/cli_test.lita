@@ -41,6 +41,10 @@ func RunCliCommand(
     var sb = StringBuilderInit(256)
     defer sb.free()
 
+    if(cwd != null) {
+        sb.append("cd \"%s\" && ", cwd)
+    }
+
     for(var i = 0; i < args.size(); i += 1) {
         var arg = args.get(i)
         if(arg == null) break
