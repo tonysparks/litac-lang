@@ -236,11 +236,17 @@ func testBuildRunCommand() {
     args.add("litac")
     args.add("build")
     args.add("-run")
+    args.add("-verbose")
     args.add(null)
 
     var result = RunCliCommand(&args, projectDir.cStr(), &output)
     if(result != 0) {
-        printf("litac build -run failed (exit code %d):\n%s\n", result, output.cStr())
+        printf(
+            "litac build -run failed (exit code %d):\n%s\n%s\n",
+            result,
+            output.cStr(),
+            projectDir.cStr()
+        )
     }
     assert(result == 0)
     assert(output.contains($"Hello World"))
