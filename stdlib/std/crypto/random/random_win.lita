@@ -19,6 +19,6 @@ func BCryptGenRandom(algo: *void, buf:*void, len:usize, flags: i32) : i32;
 
 public func SecureRandom64() : u64 {
     var result = 0u64;
-    BCryptGenRandom(null, &result, sizeof(result), BCRYPT_USE_SYSTEM_PREFERRED_RNG)
+    BCryptGenRandom(null, (&result) as (*void), sizeof(result), BCRYPT_USE_SYSTEM_PREFERRED_RNG)
     return result
 }
