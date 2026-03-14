@@ -38,6 +38,33 @@ func RunCliCommand(
     cwd: *const char,
     output: *StringBuilder
 ) : i32 {
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+
+    for(var i = 0; i < args.size(); i += 1) {
+        var arg = args.get(i)
+        if(arg == null) break
+        if(i > 0) sb.append(" ")
+
+        sb.append("%s", arg)
+    }
+
+    var process = SystemExec(sb.cStr())
+    defer return process.close()
+
+    const BUFFER_SIZE = 1024
+    var buffer: [BUFFER_SIZE]char;
+    var doneReading = false
+    while(!doneReading) {
+        var len = process.readOutput(buffer, BUFFER_SIZE as (u32))
+        if(len < 1) {
+            doneReading = true
+        }
+        if(len > 0) {
+            output.append("%.*s", len, buffer)
+        }
+    }
+/*
     var process = proc::Process{}
     if(process.create(
         args.elements,
@@ -67,6 +94,7 @@ func RunCliCommand(
     process.join(&result)
 
     return result
+*/
 }
 
 /**
