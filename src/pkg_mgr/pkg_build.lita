@@ -33,11 +33,13 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
         return PkgStatus.ERROR_PARSING_PKG_JSON
     }
 
-    var preBuildCommand = pm.pkg.json.get("pre_build_command")
-    if(preBuildCommand) {
-        var status = pm.build(preBuildCommand, options, RunType.PRE_BUILD)
-        if(status != PkgStatus.OK) {
-            return status
+    if(pm.options.litaOptions.isPreBuildEnabled) {
+        var preBuildCommand = pm.pkg.json.get("pre_build_command")
+        if(preBuildCommand) {
+            var status = pm.build(preBuildCommand, options, RunType.PRE_BUILD)
+            if(status != PkgStatus.OK) {
+                return status
+            }
         }
     }
 
@@ -49,11 +51,13 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
         }
     }
 
-    var postBuildCommand = pm.pkg.json.get("post_build_command")
-    if(postBuildCommand) {
-        var status = pm.build(postBuildCommand, options, RunType.POST_BUILD)
-        if(status != PkgStatus.OK) {
-            return status
+    if(pm.options.litaOptions.isPostBuildEnabled) {
+        var postBuildCommand = pm.pkg.json.get("post_build_command")
+        if(postBuildCommand) {
+            var status = pm.build(postBuildCommand, options, RunType.POST_BUILD)
+            if(status != PkgStatus.OK) {
+                return status
+            }
         }
     }
 
@@ -271,27 +275,6 @@ func (this: *PackageManager) buildCommandArgs(
         if(this.options.litaOptions.run) {
             programArgs.add("-run")
         }
-
-        if(this.options.litaOptions.testsOnly && runType == RunType.BUILD) {
-            /*
-            programArgs.add("-testDir")
-            if(this.options.litaOptions.srcPath.empty()) {
-                programArgs.add("./test/")
-            } else {
-                programArgs.add(this.options.litaOptions.srcPath)
-            }
-
-            if(this.options.litaOptions.testsRegex) {
-                programArgs.add("-test")
-                programArgs.add(this.options.litaOptions.testsRegex)
-            }
-            else {
-                programArgs.add("-testFile")
-            }
-
-            mainFile = "./test/main_test.lita"
-            */
-        }
     }
 
     if(!this.options.litaOptions.inputFile.empty() && runType == RunType.BUILD) {
@@ -306,6 +289,9 @@ func (this: *PackageManager) buildCommandArgs(
 //////
 // for(var i = 0; i < args.n; i+=1) {
 //     printf("Arg: %d %s\n", i, args.args[i])
+// }
+// for(var i = 0; i < this.options.litaOptions.nargs; i+=1) {
+//     printf("PArgs: %d %s\n", i, this.options.litaOptions.args[i])
 // }
 //////
 

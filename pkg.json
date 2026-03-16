@@ -9,6 +9,26 @@
         "libssl-1_1-x64.dll",
     ],
     "dependencies": [],
+    "pre_build_command": {
+        "default": {
+            "default": {
+                "default": {
+                    "cc": "clang",
+                    "cc_options": [
+                        "-std=gnu11",
+                        "-g",
+                        "%input%",
+                        "-o",
+                        "%output%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
+                        "-run"
+                    ]
+                }
+            }
+        }
+    },
     "build_command": {
         "debug": {
             "mac": {
@@ -24,9 +44,7 @@
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
-                        //"-debug",
                         "-cFormat",
-                        //"-disableLine",
                         "-verbose",
                         "-maxMemory",
                         "1GiB",

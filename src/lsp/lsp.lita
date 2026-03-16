@@ -15,12 +15,12 @@ import "std/array"
 
 import "lita"
 import "phase_result"
+import "version"
 
 import "lsp/workspace"
 import "lsp/protocol"
 
 const IN_BUFFER_SIZE = 1024 * 1024 * 2
-const VERSION = "0.12" // TODO: read from a file at compile time; share with lita.main
 
 public struct LspServer {
     requestAllocator: BucketAllocator
@@ -96,7 +96,7 @@ public func (this: *LspServer) free() {
 
 
 public func (this: *LspServer) start() {
-    this.log("starting Lita Language Server v%s\n", VERSION)
+    this.log("starting Lita Language Server v%s\n", LITAC_VERSION)
     defer this.log("terminating Lita Language Server\n")
 
     this.isRunning = true
