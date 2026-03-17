@@ -1,0 +1,279 @@
+import "std/time"
+import "std/assert"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/libc"
+
+@test
+func testDateTime() {
+    var now = Now()
+    var dateTime = now.toDateTime()
+
+    var sb = StringBuilderInit(1024)
+    dateTime.isoFormat(sb)
+    //printf("DateTime: %.*s\n", sb.length, sb.buffer)
+    //printf("Now: %lld\n", now)
+    //printf("Converted: %lld\n", dateTime.toEpochTime())
+
+    assert(dateTime.toEpochTime() == now)
+
+    var result = DateTimeFromIso(
+        sb.toString()
+    )
+    assert(result.toEpochTime() == dateTime.toEpochTime())
+    assert(result.compare(dateTime) == 0)
+    result.day += 2_u8
+    assert(result.compare(dateTime) > 0)
+
+    var birthday = DateTimeFromIso(
+        "1967-02-20T13:23:22".toString()
+    )
+    assert(birthday.year == 1967)
+    assert(birthday.month == 2)
+    assert(birthday.day == 20)
+    assert(birthday.hour == 13)
+    assert(birthday.min == 23)
+    assert(birthday.sec == 22)
+}
+
+@test
+func testNowIsPositive() {
+    var now = Now()
+    assert(now > 0i64)
+}
+
+@test
+func testNowAdvances() {
+    var a = Now()
+    var b = Now()
+    assert(b >= a)
+}
+
+@test
+func testDateTimeNowHasValidFields() {
+    var dt = DateTimeNow()
+    assert(dt.year >= 2024)
+    assert(dt.month >= 1_u8)
+    assert(dt.month <= 12_u8)
+    assert(dt.day >= 1_u8)
+    assert(dt.day <= 31_u8)
+    assert(dt.hour <= 23_u8)
+    assert(dt.min <= 59_u8)
+    assert(dt.sec <= 60_u8) // 60 for leap seconds
+}
+
+@test
+func testEpochRoundTrip() {
+    var now = Now()
+    var dt = now.toDateTime()
+    assert(dt.toEpochTime() == now)
+}
+
+@test
+func testToDateTimeKnownEpoch() {
+    // Unix epoch: 0 -> 1970-01-01T00:00:00
+    var dt = (0i64).toDateTime()
+    assert(dt.year == 1970)
+    assert(dt.month == 1_u8)
+    assert(dt.day == 1_u8)
+    assert(dt.hour == 0_u8)
+    assert(dt.min == 0_u8)
+    assert(dt.sec == 0_u8)
+}
+
+@test
+func testToDateTimeKnownDate() {
+    // 2024-03-15T12:30:45 UTC -> 1710505845
+    var epoch = 1710505845i64
+    var dt = epoch.toDateTime()
+    assert(dt.year == 2024)
+    assert(dt.month == 3_u8)
+    assert(dt.day == 15_u8)
+    assert(dt.hour == 12_u8)
+    assert(dt.min == 30_u8)
+    assert(dt.sec == 45_u8)
+}
+
+@test
+func testToEpochTimeKnownDate() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 3_u8, .day = 15_u8 },
+        .time = Time { .hour = 12_u8, .min = 30_u8, .sec = 45_u8 },
+    }
+    assert(dt.toEpochTime() == 1710505845i64)
+}
+
+@test
+func testIsoFormatRoundTrip() {
+    var now = Now()
+    var dt = now.toDateTime()
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    var status = dt.isoFormat(sb)
+    assert(status == DateTimeStatus.OK)
+    assert(sb.length > 0)
+
+    var parsed = DateTimeFromIso(sb.toString())
+    assert(parsed.toEpochTime() == now)
+}
+
+@test
+func testDateTimeFromIsoKnown() {
+    var dt = DateTimeFromIso("1967-02-20T13:23:22".toString())
+    assert(dt.year == 1967)
+    assert(dt.month == 2_u8)
+    assert(dt.day == 20_u8)
+    assert(dt.hour == 13_u8)
+    assert(dt.min == 23_u8)
+    assert(dt.sec == 22_u8)
+}
+
+@test
+func testDateTimeFormat() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 6_u8, .day = 1_u8 },
+        .time = Time { .hour = 9_u8, .min = 5_u8, .sec = 3_u8 },
+    }
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    var status = dt.format("%Y-%m-%d".toString(), sb)
+    assert(status == DateTimeStatus.OK)
+
+    var result = sb.toString()
+    assert(result.length == 10)
+    assert(result.buffer[0] == '2')
+    assert(result.buffer[1] == '0')
+    assert(result.buffer[2] == '2')
+    assert(result.buffer[3] == '4')
+}
+
+@test
+func testAddSeconds() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 1_u8, .day = 1_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var later = dt.add(90, TimeUnit.SECONDS)
+    assert(later.min == 1_u8)
+    assert(later.sec == 30_u8)
+}
+
+@test
+func testAddMinutes() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 1_u8, .day = 1_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var later = dt.add(90, TimeUnit.MINUTES)
+    assert(later.hour == 1_u8)
+    assert(later.min == 30_u8)
+}
+
+@test
+func testAddHours() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 1_u8, .day = 1_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var later = dt.add(25, TimeUnit.HOURS)
+    assert(later.day == 2_u8)
+    assert(later.hour == 1_u8)
+}
+
+@test
+func testAddDays() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 1_u8, .day = 30_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var later = dt.add(3, TimeUnit.DAYS)
+    assert(later.month == 2_u8)
+    assert(later.day == 2_u8)
+}
+
+@test
+func testAddMonths() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 11_u8, .day = 15_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var later = dt.add(3, TimeUnit.MONTHS)
+    assert(later.year == 2025)
+    assert(later.month == 2_u8)
+}
+
+@test
+func testAddYears() {
+    var dt = DateTime {
+        .date = Date { .year = 2020, .month = 2_u8, .day = 29_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var later = dt.add(4, TimeUnit.YEARS)
+    assert(later.year == 2024)
+    assert(later.month == 2_u8)
+    assert(later.day == 29_u8)
+}
+
+@test
+func testMinusDays() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 3_u8, .day = 1_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var earlier = dt.minus(1, TimeUnit.DAYS)
+    assert(earlier.month == 2_u8)
+    assert(earlier.day == 29_u8) // 2024 is a leap year
+}
+
+@test
+func testCompareEqual() {
+    var dt = DateTimeFromIso("2024-06-15T10:00:00".toString())
+    var dt2 = DateTimeFromIso("2024-06-15T10:00:00".toString())
+    assert(dt.compare(&dt2) == 0)
+}
+
+@test
+func testCompareLess() {
+    var earlier = DateTimeFromIso("2024-01-01T00:00:00".toString())
+    var later   = DateTimeFromIso("2024-12-31T23:59:59".toString())
+    assert(earlier.compare(&later) < 0)
+}
+
+@test
+func testCompareGreater() {
+    var earlier = DateTimeFromIso("2024-01-01T00:00:00".toString())
+    var later   = DateTimeFromIso("2024-12-31T23:59:59".toString())
+    assert(later.compare(&earlier) > 0)
+}
+
+@test
+func testAddMilliseconds() {
+    var dt = DateTime {
+        .date = Date { .year = 2024, .month = 1_u8, .day = 1_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+    var later = dt.add(2000, TimeUnit.MILLISECONDS)
+    assert(later.sec == 2_u8)
+}
+
+@test
+func testDateTimeFromIsoAndBack() {
+    var iso = "2000-12-31T23:59:58".toString()
+    var dt = DateTimeFromIso(iso)
+
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+
+    dt.isoFormat(sb)
+    var result = sb.toString()
+
+    assert(result.length == iso.length)
+    assert(result.buffer[0]  == '2')
+    assert(result.buffer[5]  == '1')
+    assert(result.buffer[8]  == '3')
+}
