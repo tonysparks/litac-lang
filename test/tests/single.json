@@ -17,11 +17,8 @@
         {
             "name" : "Implement post else",
             "definitions": `
-import "std/libc"
             `,
             "code": `
-            printf("Hello World")/*
-            //assert(false)
                 var this = 4 ?: this = 10;
                 assert(this == 10)
 
@@ -48,7 +45,7 @@ import "std/libc"
                 var xx = 23 + 2 / 3 ?: {
                     count += 1
                 }
-                assert(count == 3)*/
+                assert(count == 3)
             `,
             "output" :"Hello World"
         },
