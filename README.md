@@ -622,13 +622,23 @@ func testAdd2() {
 
 ```
 
-If you include the following command line option to the litaC compiler, this will run all the tests.
+Run tests with the `litac test` command. It recursively scans for `*_test.lita` files under `./test` and runs each one:
 
 ```
-litac -test ".*" ...
+litac test
 ```
 
-If you only want to run a subset of unit tests, you can define a Regular Expression to pick up the test names you want to run.  It is recommended to name your tests with a prefix standard (such as `appName.module.testName`, which would allow you to run full application tests via `appName.*` or module specific tests via `appName.module.*`).
+To run a single test file:
+
+```
+litac test -file ./test/mymodule_test.lita
+```
+
+To filter by regex:
+
+```
+litac test -regex "testAdd.*"
+```
 
 
 # Building
@@ -684,70 +694,271 @@ Once you have built the `litac` executable (which will be located in the `/bin` 
 litac -help
 ```
 
-Which will print out the command line help contents.
+The CLI uses a **command-based** structure:
 
 ```
-usage> litac [options] [source file to compile]
-OPTIONS:
-  -languageServer      Start the LitaC language server
-  -lib <arg>           The LitaC library path
-  -cPrefix <arg>       The symbol prefix to use on the generated C code output
-  -run                 Runs the program after a successful compile
-  -checkerOnly         Only runs the type checker, does not compile
-  -cOnly               Only creates the C output file, does not compile the generated C code
-  -profile             Reports profile metrics of the compiler
-  -disableLine         Disables #line directive in C output
-  -debug               Enables debug mode
-  -verbose             Enables verbose output
-  -srcDir              Specifies the source code directory, defaults to the parent folder of the supplied source file
-  -doc                 Generates document output
-  -docDir <arg>        Directory where the generated documents are written to; defaults to './output'
-  -docAll              Includes non-public types in the documentation generation; defaults to false
-  -o, -output <arg>    The name of the compiled binary
-  -outpuDir <arg>      The directory in which the C output files are stored
-  -v, -version         Displays the LitaC version
-  -h, -help            Displays this help
-  -t, -types <arg>     Includes TypeInfo for reflection
-                       <arg> can be:
-                         all         Means all types will have reflection values
-                         tagged      Means only basic types and types annoted with @typeinfo will have reflection values
-  -test <arg>          Runs functions annotated with @test.  <arg> is a regex of which tests should be run
-  -testFile            Runs functions annotated with @test in the supplied source file only
-  -pkg-install         Scans for a pkg.json file and downloads and installs LitaC packages defined in the `dependencies` section.
-                       If successful, creates a build.json which is used for building this LitaC project.
-  -proxy               Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443
-  -buildCmd            The underlying C compiler build and compile command.  Variables will
-                       be substituted if found:
-                          %output%         The executable name
-                          %input%          The C file(s) generated
+usage> litac [command] [options]
 ```
 
-Here is an example command line options:
+## Commands
+
+### `build` — Compile a LitaC project
 
 ```
-set LITAC_PATH=C:\Users\antho\git\litac-lang\stdlib
-litac -run -lib "%LITAC_PATH%" -buildCmd "clang.exe -o %%output%% %%input%% -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib -lraylib.lib" -outputDir "./bin" -output "mini" "./src/main.lita"
+litac build [source file] [options]
 ```
 
-This example, builds an executable named `mini` from the `./src/main.lita` source file.  It will run the executable after it compiles (only if there are no errors).  It uses clang to compile the generated C code.   This also specifies where the litac standard library exists (which is the `stdlib` folder in the litac project source.
+The behaviour differs depending on whether a `pkg.json` exists in the current directory.
 
-Environment Variable
-==
+#### Without `pkg.json` — direct compilation
 
-
-The LitaC compiler will also look at the `LITAC_HOME` environment variable to search for the standard library files if the `-lib` is not set.  When setting the `LITAC_HOME` environment variable, there is no need to set the `-lib` command line option, the `LITAC_HOME` variable should be set to the parent directory of the `lib` folder of the `litac` git project.
-
-Ex.
+Supply a source file and all options on the command line. The compiler is invoked directly with no project configuration:
 
 ```
-LITAC_HOME=/home/tony/projects/litac
+litac build ./src/main.lita -output "mini" -outputDir "./bin" \
+  -buildCmd "clang -o %output% %input% -I../include -L../lib -lraylib"
+```
+
+If no source file and no `pkg.json` are found, the build fails with an error directing you to either supply a `.lita` file or create a `pkg.json` via `litac init`.
+
+#### With `pkg.json` — package build
+
+When a `pkg.json` is present, `litac build` reads the `build_command` section from it. All options defined there act as defaults; any flags passed on the command line take precedence.
+
+The `build_command` section supports per-target, per-OS and per-architecture configuration:
+
+```json
+{
+  "name": "myapp",
+  "build_command": {
+    "debug": {
+      "linux": {
+        "x64": {
+          "cc": "clang",
+          "cc_options": "-g -O0 -D_CRT_SECURE_NO_WARNINGS -L./lib -lm",
+          "lita_options": ["-debug"]
+        },
+        "default": {
+          "cc": "clang",
+          "cc_options": "-g -O0"
+        }
+      },
+      "windows": {
+        "default": {
+          "cc": "clang",
+          "cc_options": "-g -O0 -D_CRT_SECURE_NO_WARNINGS"
+        }
+      },
+      "default": {
+        "default": {
+          "cc": "clang",
+          "cc_options": "-g -O0"
+        }
+      }
+    },
+    "release": {
+      "default": {
+        "default": {
+          "cc": "clang",
+          "cc_options": "-O2"
+        }
+      }
+    }
+  }
+}
+```
+
+Resolution order (most specific wins, falls back to `default` at each level):
+1. **Target**: `debug` (default) or `release` (when `-release` is passed)
+2. **OS**: `linux`, `mac`, `windows`, or `default`
+3. **Arch**: `x64`, `x86`, `arm64`, `arm32`, or `default`
+
+Each leaf section may contain:
+
+| Field | Description |
+|-------|-------------|
+| `cc` | C compiler executable (default: `clang`) |
+| `cc_options` | Flags passed to the C compiler. Can be a string or array of strings |
+| `lita_options` | Extra LitaC compiler flags. Can be a string or array of strings |
+| `script` | Shell script to run instead of the standard build pipeline |
+
+When using `pkg.json`, the following defaults are applied automatically unless overridden:
+
+| Setting | Default |
+|---------|---------|
+| `-outputDir` | `./bin/` |
+| `-output` | value of `name` in `pkg.json` |
+| `-srcDir` | `./src/` |
+| Main entry point | `./src/main.lita` |
+
+**Pre/post build steps** can be defined in `pkg.json` as `pre_build_command` and `post_build_command`, using the same structure as `build_command`. They are only run when `-prebuild` / `-postbuild` flags are passed, and use `./src/pre_main.lita` / `./src/post_main.lita` as their entry points respectively.
+
+#### Build options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `-run` | | Runs the program after a successful compile |
+| `-lib <arg>` | | The LitaC library path |
+| `-output <arg>` | `-o` | The name of the compiled binary |
+| `-outputDir <arg>` | | The directory in which the C output files are stored |
+| `-srcDir <arg>` | | Specifies the source code directory (defaults to parent folder of source file) |
+| `-buildCmd <arg>` | `-b` | The underlying C compiler command. Substitution variables: `%output%` (executable name), `%input%` (generated C files), `%options%` (`@compiler_option` flags when `-strict` is set) |
+| `-strict` | | Prevents the compiler from modifying `buildCmd`; stores generated `@compiler_option` flags in `%options%` instead |
+| `-tcc` | | Use tcc to compile (ignores `-buildCmd`) |
+| `-types <arg>` | `-t` | Include TypeInfo for reflection. `all` = all types, `tagged` = only types annotated with `@typeinfo` |
+| `-debug` | | Enables debug mode |
+| `-release` | | Selects the `release` build target in `pkg.json`; marks the build as a release build |
+| `-checkerOnly` | | Only runs the type checker, does not compile |
+| `-cOnly` | | Only generates the C output file, does not compile it |
+| `-cFormat` | | Formats the C output |
+| `-cPrefix <arg>` | | Symbol prefix to use in generated C code (default: `litaC_`) |
+| `-profile` | | Reports profile metrics of the compiler |
+| `-instrument` | | Enables profiling instrumentation for `@profile`-annotated functions |
+| `-disableLine` | | Disables `#line` directives in C output |
+| `-prebuild` | | Enables the prebuild step (runs `pre_build_command` from `pkg.json`) |
+| `-postbuild` | | Enables the postbuild step (runs `post_build_command` from `pkg.json`) |
+
+---
+
+### `test` — Run tests
+
+Recursively scans for `*_test.lita` files and runs each one. Optionally pass a directory to scan (default: current directory).
+
+```
+litac test [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-file <arg>` | Run `@test`-annotated functions in a single source file only |
+| `-package <arg>` | Run `@test`-annotated functions in a single package only |
+| `-regex <arg>` | Filter tests by regex (can be combined with `-file` or `-package`) |
+| `-testDir <arg>` | Specifies the test source directory (default: `./test`) |
+
+The `test` command also accepts all `build` options (`-lib`, `-buildCmd`, `-debug`, `-release`, `-output`, `-outputDir`, `-types`, `-profile`, `-disableLine`, `-instrument`, `-srcDir`, `-tcc`, `-strict`, `-prebuild`, `-postbuild`).
+
+Examples:
+
+```
+# run all tests discovered - anything ending in '_test.lita'
+litac test
+
+# run a single test file
+litac test -file ./test/stdlib/std/time_test.lita
+
+# run tests discovered in a specific folder
+litac test -package "./tests/integratiion"
+
+# run tests only matching the supplied regular expression - this
+# can be used with -file and -package options
+litac test -regex "testDate.*"
+
+# Use the '-testDir' option to specify an additional
+# search path to include to search for tests
+litac test -testDir ./tests/integration
+```
+
+---
+
+### `install` — Install packages
+
+Scans for a `pkg.json` file and downloads/installs all packages listed in the `dependencies` section. Creates a `.build.json` used for subsequent builds.
+
+```
+litac install [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-force` | Forces a full clean reinstall of all packages |
+
+---
+
+### `init <name>` — Initialise a new project
+
+Creates a new LitaC project scaffold in the current directory.
+
+```
+litac init <project-name>
+```
+
+Creates:
+```
+.vscode/tasks.json
+bin/
+doc/
+lib/
+src/main.lita
+test/main_test.lita
+pkg.json
+```
+
+---
+
+### `command <name>` — Run a pkg.json script
+
+Runs a script defined in the `commands` section of `pkg.json`.
+
+```
+litac command <script-name>
+```
+
+---
+
+### `doc` — Generate documentation
+
+Generates documentation output. *(Not yet fully implemented.)*
+
+```
+litac doc [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-docDir <arg>` | Output directory for generated docs (default: `./output`) |
+| `-all` | Include non-public types in the generated documentation |
+
+---
+
+### `lsp` — Language server
+
+Starts the LitaC language server (for IDE integrations).
+
+```
+litac lsp
+```
+
+---
+
+## Global Options
+
+These options apply to all commands:
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `-version` | `-v` | Displays the LitaC version |
+| `-help` | `-h` | Displays help |
+| `-verbose` | | Enables verbose output |
+| `-colors` | | Disables console colour output |
+| `-proxy <arg>` | | Proxy server for network calls. Ex: `-proxy https://proxy.com:443` |
+| `-maxMemory <arg>` | | Max memory for allocation (e.g. `300MB`, `1GB`). Temporary option |
+| `--` | | Any arguments after `--` are forwarded to the compiled program when `-run` is used |
+
+---
+
+## Environment Variable
+
+The LitaC compiler looks for the `LITAC_HOME` environment variable to locate the standard library when `-lib` is not set. Set it to the parent directory of the `stdlib` folder in the litac repo.
+
+```
+LITAC_HOME=/home/tony/projects/litac-lang
 ```
 
 # LitaC Package Manager
 
-A LitaC `package` is a bundle of LitaC modules and any other dependencies (such as DLL's, static libraries or C header files).
+A LitaC `package` is a bundle of LitaC modules and any other dependencies (such as DLLs, static libraries or C header files).
 
-The `litac` executable contains a command (`-pkg-install`) for downloading third party packages.  As of right now, only packages hosted on `github.com` are supported.  Packages are defined and can be referenced by creating a `pkg.json` file in your project folder.
+Packages are managed via the `litac install` and `litac init` commands. Only packages hosted on `github.com` are currently supported. Packages are defined by creating a `pkg.json` file in your project folder.
 
 Example project structure:
 
@@ -778,9 +989,9 @@ Here is an example `pkg.json` for using a third-party [test-pkg](https://github.
 }
 ```
 
-If you execute the command `litac -pkg-install` this will download any defined packages in the `dependencies` section of your `pkg.json` and extract them to the `.pkgs/` directory.  It will also create a `.build.json` file which will be used by the `litac` compiler to resolve package module files.
+If you execute the command `litac install` this will download any defined packages in the `dependencies` section of your `pkg.json` and extract them to the `.pkgs/` directory.  It will also create a `.build.json` file which will be used by the `litac` compiler to resolve package module files.
 
-After executing `litac -pkg-install`:
+After executing `litac install`:
 ```
 .pkgs/
 bin/
