@@ -383,7 +383,7 @@ recurse:
 			continue;
 
 		case 'Z':
-#if defined(_WIN32) || defined(_WIN64)
+#if !defined(_WIN32) && !defined(_WIN64)
 			tzset();
 			if (strncasecmp((const char *)bp, gmt, 3) == 0
           || strncasecmp((const char *)bp, utc, 3) == 0) {
