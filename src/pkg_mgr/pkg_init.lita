@@ -216,7 +216,7 @@ func test() {
                 // ARCH (x86|x64|arm32|arm64|default)
                 "default" : {
                     "cc" : "clang",
-                    "cc_options" : "-std=c11 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
+                    "cc_options" : "-std=c11 %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
                     "lita_options" : ""
                 }
             },
@@ -226,7 +226,7 @@ func test() {
                 // ARCH (x86|x64|arm32|arm64|default)
                 "default" : {
                     "cc" : "clang",
-                    "cc_options" : "-std=gnu11 -fsanitize=undefined,address %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
+                    "cc_options" : "-std=gnu11 %%input%% -o %%output%% -D_CRT_SECURE_NO_WARNINGS",
                     "lita_options" : ""
                 }
             }

@@ -382,6 +382,7 @@ recurse:
 			continue;
 
 		case 'Z':
+#if 0		
 			tzset();
 			if (strncasecmp((const char *)bp, gmt, 3) == 0
           || strncasecmp((const char *)bp, utc, 3) == 0) {
@@ -408,6 +409,7 @@ recurse:
 				}
 				bp = ep;
 			}
+#endif				
 			continue;
 
 		case 'z':
