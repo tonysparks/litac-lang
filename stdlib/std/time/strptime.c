@@ -97,12 +97,15 @@ static const u_char *find_string(const u_char *, int *, const char * const *,
 
 
 #if defined(_WIN32) || defined(_WIN64)
-static int
-strncasecmp(const char *a, const char *b, size_t c)
-{
-    return _strnicmp(a, b, c);
-}
+	#ifndef strncasecmp
+	#define strncasecmp(a, b, n)  _strnicmp((a), (b), (n))
+	#endif
 #endif
+// static int
+// strncasecmp(const char *a, const char *b, size_t c)
+// {
+//     return _strnicmp(a, b, c);
+// }
 
 
 char *
