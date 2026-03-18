@@ -148,13 +148,24 @@ public func DateTimeFromIso(value: String) : DateTime {
 }
 
 @raw("""
+#if defined(_WIN32) || defined(_WIN64)
+    /* Windows CRT: _mkgmtime is the UTC tm->epoch equivalent of timegm */
+    #define timegm _mkgmtime
+#elif defined(__linux__)
+    /* timegm is a GNU extension; must be defined before including <time.h> */
+    #ifndef _GNU_SOURCE
+        #define _GNU_SOURCE
+    #endif
+#elif defined(__APPLE__) && defined(__MACH__)
+    /* timegm is a Darwin/BSD extension */
+    #ifndef _DARWIN_C_SOURCE
+        #define _DARWIN_C_SOURCE
+    #endif
+#endif
+
 #include <time.h>
 
 typedef struct tm tm_time;
-
-#if defined(_WIN32) || defined(_WIN64)
-    #define timegm _mkgmtime
-#endif
 """);
 
 @cFile("strptime.c");
