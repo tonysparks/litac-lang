@@ -192,86 +192,31 @@ public @note packed {
 
 
 /**
-    Compiler script to inject module init and destroy functions; these
-    function must be public in order for them to be accessible to the
-    main function
+    Compiler script to inject module init and destroy functions and wire
+    them around the program entry point (real main or generated test main).
 
-    Example:
-    @module_init
-    public func moduleInitialize() {
+    Functions annotated with @module_init / @module_destroy must be public.
 
-    }
+    Two internal wrapper functions are generated as top-level declarations
+    so they go through the full type-check pipeline:
 
-    @module_destroy
-    public func moduleInitialize() {
+        func __litaModuleInit()    -- calls every @module_init function
+        func __litaModuleDestroy() -- calls every @module_destroy function
 
-    }
+    A thin wrapper entry point is then generated:
 
-    Will modify the main function to:
+        func __litaWrapperMain(len: i32, args: **char) : i32 {
+            __litaModuleInit()
+            defer __litaModuleDestroy()
+            return <realMain | __LitaTestMain>(len, args)
+        }
 
-    func main(argc:i32, args:**char) : i32 {
-        moduleInitialize()
-        defer moduleDestroy()
-        // main code
-    }
+    mainEntry is redirected to __litaWrapperMain so cgen picks it up
+    unchanged.  When there are no @module_init / @module_destroy functions
+    the wrapper is skipped entirely.
 */
-#precheck
-    fn InjectModuleInitializers() {
-        var mainSym = getMainSymbol()
-        if(!mainSym) {
-            println("No main entry symbol found.  Unable to inject module initializers")
-            return;
-        }
-
-        for(sym in getSymbolsByNote("module_destroy")) {
-            if(sym.kind == "FUNC_DECL" && sym.isPublic) {
-                var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
-                if(alias) {
-                    emitClear()
-                    emit("defer %s::%s()", alias, sym.name)
-                    astInsert(mainSym.declPtr, emitStr(), 0)
-                }
-                else {
-                    emitClear()
-                    emit("defer %s()", sym.name)
-                    astInsert(mainSym.declPtr, emitStr(), 0)
-                }
-            }
-        }
-        for(sym in getSymbolsByNote("module_init")) {
-            if(sym.kind == "FUNC_DECL" && sym.isPublic) {
-                var alias = addImport(mainSym.moduleFilename, sym.moduleFilename)
-                if(alias) {
-                    emitClear()
-                    emit("%s::%s()", alias, sym.name)
-                    astInsert(mainSym.declPtr, emitStr(), 0)
-                }
-                else {
-                    emitClear()
-                    emit("%s()", sym.name)
-                    astInsert(mainSym.declPtr, emitStr(), 0)
-                }
-            }
-        }
-    }
-
-    if(!TESTING) {
-        InjectModuleInitializers()
-    }
-#end
-
-
-/**
-    Create a test main if we are in testing mode
-
-    This will replace the current 'main' entry point of the program with a new
-    function '__LitaTestMain()' which will call each @test method that either
-    matches the options.testsRegex or options.testFileOnly options
-
-*/
-//#precheck
 #postcheck
-    fn CreateTests() {
+    fn CreateTests(moduleName) {
         fn isDisabled(sym) {
             if(sym.notes) {
                 for(note in sym.notes) {
@@ -287,17 +232,13 @@ public @note packed {
             return false
         }
 
-        var moduleName = getInputModuleFilename()
-
         emitClear()
         var testFunctionName = "__LitaTestMain"
 
-        //addImportByName(moduleName, "std/test")
         emit("@foreign(\"printf\") func __lita_test_printf(format: *const char, ...);\n")
-        emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)        
+        emit("func %s(len: i32, args: **char) : i32 {\n", testFunctionName)
         emit("   testSuite.init(); defer testSuite.free(); \n")
         emit("   var isJsonFormated = %d; \n", IS_JSON_FORMAT)
-        //emit("   var isJsonFormated = false; \n")
 
         var i = 0
         for(sym in getSymbolsToTest("test")) {
@@ -305,7 +246,7 @@ public @note packed {
             var disabled = isDisabled(sym)
             if(disabled) {
                 emit("    __testCase%d.isDisabled = true\n", i)
-            }            
+            }
             emit("   if(setjmp(testSuite.env) == 0) {\n")
             if(!disabled) {
                 var alias = addImport(moduleName, sym.moduleFilename)
@@ -334,21 +275,93 @@ public @note packed {
 
         addDeclaration(moduleName, emitStr())
         flushDeclarations()
-
         setMainSymbol(moduleName, testFunctionName)
-
-        // TODO: This doesn't work because the
-        // injected in code is not resolved and errors
-        // out in codegen
-
-        //println("HERE!!")
-        //InjectModuleInitializers()
-        //println("HERE??")
-
     }
 
-    // if we are testing only, create a new main entry point
+    fn GenerateWrapperMain(moduleName, hasInit, hasDestroy) {
+        var innerSym = getMainSymbol()
+        if(!innerSym) {
+            println("No main entry symbol found.  Unable to inject module initializers")
+            return;
+        }
+
+        emitClear()
+        emit("func __litaWrapperMain(len: i32, args: **char) : i32 {\n")
+        if(hasInit) {
+            emit("    __litaModuleInit()\n")
+        }
+        if(hasDestroy) {
+            emit("    defer __litaModuleDestroy()\n")
+        }
+        var alias = addImport(moduleName, innerSym.moduleFilename)
+        if(alias) {
+            emit("    return %s::%s(len, args)\n", alias, innerSym.name)
+        } else {
+            emit("    return %s(len, args)\n", innerSym.name)
+        }
+        emit("}\n")
+
+        addDeclaration(moduleName, emitStr())
+        flushDeclarations()
+        setMainSymbol(moduleName, "__litaWrapperMain")
+    }
+
+    var moduleName = getInputModuleFilename()
+
+    // Step 1: generate __LitaTestMain and redirect mainEntry to it
     if(TESTING) {
-        CreateTests()
+        CreateTests(moduleName)
+    }
+
+    // Step 2: generate __litaModuleInit wrapping all @module_init functions
+    var hasInit = false
+    emitClear()
+    emit("func __litaModuleInit() {\n")
+    for(sym in getSymbolsByNote("module_init")) {
+        if(sym.kind == "FUNC_DECL" && sym.isPublic) {
+            hasInit = true
+            var alias = addImport(moduleName, sym.moduleFilename)
+            if(alias) {
+                emit("    %s::%s()\n", alias, sym.name)
+            } else {
+                emit("    %s()\n", sym.name)
+            }
+        }
+    }
+    emit("}\n")
+    if(hasInit) {
+        addDeclaration(moduleName, emitStr())
+    }
+
+    // Step 3: generate __litaModuleDestroy wrapping all @module_destroy functions
+    var hasDestroy = false
+    emitClear()
+    emit("func __litaModuleDestroy() {\n")
+    for(sym in getSymbolsByNote("module_destroy")) {
+        if(sym.kind == "FUNC_DECL" && sym.isPublic) {
+            hasDestroy = true
+            var alias = addImport(moduleName, sym.moduleFilename)
+            if(alias) {
+                emit("    %s::%s()\n", alias, sym.name)
+            } else {
+                emit("    %s()\n", sym.name)
+            }
+        }
+    }
+    emit("}\n")
+    if(hasDestroy) {
+        addDeclaration(moduleName, emitStr())
+    }
+
+    // Step 4: flush lifecycle declarations so they are fully resolved
+    //         before the wrapper references them
+    if(hasInit || hasDestroy) {
+        flushDeclarations()
+    }
+
+    // Step 5: generate __litaWrapperMain that sandwiches the entry point
+    //         between lifecycle calls; skip if there is nothing to inject
+    if(hasInit || hasDestroy) {
+        GenerateWrapperMain(moduleName, hasInit, hasDestroy)
     }
 #end

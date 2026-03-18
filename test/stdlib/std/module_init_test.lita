@@ -1,0 +1,32 @@
+import "std/assert"
+
+// Regression test: @module_init and @module_destroy must run correctly
+// when the test harness is active (i.e. mainEntry == __LitaTestMain).
+//
+// Previously, InjectModuleInitializers was skipped entirely when TESTING,
+// so the lifecycle functions were never called during test runs.
+
+var initCallCount  = 0
+var destroyCallCount = 0
+
+@module_init
+public func testModuleInit() {
+    initCallCount += 1
+}
+
+@module_destroy
+public func testModuleDestroy() {
+    destroyCallCount += 1
+}
+
+@test
+func testModuleInitWasCalled() {
+    assert(initCallCount == 1)
+}
+
+@test
+func testModuleDestroyNotYetCalled() {
+    // destroy runs via defer after the whole test main returns,
+    // so it should still be 0 during any individual test
+    assert(destroyCallCount == 0)
+}

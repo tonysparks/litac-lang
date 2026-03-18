@@ -176,6 +176,7 @@ func RunTestSuite(singleOnly: bool) {
 
             func main(len:i32, args:**char):i32 {
                 %code%
+                return 0;
             }
             """
         }
@@ -546,7 +547,7 @@ public func (this: *Lita) runCaptureOutput(sb: *StringBuilder) : *const char {
     }
 
     return sb.cStrConst()
-    
+
 }
 // TODO: Doesn't work due to bug...
 // @module_init
