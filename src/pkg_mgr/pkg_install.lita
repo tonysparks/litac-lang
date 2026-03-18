@@ -41,9 +41,12 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
     if(options.fullSync) {
         var temp:[MAX_PATH]char;
         var pkgPath = StringBufferInit(temp, MAX_PATH, 0)
-        pkgPath.format("%s/%s", CurrentWorkingPath(), pm.options.pkgDir)
+        pkgPath.format("%s/%s", pm.options.projectPath, pm.options.pkgDir)
 
-        printf("Cleaning directory: '%s'\n", pkgPath.cStr())
+        if(pm.isVerbose()) {
+            printf("Cleaning directory: '%s'\n", pkgPath.cStr())
+        }
+
         var status = cleanPackageDirectory(pm, pkgPath.cStr())
         if(status != PkgStatus.OK) {
             return status
@@ -161,7 +164,7 @@ func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
 
     var buffer = [MAX_PATH]char;
     var packageRoot = StringBufferInit(buffer, MAX_PATH, 0)
-    packageRoot.format("%s/%s", CurrentWorkingPath(), pm.options.pkgDir)
+    packageRoot.format("%s/%s", pm.options.projectPath, pm.options.pkgDir)
 
     // Do not delete files outside of the package root directory
     if(!path.toString().startsWith(packageRoot.toString())) {
@@ -221,8 +224,9 @@ func makePackageDirectory(
     // the ${PWD}/.pkgs directory
     {
         pkgDirectory.format("%s/%s/",
-            CurrentWorkingPath(),
-            pm.options.pkgDir)
+            pm.options.projectPath,
+            pm.options.pkgDir
+        )
 
         Mkdir(pkgDirectory.cStr())
     }

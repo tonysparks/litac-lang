@@ -48,7 +48,9 @@
             "disabled": false,
             "definitions": `
                 @raw("""
+                #ifndef MAX_PATH
                 #define MAX_PATH (260)
+                #endif
                 """);
                 @foreign const MAX_PATH: i32;
                 const SIZE3 = 55

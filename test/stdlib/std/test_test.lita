@@ -1,0 +1,48 @@
+import "std/array"
+import "std/mem"
+import "std/string"
+import "std/string/builder"
+import "std/libc"
+import "std/assert"
+import "std/test"
+
+@test
+func TestTheTest() {
+    AssertCStr("a", "a")
+    AssertCStr("bz", "bz")
+}
+
+@test
+func TestTheTest2() {
+    AssertCStr("a", "a")
+    AssertCStr("b", "b")
+}
+
+
+struct UserData {
+    a: i32
+}
+
+@test
+func dynamicTestSetup() {
+
+    for(var i = 0; i < 10; i+=1) {
+        var userData = new<UserData>()
+        userData.a = 4
+
+        var name = StringBuilderInit(256)
+        name.append("DynamicTest_%d", i)
+        testSuite.addDynamicTest(
+            .name = name.cStr(),
+            .userData = userData,
+            .testFn = MyDynamicTest
+        )
+    }
+}
+
+func MyDynamicTest(testCase: *TestCase, userData: *void) {
+    var data = userData as (*UserData)
+    assert(data.a == 4)
+
+    defaultAllocator.free(data)
+}

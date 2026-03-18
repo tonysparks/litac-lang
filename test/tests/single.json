@@ -10,13 +10,13 @@
 
         func main(len:i32, args:**char):i32 {
             %code%
+            return 0
         }
     `,
     "tests": [
         {
             "name" : "Implement post else",
             "definitions": `
-
             `,
             "code": `
                 var this = 4 ?: this = 10;

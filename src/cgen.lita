@@ -10,6 +10,7 @@ import "std/assert"
 import "std/system"
 import "std/mem"
 import "std/unicode/utf8"
+import "std/ascii"
 
 import "ast"
 import "types"
@@ -2610,16 +2611,34 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
 
             if(expr.string.mod & Mod.MULTISTR) {
                 var str = expr.string.str
+                var startLine = expr.startPos.position
+                var endLine = FindFilePosition(expr.string.pos)
+                var isTrimmed = startLine == endLine && (
+                    str.length > 3 && str.buffer[0] == '\n'
+                )
 
                 this.buf.appendChar('"') // "
                 start = this.buf.length
-                for(var i = 0; i < str.length;) {
+                var currentFilePosition = 0;//startLine + 3
+                var offset = isTrimmed ? 1 : 0
+                for(var i = offset; i < str.length;) {
                     var byte = str.buffer[i] as (u8)
+                    currentFilePosition += 1
 
                     if(byte < 128) {
                         var c:char = byte as (char)
                         var n = str.buffer[i+1] as (u32)
                         var isSeq = (n == 'u' || n == 'U' || n != 'x')
+
+                        if(c == '\n') {
+                            currentFilePosition = 0
+                        }
+                        else if(c.isWhitespace() && currentFilePosition < startLine) {
+                            if(isTrimmed) {
+                                i += 1
+                                continue
+                            }
+                        }
 
                         if(c == '\r') {
                             i += 1
@@ -2774,4 +2793,25 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             assert(false)
         }
     }
+}
+
+func FindFilePosition(pos: SrcPos) : i32 {
+    if(pos.end == null || pos.start == null) {
+        return 0;
+    }
+
+    var end = pos.end
+    end -= 3; // the """
+
+    var position = 0;
+    while(end > pos.start) {
+        var c = *end;
+        if(c == '\n') {
+            return position;
+        }
+
+        position += 1
+        end -= 1
+    }
+    return position;
 }

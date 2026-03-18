@@ -1,0 +1,40 @@
+import "std/libc"
+import "std/io"
+import "std/system"
+import "std/string"
+import "std/string/builder"
+import "std/time"
+
+func main(len: i32, args: **char): i32 {
+    var versionFile = File{}
+    if(versionFile.open("../src/version.lita", FileOpenOp.WRITE) != FileStatus.Ok) {
+        printf("Unable to open 'src/version.lita'\n")
+        return 1;
+    }
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+
+    var version = StringBuilderInit(256)
+    version.append("0.1.9-")
+    defer version.free()
+
+    var now = DateTimeNow()
+    now.format($"%Y-%m-%d", version)
+
+    sb.append(
+"""
+// Auto generated from pre_main.lita
+public const LITAC_VERSION = "%s"
+""", //"
+        version.cStr()
+    )
+
+    printf("Creating litac version: %s\n", version.cStr())
+
+    if(versionFile.writeBytes(sb.cStr(), sb.length) != FileStatus.Ok) {
+        printf("Unable to write to 'src/version.lita'\n")
+        return 2;
+    }
+    return 0;
+}

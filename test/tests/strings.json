@@ -260,5 +260,79 @@ is"""
                 assert(strcmp("this\nis", str) == 0)
             `,
         },
+        {
+            "name" : "Verbatim string offset",
+            "definitions": `
+            import "std/string"
+            `,
+            "code": `
+                var str =
+                    """
+                    hello cruel
+                    world
+                    """
+                assert(str[0] == 'h')
+                assert(str[11] == '\n')
+                assert(str[12] == 'w')
+            `,
+        },
+        {
+            "name" : "Verbatim string offset empty",
+            "definitions": `
+            import "std/string"
+            `,
+            "code": `
+                var str =
+                    """
+                    """
+                assert(str.empty())
+            `,
+        },
+        {
+            "name" : "Verbatim string non aligned",
+            "definitions": `
+            import "std/string"
+            `,
+            "code": `
+                var str =
+                    """
+                    x
+                   """
+                assert(str[0] == '\n')
+                assert(str[1] == ' ')
+                assert(str[21] == 'x')
+
+            `,
+        },
+        {
+            "name" : "Verbatim string non aligned same aligned",
+            "definitions": `
+            import "std/string"
+            `,
+            "code": `
+                var str =
+                    """ x """
+                assert(str[0] == ' ')
+                assert(str[1] == 'x')
+                assert(str[2] == ' ')
+
+            `,
+        },
+        {
+            "name" : "Verbatim string non aligned reversed",
+            "definitions": `
+            import "std/string"
+            `,
+            "code": `
+                var str =
+                   """
+                    x
+                    """
+                assert(str[0] == '\n')
+                assert(str[1] == ' ')
+                assert(str[21] == 'x')
+
+            `,
+        },
     ]
 }

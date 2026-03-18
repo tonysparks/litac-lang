@@ -5,6 +5,10 @@ import "std/mem"
 import "std/string/buffer"
 import "std/unicode/utf8"
 import "std/assert"
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+
 //import "std/intrinsics"
 
 import "types"
@@ -443,12 +447,19 @@ const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
     }
 }
 
+@json
 public struct SrcPos {
     filename: *const char
+
+    @json(.ignore = true)
     lineStart: *const char
 
+    @json(.ignore = true)
     start: *const char
+
+    @json(.ignore = true)
     end: *const char
+
     lineNumber: i32
     position: i32
 }

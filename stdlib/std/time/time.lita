@@ -2,12 +2,6 @@ import "std/string"
 import "std/string/builder"
 import "std/string/buffer"
 
-#if (OS == "WINDOWS")
-    import using "std/time/time_win" as os
-#else
-    import using "std/time/time_posix" as os
-#end
-
 public const ISO_8601_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 // Unix timestamp - timezone is UTC
@@ -89,7 +83,7 @@ public enum DateTimeStatus {
 
 // TODO: Fix compiler bug with aliased function names
 public func (this: i64/*EpochTime*/) toDateTime() : DateTime {
-    return os::ToDateTime(this)
+    return ToDateTime(this)
 }
 
 public func (this: *DateTime) toOffsetDateTime(offset: *Offset = null) : OffsetDateTime {
@@ -100,11 +94,11 @@ public func (this: *DateTime) toOffsetDateTime(offset: *Offset = null) : OffsetD
 }
 
 public func (this: *DateTime) toEpochTime() : EpochTime {
-    return os::ToEpochTime(this)
+    return ToEpochTime(this)
 }
 
 public func (this: *DateTime) format(format: String, output: *StringBuffer) : DateTimeStatus {
-    return os::DateTimeFormat(
+    return DateTimeFormat(
         this,
         format,
         output
@@ -112,11 +106,11 @@ public func (this: *DateTime) format(format: String, output: *StringBuffer) : Da
 }
 
 public func (this: *DateTime) add(amount: i32, unit: TimeUnit) : DateTime {
-    return os::DateTimeAdd(this, amount, unit)
+    return DateTimeAdd(this, amount, unit)
 }
 
 public func (this: *DateTime) minus(amount: i32, unit: TimeUnit) : DateTime {
-    return os::DateTimeAdd(this, -amount, unit)
+    return DateTimeAdd(this, -amount, unit)
 }
 
 public func (this: *DateTime) compare(other: *DateTime) : i32 {
@@ -124,7 +118,7 @@ public func (this: *DateTime) compare(other: *DateTime) : i32 {
 }
 
 public func (this: *DateTime) isoFormat(output: *StringBuffer) : DateTimeStatus {
-    return os::DateTimeFormat(
+    return DateTimeFormat(
         this,
         ISO_8601_DATE_FORMAT.toString(),
         output
@@ -132,59 +126,212 @@ public func (this: *DateTime) isoFormat(output: *StringBuffer) : DateTimeStatus 
 }
 
 public func Now() : EpochTime {
-    return os::_Now()
+    return _Now()
 }
 
 public func DateTimeNow() : DateTime {
-    return os::_DateTimeNow()
+    return _DateTimeNow()
 }
 
 public func DateTimeFrom(format: String, value: String) : DateTime {
-    return os::_DateTimeFrom(
+    return _DateTimeFrom(
         format,
         value
     )
 }
 
 public func DateTimeFromIso(value: String) : DateTime {
-    return os::_DateTimeFrom(
+    return _DateTimeFrom(
         ISO_8601_DATE_FORMAT.toString(),
         value
     )
 }
 
-import "std/assert"
-import "std/libc"
-@test
-func testDateTime() {
-    var now = Now()
-    var dateTime = now.toDateTime()
+@raw("""
+#include <time.h>
 
-    var sb = StringBuilderInit(1024)
-    dateTime.isoFormat(sb)
-    printf("DateTime: %.*s\n", sb.length, sb.buffer)
-    printf("Now: %lld\n", now)
-    printf("Converted: %lld\n", dateTime.toEpochTime())
+typedef struct tm tm_time;
 
-    assert(dateTime.toEpochTime() == now)
+#if defined(_WIN32) || defined(_WIN64)
+    #define timegm _mkgmtime
+#endif
+""");
 
-    var result = DateTimeFromIso(
-        sb.toString()
+@cFile("strptime.c");
+
+@foreign("tm_time")
+struct tm {
+    tm_sec: i32   // Seconds (0-60, allows leap seconds)
+    tm_min: i32   // Minutes (0-59)
+    tm_hour: i32  // Hours (0-23)
+    tm_mday: i32  // Day of the month (1-31)
+    tm_mon: i32   // Month (0-11, where 0 = January)
+
+    tm_year: i32  // Year since 1900 (e.g., 2024 is stored as 124)
+    tm_wday: i32  // Day of the week (0-6, where 0 = Sunday)
+    tm_yday: i32  // Day of the year (0-365, where 0 = Jan 1)
+    tm_isdst: i32 // Daylight Saving Time flag (>0 if DST is in effect, 0 if not, <0 if unknown)
+}
+
+@foreign
+typedef void as time_t;
+
+@foreign
+func gmtime(time: *time_t) : *tm;
+
+@foreign
+func time(sec: *time_t) : time_t;
+
+@foreign
+func timegm(tm: *tm) : time_t;
+
+
+@foreign
+func strftime(s: *char, max: usize, format: *const char, tm: *const tm) : usize;
+
+@foreign
+func strptime(s: *const char, format: *const char, tm: *const tm) : *char;
+
+
+internal func ToDateTime(epoch: EpochTime) : DateTime {
+    var tm = gmtime((&epoch) as (*time_t))
+
+    return FromTM(tm)
+}
+
+@inline
+internal func FromTM(tm: *tm) : DateTime {
+    return DateTime {
+        .time = Time {
+            .sec = tm.tm_sec as (u8),
+            .min = tm.tm_min as (u8),
+            .hour = tm.tm_hour as (u8),
+        },
+        .date = Date {
+            .day = tm.tm_mday as (u8),
+            .month = (tm.tm_mon + 1)  as (u8),
+            .year = tm.tm_year + 1900,
+        }
+    }
+}
+
+@inline
+internal func ToTM(dateTime: *DateTime, tm: *tm) : *tm {
+    tm.tm_sec = dateTime.sec
+    tm.tm_min = dateTime.min
+    tm.tm_hour = dateTime.hour
+    tm.tm_mday = dateTime.day
+    tm.tm_mon = dateTime.month - 1
+    tm.tm_year = dateTime.year - 1900
+    return tm
+}
+
+internal func DateTimeAdd(this: *DateTime, amount: i64, unit: TimeUnit) : DateTime {
+    var tm: tm;
+    ToTM(this, &tm)
+
+    switch(unit) {
+        case TimeUnit.NANOSECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount / 1_000_000_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.MILLISECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount / 1_000_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.SECONDS: {
+            var epoch = timegm(&tm)
+            epoch += amount
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.MINUTES: {
+            var epoch = timegm(&tm)
+            epoch += amount * 60_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.HOURS: {
+            var epoch = timegm(&tm)
+            epoch += amount * 3_600_i64
+            return ToDateTime(epoch)
+        }
+        case TimeUnit.DAYS: {
+            tm.tm_isdst = -1
+            tm.tm_mday += amount as (i32)
+            return ToDateTime(timegm(&tm))
+        }
+        case TimeUnit.MONTHS: {
+            tm.tm_isdst = -1
+            tm.tm_mon += amount as (i32)
+            return ToDateTime(timegm(&tm))
+        }
+        case TimeUnit.YEARS: {
+            tm.tm_isdst = -1
+            tm.tm_year += amount as (i32)
+            return ToDateTime(timegm(&tm))
+        }
+        default: {
+            return *this
+        }
+    }
+}
+
+internal func ToEpochTime(dateTime: *DateTime) : EpochTime {
+    var tm = tm {}
+
+    var epoch = timegm(ToTM(dateTime, &tm))
+    return epoch as (EpochTime)
+}
+
+internal func _Now() : EpochTime {
+    var now = time(null)
+    return now as (EpochTime)
+}
+
+internal func _DateTimeNow() : DateTime {
+    var epoch = _Now()
+    return ToDateTime(epoch)
+}
+
+internal func DateTimeFormat(
+    dateTime: *DateTime,
+    format: String,
+    buffer: *StringBuffer) : DateTimeStatus {
+    if (!dateTime) {
+        return DateTimeStatus.OK
+    }
+
+    var resultStr = [64]char{}
+
+    var formatStr  = [32]char{}
+    format.copyTo(formatStr, 31)
+
+    var tm = tm {}
+    var len = strftime(
+        resultStr, sizeof(resultStr),
+        formatStr,
+        ToTM(dateTime, &tm)
     )
-    assert(result.toEpochTime() == dateTime.toEpochTime())
-    assert(result.compare(dateTime) == 0)
-    result.day += 2_u8
-    assert(result.compare(dateTime) > 0)
 
-    var birthday = DateTimeFromIso(
-        "1967-02-20T13:23:22".toString()
-    )
-    assert(birthday.year == 1967)
-    assert(birthday.month == 2)
-    assert(birthday.day == 20)
-    assert(birthday.hour == 13)
-    assert(birthday.min == 23)
-    assert(birthday.sec == 22)
+    if(len == 0) {
+        return DateTimeStatus.INVALID_INPUT_FORMAT
+    }
 
+    buffer.appendStrn(resultStr, len as (i32))
+    return DateTimeStatus.OK
+}
 
+internal func _DateTimeFrom(format: String, value: String) : DateTime {
+
+    var formatStr  = [32]char{}
+    format.copyTo(formatStr, 31)
+
+    var valueStr = [64]char{}
+    value.copyTo(valueStr, 63)
+
+    var tm = tm {}
+    strptime(valueStr, formatStr, &tm)
+
+    return FromTM(&tm)
 }

@@ -1,0 +1,46 @@
+import "std/string"
+import "std/string/buffer"
+
+#if (OS == "WINDOWS")
+    import "std/ipc/ipc_win" as os
+#else
+    import "std/ipc/ipc_posix" as os
+#end
+
+public struct Ipc {
+    ipc: os::Ipc
+}
+
+public func (this: *Ipc) init() {
+    this.ipc.init()
+}
+
+
+public func (this: *Ipc) free() {
+    this.ipc.free()
+}
+
+
+public func (this: *Ipc) open(): FileStatus {
+    return this.ipc.open()
+}
+
+public func (this: *Ipc) closeRead(): FileStatus {
+    return this.ipc.closeRead()
+}
+
+public func (this: *Ipc) closeWrite(): FileStatus {
+    return this.ipc.closeWrite()
+}
+
+public func (this: *Ipc) wait(): FileStatus {
+    return this.ipc.wait()
+}
+
+public func (this: *Ipc) write(str: String) : i32 {
+    return this.ipc.write(str)
+}
+
+public func (this: *Ipc) read(str: *StringBuffer): i32 {
+    return this.ipc.read(str)
+}

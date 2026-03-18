@@ -329,7 +329,7 @@ struct FileStat {
     func popen(command: *const char, mode: *const char) : *FILE;
 
     @foreign("_pclose")
-    func pclose(pipe: *FILE) : void;
+    func pclose(pipe: *FILE) : i32;
 
     // TODO: Move this into io module?
     public const PATH_SEPARATOR = "\\"
@@ -343,7 +343,7 @@ struct FileStat {
     func popen(command: *const char, mode: *const char) : *FILE;
 
     @foreign("pclose")
-    func pclose(pipe: *FILE) : void;
+    func pclose(pipe: *FILE) : i32;
 
     // TODO: Move this into io module?
     public const PATH_SEPARATOR = "/"
@@ -859,8 +859,11 @@ public func (this: *Process) writeInput(buffer: *char, length: usize) : i64 {
     return fwrite(buffer, sizeof(:char), length, this.pipe) as (i64)
 }
 
-public func (this: *Process) close() {
-    if(this.pipe) pclose(this.pipe)
+public func (this: *Process) close(): i32 {
+    if(this.pipe) {
+        return pclose(this.pipe)
+    }
+    return 0
 }
 
 

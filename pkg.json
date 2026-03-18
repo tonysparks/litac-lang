@@ -9,11 +9,11 @@
         "libssl-1_1-x64.dll",
     ],
     "dependencies": [],
-    "build_command": {
-        "debug": {
-            "mac": {
+    "pre_build_command": {
+        "default": {
+            "default": {
                 "default": {
-                    "cc": "gcc",
+                    "cc": "clang",
                     "cc_options": [
                         "-std=gnu11",
                         "-g",
@@ -23,13 +23,33 @@
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
+                        "-run"
+                    ]
+                }
+            }
+        }
+    },
+    "build_command": {
+        "debug": {
+            "mac": {
+                "default": {
+                    "cc": "clang",
+                    "cc_options": [
+                        //"-fsanitize=address,undefined",
+                        "-std=gnu11",
+                        "-g",
+                        "%input%",
+                        "-o",
+                        "%output%",
+                        "-D_CRT_SECURE_NO_WARNINGS"
+                    ],
+                    "lita_options": [
                         "-cFormat",
-                        "-disableLine",
                         "-verbose",
                         "-maxMemory",
                         "1GiB",
                         "-outputDir",
-                        "./bin/debug/",
+                        "./bin/output/",
                         "-output",
                         "litac"
                     ]
@@ -48,12 +68,11 @@
                     ],
                     "lita_options": [
                         "-cFormat",
-                        "-disableLine",
                         "-verbose",
                         "-maxMemory",
                         "1GiB",
                         "-outputDir",
-                        "./bin/debug/",
+                        "./bin/output/",
                         "-output",
                         "litac"
                     ]
@@ -65,19 +84,18 @@
                     "cc_options": [
                         "-std=c11",
                         "-g",
-                        "%%input%%",
+                        "%input%",
                         "-o",
-                        "%%output%%",
+                        "%output%",
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [
                         "-cFormat",
-                        "-disableLine",
                         "-verbose",
                         "-maxMemory",
                         "1GiB",
                         "-outputDir",
-                        "./bin/debug/",
+                        "./bin/output/",
                         "-output",
                         "litac"
                     ]
@@ -143,9 +161,9 @@
                         "-O3",
                         "-march=native",
                         "-mtune=native",
-                        "%%input%%",
+                        "%input%",
                         "-o",
-                        "%%output%%",
+                        "%output%",
                         "-D_CRT_SECURE_NO_WARNINGS"
                     ],
                     "lita_options": [

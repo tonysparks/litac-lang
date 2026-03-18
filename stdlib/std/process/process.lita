@@ -17,6 +17,7 @@ public func (this: *Process) create(commandLine: **const char,
                                     cwd: *const char,
                                     options: i32) : i32 {
     var subOptions = 0
+    subOptions |= subprocess_option_e.subprocess_option_search_user_path
     if(options & ProcessOption.COMBINE_STDOUT_STDERR) {
         subOptions |= subprocess_option_e.subprocess_option_combined_stdout_stderr
     }

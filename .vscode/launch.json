@@ -5,13 +5,25 @@
     "version": "0.2.0",
     "configurations": [
 
+        // {
+        //     "name": "Debug",
+        //     "type": "gdb",
+        //     "request": "launch",
+        //     "target": "./litac_tests",
+        //     "cwd": "${workspaceRoot}/bin",
+        //     "valuesFormatting": "parseText"
+        // },
+
         {
-            "name": "Debug",
-            "type": "gdb",
+            "name": "Debug C (LLDB)",
+            "type": "lldb",
             "request": "launch",
-            "target": "./litac_tests",
-            "cwd": "${workspaceRoot}/bin",
-            "valuesFormatting": "parseText"
+            "program": "${workspaceFolder}/bin/litac",
+            "args": [
+                "build"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false
         }
     ]
 }

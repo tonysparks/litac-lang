@@ -111,10 +111,10 @@
             "type": "shell",
             "command": "litac",
             "args": [
-                "-colors",
-                "-pkg-build",
-                "-run",
-                "-testFile",
+                "test",
+                "-output",
+                "litac_test_file",
+                "-file",
                 "${file}"
             ],
             "problemMatcher": [

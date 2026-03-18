@@ -352,6 +352,20 @@ public func (b: *StringBuilder) forEach(fn : func(char) : bool) {
     }
 }
 
+@doc("""
+Takes the current StringBuilder length and capacity and creates a
+new StringBuffer with length 0.
+
+Use this with caution, as all backing
+buffers are shared between this StringBuffer and the sliced StringBuffer
+""")
+public func (b: *StringBuilder) slice() : StringBuilder {
+    return StringBuilder {
+        .alloc = b.alloc,
+        .asBuffer = b.asBuffer.slice()
+    }
+}
+
 @inline
 public func (b: *StringBuilder) remaining() : i32 {
     return b.capacity - b.length

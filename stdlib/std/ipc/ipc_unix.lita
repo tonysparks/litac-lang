@@ -1,0 +1,138 @@
+import "std/libc"
+import "std/io"
+
+@raw(
+"""
+#include <unistd.h>
+#include <sys/wait.h>
+"""
+);
+
+/*
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/wait.h>
+
+int main(void) {
+    int ipc[2];
+
+    if (pipe(ipc) < 0) {
+        perror("pipe");
+        return 1;
+    }
+
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        // ---- child ----
+        close(ipc[0]);          // close read end
+
+        // Write structured IPC data
+        const char msg[] = "TEST_STARTED TestFoo\n";
+        write(ipc[1], msg, sizeof(msg) - 1);
+
+        close(ipc[1]);
+        _exit(0);
+    } else {
+        // ---- parent ----
+        close(ipc[1]);          // close write end
+
+        char buf[256];
+        ssize_t n = read(ipc[0], buf, sizeof buf - 1);
+        buf[n] = '\0';
+
+        printf("IPC received: %s", buf);
+
+        close(ipc[0]);
+        wait(NULL);
+    }
+}
+*/
+
+// TODO map errno to FileStatus/IOStatus enum
+func FileStatusToErrno(err: i32) : FileStatus {
+    return FileStatus.IOError
+}
+
+@foreign
+typedef void as pid_t;
+
+@foreign
+func pipe(fds: [2]i32): i32;
+
+@foreign
+func fork(): pid_t;
+
+@foreign
+func close(fd: i32): i32;
+
+@foreign
+func wait(fd: *i32): pid_t;
+
+@foreign
+func read(fd: i32, buf: *void, count: usize): i32;
+
+@foreign
+func write(fd: i32, buf: *void, count: usize): i32;
+
+public struct Ipc {
+    fds: [2]i32
+    pid: pid_t
+    status: FileStatus
+}
+
+public func (this: *Ipc) init() {
+    this.status = FileStatus.Ok
+}
+
+
+public func (this: *Ipc) free() {
+}
+
+func (this: *Ipc) setStatus(result: i32) : FileStatus {
+    if(result == -1) {
+        this.status = FileStatusToErrno(errno)
+    } else {
+        this.status = FileStatus.Ok
+    }
+    return this.status
+}
+
+public func (this: *Ipc) open(): FileStatus {
+    if(this.setStatus(pipe(this.fds)) != FileStatus.Ok) {
+        return this.status
+    }
+
+    this.pid = fork()
+    return this.status
+}
+
+public func (this: *Ipc) isChild(): bool {
+    return this.pid == 0
+}
+
+public func (this: *Ipc) closeRead(): FileStatus {
+    return this.setStatus(close(this.fds[0]))
+}
+
+public func (this: *Ipc) closeWrite(): FileStatus {
+    return this.setStatus(close(this.fds[1]))
+}
+
+public func (this: *Ipc) wait(): FileStatus {
+    return this.setStatus(wait(null))
+}
+
+public func (this: *Ipc) write(str: String) : i32 {
+    var result = write(this.fds[1], str.buffer, str.length)
+    this.setStatus(result)
+    return result
+}
+
+public func (this: *Ipc) read(str: *StringBuffer): i32 {
+    var slice = str.slice()
+    var result = read(this.fds[0], slice.buffer, slice.remaining())
+    this.setStatus(result)
+    return result
+}

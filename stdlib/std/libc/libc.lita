@@ -42,7 +42,7 @@ size_t strnlen(const char * s, size_t len) {
 }
 #endif
 
-#if defined(OS_WIN)
+#if defined(OS_WIN) && !defined(strncasecmp)
 #define strncasecmp(a, b, n)  _strnicmp((a), (b), (n))
 #endif
 

@@ -6,6 +6,9 @@ bin/*.rdbg
 bin/*.exp
 bin/*.lib
 bin/*.out
+bin/*.ilk
+bin/litac_inception
+bin/pre_build
 bin/litac_linux
 bin/litac_mac
 bin/test.txt
@@ -49,5 +52,5 @@ bootstrap/output/**
 .build.json
 *.dSYM*
 .DS_Store
-
+bin/file_test
 bin/profile.data.txt

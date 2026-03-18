@@ -2,10 +2,6 @@
 
 set -e
 
-# BUILD_CMD="clang -std=gnu11 -g -gcodeview %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS -I../include -L../lib ${LIBS}"
-BUILD_CMD="gcc -std=gnu11 -g %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
-# BUILD_CMD="gcc -Wall -Wextra -Werror -pedantic -Wno-unused-parameter -Wno-unused-function -Wno-implicit-fallthrough -std=gnu11 -g %input% -o %output%  -D_CRT_SECURE_NO_WARNINGS"
-
 error_compiling() {
     echo ""
     echo "=========================================="
@@ -18,18 +14,15 @@ error_compiling() {
 build_litac() {
     echo "Running bootstrapped litaC..."
 
-    cd bootstrap
-
-    ./litacc -disableLine -verbose -cFormat -profile -buildCmd "${BUILD_CMD}" "../src/main.lita" -outputDir "../bin/" -output "litac" -maxMemory 1GiB
+    ./bootstrap/litacc build -profile -outputDir "./bin"
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;
     fi
 
     echo "Running litaC inception!..."
-    cd ../bin
     #valgrind --leak-check=full --show-leak-kinds=all ./litac -disableLine -verbose -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
-    ./litac -disableLine -verbose -profile -cFormat -buildCmd "${BUILD_CMD}" "../src/main.lita" -maxMemory 1GiB -outputDir "./output/"
+    ./bin/litac build -profile -output "litac_inception"
     if [ $? -gt 0 ]; then
         error_compiling
         return 1;

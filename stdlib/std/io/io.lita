@@ -213,10 +213,10 @@ public func ReadFileFullyStr(
 ) : FileStatus {
     // TODO: fix compiler bug with unknown variable from std/system
     // due to circular dependency with importing using system_os
-    const MAX_PATH = 256;
-    
-    var path:[MAX_PATH]char;
-    var strPath = StringBufferInit(path, MAX_PATH, 0)
+    const MAX_PATHX = 256;
+
+    var path:[MAX_PATHX]char;
+    var strPath = StringBufferInit(path, MAX_PATHX, 0)
     strPath.format("%.*s", fileName.length, fileName.buffer)
     return ReadFileFully(
         strPath.cStr(),

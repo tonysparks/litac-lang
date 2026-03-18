@@ -10,6 +10,10 @@ import "std/string/builder"
 import "std/string"
 import "std/string/buffer"
 import "std/process" as sub
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+
 
 import "symbols"
 import "preprocessor"
@@ -27,6 +31,7 @@ import "intern"
 import "types"
 import "types_new"
 import "build"
+import "version"
 
 import "lsp/references"
 import "lsp/workspace"
@@ -36,7 +41,6 @@ import "tcc/libtcc"
 
 
 public const MAX_PREFIX_SIZE = 32
-public const LITA_VERSION = "0.1.6-alpha"
 
 public struct Lita {
     allocator: *const Allocator
@@ -144,6 +148,8 @@ public struct LitaOptions {
     instrument: bool               // if we have profiling instrumentation enabled
     isVerbose: bool                // if we are in verbose mode, output logging detail information
     isColoredOutput: bool          // if we should use colors in output
+    isPreBuildEnabled: bool       // if the prebuild step is enabled
+    isPostBuildEnabled: bool      // if the postbuild step is enabled
 
     args: **char                   // command line arguments to be passed to the compiled program
     nargs: i32                     // number of command line arguments
@@ -151,7 +157,9 @@ public struct LitaOptions {
     testsOnly: bool                // if we are running tests only
     testsRegex: *const char        // the regex of tests to include
     testFileOnly: bool             // if we should only test the supplied file only
+    testPackage: *const char       // if we're testing a package
     testPath: [MAX_PATH]char       // directory for tests
+    isJsonFormat: bool             // if we should output messages in json structure format
 
     typeOption: TypeInfoOption     // type generation option
 
@@ -240,6 +248,30 @@ public func (lita: *Lita) free() {
     // TODO: clear module allocators
 }
 
+public func (lita: *Lita) printf(format: *const char, ...) {
+    var args: va_list
+    va_start(args, format)
+
+    if(lita.options.isJsonFormat) {
+        var message = StringBuilderInit(1024, lita.allocator)
+        message.appendArgs(format, args)
+
+        var msgNode = CreateJsonObject(lita.allocator)
+        msgNode.putStr("type", "MESSAGE")
+        msgNode.putStr("message", message.cStr())
+
+        //sb = sb.slice()
+        var sb = StringBuilderInit(1024, lita.allocator)
+        msgNode.print(&sb)
+        printf("%s\n", sb.cStr())
+    }
+    else {
+        vfprintf(stdout, format, args)
+        fflush(stdout)
+    }
+    va_end(args)
+}
+
 public func (lita: *Lita) addModule(module: *Module) {
     lita.modules.put(module.id.filenameKey, module)
 }
@@ -261,7 +293,7 @@ public func (lita: *Lita) getModuleByName(name: *const char) : *Module {
     for(var it = lita.modules.iter(); it.hasNext();) {
         var entry = it.next()
         var pkgName = entry.value.id.packageName.view
-        printf("Checking: %.*s\n", pkgName.length, pkgName.buffer)
+        // printf("Checking: %.*s\n", pkgName.length, pkgName.buffer)
         if(pkgName.equals(packageName)) {
             return entry.value
         }
@@ -431,7 +463,7 @@ public func (this: *Lita) typeCheck(module: *Module, flags: i32 = 0) : bool {
 public func (this: *Lita) transpile(module: *Module) : bool {
 
     if(!Mkdir(this.options.outputPath)) {
-        printf("Unable to create directory: '%s'", this.options.outputPath)
+        this.printf("Unable to create directory: '%s'", this.options.outputPath)
         return false
     }
 
@@ -547,7 +579,7 @@ public func (this: *Lita) compileWithLibtcc(module: *Module, binaryFilename: *co
             tcc_set_options(state, ccOptions.cStr())
 
             if(this.options.isVerbose) {
-                printf("Options: '%s'\n", ccOptions.cStr())
+                this.printf("Options: '%s'\n", ccOptions.cStr())
             }
         }
     }
@@ -602,7 +634,7 @@ public func (this: *Lita) compileC(module: *Module, sourceFilename: *const char,
     this.applyCompilerOptions(commandStr)
 
     if(this.options.isVerbose) {
-        printf("Running command: '%s'\n", commandStr.cStr())
+        this.printf("Running command: '%s'\n", commandStr.cStr())
     }
 
     if(system(commandStr.cStrConst()) == 0) {
@@ -668,7 +700,7 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
 public func (this: *Lita) run() : i32 {
     // TODO: Fix this -- the process library doesn't support specifying the command
     // path on Linux based systems, for now we will do this horrible hack work around
-#static_if defined(__linux__)
+//#static_if !defined(_WIN32)
     var sb = StringBuilderInit(256, this.allocator)
     defer sb.free()
 
@@ -686,6 +718,7 @@ public func (this: *Lita) run() : i32 {
     }
 
     return system(sb.cStr())
+/*
 #else
     var args = ArrayInit<*const char>(this.options.nargs + 2, this.allocator)
 
@@ -717,8 +750,10 @@ public func (this: *Lita) run() : i32 {
 
     var result = 0
     process.join(&result)
+
     return result
 #end
+*/
 }
 
 
