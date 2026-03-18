@@ -95,13 +95,14 @@ static const u_char *conv_num(const unsigned char *, int *, uint, uint);
 static const u_char *find_string(const u_char *, int *, const char * const *,
 	const char * const *, int);
 
-// #ifndef MO_MINGW32
-// static int
-// strncasecmp(const char *a, const char *b, size_t c)
-// {
-//     return _strnicmp(a, b, c);
-// }
-// #endif
+
+#if defined(_WIN32) || defined(_WIN64)
+static int
+strncasecmp(const char *a, const char *b, size_t c)
+{
+    return _strnicmp(a, b, c);
+}
+#endif
 
 
 char *
@@ -382,7 +383,7 @@ recurse:
 			continue;
 
 		case 'Z':
-#if 0		
+#if defined(_WIN32) || defined(_WIN64)
 			tzset();
 			if (strncasecmp((const char *)bp, gmt, 3) == 0
           || strncasecmp((const char *)bp, utc, 3) == 0) {
@@ -409,7 +410,7 @@ recurse:
 				}
 				bp = ep;
 			}
-#endif				
+#endif
 			continue;
 
 		case 'z':
