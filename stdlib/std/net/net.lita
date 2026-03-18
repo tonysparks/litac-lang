@@ -148,7 +148,7 @@ public func testGenerated() {
     defer serverSocket.close();
 
 
-    assert(FromPort(8083_u16, &serverSocket.address))
+    assert(FromPort(8083_u16, &serverSocket.address) != 0)
     var addr = serverSocket.address
 
     if(!serverSocket.bind()) {

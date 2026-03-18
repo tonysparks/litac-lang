@@ -11,6 +11,7 @@ import "std/system"
 import "std/mem"
 import "std/unicode/utf8"
 import "std/ascii"
+import "std/time"
 
 import "ast"
 import "types"
@@ -193,8 +194,13 @@ func (this: using *CGen) emitMain(sym: *Symbol) {
 
 func (this: using *CGen) emitForward() {
     this.buf.append(
+        "// Generated on "
+    )
+    var now = DateTimeNow()
+    now.isoFormat(this.buf)
+    this.buf.append(
 """
-// Generated on %s
+
 #include <stdint.h>
 #include <stddef.h>
 typedef int8_t    %s%s;
@@ -238,7 +244,6 @@ typedef size_t    %s%s;
 #endif
 
 """,
-    CurrentDateTime(),
     this.options.cPrefix, "i8",
     this.options.cPrefix, "i16",
     this.options.cPrefix, "i32",

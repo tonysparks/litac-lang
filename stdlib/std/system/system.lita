@@ -11,7 +11,6 @@ import "std/mem"
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <time.h>
 """);
 
 #if (OS == "WINDOWS")
@@ -804,6 +803,7 @@ public func SystemTimeMSec() : f64 {
     return _SystemTimeMSec()
 }
 
+/*
 @foreign
 struct time_t;
 
@@ -827,7 +827,7 @@ public func CurrentDateTime() : *const char {
     time(&rawtime)
     timeinfo = localtime(&rawtime)
     return asctime(timeinfo)
-}
+}*/
 
 
 

@@ -74,23 +74,31 @@ public const SO_SNDTIMEO:i32
 @foreign
 public const SOL_SOCKET:i32
 
-
-@foreign
-public const MSG_CONFIRM:i32
-@foreign
-public const MSG_DONTROUTE:i32
-@foreign
-public const MSG_DONTWAIT:i32
-@foreign
-public const MSG_EOR:i32
-@foreign
-public const MSG_MORE:i32
-@foreign
-public const MSG_NOSIGNAL:i32
+#if (OS == "LINUX")
+    @foreign
+    public const MSG_CONFIRM:i32
+    @foreign
+    public const MSG_DONTWAIT:i32
+    @foreign
+    public const MSG_EOR:i32
+    @foreign
+    public const MSG_MORE:i32
+    @foreign
+    public const MSG_NOSIGNAL:i32
+    @foreign
+    public const MSG_FASTOPEN:i32
+#else
+    public const MSG_CONFIRM:i32 = 0;
+    public const MSG_DONTWAIT:i32 = 0;
+    public const MSG_EOR:i32 = 0;
+    public const MSG_MORE:i32 = 0;
+    public const MSG_NOSIGNAL:i32 = 0;
+    public const MSG_FASTOPEN:i32 = 0;
+#end
 @foreign
 public const MSG_OOB:i32
 @foreign
-public const MSG_FASTOPEN:i32
+public const MSG_DONTROUTE:i32
 
 @foreign
 public func strerror(errnum: i32) : *const char;
