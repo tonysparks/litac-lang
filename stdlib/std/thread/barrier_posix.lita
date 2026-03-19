@@ -1,0 +1,66 @@
+
+// Linux barrier implementation using native pthread_barrier_t.
+// pthread_barrier_t requires _XOPEN_SOURCE >= 600 on Linux.
+
+@raw("""
+#undef _FEATURES_H
+#if !defined(_GNU_SOURCE)
+    #define _GNU_SOURCE
+#endif
+#if !defined(_POSIX_C_SOURCE) || ((_POSIX_C_SOURCE - 0) < 200112L)
+    #undef _POSIX_C_SOURCE
+    #define _POSIX_C_SOURCE 200112L
+#endif
+#if !defined(_XOPEN_SOURCE) || ((_XOPEN_SOURCE - 0) < 600)
+    #undef _XOPEN_SOURCE
+    #define _XOPEN_SOURCE 600
+#endif
+#include <pthread.h>
+""");
+
+import "std/thread"
+
+@foreign
+struct pthread_barrier_t;
+
+@foreign
+struct pthread_barrierattr_t;
+
+@foreign
+func pthread_barrier_init(
+    barrier: *pthread_barrier_t,
+    attr: *pthread_barrierattr_t,
+    count: u32
+) : i32;
+
+@foreign
+func pthread_barrier_destroy(barrier: *pthread_barrier_t) : i32;
+
+@foreign
+func pthread_barrier_wait(barrier: *pthread_barrier_t) : i32;
+
+@foreign
+const PTHREAD_BARRIER_SERIAL_THREAD: i32;
+
+public struct Barrier {
+    _b: pthread_barrier_t
+}
+
+public func (this: *Barrier) init(threadCount: i32) : ThreadStatus {
+    var ret = pthread_barrier_init(&this._b, null, threadCount as (u32))
+    return ret == 0 ? ThreadStatus.SUCCESS : ThreadStatus.ERROR
+}
+
+public func (this: *Barrier) destroy() : ThreadStatus {
+    var ret = pthread_barrier_destroy(&this._b)
+    return ret == 0 ? ThreadStatus.SUCCESS : ThreadStatus.ERROR
+}
+
+public func (this: *Barrier) wait() : ThreadStatus {
+    var ret = pthread_barrier_wait(&this._b)
+    // PTHREAD_BARRIER_SERIAL_THREAD is returned to exactly one thread; 0 to the rest
+    if (ret == 0 || ret == PTHREAD_BARRIER_SERIAL_THREAD) {
+        return ThreadStatus.SUCCESS
+    }
+    return ThreadStatus.ERROR
+}

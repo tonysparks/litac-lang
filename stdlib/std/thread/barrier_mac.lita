@@ -1,0 +1,60 @@
+
+// macOS barrier implementation using mutex + condition variable.
+// macOS does not provide pthread_barrier_t in its POSIX implementation.
+
+import "std/thread"
+
+public struct Barrier {
+    mtx:     Mutex
+    cond:    Cond
+    count:   i32   // total threads to wait for
+    waiting: i32   // threads currently blocked in wait()
+    phase:   i32   // incremented each time the barrier opens, prevents spurious wakeup reuse
+}
+
+public func (this: *Barrier) init(threadCount: i32) : ThreadStatus {
+    var s = this.mtx.init()
+    if (s != ThreadStatus.SUCCESS) {
+        return s
+    }
+
+    s = this.cond.init()
+    if (s != ThreadStatus.SUCCESS) {
+        this.mtx.destroy()
+        return s
+    }
+
+    this.count   = threadCount
+    this.waiting = 0
+    this.phase   = 0
+    return ThreadStatus.SUCCESS
+}
+
+public func (this: *Barrier) destroy() : ThreadStatus {
+    this.cond.destroy()
+    this.mtx.destroy()
+    return ThreadStatus.SUCCESS
+}
+
+public func (this: *Barrier) wait() : ThreadStatus {
+    this.mtx.lock()
+
+    var myPhase = this.phase
+    this.waiting += 1
+
+    if (this.waiting >= this.count) {
+        // Last thread through — open the barrier
+        this.waiting = 0
+        this.phase += 1
+        this.cond.broadcast()
+    }
+    else {
+        // Spin on condition variable until the phase advances
+        while (this.phase == myPhase) {
+            this.cond.wait(&this.mtx)
+        }
+    }
+
+    this.mtx.unlock()
+    return ThreadStatus.SUCCESS
+}

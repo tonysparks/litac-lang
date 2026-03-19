@@ -1,0 +1,56 @@
+
+// Windows barrier implementation using SYNCHRONIZATION_BARRIER (Vista+).
+
+@raw("""
+#ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #define _BARRIER_WIN_UNDEF_LEAN
+#endif
+#include <windows.h>
+#ifdef _BARRIER_WIN_UNDEF_LEAN
+    #undef WIN32_LEAN_AND_MEAN
+    #undef _BARRIER_WIN_UNDEF_LEAN
+#endif
+""");
+
+import "std/thread"
+
+@foreign
+struct SYNCHRONIZATION_BARRIER;
+
+@foreign
+func InitializeSynchronizationBarrier(
+    barrier:     *SYNCHRONIZATION_BARRIER,
+    totalThreads: i32,
+    spinCount:    i32
+) : bool;
+
+@foreign
+func EnterSynchronizationBarrier(
+    barrier: *SYNCHRONIZATION_BARRIER,
+    flags:   i32
+) : bool;
+
+@foreign
+func DeleteSynchronizationBarrier(barrier: *SYNCHRONIZATION_BARRIER);
+
+public struct Barrier {
+    _b: SYNCHRONIZATION_BARRIER
+}
+
+public func (this: *Barrier) init(threadCount: i32) : ThreadStatus {
+    if (!InitializeSynchronizationBarrier(&this._b, threadCount, -1)) {
+        return ThreadStatus.ERROR
+    }
+    return ThreadStatus.SUCCESS
+}
+
+public func (this: *Barrier) destroy() : ThreadStatus {
+    DeleteSynchronizationBarrier(&this._b)
+    return ThreadStatus.SUCCESS
+}
+
+public func (this: *Barrier) wait() : ThreadStatus {
+    EnterSynchronizationBarrier(&this._b, 0)
+    return ThreadStatus.SUCCESS
+}
