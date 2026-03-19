@@ -1,0 +1,8 @@
+
+#if (OS == "WINDOWS")
+    import using "std/thread/barrier_win"
+#elseif (OS == "MAC")
+    import using "std/thread/barrier_mac"
+#else
+    import using "std/thread/barrier_posix"
+#end

@@ -1,0 +1,140 @@
+import "std/thread"
+import "std/thread/barrier"
+import "std/atomic"
+import "std/assert"
+import "std/libc"
+
+// ---------------------------------------------------------------------------
+// Test: N worker threads all block at the barrier until every one arrives
+// ---------------------------------------------------------------------------
+
+struct BasicState {
+    barrier:      Barrier
+    arrivedCount: Atomic<i32>
+    passedCount:  Atomic<i32>
+}
+
+func basicWorkerFn(arg: *void) : i32 {
+    var state = arg as (*BasicState)
+
+    // Signal arrival before waiting
+    state.arrivedCount.getAdd(1)
+
+    // Block until all N threads have called wait()
+    state.barrier.wait()
+
+    // After the barrier opens every prior arrival must be visible
+    state.passedCount.getAdd(1)
+    return 0
+}
+
+@test("barrier blocks until all N threads arrive")
+func testBarrierBlocksAllThreads() {
+    const N = 4
+    var state = BasicState{}
+    state.arrivedCount.init(0)
+    state.passedCount.init(0)
+
+    assert(state.barrier.init(N) == ThreadStatus.SUCCESS)
+    defer state.barrier.destroy()
+
+    var threads: [N]Thread;
+    for (var i = 0; i < N; i += 1) {
+        assert(threads[i].create(basicWorkerFn, &state) == ThreadStatus.SUCCESS)
+    }
+
+    for (var i = 0; i < N; i += 1) {
+        threads[i].join(null)
+    }
+
+    assert(state.arrivedCount.get() == N)
+    assert(state.passedCount.get()  == N)
+}
+
+// ---------------------------------------------------------------------------
+// Test: main thread participates in the barrier together with workers
+// ---------------------------------------------------------------------------
+
+struct MainParticipantState {
+    barrier:      Barrier
+    workerCount:  Atomic<i32>
+}
+
+func mainParticipantWorkerFn(arg: *void) : i32 {
+    var state = arg as (*MainParticipantState)
+    state.workerCount.getAdd(1)
+    state.barrier.wait()
+    return 0
+}
+
+@test("main thread participates in barrier with workers")
+func testMainThreadParticipates() {
+    const N_WORKERS = 3
+    const N_TOTAL   = N_WORKERS + 1  // workers + main
+
+    var state = MainParticipantState{}
+    state.workerCount.init(0)
+
+    assert(state.barrier.init(N_TOTAL) == ThreadStatus.SUCCESS)
+    defer state.barrier.destroy()
+
+    var threads: [N_WORKERS]Thread;
+    for (var i = 0; i < N_WORKERS; i += 1) {
+        assert(threads[i].create(mainParticipantWorkerFn, &state) == ThreadStatus.SUCCESS)
+    }
+
+    // Main participates — all N_TOTAL must call wait() before any proceeds
+    state.barrier.wait()
+
+    // All workers must have incremented workerCount before the barrier opened
+    assert(state.workerCount.get() == N_WORKERS)
+
+    for (var i = 0; i < N_WORKERS; i += 1) {
+        threads[i].join(null)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test: barrier can be reused across multiple rendezvous phases
+// ---------------------------------------------------------------------------
+
+struct ReuseState {
+    barrier: Barrier
+    phase1:  Atomic<i32>
+    phase2:  Atomic<i32>
+}
+
+func reuseWorkerFn(arg: *void) : i32 {
+    var state = arg as (*ReuseState)
+
+    state.phase1.getAdd(1)
+    state.barrier.wait()
+
+    state.phase2.getAdd(1)
+    state.barrier.wait()
+
+    return 0
+}
+
+@test("barrier can be reused across multiple rendezvous phases")
+func testBarrierReuse() {
+    const N = 4
+    var state = ReuseState{}
+    state.phase1.init(0)
+    state.phase2.init(0)
+
+    assert(state.barrier.init(N) == ThreadStatus.SUCCESS)
+    defer state.barrier.destroy()
+
+    var threads: [N]Thread;
+    for (var i = 0; i < N; i += 1) {
+        assert(threads[i].create(reuseWorkerFn, &state) == ThreadStatus.SUCCESS)
+    }
+
+    for (var i = 0; i < N; i += 1) {
+        threads[i].join(null)
+    }
+
+    assert(state.phase1.get() == N)
+    assert(state.phase2.get() == N)
+}

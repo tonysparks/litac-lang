@@ -28,6 +28,15 @@ import "std/mem"
 #endif
 #define _XPG6
 
+/* On macOS, enable Darwin/BSD extensions so that Apple-specific APIs
+   (e.g. pthread_threadid_np, timegm) are visible regardless of
+   _POSIX_C_SOURCE / _XOPEN_SOURCE restrictions. */
+#if defined(__APPLE__) && defined(__MACH__)
+    #ifndef _DARWIN_C_SOURCE
+        #define _DARWIN_C_SOURCE
+    #endif
+#endif
+
 #include <time.h>
 #include <pthread.h>
 
