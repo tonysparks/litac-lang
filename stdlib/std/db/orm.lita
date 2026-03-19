@@ -18,7 +18,7 @@ public func (this: *SqlConnection) queryMany<T>(
     sql: String,
     $...
 ) : i32 {
-    assert(allocator)
+    assert(allocator != null)
 
     if (this.hasError()) return 0
 
