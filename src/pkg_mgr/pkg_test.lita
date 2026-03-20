@@ -309,8 +309,8 @@ func ProcessTestOutput(
                         filename,
                         lineNumber,
                         ConsoleColorsAsStr(ConsoleColors.RED),
-                        error.getStr("message"),
-                        ConsoleColorsAsStr(ConsoleColors.CLEAR)
+                        ConsoleColorsAsStr(ConsoleColors.CLEAR),
+                        error.getStr("message")
                     )
                 }
             }
