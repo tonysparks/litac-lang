@@ -1,0 +1,249 @@
+/**
+    LSP Incremental-Build Regression Tests
+    =======================================
+    Spawns the litaC language server, drives it with LSP JSON-RPC messages,
+    and verifies it survives multiple consecutive incremental rebuild cycles
+    without crashing.
+
+    All LSP messages are written to a temp file up-front, then fed to the
+    server via shell stdin-redirection (<).  The server processes messages
+    sequentially, so no artificial sleeps are needed.
+
+    Bugs covered:
+      1. Arena aliasing  – importAliases/usingModules buckets were overwritten
+         by the typeSpecAllocator BucketList expansion after arena.clear().
+      2. Stale funcDecl  – method-symbol TypeInfo.funcDecl still pointed into
+         the cleared arena; isMethodForType crashed reading params.size().
+      3. Stale aggDecl   – markReset nulled the aggDecl of a shared TypeInfo
+         (typedef aliasing a struct), crashing addDefaultArguments.
+
+    Run from the project root:
+        ./bin/litac test -file test/lsp_test.lita
+*/
+
+import "std/libc"
+import "std/assert"
+import "std/mem"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/system"
+
+
+// ---------------------------------------------------------------------------
+// Test source (version A)
+// Exercises all three bug-triggering patterns:
+//   - struct + methods  → funcDecl / isMethodForType
+//   - typedef alias     → shared TypeInfo / addDefaultArguments
+//   - method call expr  → checkMethodExpr / resolveGetExpr
+// ---------------------------------------------------------------------------
+const TEST_SOURCE_A = """struct Point {
+    x: i32
+    y: i32
+}
+func (this: *Point) add(other: Point) : Point {
+    return Point{.x = this.x + other.x, .y = this.y + other.y}
+}
+func (this: *Point) scale(factor: i32) : Point {
+    return Point{.x = this.x * factor, .y = this.y * factor}
+}
+typedef Vec2 = Point
+func compute() : i32 {
+    var p = Point{.x = 1, .y = 2}
+    var q = Vec2{.x = 3, .y = 4}
+    var r = p.add(q)
+    var s = r.scale(2)
+    return s.x + s.y
+}"""
+
+// Version B: minor whitespace tweak (simulates typing a space).
+// Causes a fresh incremental rebuild while keeping the same AST shape.
+const TEST_SOURCE_B = """struct Point {
+    x: i32
+    y: i32
+}
+func (this: *Point) add(other: Point) : Point {
+    return Point{.x = this.x + other.x, .y = this.y + other.y}
+}
+func (this: *Point) scale(factor: i32) : Point {
+    return Point{.x = this.x * factor, .y = this.y * factor}
+}
+typedef Vec2 = Point
+func compute() : i32 {
+    var p  = Point{.x = 1, .y = 2}
+    var q  = Vec2{.x = 3, .y = 4}
+    var r  = p.add(q)
+    var s  = r.scale(2)
+    return s.x + s.y
+}"""
+
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Append text as a JSON string literal (with surrounding quotes) into sb.
+// Escapes: backslash, double-quote, newline, carriage-return, tab.
+func AppendJsonString(sb: *StringBuilder, text: *const char) {
+    sb.appendChar('"')
+    var i = 0
+    while(text[i] != '\0') {
+        var c = text[i]
+        if(c == '\\') {
+            sb.appendStrn("\\\\", 2)
+        }
+        else if(c == '"') {
+            sb.appendStrn("\\\"", 2)
+        }
+        else if(c == '\n') {
+            sb.appendStrn("\\n", 2)
+        }
+        else if(c == '\r') {
+            sb.appendStrn("\\r", 2)
+        }
+        else if(c == '\t') {
+            sb.appendStrn("\\t", 2)
+        }
+        else {
+            sb.appendChar(c)
+        }
+        i += 1
+    }
+    sb.appendChar('"')
+}
+
+// Append one LSP message (Content-Length header + body) to out.
+func AppendLspMsg(out: *StringBuilder, body: *const char) {
+    var len = strlen(body)
+    out.append("Content-Length: %d\r\n\r\n", len)
+    out.appendStrn(body, len as (i32))
+}
+
+// Build and append a textDocument/didChange message to out.
+func AppendChange(out: *StringBuilder,
+                  sb: *StringBuilder,
+                  fileUri: *const char,
+                  version: i32,
+                  source: *const char) {
+    sb.clear()
+    sb.appendStr("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":")
+    AppendJsonString(sb, fileUri)
+    sb.append(",\"version\":%d},\"contentChanges\":[{\"text\":", version)
+    AppendJsonString(sb, source)
+    sb.appendStr("}]}}")
+    AppendLspMsg(out, sb.cStr())
+}
+
+
+// ---------------------------------------------------------------------------
+// Test
+// ---------------------------------------------------------------------------
+
+@test("lsp_incremental_build_survives_3_cycles")
+func testIncrementalBuild() {
+    var cwd = CurrentWorkingPath()
+
+    // Determine project root: when run via 'litac test' the binary may run in
+    // bin/output/.  Walk up until we find a directory containing bin/litac.
+    var root   = [MAX_PATH]char{0}
+    var probe  = [MAX_PATH]char{0}
+    var rootBuf = StringBufferInit(root, MAX_PATH, 0)
+    rootBuf.format("%s", cwd)
+    var found = false
+    for(var depth = 0; depth < 5 && !found; depth += 1) {
+        var pb = StringBufferInit(probe, MAX_PATH, 0)
+#if OS == "WINDOWS"
+        pb.format("%s/bin/litac.exe", root)
+#else
+        pb.format("%s/bin/litac", root)
+#end
+        if(FileExists(probe)) {
+            found = true;
+        }
+        else {
+            var up = [MAX_PATH]char{0}
+            FileParent(root, up)
+            rootBuf.format("%s", up)
+        }
+    }
+    assert(found)
+
+    var binPath    = [MAX_PATH]char{0}
+    var rootUriStr = [MAX_PATH]char{0}
+    var fileUriStr = [MAX_PATH]char{0}
+
+    var binBuf     = StringBufferInit(binPath,    MAX_PATH, 0)
+    var rootUriBuf = StringBufferInit(rootUriStr, MAX_PATH, 0)
+    var fileUriBuf = StringBufferInit(fileUriStr, MAX_PATH, 0)
+#if OS == "WINDOWS"
+    binBuf.format("%s/bin/litac.exe", root)
+#else
+    binBuf.format("%s/bin/litac", root)
+#end
+    rootUriBuf.format("file://%s",                              root)
+    fileUriBuf.format("file://%s/src/test_incremental_lsp.lita", root)
+
+    var sb = StringBuilderInit(16384, defaultAllocator)
+    defer sb.free()
+
+    // Build all LSP messages into a single buffer.
+    // The server reads stdin sequentially, so ordering is sufficient –
+    // no sleeps between messages are required.
+    var messages = StringBuilderInit(65536, defaultAllocator)
+    defer messages.free()
+
+    // ---- initialize -------------------------------------------------------
+    sb.clear()
+    sb.append(
+        "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"processId\":1,\"rootPath\":\"%s\",\"rootUri\":\"%s\",\"capabilities\":{}}}",
+        cwd, rootUriStr)
+    AppendLspMsg(messages, sb.cStr())
+
+    // ---- initialized ------------------------------------------------------
+    AppendLspMsg(messages, "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}")
+
+    // ---- textDocument/didOpen ---------------------------------------------
+    sb.clear()
+    sb.appendStr("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":")
+    AppendJsonString(sb, fileUriStr)
+    sb.appendStr(",\"languageId\":\"litac\",\"version\":1,\"text\":")
+    AppendJsonString(sb, TEST_SOURCE_A)
+    sb.appendStr("}}}")
+    AppendLspMsg(messages, sb.cStr())
+
+    // ---- three didChange rounds --------------------------------------------
+    AppendChange(messages, sb, fileUriStr, 2, TEST_SOURCE_A)
+    AppendChange(messages, sb, fileUriStr, 3, TEST_SOURCE_B)
+    AppendChange(messages, sb, fileUriStr, 4, TEST_SOURCE_A)
+
+    // ---- clean shutdown ---------------------------------------------------
+    AppendLspMsg(messages, "{\"jsonrpc\":\"2.0\",\"id\":99,\"method\":\"shutdown\"}")
+    AppendLspMsg(messages, "{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}")
+
+    // Write messages to a temp file in the project root.
+    var tmpPath = [MAX_PATH]char{0}
+    var tmpBuf = StringBufferInit(tmpPath, MAX_PATH, 0)
+    tmpBuf.format("%s/lsp_test_input.dat", root)
+    defer FileDelete(tmpPath)
+
+    var f = fopen(tmpPath, "wb")
+    assert(f != null)
+    var msgStr = messages.cStr()
+    fwrite(msgStr, 1, strlen(msgStr), f)
+    fclose(f)
+
+    // Launch LSP with stdin redirected from the temp file.
+    // SystemExec opens the process via popen in read mode; we drain stdout
+    // so the LSP's output pipe never stalls.
+    var cmdPath = [MAX_PATH + 64]char{0}
+    var cmdBuf = StringBufferInit(cmdPath, MAX_PATH + 64, 0)
+    cmdBuf.format("%s lsp < %s", binPath, tmpPath)
+
+    var process = SystemExec(cmdPath)
+
+    // Drain LSP stdout so the pipe buffer cannot fill and block the server.
+    var drain = [4096]char{0}
+    while(process.readOutput(drain, 4096) > 0) {}
+
+    var returnCode = process.close()
+    assert(returnCode == 0)
+}

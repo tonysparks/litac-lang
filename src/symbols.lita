@@ -588,6 +588,20 @@ func (this: *Scope) markReset(symbols: *Map<InternedString, *Symbol>) {
         // DO NOT clear symbol.type, this is used as a cache and allows
         // for type look up and equality
         // symbol.type = null
+
+        // Null funcDecl for FUNC symbols only.
+        // funcDecl points into the module arena which is about to be cleared;
+        // it gets refreshed by newFuncTypeInfo when the symbol is re-resolved.
+        // Callers that guard on (funcDecl == null) (e.g. isMethodForType) will
+        // safely skip this symbol until re-resolution replaces the pointer.
+        //
+        // aggDecl/enumDecl are intentionally NOT cleared here: those TypeInfos
+        // can be shared via typedef aliases pointing at types in other modules.
+        // Nulling them would corrupt TypeInfos that are never re-resolved in the
+        // incremental pass (the foreign module's arena is untouched).
+        if(symbol.type != null && symbol.type.kind == TypeKind.FUNC) {
+            symbol.type.funcDecl = null
+        }
     }
 }
 
