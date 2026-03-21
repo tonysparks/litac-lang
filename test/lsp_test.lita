@@ -1,9 +1,13 @@
 /**
     LSP Incremental-Build Regression Tests
     =======================================
-    Spawns the litaC language server as a subprocess, drives it with LSP
-    JSON-RPC messages, and verifies it survives multiple consecutive
-    incremental rebuild cycles without crashing.
+    Spawns the litaC language server, drives it with LSP JSON-RPC messages,
+    and verifies it survives multiple consecutive incremental rebuild cycles
+    without crashing.
+
+    All LSP messages are written to a temp file up-front, then fed to the
+    server via shell stdin-redirection (<).  The server processes messages
+    sequentially, so no artificial sleeps are needed.
 
     Bugs covered:
       1. Arena aliasing  – importAliases/usingModules buckets were overwritten
@@ -23,8 +27,6 @@ import "std/mem"
 import "std/string/builder"
 import "std/string/buffer"
 import "std/system"
-import "std/thread/thread"       // ThreadSleepMSec
-import "std/process/subprocess"
 
 
 // ---------------------------------------------------------------------------
@@ -109,33 +111,26 @@ func AppendJsonString(sb: *StringBuilder, text: *const char) {
     sb.appendChar('"')
 }
 
-// Write one LSP message (Content-Length header + body) to stdin.
-func WriteLspMsg(input: *FILE, body: *const char) {
+// Append one LSP message (Content-Length header + body) to out.
+func AppendLspMsg(out: *StringBuilder, body: *const char) {
     var len = strlen(body)
-    fprintf(input, "Content-Length: %d\r\n\r\n", len)
-    fwrite(body, 1, len, input)
-    fflush(input)
+    out.append("Content-Length: %d\r\n\r\n", len)
+    out.appendStrn(body, len as (i32))
 }
 
-// Build and send a textDocument/didChange message.
-func SendChange(input: *FILE,
-                sb: *StringBuilder,
-                fileUri: *const char,
-                version: i32,
-                source: *const char,
-                sleepMs: i64) {
+// Build and append a textDocument/didChange message to out.
+func AppendChange(out: *StringBuilder,
+                  sb: *StringBuilder,
+                  fileUri: *const char,
+                  version: i32,
+                  source: *const char) {
     sb.clear()
     sb.appendStr("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":")
     AppendJsonString(sb, fileUri)
     sb.append(",\"version\":%d},\"contentChanges\":[{\"text\":", version)
     AppendJsonString(sb, source)
     sb.appendStr("}]}}")
-
-    WriteLspMsg(input, sb.cStr())
-    // Give the LSP time to process the incremental rebuild.
-    // The total stdout output is small (~200 bytes per response) so the
-    // 64 KB pipe buffer never fills up – no drain needed.
-    ThreadSleepMSec(sleepMs)
+    AppendLspMsg(out, sb.cStr())
 }
 
 
@@ -182,70 +177,65 @@ func testIncrementalBuild() {
     var sb = StringBuilderInit(16384, defaultAllocator)
     defer sb.free()
 
-    // ---- launch LSP -------------------------------------------------------
-    var process: subprocess_s
-    var binaryArgs = []*const char {
-        binPath,
-        "lsp",
-        null
-    }
-    // combined_stdout_stderr: merge LSP stdout+stderr into one pipe.
-    // inherit_environment: LSP needs LITAC_HOME etc. from the shell.
-    // NOTE: enable_async is deliberately omitted – on Linux it has no effect
-    //       on subprocess_read_stdout (reads still block).  We avoid deadlock
-    //       by never draining; the LSP's total output per session is ~1 KB,
-    //       well under the 64 KB pipe buffer.
-    var options: i32 =
-        subprocess_option_e.subprocess_option_combined_stdout_stderr |
-        subprocess_option_e.subprocess_option_inherit_environment
-
-    assert(subprocess_create(binaryArgs, options, &process) == 0)
-    defer subprocess_destroy(&process)
-
-    var input = subprocess_stdin(&process)
+    // Build all LSP messages into a single buffer.
+    // The server reads stdin sequentially, so ordering is sufficient –
+    // no sleeps between messages are required.
+    var messages = StringBuilderInit(65536, defaultAllocator)
+    defer messages.free()
 
     // ---- initialize -------------------------------------------------------
-    // workspace.setup() runs a full project build synchronously; allow ~5 s.
     sb.clear()
     sb.append(
         "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"processId\":1,\"rootPath\":\"%s\",\"rootUri\":\"%s\",\"capabilities\":{}}}",
         cwd, rootUriStr)
-    WriteLspMsg(input, sb.cStr())
-    ThreadSleepMSec(5000_i64)
+    AppendLspMsg(messages, sb.cStr())
 
     // ---- initialized ------------------------------------------------------
-    WriteLspMsg(input, "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}")
-    ThreadSleepMSec(200_i64)
+    AppendLspMsg(messages, "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\",\"params\":{}}")
 
     // ---- textDocument/didOpen ---------------------------------------------
-    // Supply source inline so the LSP uses it as module text without needing
-    // the file to exist on disk (ParseModule checks openedDocuments first).
     sb.clear()
     sb.appendStr("{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":")
     AppendJsonString(sb, fileUriStr)
     sb.appendStr(",\"languageId\":\"litac\",\"version\":1,\"text\":")
     AppendJsonString(sb, TEST_SOURCE_A)
     sb.appendStr("}}}")
-    WriteLspMsg(input, sb.cStr())
-    ThreadSleepMSec(3000_i64)
+    AppendLspMsg(messages, sb.cStr())
 
     // ---- three didChange rounds --------------------------------------------
-    // Each round triggers an incremental rebuild.  Three rounds exercise:
-    //   round 1 – first incremental rebuild  (basic arena-reset correctness)
-    //   round 2 – second rebuild with tweaked source  (re-enters markReset)
-    //   round 3 – third rebuild back to original source  (confirm stability)
-    SendChange(input, &sb, fileUriStr, 2, TEST_SOURCE_A, 2000_i64)
-    SendChange(input, &sb, fileUriStr, 3, TEST_SOURCE_B, 2000_i64)
-    SendChange(input, &sb, fileUriStr, 4, TEST_SOURCE_A, 2000_i64)
+    AppendChange(messages, sb, fileUriStr, 2, TEST_SOURCE_A)
+    AppendChange(messages, sb, fileUriStr, 3, TEST_SOURCE_B)
+    AppendChange(messages, sb, fileUriStr, 4, TEST_SOURCE_A)
 
     // ---- clean shutdown ---------------------------------------------------
-    // Send LSP shutdown + exit so the server calls exit(0) and terminates.
-    WriteLspMsg(input, "{\"jsonrpc\":\"2.0\",\"id\":99,\"method\":\"shutdown\"}")
-    ThreadSleepMSec(500_i64)
-    WriteLspMsg(input, "{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}")
+    AppendLspMsg(messages, "{\"jsonrpc\":\"2.0\",\"id\":99,\"method\":\"shutdown\"}")
+    AppendLspMsg(messages, "{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}")
 
-    var returnCode = 0_i32
-    subprocess_join(&process, &returnCode)
+    // Write messages to a temp file in the project root.
+    var tmpPath = [MAX_PATH]char{0}
+    var tmpBuf = StringBufferInit(tmpPath, MAX_PATH, 0)
+    tmpBuf.format("%s/lsp_test_input.dat", root)
+    defer FileDelete(tmpPath)
 
+    var f = fopen(tmpPath, "wb")
+    assert(f != null)
+    var msgStr = messages.cStr()
+    fwrite(msgStr, 1, strlen(msgStr), f)
+    fclose(f)
+
+    // Launch LSP with stdin redirected from the temp file.
+    // SystemExec opens the process via popen in read mode; we drain stdout
+    // so the LSP's output pipe never stalls.
+    var cmdPath = [MAX_PATH + 64]char{0}
+    var cmdBuf = StringBufferInit(cmdPath, MAX_PATH + 64, 0)
+    cmdBuf.format("%s lsp < %s", binPath, tmpPath)
+
+    var process = SystemExec(cmdPath)
+
+    // Drain LSP stdout so the pipe buffer cannot fill and block the server.
+    var drain = [4096]char{0}
+    while(process.readOutput(drain, 4096) > 0) {}
+
+    var returnCode = process.close()
     assert(returnCode == 0)
 }
