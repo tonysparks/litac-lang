@@ -151,7 +151,11 @@ func testIncrementalBuild() {
     var found = false
     for(var depth = 0; depth < 5 && !found; depth += 1) {
         var pb = StringBufferInit(probe, MAX_PATH, 0)
+#if OS == "WINDOWS"
+        pb.format("%s/bin/litac.exe", root)
+#else
         pb.format("%s/bin/litac", root)
+#end
         if(FileExists(probe)) {
             found = true;
         }
@@ -170,7 +174,11 @@ func testIncrementalBuild() {
     var binBuf     = StringBufferInit(binPath,    MAX_PATH, 0)
     var rootUriBuf = StringBufferInit(rootUriStr, MAX_PATH, 0)
     var fileUriBuf = StringBufferInit(fileUriStr, MAX_PATH, 0)
-    binBuf.format("%s/bin/litac",                               root)
+#if OS == "WINDOWS"
+    binBuf.format("%s/bin/litac.exe", root)
+#else
+    binBuf.format("%s/bin/litac", root)
+#end
     rootUriBuf.format("file://%s",                              root)
     fileUriBuf.format("file://%s/src/test_incremental_lsp.lita", root)
 
