@@ -1,0 +1,561 @@
+import "std/unicode/utf8"
+import "std/assert"
+
+// ============================================================
+// Utf8Encode tests
+// ============================================================
+
+@test
+func testEncodeAscii() {
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode('A', buf)
+    assert(n == 1)
+    assert(buf[0] == 0x41_u8)
+}
+
+@test
+func testEncodeAsciiSpace() {
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(' ', buf)
+    assert(n == 1)
+    assert(buf[0] == 0x20_u8)
+}
+
+@test
+func testEncodeAsciiNul() {
+    var buf = []u8 { 0xFF_u8, 0xFF_u8, 0xFF_u8, 0xFF_u8 }
+    var n = Utf8Encode(0, buf)
+    assert(n == 1)
+    assert(buf[0] == 0x00_u8)
+}
+
+@test
+func testEncode2Byte() {
+    // U+00A3 POUND SIGN: C2 A3
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0xA3, buf)
+    assert(n == 2)
+    assert(buf[0] == 0xC2_u8)
+    assert(buf[1] == 0xA3_u8)
+}
+
+@test
+func testEncode2ByteLowerBound() {
+    // U+0080 is the first 2-byte codepoint: C2 80
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x80, buf)
+    assert(n == 2)
+    assert(buf[0] == 0xC2_u8)
+    assert(buf[1] == 0x80_u8)
+}
+
+@test
+func testEncode2ByteUpperBound() {
+    // U+07FF is the last 2-byte codepoint: DF BF
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x7FF, buf)
+    assert(n == 2)
+    assert(buf[0] == 0xDF_u8)
+    assert(buf[1] == 0xBF_u8)
+}
+
+@test
+func testEncode3Byte() {
+    // U+2D5A TIFINAGH LETTER YAZ: E2 B5 9A
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x2D5A, buf)
+    assert(n == 3)
+    assert(buf[0] == 0xE2_u8)
+    assert(buf[1] == 0xB5_u8)
+    assert(buf[2] == 0x9A_u8)
+}
+
+@test
+func testEncode3ByteLowerBound() {
+    // U+0800 is the first 3-byte codepoint: E0 A0 80
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x0800, buf)
+    assert(n == 3)
+    assert(buf[0] == 0xE0_u8)
+    assert(buf[1] == 0xA0_u8)
+    assert(buf[2] == 0x80_u8)
+}
+
+@test
+func testEncode3ByteUpperBound() {
+    // U+FFFF: EF BF BF
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0xFFFF, buf)
+    assert(n == 3)
+    assert(buf[0] == 0xEF_u8)
+    assert(buf[1] == 0xBF_u8)
+    assert(buf[2] == 0xBF_u8)
+}
+
+@test
+func testEncode4Byte() {
+    // U+1F600 GRINNING FACE: F0 9F 98 80
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x1F600, buf)
+    assert(n == 4)
+    assert(buf[0] == 0xF0_u8)
+    assert(buf[1] == 0x9F_u8)
+    assert(buf[2] == 0x98_u8)
+    assert(buf[3] == 0x80_u8)
+}
+
+@test
+func testEncode4ByteLowerBound() {
+    // U+10000 is the first 4-byte codepoint: F0 90 80 80
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x10000, buf)
+    assert(n == 4)
+    assert(buf[0] == 0xF0_u8)
+    assert(buf[1] == 0x90_u8)
+    assert(buf[2] == 0x80_u8)
+    assert(buf[3] == 0x80_u8)
+}
+
+@test
+func testEncode4ByteUpperBound() {
+    // U+10FFFF is the last valid Unicode codepoint: F4 8F BF BF
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x10FFFF, buf)
+    assert(n == 4)
+    assert(buf[0] == 0xF4_u8)
+    assert(buf[1] == 0x8F_u8)
+    assert(buf[2] == 0xBF_u8)
+    assert(buf[3] == 0xBF_u8)
+}
+
+@test
+func testEncodeInvalidNegative() {
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(-1, buf)
+    assert(n == 0)
+}
+
+@test
+func testEncodeInvalidAboveMax() {
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var n = Utf8Encode(0x110000, buf)
+    assert(n == 0)
+}
+
+// ============================================================
+// Utf8Decode tests
+// ============================================================
+
+@test
+func testDecodeAscii() {
+    var bytes = []u8 { 0x41_u8, 0_u8 }   // 'A'
+    var r: rune = 0
+    var n = Utf8Decode(bytes, 1, &r)
+    assert(n == 1)
+    assert(r == 0x41)
+}
+
+@test
+func testDecodeAsciiNul() {
+    var bytes = []u8 { 0x00_u8, 0_u8 }
+    var r: rune = 0
+    var n = Utf8Decode(bytes, 1, &r)
+    assert(n == 1)
+    assert(r == 0)
+}
+
+@test
+func testDecode2Byte() {
+    // U+00A3 POUND SIGN: C2 A3
+    var bytes = []u8 { 0xC2_u8, 0xA3_u8, 0_u8 }
+    var r: rune = 0
+    var n = Utf8Decode(bytes, 2, &r)
+    assert(n == 2)
+    assert(r == 0xA3)
+}
+
+@test
+func testDecode3Byte() {
+    // U+2D5A TIFINAGH LETTER YAZ: E2 B5 9A
+    var bytes = []u8 { 0xE2_u8, 0xB5_u8, 0x9A_u8, 0_u8 }
+    var r: rune = 0
+    var n = Utf8Decode(bytes, 3, &r)
+    assert(n == 3)
+    assert(r == 0x2D5A)
+}
+
+@test
+func testDecode4Byte() {
+    // U+1F600 GRINNING FACE: F0 9F 98 80
+    var bytes = []u8 { 0xF0_u8, 0x9F_u8, 0x98_u8, 0x80_u8, 0_u8 }
+    var r: rune = 0
+    var n = Utf8Decode(bytes, 4, &r)
+    assert(n == 4)
+    assert(r == 0x1F600)
+}
+
+@test
+func testDecodeRoundtripAscii() {
+    var codepoint: rune = 'Z'
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var encLen = Utf8Encode(codepoint, buf)
+    var decoded: rune = 0
+    var decLen = Utf8Decode(buf, encLen, &decoded)
+    assert(encLen == decLen)
+    assert(codepoint == decoded)
+}
+
+@test
+func testDecodeRoundtrip2Byte() {
+    // U+00C9 LATIN CAPITAL LETTER E WITH ACUTE (É)
+    var codepoint: rune = 0x00C9
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var encLen = Utf8Encode(codepoint, buf)
+    var decoded: rune = 0
+    var decLen = Utf8Decode(buf, encLen, &decoded)
+    assert(encLen == decLen)
+    assert(codepoint == decoded)
+}
+
+@test
+func testDecodeRoundtrip3Byte() {
+    // U+4E2D CJK UNIFIED IDEOGRAPH (中)
+    var codepoint: rune = 0x4E2D
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var encLen = Utf8Encode(codepoint, buf)
+    var decoded: rune = 0
+    var decLen = Utf8Decode(buf, encLen, &decoded)
+    assert(encLen == decLen)
+    assert(codepoint == decoded)
+}
+
+@test
+func testDecodeRoundtrip4Byte() {
+    // U+1F600 GRINNING FACE
+    var codepoint: rune = 0x1F600
+    var buf = []u8 { 0_u8, 0_u8, 0_u8, 0_u8 }
+    var encLen = Utf8Encode(codepoint, buf)
+    var decoded: rune = 0
+    var decLen = Utf8Decode(buf, encLen, &decoded)
+    assert(encLen == decLen)
+    assert(codepoint == decoded)
+}
+
+// ============================================================
+// Utf8CodepointValid tests
+// ============================================================
+
+@test
+func testCodepointValidAscii() {
+    assert(Utf8CodepointValid('A'))
+    assert(Utf8CodepointValid(0))
+    assert(Utf8CodepointValid(0x7F))
+}
+
+@test
+func testCodepointValidLatin1() {
+    assert(Utf8CodepointValid(0x00C9))   // É
+    assert(Utf8CodepointValid(0x00FF))   // ÿ
+}
+
+@test
+func testCodepointValidHighPlane() {
+    assert(Utf8CodepointValid(0x10FFFF))
+    assert(Utf8CodepointValid(0x1F600))
+}
+
+@test
+func testCodepointValidSurrogatesInvalid() {
+    assert(!Utf8CodepointValid(0xD800))
+    assert(!Utf8CodepointValid(0xDBFF))
+    assert(!Utf8CodepointValid(0xDC00))
+    assert(!Utf8CodepointValid(0xDFFF))
+}
+
+@test
+func testCodepointValidAboveMaxInvalid() {
+    assert(!Utf8CodepointValid(0x110000))
+    assert(!Utf8CodepointValid(0x1FFFFF))
+}
+
+@test
+func testCodepointValidNegativeInvalid() {
+    assert(!Utf8CodepointValid(-1))
+}
+
+// ============================================================
+// Utf8CharWidth — ASCII range
+// ============================================================
+
+@test
+func testCharWidthNul() {
+    assert(Utf8CharWidth(0) == 0)
+}
+
+@test
+func testCharWidthC0Controls() {
+    assert(Utf8CharWidth(0x01) == -1)
+    assert(Utf8CharWidth(0x08) == -1)   // backspace
+    assert(Utf8CharWidth(0x09) == -1)   // tab
+    assert(Utf8CharWidth(0x0A) == -1)   // newline
+    assert(Utf8CharWidth(0x0D) == -1)   // carriage return
+    assert(Utf8CharWidth(0x1B) == -1)   // escape
+    assert(Utf8CharWidth(0x1F) == -1)
+}
+
+@test
+func testCharWidthAsciiPrintable() {
+    assert(Utf8CharWidth(0x20) == 1)    // space
+    assert(Utf8CharWidth(0x21) == 1)    // '!'
+    assert(Utf8CharWidth(0x30) == 1)    // '0'
+    assert(Utf8CharWidth(0x41) == 1)    // 'A'
+    assert(Utf8CharWidth(0x61) == 1)    // 'a'
+    assert(Utf8CharWidth(0x7E) == 1)    // '~'
+}
+
+@test
+func testCharWidthDel() {
+    assert(Utf8CharWidth(0x7F) == -1)
+}
+
+// ============================================================
+// Utf8CharWidth — Latin-1 range
+// ============================================================
+
+@test
+func testCharWidthC1Controls() {
+    // C1 controls U+0080-U+009F: non-printable
+    assert(Utf8CharWidth(0x80) == -1)
+    assert(Utf8CharWidth(0x85) == -1)   // NEL
+    assert(Utf8CharWidth(0x9F) == -1)
+}
+
+@test
+func testCharWidthLatin1Printable() {
+    // U+00A0-U+00FF: printable Latin-1 supplement
+    assert(Utf8CharWidth(0xA0) == 1)    // NO-BREAK SPACE
+    assert(Utf8CharWidth(0xA1) == 1)    // ¡
+    assert(Utf8CharWidth(0xAD) == 1)    // SOFT HYPHEN
+    assert(Utf8CharWidth(0xC0) == 1)    // À
+    assert(Utf8CharWidth(0xE9) == 1)    // é
+    assert(Utf8CharWidth(0xFF) == 1)    // ÿ
+}
+
+// ============================================================
+// Utf8CharWidth — Combining characters (width 0) via binary search
+// ============================================================
+
+@test
+func testCharWidthCombiningDiacriticals() {
+    // U+0300-U+036F Combining Diacritical Marks
+    assert(Utf8CharWidth(0x0300) == 0)   // COMBINING GRAVE ACCENT
+    assert(Utf8CharWidth(0x0301) == 0)   // COMBINING ACUTE ACCENT
+    assert(Utf8CharWidth(0x0308) == 0)   // COMBINING DIAERESIS
+    assert(Utf8CharWidth(0x036F) == 0)   // last in range
+}
+
+@test
+func testCharWidthCombiningCyrillic() {
+    assert(Utf8CharWidth(0x0483) == 0)   // COMBINING CYRILLIC TITLO
+    assert(Utf8CharWidth(0x0486) == 0)
+    assert(Utf8CharWidth(0x0488) == 0)   // COMBINING CYRILLIC THOUSANDS SIGN (Me)
+    assert(Utf8CharWidth(0x0489) == 0)   // COMBINING CYRILLIC MILLIONS SIGN (Me)
+}
+
+@test
+func testCharWidthCombiningHebrew() {
+    assert(Utf8CharWidth(0x0591) == 0)   // HEBREW ACCENT ETNAHTA
+    assert(Utf8CharWidth(0x05BD) == 0)
+    assert(Utf8CharWidth(0x05BF) == 0)
+    assert(Utf8CharWidth(0x05C1) == 0)
+    assert(Utf8CharWidth(0x05C7) == 0)
+}
+
+@test
+func testCharWidthCombiningArabic() {
+    assert(Utf8CharWidth(0x0610) == 0)   // ARABIC SIGN SALLALLAHOU ALAYHE WASSALLAM
+    assert(Utf8CharWidth(0x064B) == 0)   // ARABIC FATHATAN
+    assert(Utf8CharWidth(0x0670) == 0)   // ARABIC SUPERSCRIPT ALEF
+    assert(Utf8CharWidth(0x06D6) == 0)
+    assert(Utf8CharWidth(0x06EA) == 0)
+}
+
+@test
+func testCharWidthCombiningSyriac() {
+    assert(Utf8CharWidth(0x0711) == 0)
+    assert(Utf8CharWidth(0x0730) == 0)
+    assert(Utf8CharWidth(0x074A) == 0)
+}
+
+@test
+func testCharWidthCombiningDevanagari() {
+    assert(Utf8CharWidth(0x0901) == 0)   // DEVANAGARI SIGN INVERTED CANDRABINDU
+    assert(Utf8CharWidth(0x0902) == 0)
+    assert(Utf8CharWidth(0x093C) == 0)   // DEVANAGARI SIGN NUKTA
+    assert(Utf8CharWidth(0x0941) == 0)   // DEVANAGARI VOWEL SIGN U
+    assert(Utf8CharWidth(0x094D) == 0)   // DEVANAGARI SIGN VIRAMA
+}
+
+@test
+func testCharWidthCombiningThai() {
+    assert(Utf8CharWidth(0x0E31) == 0)   // THAI CHARACTER MAI HAN AKAT
+    assert(Utf8CharWidth(0x0E34) == 0)   // THAI CHARACTER SARA I
+    assert(Utf8CharWidth(0x0E3A) == 0)
+    assert(Utf8CharWidth(0x0E47) == 0)
+    assert(Utf8CharWidth(0x0E4E) == 0)
+}
+
+@test
+func testCharWidthCombiningTibetan() {
+    assert(Utf8CharWidth(0x0F71) == 0)
+    assert(Utf8CharWidth(0x0F7E) == 0)
+    assert(Utf8CharWidth(0x0F90) == 0)
+    assert(Utf8CharWidth(0x0FC6) == 0)
+}
+
+@test
+func testCharWidthHangulJamoMedialVowels() {
+    // U+1160-U+11FF are within the ZERO_WIDTH_INTERVALS table
+    assert(Utf8CharWidth(0x1160) == 0)
+    assert(Utf8CharWidth(0x11A7) == 0)
+    assert(Utf8CharWidth(0x11FF) == 0)
+}
+
+@test
+func testCharWidthCombiningSymbols() {
+    assert(Utf8CharWidth(0x20D0) == 0)   // COMBINING LEFT HARPOON ABOVE
+    assert(Utf8CharWidth(0x20EF) == 0)
+    assert(Utf8CharWidth(0x3099) == 0)   // COMBINING KATAKANA-HIRAGANA VOICED
+    assert(Utf8CharWidth(0x309A) == 0)
+}
+
+// ============================================================
+// Utf8CharWidth — Zero-width format characters (Cf, width 0)
+// ============================================================
+
+@test
+func testCharWidthZeroWidthSpace() {
+    assert(Utf8CharWidth(0x200B) == 0)   // ZERO WIDTH SPACE
+    assert(Utf8CharWidth(0x200C) == 0)   // ZERO WIDTH NON-JOINER
+    assert(Utf8CharWidth(0x200D) == 0)   // ZERO WIDTH JOINER
+    assert(Utf8CharWidth(0x200F) == 0)   // RIGHT-TO-LEFT MARK
+}
+
+@test
+func testCharWidthDirectionalMarks() {
+    assert(Utf8CharWidth(0x202A) == 0)   // LEFT-TO-RIGHT EMBEDDING
+    assert(Utf8CharWidth(0x202E) == 0)   // RIGHT-TO-LEFT OVERRIDE
+}
+
+@test
+func testCharWidthWordJoiner() {
+    assert(Utf8CharWidth(0x2060) == 0)   // WORD JOINER
+    assert(Utf8CharWidth(0xFEFF) == 0)   // BOM / ZERO WIDTH NO-BREAK SPACE
+}
+
+@test
+func testCharWidthVariationSelectors() {
+    assert(Utf8CharWidth(0xFE00) == 0)
+    assert(Utf8CharWidth(0xFE0F) == 0)
+}
+
+// ============================================================
+// Utf8CharWidth — Miscellaneous width-1 characters
+// ============================================================
+
+@test
+func testCharWidthGreek() {
+    assert(Utf8CharWidth(0x03B1) == 1)   // GREEK SMALL LETTER ALPHA
+    assert(Utf8CharWidth(0x03A9) == 1)   // GREEK CAPITAL LETTER OMEGA
+}
+
+@test
+func testCharWidthCyrillicAlphabet() {
+    assert(Utf8CharWidth(0x0410) == 1)   // CYRILLIC CAPITAL LETTER A
+    assert(Utf8CharWidth(0x044F) == 1)   // CYRILLIC SMALL LETTER YA
+}
+
+@test
+func testCharWidthTifinagh() {
+    assert(Utf8CharWidth(0x2D5A) == 1)   // TIFINAGH LETTER YAZ
+}
+
+@test
+func testCharWidthArabicLetters() {
+    // Arabic letters themselves (not combining) are width 1
+    assert(Utf8CharWidth(0x0627) == 1)   // ARABIC LETTER ALEF
+    assert(Utf8CharWidth(0x0644) == 1)   // ARABIC LETTER LAM
+}
+
+@test
+func testCharWidthHebrewLetters() {
+    assert(Utf8CharWidth(0x05D0) == 1)   // HEBREW LETTER ALEF
+    assert(Utf8CharWidth(0x05EA) == 1)   // HEBREW LETTER TAV
+}
+
+// ============================================================
+// Utf8CharWidth — East Asian Wide / Full-width (width 2)
+// ============================================================
+
+@test
+func testCharWidthHangulJamo() {
+    // U+1100-U+115F Hangul Jamo leading consonants: wide
+    assert(Utf8CharWidth(0x1100) == 2)
+    assert(Utf8CharWidth(0x115F) == 2)
+}
+
+@test
+func testCharWidthCjkIdeographs() {
+    assert(Utf8CharWidth(0x4E2D) == 2)   // 中
+    assert(Utf8CharWidth(0x4E00) == 2)   // first CJK
+    assert(Utf8CharWidth(0x9FFF) == 2)   // last CJK
+    assert(Utf8CharWidth(0x6587) == 2)   // 文
+}
+
+@test
+func testCharWidthHiragana() {
+    assert(Utf8CharWidth(0x3042) == 2)   // あ
+    assert(Utf8CharWidth(0x3093) == 2)   // ん
+}
+
+@test
+func testCharWidthKatakana() {
+    assert(Utf8CharWidth(0x30A2) == 2)   // ア
+    assert(Utf8CharWidth(0x30F3) == 2)   // ン
+}
+
+@test
+func testCharWidthHangulSyllables() {
+    assert(Utf8CharWidth(0xAC00) == 2)   // first Hangul syllable (가)
+    assert(Utf8CharWidth(0xD7A3) == 2)   // last Hangul syllable (힣)
+}
+
+@test
+func testCharWidthFullwidthLatin() {
+    assert(Utf8CharWidth(0xFF21) == 2)   // FULLWIDTH LATIN CAPITAL LETTER A
+    assert(Utf8CharWidth(0xFF41) == 2)   // FULLWIDTH LATIN SMALL LETTER A
+}
+
+@test
+func testCharWidthCjkExtensionA() {
+    assert(Utf8CharWidth(0x3400) == 2)
+    assert(Utf8CharWidth(0x4DBF) == 2)
+}
+
+@test
+func testCharWidthCjkCompatibility() {
+    assert(Utf8CharWidth(0xF900) == 2)
+    assert(Utf8CharWidth(0xFAFF) == 2)
+}
+
+@test
+func testCharWidthCjkExtensionBeyond() {
+    assert(Utf8CharWidth(0x20000) == 2)  // CJK Extension B
+    assert(Utf8CharWidth(0x2A6DF) == 2)
+}
+
+@test
+func testCharWidthYi() {
+    assert(Utf8CharWidth(0xA000) == 2)
+    assert(Utf8CharWidth(0xA4CF) == 2)
+}
