@@ -2,14 +2,16 @@
 	"name": "litac",
 	"displayName": "LitaC",
 	"description": "LitaC Programming Language",
-    "icon" : "images/litac_logo_128x128.png",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/tonysparks/litac-lang"
-    },
-    "homepage" : "https://github.com/tonysparks/litac-lang/README.md",
-    "keywords" : ["litac"],
-	"version": "0.0.4",
+	"icon": "images/litac_logo_128x128.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tonysparks/litac-lang"
+	},
+	"homepage": "https://github.com/tonysparks/litac-lang/README.md",
+	"keywords": [
+		"litac"
+	],
+	"version": "0.0.5",
 	"publisher": "tonysparks",
 	"engines": {
 		"vscode": "^1.35.0"
@@ -49,12 +51,12 @@
 				"litac.languageServerPath": {
 					"type": "string",
 					"default": "",
-					"description": "Path of the LitaC language server binary (e.g. \"C:/litac-lsp.exe\")"
+					"description": "Path of the LitaC compiler binary (e.g. \"C:/litac.exe\")"
 				},
 				"litac.languageServerArguments": {
 					"type": "string",
 					"default": "-languageServer",
-					"description": "Command line arguments for the LitaC language server"
+					"description": "Command line arguments for the LitaC compiler"
 				},
 				"litac.failFast": {
 					"type": "boolean",
@@ -64,7 +66,7 @@
 				"litac.languageServerLog": {
 					"type": "boolean",
 					"default": "false",
-					"description": "Outputs a log file for debuging the LitaC Language Server"
+					"description": "Outputs a log file for debuging the LitaC compiler"
 				},
 				"litac.libraryPath": {
 					"type": "string",
@@ -93,5 +95,7 @@
 	"dependencies": {
 		"vscode-languageclient": "^4.4.2"
 	},
-	"devDependencies": {}
+	"devDependencies": {
+		"@vscode/vsce": "^2.15.0"
+	}
 }

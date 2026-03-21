@@ -18,7 +18,7 @@ You need [LitaC](https://github.com/tonysparks/litac-lang) installed
 ## Extension Settings
 
 
-* `litac.languageServerPath`: Path of the LitaC language server binary (e.g. `"C:/litac-lsp.exe"`)
+* `litac.languageServerPath`: Path of the LitaC language server binary (e.g. `"C:/litac.exe"`)
 * `litac.languageServerArguments`: Command line arguments for the LitaC language server
 * `litac.failFast`: Prevents the server from being restarted after it has crashed (defaults to `false`)
 * `litac.languageServerLog`: Outputs a log file for debuging the LitaC Language Server (defaults to `false`)
