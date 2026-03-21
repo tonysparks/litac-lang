@@ -152,6 +152,32 @@ public func (this: using *CGen) emitFuncDeclSignature(decl: *FuncDecl, name: *co
     }
 }
 
+func funcBodyHasMocks(body: *Stmt) : bool {
+    if(!body) {
+        return false
+    }
+    if(body.kind == StmtKind.MOCK_STMT) {
+        return true
+    }
+    if(body.kind == StmtKind.FUNC_BODY_STMT) {
+        var fb = body as (*FuncBodyStmt)
+        for(var i = 0; i < fb.stmts.size(); i += 1) {
+            if(funcBodyHasMocks(fb.stmts.get(i))) {
+                return true
+            }
+        }
+    }
+    if(body.kind == StmtKind.BLOCK_STMT) {
+        var bs = body as (*BlockStmt)
+        for(var i = 0; i < bs.stmts.size(); i += 1) {
+            if(funcBodyHasMocks(bs.stmts.get(i))) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
 public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     assert(decl != null)
 
@@ -162,6 +188,19 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
     decl.sym.flags |= SymbolFlags.IS_EMITTED
 
     var name = this.cName(decl.sym)
+
+    // If this function is a mock target, emit the intercept wrapper
+    if(this.lita.options.testsOnly &&
+       this.lita.mockTargets.contains(decl.sym.qualifiedName)) {
+        this.emitMockedFuncDecl(decl, name)
+        return;
+    }
+
+    // Reset mock helper buffer for collecting mock function definitions
+    // that need to be emitted before the enclosing function
+    this.mockHelperBuf.clear()
+    this.funcPreIndex = this.buf.length
+
     this.emitFuncDeclSignature(decl, name)
     this.emitStrn(" {", 2)
     // mark our current index into this function, so that
@@ -170,10 +209,128 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
 
     if(decl.body) {
         this.currentFunc = decl.sym.type
+
+        // For @test functions that use mock statements, inject MockScope setup/teardown
+        var isTest = decl.sym.flags & SymbolFlags.IS_TEST
+        var hasMocks = isTest && this.lita.options.testsOnly && funcBodyHasMocks(decl.body)
+        if(hasMocks) {
+            buf.append("\n%sstd__mock__MockScope __mock_scope = {0};\n%sstd__mock__MockScope_init(&__mock_scope, %sstd__mem__defaultAllocator);",
+                this.options.cPrefix, this.options.cPrefix, this.options.cPrefix)
+            this.emitStmt(decl.body)
+            buf.append("\n%sstd__mock__MockScope_clear(&__mock_scope);", this.options.cPrefix)
+        }
+        else {
+            this.emitStmt(decl.body)
+        }
+
+        this.currentFunc = null
+    }
+    this.emitStrn("}\n", 2)
+
+    // If any mock helper functions were collected, insert them before this function
+    // (C does not allow nested function definitions)
+    if(this.mockHelperBuf.length > 0) {
+        buf.insert(this.funcPreIndex, "%.*s", this.mockHelperBuf.length, this.mockHelperBuf.buffer)
+    }
+}
+
+func (this: using *CGen) emitMockedFuncDecl(decl: *FuncDecl, name: *const char) {
+    var funcInfo = decl.sym.type
+    var isVoid = funcInfo.returnType.kind == TypeKind.VOID
+
+    // 1. Emit the __real_ version with original body
+    var realNameSb = StringBuilderInit(512, this.allocator)
+    // name looks like "prefix__pkg__FuncName"; we want "__real_prefix__pkg__FuncName"
+    realNameSb.append("__real_%s", name)
+    var realName = realNameSb.cStrConst()
+
+    this.emitFuncDeclSignature(decl, realName)
+    this.emitStrn(" {", 2)
+    this.funcIndex = this.buf.length
+    if(decl.body) {
+        this.currentFunc = decl.sym.type
         this.emitStmt(decl.body)
         this.currentFunc = null
     }
     this.emitStrn("}\n", 2)
+
+    // 2. Emit global registry pointer
+    buf.append("\nstatic %sstd__mock__MockRegistry* __mock_%s = NULL;\n", this.options.cPrefix, name)
+
+    // 3. Emit the intercept wrapper with original name
+    this.emitFuncDeclSignature(decl, name)
+    this.emitStrn(" {", 2)
+
+    buf.append("\nif(__mock_%s) {", name)
+    buf.append("\n%sstd__mock__MockEntry* __e = %sstd__mock__MockRegistry_lookup(__mock_%s, ", this.options.cPrefix, this.options.cPrefix, name)
+
+    // The key: for methods, use first param cast to usize; for free functions, use 0
+    var funcDecl = funcInfo.funcDecl
+    if(funcDecl.flags & FuncFlags.IS_METHOD && !funcDecl.params.empty()) {
+        var firstParam = funcDecl.params.get(0)
+        buf.append("(%susize)%s", this.options.cPrefix, this.cName(firstParam.sym))
+    }
+    else {
+        buf.append("(%susize)0", this.options.cPrefix)
+    }
+    buf.appendStrn(");", 2)
+
+    buf.appendStr("\nif(__e) {")
+    buf.appendStr("\n__e->callCount += 1;")
+
+    if(!isVoid) {
+        buf.append("\nreturn ((%s(*)(", this.cType(funcInfo.returnType))
+        for(var i = 0; i < funcDecl.params.size(); i += 1) {
+            if(i > 0) buf.appendStrn(",", 1)
+            var param = funcDecl.params.get(i)
+            buf.appendStr(this.cType(param.sym.type))
+        }
+        if(funcDecl.params.size() > 0) buf.appendStrn(",", 1)
+        buf.appendStrn("void*))__e->fn)(", 16)
+        for(var i = 0; i < funcDecl.params.size(); i += 1) {
+            if(i > 0) buf.appendStrn(",", 1)
+            var param = funcDecl.params.get(i)
+            buf.appendStr(this.cName(param.sym))
+        }
+        if(funcDecl.params.size() > 0) buf.appendStrn(",", 1)
+        buf.appendStrn("__e->ctx);", 10)
+    }
+    else {
+        buf.append("\n((%s(*)(", this.cType(funcInfo.returnType))
+        for(var i = 0; i < funcDecl.params.size(); i += 1) {
+            if(i > 0) buf.appendStrn(",", 1)
+            var param = funcDecl.params.get(i)
+            buf.appendStr(this.cType(param.sym.type))
+        }
+        if(funcDecl.params.size() > 0) buf.appendStrn(",", 1)
+        buf.appendStrn("void*))__e->fn)(", 16)
+        for(var i = 0; i < funcDecl.params.size(); i += 1) {
+            if(i > 0) buf.appendStrn(",", 1)
+            var param = funcDecl.params.get(i)
+            buf.appendStr(this.cName(param.sym))
+        }
+        if(funcDecl.params.size() > 0) buf.appendStrn(",", 1)
+        buf.appendStrn("__e->ctx);\nreturn;", 18)
+    }
+
+    buf.appendStrn("\n}", 2)  // close if(__e)
+    buf.appendStrn("\n}", 2)  // close if(__mock_name)
+
+    // fallthrough to real implementation
+    if(!isVoid) {
+        buf.append("\nreturn %s(", realName)
+    }
+    else {
+        buf.append("\n%s(", realName)
+    }
+    for(var i = 0; i < funcDecl.params.size(); i += 1) {
+        if(i > 0) buf.appendStrn(",", 1)
+        var param = funcDecl.params.get(i)
+        buf.appendStr(this.cName(param.sym))
+    }
+    buf.appendStrn(");", 2)
+    this.emitStrn("\n}", 2)
+    this.emitln()
 }
 
 

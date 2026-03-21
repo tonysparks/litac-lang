@@ -638,6 +638,10 @@ public func CopyStmt(stmt: *Stmt, module: *Module) : *Stmt {
                                     module.allocator)
             return copy
         }
+        case StmtKind.MOCK_STMT: {
+            // mock statements are not generic-copied; return as-is
+            return stmt
+        }
         default: {
             if(IsExpr(stmt)) {
                 return CopyExpr(stmt as (*Expr), module) as (*Stmt)

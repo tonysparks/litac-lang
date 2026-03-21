@@ -1565,6 +1565,10 @@ func (p: *Parser) tryStatement() : *Stmt {
         return p.gotoStatement()
     }
 
+    if(p.match(TokenType.MOCK)) {
+        return p.mockStatement()
+    }
+
     if(p.check(TokenType.IDENTIFIER)) {
         var stmt = p.tryLabelStatement()
         if(stmt) {
@@ -2137,6 +2141,107 @@ func (p: *Parser) deferStatement() : *Stmt {
     var pos = p.prevPos()
     var defered = p.statement()
     return NewDeferStmt(pos, p.pos(), defered, p.allocator)
+}
+
+func (p: *Parser) mockStatement() : *Stmt {
+    var pos = p.prevPos()
+
+    // Optional: "name ="
+    // Peek: if IDENTIFIER followed by EQUALS (not EQUALS_EQUALS), it's a var binding
+    var varName = Identifier {
+        .str = EMPTY_STR,
+        .token = Token { .type = TokenType.VOID }
+    }
+    var hasVarBinding = false
+
+    if(p.check(TokenType.IDENTIFIER)) {
+        // peek one ahead
+        var nextIdx = p.current + 1
+        if(nextIdx < p.tokens.size()) {
+            var nextTok = &p.tokens.elements[nextIdx]
+            if(nextTok.type == TokenType.EQUALS) {
+                var identTok = p.advancep()
+                p.advance()  // consume the '='
+                varName = Identifier {
+                    .str = p.strings.internString(identTok.value.str),
+                    .token = *identTok
+                }
+                hasVarBinding = true
+            }
+        }
+    }
+
+    // Parse target: [object .] methodName
+    var object: *Expr = null
+    var methodName = Identifier {
+        .str = EMPTY_STR,
+        .token = Token { .type = TokenType.VOID }
+    }
+
+    // Parse first identifier
+    var firstIdent = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+    if(!firstIdent) {
+        goto err
+    }
+
+    if(p.match(TokenType.DOT)) {
+        // method form: object.method
+        var identTypeSpec = NewNameTypeSpecIntern(firstIdent.pos, p.strings.internString(firstIdent.value.str), p.typeAllocator)
+        var identExpr = NewIdentifierExpr(firstIdent.pos, firstIdent.pos, identTypeSpec, p.allocator) as (*IdentifierExpr)
+        object = identExpr as (*Expr)
+
+        var methodTok = p.consume(TokenType.IDENTIFIER, ErrorCode.MISSING_IDENTIFIER)
+        if(!methodTok) {
+            goto err
+        }
+        methodName = Identifier {
+            .str = p.strings.internString(methodTok.value.str),
+            .token = *methodTok
+        }
+    }
+    else {
+        // free function form: just the function name
+        methodName = Identifier {
+            .str = p.strings.internString(firstIdent.value.str),
+            .token = *firstIdent
+        }
+    }
+
+    // Parse (params)
+    var parameters = p.parametersStatement()
+    if(!parameters) {
+        goto err
+    }
+
+    // Parse : ReturnType (optional)
+    var returnType: *TypeSpec = null
+    if(p.match(TokenType.COLON)) {
+        returnType = p.type()
+        if(!returnType) {
+            goto err
+        }
+    }
+    else {
+        returnType = NewVoidTypeSpec(p.pos(), p.typeAllocator)
+    }
+
+    // Parse { body }
+    if(!p.check(TokenType.LEFT_BRACE)) {
+        p.errorAtToken(p.peek(), ErrorCode.MISSING_LEFT_BRACE)
+        goto err
+    }
+
+    p.funcLevel += 1
+    var body = p.statement()
+    if(body && body.kind == StmtKind.BLOCK_STMT) {
+        body.kind = StmtKind.FUNC_BODY_STMT
+    }
+    p.funcLevel -= 1
+
+    return NewMockStmt(pos, p.prevPos(), varName, hasVarBinding,
+                       object, methodName, parameters, returnType, body, p.allocator) as (*Stmt)
+err:
+    return p.poisonStatement(pos)
 }
 
 func (p: *Parser) gotoStatement() : *Stmt {

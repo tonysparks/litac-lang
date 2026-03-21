@@ -1,0 +1,9 @@
+
+import "main"
+import "std/assert"
+
+@test("project_test")
+func test() {
+    assert(true)
+}
+

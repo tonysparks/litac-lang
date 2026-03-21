@@ -1,0 +1,149 @@
+import "std/libc"
+import "std/mem"
+
+// Internal registry entry
+public struct MockEntry {
+    key: usize          // instance pointer (0 for free functions)
+    fn: *void           // pointer to the synthesized mock function
+    ctx: *void          // pointer to capture struct (may be null)
+    callCount: i32
+    next: *MockEntry    // linked list chaining for hash collisions
+}
+
+// Per-method global registry (one per mocked function)
+const MOCK_REGISTRY_SIZE = 64
+
+public struct MockRegistry {
+    entries: [MOCK_REGISTRY_SIZE]*MockEntry
+    allocator: *const Allocator
+}
+
+public func (this: *MockRegistry) init(allocator: *const Allocator) {
+    this.allocator = allocator
+    for(var i = 0; i < MOCK_REGISTRY_SIZE; i += 1) {
+        this.entries[i] = null
+    }
+}
+
+public func (this: *MockRegistry) clear() {
+    for(var i = 0; i < MOCK_REGISTRY_SIZE; i += 1) {
+        var e = this.entries[i]
+        while(e != null) {
+            var next = e.next
+            this.allocator.free(e as (*void))
+            e = next
+        }
+        this.entries[i] = null
+    }
+}
+
+public func (this: *MockRegistry) register(key: usize, fn: *void, ctx: *void) : *MockEntry {
+    var idx = (key % (MOCK_REGISTRY_SIZE as (usize))) as (i32)
+    var e = new<MockEntry>(this.allocator)
+    e.key = key
+    e.fn = fn
+    e.ctx = ctx
+    e.callCount = 0
+    e.next = this.entries[idx]
+    this.entries[idx] = e
+    return e
+}
+
+public func MockRegistry_lookup(reg: *MockRegistry, key: usize) : *MockEntry {
+    if(reg == null) {
+        return null
+    }
+    var idx = (key % (MOCK_REGISTRY_SIZE as (usize))) as (i32)
+    var e = reg.entries[idx]
+    while(e != null) {
+        if(e.key == key) {
+            return e
+        }
+        e = e.next
+    }
+    return null
+}
+
+// Tracks all registrations made in one @test function for cleanup
+public struct MockScopeEntry {
+    registry: **MockRegistry
+    next: *MockScopeEntry
+}
+
+public struct MockScope {
+    head: *MockScopeEntry
+    allocator: *const Allocator
+}
+
+public func (this: *MockScope) init(allocator: *const Allocator) {
+    this.allocator = allocator
+    this.head = null
+}
+
+public func (this: *MockScope) track(registry: **MockRegistry) {
+    var e = new<MockScopeEntry>(this.allocator)
+    e.registry = registry
+    e.next = this.head
+    this.head = e
+}
+
+public func (this: *MockScope) clear() {
+    var e = this.head
+    while(e != null) {
+        var next = e.next
+        var regPtr = *(e.registry)
+        if(regPtr != null) {
+            regPtr.clear();
+            this.allocator.free(regPtr as (*void));
+            *(e.registry) = null;
+        }
+        this.allocator.free(e as (*void));
+        e = next
+    }
+    this.head = null
+}
+
+// Handle returned to the test author for verification
+public struct MockHandle {
+    entry: *MockEntry
+}
+
+public func (this: MockHandle) assertCalledTimes(
+    n: i32,
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    if(this.entry == null) {
+        if(n != 0) {
+            printf("%s:%zu: expected %d calls but mock was never registered\n", filename, lineNumber, n)
+        }
+        return;
+    }
+    if(this.entry.callCount != n) {
+        printf("%s:%zu: expected %d calls but got %d\n", filename, lineNumber, n, this.entry.callCount)
+    }
+}
+
+public func (this: MockHandle) assertCalledOnce(
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    this.assertCalledTimes(1, filename, lineNumber)
+}
+
+public func (this: MockHandle) assertCalled(
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    var count = (this.entry != null) ? this.entry.callCount : 0
+    if(count < 1) {
+        printf("%s:%zu: expected mock to be called at least once but was called %d times\n", filename, lineNumber, count)
+    }
+}
+
+public func (this: MockHandle) assertNotCalled(
+    filename: *const char = __FILE__,
+    lineNumber: usize = __LINE__
+) {
+    this.assertCalledTimes(0, filename, lineNumber)
+}

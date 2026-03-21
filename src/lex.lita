@@ -70,6 +70,7 @@ public enum TokenType {
     PUBLIC,
     INTERNAL,
     USING,
+    MOCK,
     // End KeyWords
 
     // Symbols
@@ -197,6 +198,7 @@ public const tokenText = [TokenType.MAX_TOKEN_TYPES]*const char {
     [TokenType.PUBLIC] = "public",
     [TokenType.INTERNAL] = "internal",
     [TokenType.USING] = "using",
+    [TokenType.MOCK] = "mock",
 
     // End KeyWords
 
@@ -343,6 +345,7 @@ const keywordCache = [MAX_KEYWORD_CACHE]**const char {
         "else",
         "case",
         "goto",
+        "mock",
         null
     },
     [5] = []*const char {
@@ -413,6 +416,7 @@ const keywordCacheIndex = [MAX_KEYWORD_CACHE]*TokenType {
         TokenType.ELSE,
         TokenType.CASE,
         TokenType.GOTO,
+        TokenType.MOCK,
     },
     [5] = []TokenType {
         TokenType.TRAIT,

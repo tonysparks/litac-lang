@@ -1117,6 +1117,34 @@ public func NewEnumFieldEntryDecl(startPos: SrcPos,
 }
 
 
+public func NewMockStmt(startPos: SrcPos,
+                        endPos: SrcPos,
+                        varName: Identifier,
+                        hasVarBinding: bool,
+                        object: *Expr,
+                        methodName: Identifier,
+                        params: *ParametersStmt,
+                        returnType: *TypeSpec,
+                        body: *Stmt,
+                        allocator: *const Allocator) : *MockStmt {
+    var stmt = new<MockStmt>(allocator)
+    stmt.kind = StmtKind.MOCK_STMT
+    stmt.startPos = startPos
+    stmt.endPos = endPos
+    stmt.varName = varName
+    stmt.hasVarBinding = hasVarBinding
+    stmt.object = object
+    stmt.methodName = methodName
+    stmt.params = params
+    stmt.returnType = returnType
+    stmt.body = body
+    stmt.targetFuncSym = null
+    stmt.captureVars.init(0, allocator)
+    stmt.mockIndex = 0
+    return stmt
+}
+
+
 @test
 func typeSpecAllocator() {
     var specs = TypeSpecAllocator{}

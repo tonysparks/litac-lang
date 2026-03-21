@@ -84,6 +84,8 @@ public struct TypeChecker {
     randomNameIndex: u32
 
     bypassing: bool // if the checker should bypass imported modules and look at all modules
+
+    mockIndex: i32  // counter for mock statements within current test function
 }
 
 public func (this: *TypeChecker) init(lita: *Lita, allocator: *const Allocator) {
@@ -1902,6 +1904,10 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             }
             return true
         }
+        case StmtKind.MOCK_STMT: {
+            var mockStmt = stmt as (*MockStmt)
+            return this.resolveMockStmt(mockStmt)
+        }
 
         // --------------------------------------------------
         //          Expressions
@@ -1942,4 +1948,117 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
     }
 
     return false
+}
+
+func (this: *TypeChecker) resolveMockStmt(stmt: *MockStmt) : bool {
+    // Assign a unique index for this mock within the test function
+    stmt.mockIndex = this.mockIndex
+    this.mockIndex += 1
+
+    // 1. Resolve target function symbol
+    var targetSym: *Symbol = null
+
+    if(stmt.object != null) {
+        // Method mock: resolve the object expression, then find method on its type
+        if(!this.resolveExpr(stmt.object)) {
+            return false
+        }
+        var objType = stmt.object.operand.typeInfo
+        if(!objType) {
+            this.result.addError(stmt.methodName.token.pos,
+                "could not determine type for mock target object")
+            return false
+        }
+        // unwrap pointer
+        var baseType = objType.getBaseType()
+        // find method on the base type
+        var methodResult = baseType.getMethod(this.lita.strings, this.current, stmt.methodName.str)
+        if(!methodResult.symbol) {
+            this.result.addError(stmt.methodName.token.pos,
+                "mock target method '%.*s' not found",
+                stmt.methodName.str.length, stmt.methodName.str.buffer)
+            return false
+        }
+        targetSym = methodResult.symbol
+    }
+    else {
+        // Free function mock: look up by function name
+        targetSym = this.getTypeByName(stmt.methodName.str, SearchType.FUNC)
+        if(!targetSym) {
+            this.result.addError(stmt.methodName.token.pos,
+                "mock target function '%.*s' not found",
+                stmt.methodName.str.length, stmt.methodName.str.buffer)
+            return false
+        }
+    }
+
+    stmt.targetFuncSym = targetSym
+
+    // 2. Register in mockTargets
+    this.lita.mockTargets.put(targetSym.qualifiedName, targetSym)
+
+    // Resolve the return type from the typespec
+    var mockReturnType: *TypeInfo = &VOID_TYPE
+    if(stmt.returnType) {
+        mockReturnType = this.resolveTypeSpec(stmt.returnType)
+        if(!mockReturnType) {
+            mockReturnType = &VOID_TYPE
+        }
+    }
+
+    // 3. Resolve params in new scope, then resolve body
+    this.pushScope(&Scope{})
+    defer this.popScope()
+
+    for(var i = 0; i < stmt.params.size(); i += 1) {
+        var param = stmt.params.get(i)
+        if(!this.resolveParamDecl(param)) {
+            return false
+        }
+    }
+
+    // Push a mock function TypeInfo so return statements type-check correctly
+    var mockFuncType = TypeInfo{
+        .kind = TypeKind.FUNC,
+        .returnType = mockReturnType
+    }
+    this.funcDeclStack.add(&mockFuncType)
+    defer this.funcDeclStack.pop()
+
+    // 4. Resolve body
+    if(!this.resolveStmt(stmt.body)) {
+        return false
+    }
+
+    // 5. If has var binding, introduce a MockHandle symbol in the outer scope
+    if(stmt.hasVarBinding) {
+        // Look up MockHandle type
+        var mockHandleName = this.lita.strings.internCopy("MockHandle")
+        var mockHandleSym = this.getTypeByName(mockHandleName)
+        if(!mockHandleSym) {
+            // MockHandle not found -- user needs to import std/mock
+            this.result.addError(stmt.varName.token.pos,
+                "MockHandle type not found: make sure to import \"std/mock\"")
+            return false
+        }
+
+        // Create a simple type spec for MockHandle (already resolved)
+        var mockHandleType = mockHandleSym.type
+
+        // Add symbol to the outer scope (the scope before we pushed for params)
+        // The outer scope is this.currentScope() since we're past the defer popScope
+        // Actually, we're still inside the defer popScope -- we need to add to parent scope
+        var outerScope = this.currentScope().parent
+        if(outerScope) {
+            var sym = outerScope.addSymbol(stmt.varName.str, this.current, stmt as (*Decl), 0)
+            if(sym) {
+                sym.type = mockHandleType
+                sym.state = SymbolState.RESOLVED
+                sym.flags |= SymbolFlags.IS_LOCAL
+                stmt.handleSym = sym
+            }
+        }
+    }
+
+    return true
 }

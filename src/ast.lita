@@ -56,6 +56,7 @@ public enum StmtKind {
     SWITCH_CASE_STMT,
     SWITCH_STMT,
     WHILE_STMT,
+    MOCK_STMT,
 
     ARRAY_DESIGNATION_EXPR,
     ARRAY_INIT_EXPR,
@@ -450,6 +451,22 @@ public struct WhileStmt {
     body: *Stmt
 }
 
+public struct MockStmt {
+    stmt: using Stmt
+    varName: Identifier          // variable name for the MockHandle (may be empty)
+    hasVarBinding: bool          // true if user wrote "mock name = ..."
+    object: *Expr                // receiver for method mocks (null for free functions)
+    methodName: Identifier       // method/function name
+    params: *ParametersStmt      // declared parameters in the mock body
+    returnType: *TypeSpec        // declared return type
+    body: *Stmt                  // the mock body
+
+    // Filled by type checker:
+    targetFuncSym: *Symbol       // the resolved function symbol
+    handleSym: *Symbol           // the MockHandle symbol (if hasVarBinding)
+    captureVars: Array<*Symbol>  // local variables captured from enclosing scope
+    mockIndex: i32               // unique index within the test function (for naming synthesized fns)
+}
 
 public struct Stmt {
     node: using Node

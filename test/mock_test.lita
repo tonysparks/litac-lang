@@ -1,0 +1,39 @@
+import "std/mock"
+import "std/libc"
+import "std/assert"
+
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+
+func add(a: i32, b: i32) : i32 {
+    return a + b
+}
+
+@test
+func testMockFreeFunction() {
+    mock addMock = add(a: i32, b: i32) : i32 {
+        return 99
+    }
+
+    var result = add(1, 2)
+    assert(result == 99)
+    addMock.assertCalledOnce()
+}
+
+@test
+func testMockMethod() {
+    var sb = StringBuilderInit(1024)
+
+    mock sbAppend = sb.appendStrn(str: *const char, n: i32): i32 {
+        return 2
+    }
+
+    //  mock sbCstr = sb.cStr(): *char {
+    //     return "hi"
+    //  }
+
+    //  assert(sb.append("%s", "hello world") == 2)
+    //  var result = sb.cStr()
+    //  assert(result.equals("hi"))
+}

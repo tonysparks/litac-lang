@@ -683,6 +683,19 @@ public func PrintStmt(s: *Stmt, indent: i32 = 0) {
             PrintStmt(stmt.body, indent)
             return;
         }
+        case StmtKind.MOCK_STMT: {
+            var stmt = s as (*MockStmt)
+            Printf(indent, "mock ")
+            if(stmt.hasVarBinding) {
+                Printf(0, "%.*s = ", stmt.varName.str.length, stmt.varName.str.buffer)
+            }
+            if(stmt.object != null) {
+                PrintStmt(stmt.object, 0)
+                Printf(0, ".")
+            }
+            Printf(0, "%.*s(...)", stmt.methodName.str.length, stmt.methodName.str.buffer)
+            return;
+        }
 
         case StmtKind.ARRAY_DESIGNATION_EXPR: {
             var expr = s as (*ArrayDesignationExpr)

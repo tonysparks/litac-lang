@@ -38,6 +38,7 @@ public struct CGen {
 
     bufferFlush: bool
     funcIndex: i32
+    funcPreIndex: i32
     tmpVar: i32
     deferStack: i32
 
@@ -45,6 +46,8 @@ public struct CGen {
 
     currentFunc: *TypeInfo
     currentScope: *CGenScope
+
+    mockHelperBuf: StringBuilder
 
     output: *File
 }
@@ -101,6 +104,7 @@ public func (this: *CGen) init(lita: *Lita, output: *File) {
     this.bufferFlush = false
 
     this.deferStack = 0
+    this.mockHelperBuf.init(1024, lita.allocator)
 
     this.format = lita.options.cFormat
     this.output = output
@@ -2053,6 +2057,11 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emitStrn(";\n", 2)
             return;
         }
+        case StmtKind.MOCK_STMT: {
+            var stmt = s as (*MockStmt)
+            this.emitMockStmt(stmt)
+            return;
+        }
         case StmtKind.WHILE_STMT: {
             var stmt = s as (*WhileStmt)
             this.emitStrn("while(", 6)
@@ -2797,6 +2806,168 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             this.emit("<%s Not Implemented>", StmtKindAsStr(s.kind))
             assert(false)
         }
+    }
+}
+
+func (this: using *CGen) emitMockStmt(stmt: *MockStmt) {
+    var targetSym = stmt.targetFuncSym
+    if(!targetSym) {
+        return;
+    }
+
+    var funcInfo = targetSym.type
+    if(!funcInfo || funcInfo.kind != TypeKind.FUNC) {
+        return;
+    }
+
+    var funcDecl = funcInfo.funcDecl
+    if(!funcDecl) {
+        return;
+    }
+
+    var targetName = this.cName(targetSym)
+    var isVoid = funcInfo.returnType.kind == TypeKind.VOID
+
+    // Build mock function name: __mock_fn_<N>
+    var mockFnSb = StringBuilderInit(128, this.allocator)
+    mockFnSb.append("__mock_fn_%d", stmt.mockIndex)
+    var mockFnName = mockFnSb.cStrConst()
+
+    // Build registry variable name: __mock_<targetName>
+    var registrySb = StringBuilderInit(128, this.allocator)
+    registrySb.append("__mock_%s", targetName)
+    var registryName = registrySb.cStrConst()
+
+    // 1. Emit capture struct if there are captures
+    var captureStructName = StringBuilderInit(128, this.allocator)
+    captureStructName.append("__MockCapture_%d", stmt.mockIndex)
+    var capStructName = captureStructName.cStrConst()
+
+    // 2. Emit the named mock function with the real signature + void* __ctx
+    // We record the position in buf, emit everything (capture struct + function),
+    // then move it to mockHelperBuf so that it ends up before the enclosing @test
+    // function (C does not allow nested function definitions)
+    var mockFnStart = buf.length
+
+    if(stmt.captureVars.size() > 0) {
+        buf.append("\ntypedef struct { ")
+        for(var i = 0; i < stmt.captureVars.size(); i += 1) {
+            var sym = stmt.captureVars.get(i)
+            buf.appendStr(this.cTypeDecl(sym.type, this.cName(sym)))
+            buf.appendStrn(";", 1)
+        }
+        buf.append(" } %s;\n", capStructName)
+    }
+
+    if(!isVoid) {
+        buf.append("\nstatic %s %s(", this.cType(funcInfo.returnType), mockFnName)
+    }
+    else {
+        buf.append("\nstatic void %s(", mockFnName)
+    }
+
+    // emit original params
+    for(var i = 0; i < funcDecl.params.size(); i += 1) {
+        if(i > 0) buf.appendStrn(",", 1)
+        var param = funcDecl.params.get(i)
+        buf.appendStr(this.cTypeDecl(param.sym.type, this.cName(param.sym)))
+    }
+    // add void* __ctx parameter
+    if(funcDecl.params.size() > 0) buf.appendStrn(",", 1)
+    buf.appendStrn("void* __ctx) {", 14)
+
+    // Unpack capture struct
+    if(stmt.captureVars.size() > 0) {
+        buf.append("\n%s* __cap = (%s*)__ctx;", capStructName, capStructName)
+        for(var i = 0; i < stmt.captureVars.size(); i += 1) {
+            var sym = stmt.captureVars.get(i)
+            buf.append("\n%s %s = __cap->%s;",
+                this.cType(sym.type), this.cName(sym), this.cName(sym))
+        }
+    }
+
+    // Emit the body
+    this.emitStmt(stmt.body)
+    buf.appendStrn("\n}\n", 3)
+
+    // Move the mock function definition from buf to mockHelperBuf
+    var mockFnLen = buf.length - mockFnStart
+    mockHelperBuf.appendStrn(buf.buffer + mockFnStart, mockFnLen)
+    buf.length = mockFnStart
+
+    // 3. Initialize capture struct (if any)
+    if(stmt.captureVars.size() > 0) {
+        buf.append("\n%s __cap_%d = {", capStructName, stmt.mockIndex)
+        for(var i = 0; i < stmt.captureVars.size(); i += 1) {
+            if(i > 0) buf.appendStrn(",", 1)
+            var sym = stmt.captureVars.get(i)
+            var symName = this.cName(sym)
+            buf.append(".%s = %s", symName, symName)
+        }
+        buf.appendStrn("};", 2)
+    }
+
+    // 4. Initialize registry if null, track it, and register mock
+    buf.append("\nif(!%s) { %s = (%sstd__mock__MockRegistry*)%sstd__mem__Allocator_alloc(%sstd__mem__defaultAllocator, sizeof(%sstd__mock__MockRegistry)); %sstd__mock__MockRegistry_init(%s, %sstd__mem__defaultAllocator); %sstd__mock__MockScope_track(&__mock_scope, &%s); }",
+        registryName,          // 1: if(!%s)
+        registryName,          // 2: { %s =
+        this.options.cPrefix,  // 3: (%sstd__mock__MockRegistry*)
+        this.options.cPrefix,  // 4: %sstd__mem__Allocator_alloc(
+        this.options.cPrefix,  // 5: %sstd__mem__defaultAllocator, in Allocator_alloc call
+        this.options.cPrefix,  // 6: sizeof(%sstd__mock__MockRegistry)
+        this.options.cPrefix,  // 7: %sstd__mock__MockRegistry_init(
+        registryName,          // 8: (%s, in MockRegistry_init call
+        this.options.cPrefix,  // 9: %sstd__mem__defaultAllocator) in MockRegistry_init call
+        this.options.cPrefix,  // 10: %sstd__mock__MockScope_track(
+        registryName)          // 11: &%s)
+
+    // Determine the key: for methods with an object, use (usize)object; else 0
+    var keyExpr = StringBuilderInit(64, this.allocator)
+    if(stmt.object != null && funcDecl.flags & FuncFlags.IS_METHOD) {
+        // The object expr's C name
+        var savedLen = buf.length
+        this.emitStmt(stmt.object)
+        var objStr = buf.buffer + savedLen
+        var objLen = buf.length - savedLen
+        // Restore the buf - we don't want to actually emit it here
+        buf.length = savedLen
+        // Build key expression
+        keyExpr.append("(%susize)(", this.options.cPrefix)
+        keyExpr.appendStrn(objStr, objLen)
+        keyExpr.appendStrn(")", 1)
+    }
+    else {
+        keyExpr.append("(%susize)0", this.options.cPrefix)
+    }
+
+    // Determine ctx expression
+    var ctxExpr = StringBuilderInit(64, this.allocator)
+    if(stmt.captureVars.size() > 0) {
+        ctxExpr.append("(void*)&__cap_%d", stmt.mockIndex)
+    }
+    else {
+        ctxExpr.appendStr("NULL")
+    }
+
+    // Emit registration
+    if(stmt.hasVarBinding && stmt.handleSym != null) {
+        var handleName = this.cName(stmt.handleSym)
+        buf.append("\n%sstd__mock__MockHandle %s = { .entry = %sstd__mock__MockRegistry_register(%s, %s, (void*)%s, %s) };",
+            this.options.cPrefix,
+            handleName,
+            this.options.cPrefix,
+            registryName,
+            keyExpr.cStrConst(),
+            mockFnName,
+            ctxExpr.cStrConst())
+    }
+    else {
+        buf.append("\n%sstd__mock__MockRegistry_register(%s, %s, (void*)%s, %s);",
+            this.options.cPrefix,
+            registryName,
+            keyExpr.cStrConst(),
+            mockFnName,
+            ctxExpr.cStrConst())
     }
 }
 
