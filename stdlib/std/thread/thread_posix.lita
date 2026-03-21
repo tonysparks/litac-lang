@@ -199,8 +199,8 @@ func pthread_cond_wait(cond: *pthread_cond_t, mtx: *pthread_mutex_t) : i32;
 @foreign
 func pthread_cond_timedwait(cond: *pthread_cond_t, mtx: *pthread_mutex_t, ts: *const timespec) : i32;
 
-@foreign
-func gettid(): i32;
+// @foreign
+// func gettid(): i32;
 
 @foreign
 typedef void as pthread_t;
@@ -430,7 +430,7 @@ func _thrd_wrapper_function(aArg: *void): *void {
     var fun = ti.mFunction;
     var arg = ti.mArg;
 
-    ti.thread.threadId = gettid() as (i32)
+    // ti.thread.threadId = gettid() as (i32)
 
     /* The thread is responsible for freeing the startup information */
     ti.allocator.free(ti as (*void));
@@ -444,7 +444,7 @@ func _thrd_wrapper_function(aArg: *void): *void {
 public typedef func(*void) : i32 as ThreadStartFn;
 public struct Thread {
     thrd: pthread_t
-    threadId: i32
+    //threadId: i32
 }
 
 
@@ -507,7 +507,7 @@ public func (this: Thread) detach() : ThreadStatus {
 }
 
 public func (this: Thread) id() : i32 {
-    return this.threadId
+    return this.thrd as (i32)
 }
 
 public func (this: Thread) equal(other: Thread) : bool {
@@ -537,8 +537,7 @@ public func (this: Thread) yield() {
 public func ThreadCurrent() : Thread {
     var thrd = pthread_self();
     return Thread{
-        thrd,
-        gettid()
+        thrd
     }
 }
 
