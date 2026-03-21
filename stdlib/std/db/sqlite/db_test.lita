@@ -6,6 +6,7 @@ import "std/string"
 import "std/string/builder"
 import "std/string/buffer"
 import "std/array"
+import "std/time"
 
 import "std/db"
 import "std/db/sqlite"
@@ -31,6 +32,41 @@ public struct Team {
 }
 
 import "std/assert"
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+func createTeamTable(conn: *SqliteConnection) {
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS team (
+            id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            city TEXT NOT NULL,
+            state TEXT NOT NULL
+        );
+        """
+    )
+    assert(!conn.hasError())
+}
+
+func insertNFLTeams(conn: *SqliteConnection) {
+    conn.execute(
+        """
+        INSERT INTO team (name, city, state) VALUES
+            ('Green Bay Packers', 'Green Bay', 'WI'),
+            ('Chicago Bears',     'Chicago',   'IL'),
+            ('Minnesota Vikings', 'Minneapolis','MN'),
+            ('Detroit Lions',     'Detroit',   'MI');
+        """
+    )
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// testDatabase – original integration smoke test
+// -----------------------------------------------------------------------
 
 @test
 func testDatabase() {
@@ -210,51 +246,776 @@ func testDatabase() {
         numRead = conn.connection.queryOneById(&result2, t1.id)
         assert(numRead == 0)
     }
+}
 
-    /*
-        // Query using raw SQL
-    {
-        var stmt = SqlStatement{}
-        defer stmt.close()
+// -----------------------------------------------------------------------
+// SqlResult helper methods: isOk, isError, isEmptyResults
+// -----------------------------------------------------------------------
 
-        conn.prepare(
-            &stmt,
-            $"""
-                SELECT
-                    t.id,
-                    t.name,
-                    t.state,
-                    t.city
-                FROM team t
-                WHERE t.state = :STATE
-            """
-        )
+@test
+func testSqlResultHelpers() {
+    var ok = SqlResult{.type = SqlResultType.OK, .category = SqlResultCategory.NONE}
+    assert(ok.isOk())
+    assert(!ok.isError())
+    assert(!ok.isEmptyResults())
 
-        var attempts = 0
-        var results = SqlResultSet{}
-        do {
+    var empty = SqlResult{
+        .type     = SqlResultType.OK,
+        .category = SqlResultCategory.EMPTY_RESULTS
+    }
+    assert(empty.isOk())
+    assert(!empty.isError())
+    assert(empty.isEmptyResults())
 
-            stmt.bindString(1, $"WI")
-            stmt.execute(results)
+    var err = SqlResult{.type = SqlResultType.ERROR}
+    assert(!err.isOk())
+    assert(err.isError())
+    assert(!err.isEmptyResults())
+}
 
-            var i = 0
-            while(results.hasNext()) {
-                results.next()
+// -----------------------------------------------------------------------
+// Error handling: hasError, setError, clearError, lastError, lastResult
+// -----------------------------------------------------------------------
 
-                printf(
-                    "%3d) id: %ld name: '%s', city: '%s', state: '%s'\n",
-                    i += 1,
-                    results.columnInt64(0),
-                    results.columnText(1),
-                    results.columnText(2),
-                    results.columnText(3)
-                )
-            }
+@test
+func testErrorHandling() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
 
-            stmt.reset()
-            attempts += 1
-        } while(attempts < 0);
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    // Fresh connection – no error
+    assert(!conn.hasError())
+    assert(conn.lastResult().isOk())
+
+    // setError
+    conn.setError(SqlResult{
+        .type        = SqlResultType.ERROR,
+        .description = $"custom error"
+    })
+    assert(conn.hasError())
+    assert(conn.lastResult().isError())
+    assert(conn.lastError().equals($"custom error"))
+
+    // clearError restores clean state
+    conn.clearError()
+    assert(!conn.hasError())
+    assert(conn.lastResult().isOk())
+
+    // Invalid SQL triggers an error
+    conn.execute("NOT VALID SQL!!!;")
+    assert(conn.hasError())
+    assert(conn.lastError().length > 0)
+
+    // Operations are short-circuited while in error state
+    var r = conn.execute("SELECT 1;")
+    assert(r.isError())
+
+    // clearError allows further operations
+    conn.clearError()
+    assert(!conn.hasError())
+    conn.execute("SELECT 1;")
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// Transaction rollback
+// -----------------------------------------------------------------------
+
+@test
+func testTransactionRollback() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    // Verify baseline count
+    var rs: SqlResultSet
+    conn.connection.query(&rs, $"SELECT count(*) FROM team")
+    assert(rs.hasNext())
+    rs.next()
+    var baseline = rs.columnInt32(0)
+    assert(baseline == 4)
+
+    // Insert inside a transaction, then roll back
+    conn.begin()
+    conn.execute("INSERT INTO team (name, city, state) VALUES ('Patriots', 'Foxborough', 'MA');")
+    assert(!conn.hasError())
+    var rollbackResult = conn.rollback()
+    assert(rollbackResult.isOk())
+
+    // Count must still be baseline
+    conn.connection.query(&rs, $"SELECT count(*) FROM team")
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt32(0) == baseline)
+}
+
+// -----------------------------------------------------------------------
+// Raw statement API: prepare, bind*, parameterCount/Name/Index,
+//                    clearBindings, step, reset, finalize
+// -----------------------------------------------------------------------
+
+@test
+func testRawStatementApi() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    // Prepare a statement with named parameters
+    var stmt: SqlStatement
+    conn.prepare(
+        &stmt,
+        $"SELECT id, name, city, state FROM team WHERE state = :STATE AND city = :CITY"
+    )
+    assert(!conn.hasError())
+
+    // parameterCount
+    assert(stmt.parameterCount() == 2)
+
+    // parameterName (1-based)
+    var n1 = stmt.parameterName(1)
+    assert(strcmp(n1, ":STATE") == 0)
+    var n2 = stmt.parameterName(2)
+    assert(strcmp(n2, ":CITY") == 0)
+
+    // parameterIndex
+    assert(stmt.parameterIndex(":STATE") == 1)
+    assert(stmt.parameterIndex(":CITY") == 2)
+
+    // Bind by index and execute
+    stmt.bindText(1, "WI", 2)
+    stmt.bindText(2, "Green Bay", 9)
+    var rs: SqlResultSet
+    stmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    // columnCount
+    assert(rs.columnCount() == 4)
+
+    // columnInt64 for the id column
+    var id = rs.columnInt64(0)
+    assert(id > 0)
+
+    // columnText
+    var nameText = rs.columnText(1)
+    assert(strcmp(nameText, "Green Bay Packers") == 0)
+
+    // columnString
+    var cityStr = rs.columnString(2)
+    assert(cityStr.equals($"Green Bay"))
+
+    // columnType
+    assert(rs.columnType(0) == SqlColumnType.INT)
+    assert(rs.columnType(1) == SqlColumnType.TEXT)
+    assert(rs.columnType(2) == SqlColumnType.TEXT)
+
+    // reset + clearBindings + re-bind
+    stmt.reset()
+    assert(!conn.hasError())
+    stmt.clearBindings()
+    assert(!conn.hasError())
+
+    stmt.bindString(1, $"IL")
+    stmt.bindString(2, $"Chicago")
+    stmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+    assert(strcmp(rs.columnText(1), "Chicago Bears") == 0)
+
+    // finalize explicitly
+    stmt.finalize()
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// bindInt32, bindInt64, bindFloat64, bindNull, bindBlob, bindBlob64,
+// bindText, bindText64, bindString
+// columnInt32, columnInt64, columnDouble, columnText, columnString,
+// columnBlob, columnType, columnCount
+// -----------------------------------------------------------------------
+
+@test
+func testColumnTypes() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute(
+        """
+        CREATE TABLE types_test (
+            int_col  INTEGER,
+            big_col  INTEGER,
+            real_col REAL,
+            text_col TEXT,
+            str_col  TEXT,
+            blob_col BLOB,
+            null_col INTEGER
+        );
+        """
+    )
+    assert(!conn.hasError())
+
+    // Insert a row exercising every bind variant
+    var stmt: SqlStatement
+    conn.prepare(
+        &stmt,
+        $"INSERT INTO types_test (int_col, big_col, real_col, text_col, str_col, blob_col, null_col) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    assert(!conn.hasError())
+
+    var blobData: *const char = "BLOBDATA"
+
+    stmt.bindInt32(1, 42_i32)
+    stmt.bindInt64(2, 9000000000_i64)
+    stmt.bindFloat64(3, 2.718281828)
+    stmt.bindText(4, "hello", 5)
+    stmt.bindString(5, $"world")
+    stmt.bindBlob(6, blobData as (*const void), 8)
+    stmt.bindNull(7)
+
+    var stepResult = stmt.step()
+    assert(stepResult.isOk())
+    stmt.close()
+    assert(!conn.hasError())
+
+    // Read back and verify every column type and value
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT int_col, big_col, real_col, text_col, str_col, blob_col, null_col FROM types_test")
+    assert(!conn.hasError())
+
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    assert(rs.columnCount() == 7)
+
+    // int_col
+    assert(rs.columnType(0) == SqlColumnType.INT)
+    assert(rs.columnInt32(0) == 42)
+
+    // big_col
+    assert(rs.columnType(1) == SqlColumnType.INT)
+    assert(rs.columnInt64(1) == 9000000000_i64)
+
+    // real_col
+    assert(rs.columnType(2) == SqlColumnType.DOUBLE)
+    var dbl = rs.columnDouble(2)
+    assert(dbl > 2.71 && dbl < 2.72)
+
+    // text_col (bindText)
+    assert(rs.columnType(3) == SqlColumnType.TEXT)
+    assert(strcmp(rs.columnText(3), "hello") == 0)
+
+    // str_col (bindString)
+    assert(rs.columnType(4) == SqlColumnType.TEXT)
+    assert(rs.columnString(4).equals($"world"))
+
+    // blob_col
+    assert(rs.columnType(5) == SqlColumnType.BLOB)
+    var blob = rs.columnBlob(5) as (*const char)
+    assert(blob != null)
+    assert(strncmp(blob, "BLOBDATA", 8) == 0)
+
+    // null_col
+    assert(rs.columnType(6) == SqlColumnType.NULL)
+    assert(rs.columnInt32(6) == 0) // SQLite returns 0 for NULL integer
+
+    qstmt.close()
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// bindBlob64 and bindText64
+// -----------------------------------------------------------------------
+
+@test
+func testBindBlob64AndText64() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute("CREATE TABLE b64_test (name TEXT, data BLOB);")
+    assert(!conn.hasError())
+
+    var stmt: SqlStatement
+    conn.prepare(&stmt, $"INSERT INTO b64_test (name, data) VALUES (?, ?)")
+
+    // bindText64 with SQLITE_UTF8 encoding (value = 1)
+    stmt.bindText64(1, "Saints", 6_u64, 1_u8)
+
+    var blob64: *const char = "RAWBLOB"
+    stmt.bindBlob64(2, blob64 as (*const void), 7_u64)
+
+    stmt.step()
+    stmt.close()
+    assert(!conn.hasError())
+
+    // Verify
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT name, data FROM b64_test")
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    assert(strcmp(rs.columnText(0), "Saints") == 0)
+    var b = rs.columnBlob(1) as (*const char)
+    assert(b != null)
+    assert(strncmp(b, "RAWBLOB", 7) == 0)
+
+    qstmt.close()
+}
+
+// -----------------------------------------------------------------------
+// bindDateTime / columnDateTime
+// -----------------------------------------------------------------------
+
+@test
+func testBindAndColumnDateTime() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute("CREATE TABLE dt_test (ts TEXT);")
+    assert(!conn.hasError())
+
+    var now = DateTimeNow()
+
+    var stmt: SqlStatement
+    conn.prepare(&stmt, $"INSERT INTO dt_test (ts) VALUES (?)")
+    stmt.bindDateTime(1, now)
+    stmt.step()
+    stmt.close()
+    assert(!conn.hasError())
+
+    // Read back via columnDateTime
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT ts FROM dt_test")
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    // Stored as ISO text
+    assert(rs.columnType(0) == SqlColumnType.TEXT)
+
+    // Round-trip: parsed DateTime must be a plausible year
+    var dt = rs.columnDateTime(0)
+    assert(dt.year >= 2024)
+
+    qstmt.close()
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// statement.connection() returns the owning connection
+// -----------------------------------------------------------------------
+
+@test
+func testStatementConnection() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+
+    var stmt: SqlStatement
+    conn.prepare(&stmt, $"SELECT 1")
+    assert(!conn.hasError())
+
+    var stmtConn = stmt.connection()
+    assert(!stmtConn.hasError())
+
+    stmt.close()
+}
+
+// -----------------------------------------------------------------------
+// query() with multiple parameter types via varargs
+// -----------------------------------------------------------------------
+
+@test
+func testQueryVarargs() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute(
+        """
+        CREATE TABLE scores (
+            name TEXT,
+            score INTEGER,
+            rating REAL
+        );
+        INSERT INTO scores VALUES ('Alice', 95, 4.8);
+        INSERT INTO scores VALUES ('Bob',   80, 3.5);
+        INSERT INTO scores VALUES ('Carol', 72, 3.0);
+        """
+    )
+    assert(!conn.hasError())
+
+    // i32 and f64 varargs
+    var rs: SqlResultSet
+    conn.connection.query(
+        &rs,
+        $"SELECT name FROM scores WHERE score > ? AND rating > ?",
+        85_i32, 4.0_f64
+    )
+    assert(rs.hasNext())
+    rs.next()
+    assert(strcmp(rs.columnText(0), "Alice") == 0)
+    assert(!rs.hasNext())
+
+    // String vararg
+    conn.connection.query(
+        &rs,
+        $"SELECT score FROM scores WHERE name = ?",
+        $"Bob"
+    )
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt32(0) == 80)
+
+    // *const char vararg
+    conn.connection.query(
+        &rs,
+        $"SELECT score FROM scores WHERE name = ?",
+        "Carol"
+    )
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt32(0) == 72)
+}
+
+// -----------------------------------------------------------------------
+// ORM: updateOne
+// -----------------------------------------------------------------------
+
+@test
+func testOrmUpdateOne() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    // Fetch Packers
+    var teams = ArrayInit<Team>(4, &allocator.allocator)
+    conn.connection.queryMany(
+        &allocator.allocator,
+        &teams,
+        .alias = $"t",
+        .sql   = $"where t.state = ?",
+        $"WI"
+    )
+    assert(teams.size() == 1)
+    var packers = teams.getPtr(0)
+
+    // Mutate and update
+    packers.city = $"Titletown"
+    var updated = conn.connection.updateOne(packers)
+    assert(updated == 1)
+    assert(!conn.hasError())
+
+    // Read back and verify
+    var check = Team{}
+    assert(conn.connection.queryOneById(&check, packers.id) == 1)
+    assert(check.city.equals($"Titletown"))
+    assert(check.name.equals($"Green Bay Packers"))
+    assert(check.state.equals($"WI"))
+}
+
+// -----------------------------------------------------------------------
+// ORM: updateMany
+// -----------------------------------------------------------------------
+
+@test
+func testOrmUpdateMany() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    // Fetch all teams
+    var teams = ArrayInit<Team>(8, &allocator.allocator)
+    conn.connection.queryMany(
+        &allocator.allocator,
+        &teams,
+        .alias = $"t",
+        .sql   = $"order by t.id"
+    )
+    assert(teams.size() == 4)
+
+    // Relocate every team to Texas
+    for(var i = 0; i < teams.size(); i += 1) {
+        teams.getPtr(i).state = $"TX"
     }
 
-*/
+    var updated = conn.connection.updateMany(&teams)
+    assert(updated == 4)
+    assert(!conn.hasError())
+
+    // All four should now be in TX
+    var txTeams = ArrayInit<Team>(8, &allocator.allocator)
+    conn.connection.queryMany(
+        &allocator.allocator,
+        &txTeams,
+        .alias = $"t",
+        .sql   = $"where t.state = ?",
+        $"TX"
+    )
+    assert(txTeams.size() == 4)
+}
+
+// -----------------------------------------------------------------------
+// ORM: deleteOne (entity-based)
+// -----------------------------------------------------------------------
+
+@test
+func testOrmDeleteOne() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    // Fetch Bears
+    var teams = ArrayInit<Team>(4, &allocator.allocator)
+    conn.connection.queryMany(
+        &allocator.allocator,
+        &teams,
+        .alias = $"t",
+        .sql   = $"where t.state = ?",
+        $"IL"
+    )
+    assert(teams.size() == 1)
+    var bears = teams.getPtr(0)
+    var bearsId = bears.id
+
+    var deleted = conn.connection.deleteOne(bears)
+    assert(deleted == 1)
+    assert(!conn.hasError())
+
+    // Verify gone
+    var check = Team{}
+    assert(conn.connection.queryOneById(&check, bearsId) == 0)
+
+    // Three remaining
+    var remaining = ArrayInit<Team>(8, &allocator.allocator)
+    conn.connection.queryMany(
+        &allocator.allocator,
+        &remaining,
+        .alias = $"t",
+        .sql   = $"order by t.id"
+    )
+    assert(remaining.size() == 3)
+}
+
+// -----------------------------------------------------------------------
+// ORM: deleteMany (batch entity-based delete)
+// -----------------------------------------------------------------------
+
+@test
+func testOrmDeleteMany() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    // Select two teams to delete
+    var toDelete = ArrayInit<Team>(4, &allocator.allocator)
+    conn.connection.queryMany(
+        &allocator.allocator,
+        &toDelete,
+        .alias = $"t",
+        .sql   = $"where t.state in (?, ?) order by t.id",
+        $"WI", $"IL"
+    )
+    assert(toDelete.size() == 2)
+
+    var deleted = conn.connection.deleteMany(&toDelete)
+    assert(deleted == 2)
+    assert(!conn.hasError())
+
+    // Two should remain
+    var remaining = ArrayInit<Team>(8, &allocator.allocator)
+    conn.connection.queryMany(
+        &allocator.allocator,
+        &remaining,
+        .alias = $"t",
+        .sql   = $"order by t.id"
+    )
+    assert(remaining.size() == 2)
+
+    // The survivors should be MN and MI
+    assert(remaining.get(0).state.equals($"MN"))
+    assert(remaining.get(1).state.equals($"MI"))
+}
+
+// -----------------------------------------------------------------------
+// ORM: queryOneById / queryMany with no matching rows
+// -----------------------------------------------------------------------
+
+@test
+func testOrmQueryNoResults() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    // No rows inserted
+
+    // queryOneById on empty table
+    var result = Team{}
+    var found = conn.connection.queryOneById(&result, 1_i64)
+    assert(found == 0)
+
+    // queryMany with a filter that matches nothing
+    var teams = ArrayInit<Team>(4, &allocator.allocator)
+    var count = conn.connection.queryMany(
+        &allocator.allocator,
+        &teams,
+        .alias = $"t",
+        .sql   = $"where t.state = ?",
+        $"ZZ"
+    )
+    assert(count == 0)
+    assert(teams.size() == 0)
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// enableWAL / disableWAL
+// -----------------------------------------------------------------------
+
+@test
+func testEnableDisableWAL() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    // enableWAL on :memory: succeeds (SQLite silently keeps "memory" mode)
+    var r1 = conn.enableWAL()
+    assert(!r1.isError())
+
+    // disableWAL should also succeed
+    var r2 = conn.disableWAL()
+    assert(!r2.isError())
+
+    // Connection still usable
+    conn.execute("SELECT 1;")
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// statement result-set statement() accessor
+// -----------------------------------------------------------------------
+
+@test
+func testResultSetStatementAccessor() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    var rs: SqlResultSet
+    conn.connection.query(&rs, $"SELECT id, name FROM team ORDER BY id")
+    assert(!conn.hasError())
+    assert(rs.hasNext())
+    rs.next()
+
+    // statement() on the result set returns the owning statement
+    var stmt = rs.statement()
+    // The statement's connection should be error-free
+    assert(!stmt.connection().hasError())
+}
+
+// -----------------------------------------------------------------------
+// Verify connection is idempotently closeable (double-close safety)
+// -----------------------------------------------------------------------
+
+@test
+func testConnectionClose() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    var r = conn.close()
+    assert(r.isOk())
 }

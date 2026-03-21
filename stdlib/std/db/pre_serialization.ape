@@ -341,13 +341,16 @@ fn EmitDBFunctions(sym) {
         emit(`\n`)
         var isFirst = true
         for(field in structDecl.fields) {
+            if(field == idField.field) {
+                continue
+            }
             if(!isFirst) {
                 emit(`,\n`)
             }
-            emit(`                        ${getColumnName(field)} = :${getColumnName(field)}`)
+            emit(`                        ${getColumnName(field)} = ?`)
             isFirst = false
         }
-        emit(`\n                    WHERE ${idName} = :id;"""`)
+        emit(`\n                    WHERE ${idName} = ?;"""`)
         emit(
             `
             }
