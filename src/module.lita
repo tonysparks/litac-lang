@@ -201,8 +201,14 @@ public func (this: *Module) initIncrementalBuild() {
     this.flags |= ModuleFlags.INCREMENTAL_COMPILATION
 
     this.arena.clear()
-    this.importAliases.clear()
+
+    // Re-initialize in the same order as module.init() to prevent arena overlap.
+    // typeSpecAllocator must be first (gets arena[0..N]), then the maps get fresh
+    // allocations after it. Using .clear() or omitting re-init leaves stale bucket
+    // pointers that get overwritten when typeSpecAllocator expands into a second bucket.
     this.typeSpecAllocator.init(this.allocator)
+    this.importAliases = InternMap<*Module>(null, 16, this.allocator)
+    this.usingModules.init(null, 16, this.allocator)
 
     this.symbols.initIncrementalBuild()
 }

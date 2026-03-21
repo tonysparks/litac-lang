@@ -396,8 +396,7 @@ public func (this: *LspServer) handleTextDocumentChangeMessage(msg: *JsonNode, p
     var changeEvent = JsonNodeToTextDocumentChangeEvent(params, this.requestAlloc())
     if(changeEvent) {
         this.workspace.changeDocument(changeEvent)
-        // TODO re-enable to enable LSP
-        // this.writeDiagnostic(changeEvent.textDocument.uri)
+        this.writeDiagnostic(changeEvent.textDocument.uri)
     }
 }
 
