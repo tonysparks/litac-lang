@@ -1,0 +1,810 @@
+import "std/db/db"
+import "std/crypto/sha1"
+import "std/io"
+import "std/fs"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/array"
+import "std/mem"
+import "std/libc"
+import "std/time"
+
+// -----------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------
+
+const CHECKSUM_LEN    =  40_i32  // SHA1 hex digits (no null)
+const CHECKSUM_SIZE   =  41_i32  // + null terminator
+const DESCRIPTION_MAX = 256_i32
+const FILENAME_MAX    = 512_i32
+const TIMESTAMP_MAX   =  24_i32  // epoch as decimal string
+const MSG_MAX         = 1024_i32
+
+// -----------------------------------------------------------------------
+// Public error types
+// -----------------------------------------------------------------------
+
+@asStr
+public enum MigrationStatus {
+    OK,
+    IO_ERROR,
+    SQL_ERROR,
+    CHECKSUM_MISMATCH,
+    PARSE_ERROR,
+    OUT_OF_ORDER,
+}
+
+public struct MigrationError {
+    status:  MigrationStatus
+    message: [MSG_MAX]char
+}
+
+public func (e: *MigrationError) isOk() : bool {
+    return e.status == MigrationStatus.OK
+}
+
+/// Returns the error message as a String view.
+public func (e: *MigrationError) description() : String {
+    return StringInit(e.message)
+}
+
+// -----------------------------------------------------------------------
+// MigrationInfo — returned from Migrator.status()
+// -----------------------------------------------------------------------
+
+public struct MigrationInfo {
+    version:     i64
+    description: [DESCRIPTION_MAX]char
+    filename:    [FILENAME_MAX]char
+    checksum:    [CHECKSUM_SIZE]char    // 40-char hex SHA1 or empty
+    appliedAt:   [TIMESTAMP_MAX]char    // ISO 8601 timestamp or empty
+    applied:     bool
+}
+
+// -----------------------------------------------------------------------
+// Migrator
+// -----------------------------------------------------------------------
+
+public struct Migrator {
+    conn:          SqlConnection
+    migrationsDir: String
+    tableName:     String
+    allocator:     *const Allocator
+}
+
+/// Create a Migrator.
+///
+/// - conn:          open database connection (any SqlConnection implementation)
+/// - migrationsDir: directory containing V{N}__{description}.sql files
+/// - tableName:     tracking table name (default "schema_migrations")
+/// - alloc:         allocator for internal work buffers
+public func MigratorInit(
+    conn:          SqlConnection,
+    migrationsDir: String,
+    tableName:     String = $"schema_migrations",
+    alloc:         *const Allocator = defaultAllocator
+) : Migrator {
+    return Migrator {
+        .conn          = conn,
+        .migrationsDir = migrationsDir,
+        .tableName     = tableName,
+        .allocator     = alloc,
+    }
+}
+
+/// Run all pending migrations in version order.
+///
+/// Before applying anything, validates that every already-applied
+/// migration's file still matches its stored SHA1 checksum.
+/// Each migration file is executed inside a single transaction;
+/// on any failure the transaction is rolled back and the error returned.
+public func (m: *Migrator) migrate() : MigrationError {
+    var err: MigrationError
+
+    if(!m.ensureTable(&err)) {
+        return err
+    }
+
+    var migrations = ArrayInit<Migration>(16, m.allocator)
+    defer FreeMigrations(&migrations)
+
+    if(!m.scanMigrations(&migrations, &err)) {
+        return err
+    }
+    SortMigrations(&migrations)
+
+    var applied = ArrayInit<AppliedRecord>(16, m.allocator)
+    defer applied.free()
+
+    if(!m.loadApplied(&applied, &err)) {
+        return err
+    }
+
+    if(!ValidateChecksums(&migrations, &applied, &err)) {
+        return err
+    }
+
+    var highest = HighestAppliedVersion(&applied)
+
+    for(var i = 0; i < migrations.length; i += 1) {
+        var mig = migrations.getPtr(i)
+        if(IsApplied(&applied, mig.version)) {
+            continue
+        }
+
+        if(mig.version < highest) {
+            err.status = MigrationStatus.OUT_OF_ORDER
+            var msg = StringBufferInit(err.message, MSG_MAX, 0)
+            msg.format(
+                "Migration V%lld ('%s') is out of order: highest applied version is V%lld",
+                mig.version, mig.filename, highest
+            )
+            return err
+        }
+
+        if(!m.applyMigration(mig, &err)) {
+            return err
+        }
+    }
+
+    return MigrationError{
+        .status = MigrationStatus.OK
+    }
+}
+
+/// Validate SHA1 checksums of all applied migrations without running anything.
+/// Returns CHECKSUM_MISMATCH if any applied migration's file was modified.
+public func (m: *Migrator) validate() : MigrationError {
+    var err: MigrationError
+
+    if(!m.ensureTable(&err)) {
+        return err
+    }
+
+    var migrations = ArrayInit<Migration>(16, m.allocator)
+    defer FreeMigrations(&migrations)
+
+    if(!m.scanMigrations(&migrations, &err)) {
+        return err
+    }
+
+    var applied = ArrayInit<AppliedRecord>(16, m.allocator)
+    defer applied.free()
+
+    if(!m.loadApplied(&applied, &err)) {
+        return err
+    }
+
+    ValidateChecksums(&migrations, &applied, &err)
+    return err
+}
+
+/// Populate results with the status of every known migration file.
+/// Each MigrationInfo reports whether the migration has been applied,
+/// its stored checksum, and when it was applied.
+public func (m: *Migrator) status(results: *Array<MigrationInfo>) : MigrationError {
+    var err: MigrationError
+
+    if(!m.ensureTable(&err)) {
+        return err
+    }
+
+    var migrations = ArrayInit<Migration>(16, m.allocator)
+    defer FreeMigrations(&migrations)
+
+    if(!m.scanMigrations(&migrations, &err)) {
+        return err
+    }
+    SortMigrations(&migrations)
+
+    var applied = ArrayInit<AppliedRecord>(16, m.allocator)
+    defer applied.free()
+
+    if(!m.loadApplied(&applied, &err)) {
+        return err
+    }
+
+    for(var i = 0; i < migrations.length; i += 1) {
+        var mig = migrations.getPtr(i)
+        var rec = FindApplied(&applied, mig.version)
+
+        var info: MigrationInfo
+        info.version = mig.version
+        info.applied = rec != null
+        StringCopy(mig.description, info.description, DESCRIPTION_MAX as (usize))
+        StringCopy(mig.filename,    info.filename,    FILENAME_MAX    as (usize))
+
+        if(rec != null) {
+            StringCopy(rec.checksum,  info.checksum,  CHECKSUM_SIZE as (usize))
+            StringCopy(rec.appliedAt, info.appliedAt, TIMESTAMP_MAX as (usize))
+        }
+
+        results.add(info)
+    }
+
+    return MigrationError{.status = MigrationStatus.OK}
+}
+
+// -----------------------------------------------------------------------
+// Internal structures
+// -----------------------------------------------------------------------
+
+struct Migration {
+    version:     i64
+    description: [DESCRIPTION_MAX]char
+    descLen:     i32
+    filename:    [FILENAME_MAX]char
+    filenameLen: i32
+    checksum:    [CHECKSUM_SIZE]char    // 40 hex chars + null
+}
+
+struct AppliedRecord {
+    version:   i64
+    checksum:  [CHECKSUM_SIZE]char
+    appliedAt: [TIMESTAMP_MAX]char
+}
+
+// -----------------------------------------------------------------------
+// Collection helpers
+// -----------------------------------------------------------------------
+
+func FreeMigrations(arr: *Array<Migration>) {
+    arr.free()
+}
+
+// Insertion sort by version number (migration sets are typically small).
+func SortMigrations(arr: *Array<Migration>) {
+    for(var i = 1; i < arr.length; i += 1) {
+        var j = i
+        while(j > 0 && arr.getPtr(j - 1).version > arr.getPtr(j).version) {
+            arr.swap(j - 1, j)
+            j -= 1
+        }
+    }
+}
+
+func HighestAppliedVersion(applied: *Array<AppliedRecord>) : i64 {
+    var highest: i64 = -1_i64
+    for(var i = 0; i < applied.length; i += 1) {
+        var v = applied.getPtr(i).version
+        if(v > highest) {
+            highest = v
+        }
+    }
+    return highest
+}
+
+func IsApplied(applied: *Array<AppliedRecord>, version: i64) : bool {
+    return FindApplied(applied, version) != null
+}
+
+func FindApplied(applied: *Array<AppliedRecord>, version: i64) : *AppliedRecord {
+    for(var i = 0; i < applied.length; i += 1) {
+        var r = applied.getPtr(i)
+        if(r.version == version) {
+            return r
+        }
+    }
+    return null
+}
+
+func ValidateChecksums(
+    migrations: *Array<Migration>,
+    applied:    *Array<AppliedRecord>,
+    err:        *MigrationError
+) : bool {
+    for(var i = 0; i < migrations.length; i += 1) {
+        var mig = migrations.getPtr(i)
+        var rec = FindApplied(applied, mig.version)
+        if(rec == null) {
+            continue
+        }
+
+        if(StringEqual(mig.checksum, rec.checksum) == false) {
+            err.status = MigrationStatus.CHECKSUM_MISMATCH
+            var msg = StringBufferInit(err.message, MSG_MAX, 0)
+            msg.format(
+                "Checksum mismatch for V%lld ('%s'): file is '%s' but DB recorded '%s'",
+                mig.version, mig.filename, mig.checksum, rec.checksum
+            )
+            return false
+        }
+    }
+    return true
+}
+
+// -----------------------------------------------------------------------
+// Database operations
+// -----------------------------------------------------------------------
+
+func (m: *Migrator) ensureTable(err: *MigrationError) : bool {
+    var sqlBuf: [1024]char
+    var sql = StringBufferInit(sqlBuf, 1024, 0)
+    sql.format(
+        """
+        CREATE TABLE IF NOT EXISTS %.*s (
+            version     INTEGER NOT NULL,
+            filename    TEXT    NOT NULL,
+            description TEXT    NOT NULL,
+            checksum    TEXT    NOT NULL,
+            applied_at  TEXT    NOT NULL,
+            PRIMARY KEY (version)
+        )
+        """,
+        m.tableName.length, m.tableName.buffer)
+
+    var r = m.conn.execute(sql.cStr())
+    if(r.isError()) {
+        err.status = MigrationStatus.SQL_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format(
+            "Failed to create migrations table '%.*s': %.*s",
+            m.tableName.length, m.tableName.buffer,
+            r.description.length, r.description.buffer
+        )
+        return false
+    }
+    return true
+}
+
+func (m: *Migrator) loadApplied(
+    out: *Array<AppliedRecord>,
+    err: *MigrationError
+) : bool {
+    var sqlBuf: [512]char
+    var sqlSb = StringBufferInit(sqlBuf, 512, 0)
+    sqlSb.format(
+        """
+        SELECT version, checksum, applied_at
+        FROM %.*s
+        ORDER BY version ASC
+        """,
+        m.tableName.length, m.tableName.buffer
+    )
+
+    var sql = StringInit(sqlBuf, sqlSb.length)
+
+    var rs: SqlResultSet
+    var r = m.conn.query(&rs, sql)
+    if(r.isError()) {
+        err.status = MigrationStatus.SQL_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to load applied migrations: %.*s",
+            r.description.length, r.description.buffer)
+        return false
+    }
+
+    while(rs.hasNext()) {
+        rs.next()
+        var rec: AppliedRecord
+        rec.version = rs.columnInt64(0)
+        var chk = rs.columnString(1)
+        var at  = rs.columnString(2)
+        chk.copyTo(rec.checksum,  CHECKSUM_SIZE - 1)
+        at.copyTo( rec.appliedAt, TIMESTAMP_MAX - 1)
+        out.add(rec)
+    }
+
+    rs.closeAndReleaseAll()
+    return true
+}
+
+func (m: *Migrator) recordApplied(mig: *Migration, err: *MigrationError) : bool {
+    var sqlBuf: [512]char
+    var sqlSb = StringBufferInit(sqlBuf, 512, 0)
+    sqlSb.format(
+        """
+        INSERT INTO %.*s
+            (version, filename, description, checksum, applied_at)
+        VALUES
+            (?, ?, ?, ?, ?)
+        """,
+        m.tableName.length, m.tableName.buffer
+    )
+
+    var sql = StringInit(sqlBuf, sqlSb.length)
+
+    var stmt: SqlStatement
+    var r = m.conn.prepare(&stmt, sql)
+    if(r.isError()) {
+        err.status = MigrationStatus.SQL_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to prepare insert for V%lld: %.*s",
+            mig.version, r.description.length, r.description.buffer
+        )
+        return false
+    }
+
+    var nowBuf: [TIMESTAMP_MAX]char
+    var nowSb = StringBufferInit(nowBuf, TIMESTAMP_MAX, 0)
+    var now = DateTimeNow()
+    now.isoFormat(&nowSb)
+
+    stmt.bindInt64(1, mig.version)
+    stmt.bindText (2, mig.filename,    mig.filenameLen)
+    stmt.bindText (3, mig.description, mig.descLen)
+    stmt.bindText (4, mig.checksum,    CHECKSUM_LEN)
+    stmt.bindText (5, nowBuf,          nowSb.length)
+
+    r = stmt.step()
+    stmt.close()
+
+    if(r.isError()) {
+        err.status = MigrationStatus.SQL_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to record migration V%lld: %.*s",
+            mig.version, r.description.length, r.description.buffer
+        )
+        return false
+    }
+    return true
+}
+
+func (m: *Migrator) applyMigration(mig: *Migration, err: *MigrationError) : bool {
+    var sb = StringBuilderInit(4096, m.allocator)
+    defer sb.free()
+
+    var status = ReadFileFully(mig.filename, &sb)
+    if(status != FileStatus.Ok) {
+        err.status = MigrationStatus.IO_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to read migration file '%s': %s",
+            mig.filename, FileStatusAsStr(status)
+        )
+        return false
+    }
+
+    var r = m.conn.begin()
+    if(r.isError()) {
+        err.status = MigrationStatus.SQL_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to begin transaction for V%lld: %.*s",
+            mig.version, r.description.length, r.description.buffer
+        )
+        return false
+    }
+
+    if(!m.executeStatements(sb.toString(), mig, err)) {
+        m.conn.rollback()
+        return false
+    }
+
+    if(!m.recordApplied(mig, err)) {
+        m.conn.rollback()
+        return false
+    }
+
+    r = m.conn.commit()
+    if(r.isError()) {
+        err.status = MigrationStatus.SQL_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to commit transaction for V%lld: %.*s",
+            mig.version, r.description.length, r.description.buffer
+        )
+        m.conn.rollback()
+        return false
+    }
+
+    return true
+}
+
+// -----------------------------------------------------------------------
+// SQL statement splitter
+//
+// Splits on ';' while correctly ignoring semicolons inside:
+//   - single-quoted strings  ('...')
+//   - double-quoted strings  ("...")
+//   - line comments          (-- ... \n)
+//   - block comments         (/* ... */)
+// All statements in the file are executed within the caller's transaction.
+// -----------------------------------------------------------------------
+
+enum SqlSplitState {
+    NORMAL,
+    SINGLE_QUOTE,
+    DOUBLE_QUOTE,
+    LINE_COMMENT,
+    BLOCK_COMMENT,
+}
+
+func (m: *Migrator) executeStatements(
+    sql: String,
+    mig: *Migration,
+    err: *MigrationError
+) : bool {
+    var stmt = StringBuilderInit(sql.length + 1, m.allocator)
+    defer stmt.free()
+
+    var state = SqlSplitState.NORMAL
+
+    for(var i = 0; i < sql.length; i += 1) {
+        var c    = sql.buffer[i]
+        var next = (i + 1 < sql.length) ? sql.buffer[i + 1] : '\0'
+
+        switch(state) {
+            case SqlSplitState.NORMAL: {
+                if(c == '\'' ) {
+                    state = SqlSplitState.SINGLE_QUOTE
+                    stmt.appendChar(c)
+                }
+                else if(c == '"') {
+                    state = SqlSplitState.DOUBLE_QUOTE
+                    stmt.appendChar(c)
+                }
+                else if(c == '-' && next == '-') {
+                    state = SqlSplitState.LINE_COMMENT
+                    i += 1  // consume second '-'
+                }
+                else if(c == '/' && next == '*') {
+                    state = SqlSplitState.BLOCK_COMMENT
+                    i += 1  // consume '*'
+                }
+                else if(c == ';') {
+                    if(!m.executeOne(stmt.toString(), mig, err)) {
+                        return false
+                    }
+                    stmt.length = 0
+                }
+                else {
+                    stmt.appendChar(c)
+                }
+                break
+            }
+            case SqlSplitState.SINGLE_QUOTE: {
+                stmt.appendChar(c)
+                if(c == '\'' && next == '\'') {
+                    stmt.appendChar(next)   // escaped '' — stay in string
+                    i += 1
+                }
+                else if(c == '\'') {
+                    state = SqlSplitState.NORMAL
+                }
+                break
+            }
+            case SqlSplitState.DOUBLE_QUOTE: {
+                stmt.appendChar(c)
+                if(c == '"' && next == '"') {
+                    stmt.appendChar(next)   // escaped "" — stay in string
+                    i += 1
+                }
+                else if(c == '"') {
+                    state = SqlSplitState.NORMAL
+                }
+                break
+            }
+            case SqlSplitState.LINE_COMMENT: {
+                if(c == '\n') {
+                    state = SqlSplitState.NORMAL
+                }
+                // skip comment characters
+                break
+            }
+            case SqlSplitState.BLOCK_COMMENT: {
+                if(c == '*' && next == '/') {
+                    state = SqlSplitState.NORMAL
+                    i += 1  // consume '/'
+                }
+                // skip comment characters
+                break
+            }
+        }
+    }
+
+    // Execute any trailing statement not terminated by ';'
+    var remaining = stmt.toString().trim()
+    if(remaining.length > 0) {
+        if(!m.executeOne(remaining, mig, err)) {
+            return false
+        }
+    }
+
+    return true
+}
+
+func (m: *Migrator) executeOne(
+    sql: String,
+    mig: *Migration,
+    err: *MigrationError
+) : bool {
+    var trimmed = sql.trim()
+    if(trimmed.length == 0) {
+        return true
+    }
+
+    // connection.execute() requires a null-terminated string
+    var buf = StringBuilderInit(trimmed.length + 1, m.allocator)
+    defer buf.free()
+    buf.appendString(trimmed)
+
+    var r = m.conn.execute(buf.cStr())
+    if(r.isError()) {
+        err.status = MigrationStatus.SQL_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format(
+            "SQL error in V%lld ('%s'): %.*s\n  Statement: %.*s",
+            mig.version, mig.filename,
+            r.description.length, r.description.buffer,
+            trimmed.length, trimmed.buffer
+        )
+        return false
+    }
+    return true
+}
+
+// -----------------------------------------------------------------------
+// File scanning and migration parsing
+// -----------------------------------------------------------------------
+
+func (m: *Migrator) scanMigrations(
+    out: *Array<Migration>,
+    err: *MigrationError
+) : bool {
+    var files = ArrayInit<String>(32, m.allocator)
+    defer files.free()
+
+    var status = ListFiles(m.migrationsDir, &files, 0, m.allocator)
+    if(status != FileStatus.Ok) {
+        err.status = MigrationStatus.IO_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to list migration directory '%.*s': %s",
+            m.migrationsDir.length, m.migrationsDir.buffer,
+            FileStatusAsStr(status)
+        )
+        return false
+    }
+
+    for(var i = 0; i < files.length; i += 1) {
+        var path = files.get(i)
+
+        // Only process .sql files; silently skip everything else
+        if(!path.endsWith($".sql")) {
+            continue
+        }
+
+        var mig: Migration
+        if(!ParseMigrationFile(path, &mig, err)) {
+            return false
+        }
+
+        if(!ComputeChecksum(path, mig.checksum, m.allocator, err)) {
+            return false
+        }
+
+        out.add(mig)
+    }
+
+    return true
+}
+
+/// Parse a file path whose basename must match V{N}__{description}.sql.
+///
+/// Examples of valid basenames:
+///   V1__initial_schema.sql
+///   V2__add_users_table.sql
+///   V10__create_indexes.sql
+func ParseMigrationFile(
+    path: String,
+    mig: *Migration,
+    err: *MigrationError
+) : bool {
+    // Locate the filename portion (after the last '/')
+    var slashIdx = path.lastIndexOfAt($"/")
+    var name = (slashIdx < 0) ? path : path.substring(slashIdx + 1)
+
+    // Must start with 'V' or 'v'
+    if(name.length < 5 || (name.buffer[0] != 'V' && name.buffer[0] != 'v')) {
+        err.status = MigrationStatus.PARSE_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format(
+            "Migration file '%.*s' does not match V{N}__{description}.sql pattern",
+            name.length, name.buffer
+        )
+        return false
+    }
+
+    // Parse version digits after 'V'
+    var version: i64 = 0
+    var i = 1
+    var hasDigits = false
+    while(i < name.length && name.buffer[i] >= '0' && name.buffer[i] <= '9') {
+        version = version * 10_i64 + (name.buffer[i] - '0') as (i64)
+        hasDigits = true
+        i += 1
+    }
+
+    if(!hasDigits) {
+        err.status = MigrationStatus.PARSE_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Migration file '%.*s': expected version number after 'V'",
+            name.length, name.buffer
+        )
+        return false
+    }
+
+    // Expect '__' separator
+    if(i + 1 >= name.length || name.buffer[i] != '_' || name.buffer[i + 1] != '_') {
+        err.status = MigrationStatus.PARSE_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Migration file '%.*s': expected '__' separator after version number",
+            name.length, name.buffer
+        )
+        return false
+    }
+    i += 2
+
+    // Parse description up to '.'
+    var descStart = i
+    while(i < name.length && name.buffer[i] != '.') {
+        i += 1
+    }
+    var descLen = i - descStart
+
+    if(descLen == 0) {
+        err.status = MigrationStatus.PARSE_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Migration file '%.*s': description cannot be empty",
+            name.length, name.buffer
+        )
+        return false
+    }
+
+    if(path.length >= FILENAME_MAX) {
+        err.status = MigrationStatus.PARSE_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Migration file path too long (%d chars, max %d): '%.*s'",
+            path.length, FILENAME_MAX - 1, path.length, path.buffer
+        )
+        return false
+    }
+
+    mig.version = version
+
+    if(descLen >= DESCRIPTION_MAX) {
+        descLen = DESCRIPTION_MAX - 1
+    }
+    var desc = name.substring(descStart, descStart + descLen)
+    desc.copyTo(mig.description, DESCRIPTION_MAX - 1)
+    mig.descLen = descLen
+
+    path.copyTo(mig.filename, FILENAME_MAX - 1)
+    mig.filenameLen = path.length
+
+    return true
+}
+
+/// Compute the SHA1 checksum of a file and write it as a 40-char
+/// lowercase hex string into out (which must be at least CHECKSUM_SIZE bytes).
+func ComputeChecksum(
+    path:  String,
+    out:   *char,
+    alloc: *const Allocator,
+    err:   *MigrationError
+) : bool {
+    var sb = StringBuilderInit(4096, alloc)
+    defer sb.free()
+
+    var status = ReadFileFullyStr(path, &sb)
+    if(status != FileStatus.Ok) {
+        err.status = MigrationStatus.IO_ERROR
+        var msg = StringBufferInit(err.message, MSG_MAX, 0)
+        msg.format("Failed to read '%.*s' for checksum: %s",
+            path.length, path.buffer, FileStatusAsStr(status)
+        )
+        return false
+    }
+
+    var ctx: sha1_ctx
+    sha1_init(&ctx)
+    sha1_update(&ctx, sb.buffer as (*const u8), sb.length as (usize))
+
+    var hash: [SHA1_BLOCK_SIZE]u8
+    sha1_final(&ctx, hash as (*u8))
+
+    for(var i = 0; i < SHA1_BLOCK_SIZE; i += 1) {
+        sprintf(&out[i * 2], "%02x", hash[i] as (u32))
+    }
+    out[CHECKSUM_LEN] = '\0'
+
+    return true
+}

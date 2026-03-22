@@ -1,0 +1,632 @@
+import "std/db/migrations"
+import "std/db/sqlite"
+import "std/db/sqlite/sqlite_db"
+import "std/db"
+import "std/io"
+import "std/string"
+import "std/string/builder"
+import "std/array"
+import "std/assert"
+import "std/libc"
+import "std/system"
+import "std/mem"
+
+// -----------------------------------------------------------------------
+// Test helpers
+// -----------------------------------------------------------------------
+
+func openMemDb(conn: *SqliteConnection) {
+    var r = Connect(":memory:", conn, .enableWAL = false)
+    assert(r.isOk())
+}
+
+// Returns a null-terminated String for {cwd}/test_output/migrations/{name}.
+// Also creates the directory.  The backing buffer is heap-allocated and
+// intentionally leaked (acceptable in test code).
+func migDir(name: *const char) : String {
+    var base = StringBuilderInit(512, defaultAllocator)
+    base.append("%s/test_output", CurrentWorkingPath())
+    Mkdir(base.cStr())
+    base.length = 0
+
+    base.append("%s/test_output/migrations", CurrentWorkingPath())
+    Mkdir(base.cStr())
+    base.length = 0
+
+    base.append("%s/test_output/migrations/%s", CurrentWorkingPath(), name)
+    Mkdir(base.cStr())
+    return StringInit(base.buffer, base.length)
+}
+
+// Returns a null-terminated String for {dir}/{name}.
+// The backing buffer is heap-allocated and intentionally leaked.
+func migFile(dir: String, name: *const char) : String {
+    var sb = StringBuilderInit(512, defaultAllocator)
+    sb.append("%.*s/%s", dir.length, dir.buffer, name)
+    sb.cStr()  // ensure null terminator
+    return StringInit(sb.buffer, sb.length)
+}
+
+// Write a String as a file (overwrites any existing content).
+func writeFile(path: String, content: String) {
+    var status = WriteFile(path.buffer, content.buffer, content.length as (usize))
+    assert(status == FileStatus.Ok)
+}
+
+// -----------------------------------------------------------------------
+// Parse error tests
+// (exercised indirectly: scanMigrations rejects bad filenames)
+// -----------------------------------------------------------------------
+
+@test
+func testParseError_noVersionDigit() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_parse1")
+    var file = migFile(dir, "Vabc__bad.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"SELECT 1;")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+
+    assert(err.status == MigrationStatus.PARSE_ERROR)
+    assert(err.description().contains($"Vabc__bad.sql"))
+}
+
+@test
+func testParseError_noSeparator() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_parse2")
+    var file = migFile(dir, "V1_nodoublescore.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"SELECT 1;")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+
+    assert(err.status == MigrationStatus.PARSE_ERROR)
+    assert(err.description().contains($"V1_nodoublescore.sql"))
+}
+
+@test
+func testParseError_emptyDescription() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_parse3")
+    var file = migFile(dir, "V1__.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"SELECT 1;")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+
+    assert(err.status == MigrationStatus.PARSE_ERROR)
+}
+
+// -----------------------------------------------------------------------
+// Non-.sql files must be silently skipped
+// -----------------------------------------------------------------------
+
+@test
+func testNonSqlFilesAreSkipped() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir     = migDir("lmig_skip")
+    var readme  = migFile(dir, "README.md")
+    var initSql = migFile(dir, "V1__init.sql")
+    FileDelete(readme.buffer)
+    FileDelete(initSql.buffer)
+    writeFile(readme,  $"This is a readme")
+    writeFile(initSql, $"CREATE TABLE skip_test (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+
+    assert(err.isOk())
+
+    // Table from the .sql file must exist
+    var r = conn.connection.execute("INSERT INTO skip_test VALUES (1)")
+    assert(r.isOk())
+}
+
+// -----------------------------------------------------------------------
+// Basic migration: two files applied in order, DB state updated
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateRunsMigrations() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir   = migDir("lmig_basic")
+    var users = migFile(dir, "V1__create_users.sql")
+    var posts = migFile(dir, "V2__create_posts.sql")
+    FileDelete(users.buffer)
+    FileDelete(posts.buffer)
+    writeFile(users, $"CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL);")
+    writeFile(posts, $"CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT NOT NULL);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+
+    assert(err.isOk())
+
+    // Both tables must now exist
+    var r = conn.connection.execute("INSERT INTO users (id, name) VALUES (1, 'Alice')")
+    assert(r.isOk())
+    r = conn.connection.execute("INSERT INTO posts (id, title) VALUES (1, 'Hello')")
+    assert(r.isOk())
+}
+
+// -----------------------------------------------------------------------
+// Idempotency: running migrate() twice does not re-apply migrations
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateIsIdempotent() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_idem")
+    var file = migFile(dir, "V1__idem.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"CREATE TABLE idem_test (id INTEGER PRIMARY KEY);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    // Second call: no new migrations, no error
+    err = m.migrate()
+    assert(err.isOk())
+
+    // Exactly one row in the tracking table
+    var rs: SqlResultSet
+    var r = conn.connection.query(&rs, $"SELECT COUNT(*) FROM schema_migrations")
+    assert(r.isOk())
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt64(0) == 1_i64)
+    rs.closeAndReleaseAll()
+}
+
+// -----------------------------------------------------------------------
+// Tracking: version, description, 40-char SHA1 checksum, and ISO
+// timestamp are all stored in the tracking row
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateRecordsTrackingRow() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_record")
+    var file = migFile(dir, "V7__some_change.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"CREATE TABLE record_test (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    var rs: SqlResultSet
+    var r = conn.connection.query(&rs,
+        $"SELECT version, description, checksum, applied_at FROM schema_migrations")
+    assert(r.isOk())
+    assert(rs.hasNext())
+    rs.next()
+
+    assert(rs.columnInt64(0) == 7_i64)
+    assert(rs.columnString(1).equalsString("some_change"))
+
+    var checksum = rs.columnString(2)
+    assert(checksum.length == 40)   // 40-char hex SHA1
+
+    var appliedAt = rs.columnString(3)
+    assert(appliedAt.length > 0)    // ISO 8601 timestamp was recorded
+
+    rs.closeAndReleaseAll()
+}
+
+// -----------------------------------------------------------------------
+// Version ordering: files run numerically (V1 → V2 → V3)
+// regardless of the order the filesystem returns them
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateRunsInVersionOrder() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir   = migDir("lmig_order")
+    var step1 = migFile(dir, "V1__step_one.sql")
+    var step2 = migFile(dir, "V2__step_two.sql")
+    var step3 = migFile(dir, "V3__step_three.sql")
+    FileDelete(step1.buffer)
+    FileDelete(step2.buffer)
+    FileDelete(step3.buffer)
+
+    // Write in reverse order to stress-test sorting
+    writeFile(step3, $"CREATE TABLE step3 (id INTEGER);")
+    writeFile(step1, $"CREATE TABLE step1 (id INTEGER);")
+    writeFile(step2, $"CREATE TABLE step2 (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    var r = conn.connection.execute("INSERT INTO step1 VALUES (1)")
+    assert(r.isOk())
+    r = conn.connection.execute("INSERT INTO step2 VALUES (1)")
+    assert(r.isOk())
+    r = conn.connection.execute("INSERT INTO step3 VALUES (1)")
+    assert(r.isOk())
+}
+
+// V10 must sort after V2, not between V1 and V2 (numeric, not lexicographic)
+@test
+func testMigrateNumericVersionOrder() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir    = migDir("lmig_numorder")
+    var second = migFile(dir, "V2__second.sql")
+    var tenth  = migFile(dir, "V10__tenth.sql")
+    FileDelete(second.buffer)
+    FileDelete(tenth.buffer)
+
+    // V10 alters a table that V2 creates; would fail if V10 ran before V2
+    writeFile(tenth,  $"ALTER TABLE numorder_test ADD COLUMN extra TEXT;")
+    writeFile(second, $"CREATE TABLE numorder_test (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+
+    assert(err.isOk())
+}
+
+// -----------------------------------------------------------------------
+// Multi-statement SQL: all statements in one file run in one transaction
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateMultiStatement() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_multi")
+    var file = migFile(dir, "V1__multi.sql")
+    FileDelete(file.buffer)
+    writeFile(file,
+        $"""
+        CREATE TABLE multi_a (id INTEGER);
+        CREATE TABLE multi_b (id INTEGER);
+        INSERT INTO multi_a VALUES (42);
+        """)
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    var rs: SqlResultSet
+    var r = conn.connection.query(&rs, $"SELECT id FROM multi_a")
+    assert(r.isOk())
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt64(0) == 42_i64)
+    rs.closeAndReleaseAll()
+
+    r = conn.connection.execute("INSERT INTO multi_b VALUES (1)")
+    assert(r.isOk())
+}
+
+// -----------------------------------------------------------------------
+// Comment handling: -- and /* */ must not interfere with statement splitting
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateLineAndBlockCommentsIgnored() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_comments")
+    var file = migFile(dir, "V1__commented.sql")
+    FileDelete(file.buffer)
+    writeFile(file,
+        $"""
+        -- Create the table
+        CREATE TABLE comments_test (id INTEGER);
+
+        /* Insert a row:
+           this comment spans multiple lines */
+        INSERT INTO comments_test VALUES (99);
+        """)
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    var rs: SqlResultSet
+    var r = conn.connection.query(&rs, $"SELECT id FROM comments_test")
+    assert(r.isOk())
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt64(0) == 99_i64)
+    rs.closeAndReleaseAll()
+}
+
+// Semicolons inside string literals must NOT split statements
+@test
+func testMigrateSemicolonInsideStringLiteral() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_strquote")
+    var file = migFile(dir, "V1__quoted.sql")
+    FileDelete(file.buffer)
+    writeFile(file,
+        $"""
+        CREATE TABLE quoted_test (id INTEGER, val TEXT);
+        INSERT INTO quoted_test VALUES (1, 'a;b;c');
+        """)
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    var rs: SqlResultSet
+    var r = conn.connection.query(&rs, $"SELECT val FROM quoted_test WHERE id = 1")
+    assert(r.isOk())
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnString(0).equalsString("a;b;c"))
+    rs.closeAndReleaseAll()
+}
+
+// -----------------------------------------------------------------------
+// Transaction rollback: a bad statement rolls back the whole file
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateRollsBackOnSqlError() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_rollback")
+    var file = migFile(dir, "V1__bad.sql")
+    FileDelete(file.buffer)
+    writeFile(file,
+        $"""
+        CREATE TABLE rollback_test (id INTEGER);
+        INSERT INTO rollback_test VALUES (1);
+        THIS IS NOT VALID SQL;
+        """)
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+
+    assert(err.status == MigrationStatus.SQL_ERROR)
+    assert(err.description().contains($"V1"))
+
+    // Table must NOT exist because the transaction was rolled back
+    var r = conn.connection.execute("SELECT * FROM rollback_test")
+    assert(r.isError())
+    conn.connection.clearError()  // clear the sticky error so we can query schema_migrations
+
+    // Tracking table must be empty (V1 was never committed)
+    var rs: SqlResultSet
+    r = conn.connection.query(&rs, $"SELECT COUNT(*) FROM schema_migrations")
+    assert(r.isOk())
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt64(0) == 0_i64)
+    rs.closeAndReleaseAll()
+}
+
+// -----------------------------------------------------------------------
+// Checksum: SHA1 detects tampering with applied migration files
+// -----------------------------------------------------------------------
+
+@test
+func testValidatePassesWhenFilesUnchanged() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_val_ok")
+    var file = migFile(dir, "V1__val_ok.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"CREATE TABLE val_ok (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    // File unchanged: validate() must succeed
+    err = m.validate()
+    assert(err.isOk())
+}
+
+@test
+func testMigrateDetectsChecksumMismatch() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_chksum")
+    var file = migFile(dir, "V1__original.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"CREATE TABLE chksum_test (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    // Tamper with the file after it has been applied
+    writeFile(file, $"CREATE TABLE chksum_test (id INTEGER); -- tampered")
+
+    err = m.migrate()
+    assert(err.status == MigrationStatus.CHECKSUM_MISMATCH)
+    assert(err.description().contains($"V1"))
+}
+
+@test
+func testValidateDetectsChecksumMismatch() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_val_chk")
+    var file = migFile(dir, "V1__val_chk.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"CREATE TABLE val_chk (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    // Tamper and call validate() (no new migration to apply)
+    writeFile(file, $"DROP TABLE val_chk; -- bad actor")
+
+    err = m.validate()
+    assert(err.status == MigrationStatus.CHECKSUM_MISMATCH)
+}
+
+// -----------------------------------------------------------------------
+// Out-of-order: a version lower than the highest applied is rejected
+// -----------------------------------------------------------------------
+
+@test
+func testMigrateRejectsOutOfOrderVersion() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_oor")
+    var low  = migFile(dir, "V1__low.sql")
+    var high = migFile(dir, "V3__high.sql")
+
+    // Pre-cleanup so a stale V1 from a previous run doesn't interfere
+    FileDelete(low.buffer)
+    FileDelete(high.buffer)
+
+    // Apply V3 on its own first
+    writeFile(high, $"CREATE TABLE oor_high (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    // Now introduce V1, which is lower than the already-applied V3
+    writeFile(low, $"CREATE TABLE oor_low (id INTEGER);")
+
+    err = m.migrate()
+    assert(err.status == MigrationStatus.OUT_OF_ORDER)
+    assert(err.description().contains($"V1"))
+
+    // Remove V1 so it doesn't affect the next run
+    FileDelete(low.buffer)
+}
+
+// -----------------------------------------------------------------------
+// Status API: applied vs. pending migrations are correctly reported
+// -----------------------------------------------------------------------
+
+@test
+func testStatusShowsAppliedAndPending() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir     = migDir("lmig_status")
+    var applied = migFile(dir, "V1__applied.sql")
+    var pending = migFile(dir, "V2__pending.sql")
+    FileDelete(applied.buffer)
+    FileDelete(pending.buffer)
+
+    // Apply only V1
+    writeFile(applied, $"CREATE TABLE status_a (id INTEGER);")
+
+    var m = MigratorInit(conn.connection, dir)
+    var err = m.migrate()
+    assert(err.isOk())
+
+    // Add V2 without running migrate() again
+    writeFile(pending, $"CREATE TABLE status_b (id INTEGER);")
+
+    var results = ArrayInit<MigrationInfo>(8)
+    defer results.free()
+
+    err = m.status(&results)
+    assert(err.isOk())
+    assert(results.size() == 2)
+
+    var info1 = results.get(0)
+    assert(info1.version == 1_i64)
+    assert(info1.applied == true)
+    assert(StringInit(info1.description).equalsString("applied"))
+
+    var info2 = results.get(1)
+    assert(info2.version == 2_i64)
+    assert(info2.applied == false)
+    assert(StringInit(info2.description).equalsString("pending"))
+
+    // Remove V2 so it doesn't affect the next run
+    FileDelete(pending.buffer)
+}
+
+// -----------------------------------------------------------------------
+// Custom tracking table name
+// -----------------------------------------------------------------------
+
+@test
+func testCustomTableName() {
+    var conn: SqliteConnection
+    openMemDb(&conn)
+    defer conn.connection.close()
+
+    var dir  = migDir("lmig_custom_tbl")
+    var file = migFile(dir, "V1__init.sql")
+    FileDelete(file.buffer)
+    writeFile(file, $"CREATE TABLE custom_tbl_test (id INTEGER);")
+
+    var m = MigratorInit(
+        conn.connection,
+        dir,
+        .tableName = $"my_custom_migrations"
+    )
+    var err = m.migrate()
+    assert(err.isOk())
+
+    // Custom table must exist and hold the record
+    var rs: SqlResultSet
+    var r = conn.connection.query(&rs, $"SELECT version FROM my_custom_migrations")
+    assert(r.isOk())
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt64(0) == 1_i64)
+    rs.closeAndReleaseAll()
+
+    // Default table must NOT exist
+    r = conn.connection.execute("SELECT * FROM schema_migrations")
+    assert(r.isError())
+}

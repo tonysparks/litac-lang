@@ -203,7 +203,12 @@ public func (this: *SqliteConnection) commit() : SqlResult  {
 }
 
 public func (this: *SqliteConnection) rollback() : SqlResult  {
-    return this.execute("ROLLBACK;")
+    // Always attempt rollback regardless of current error state,
+    // so a failed statement inside a transaction can be properly rolled back.
+    var error: *char = null
+    var errorCode = sqlite3_exec(this.db, "ROLLBACK;", null, null, &error)
+    this.error = CreateError(this, null, errorCode, error)
+    return this.error
 }
 
 public func (this: *SqliteConnection) prepare(statement: *SqlStatement, sql: String) : SqlResult  {
@@ -460,9 +465,11 @@ public func (this: *SqliteResultSet) statement() : SqlStatement {
 }
 
 public func (this: *SqliteResultSet) closeAndReleaseAll() : SqlResult {
-    this.stmt.close()
-    this.stmt.conn.release(this.stmt)
-    return this.stmt.conn.error
+    // release() calls close() internally, so avoid calling close() here
+    // to prevent double-finalizing the underlying sqlite3_stmt.
+    var conn = this.stmt.conn
+    conn.release(this.stmt)
+    return conn.lastResult()
 }
 
 public func (this: *SqliteResultSet) hasNext() : bool {
