@@ -25,6 +25,7 @@ const MSG_MAX         = 1024_i32
 // Public error types
 // -----------------------------------------------------------------------
 
+@asStr
 public enum MigrationStatus {
     OK,
     IO_ERROR,

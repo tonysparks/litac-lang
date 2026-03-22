@@ -35,6 +35,9 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
 
     if(pm.options.litaOptions.isPreBuildEnabled) {
         var preBuildCommand = pm.pkg.json.get("pre_build_command")
+        if(!preBuildCommand) {
+            preBuildCommand = pm.pkg.json.get("build_command")
+        }
         if(preBuildCommand) {
             var status = pm.build(preBuildCommand, options, RunType.PRE_BUILD)
             if(status != PkgStatus.OK) {
@@ -53,6 +56,9 @@ public func PackageBuild(pm: *PackageManager, options: PackageBuildOptions) : Pk
 
     if(pm.options.litaOptions.isPostBuildEnabled) {
         var postBuildCommand = pm.pkg.json.get("post_build_command")
+        if(!postBuildCommand) {
+            postBuildCommand = pm.pkg.json.get("build_command")
+        }
         if(postBuildCommand) {
             var status = pm.build(postBuildCommand, options, RunType.POST_BUILD)
             if(status != PkgStatus.OK) {
