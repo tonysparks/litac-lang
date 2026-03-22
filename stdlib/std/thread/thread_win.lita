@@ -823,7 +823,7 @@ public func (thr: Thread) detach() : ThreadStatus {
     return CloseHandle(thr.hnd) ? ThreadStatus.SUCCESS : ThreadStatus.ERROR
 }
 
-public func (thr: Thread) id() : i32 {
+public func (thr: Thread) id() : i64 {
     return GetThreadId(thr.hnd)
 }
 

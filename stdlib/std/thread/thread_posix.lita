@@ -506,8 +506,8 @@ public func (this: Thread) detach() : ThreadStatus {
         ? ThreadStatus.SUCCESS : ThreadStatus.ERROR
 }
 
-public func (this: Thread) id() : i32 {
-    return this.thrd as (i32)
+public func (this: Thread) id() : i64 {
+    return this.thrd as (i64)
 }
 
 public func (this: Thread) equal(other: Thread) : bool {
