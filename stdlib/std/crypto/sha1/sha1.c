@@ -23,7 +23,7 @@ void sha1_transform(SHA1_CTX *ctx, const BYTE_SHA1 data[])
 	WORD_SHA1 a, b, c, d, e, i, j, t, m[80];
 
 	for (i = 0, j = 0; i < 16; ++i, j += 4)
-		m[i] = (data[j] << 24) + (data[j + 1] << 16) + (data[j + 2] << 8) + (data[j + 3]);
+		m[i] = ((WORD_SHA1)data[j] << 24) | ((WORD_SHA1)data[j + 1] << 16) | ((WORD_SHA1)data[j + 2] << 8) | (WORD_SHA1)data[j + 3];
 	for ( ; i < 80; ++i) {
 		m[i] = (m[i - 3] ^ m[i - 8] ^ m[i - 14] ^ m[i - 16]);
 		m[i] = (m[i] << 1) | (m[i] >> 31);
