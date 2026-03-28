@@ -369,6 +369,12 @@ public func (this: *SqliteStatement) bindString(index: i32, str: String) : SqlRe
 public func (this: *SqliteStatement) bindDateTime(index: i32, dateTime: DateTime) : SqlResult {
     if (this.conn.hasError()) return this.conn.error
 
+    // A zero-initialized DateTime has no valid date — bind NULL to avoid
+    // passing an invalid struct tm (tm_mon = -1) to strftime on Windows.
+    if (dateTime.year == 0 && dateTime.month == 0 && dateTime.day == 0) {
+        return this.bindNull(index)
+    }
+
     var buffer:[64]char;
     var dateString = StringBufferInit(buffer, 64, 0)
     dateTime.isoFormat(&dateString)
