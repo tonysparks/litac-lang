@@ -69,7 +69,9 @@ public func (this: DateTime) toJson(sb: *StringBuilder) {
     if(!sb.reserve(64)) {
         return;
     }
+    sb.appendChar('"')
     this.isoFormat(&sb.asBuffer)
+    sb.appendChar('"')
 }
 
 public func (this: *Map<K, V>) toJson<K, V>(sb: *StringBuilder) {
