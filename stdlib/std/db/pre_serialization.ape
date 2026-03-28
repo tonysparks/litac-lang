@@ -381,8 +381,13 @@ fn EmitDBFunctions(sym) {
             if(isString(columnType)) {
                 emit(
                 `
-                len = sb.append("%%s", resultSet.column${columnType}(fromIndex += 1))
-                this.${columnName} = sb.substring(sb.length - len, sb.length)
+                {
+                    var _colVal = resultSet.columnText(fromIndex += 1)
+                    if(_colVal != null) {
+                        len = sb.append("%%s", _colVal)
+                        this.${columnName} = StringInit(sb.buffer + (sb.length - len), len)
+                    }
+                }
                 `
                 )
             } else {

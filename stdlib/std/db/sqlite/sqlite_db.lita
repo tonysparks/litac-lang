@@ -529,7 +529,12 @@ public func (this: *SqliteResultSet) columnString(column: i32) : String {
 }
 
 public func (this: *SqliteResultSet) columnDateTime(column: i32) : DateTime {
-    var value = this.columnText(column).toString()
+    var ptr = this.columnText(column)
+    if(ptr == null) {
+        return DateTime{}
+    }
+
+    var value = ptr.toString()
     if(value.empty()) {
         return DateTime{}
     }
