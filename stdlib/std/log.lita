@@ -7,8 +7,8 @@ import "std/string/buffer"
 @asStr
 public enum LogLevel {
     TRACE,
-    INFO,
     DEBUG,
+    INFO,
     WARN,
     ERROR,
     FATAL
@@ -21,8 +21,12 @@ public enum LogLevel {
 
 var outputFile: *FILE = null
 var mtx: Mutex;
+var logLevel: LogLevel = LogLevel.TRACE
 
-public func LogInit(outputFileName: *const char) {
+public func LogInit(
+    outputFileName: *const char,
+    level: LogLevel = LogLevel.TRACE
+) {
     if(outputFileName) {
         outputFile = fopen(outputFileName, "w")
     }
@@ -30,7 +34,7 @@ public func LogInit(outputFileName: *const char) {
     if(!outputFile) {
         outputFile = stdout
     }
-
+    logLevel = level
     mtx.init()
 }
 
@@ -43,6 +47,7 @@ public func Log(level: LogLevel, format: *const char, ...) {
 
 public func Logv(level: LogLevel, format: *const char, args: va_list) {
     if(!outputFile) return;
+    if(logLevel > level) return;
 
     mtx.lock()
         var buffer:[64]char;
