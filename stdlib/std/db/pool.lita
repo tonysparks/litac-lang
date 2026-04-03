@@ -66,7 +66,10 @@ public func (this: *UriParams) getBool(key: *const char, defaultVal: bool) : boo
 //       return SqlResult { .type = SqlResultType.OK }
 //   }
 //
-//   var driver = DbDriver{}
+//   var driver = DbDriver{
+//      .name = $"mydb",
+//      .connect = MyConnect
+//   }
 //   $"mydb".copyTo(driver.name, MAX_DRIVER_LEN)
 //   driver.connect = MyConnect
 //   RegisterDriver(driver)
@@ -82,7 +85,7 @@ public typedef func(path: *const char,
                     allocator: *const Allocator) : SqlResult as DbDriverFn
 
 public struct DbDriver {
-    name:    [MAX_DRIVER_LEN]char
+    name:    String
     connect: DbDriverFn
 }
 
@@ -298,7 +301,7 @@ public func (this: *ConnectionPool) destroy() {
 func CreateConnection(pool: *ConnectionPool, conn: *SqlConnection) : SqlResult {
     // user-registered drivers take precedence over built-ins
     for (var i = 0; i < _driverCount; i += 1) {
-        if (_drivers[i].name.equals(pool.driver)) {
+        if (_drivers[i].name.equalsString(pool.driver)) {
             return _drivers[i].connect(pool.path, &pool.params, conn, pool.allocator)
         }
     }

@@ -161,9 +161,10 @@ func noopConnect(path: *const char, params: *UriParams,
 
 @test
 func testRegisterDriver() {
-    var driver = DbDriver{}
-    $"noop".copyTo(driver.name, MAX_DRIVER_LEN)
-    driver.connect = noopConnect
+    var driver = DbDriver{
+        .name = $"noop",
+        .connect = noopConnect
+    }
     RegisterDriver(driver)
 
     var config = PoolConfig { .maxSize = 1, .minSize = 1 }
