@@ -1347,6 +1347,52 @@
             "error": "trait method: 'minus' contains variable arguments which are currently not supported in trait functions"
         },
         {
+            "name" : "Trait type as generic Array element",
+            "definitions": `
+                import "std/array"
+                import "std/mem"
+
+                trait Shape {
+                    area: func() : i32
+                }
+
+                struct Rect {
+                    w: i32
+                    h: i32
+                }
+
+                func (this: *Rect) area() : i32 {
+                    return this.w * this.h
+                }
+
+                struct Circle {
+                    r: i32
+                }
+
+                func (this: *Circle) area() : i32 {
+                    return this.r * this.r
+                }
+            `,
+            "code": `
+                var rect   = Rect{.w = 3, .h = 4}
+                var circle = Circle{.r = 5}
+
+                // Array<TraitType> previously failed to compile — the codegen
+                // emitted an undefined null->trait cast function when the
+                // internal elements pointer was initialised to null.
+                var shapes = ArrayInit<Shape>(4)
+
+                shapes.add(&rect)
+                shapes.add(&circle)
+
+                assert(shapes.length == 2)
+                assert(shapes.get(0).area() == 12)
+                assert(shapes.get(1).area() == 25)
+
+                shapes.free()
+            `,
+        },
+        {
             "name" : "Trait native var args",
             "disabled": true,
             "definitions": `

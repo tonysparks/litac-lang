@@ -1,0 +1,174 @@
+import "std/assert"
+import "std/mem"
+import "std/string"
+import "std/db"
+import "std/db/sqlite/sqlite_db"
+import "std/db/pool"
+
+// -----------------------------------------------------------------------
+// ConnectionPoolInit with in-memory SQLite
+// -----------------------------------------------------------------------
+
+@test
+func testPoolInit() {
+    var config = PoolConfig {
+        .maxSize = 4,
+        .minSize = 2,
+    }
+    var pool: ConnectionPool;
+    var result = ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    assert(!result.isError())
+    assert(pool.totalSize == 2)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// acquire / release round-trip
+// -----------------------------------------------------------------------
+
+@test
+func testAcquireRelease() {
+    var config = PoolConfig { .maxSize = 3, .minSize = 1 }
+    var pool: ConnectionPool;
+    var result = ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    assert(!result.isError())
+
+    var conn: SqlConnection;
+    result = pool.acquire(&conn)
+    assert(!result.isError())
+
+    // use the connection
+    conn.execute("CREATE TABLE t (id INTEGER)")
+    assert(!conn.hasError())
+
+    pool.release(conn)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// tryAcquire returns error when pool is exhausted
+// -----------------------------------------------------------------------
+
+@test
+func testTryAcquireExhausted() {
+    var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+    var pool: ConnectionPool;
+    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+
+    // drain the single connection
+    var conn: SqlConnection;
+    pool.acquire(&conn)
+
+    // pool is now empty and at maxSize — tryAcquire must fail
+    var conn2: SqlConnection;
+    var result = pool.tryAcquire(&conn2)
+    assert(result.isError())
+
+    pool.release(conn)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// acquire lazily creates connections up to maxSize
+// -----------------------------------------------------------------------
+
+@test
+func testLazyGrowth() {
+    var config = PoolConfig { .maxSize = 3, .minSize = 1 }
+    var pool: ConnectionPool;
+    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+
+    assert(pool.totalSize == 1)
+
+    var c1: SqlConnection;
+    var c2: SqlConnection;
+    var c3: SqlConnection;
+    pool.acquire(&c1)
+    assert(pool.totalSize == 1)   // c1 came from idle
+
+    pool.acquire(&c2)
+    assert(pool.totalSize == 2)   // c2 was freshly created
+
+    pool.acquire(&c3)
+    assert(pool.totalSize == 3)   // c3 was freshly created
+
+    pool.release(c1)
+    pool.release(c2)
+    pool.release(c3)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// acquire after release reuses the connection (idle count goes back up)
+// -----------------------------------------------------------------------
+
+@test
+func testReuseAfterRelease() {
+    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var pool: ConnectionPool;
+    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+
+    var conn: SqlConnection;
+    pool.acquire(&conn)
+    pool.release(conn)
+
+    // should be back in idle — totalSize must not exceed 2
+    var conn2: SqlConnection;
+    pool.acquire(&conn2)
+    assert(pool.totalSize <= 2)
+
+    pool.release(conn2)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// URI query params: wal=false
+// -----------------------------------------------------------------------
+
+@test
+func testUriParamWalFalse() {
+    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var pool: ConnectionPool;
+    var result = ConnectionPoolInit("ldbc://sqlite/:memory:?wal=false", &pool, config)
+    assert(!result.isError())
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// Invalid URI is rejected
+// -----------------------------------------------------------------------
+
+@test
+func testInvalidUri() {
+    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var pool: ConnectionPool;
+    var result = ConnectionPoolInit("jdbc://sqlite/:memory:", &pool, config)
+    assert(result.isError())
+}
+
+// -----------------------------------------------------------------------
+// RegisterDriver: custom no-op driver
+// -----------------------------------------------------------------------
+
+func noopConnect(path: *const char, params: *UriParams,
+                 conn: *SqlConnection, allocator: *const Allocator) : SqlResult {
+    // deliberately return error so we can detect the call was dispatched
+    return SqlResult {
+        .type = SqlResultType.ERROR,
+        .description = $"noop driver called"
+    }
+}
+
+@test
+func testRegisterDriver() {
+    var driver = DbDriver{}
+    $"noop".copyTo(driver.name, MAX_DRIVER_LEN)
+    driver.connect = noopConnect
+    RegisterDriver(driver)
+
+    var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+    var pool: ConnectionPool;
+    var result = ConnectionPoolInit("ldbc://noop/somedb", &pool, config)
+    // the noop driver always returns error, so init should fail
+    assert(result.isError())
+}

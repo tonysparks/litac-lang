@@ -17,9 +17,9 @@ run_tests() {
 
     # valgrind --leak-check=full --show-leak-kinds=all ./litac_tests $1
     if [ -n "$1" ]; then
-        ./bin/litac test -regex "singleOnly" -file "./test/compiler_test.lita" -output "litac_tests"
+        ./bin/output/litac test -regex "singleOnly" -file "./test/compiler_test.lita" -output "litac_tests"
     else
-        ./bin/litac test -output "litac_tests"
+        ./bin/output/litac test -output "litac_tests"
     fi
 
     result=$?

@@ -1,0 +1,447 @@
+import "std/array"
+import "std/mem"
+import "std/thread"
+import "std/string"
+import "std/db"
+import "std/db/sqlite/sqlite_db"
+
+// =========================================================================
+// Constants
+// =========================================================================
+
+public const MAX_URI_LEN     = 512
+public const MAX_DRIVER_LEN  = 32
+public const MAX_URI_PARAMS  = 16
+public const MAX_PARAM_KEY   = 64
+public const MAX_PARAM_VAL   = 256
+public const MAX_DRIVERS     = 16
+const LDBC_SCHEME     = "ldbc://"
+const LDBC_SCHEME_LEN = 7
+
+// =========================================================================
+// URI Params
+// =========================================================================
+
+struct UriParam {
+    key:   [MAX_PARAM_KEY]char
+    value: [MAX_PARAM_VAL]char
+}
+
+public struct UriParams {
+    params: [MAX_URI_PARAMS]UriParam
+    count:  i32
+}
+
+public func (this: *UriParams) get(key: *const char) : *const char {
+    for (var i = 0; i < this.count; i += 1) {
+        if (this.params[i].key.equals(key)) {
+            return this.params[i].value
+        }
+    }
+    return null
+}
+
+public func (this: *UriParams) getBool(key: *const char, defaultVal: bool) : bool {
+    var val = this.get(key)
+    if (val == null) return defaultVal
+    return val.equals("true") || val.equals("1")
+}
+
+// =========================================================================
+// Driver Registry
+//
+// Drivers map a URI scheme name (e.g. "sqlite") to a factory function that
+// opens a single connection.  Built-in drivers (sqlite) are handled directly
+// in CreateConnection(); custom drivers can be added at startup by calling
+// RegisterDriver() before the first ConnectionPoolInit().
+//
+// Custom driver example:
+//
+//   func MyConnect(path: *const char, params: *UriParams,
+//                  conn: *SqlConnection, alloc: *const Allocator) : SqlResult {
+//       var c = new<MyConnection>(alloc)
+//       ...
+//       var ptr = c;
+//       *conn = ptr
+//       return SqlResult { .type = SqlResultType.OK }
+//   }
+//
+//   var driver = DbDriver{}
+//   $"mydb".copyTo(driver.name, MAX_DRIVER_LEN)
+//   driver.connect = MyConnect
+//   RegisterDriver(driver)
+//
+//   // Then use it:
+//   ConnectionPoolInit("ldbc://mydb/path/to/data", &pool, config)
+//
+// =========================================================================
+
+public typedef func(path: *const char,
+                    params: *UriParams,
+                    conn: *SqlConnection,
+                    allocator: *const Allocator) : SqlResult as DbDriverFn
+
+public struct DbDriver {
+    name:    [MAX_DRIVER_LEN]char
+    connect: DbDriverFn
+}
+
+var _drivers:     [MAX_DRIVERS]DbDriver
+var _driverCount: i32 = 0
+
+// RegisterDriver adds a custom driver to the global registry.
+// Registered drivers take precedence over built-in drivers.
+// Safe to call only from a single thread before the pool is used.
+public func RegisterDriver(driver: DbDriver) {
+    if (_driverCount >= MAX_DRIVERS) {
+        return;
+    }
+    _drivers[_driverCount] = driver
+    _driverCount += 1
+}
+
+// =========================================================================
+// Pool Config & Structs
+// =========================================================================
+
+public struct PoolConfig {
+    allocator: *const Allocator  // memory allocator; defaults to defaultAllocator if null
+    maxSize:   i32               // max total connections (default 10 if <= 0)
+    minSize:   i32               // connections to pre-warm  (default 1  if <= 0)
+}
+
+public struct ConnectionPool {
+    allocator: *const Allocator
+    uri:       [MAX_URI_LEN]char
+    driver:    [MAX_DRIVER_LEN]char
+    path:      [MAX_URI_LEN]char
+    params:    UriParams
+    config:    PoolConfig
+    mutex:     Mutex
+    available: Cond
+    idle:      Array<SqlConnection>
+    totalSize: i32    // total connections created (idle + currently acquired)
+    closed:    bool
+}
+
+// =========================================================================
+// Pool API
+// =========================================================================
+
+// ConnectionPoolInit creates a thread-safe connection pool for the given URI.
+//
+// URI format:  ldbc://<driver>/<path>[?key=value&...]
+//
+// Examples:
+//   ldbc://sqlite/:memory:
+//   ldbc://sqlite/./myapp.db?wal=true
+//   ldbc://sqlite//absolute/path/db.sqlite?readonly=true
+//
+// Supported SQLite query params:
+//   wal=true|false    enable WAL mode (default true)
+//   readonly=true     open read-only (default false)
+public func ConnectionPoolInit(
+    uri:    *const char,
+    pool:   *ConnectionPool,
+    config: PoolConfig
+) : SqlResult {
+    var result = ParseUri(uri, pool)
+    if (result.isError()) return result
+
+    pool.config    = config
+    pool.allocator = config.allocator ? config.allocator : defaultAllocator
+    pool.totalSize = 0
+    pool.closed    = false
+
+    var maxSize = config.maxSize > 0 ? config.maxSize : 10
+    var minSize = config.minSize > 0 ? config.minSize : 1
+    pool.config.maxSize = maxSize
+    pool.config.minSize = minSize
+
+    pool.idle = ArrayInit<SqlConnection>(maxSize, pool.allocator)
+    pool.mutex.init()
+    pool.available.init()
+
+    for (var i = 0; i < minSize; i += 1) {
+        var conn: SqlConnection;
+        result = CreateConnection(pool, &conn)
+        if (result.isError()) {
+            // clean up any connections already opened
+            for (var j = 0; j < pool.idle.length; j += 1) {
+                var c = pool.idle.get(j)
+                c.close()
+                pool.allocator.free(c.__this)
+            }
+            pool.idle.free()
+            pool.available.destroy()
+            pool.mutex.destroy()
+            return result
+        }
+        pool.idle.add(conn)
+        pool.totalSize += 1
+    }
+
+    return SqlResult { .type = SqlResultType.OK }
+}
+
+// acquire checks out a connection from the pool.
+// Blocks until one is available if the pool is exhausted.
+public func (this: *ConnectionPool) acquire(conn: *SqlConnection) : SqlResult {
+    this.mutex.lock()
+
+    while (this.idle.length == 0 &&
+           this.totalSize >= this.config.maxSize &&
+           !this.closed) {
+        this.available.wait(&this.mutex)
+    }
+
+    if (this.closed) {
+        this.mutex.unlock()
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"connection pool is closed"
+        }
+    }
+
+    var result: SqlResult
+    if (this.idle.length > 0) {
+        var tmp = this.idle.pop();
+        *conn = tmp
+        result = SqlResult { .type = SqlResultType.OK }
+    } else {
+        // totalSize < maxSize — create a fresh connection
+        result = CreateConnection(this, conn)
+        if (result.isOk()) {
+            this.totalSize += 1
+        }
+    }
+
+    this.mutex.unlock()
+    return result
+}
+
+// tryAcquire checks out a connection without blocking.
+// Returns an error immediately if no connection is available.
+public func (this: *ConnectionPool) tryAcquire(conn: *SqlConnection) : SqlResult {
+    this.mutex.lock()
+
+    if (this.closed) {
+        this.mutex.unlock()
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"connection pool is closed"
+        }
+    }
+
+    var result: SqlResult
+    if (this.idle.length > 0) {
+        var tmp = this.idle.pop();
+        *conn = tmp
+        result = SqlResult { .type = SqlResultType.OK }
+    } else if (this.totalSize < this.config.maxSize) {
+        result = CreateConnection(this, conn)
+        if (result.isOk()) {
+            this.totalSize += 1
+        }
+    } else {
+        result = SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"no connections available"
+        }
+    }
+
+    this.mutex.unlock()
+    return result
+}
+
+// release returns a previously acquired connection to the pool.
+// If the pool has been destroyed, the connection is closed and freed instead.
+public func (this: *ConnectionPool) release(conn: SqlConnection) {
+    this.mutex.lock()
+
+    if (this.closed) {
+        this.mutex.unlock()
+        conn.close()
+        this.allocator.free(conn.__this)
+        return;
+    }
+
+    this.idle.add(conn)
+    this.available.signal()
+    this.mutex.unlock()
+}
+
+// destroy closes all idle connections and shuts the pool down.
+// Connections that are still acquired remain valid until release() is called,
+// at which point they are closed and freed rather than returned to the pool.
+public func (this: *ConnectionPool) destroy() {
+    this.mutex.lock()
+    this.closed = true
+
+    for (var i = 0; i < this.idle.length; i += 1) {
+        var c = this.idle.get(i)
+        c.close()
+        this.allocator.free(c.__this)
+    }
+    this.idle.free()
+
+    this.mutex.unlock()
+    this.available.broadcast()   // wake any threads blocked in acquire()
+    this.available.destroy()
+    this.mutex.destroy()
+}
+
+// =========================================================================
+// Internal helpers
+// =========================================================================
+
+func CreateConnection(pool: *ConnectionPool, conn: *SqlConnection) : SqlResult {
+    // user-registered drivers take precedence over built-ins
+    for (var i = 0; i < _driverCount; i += 1) {
+        if (_drivers[i].name.equals(pool.driver)) {
+            return _drivers[i].connect(pool.path, &pool.params, conn, pool.allocator)
+        }
+    }
+
+    // built-in: sqlite
+    if (pool.driver.equals("sqlite")) {
+        return SqliteDriverConnect(pool.path, &pool.params, conn, pool.allocator)
+    }
+
+    return SqlResult {
+        .type = SqlResultType.ERROR,
+        .description = $"unknown driver; register it with RegisterDriver() before use"
+    }
+}
+
+func ParseUri(uri: *const char, pool: *ConnectionPool) : SqlResult {
+    var uriStr = uri.toString()
+
+    if (!uriStr.startsWith($"ldbc://")) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"invalid URI: must start with ldbc://"
+        }
+    }
+
+    // everything after "ldbc://"
+    var rest = uriStr.substring(LDBC_SCHEME_LEN)
+
+    // driver name: up to the first '/'
+    var slashIdx = rest.indexOf($"/")
+    if (slashIdx < 0) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"invalid URI: missing '/' separator after driver name"
+        }
+    }
+    if (slashIdx == 0) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"invalid URI: missing driver name"
+        }
+    }
+    if (slashIdx >= MAX_DRIVER_LEN) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"invalid URI: driver name too long"
+        }
+    }
+
+    var driverStr = rest.substring(0, slashIdx)
+    driverStr.copyTo(pool.driver, MAX_DRIVER_LEN)
+
+    // path: everything after the '/' up to an optional '?'
+    var afterDriver = rest.substring(slashIdx + 1)
+    var qIdx = afterDriver.indexOf($"?")
+    var pathStr = qIdx >= 0 ? afterDriver.substring(0, qIdx) : afterDriver
+
+    if (pathStr.length >= MAX_URI_LEN) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"invalid URI: path too long"
+        }
+    }
+
+    pathStr.copyTo(pool.path, MAX_URI_LEN)
+
+    // store the full URI for reference
+    if (uriStr.length >= MAX_URI_LEN) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"invalid URI: too long"
+        }
+    }
+    uriStr.copyTo(pool.uri, MAX_URI_LEN)
+
+    // query params (everything after '?')
+    pool.params.count = 0
+    if (qIdx >= 0) {
+        var queryStr = afterDriver.substring(qIdx + 1)
+        ParseQueryParams(queryStr, &pool.params)
+    }
+
+    return SqlResult { .type = SqlResultType.OK }
+}
+
+func ParseQueryParams(query: String, params: *UriParams) {
+    var remaining = query
+    while (remaining.length > 0 && params.count < MAX_URI_PARAMS) {
+        var param = &params.params[params.count]
+
+        // split off one "key=value" (or just "key") at the next '&'
+        var ampIdx = remaining.indexOf($"&")
+        var pair = ampIdx >= 0 ? remaining.substring(0, ampIdx) : remaining
+
+        var eqIdx = pair.indexOf($"=")
+        var keyStr = eqIdx >= 0 ? pair.substring(0, eqIdx) : pair
+        var valStr = eqIdx >= 0 ? pair.substring(eqIdx + 1) : $""
+
+        if (keyStr.length > 0) {
+            keyStr.copyTo(param.key, MAX_PARAM_KEY)
+            valStr.copyTo(param.value, MAX_PARAM_VAL)
+            params.count += 1
+        }
+
+        remaining = ampIdx >= 0 ? remaining.substring(ampIdx + 1) : $""
+    }
+}
+
+// =========================================================================
+// Built-in SQLite driver
+// =========================================================================
+
+func SqliteDriverConnect(
+    path:      *const char,
+    params:    *UriParams,
+    conn:      *SqlConnection,
+    allocator: *const Allocator
+) : SqlResult {
+    var sqliteConn = new<SqliteConnection>(allocator)
+    if (sqliteConn == null) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .category = SqlResultCategory.OUT_OF_MEMORY,
+            .description = $"out of memory allocating SqliteConnection"
+        }
+    }
+
+    var isReadonly = params.getBool("readonly", false)
+    var enableWal  = params.getBool("wal", true)
+
+    var result: SqlResult
+    if (isReadonly) {
+        result = ConnectReadOnly(path, sqliteConn, .allocator = allocator)
+    } else {
+        result = Connect(path, sqliteConn, .enableWAL = enableWal, .allocator = allocator)
+    }
+
+    if (result.isError()) {
+        allocator.free(sqliteConn as (*void))
+        return result
+    }
+
+    var ptr = sqliteConn;
+    *conn = ptr
+    return result
+}

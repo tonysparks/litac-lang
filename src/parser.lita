@@ -1572,6 +1572,10 @@ func (p: *Parser) tryStatement() : *Stmt {
         }
     }
 
+    if(p.match(TokenType.SEMICOLON)) {
+        return p.emptyStatement()
+    }
+
     return p.expression() as (*Stmt)
 
 err:
@@ -2181,6 +2185,10 @@ func (p: *Parser) tryLabelStatement() : *Stmt {
 
 err:
     return p.poisonStatement(pos)
+}
+
+func (p: *Parser) emptyStatement(): *Stmt {
+    return NewEmptyStmt(p.pos(), p.pos(), p.allocator)
 }
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -428,7 +428,10 @@ public func (this: using *CGen) emitTraitCast(expr: *Expr) : bool {
     }
 
     if(IsTraitLike(expr.expectedType)) {
-        if(expr.operand.typeInfo != null && !IsTraitLike(expr.operand.typeInfo)) {
+        if(expr.operand.typeInfo != null &&
+           expr.operand.typeInfo.kind != TypeKind.NULL &&
+           !IsTraitLike(expr.operand.typeInfo)
+        ) {
             var traitName = this.cTypeName(expr.expectedType.getBaseType())
             var implName = this.cTypeName(expr.operand.typeInfo.getBaseType())
 
