@@ -1,0 +1,33 @@
+import "std/assert"
+
+@test
+func testDerefAfterExplicitSemicolon() {
+    var x: i32 = 10
+    var p = &x
+    var y: i32 = 0
+    var q = &y
+    // previous statement has explicit ";", leading ";" before dereference
+    y = 99;
+    ;*q = 42
+    assert(*q == 42)
+}
+
+@test
+func testDerefAsFirstInBlock() {
+    var x: i32 = 0
+    var p = &x;
+    // leading ";" as first statement in block
+    {
+        ;*p = 77
+    }
+    assert(x == 77)
+}
+
+@test
+func testDerefAfterNoSemicolon() {
+    var x: i32 = 0
+    var p = &x
+    var tmp = p
+    ;*tmp = 55
+    assert(x == 55)
+}
