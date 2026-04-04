@@ -1,6 +1,7 @@
 import "std/assert"
 import "std/mem"
 import "std/string"
+import "std/thread"
 import "std/db"
 import "std/db/sqlite/sqlite_db"
 import "std/db/pool"
@@ -157,6 +158,96 @@ func noopConnect(path: *const char, params: *UriParams,
         .type = SqlResultType.ERROR,
         .description = $"noop driver called"
     }
+}
+
+// -----------------------------------------------------------------------
+// acquireTimed: succeeds when a connection is immediately available
+// -----------------------------------------------------------------------
+
+@test
+func testAcquireTimedSuccess() {
+    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var pool: ConnectionPool;
+    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+
+    var conn: SqlConnection;
+    var result = pool.acquireTimed(1000, &conn)
+    assert(!result.isError())
+
+    pool.release(conn)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// acquireTimed: times out when pool is exhausted
+// -----------------------------------------------------------------------
+
+@test
+func testAcquireTimedTimeout() {
+    var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+    var pool: ConnectionPool;
+    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+
+    // drain the single connection
+    var conn: SqlConnection;
+    pool.acquire(&conn)
+
+    // pool is exhausted — acquireTimed must time out
+    var conn2: SqlConnection;
+    var result = pool.acquireTimed(50, &conn2)
+    assert(result.isError())
+
+    pool.release(conn)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
+// RegisterDriver: custom no-op driver
+// -----------------------------------------------------------------------
+
+// -----------------------------------------------------------------------
+// close interrupts a thread blocked in acquire
+// -----------------------------------------------------------------------
+
+struct CloseTestState {
+    pool:   *ConnectionPool
+    result: SqlResult
+}
+
+func blockedAcquireThread(arg: *void) : i32 {
+    var state = arg as (*CloseTestState)
+    var conn: SqlConnection;
+    state.result = state.pool.acquire(&conn)
+    return 0
+}
+
+@test
+func testCloseInterruptsWaiter() {
+    var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+    var pool: ConnectionPool;
+    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+
+    // drain the only connection so the next acquire will block
+    var conn: SqlConnection;
+    pool.acquire(&conn)
+
+    // start a thread that will block in acquire()
+    var state = CloseTestState { .pool = &pool }
+    var thread: Thread;
+    thread.create(blockedAcquireThread, &state)
+
+    // give the thread time to enter the wait, then close the pool
+    ThreadSleepMSec(50)
+    pool.close()
+
+    thread.join()
+
+    // the blocked acquire must have returned an error
+    assert(state.result.isError())
+
+    // release the connection we held (close/free path since pool is closed)
+    pool.release(conn)
+    pool.destroy()
 }
 
 @test

@@ -191,15 +191,17 @@ public func ConnectionPoolInit(
 // Blocks until one is available if the pool is exhausted.
 public func (this: *ConnectionPool) acquire(conn: *SqlConnection) : SqlResult {
     this.mutex.lock()
+    defer this.mutex.unlock()
 
-    while (this.idle.length == 0 &&
-           this.totalSize >= this.config.maxSize &&
-           !this.closed) {
+    while(
+        this.idle.length == 0 &&
+        this.totalSize >= this.config.maxSize &&
+        !this.closed
+    ) {
         this.available.wait(&this.mutex)
     }
 
     if (this.closed) {
-        this.mutex.unlock()
         return SqlResult {
             .type = SqlResultType.ERROR,
             .description = $"connection pool is closed"
@@ -219,7 +221,6 @@ public func (this: *ConnectionPool) acquire(conn: *SqlConnection) : SqlResult {
         }
     }
 
-    this.mutex.unlock()
     return result
 }
 
@@ -227,33 +228,70 @@ public func (this: *ConnectionPool) acquire(conn: *SqlConnection) : SqlResult {
 // Returns an error immediately if no connection is available.
 public func (this: *ConnectionPool) tryAcquire(conn: *SqlConnection) : SqlResult {
     this.mutex.lock()
+    defer this.mutex.unlock()
 
     if (this.closed) {
-        this.mutex.unlock()
         return SqlResult {
             .type = SqlResultType.ERROR,
             .description = $"connection pool is closed"
         }
     }
 
-    var result: SqlResult
     if (this.idle.length > 0) {
         var tmp = this.idle.pop();
         *conn = tmp
-        result = SqlResult { .type = SqlResultType.OK }
+        return SqlResult { .type = SqlResultType.OK }
     } else if (this.totalSize < this.config.maxSize) {
-        result = CreateConnection(this, conn)
+        var result = CreateConnection(this, conn)
         if (result.isOk()) {
             this.totalSize += 1
         }
-    } else {
-        result = SqlResult {
-            .type = SqlResultType.ERROR,
-            .description = $"no connections available"
+        return result
+    }
+
+    return SqlResult {
+        .type = SqlResultType.ERROR,
+        .description = $"no connections available"
+    }
+}
+
+// acquireTimed checks out a connection, blocking at most timeoutMs milliseconds.
+// Returns an error if the timeout expires before a connection becomes available.
+public func (this: *ConnectionPool) acquireTimed(timeoutMs: i64, conn: *SqlConnection) : SqlResult {
+    this.mutex.lock()
+    defer this.mutex.unlock()
+
+    while(
+        this.idle.length == 0 &&
+        this.totalSize >= this.config.maxSize &&
+        !this.closed
+    ) {
+        if (this.available.timedWait(&this.mutex, timeoutMs) == ThreadStatus.TIMEDOUT) {
+            return SqlResult {
+                .type = SqlResultType.ERROR,
+                .description = $"timed out waiting for connection"
+            }
         }
     }
 
-    this.mutex.unlock()
+    if (this.closed) {
+        return SqlResult {
+            .type = SqlResultType.ERROR,
+            .description = $"connection pool is closed"
+        }
+    }
+
+    if (this.idle.length > 0) {
+        var tmp = this.idle.pop();
+        *conn = tmp
+        return SqlResult { .type = SqlResultType.OK }
+    }
+
+    // totalSize < maxSize — create a fresh connection
+    var result = CreateConnection(this, conn)
+    if (result.isOk()) {
+        this.totalSize += 1
+    }
     return result
 }
 
@@ -261,9 +299,9 @@ public func (this: *ConnectionPool) tryAcquire(conn: *SqlConnection) : SqlResult
 // If the pool has been destroyed, the connection is closed and freed instead.
 public func (this: *ConnectionPool) release(conn: SqlConnection) {
     this.mutex.lock()
+    defer this.mutex.unlock()
 
     if (this.closed) {
-        this.mutex.unlock()
         conn.close()
         this.allocator.free(conn.__this)
         return;
@@ -271,25 +309,34 @@ public func (this: *ConnectionPool) release(conn: SqlConnection) {
 
     this.idle.add(conn)
     this.available.signal()
-    this.mutex.unlock()
 }
 
-// destroy closes all idle connections and shuts the pool down.
+// close marks the pool as closed and interrupts any threads blocked in acquire/acquireTimed.
+// Those calls will return an error. In-flight connections remain valid; release() will
+// close and free them instead of returning them to the pool.
+// Call destroy() afterwards to free all remaining idle connections and pool resources.
+public func (this: *ConnectionPool) close() {
+    this.mutex.lock()
+    defer this.mutex.unlock()
+    this.closed = true
+    this.available.broadcast()
+}
+
+// destroy closes all idle connections and frees pool resources.
 // Connections that are still acquired remain valid until release() is called,
 // at which point they are closed and freed rather than returned to the pool.
 public func (this: *ConnectionPool) destroy() {
-    this.mutex.lock()
-    this.closed = true
+    this.close()
 
+    this.mutex.lock()
     for (var i = 0; i < this.idle.length; i += 1) {
         var c = this.idle.get(i)
         c.close()
         this.allocator.free(c.__this)
     }
     this.idle.free()
-
     this.mutex.unlock()
-    this.available.broadcast()   // wake any threads blocked in acquire()
+
     this.available.destroy()
     this.mutex.destroy()
 }
