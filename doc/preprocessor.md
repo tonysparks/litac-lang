@@ -85,7 +85,7 @@
 | Field | Type | Description |
 |-------|------|-------------|
 | `lita` | \*[Lita](lita.md#struct-lita) |  |
-| `runtime` | [ScriptRuntime](preprocessor::api.md#struct-scriptruntime) |  |
+| `runtime` | [ScriptRuntime](preprocessor_api.md#struct-scriptruntime) |  |
 | `callContext` | [CallContext](preprocessor.md#struct-callcontext) |  |
 | `preCheckers` | Array\<[CheckerContext](preprocessor.md#struct-checkercontext)\> |  |
 | `postCheckers` | Array\<[CheckerContext](preprocessor.md#struct-checkercontext)\> |  |

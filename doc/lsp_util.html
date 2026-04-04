@@ -29,14 +29,14 @@ a{color:#0366d6}
 <h2>Functions</h2>
 <a id="func-issrcposatposition"></a>
 
-<h3><code>func IsSrcPosAtPosition(srcPos: *<a href="lex.html#struct-srcpos">SrcPos</a>, pos: <a href="lsp::protocol.html#struct-position">Position</a>) : bool</code></h3>
+<h3><code>func IsSrcPosAtPosition(srcPos: *<a href="lex.html#struct-srcpos">SrcPos</a>, pos: <a href="lsp_protocol.html#struct-position">Position</a>) : bool</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/util.lita:46</span>
 
 <hr>
 
 <a id="func-findastnodebyposition"></a>
 
-<h3><code>func (this: *<a href="lsp::util.html#struct-sourcelookup">SourceLookup</a>) findAstNodeByPosition(moduleAst: *<a href="ast.html#struct-modulestmt">ModuleStmt</a>, pos: <a href="lsp::protocol.html#struct-position">Position</a>) : <a href="lsp::util.html#struct-sourcelocation">SourceLocation</a></code></h3>
+<h3><code>func (this: *<a href="lsp_util.html#struct-sourcelookup">SourceLookup</a>) findAstNodeByPosition(moduleAst: *<a href="ast.html#struct-modulestmt">ModuleStmt</a>, pos: <a href="lsp_protocol.html#struct-position">Position</a>) : <a href="lsp_util.html#struct-sourcelocation">SourceLocation</a></code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/util.lita:73</span>
 
 <hr>
@@ -68,9 +68,9 @@ a{color:#0366d6}
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>kind</code></td><td><a href="lsp::util.html#enum-sourcelocationkind">SourceLocationKind</a></td><td></td></tr>
+<tr><td><code>kind</code></td><td><a href="lsp_util.html#enum-sourcelocationkind">SourceLocationKind</a></td><td></td></tr>
 <tr><td><code>module</code></td><td>*<a href="module.html#struct-module">Module</a></td><td></td></tr>
-<tr><td><code>location</code></td><td><a href="lsp::protocol.html#struct-location">Location</a></td><td></td></tr>
+<tr><td><code>location</code></td><td><a href="lsp_protocol.html#struct-location">Location</a></td><td></td></tr>
 </tbody>
 </table>
 
@@ -84,9 +84,9 @@ a{color:#0366d6}
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>lsp</code></td><td>*<a href="lsp::lsp.html#struct-lspserver">LspServer</a></td><td></td></tr>
-<tr><td><code>lookupPos</code></td><td><a href="lsp::protocol.html#struct-position">Position</a></td><td></td></tr>
-<tr><td><code>result</code></td><td><a href="lsp::util.html#struct-sourcelocation">SourceLocation</a></td><td></td></tr>
+<tr><td><code>lsp</code></td><td>*<a href="lsp_lsp.html#struct-lspserver">LspServer</a></td><td></td></tr>
+<tr><td><code>lookupPos</code></td><td><a href="lsp_protocol.html#struct-position">Position</a></td><td></td></tr>
+<tr><td><code>result</code></td><td><a href="lsp_util.html#struct-sourcelocation">SourceLocation</a></td><td></td></tr>
 </tbody>
 </table>
 

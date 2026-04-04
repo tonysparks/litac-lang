@@ -4,7 +4,7 @@
 
 <a id="func-issrcposatposition"></a>
 
-### func IsSrcPosAtPosition(srcPos: \*[SrcPos](lex.md#struct-srcpos), pos: [Position](lsp::protocol.md#struct-position)) : bool
+### func IsSrcPosAtPosition(srcPos: \*[SrcPos](lex.md#struct-srcpos), pos: [Position](lsp_protocol.md#struct-position)) : bool
 
 *public* | *src/lsp/util.lita:46*
 
@@ -12,7 +12,7 @@
 
 <a id="func-findastnodebyposition"></a>
 
-### func (this: \*[SourceLookup](lsp::util.md#struct-sourcelookup)) findAstNodeByPosition(moduleAst: \*[ModuleStmt](ast.md#struct-modulestmt), pos: [Position](lsp::protocol.md#struct-position)) : [SourceLocation](lsp::util.md#struct-sourcelocation)
+### func (this: \*[SourceLookup](lsp_util.md#struct-sourcelookup)) findAstNodeByPosition(moduleAst: \*[ModuleStmt](ast.md#struct-modulestmt), pos: [Position](lsp_protocol.md#struct-position)) : [SourceLocation](lsp_util.md#struct-sourcelocation)
 
 *public* | *src/lsp/util.lita:73*
 
@@ -44,9 +44,9 @@ The ast node at a particular location in the source code
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `kind` | [SourceLocationKind](lsp::util.md#enum-sourcelocationkind) |  |
+| `kind` | [SourceLocationKind](lsp_util.md#enum-sourcelocationkind) |  |
 | `module` | \*[Module](module.md#struct-module) |  |
-| `location` | [Location](lsp::protocol.md#struct-location) |  |
+| `location` | [Location](lsp_protocol.md#struct-location) |  |
 
 ---
 
@@ -58,9 +58,9 @@ The ast node at a particular location in the source code
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `lsp` | \*[LspServer](lsp::lsp.md#struct-lspserver) |  |
-| `lookupPos` | [Position](lsp::protocol.md#struct-position) |  |
-| `result` | [SourceLocation](lsp::util.md#struct-sourcelocation) |  |
+| `lsp` | \*[LspServer](lsp_lsp.md#struct-lspserver) |  |
+| `lookupPos` | [Position](lsp_protocol.md#struct-position) |  |
+| `result` | [SourceLocation](lsp_util.md#struct-sourcelocation) |  |
 
 ---
 

@@ -242,8 +242,8 @@
 |-------|------|-------------|
 | `options` | [PackageOptions](pkg_mgr.md#struct-packageoptions) |  |
 | `allocator` | \*const Allocator |  |
-| `packages` | Map\<\*const char, \*[PackageDef](pkg_mgr::pkg.md#struct-packagedef)\> |  |
-| `pkg` | \*[PackageDef](pkg_mgr::pkg.md#struct-packagedef) |  |
+| `packages` | Map\<\*const char, \*[PackageDef](pkg_mgr_pkg.md#struct-packagedef)\> |  |
+| `pkg` | \*[PackageDef](pkg_mgr_pkg.md#struct-packagedef) |  |
 | `errors` | StringBuilder |  |
 | `warnings` | StringBuilder |  |
 

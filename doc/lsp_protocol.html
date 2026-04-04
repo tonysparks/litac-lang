@@ -33,7 +33,7 @@ a{color:#0366d6}
 <h2>Functions</h2>
 <a id="func-symbolkindfromsymbol"></a>
 
-<h3><code>func SymbolKindFromSymbol(sym: *<a href="symbols.html#struct-symbol">sym::Symbol</a>) : <a href="lsp::protocol.html#enum-symbolinfokind">SymbolInfoKind</a></code></h3>
+<h3><code>func SymbolKindFromSymbol(sym: *<a href="symbols.html#struct-symbol">sym::Symbol</a>) : <a href="lsp_protocol.html#enum-symbolinfokind">SymbolInfoKind</a></code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:132</span>
 
 <hr>
@@ -89,14 +89,14 @@ a{color:#0366d6}
 
 <a id="func-jsonnodetotextdocumentchangeevent"></a>
 
-<h3><code>func JsonNodeToTextDocumentChangeEvent(params: *JsonNode, alloc: *const Allocator) : *<a href="lsp::protocol.html#struct-textdocumentdidchange">TextDocumentDidChange</a></code></h3>
+<h3><code>func JsonNodeToTextDocumentChangeEvent(params: *JsonNode, alloc: *const Allocator) : *<a href="lsp_protocol.html#struct-textdocumentdidchange">TextDocumentDidChange</a></code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:327</span>
 
 <hr>
 
 <a id="func-symbolinfokindasstr"></a>
 
-<h3><code>func SymbolInfoKindAsStr(enumType: <a href="lsp::protocol.html#enum-symbolinfokind">SymbolInfoKind</a>) : *const char</code></h3>
+<h3><code>func SymbolInfoKindAsStr(enumType: <a href="lsp_protocol.html#enum-symbolinfokind">SymbolInfoKind</a>) : *const char</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:1</span>
 
 <hr>
@@ -125,8 +125,8 @@ a{color:#0366d6}
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>start</code></td><td><a href="lsp::protocol.html#struct-position">Position</a></td><td></td></tr>
-<tr><td><code>end</code></td><td><a href="lsp::protocol.html#struct-position">Position</a></td><td></td></tr>
+<tr><td><code>start</code></td><td><a href="lsp_protocol.html#struct-position">Position</a></td><td></td></tr>
+<tr><td><code>end</code></td><td><a href="lsp_protocol.html#struct-position">Position</a></td><td></td></tr>
 </tbody>
 </table>
 
@@ -141,7 +141,7 @@ a{color:#0366d6}
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>uri</code></td><td>*const char</td><td></td></tr>
-<tr><td><code>range</code></td><td><a href="lsp::protocol.html#struct-range">Range</a></td><td></td></tr>
+<tr><td><code>range</code></td><td><a href="lsp_protocol.html#struct-range">Range</a></td><td></td></tr>
 </tbody>
 </table>
 
@@ -170,8 +170,8 @@ a{color:#0366d6}
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>textDocument</code></td><td><a href="lsp::protocol.html#struct-textdocument">TextDocument</a></td><td></td></tr>
-<tr><td><code>contentChanges</code></td><td>Array&lt;<a href="lsp::protocol.html#struct-textdocumentchangeevent">TextDocumentChangeEvent</a>&gt;</td><td></td></tr>
+<tr><td><code>textDocument</code></td><td><a href="lsp_protocol.html#struct-textdocument">TextDocument</a></td><td></td></tr>
+<tr><td><code>contentChanges</code></td><td>Array&lt;<a href="lsp_protocol.html#struct-textdocumentchangeevent">TextDocumentChangeEvent</a>&gt;</td><td></td></tr>
 </tbody>
 </table>
 
@@ -186,7 +186,7 @@ a{color:#0366d6}
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>hasRange</code></td><td>bool</td><td></td></tr>
-<tr><td><code>range</code></td><td><a href="lsp::protocol.html#struct-range">Range</a></td><td></td></tr>
+<tr><td><code>range</code></td><td><a href="lsp_protocol.html#struct-range">Range</a></td><td></td></tr>
 <tr><td><code>rangeLength</code></td><td>u32</td><td></td></tr>
 <tr><td><code>text</code></td><td>*const char</td><td></td></tr>
 </tbody>

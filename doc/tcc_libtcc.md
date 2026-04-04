@@ -12,7 +12,7 @@
 
 <a id="func-tcc_new"></a>
 
-### func tcc_new() : \*[TCCState](tcc::libtcc.md#struct-tccstate)
+### func tcc_new() : \*[TCCState](tcc_libtcc.md#struct-tccstate)
 
 *public* | *src/tcc/libtcc.lita:62*
 
@@ -20,7 +20,7 @@
 
 <a id="func-tcc_delete"></a>
 
-### func tcc_delete(s: \*[TCCState](tcc::libtcc.md#struct-tccstate)) : void
+### func tcc_delete(s: \*[TCCState](tcc_libtcc.md#struct-tccstate)) : void
 
 *public* | *src/tcc/libtcc.lita:66*
 
@@ -28,7 +28,7 @@
 
 <a id="func-tcc_set_lib_path"></a>
 
-### func tcc_set_lib_path(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), path: \*const char) : void
+### func tcc_set_lib_path(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), path: \*const char) : void
 
 *public* | *src/tcc/libtcc.lita:70*
 
@@ -36,7 +36,7 @@
 
 <a id="func-tcc_set_error_func"></a>
 
-### func tcc_set_error_func(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), error_opaque: \*void, error_func: TCCErrorFunc) : void
+### func tcc_set_error_func(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), error_opaque: \*void, error_func: TCCErrorFunc) : void
 
 *public* | *src/tcc/libtcc.lita:74*
 
@@ -44,7 +44,7 @@
 
 <a id="func-tcc_get_error_func"></a>
 
-### func tcc_get_error_func(s: \*[TCCState](tcc::libtcc.md#struct-tccstate)) : TCCErrorFunc
+### func tcc_get_error_func(s: \*[TCCState](tcc_libtcc.md#struct-tccstate)) : TCCErrorFunc
 
 *public* | *src/tcc/libtcc.lita:78*
 
@@ -52,7 +52,7 @@
 
 <a id="func-tcc_get_error_opaque"></a>
 
-### func tcc_get_error_opaque(s: \*[TCCState](tcc::libtcc.md#struct-tccstate)) : \*void
+### func tcc_get_error_opaque(s: \*[TCCState](tcc_libtcc.md#struct-tccstate)) : \*void
 
 *public* | *src/tcc/libtcc.lita:82*
 
@@ -60,7 +60,7 @@
 
 <a id="func-tcc_set_options"></a>
 
-### func tcc_set_options(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), str: \*const char) : void
+### func tcc_set_options(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), str: \*const char) : void
 
 *public* | *src/tcc/libtcc.lita:86*
 
@@ -68,7 +68,7 @@
 
 <a id="func-tcc_add_include_path"></a>
 
-### func tcc_add_include_path(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), pathname: \*const char) : i32
+### func tcc_add_include_path(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), pathname: \*const char) : i32
 
 *public* | *src/tcc/libtcc.lita:93*
 
@@ -76,7 +76,7 @@
 
 <a id="func-tcc_add_sysinclude_path"></a>
 
-### func tcc_add_sysinclude_path(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), pathname: \*const char) : i32
+### func tcc_add_sysinclude_path(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), pathname: \*const char) : i32
 
 *public* | *src/tcc/libtcc.lita:97*
 
@@ -84,7 +84,7 @@
 
 <a id="func-tcc_define_symbol"></a>
 
-### func tcc_define_symbol(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), sym: \*const char, value: \*const char) : void
+### func tcc_define_symbol(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), sym: \*const char, value: \*const char) : void
 
 *public* | *src/tcc/libtcc.lita:101*
 
@@ -92,7 +92,7 @@
 
 <a id="func-tcc_undefine_symbol"></a>
 
-### func tcc_undefine_symbol(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), sym: \*const char) : void
+### func tcc_undefine_symbol(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), sym: \*const char) : void
 
 *public* | *src/tcc/libtcc.lita:105*
 
@@ -100,7 +100,7 @@
 
 <a id="func-tcc_add_file"></a>
 
-### func tcc_add_file(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), filename: \*const char) : i32
+### func tcc_add_file(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), filename: \*const char) : i32
 
 *public* | *src/tcc/libtcc.lita:112*
 
@@ -108,7 +108,7 @@
 
 <a id="func-tcc_compile_string"></a>
 
-### func tcc_compile_string(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), buf: \*const char) : i32
+### func tcc_compile_string(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), buf: \*const char) : i32
 
 *public* | *src/tcc/libtcc.lita:116*
 
@@ -116,7 +116,7 @@
 
 <a id="func-tcc_set_output_type"></a>
 
-### func tcc_set_output_type(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), output_type: i32) : i32
+### func tcc_set_output_type(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), output_type: i32) : i32
 
 *public* | *src/tcc/libtcc.lita:123*
 
@@ -124,7 +124,7 @@
 
 <a id="func-tcc_add_library_path"></a>
 
-### func tcc_add_library_path(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), pathname: \*const char) : i32
+### func tcc_add_library_path(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), pathname: \*const char) : i32
 
 *public* | *src/tcc/libtcc.lita:138*
 
@@ -132,7 +132,7 @@
 
 <a id="func-tcc_add_library"></a>
 
-### func tcc_add_library(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), libraryname: \*const char) : i32
+### func tcc_add_library(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), libraryname: \*const char) : i32
 
 *public* | *src/tcc/libtcc.lita:142*
 
@@ -140,7 +140,7 @@
 
 <a id="func-tcc_add_symbol"></a>
 
-### func tcc_add_symbol(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), name: \*const char, val: \*const void) : i32
+### func tcc_add_symbol(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), name: \*const char, val: \*const void) : i32
 
 *public* | *src/tcc/libtcc.lita:146*
 
@@ -148,7 +148,7 @@
 
 <a id="func-tcc_output_file"></a>
 
-### func tcc_output_file(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), filename: \*const char) : i32
+### func tcc_output_file(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), filename: \*const char) : i32
 
 *public* | *src/tcc/libtcc.lita:151*
 
@@ -156,7 +156,7 @@
 
 <a id="func-tcc_run"></a>
 
-### func tcc_run(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), argc: i32, argv: \*\*char) : i32
+### func tcc_run(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), argc: i32, argv: \*\*char) : i32
 
 *public* | *src/tcc/libtcc.lita:156*
 
@@ -164,7 +164,7 @@
 
 <a id="func-tcc_relocate"></a>
 
-### func tcc_relocate(s1: \*[TCCState](tcc::libtcc.md#struct-tccstate), tpr: \*void) : i32
+### func tcc_relocate(s1: \*[TCCState](tcc_libtcc.md#struct-tccstate), tpr: \*void) : i32
 
 *public* | *src/tcc/libtcc.lita:160*
 
@@ -172,7 +172,7 @@
 
 <a id="func-tcc_get_symbol"></a>
 
-### func tcc_get_symbol(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), name: \*const char) : \*void
+### func tcc_get_symbol(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), name: \*const char) : \*void
 
 *public* | *src/tcc/libtcc.lita:171*
 
@@ -180,7 +180,7 @@
 
 <a id="func-tcc_list_symbols"></a>
 
-### func tcc_list_symbols(s: \*[TCCState](tcc::libtcc.md#struct-tccstate), ctx: \*void, symbol_cb: func(\*void, \*const char, \*const void) : void) : void
+### func tcc_list_symbols(s: \*[TCCState](tcc_libtcc.md#struct-tccstate), ctx: \*void, symbol_cb: func(\*void, \*const char, \*const void) : void) : void
 
 *public* | *src/tcc/libtcc.lita:175*
 

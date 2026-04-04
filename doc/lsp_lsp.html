@@ -29,147 +29,147 @@ a{color:#0366d6}
 <h2>Functions</h2>
 <a id="func-init"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) init(lita: *<a href="lita.html#struct-lita">Lita</a>) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) init(lita: *<a href="lita.html#struct-lita">Lita</a>) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:43</span>
 
 <hr>
 
 <a id="func-requestalloc"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) requestAlloc() : *const Allocator</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) requestAlloc() : *const Allocator</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:70</span>
 
 <hr>
 
 <a id="func-appalloc"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) appAlloc() : *const Allocator</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) appAlloc() : *const Allocator</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:75</span>
 
 <hr>
 
 <a id="func-free"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) free() : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) free() : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:79</span>
 
 <hr>
 
 <a id="func-start"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) start() : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) start() : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:98</span>
 
 <hr>
 
 <a id="func-log"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) log(format: *const char, ...) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) log(format: *const char, ...) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:109</span>
 
 <hr>
 
 <a id="func-readmessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) readMessage() : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) readMessage() : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:117</span>
 
 <hr>
 
 <a id="func-handlemessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleMessage(msg: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleMessage(msg: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:238</span>
 
 <hr>
 
 <a id="func-handleinitializemessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleInitializeMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleInitializeMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:301</span>
 
 <hr>
 
 <a id="func-handletextdocumentopenmessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentOpenMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentOpenMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:344</span>
 
 <hr>
 
 <a id="func-handletextdocumentclosemessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentCloseMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentCloseMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:355</span>
 
 <hr>
 
 <a id="func-handletextdocumentsymbolmessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentSymbolMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentSymbolMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:367</span>
 
 <hr>
 
 <a id="func-handletextdocumentsavemessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentSaveMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentSaveMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:383</span>
 
 <hr>
 
 <a id="func-handletextdocumentchangemessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentChangeMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentChangeMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:395</span>
 
 <hr>
 
 <a id="func-handletextdocumentreferencesmessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentReferencesMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentReferencesMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:403</span>
 
 <hr>
 
 <a id="func-handletextdocumentdefinitionmessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentDefinitionMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentDefinitionMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:421</span>
 
 <hr>
 
 <a id="func-handletextdocumentcompletionmessage"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentCompletionMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) handleTextDocumentCompletionMessage(msg: *JsonNode, params: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:438</span>
 
 <hr>
 
 <a id="func-writediagnostic"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) writeDiagnostic(docUri: *const char, fullBuild: bool) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) writeDiagnostic(docUri: *const char, fullBuild: bool) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:456</span>
 
 <hr>
 
 <a id="func-writeerrorresponse"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) writeErrorResponse(id: i64, code: i32, format: *const char, ...) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) writeErrorResponse(id: i64, code: i32, format: *const char, ...) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:503</span>
 
 <hr>
 
 <a id="func-writeresponse"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) writeResponse(msg: *JsonNode) : void</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) writeResponse(msg: *JsonNode) : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:521</span>
 
 <hr>
 
 <a id="func-createresponse"></a>
 
-<h3><code>func (this: *<a href="lsp::lsp.html#struct-lspserver">LspServer</a>) createResponse(id: i64) : *JsonNode</code></h3>
+<h3><code>func (this: *<a href="lsp_lsp.html#struct-lspserver">LspServer</a>) createResponse(id: i64) : *JsonNode</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/lsp/lsp.lita:546</span>
 
 <hr>
@@ -191,7 +191,7 @@ a{color:#0366d6}
 <tr><td><code>outbound</code></td><td>StringBuilder</td><td></td></tr>
 <tr><td><code>isInitialized</code></td><td>bool</td><td></td></tr>
 <tr><td><code>isRunning</code></td><td>bool</td><td></td></tr>
-<tr><td><code>workspace</code></td><td><a href="lsp::workspace.html#struct-workspace">Workspace</a></td><td></td></tr>
+<tr><td><code>workspace</code></td><td><a href="lsp_workspace.html#struct-workspace">Workspace</a></td><td></td></tr>
 <tr><td><code>logFile</code></td><td>*FILE</td><td></td></tr>
 </tbody>
 </table>

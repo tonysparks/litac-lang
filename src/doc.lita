@@ -906,20 +906,38 @@ func (this: *DocContext) isProjectModule(mod: *Module) : bool {
 // Path helpers
 // ---------------------------------------------------------------------------
 
+// Converts a module package name to a safe filename by replacing '::' with '_'.
+// e.g. "lsp::document" -> "lsp_document"
+func sanitizeModuleName(pkgName: String, allocator: *const Allocator) : *const char {
+    var sb = StringBuilderInit(pkgName.length + 1, allocator)
+    var i = 0
+    while(i < pkgName.length) {
+        var c = pkgName.buffer[i]
+        if(c == ':' && i + 1 < pkgName.length && pkgName.buffer[i + 1] == ':') {
+            sb.append("_")
+            i += 2
+        } else {
+            sb.append("%c", c)
+            i += 1
+        }
+    }
+    return sb.cStr()
+}
+
 // Returns a heap-allocated absolute path for the module's output file
 func (this: *DocContext) moduleDocAbsPath(mod: *Module) : *const char {
-    var pkgName = mod.id.packageName.view
+    var safe = sanitizeModuleName(mod.id.packageName.view, this.allocator)
     var buf = StringBuilderInit(MAX_PATH, this.allocator)
-    buf.append("%s/%.*s%s", this.options.docDir, pkgName.length, pkgName.buffer, this.fileExt())
+    buf.append("%s/%s%s", this.options.docDir, safe, this.fileExt())
     return buf.cStr()
 }
 
 // Returns a heap-allocated relative path (from docDir) for the module's output file
-// e.g. "pkg_mgr/pkg.md" or "pkg_mgr/pkg.html"
+// e.g. "lsp_document.md" or "lsp_document.html"
 func (this: *DocContext) moduleDocRelPath(mod: *Module) : *const char {
-    var pkgName = mod.id.packageName.view
+    var safe = sanitizeModuleName(mod.id.packageName.view, this.allocator)
     var buf = StringBuilderInit(128, this.allocator)
-    buf.append("%.*s%s", pkgName.length, pkgName.buffer, this.fileExt())
+    buf.append("%s%s", safe, this.fileExt())
     return buf.cStr()
 }
 

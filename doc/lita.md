@@ -211,8 +211,8 @@ Extremely slow, this is a linear probe
 | `typeCache` | [TypeCache](types_new.md#struct-typecache) |  |
 | `strings` | [Strings](intern.md#struct-strings) |  |
 | `builtins` | [Module](module.md#struct-module) |  |
-| `references` | [ReferenceDatabase](lsp::references.md#struct-referencedatabase) |  |
-| `workspace` | \*[Workspace](lsp::workspace.md#struct-workspace) |  |
+| `references` | [ReferenceDatabase](lsp_references.md#struct-referencedatabase) |  |
+| `workspace` | \*[Workspace](lsp_workspace.md#struct-workspace) |  |
 
 ---
 

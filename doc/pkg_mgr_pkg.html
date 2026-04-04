@@ -29,56 +29,56 @@ a{color:#0366d6}
 <h2>Functions</h2>
 <a id="func-free"></a>
 
-<h3><code>func (this: *<a href="pkg_mgr::pkg.html#struct-packagedef">PackageDef</a>) free() : void</code></h3>
+<h3><code>func (this: *<a href="pkg_mgr_pkg.html#struct-packagedef">PackageDef</a>) free() : void</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:47</span>
 
 <hr>
 
 <a id="func-repo"></a>
 
-<h3><code>func (this: *<a href="pkg_mgr::pkg.html#struct-packageid">PackageId</a>) repo() : String</code></h3>
+<h3><code>func (this: *<a href="pkg_mgr_pkg.html#struct-packageid">PackageId</a>) repo() : String</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:70</span>
 
 <hr>
 
 <a id="func-name"></a>
 
-<h3><code>func (this: *<a href="pkg_mgr::pkg.html#struct-packageid">PackageId</a>) name() : String</code></h3>
+<h3><code>func (this: *<a href="pkg_mgr_pkg.html#struct-packageid">PackageId</a>) name() : String</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:74</span>
 
 <hr>
 
 <a id="func-version"></a>
 
-<h3><code>func (this: *<a href="pkg_mgr::pkg.html#struct-packageid">PackageId</a>) version() : String</code></h3>
+<h3><code>func (this: *<a href="pkg_mgr_pkg.html#struct-packageid">PackageId</a>) version() : String</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:78</span>
 
 <hr>
 
 <a id="func-packageidfromstring"></a>
 
-<h3><code>func PackageIdFromString(id: *const char, pkgId: *<a href="pkg_mgr::pkg.html#struct-packageid">PackageId</a>) : bool</code></h3>
+<h3><code>func PackageIdFromString(id: *const char, pkgId: *<a href="pkg_mgr_pkg.html#struct-packageid">PackageId</a>) : bool</code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:82</span>
 
 <hr>
 
 <a id="func-parsepackagefile"></a>
 
-<h3><code>func ParsePackageFile(pm: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>, pkgFile: *const char, result: **<a href="pkg_mgr::pkg.html#struct-packagedef">PackageDef</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<h3><code>func ParsePackageFile(pm: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>, pkgFile: *const char, result: **<a href="pkg_mgr_pkg.html#struct-packagedef">PackageDef</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:109</span>
 
 <hr>
 
 <a id="func-parsepackage"></a>
 
-<h3><code>func ParsePackage(pm: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>, json: *JsonNode, result: **<a href="pkg_mgr::pkg.html#struct-packagedef">PackageDef</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<h3><code>func ParsePackage(pm: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>, json: *JsonNode, result: **<a href="pkg_mgr_pkg.html#struct-packagedef">PackageDef</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:150</span>
 
 <hr>
 
 <a id="func-parsepackageid"></a>
 
-<h3><code>func ParsePackageId(json: *JsonNode, pkgId: *<a href="pkg_mgr::pkg.html#struct-packageid">PackageId</a>, allocator: *const Allocator) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<h3><code>func ParsePackageId(json: *JsonNode, pkgId: *<a href="pkg_mgr_pkg.html#struct-packageid">PackageId</a>, allocator: *const Allocator) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
 <span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg.lita:233</span>
 
 <hr>
@@ -109,11 +109,11 @@ a{color:#0366d6}
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>id</code></td><td><a href="pkg_mgr::pkg.html#struct-packageid">PackageId</a></td><td></td></tr>
+<tr><td><code>id</code></td><td><a href="pkg_mgr_pkg.html#struct-packageid">PackageId</a></td><td></td></tr>
 <tr><td><code>path</code></td><td>[]char</td><td></td></tr>
-<tr><td><code>type</code></td><td><a href="pkg_mgr::pkg.html#enum-packagetype">PackageType</a></td><td></td></tr>
+<tr><td><code>type</code></td><td><a href="pkg_mgr_pkg.html#enum-packagetype">PackageType</a></td><td></td></tr>
 <tr><td><code>dynamicLibraries</code></td><td>Array&lt;*const char&gt;</td><td></td></tr>
-<tr><td><code>dependencies</code></td><td>Array&lt;<a href="pkg_mgr::pkg.html#struct-packagedependency">PackageDependency</a>&gt;</td><td></td></tr>
+<tr><td><code>dependencies</code></td><td>Array&lt;<a href="pkg_mgr_pkg.html#struct-packagedependency">PackageDependency</a>&gt;</td><td></td></tr>
 <tr><td><code>json</code></td><td>*JsonNode</td><td></td></tr>
 </tbody>
 </table>
@@ -128,7 +128,7 @@ a{color:#0366d6}
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>pkgId</code></td><td><a href="pkg_mgr::pkg.html#struct-packageid">PackageId</a></td><td></td></tr>
+<tr><td><code>pkgId</code></td><td><a href="pkg_mgr_pkg.html#struct-packageid">PackageId</a></td><td></td></tr>
 <tr><td><code>link</code></td><td>bool</td><td></td></tr>
 </tbody>
 </table>

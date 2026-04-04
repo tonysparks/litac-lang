@@ -8,7 +8,7 @@
 
 <a id="func-symbolkindfromsymbol"></a>
 
-### func SymbolKindFromSymbol(sym: \*[sym::Symbol](symbols.md#struct-symbol)) : [SymbolInfoKind](lsp::protocol.md#enum-symbolinfokind)
+### func SymbolKindFromSymbol(sym: \*[sym::Symbol](symbols.md#struct-symbol)) : [SymbolInfoKind](lsp_protocol.md#enum-symbolinfokind)
 
 *public* | *src/lsp/protocol.lita:132*
 
@@ -72,7 +72,7 @@
 
 <a id="func-jsonnodetotextdocumentchangeevent"></a>
 
-### func JsonNodeToTextDocumentChangeEvent(params: \*JsonNode, alloc: \*const Allocator) : \*[TextDocumentDidChange](lsp::protocol.md#struct-textdocumentdidchange)
+### func JsonNodeToTextDocumentChangeEvent(params: \*JsonNode, alloc: \*const Allocator) : \*[TextDocumentDidChange](lsp_protocol.md#struct-textdocumentdidchange)
 
 *public* | *src/lsp/protocol.lita:327*
 
@@ -80,7 +80,7 @@
 
 <a id="func-symbolinfokindasstr"></a>
 
-### func SymbolInfoKindAsStr(enumType: [SymbolInfoKind](lsp::protocol.md#enum-symbolinfokind)) : \*const char
+### func SymbolInfoKindAsStr(enumType: [SymbolInfoKind](lsp_protocol.md#enum-symbolinfokind)) : \*const char
 
 *public* | *src/lsp/protocol.lita:1*
 
@@ -109,8 +109,8 @@
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `start` | [Position](lsp::protocol.md#struct-position) |  |
-| `end` | [Position](lsp::protocol.md#struct-position) |  |
+| `start` | [Position](lsp_protocol.md#struct-position) |  |
+| `end` | [Position](lsp_protocol.md#struct-position) |  |
 
 ---
 
@@ -123,7 +123,7 @@
 | Field | Type | Description |
 |-------|------|-------------|
 | `uri` | \*const char |  |
-| `range` | [Range](lsp::protocol.md#struct-range) |  |
+| `range` | [Range](lsp_protocol.md#struct-range) |  |
 
 ---
 
@@ -148,8 +148,8 @@
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `textDocument` | [TextDocument](lsp::protocol.md#struct-textdocument) |  |
-| `contentChanges` | Array\<[TextDocumentChangeEvent](lsp::protocol.md#struct-textdocumentchangeevent)\> |  |
+| `textDocument` | [TextDocument](lsp_protocol.md#struct-textdocument) |  |
+| `contentChanges` | Array\<[TextDocumentChangeEvent](lsp_protocol.md#struct-textdocumentchangeevent)\> |  |
 
 ---
 
@@ -162,7 +162,7 @@
 | Field | Type | Description |
 |-------|------|-------------|
 | `hasRange` | bool |  |
-| `range` | [Range](lsp::protocol.md#struct-range) |  |
+| `range` | [Range](lsp_protocol.md#struct-range) |  |
 | `rangeLength` | u32 |  |
 | `text` | \*const char |  |
 
