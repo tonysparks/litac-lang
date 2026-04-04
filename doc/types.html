@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>types</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>types</h1>
+<h2>Functions</h2>
+<a id="func-typekindfromstring"></a>
+
+<h3><code>func TypeKindFromString(str: *const char, len: i32) : <a href="types.html#enum-typekind">TypeKind</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:94</span>
+
+<hr>
+
+<a id="func-isarray"></a>
+
+<h3><code>func IsArray(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:105</span>
+
+<hr>
+
+<a id="func-isenum"></a>
+
+<h3><code>func IsEnum(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:118</span>
+
+<hr>
+
+<a id="func-isptr"></a>
+
+<h3><code>func IsPtr(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:131</span>
+
+<hr>
+
+<a id="func-isptrlike"></a>
+
+<h3><code>func IsPtrLike(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:144</span>
+
+<hr>
+
+<a id="func-isptrof"></a>
+
+<h3><code>func IsPtrOf(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>, kind: <a href="types.html#enum-typekind">TypeKind</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:165</span>
+
+<hr>
+
+<a id="func-isfunclike"></a>
+
+<h3><code>func IsFuncLike(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:193</span>
+
+<hr>
+
+<a id="func-isprimitive"></a>
+
+<h3><code>func IsPrimitive(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:209</span>
+
+<hr>
+
+<a id="func-isnumberlike"></a>
+
+<h3><code>func IsNumberLike(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:217</span>
+
+<hr>
+
+<a id="func-isinteger"></a>
+
+<h3><code>func IsInteger(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:253</span>
+
+<hr>
+
+<a id="func-isbitfield"></a>
+
+<h3><code>func IsBitField(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:284</span>
+
+<hr>
+
+<a id="func-isbooleanable"></a>
+
+<h3><code>func IsBooleanable(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:312</span>
+
+<hr>
+
+<a id="func-isstringlike"></a>
+
+<h3><code>func IsStringLike(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:349</span>
+
+<hr>
+
+<a id="func-ischarlike"></a>
+
+<h3><code>func IsCharLike(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:370</span>
+
+<hr>
+
+<a id="func-astraitfuncptr"></a>
+
+<h3><code>func AsTraitFuncPtr(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>, name: <a href="intern.html#union-internedstring">InternedString</a>, typeCache: *<a href="types_new.html#struct-typecache">TypeCache</a>) : *<a href="types.html#struct-typeinfo">TypeInfo</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:395</span>
+
+<hr>
+
+<a id="func-asaggregate"></a>
+
+<h3><code>func AsAggregate(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : *<a href="types.html#struct-typeinfo">TypeInfo</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:425</span>
+
+<hr>
+
+<a id="func-isaggregatelike"></a>
+
+<h3><code>func IsAggregateLike(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:453</span>
+
+<hr>
+
+<a id="func-isaggregate"></a>
+
+<h3><code>func IsAggregate(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:457</span>
+
+<hr>
+
+<a id="func-isptraggregate"></a>
+
+<h3><code>func IsPtrAggregate(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:472</span>
+
+<hr>
+
+<a id="func-istrait"></a>
+
+<h3><code>func IsTrait(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:487</span>
+
+<hr>
+
+<a id="func-isptrtrait"></a>
+
+<h3><code>func IsPtrTrait(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:500</span>
+
+<hr>
+
+<a id="func-istraitlike"></a>
+
+<h3><code>func IsTraitLike(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:516</span>
+
+<hr>
+
+<a id="func-isfieldaccessible"></a>
+
+<h3><code>func IsFieldAccessible(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:520</span>
+
+<hr>
+
+<a id="func-isgenericcapable"></a>
+
+<h3><code>func IsGenericCapable(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:532</span>
+
+<hr>
+
+<a id="func-getbasetype"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getBaseType() : *<a href="types.html#struct-typeinfo">TypeInfo</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:549</span>
+
+<hr>
+
+<a id="func-gettypeof"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getTypeOf() : *<a href="types.html#struct-typeinfo">TypeInfo</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:577</span>
+
+<hr>
+
+<a id="func-tostringdebug"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) toStringDebug() : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:602</span>
+
+<hr>
+
+<a id="func-tostring"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) toString(sb: *StringBuilder, fullyQualify: bool) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:608</span>
+
+<hr>
+
+<a id="func-strictequals"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) strictEquals(other: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:724</span>
+
+<hr>
+
+<a id="func-isassignable"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) isAssignable(other: *<a href="types.html#struct-typeinfo">TypeInfo</a>, checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>, allowDecay: bool, allowPtrArithmetic: bool) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:801</span>
+
+<hr>
+
+<a id="func-isdeclarable"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) isDeclarable(other: *<a href="types.html#struct-typeinfo">TypeInfo</a>, checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1001</span>
+
+<hr>
+
+<a id="func-cancastto"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) canCastTo(castTo: *<a href="types.html#struct-typeinfo">TypeInfo</a>, checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1325</span>
+
+<hr>
+
+<a id="func-isfuncimpl"></a>
+
+<h3><code>func IsFuncImpl(traitFn: *<a href="types.html#struct-typeinfo">TypeInfo</a>, fn: *<a href="types.html#struct-typeinfo">TypeInfo</a>, checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1440</span>
+
+<hr>
+
+<a id="func-astypespec"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) asTypeSpec(module: *<a href="module.html#struct-module">Module</a>, fullyQualify: bool) : *<a href="ast.html#struct-typespec">TypeSpec</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1485</span>
+
+<hr>
+
+<a id="func-asptr"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) asPtr(typeCache: *<a href="types_new.html#struct-typecache">TypeCache</a>) : *<a href="types.html#struct-typeinfo">TypeInfo</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1663</span>
+
+<hr>
+
+<a id="func-getenumfield"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getEnumField(name: <a href="intern.html#union-internedstring">InternedString</a>) : *<a href="ast.html#struct-enumfieldentrydecl">EnumFieldEntryDecl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1685</span>
+
+<hr>
+
+<a id="func-getenumfieldindex"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getEnumFieldIndex(name: <a href="intern.html#union-internedstring">InternedString</a>) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1697</span>
+
+<hr>
+
+<a id="func-getbasename"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getBaseName(name: []char, includePackage: bool, alias: *<a href="intern.html#union-internedstring">InternedString</a>) : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1710</span>
+
+<hr>
+
+<a id="func-getbasenameview"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getBaseNameView() : String</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1763</span>
+
+<hr>
+
+<a id="func-getfieldbyposition"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFieldByPosition(position: i32) : <a href="ast.html#struct-fieldstmt">FieldStmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1780</span>
+
+<hr>
+
+<a id="func-getfield"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getField(name: <a href="intern.html#union-internedstring">InternedString</a>) : <a href="ast.html#struct-fieldstmt">FieldStmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1791</span>
+
+<hr>
+
+<a id="func-getfieldindex"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFieldIndex(name: <a href="intern.html#union-internedstring">InternedString</a>) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1856</span>
+
+<p>Gets the field position in this aggregate type (including anonymous aggregates) only</p>
+
+<hr>
+
+<a id="func-getfieldposition"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFieldPosition(name: <a href="intern.html#union-internedstring">InternedString</a>) : <a href="types.html#struct-fieldpositionresult">FieldPositionResult</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1931</span>
+
+<p>Gets the field position in this aggregate type and any using sub aggregates</p>
+
+<hr>
+
+<a id="func-getfieldbytype"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFieldByType(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>, isParent: bool) : <a href="ast.html#struct-fieldstmt">FieldStmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1966</span>
+
+<p>
+Gets the first field of the supplied type.  This should only be used for finding 'using'
+fields to match against and the supplied type should be an aggregate (i.e., not a pointer)
+</p>
+
+<hr>
+
+<a id="func-getfieldwithusing"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFieldWithUsing(name: <a href="intern.html#union-internedstring">InternedString</a>) : <a href="ast.html#struct-fieldstmt">FieldStmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2032</span>
+
+<hr>
+
+<a id="func-getfieldpath"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFieldPath(name: <a href="intern.html#union-internedstring">InternedString</a>, path: *<a href="types.html#struct-fieldpath">FieldPath</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2097</span>
+
+<hr>
+
+<a id="func-getfieldpathbytype"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFieldPathByType(type: *<a href="types.html#struct-typeinfo">TypeInfo</a>, path: *<a href="types.html#struct-fieldpath">FieldPath</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2144</span>
+
+<hr>
+
+<a id="func-getfunctionname"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getFunctionName(result: []char, methodName: <a href="intern.html#union-internedstring">InternedString</a>, alias: *<a href="intern.html#union-internedstring">InternedString</a>, includePackage: bool) : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2206</span>
+
+<p>
+Given a method name, this will return the function name equivalent, which is:
+AggregateName_MethodName
+</p>
+
+<hr>
+
+<a id="func-getmethod"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) getMethod(strings: *<a href="intern.html#struct-strings">Strings</a>, module: *<a href="module.html#struct-module">Module</a>, methodName: <a href="intern.html#union-internedstring">InternedString</a>) : <a href="types.html#struct-methodresult">MethodResult</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2227</span>
+
+<hr>
+
+<a id="func-implementstrait"></a>
+
+<h3><code>func (this: *<a href="types.html#struct-typeinfo">TypeInfo</a>) implementsTrait(iface: *<a href="types.html#struct-typeinfo">TypeInfo</a>, checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>, missingMethods: *Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2357</span>
+
+<hr>
+
+<a id="func-nexttypeid"></a>
+
+<h3><code>func NextTypeId() : Typeid</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2379</span>
+
+<hr>
+
+<a id="func-typesinit"></a>
+
+<h3><code>func TypesInit(strings: *<a href="intern.html#struct-strings">Strings</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2387</span>
+
+<p>
+The supplied `Strings` must be initialized and pre-populated with interned constants
+</p>
+
+<hr>
+
+<a id="func-typekindasstr"></a>
+
+<h3><code>func TypeKindAsStr(enumType: <a href="types.html#enum-typekind">TypeKind</a>) : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="enum-typekind"></a>
+
+<h3><code>enum TypeKind</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:23</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>BOOL</code></td><td></td></tr>
+<tr><td><code>CHAR</code></td><td></td></tr>
+<tr><td><code>I8</code></td><td></td></tr>
+<tr><td><code>U8</code></td><td></td></tr>
+<tr><td><code>I16</code></td><td></td></tr>
+<tr><td><code>U16</code></td><td></td></tr>
+<tr><td><code>I32</code></td><td></td></tr>
+<tr><td><code>U32</code></td><td></td></tr>
+<tr><td><code>I64</code></td><td></td></tr>
+<tr><td><code>U64</code></td><td></td></tr>
+<tr><td><code>F32</code></td><td></td></tr>
+<tr><td><code>F64</code></td><td></td></tr>
+<tr><td><code>USIZE</code></td><td></td></tr>
+<tr><td><code>NULL</code></td><td></td></tr>
+<tr><td><code>VOID</code></td><td></td></tr>
+<tr><td><code>STR</code></td><td></td></tr>
+<tr><td><code>ARRAY</code></td><td></td></tr>
+<tr><td><code>PTR</code></td><td></td></tr>
+<tr><td><code>FUNC_PTR</code></td><td></td></tr>
+<tr><td><code>STRUCT</code></td><td></td></tr>
+<tr><td><code>UNION</code></td><td></td></tr>
+<tr><td><code>TRAIT</code></td><td></td></tr>
+<tr><td><code>ENUM</code></td><td></td></tr>
+<tr><td><code>FUNC</code></td><td></td></tr>
+<tr><td><code>CONST</code></td><td></td></tr>
+<tr><td><code>GENERIC_PARAM</code></td><td></td></tr>
+<tr><td><code>POISON</code></td><td></td></tr>
+<tr><td><code>MAX_TYPE_KINDS</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-fieldpositionresult"></a>
+
+<h3><code>struct FieldPositionResult</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:1925</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>aggInfo</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+<tr><td><code>position</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-fieldpath"></a>
+
+<h3><code>struct FieldPath</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2078</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>fields</code></td><td>[]<a href="ast.html#struct-fieldstmt">FieldStmt</a></td><td></td></tr>
+<tr><td><code>numOfFields</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-methodresult"></a>
+
+<h3><code>struct MethodResult</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2222</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>symbol</code></td><td>*<a href="symbols.html#struct-symbol">Symbol</a></td><td></td></tr>
+<tr><td><code>name</code></td><td><a href="intern.html#union-internedstring">InternedString</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="typedef-typeid"></a>
+
+<h3><code>typedef Typeid = i64</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2374</span>
+
+<hr>
+
+<a id="struct-typeinfo"></a>
+
+<h3><code>struct TypeInfo</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2408</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>kind</code></td><td><a href="types.html#enum-typekind">TypeKind</a></td><td></td></tr>
+<tr><td><code>typeid</code></td><td>Typeid</td><td></td></tr>
+<tr><td><code>name</code></td><td><a href="intern.html#union-internedstring">InternedString</a></td><td></td></tr>
+<tr><td><code>sym</code></td><td>*<a href="symbols.html#struct-symbol">Symbol</a></td><td></td></tr>
+<tr><td><code>genericTypeid</code></td><td>Typeid</td><td></td></tr>
+<tr><td><code>returnType</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>Variables and Constants</h2>
+<a id="const-max_field_path"></a>
+
+<h3><code>const MAX_FIELD_PATH</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2077</span>
+
+<hr>
+
+<a id="const-bool_type"></a>
+
+<h3><code>const BOOL_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2456</span>
+
+<hr>
+
+<a id="const-char_type"></a>
+
+<h3><code>const CHAR_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2462</span>
+
+<hr>
+
+<a id="const-i8_type"></a>
+
+<h3><code>const I8_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2468</span>
+
+<hr>
+
+<a id="const-u8_type"></a>
+
+<h3><code>const U8_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2474</span>
+
+<hr>
+
+<a id="const-i16_type"></a>
+
+<h3><code>const I16_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2480</span>
+
+<hr>
+
+<a id="const-u16_type"></a>
+
+<h3><code>const U16_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2486</span>
+
+<hr>
+
+<a id="const-i32_type"></a>
+
+<h3><code>const I32_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2492</span>
+
+<hr>
+
+<a id="const-u32_type"></a>
+
+<h3><code>const U32_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2498</span>
+
+<hr>
+
+<a id="const-i64_type"></a>
+
+<h3><code>const I64_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2504</span>
+
+<hr>
+
+<a id="const-u64_type"></a>
+
+<h3><code>const U64_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2510</span>
+
+<hr>
+
+<a id="const-f32_type"></a>
+
+<h3><code>const F32_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2516</span>
+
+<hr>
+
+<a id="const-f64_type"></a>
+
+<h3><code>const F64_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2522</span>
+
+<hr>
+
+<a id="const-usize_type"></a>
+
+<h3><code>const USIZE_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2528</span>
+
+<hr>
+
+<a id="const-null_type"></a>
+
+<h3><code>const NULL_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2534</span>
+
+<hr>
+
+<a id="const-void_type"></a>
+
+<h3><code>const VOID_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2540</span>
+
+<hr>
+
+<a id="const-str_type"></a>
+
+<h3><code>const STR_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2546</span>
+
+<hr>
+
+<a id="const-poison_type"></a>
+
+<h3><code>const POISON_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2552</span>
+
+<hr>
+
+<a id="const-builtin_types"></a>
+
+<h3><code>const BUILTIN_TYPES</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/types.lita:2558</span>
+
+<hr>
+
+</body>
+</html>

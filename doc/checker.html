@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>checker</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>checker</h1>
+<h2>Functions</h2>
+<a id="func-init"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) init(lita: *<a href="lita.html#struct-lita">Lita</a>, allocator: *const Allocator) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:89</span>
+
+<hr>
+
+<a id="func-typecheck"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) typeCheck(root: *<a href="module.html#struct-module">Module</a>, flags: i32) : <a href="symbols.html#struct-programsymbols">ProgramSymbols</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:116</span>
+
+<hr>
+
+<a id="func-errors"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) errors() : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:184</span>
+
+<hr>
+
+<a id="func-checkcastability"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) checkCastability(src: <a href="lex.html#struct-srcpos">SrcPos</a>, a: *<a href="types.html#struct-typeinfo">TypeInfo</a>, b: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:242</span>
+
+<hr>
+
+<a id="func-checkassignability"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) checkAssignability(src: <a href="lex.html#struct-srcpos">SrcPos</a>, a: *<a href="types.html#struct-typeinfo">TypeInfo</a>, b: *<a href="types.html#struct-typeinfo">TypeInfo</a>, allowDecay: bool) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:270</span>
+
+<hr>
+
+<a id="func-checkdeclarability"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) checkDeclarability(src: <a href="lex.html#struct-srcpos">SrcPos</a>, a: *<a href="types.html#struct-typeinfo">TypeInfo</a>, b: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:352</span>
+
+<hr>
+
+<a id="func-checktypecompatibility"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) checkTypeCompatibility(src: <a href="lex.html#struct-srcpos">SrcPos</a>, a: *<a href="types.html#struct-typeinfo">TypeInfo</a>, b: *<a href="types.html#struct-typeinfo">TypeInfo</a>, allowPtrArithmetic: bool) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:378</span>
+
+<hr>
+
+<a id="func-checktypeconstraint"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) checkTypeConstraint(src: <a href="lex.html#struct-srcpos">SrcPos</a>, a: *<a href="types.html#struct-typeinfo">TypeInfo</a>, b: *<a href="types.html#struct-typeinfo">TypeInfo</a>, sym: *<a href="symbols.html#struct-symbol">Symbol</a>, index: i32) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:413</span>
+
+<hr>
+
+<a id="func-createdeclsymbol"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) createDeclSymbol(decl: *<a href="ast.html#struct-decl">Decl</a>) : *<a href="symbols.html#struct-symbol">Symbol</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:506</span>
+
+<hr>
+
+<a id="func-entermodule"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) enterModule(module: *<a href="module.html#struct-module">Module</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:691</span>
+
+<hr>
+
+<a id="func-leavemodule"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) leaveModule() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:696</span>
+
+<hr>
+
+<a id="func-currentscope"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) currentScope() : *<a href="symbols.html#struct-scope">Scope</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:705</span>
+
+<hr>
+
+<a id="func-pushscope"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) pushScope(scope: *<a href="symbols.html#struct-scope">Scope</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:709</span>
+
+<hr>
+
+<a id="func-popscope"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) popScope() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:714</span>
+
+<hr>
+
+<a id="func-isgenericparamtype"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) isGenericParamType(name: *<a href="ast.html#struct-typespec">TypeSpec</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:720</span>
+
+<hr>
+
+<a id="func-createimportsymbols"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) createImportSymbols(imp: *<a href="ast.html#struct-importdecl">ImportDecl</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:739</span>
+
+<hr>
+
+<a id="func-resolvesymbol"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) resolveSymbol(sym: *<a href="symbols.html#struct-symbol">Symbol</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:830</span>
+
+<hr>
+
+<a id="func-finishresolvesymbol"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) finishResolveSymbol(sym: *<a href="symbols.html#struct-symbol">Symbol</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:974</span>
+
+<hr>
+
+<a id="func-gettype"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) getType(spec: *<a href="ast.html#struct-typespec">TypeSpec</a>, searchType: <a href="checker.html#enum-searchtype">SearchType</a>) : *<a href="symbols.html#struct-symbol">Symbol</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1046</span>
+
+<hr>
+
+<a id="func-gettypebyname"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) getTypeByName(typeName: <a href="intern.html#union-internedstring">InternedString</a>, searchType: <a href="checker.html#enum-searchtype">SearchType</a>) : *<a href="symbols.html#struct-symbol">Symbol</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1051</span>
+
+<hr>
+
+<a id="func-implementstrait"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) implementsTrait(agg: *<a href="types.html#struct-typeinfo">TypeInfo</a>, iface: *<a href="types.html#struct-typeinfo">TypeInfo</a>, missingMethods: *Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1146</span>
+
+<hr>
+
+<a id="func-resolvetypespec"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) resolveTypeSpec(spec: *<a href="ast.html#struct-typespec">TypeSpec</a>, searchType: <a href="checker.html#enum-searchtype">SearchType</a>) : *<a href="types.html#struct-typeinfo">TypeInfo</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1270</span>
+
+<hr>
+
+<a id="func-addsymbol"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) addSymbol(decl: *<a href="ast.html#struct-decl">Decl</a>, typeInfo: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : *<a href="symbols.html#struct-symbol">Symbol</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1403</span>
+
+<hr>
+
+<a id="func-addtypetoscope"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) addTypeToScope(decl: *<a href="ast.html#struct-decl">Decl</a>, scope: *<a href="symbols.html#struct-scope">Scope</a>, baseType: *<a href="types.html#struct-typeinfo">TypeInfo</a>, currentType: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1417</span>
+
+<hr>
+
+<a id="func-resolvenotes"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) resolveNotes(notes: *Array&lt;*<a href="ast.html#struct-notestmt">NoteStmt</a>&gt;) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1462</span>
+
+<hr>
+
+<a id="func-resolvestmt"></a>
+
+<h3><code>func (this: *<a href="checker.html#struct-typechecker">TypeChecker</a>) resolveStmt(stmt: *<a href="ast.html#struct-stmt">Stmt</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1527</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="enum-typecheckerflags"></a>
+
+<h3><code>enum TypeCheckerFlags</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:53</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DISABLE_TRAIT_WRAPPERS</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-typechecker"></a>
+
+<h3><code>struct TypeChecker</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:57</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>lita</code></td><td>*<a href="lita.html#struct-lita">Lita</a></td><td></td></tr>
+<tr><td><code>current</code></td><td>*<a href="module.html#struct-module">Module</a></td><td></td></tr>
+<tr><td><code>moduleStack</code></td><td>Array&lt;*<a href="module.html#struct-module">Module</a>&gt;</td><td></td></tr>
+<tr><td><code>funcDeclStack</code></td><td>Array&lt;*<a href="types.html#struct-typeinfo">TypeInfo</a>&gt;</td><td></td></tr>
+<tr><td><code>pendingValues</code></td><td>Array&lt;*<a href="symbols.html#struct-symbol">Symbol</a>&gt;</td><td></td></tr>
+<tr><td><code>symbolTypes</code></td><td>Array&lt;*<a href="symbols.html#struct-symbol">Symbol</a>&gt;</td><td></td></tr>
+<tr><td><code>symbolFuncs</code></td><td>Array&lt;*<a href="symbols.html#struct-symbol">Symbol</a>&gt;</td><td></td></tr>
+<tr><td><code>symbolTraits</code></td><td>Array&lt;*<a href="symbols.html#struct-symbol">Symbol</a>&gt;</td><td></td></tr>
+<tr><td><code>mainEntry</code></td><td>*<a href="symbols.html#struct-symbol">Symbol</a></td><td></td></tr>
+<tr><td><code>symbolNotes</code></td><td>Array&lt;*<a href="symbols.html#struct-symbol">Symbol</a>&gt;</td><td></td></tr>
+<tr><td><code>genericContext</code></td><td>GenericContext</td><td></td></tr>
+<tr><td><code>genericParamStack</code></td><td>Array&lt;Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;&gt;</td><td></td></tr>
+<tr><td><code>genericTemplates</code></td><td>Array&lt;*<a href="symbols.html#struct-symbol">Symbol</a>&gt;</td><td></td></tr>
+<tr><td><code>interfaceImpls</code></td><td>Map&lt;Typeid, Array&lt;Typeid&gt;&gt;</td><td></td></tr>
+<tr><td><code>labels</code></td><td>[]LabelInfo</td><td></td></tr>
+<tr><td><code>numOfLabels</code></td><td>i32</td><td></td></tr>
+<tr><td><code>typeCache</code></td><td>*<a href="types_new.html#struct-typecache">TypeCache</a></td><td></td></tr>
+<tr><td><code>randomNameIndex</code></td><td>u32</td><td></td></tr>
+<tr><td><code>bypassing</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-searchtype"></a>
+
+<h3><code>enum SearchType</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/checker.lita:1040</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>TYPE</code></td><td></td></tr>
+<tr><td><code>FUNC</code></td><td></td></tr>
+<tr><td><code>NOTE</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+</body>
+</html>

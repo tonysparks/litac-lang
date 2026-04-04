@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>lsp::references</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>lsp::references</h1>
+<h2>Functions</h2>
+<a id="func-init"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) init(allocator: *const Allocator) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:47</span>
+
+<hr>
+
+<a id="func-addsymbolreference"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) addSymbolReference(symbol: *<a href="symbols.html#struct-symbol">Symbol</a>, pos: <a href="lex.html#struct-srcpos">SrcPos</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:56</span>
+
+<hr>
+
+<a id="func-addtypereference"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) addTypeReference(type: *<a href="ast.html#struct-typespec">TypeSpec</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:70</span>
+
+<hr>
+
+<a id="func-addtypereferencebysymbol"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) addTypeReferenceBySymbol(srcPos: <a href="lex.html#struct-srcpos">SrcPos</a>, sym: *<a href="symbols.html#struct-symbol">Symbol</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:79</span>
+
+<hr>
+
+<a id="func-addtypereferencebytypeinfo"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) addTypeReferenceByTypeInfo(srcPos: <a href="lex.html#struct-srcpos">SrcPos</a>, typeInfo: *<a href="types.html#struct-typeinfo">TypeInfo</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:85</span>
+
+<hr>
+
+<a id="func-addfieldreference"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) addFieldReference(srcPos: <a href="lex.html#struct-srcpos">SrcPos</a>, parent: *<a href="types.html#struct-typeinfo">TypeInfo</a>, offset: i32) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:109</span>
+
+<hr>
+
+<a id="func-getsymbolreferences"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) getSymbolReferences(symbol: *<a href="symbols.html#struct-symbol">Symbol</a>) : Array&lt;<a href="lex.html#struct-srcpos">SrcPos</a>&gt;</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:119</span>
+
+<hr>
+
+<a id="func-removelocalsymbolreferences"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) removeLocalSymbolReferences(module: *<a href="module.html#struct-module">Module</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:131</span>
+
+<hr>
+
+<a id="func-gettypereferences"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) getTypeReferences(typeid: Typeid, results: *Array&lt;<a href="lex.html#struct-srcpos">SrcPos</a>&gt;) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:144</span>
+
+<hr>
+
+<a id="func-getfieldreferences"></a>
+
+<h3><code>func (this: *<a href="lsp::references.html#struct-referencedatabase">ReferenceDatabase</a>) getFieldReferences(typeid: Typeid, offset: i32, results: *Array&lt;<a href="lex.html#struct-srcpos">SrcPos</a>&gt;) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:153</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="struct-reference"></a>
+
+<h3><code>struct Reference</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:25</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>type</code></td><td>Typeid</td><td></td></tr>
+<tr><td><code>pos</code></td><td><a href="lex.html#struct-srcpos">SrcPos</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-referencedatabase"></a>
+
+<h3><code>struct ReferenceDatabase</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/references.lita:39</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>allocator</code></td><td>*const Allocator</td><td></td></tr>
+<tr><td><code>typeReferences</code></td><td>Array&lt;<a href="lsp::references.html#struct-reference">Reference</a>&gt;</td><td></td></tr>
+<tr><td><code>fieldReferences</code></td><td>Array&lt;FieldReference&gt;</td><td></td></tr>
+<tr><td><code>symbols</code></td><td>Map&lt;usize, Array&lt;<a href="lex.html#struct-srcpos">SrcPos</a>&gt;&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+</body>
+</html>

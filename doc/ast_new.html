@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ast_new</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>ast_new</h1>
+<h2>Functions</h2>
+<a id="func-init"></a>
+
+<h3><code>func (this: *<a href="ast_new.html#struct-typespecallocator">TypeSpecAllocator</a>) init(allocator: *const Allocator) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:22</span>
+
+<hr>
+
+<a id="func-free"></a>
+
+<h3><code>func (this: *<a href="ast_new.html#struct-typespecallocator">TypeSpecAllocator</a>) free() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:27</span>
+
+<hr>
+
+<a id="func-clear"></a>
+
+<h3><code>func (this: *<a href="ast_new.html#struct-typespecallocator">TypeSpecAllocator</a>) clear() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:31</span>
+
+<hr>
+
+<a id="func-alloc"></a>
+
+<h3><code>func (this: *<a href="ast_new.html#struct-typespecallocator">TypeSpecAllocator</a>) alloc() : *<a href="ast.html#struct-typespec">TypeSpec</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:35</span>
+
+<hr>
+
+<a id="func-newvoidtypespec"></a>
+
+<h3><code>func NewVoidTypeSpec(pos: <a href="lex.html#struct-srcpos">SrcPos</a>, typeAllocator: *<a href="ast_new.html#struct-typespecallocator">TypeSpecAllocator</a>) : *<a href="ast.html#struct-typespec">TypeSpec</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:41</span>
+
+<hr>
+
+<a id="func-newnametypespecintern"></a>
+
+<h3><code>func NewNameTypeSpecIntern(pos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="intern.html#union-internedstring">InternedString</a>, typeAllocator: *<a href="ast_new.html#struct-typespecallocator">TypeSpecAllocator</a>) : *<a href="ast.html#struct-typespec">TypeSpec</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:47</span>
+
+<hr>
+
+<a id="func-newtypespec"></a>
+
+<h3><code>func NewTypeSpec(kind: <a href="ast.html#enum-typespeckind">TypeSpecKind</a>, pos: <a href="lex.html#struct-srcpos">SrcPos</a>, typeAllocator: *<a href="ast_new.html#struct-typespecallocator">TypeSpecAllocator</a>) : *<a href="ast.html#struct-typespec">TypeSpec</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:57</span>
+
+<hr>
+
+<a id="func-newidentifier"></a>
+
+<h3><code>func NewIdentifier(name: *const char, pos: <a href="lex.html#struct-srcpos">SrcPos</a>, strings: *<a href="intern.html#struct-strings">Strings</a>) : <a href="ast.html#struct-identifier">Identifier</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:116</span>
+
+<hr>
+
+<a id="func-newimportdecl"></a>
+
+<h3><code>func NewImportDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, alias: <a href="ast.html#struct-identifier">Identifier</a>, isUsing: bool, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:135</span>
+
+<hr>
+
+<a id="func-newvardecl"></a>
+
+<h3><code>func NewVarDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, expr: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:152</span>
+
+<hr>
+
+<a id="func-newfuncdecl"></a>
+
+<h3><code>func NewFuncDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, genericParams: Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;, params: *<a href="ast.html#struct-parametersstmt">ParametersStmt</a>, body: *<a href="ast.html#struct-stmt">Stmt</a>, returnType: *<a href="ast.html#struct-typespec">TypeSpec</a>, flags: i32, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:169</span>
+
+<hr>
+
+<a id="func-newaggregatedecl"></a>
+
+<h3><code>func NewAggregateDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, kind: <a href="ast.html#enum-stmtkind">StmtKind</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, genericParams: Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;, fields: Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;, flags: i32, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:192</span>
+
+<hr>
+
+<a id="func-newstructdecl"></a>
+
+<h3><code>func NewStructDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, genericParams: Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;, fields: Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;, flags: i32, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:242</span>
+
+<hr>
+
+<a id="func-newuniondecl"></a>
+
+<h3><code>func NewUnionDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, genericParams: Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;, fields: Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;, flags: i32, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:253</span>
+
+<hr>
+
+<a id="func-newtraitdecl"></a>
+
+<h3><code>func NewTraitDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, genericParams: Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;, fields: Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;, flags: i32, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:265</span>
+
+<hr>
+
+<a id="func-newenumdecl"></a>
+
+<h3><code>func NewEnumDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, fields: Array&lt;*<a href="ast.html#struct-enumfieldentrydecl">EnumFieldEntryDecl</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:277</span>
+
+<hr>
+
+<a id="func-newtypedefdecl"></a>
+
+<h3><code>func NewTypedefDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, genericParams: Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:292</span>
+
+<hr>
+
+<a id="func-newnotedecl"></a>
+
+<h3><code>func NewNoteDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, fields: Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:310</span>
+
+<hr>
+
+<a id="func-newparameterdecl"></a>
+
+<h3><code>func NewParameterDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, name: <a href="ast.html#struct-identifier">Identifier</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, defaultExpr: *<a href="ast.html#struct-expr">Expr</a>, isUsing: bool, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:320</span>
+
+<hr>
+
+<a id="func-newnotesdecl"></a>
+
+<h3><code>func NewNotesDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, notes: Array&lt;*<a href="ast.html#struct-notestmt">NoteStmt</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:339</span>
+
+<hr>
+
+<a id="func-newbuiltindecl"></a>
+
+<h3><code>func NewBuiltinDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: *<a href="types.html#struct-typeinfo">TypeInfo</a>, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:351</span>
+
+<hr>
+
+<a id="func-newpoisondecl"></a>
+
+<h3><code>func NewPoisonDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, allocator: *const Allocator) : *<a href="ast.html#struct-decl">Decl</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:363</span>
+
+<hr>
+
+<a id="func-newternaryexpr"></a>
+
+<h3><code>func NewTernaryExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, cond: *<a href="ast.html#struct-expr">Expr</a>, then: *<a href="ast.html#struct-expr">Expr</a>, other: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:373</span>
+
+<hr>
+
+<a id="func-newbinaryexpr"></a>
+
+<h3><code>func NewBinaryExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, left: *<a href="ast.html#struct-expr">Expr</a>, operator: <a href="lex.html#enum-tokentype">TokenType</a>, right: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:390</span>
+
+<hr>
+
+<a id="func-newunaryexpr"></a>
+
+<h3><code>func NewUnaryExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, operator: <a href="lex.html#enum-tokentype">TokenType</a>, expr: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:407</span>
+
+<hr>
+
+<a id="func-newinitexpr"></a>
+
+<h3><code>func NewInitExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, arguments: Array&lt;*<a href="ast.html#struct-initargexpr">InitArgExpr</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:422</span>
+
+<hr>
+
+<a id="func-newfunccallexpr"></a>
+
+<h3><code>func NewFuncCallExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, object: *<a href="ast.html#struct-expr">Expr</a>, arguments: Array&lt;<a href="ast.html#struct-callarg">CallArg</a>&gt;, genericArgs: Array&lt;<a href="ast.html#struct-genericarg">GenericArg</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:438</span>
+
+<hr>
+
+<a id="func-newsubscriptgetexpr"></a>
+
+<h3><code>func NewSubscriptGetExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, object: *<a href="ast.html#struct-expr">Expr</a>, index: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:457</span>
+
+<hr>
+
+<a id="func-newsubscriptsetexpr"></a>
+
+<h3><code>func NewSubscriptSetExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, object: *<a href="ast.html#struct-expr">Expr</a>, index: *<a href="ast.html#struct-expr">Expr</a>, operator: <a href="lex.html#enum-tokentype">TokenType</a>, value: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:472</span>
+
+<hr>
+
+<a id="func-newgetexpr"></a>
+
+<h3><code>func NewGetExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, object: *<a href="ast.html#struct-expr">Expr</a>, field: *<a href="ast.html#struct-identifierexpr">IdentifierExpr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:491</span>
+
+<hr>
+
+<a id="func-newsetexpr"></a>
+
+<h3><code>func NewSetExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, object: *<a href="ast.html#struct-expr">Expr</a>, field: *<a href="ast.html#struct-identifierexpr">IdentifierExpr</a>, operator: <a href="lex.html#enum-tokentype">TokenType</a>, value: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:506</span>
+
+<hr>
+
+<a id="func-newidentifierexpr"></a>
+
+<h3><code>func NewIdentifierExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:525</span>
+
+<hr>
+
+<a id="func-newtypeidentifierexpr"></a>
+
+<h3><code>func NewTypeIdentifierExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, isBased: bool, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:538</span>
+
+<hr>
+
+<a id="func-newcastexpr"></a>
+
+<h3><code>func NewCastExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, castExpr: *<a href="ast.html#struct-expr">Expr</a>, castTo: *<a href="ast.html#struct-typespec">TypeSpec</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:553</span>
+
+<hr>
+
+<a id="func-newarraydesignationexpr"></a>
+
+<h3><code>func NewArrayDesignationExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, index: *<a href="ast.html#struct-expr">Expr</a>, value: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:568</span>
+
+<hr>
+
+<a id="func-newinitargexpr"></a>
+
+<h3><code>func NewInitArgExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, fieldName: <a href="ast.html#struct-identifier">Identifier</a>, position: i32, value: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:583</span>
+
+<hr>
+
+<a id="func-newbooleanexpr"></a>
+
+<h3><code>func NewBooleanExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, boolean: bool, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:600</span>
+
+<hr>
+
+<a id="func-newnullexpr"></a>
+
+<h3><code>func NewNullExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:612</span>
+
+<hr>
+
+<a id="func-newnumberexpr"></a>
+
+<h3><code>func NewNumberExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, number: <a href="lex.html#struct-token">Token</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:622</span>
+
+<hr>
+
+<a id="func-newstringexpr"></a>
+
+<h3><code>func NewStringExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, string: <a href="lex.html#struct-token">Token</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:634</span>
+
+<hr>
+
+<a id="func-newnativestringexpr"></a>
+
+<h3><code>func NewNativeStringExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, string: <a href="lex.html#struct-token">Token</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:646</span>
+
+<hr>
+
+<a id="func-newcharexpr"></a>
+
+<h3><code>func NewCharExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, character: <a href="lex.html#struct-token">Token</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:658</span>
+
+<hr>
+
+<a id="func-newgroupexpr"></a>
+
+<h3><code>func NewGroupExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, groupedExpr: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:670</span>
+
+<hr>
+
+<a id="func-newarrayinitexpr"></a>
+
+<h3><code>func NewArrayInitExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, values: Array&lt;*<a href="ast.html#struct-expr">Expr</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:683</span>
+
+<hr>
+
+<a id="func-newsizeofexpr"></a>
+
+<h3><code>func NewSizeOfExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, sizeOfExpr: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:715</span>
+
+<hr>
+
+<a id="func-newtypeofexpr"></a>
+
+<h3><code>func NewTypeOfExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, typeOfExpr: *<a href="ast.html#struct-expr">Expr</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:729</span>
+
+<hr>
+
+<a id="func-newnameofexpr"></a>
+
+<h3><code>func NewNameOfExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, typeOfExpr: *<a href="ast.html#struct-expr">Expr</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:744</span>
+
+<hr>
+
+<a id="func-newoffsetofexpr"></a>
+
+<h3><code>func NewOffsetOfExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, field: <a href="ast.html#struct-identifier">Identifier</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:759</span>
+
+<hr>
+
+<a id="func-newpoisonexpr"></a>
+
+<h3><code>func NewPoisonExpr(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, allocator: *const Allocator) : *<a href="ast.html#struct-expr">Expr</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:774</span>
+
+<hr>
+
+<a id="func-newmodulestmt"></a>
+
+<h3><code>func NewModuleStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, imports: Array&lt;*<a href="ast.html#struct-importdecl">ImportDecl</a>&gt;, notes: Array&lt;*<a href="ast.html#struct-notestmt">NoteStmt</a>&gt;, declarations: Array&lt;*<a href="ast.html#struct-decl">Decl</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:784</span>
+
+<hr>
+
+<a id="func-newcompstmt"></a>
+
+<h3><code>func NewCompStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: <a href="intern.html#union-internedstring">InternedString</a>, expr: String, body: Array&lt;*<a href="ast.html#struct-stmt">Stmt</a>&gt;, end: *<a href="ast.html#struct-compstmt">CompStmt</a>, isScriptLoad: bool, isStatic: bool, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:800</span>
+
+<hr>
+
+<a id="func-newfuncbodystmt"></a>
+
+<h3><code>func NewFuncBodyStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, stmts: Array&lt;*<a href="ast.html#struct-stmt">Stmt</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:823</span>
+
+<hr>
+
+<a id="func-newblockstmt"></a>
+
+<h3><code>func NewBlockStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, stmts: Array&lt;*<a href="ast.html#struct-stmt">Stmt</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:836</span>
+
+<hr>
+
+<a id="func-newifstmt"></a>
+
+<h3><code>func NewIfStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, cond: *<a href="ast.html#struct-expr">Expr</a>, then: *<a href="ast.html#struct-stmt">Stmt</a>, other: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:848</span>
+
+<hr>
+
+<a id="func-newpostelsestmt"></a>
+
+<h3><code>func NewPostElseStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, cond: *<a href="ast.html#struct-stmt">Stmt</a>, post: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:864</span>
+
+<hr>
+
+<a id="func-newwhilestmt"></a>
+
+<h3><code>func NewWhileStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, cond: *<a href="ast.html#struct-expr">Expr</a>, body: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:881</span>
+
+<hr>
+
+<a id="func-newdowhilestmt"></a>
+
+<h3><code>func NewDoWhileStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, cond: *<a href="ast.html#struct-expr">Expr</a>, body: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:895</span>
+
+<hr>
+
+<a id="func-newforstmt"></a>
+
+<h3><code>func NewForStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, init: *<a href="ast.html#struct-stmt">Stmt</a>, cond: *<a href="ast.html#struct-expr">Expr</a>, post: *<a href="ast.html#struct-stmt">Stmt</a>, body: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:909</span>
+
+<hr>
+
+<a id="func-newswitchcasestmt"></a>
+
+<h3><code>func NewSwitchCaseStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, cond: *<a href="ast.html#struct-expr">Expr</a>, body: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:927</span>
+
+<hr>
+
+<a id="func-newswitchstmt"></a>
+
+<h3><code>func NewSwitchStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, cond: *<a href="ast.html#struct-expr">Expr</a>, cases: Array&lt;*<a href="ast.html#struct-switchcasestmt">SwitchCaseStmt</a>&gt;, defaultStmt: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:941</span>
+
+<hr>
+
+<a id="func-newbreakstmt"></a>
+
+<h3><code>func NewBreakStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:957</span>
+
+<hr>
+
+<a id="func-newcontinuestmt"></a>
+
+<h3><code>func NewContinueStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:967</span>
+
+<hr>
+
+<a id="func-newreturnstmt"></a>
+
+<h3><code>func NewReturnStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, expr: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:977</span>
+
+<hr>
+
+<a id="func-newdeferstmt"></a>
+
+<h3><code>func NewDeferStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, defered: *<a href="ast.html#struct-stmt">Stmt</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:989</span>
+
+<hr>
+
+<a id="func-newgotostmt"></a>
+
+<h3><code>func NewGotoStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, label: <a href="ast.html#struct-identifier">Identifier</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1001</span>
+
+<hr>
+
+<a id="func-newlabelstmt"></a>
+
+<h3><code>func NewLabelStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, label: <a href="ast.html#struct-identifier">Identifier</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1013</span>
+
+<hr>
+
+<a id="func-newnotestmt"></a>
+
+<h3><code>func NewNoteStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, arguments: Array&lt;<a href="ast.html#struct-callarg">CallArg</a>&gt;, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1025</span>
+
+<hr>
+
+<a id="func-newemptystmt"></a>
+
+<h3><code>func NewEmptyStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1039</span>
+
+<hr>
+
+<a id="func-newparametersstmt"></a>
+
+<h3><code>func NewParametersStmt(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, params: Array&lt;*<a href="ast.html#struct-parameterdecl">ParameterDecl</a>&gt;, isVararg: bool, isNativeVararg: bool, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1049</span>
+
+<hr>
+
+<a id="func-newvarfielddecl"></a>
+
+<h3><code>func NewVarFieldDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, fieldName: <a href="ast.html#struct-identifier">Identifier</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, attributes: <a href="ast.html#struct-attributes">Attributes</a>, defaultExpr: *<a href="ast.html#struct-expr">Expr</a>, bitFieldExpr: *<a href="ast.html#struct-expr">Expr</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1066</span>
+
+<hr>
+
+<a id="func-newtraitfielddecl"></a>
+
+<h3><code>func NewTraitFieldDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, fieldName: <a href="ast.html#struct-identifier">Identifier</a>, type: *<a href="ast.html#struct-typespec">TypeSpec</a>, attributes: <a href="ast.html#struct-attributes">Attributes</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1086</span>
+
+<hr>
+
+<a id="func-newenumfieldentrydecl"></a>
+
+<h3><code>func NewEnumFieldEntryDecl(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, fieldName: <a href="ast.html#struct-identifier">Identifier</a>, value: *<a href="ast.html#struct-expr">Expr</a>, attributes: <a href="ast.html#struct-attributes">Attributes</a>, allocator: *const Allocator) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:1103</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="struct-typespecallocator"></a>
+
+<h3><code>struct TypeSpecAllocator</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast_new.lita:17</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>allocator</code></td><td>*const Allocator</td><td></td></tr>
+<tr><td><code>typeSpecs</code></td><td>BucketList&lt;<a href="ast.html#struct-typespec">TypeSpec</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+</body>
+</html>

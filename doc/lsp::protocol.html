@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>lsp::protocol</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>lsp::protocol</h1>
+<blockquote><p>
+    Protocol specifications from: https://microsoft.github.io/language-server-protocol/specifications
+</p></blockquote>
+
+<h2>Functions</h2>
+<a id="func-symbolkindfromsymbol"></a>
+
+<h3><code>func SymbolKindFromSymbol(sym: *<a href="symbols.html#struct-symbol">sym::Symbol</a>) : <a href="lsp::protocol.html#enum-symbolinfokind">SymbolInfoKind</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:132</span>
+
+<hr>
+
+<a id="func-symboltosymbolinformation"></a>
+
+<h3><code>func SymbolToSymbolInformation(sym: *<a href="symbols.html#struct-symbol">sym::Symbol</a>, rootPath: *const char, alloc: *const Allocator) : *JsonNode</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:203</span>
+
+<hr>
+
+<a id="func-srcpostolocation"></a>
+
+<h3><code>func SrcPosToLocation(pos: <a href="lex.html#struct-srcpos">SrcPos</a>, rootPath: *const char, alloc: *const Allocator) : *JsonNode</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:227</span>
+
+<hr>
+
+<a id="func-srcposwithendtolocation"></a>
+
+<h3><code>func SrcPosWithEndToLocation(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, rootPath: *const char, alloc: *const Allocator) : *JsonNode</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:243</span>
+
+<hr>
+
+<a id="func-srcpostorange"></a>
+
+<h3><code>func SrcPosToRange(pos: <a href="lex.html#struct-srcpos">SrcPos</a>, alloc: *const Allocator) : *JsonNode</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:258</span>
+
+<hr>
+
+<a id="func-srcposwithendtorange"></a>
+
+<h3><code>func SrcPosWithEndToRange(startPos: <a href="lex.html#struct-srcpos">SrcPos</a>, endPos: <a href="lex.html#struct-srcpos">SrcPos</a>, alloc: *const Allocator) : *JsonNode</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:277</span>
+
+<hr>
+
+<a id="func-srcpostolocations"></a>
+
+<h3><code>func SrcPosToLocations(rootPath: *const char, results: *Array&lt;<a href="lex.html#struct-srcpos">SrcPos</a>&gt;, alloc: *const Allocator) : *JsonNode</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:297</span>
+
+<hr>
+
+<a id="func-symboltocompletionitem"></a>
+
+<h3><code>func SymbolToCompletionItem(symbol: *<a href="symbols.html#struct-symbol">sym::Symbol</a>, alloc: *const Allocator) : *JsonNode</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:312</span>
+
+<hr>
+
+<a id="func-jsonnodetotextdocumentchangeevent"></a>
+
+<h3><code>func JsonNodeToTextDocumentChangeEvent(params: *JsonNode, alloc: *const Allocator) : *<a href="lsp::protocol.html#struct-textdocumentdidchange">TextDocumentDidChange</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:327</span>
+
+<hr>
+
+<a id="func-symbolinfokindasstr"></a>
+
+<h3><code>func SymbolInfoKindAsStr(enumType: <a href="lsp::protocol.html#enum-symbolinfokind">SymbolInfoKind</a>) : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:1</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="struct-position"></a>
+
+<h3><code>struct Position</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:16</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>line</code></td><td>i32</td><td></td></tr>
+<tr><td><code>character</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-range"></a>
+
+<h3><code>struct Range</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:21</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>start</code></td><td><a href="lsp::protocol.html#struct-position">Position</a></td><td></td></tr>
+<tr><td><code>end</code></td><td><a href="lsp::protocol.html#struct-position">Position</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-location"></a>
+
+<h3><code>struct Location</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:26</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>uri</code></td><td>*const char</td><td></td></tr>
+<tr><td><code>range</code></td><td><a href="lsp::protocol.html#struct-range">Range</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-textdocument"></a>
+
+<h3><code>struct TextDocument</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:31</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>uri</code></td><td>*const char</td><td></td></tr>
+<tr><td><code>version</code></td><td>u32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-textdocumentdidchange"></a>
+
+<h3><code>struct TextDocumentDidChange</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:36</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>textDocument</code></td><td><a href="lsp::protocol.html#struct-textdocument">TextDocument</a></td><td></td></tr>
+<tr><td><code>contentChanges</code></td><td>Array&lt;<a href="lsp::protocol.html#struct-textdocumentchangeevent">TextDocumentChangeEvent</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-textdocumentchangeevent"></a>
+
+<h3><code>struct TextDocumentChangeEvent</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:41</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>hasRange</code></td><td>bool</td><td></td></tr>
+<tr><td><code>range</code></td><td><a href="lsp::protocol.html#struct-range">Range</a></td><td></td></tr>
+<tr><td><code>rangeLength</code></td><td>u32</td><td></td></tr>
+<tr><td><code>text</code></td><td>*const char</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-errorcodes"></a>
+
+<h3><code>enum ErrorCodes</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:48</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>ParseError</code></td><td></td></tr>
+<tr><td><code>InvalidRequest</code></td><td></td></tr>
+<tr><td><code>MethodNotFound</code></td><td></td></tr>
+<tr><td><code>InvalidParams</code></td><td></td></tr>
+<tr><td><code>InternalError</code></td><td></td></tr>
+<tr><td><code>jsonrpcReservedErrorRangeStart</code></td><td></td></tr>
+<tr><td><code>serverErrorStart</code></td><td></td></tr>
+<tr><td><code>ServerNotInitialized</code></td><td></td></tr>
+<tr><td><code>UnknownErrorCode</code></td><td></td></tr>
+<tr><td><code>jsonrpcReservedErrorRangeEnd</code></td><td></td></tr>
+<tr><td><code>serverErrorEnd</code></td><td></td></tr>
+<tr><td><code>lspReservedErrorRangeStart</code></td><td></td></tr>
+<tr><td><code>ContentModified</code></td><td></td></tr>
+<tr><td><code>RequestCancelled</code></td><td></td></tr>
+<tr><td><code>lspReservedErrorRangeEnd</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-symbolinfokind"></a>
+
+<h3><code>enum SymbolInfoKind</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/lsp/protocol.lita:103</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>File</code></td><td></td></tr>
+<tr><td><code>Module</code></td><td></td></tr>
+<tr><td><code>Namespace</code></td><td></td></tr>
+<tr><td><code>Package</code></td><td></td></tr>
+<tr><td><code>Class</code></td><td></td></tr>
+<tr><td><code>Method</code></td><td></td></tr>
+<tr><td><code>Property</code></td><td></td></tr>
+<tr><td><code>Field</code></td><td></td></tr>
+<tr><td><code>Constructor</code></td><td></td></tr>
+<tr><td><code>Enum</code></td><td></td></tr>
+<tr><td><code>Interface</code></td><td></td></tr>
+<tr><td><code>Function</code></td><td></td></tr>
+<tr><td><code>Variable</code></td><td></td></tr>
+<tr><td><code>Constant</code></td><td></td></tr>
+<tr><td><code>String</code></td><td></td></tr>
+<tr><td><code>Number</code></td><td></td></tr>
+<tr><td><code>Boolean</code></td><td></td></tr>
+<tr><td><code>Array</code></td><td></td></tr>
+<tr><td><code>Object</code></td><td></td></tr>
+<tr><td><code>Key</code></td><td></td></tr>
+<tr><td><code>Null</code></td><td></td></tr>
+<tr><td><code>EnumMember</code></td><td></td></tr>
+<tr><td><code>Struct</code></td><td></td></tr>
+<tr><td><code>Event</code></td><td></td></tr>
+<tr><td><code>Operator</code></td><td></td></tr>
+<tr><td><code>TypeParameter</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+</body>
+</html>

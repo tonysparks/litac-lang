@@ -207,6 +207,7 @@ public func BuildArgs(parser: *CmdParser) {
     var docCmd = parser.addCommand("doc", "Generates document output")
         .addOption("docDir",         '\0', "Directory where the generated documents are written to, defaults to './doc'", OptionFlag.HAS_ARGUMENT, null)
         .addOption("srcDir",         '\0', "Directory to scan for .lita source files, defaults to './src'", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("format",         '\0', "Output format: 'md' (default) or 'html'", OptionFlag.HAS_ARGUMENT, null)
         .addOption("all",            '\0', "Includes private types in the documentation generation", 0, null)
 
     var testCmd = parser.addCommand("test", "Recursively scan for *_test.lita files and run each. \nOptionally pass a directory to scan (default: current directory).")
@@ -515,7 +516,9 @@ public func ApplyArgs(
     }
     else if(cmd.name.equals("doc")) {
         options.pkgOptions.pkgCmd = PkgCommand.PKG_DOC
-        options.docAll = cmd.hasOption("all")
+        options.docAll  = cmd.hasOption("all")
+        options.docHtml = cmd.hasOption("format") &&
+                          cmd.getOption("format").value.toString().equals($"html")
 
         var docDir = cmd.hasOption("docDir") ? cmd.getOption("docDir").value : null as (*const char)
         if(docDir == null || StringInit(docDir).empty()) {

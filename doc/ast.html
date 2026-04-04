@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ast</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>ast</h1>
+<h2>Functions</h2>
+<a id="func-setsrcpos"></a>
+
+<h3><code>func setSrcPos(n: *<a href="ast.html#struct-node">Node</a>, start: <a href="lex.html#struct-srcpos">SrcPos</a>, end: <a href="lex.html#struct-srcpos">SrcPos</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:194</span>
+
+<hr>
+
+<a id="func-becomeparentof"></a>
+
+<h3><code>func becomeParentOf&lt;T&gt;(n: *<a href="ast.html#struct-node">Node</a>, child: *T) : *T</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:199</span>
+
+<hr>
+
+<a id="func-becomeparentofchildren"></a>
+
+<h3><code>func becomeParentOfChildren&lt;T&gt;(n: *<a href="ast.html#struct-node">Node</a>, children: *Array&lt;T&gt;) : *Array&lt;T&gt;</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:206</span>
+
+<hr>
+
+<a id="func-becomeparentofchildrencallargs"></a>
+
+<h3><code>func becomeParentOfChildrenCallArgs(n: *<a href="ast.html#struct-node">Node</a>, children: *Array&lt;<a href="ast.html#struct-callarg">CallArg</a>&gt;) : *Array&lt;<a href="ast.html#struct-callarg">CallArg</a>&gt;</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:218</span>
+
+<hr>
+
+<a id="func-isexpr"></a>
+
+<h3><code>func IsExpr(node: *<a href="ast.html#struct-node">Node</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:645</span>
+
+<hr>
+
+<a id="func-isdecl"></a>
+
+<h3><code>func IsDecl(node: *<a href="ast.html#struct-node">Node</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:683</span>
+
+<hr>
+
+<a id="func-hasnotes"></a>
+
+<h3><code>func hasNotes(d: *<a href="ast.html#struct-decl">Decl</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:705</span>
+
+<hr>
+
+<a id="func-hasnote"></a>
+
+<h3><code>func hasNote(d: *<a href="ast.html#struct-decl">Decl</a>, name: *const char) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:710</span>
+
+<hr>
+
+<a id="func-getnote"></a>
+
+<h3><code>func getNote(d: *<a href="ast.html#struct-decl">Decl</a>, name: *const char) : *<a href="ast.html#struct-notestmt">NoteStmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:715</span>
+
+<hr>
+
+<a id="func-getnoteargument"></a>
+
+<h3><code>func getNoteArgument(d: *<a href="ast.html#struct-decl">Decl</a>, name: *const char, arg: *const char) : *<a href="ast.html#struct-callarg">CallArg</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:731</span>
+
+<hr>
+
+<a id="func-getbasetype"></a>
+
+<h3><code>func (this: *<a href="ast.html#struct-typespec">TypeSpec</a>) getBaseType() : *<a href="ast.html#struct-typespec">TypeSpec</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:750</span>
+
+<hr>
+
+<a id="func-getname"></a>
+
+<h3><code>func getName(f: *<a href="ast.html#struct-funcdecl">FuncDecl</a>, name: []char) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:776</span>
+
+<hr>
+
+<a id="func-isidentifier"></a>
+
+<h3><code>func isIdentifier(expr: *<a href="ast.html#struct-expr">Expr</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:826</span>
+
+<hr>
+
+<a id="func-isconstnumberexpr"></a>
+
+<h3><code>func isConstNumberExpr(expr: *<a href="ast.html#struct-expr">Expr</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:837</span>
+
+<hr>
+
+<a id="func-isconstexpr"></a>
+
+<h3><code>func isConstExpr(expr: *<a href="ast.html#struct-expr">Expr</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:874</span>
+
+<hr>
+
+<a id="func-callargsort"></a>
+
+<h3><code>func CallArgSort(a: <a href="ast.html#struct-callarg">CallArg</a>, b: <a href="ast.html#struct-callarg">CallArg</a>) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:913</span>
+
+<hr>
+
+<a id="func-typespeckindasstr"></a>
+
+<h3><code>func TypeSpecKindAsStr(enumType: <a href="ast.html#enum-typespeckind">TypeSpecKind</a>) : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:1</span>
+
+<hr>
+
+<a id="func-stmtkindasstr"></a>
+
+<h3><code>func StmtKindAsStr(enumType: <a href="ast.html#enum-stmtkind">StmtKind</a>) : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:1</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="enum-stmtkind"></a>
+
+<h3><code>enum StmtKind</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:16</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>IMPORT_DECL</code></td><td></td></tr>
+<tr><td><code>CONST_DECL</code></td><td></td></tr>
+<tr><td><code>VAR_DECL</code></td><td></td></tr>
+<tr><td><code>STRUCT_DECL</code></td><td></td></tr>
+<tr><td><code>UNION_DECL</code></td><td></td></tr>
+<tr><td><code>TRAIT_DECL</code></td><td></td></tr>
+<tr><td><code>ENUM_DECL</code></td><td></td></tr>
+<tr><td><code>FUNC_DECL</code></td><td></td></tr>
+<tr><td><code>TYPEDEF_DECL</code></td><td></td></tr>
+<tr><td><code>NOTE_DECL</code></td><td></td></tr>
+<tr><td><code>PARAM_DECL</code></td><td></td></tr>
+<tr><td><code>NATIVE_DECL</code></td><td></td></tr>
+<tr><td><code>NOTES_DECL</code></td><td></td></tr>
+<tr><td><code>VAR_FIELD_DECL</code></td><td></td></tr>
+<tr><td><code>ENUM_FIELD_ENTRY_DECL</code></td><td></td></tr>
+<tr><td><code>ENUM_FIELD_DECL</code></td><td></td></tr>
+<tr><td><code>STRUCT_FIELD_DECL</code></td><td></td></tr>
+<tr><td><code>UNION_FIELD_DECL</code></td><td></td></tr>
+<tr><td><code>TRAIT_FIELD_DECL</code></td><td></td></tr>
+<tr><td><code>POISON_DECL</code></td><td></td></tr>
+<tr><td><code>BLOCK_STMT</code></td><td></td></tr>
+<tr><td><code>BREAK_STMT</code></td><td></td></tr>
+<tr><td><code>COMP_STMT</code></td><td></td></tr>
+<tr><td><code>CONTINUE_STMT</code></td><td></td></tr>
+<tr><td><code>DEFER_STMT</code></td><td></td></tr>
+<tr><td><code>DO_WHILE_STMT</code></td><td></td></tr>
+<tr><td><code>EMPTY_STMT</code></td><td></td></tr>
+<tr><td><code>FOR_STMT</code></td><td></td></tr>
+<tr><td><code>FUNC_BODY_STMT</code></td><td></td></tr>
+<tr><td><code>GOTO_STMT</code></td><td></td></tr>
+<tr><td><code>IF_STMT</code></td><td></td></tr>
+<tr><td><code>POST_ELSE_STMT</code></td><td></td></tr>
+<tr><td><code>LABEL_STMT</code></td><td></td></tr>
+<tr><td><code>MODULE_STMT</code></td><td></td></tr>
+<tr><td><code>NOTE_STMT</code></td><td></td></tr>
+<tr><td><code>PARAMETERS_STMT</code></td><td></td></tr>
+<tr><td><code>RETURN_STMT</code></td><td></td></tr>
+<tr><td><code>SWITCH_CASE_STMT</code></td><td></td></tr>
+<tr><td><code>SWITCH_STMT</code></td><td></td></tr>
+<tr><td><code>WHILE_STMT</code></td><td></td></tr>
+<tr><td><code>ARRAY_DESIGNATION_EXPR</code></td><td></td></tr>
+<tr><td><code>ARRAY_INIT_EXPR</code></td><td></td></tr>
+<tr><td><code>BINARY_EXPR</code></td><td></td></tr>
+<tr><td><code>BOOLEAN_EXPR</code></td><td></td></tr>
+<tr><td><code>CAST_EXPR</code></td><td></td></tr>
+<tr><td><code>CHAR_EXPR</code></td><td></td></tr>
+<tr><td><code>FUNC_CALL_EXPR</code></td><td></td></tr>
+<tr><td><code>FUNC_IDENTIFIER_EXPR</code></td><td></td></tr>
+<tr><td><code>GET_EXPR</code></td><td></td></tr>
+<tr><td><code>GROUP_EXPR</code></td><td></td></tr>
+<tr><td><code>IDENTIFIER_EXPR</code></td><td></td></tr>
+<tr><td><code>INIT_EXPR</code></td><td></td></tr>
+<tr><td><code>INIT_ARG_EXPR</code></td><td></td></tr>
+<tr><td><code>NULL_EXPR</code></td><td></td></tr>
+<tr><td><code>NUMBER_EXPR</code></td><td></td></tr>
+<tr><td><code>OFFSET_OF_EXPR</code></td><td></td></tr>
+<tr><td><code>SET_EXPR</code></td><td></td></tr>
+<tr><td><code>SIZE_OF_EXPR</code></td><td></td></tr>
+<tr><td><code>STRING_EXPR</code></td><td></td></tr>
+<tr><td><code>NATIVE_STRING_EXPR</code></td><td></td></tr>
+<tr><td><code>SUBSCRIPT_GET_EXPR</code></td><td></td></tr>
+<tr><td><code>SUBSCRIPT_SET_EXPR</code></td><td></td></tr>
+<tr><td><code>TERNARY_EXPR</code></td><td></td></tr>
+<tr><td><code>TYPE_IDENTIFIER_EXPR</code></td><td></td></tr>
+<tr><td><code>TYPE_OF_EXPR</code></td><td></td></tr>
+<tr><td><code>NAME_OF_EXPR</code></td><td></td></tr>
+<tr><td><code>UNARY_EXPR</code></td><td></td></tr>
+<tr><td><code>POISON_EXPR</code></td><td></td></tr>
+<tr><td><code>MAX_STMT_KINDS</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-typespeckind"></a>
+
+<h3><code>enum TypeSpecKind</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:93</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>NONE</code></td><td></td></tr>
+<tr><td><code>ARRAY</code></td><td></td></tr>
+<tr><td><code>PTR</code></td><td></td></tr>
+<tr><td><code>CONST</code></td><td></td></tr>
+<tr><td><code>NAME</code></td><td></td></tr>
+<tr><td><code>FUNC_PTR</code></td><td></td></tr>
+<tr><td><code>MAX_TYPESPEC_KINDS</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-funcflags"></a>
+
+<h3><code>enum FuncFlags</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:104</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>HAS_VARARGS</code></td><td></td></tr>
+<tr><td><code>IS_METHOD</code></td><td></td></tr>
+<tr><td><code>HAS_NATIVE_VARARGS</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-aggregateflags"></a>
+
+<h3><code>enum AggregateFlags</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:110</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>IS_EMBEDDED</code></td><td></td></tr>
+<tr><td><code>IS_ANONYMOUS</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-typespec"></a>
+
+<h3><code>struct TypeSpec</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:116</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>kind</code></td><td><a href="ast.html#enum-typespeckind">TypeSpecKind</a></td><td></td></tr>
+<tr><td><code>pos</code></td><td><a href="lex.html#struct-srcpos">SrcPos</a></td><td></td></tr>
+<tr><td><code>base</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>typeInfo</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-identifier"></a>
+
+<h3><code>struct Identifier</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:144</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>str</code></td><td><a href="intern.html#union-internedstring">InternedString</a></td><td></td></tr>
+<tr><td><code>token</code></td><td><a href="lex.html#struct-token">Token</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-genericparam"></a>
+
+<h3><code>struct GenericParam</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:149</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+<tr><td><code>typeConstraint</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-genericargkind"></a>
+
+<h3><code>enum GenericArgKind</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:154</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>TYPE</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-genericarg"></a>
+
+<h3><code>struct GenericArg</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:158</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>kind</code></td><td><a href="ast.html#enum-genericargkind">GenericArgKind</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-visibility"></a>
+
+<h3><code>enum Visibility</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:167</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>PRIVATE</code></td><td></td></tr>
+<tr><td><code>INTERNAL</code></td><td></td></tr>
+<tr><td><code>PUBLIC</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-attributes"></a>
+
+<h3><code>struct Attributes</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:178</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>visibility</code></td><td><a href="ast.html#enum-visibility">Visibility</a></td><td></td></tr>
+<tr><td><code>isGlobal</code></td><td>bool</td><td></td></tr>
+<tr><td><code>isUsing</code></td><td>bool</td><td></td></tr>
+<tr><td><code>isGenerated</code></td><td>bool</td><td></td></tr>
+<tr><td><code>notes</code></td><td>Array&lt;*<a href="ast.html#struct-notestmt">NoteStmt</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-node"></a>
+
+<h3><code>struct Node</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:187</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>kind</code></td><td><a href="ast.html#enum-stmtkind">StmtKind</a></td><td></td></tr>
+<tr><td><code>parent</code></td><td>*<a href="ast.html#struct-node">Node</a></td><td></td></tr>
+<tr><td><code>startPos</code></td><td><a href="lex.html#struct-srcpos">SrcPos</a></td><td></td></tr>
+<tr><td><code>endPos</code></td><td><a href="lex.html#struct-srcpos">SrcPos</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-decl"></a>
+
+<h3><code>struct Decl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:230</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>sym</code></td><td>*<a href="symbols.html#struct-symbol">Symbol</a></td><td></td></tr>
+<tr><td><code>name</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+<tr><td><code>attributes</code></td><td><a href="ast.html#struct-attributes">Attributes</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-genericdecl"></a>
+
+<h3><code>struct GenericDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:237</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>declaration</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>genericParams</code></td><td>Array&lt;<a href="ast.html#struct-genericparam">GenericParam</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-importdecl"></a>
+
+<h3><code>struct ImportDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:242</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>alias</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+<tr><td><code>isUsing</code></td><td>bool</td><td></td></tr>
+<tr><td><code>moduleId</code></td><td>*<a href="module.html#struct-moduleid">ModuleId</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-vardecl"></a>
+
+<h3><code>struct VarDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:251</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>typeSpec</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>expr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-parameterdecl"></a>
+
+<h3><code>struct ParameterDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:257</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>defaultExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>typeInfo</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-funcdecl"></a>
+
+<h3><code>struct FuncDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:265</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-genericdecl">GenericDecl</a></td><td></td></tr>
+<tr><td><code>params</code></td><td>*<a href="ast.html#struct-parametersstmt">ParametersStmt</a></td><td></td></tr>
+<tr><td><code>body</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>returnType</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>flags</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-aggregatedecl"></a>
+
+<h3><code>struct AggregateDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:273</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-genericdecl">GenericDecl</a></td><td></td></tr>
+<tr><td><code>fields</code></td><td>Array&lt;<a href="ast.html#struct-fieldstmt">FieldStmt</a>&gt;</td><td></td></tr>
+<tr><td><code>flags</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-enumdecl"></a>
+
+<h3><code>struct EnumDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:279</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>fields</code></td><td>Array&lt;*<a href="ast.html#struct-enumfieldentrydecl">EnumFieldEntryDecl</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-typedefdecl"></a>
+
+<h3><code>struct TypedefDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:284</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-genericdecl">GenericDecl</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-nativedecl"></a>
+
+<h3><code>struct NativeDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:289</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>typeInfo</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-notesdecl"></a>
+
+<h3><code>struct NotesDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:294</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>notes</code></td><td>Array&lt;*<a href="ast.html#struct-notestmt">NoteStmt</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-poisondecl"></a>
+
+<h3><code>struct PoisonDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:299</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-blockstmt"></a>
+
+<h3><code>struct BlockStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:303</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>stmts</code></td><td>Array&lt;*<a href="ast.html#struct-stmt">Stmt</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-breakstmt"></a>
+
+<h3><code>struct BreakStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:308</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-compstmt"></a>
+
+<h3><code>struct CompStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:312</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>type</code></td><td><a href="intern.html#union-internedstring">InternedString</a></td><td></td></tr>
+<tr><td><code>expr</code></td><td>String</td><td></td></tr>
+<tr><td><code>end</code></td><td>*<a href="ast.html#struct-compstmt">CompStmt</a></td><td></td></tr>
+<tr><td><code>evaluatedStmt</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>body</code></td><td>Array&lt;*<a href="ast.html#struct-stmt">Stmt</a>&gt;</td><td></td></tr>
+<tr><td><code>isScriptLoad</code></td><td>bool</td><td></td></tr>
+<tr><td><code>isStatic</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-continuestmt"></a>
+
+<h3><code>struct ContinueStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:323</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-deferstmt"></a>
+
+<h3><code>struct DeferStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:327</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>deferedStmt</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-dowhilestmt"></a>
+
+<h3><code>struct DoWhileStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:332</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>body</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-emptystmt"></a>
+
+<h3><code>struct EmptyStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:338</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-enumfieldentrydecl"></a>
+
+<h3><code>struct EnumFieldEntryDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:342</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>value</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-forstmt"></a>
+
+<h3><code>struct ForStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:347</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>init</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>post</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>body</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-funcbodystmt"></a>
+
+<h3><code>struct FuncBodyStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:355</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>stmts</code></td><td>Array&lt;*<a href="ast.html#struct-stmt">Stmt</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-gotostmt"></a>
+
+<h3><code>struct GotoStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:360</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>label</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-ifstmt"></a>
+
+<h3><code>struct IfStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:365</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>then</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>elseStmt</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-postelsestmt"></a>
+
+<h3><code>struct PostElseStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:372</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>post</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-labelstmt"></a>
+
+<h3><code>struct LabelStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:378</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>label</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-modulestmt"></a>
+
+<h3><code>struct ModuleStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:384</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>imports</code></td><td>Array&lt;*<a href="ast.html#struct-importdecl">ImportDecl</a>&gt;</td><td></td></tr>
+<tr><td><code>notes</code></td><td>Array&lt;*<a href="ast.html#struct-notestmt">NoteStmt</a>&gt;</td><td></td></tr>
+<tr><td><code>declarations</code></td><td>Array&lt;*<a href="ast.html#struct-decl">Decl</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-notestmt"></a>
+
+<h3><code>struct NoteStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:392</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>arguments</code></td><td>Array&lt;<a href="ast.html#struct-callarg">CallArg</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-parametersstmt"></a>
+
+<h3><code>struct ParametersStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:398</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>params</code></td><td>Array&lt;*<a href="ast.html#struct-parameterdecl">ParameterDecl</a>&gt;</td><td></td></tr>
+<tr><td><code>isVararg</code></td><td>bool</td><td></td></tr>
+<tr><td><code>isNativeVararg</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-returnstmt"></a>
+
+<h3><code>struct ReturnStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:405</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>expr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-switchcasestmt"></a>
+
+<h3><code>struct SwitchCaseStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:410</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>body</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-switchstmt"></a>
+
+<h3><code>struct SwitchStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:416</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>cases</code></td><td>Array&lt;*<a href="ast.html#struct-switchcasestmt">SwitchCaseStmt</a>&gt;</td><td></td></tr>
+<tr><td><code>defaultStmt</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-varfielddecl"></a>
+
+<h3><code>struct VarFieldDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:423</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>defaultExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>bitFieldExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-traitfielddecl"></a>
+
+<h3><code>struct TraitFieldDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:430</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>decl</code></td><td><a href="ast.html#struct-decl">Decl</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-fieldstmt"></a>
+
+<h3><code>struct FieldStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:435</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>kind</code></td><td><a href="ast.html#enum-stmtkind">StmtKind</a></td><td></td></tr>
+<tr><td><code>typeInfo</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-whilestmt"></a>
+
+<h3><code>struct WhileStmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:447</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>body</code></td><td>*<a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-stmt"></a>
+
+<h3><code>struct Stmt</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:454</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>node</code></td><td><a href="ast.html#struct-node">Node</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-arraydesignationexpr"></a>
+
+<h3><code>struct ArrayDesignationExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:458</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>index</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>value</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-arrayinitexpr"></a>
+
+<h3><code>struct ArrayInitExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:464</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>values</code></td><td>Array&lt;*<a href="ast.html#struct-expr">Expr</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-binaryexpr"></a>
+
+<h3><code>struct BinaryExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:470</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>left</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>operator</code></td><td><a href="lex.html#enum-tokentype">TokenType</a></td><td></td></tr>
+<tr><td><code>right</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-booleanexpr"></a>
+
+<h3><code>struct BooleanExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:477</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>boolean</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-castexpr"></a>
+
+<h3><code>struct CastExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:482</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>castTo</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>exprToCast</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-charexpr"></a>
+
+<h3><code>struct CharExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:488</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>character</code></td><td><a href="lex.html#struct-token">Token</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-callarg"></a>
+
+<h3><code>struct CallArg</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:493</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>argExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>argName</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+<tr><td><code>index</code></td><td>i32</td><td></td></tr>
+<tr><td><code>isDefault</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-funccallexpr"></a>
+
+<h3><code>struct FuncCallExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:500</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>object</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>genericArgs</code></td><td>Array&lt;<a href="ast.html#struct-genericarg">GenericArg</a>&gt;</td><td></td></tr>
+<tr><td><code>arguments</code></td><td>Array&lt;<a href="ast.html#struct-callarg">CallArg</a>&gt;</td><td></td></tr>
+<tr><td><code>flags</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-funccallexprflags"></a>
+
+<h3><code>enum FuncCallExprFlags</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:508</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>HAS_NATIVE_VARARG</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-getexprflags"></a>
+
+<h3><code>enum GetExprFlags</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:512</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>IS_NORMAL</code></td><td></td></tr>
+<tr><td><code>IS_METHOD_CALL</code></td><td></td></tr>
+<tr><td><code>IS_ENUM</code></td><td></td></tr>
+<tr><td><code>IS_USING</code></td><td></td></tr>
+<tr><td><code>IS_METHOD_ARG</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-getexpr"></a>
+
+<h3><code>struct GetExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:520</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>object</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>field</code></td><td>*<a href="ast.html#struct-identifierexpr">IdentifierExpr</a></td><td></td></tr>
+<tr><td><code>flags</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-groupexpr"></a>
+
+<h3><code>struct GroupExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:527</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>groupedExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-identifierexpr"></a>
+
+<h3><code>struct IdentifierExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:532</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>sym</code></td><td>*<a href="symbols.html#struct-symbol">Symbol</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-initargexpr"></a>
+
+<h3><code>struct InitArgExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:539</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>fieldName</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+<tr><td><code>argPosition</code></td><td>i32</td><td></td></tr>
+<tr><td><code>value</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-initexpr"></a>
+
+<h3><code>struct InitExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:546</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>genericArgs</code></td><td>Array&lt;<a href="ast.html#struct-genericarg">GenericArg</a>&gt;</td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>arguments</code></td><td>Array&lt;*<a href="ast.html#struct-initargexpr">InitArgExpr</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-nullexpr"></a>
+
+<h3><code>struct NullExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:553</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-numberexpr"></a>
+
+<h3><code>struct NumberExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:557</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>number</code></td><td><a href="lex.html#struct-token">Token</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-offsetofexpr"></a>
+
+<h3><code>struct OffsetOfExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:562</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>field</code></td><td><a href="ast.html#struct-identifier">Identifier</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-setexpr"></a>
+
+<h3><code>struct SetExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:568</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>object</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>field</code></td><td>*<a href="ast.html#struct-identifierexpr">IdentifierExpr</a></td><td></td></tr>
+<tr><td><code>operator</code></td><td><a href="lex.html#enum-tokentype">TokenType</a></td><td></td></tr>
+<tr><td><code>value</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>flags</code></td><td>i32</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-sizeofexpr"></a>
+
+<h3><code>struct SizeOfExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:577</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>sizeOfExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-stringexpr"></a>
+
+<h3><code>struct StringExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:582</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>string</code></td><td><a href="lex.html#struct-token">Token</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-subscriptgetexpr"></a>
+
+<h3><code>struct SubscriptGetExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:587</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>object</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>index</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-subscriptsetexpr"></a>
+
+<h3><code>struct SubscriptSetExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:593</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>object</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>index</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>operator</code></td><td><a href="lex.html#enum-tokentype">TokenType</a></td><td></td></tr>
+<tr><td><code>value</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-ternaryexpr"></a>
+
+<h3><code>struct TernaryExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:601</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>cond</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>then</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>other</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-typeidentifierexpr"></a>
+
+<h3><code>struct TypeIdentifierExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:608</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+<tr><td><code>sym</code></td><td>*<a href="symbols.html#struct-symbol">Symbol</a></td><td></td></tr>
+<tr><td><code>isBased</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-typeofexpr"></a>
+
+<h3><code>struct TypeOfExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:616</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>typeOfExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>type</code></td><td>*<a href="ast.html#struct-typespec">TypeSpec</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-unaryexpr"></a>
+
+<h3><code>struct UnaryExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:622</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+<tr><td><code>operator</code></td><td><a href="lex.html#enum-tokentype">TokenType</a></td><td></td></tr>
+<tr><td><code>unaryExpr</code></td><td>*<a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-poisonexpr"></a>
+
+<h3><code>struct PoisonExpr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:628</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>expr</code></td><td><a href="ast.html#struct-expr">Expr</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-expr"></a>
+
+<h3><code>struct Expr</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:632</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>stmt</code></td><td><a href="ast.html#struct-stmt">Stmt</a></td><td></td></tr>
+<tr><td><code>operand</code></td><td><a href="ast.html#struct-operand">Operand</a></td><td></td></tr>
+<tr><td><code>expectedType</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-operand"></a>
+
+<h3><code>struct Operand</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/ast.lita:638</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>typeInfo</code></td><td>*<a href="types.html#struct-typeinfo">TypeInfo</a></td><td></td></tr>
+<tr><td><code>isRightValue</code></td><td>bool</td><td></td></tr>
+<tr><td><code>isConst</code></td><td>bool</td><td></td></tr>
+<tr><td><code>val</code></td><td><a href="lex.html#union-value">Value</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+</body>
+</html>

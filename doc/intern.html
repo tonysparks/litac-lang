@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>intern</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>intern</h1>
+<h2>Functions</h2>
+<a id="func-internmap"></a>
+
+<h3><code>func InternMap&lt;V&gt;(emptyValue: V, initialSize: i32, allocator: *const Allocator) : Map&lt;<a href="intern.html#union-internedstring">InternedString</a>, V&gt;</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:90</span>
+
+<hr>
+
+<a id="func-init"></a>
+
+<h3><code>func (this: *<a href="intern.html#struct-strings">Strings</a>) init(allocator: *const Allocator) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:110</span>
+
+<hr>
+
+<a id="func-free"></a>
+
+<h3><code>func (this: *<a href="intern.html#struct-strings">Strings</a>) free() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:183</span>
+
+<hr>
+
+<a id="func-internstring"></a>
+
+<h3><code>func (this: *<a href="intern.html#struct-strings">Strings</a>) internString(string: *String) : <a href="intern.html#union-internedstring">InternedString</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:196</span>
+
+<hr>
+
+<a id="func-intern"></a>
+
+<h3><code>func (this: *<a href="intern.html#struct-strings">Strings</a>) intern(string: *const char, length: i32) : <a href="intern.html#union-internedstring">InternedString</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:204</span>
+
+<p>
+    The supplied `string` must be long-lived, as in for the duration of the lifetime of this
+    `Strings`.  If you can't garauntee to the lifetime of the supplied `string`, use `Strings#internCopy`
+</p>
+
+<hr>
+
+<a id="func-interncopy"></a>
+
+<h3><code>func (this: *<a href="intern.html#struct-strings">Strings</a>) internCopy(string: *const char, length: i32) : <a href="intern.html#union-internedstring">InternedString</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:225</span>
+
+<p>
+    If this `string` has not been interned yet, a copy of the `string` is stored as the interned string.
+</p>
+
+<hr>
+
+<a id="func-put"></a>
+
+<h3><code>func (this: *<a href="intern.html#struct-strings">Strings</a>) put(key: String, value: <a href="intern.html#union-internedstring">InternedString</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:247</span>
+
+<hr>
+
+<a id="func-size"></a>
+
+<h3><code>func (this: *<a href="intern.html#struct-strings">Strings</a>) size() : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:275</span>
+
+<hr>
+
+<a id="func-equalsstr"></a>
+
+<h3><code>func (this: *<a href="intern.html#union-internedstring">InternedString</a>) equalsStr(other: *const char) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:327</span>
+
+<hr>
+
+<a id="func-equals"></a>
+
+<h3><code>func (this: *<a href="intern.html#union-internedstring">InternedString</a>) equals(other: *<a href="intern.html#union-internedstring">InternedString</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:336</span>
+
+<hr>
+
+<a id="func-hash"></a>
+
+<h3><code>func (this: *<a href="intern.html#union-internedstring">InternedString</a>) hash() : u32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:340</span>
+
+<hr>
+
+<a id="func-empty"></a>
+
+<h3><code>func (this: *<a href="intern.html#union-internedstring">InternedString</a>) empty() : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:347</span>
+
+<hr>
+
+<a id="func-asstring"></a>
+
+<h3><code>func (this: *<a href="intern.html#union-internedstring">InternedString</a>) asString() : String</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:351</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="union-internedstring"></a>
+
+<h3><code>union InternedString</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:14</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>view</code></td><td>String</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-strings"></a>
+
+<h3><code>struct Strings</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:101</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>allocator</code></td><td>*const Allocator</td><td></td></tr>
+<tr><td><code>length</code></td><td>i32</td><td></td></tr>
+<tr><td><code>capacity</code></td><td>i32</td><td></td></tr>
+<tr><td><code>keys</code></td><td>*String</td><td></td></tr>
+<tr><td><code>values</code></td><td>*<a href="intern.html#union-internedstring">InternedString</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>Variables and Constants</h2>
+<a id="const-empty_str"></a>
+
+<h3><code>const EMPTY_STR</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:26</span>
+
+<hr>
+
+<a id="const-void"></a>
+
+<h3><code>const VOID</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:30</span>
+
+<hr>
+
+<a id="const-null"></a>
+
+<h3><code>const NULL</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:31</span>
+
+<hr>
+
+<a id="const-bool"></a>
+
+<h3><code>const BOOL</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:32</span>
+
+<hr>
+
+<a id="const-char"></a>
+
+<h3><code>const CHAR</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:33</span>
+
+<hr>
+
+<a id="const-i8"></a>
+
+<h3><code>const I8</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:34</span>
+
+<hr>
+
+<a id="const-u8"></a>
+
+<h3><code>const U8</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:35</span>
+
+<hr>
+
+<a id="const-i16"></a>
+
+<h3><code>const I16</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:36</span>
+
+<hr>
+
+<a id="const-u16"></a>
+
+<h3><code>const U16</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:37</span>
+
+<hr>
+
+<a id="const-i32"></a>
+
+<h3><code>const I32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:38</span>
+
+<hr>
+
+<a id="const-u32"></a>
+
+<h3><code>const U32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:39</span>
+
+<hr>
+
+<a id="const-i64"></a>
+
+<h3><code>const I64</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:40</span>
+
+<hr>
+
+<a id="const-u64"></a>
+
+<h3><code>const U64</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:41</span>
+
+<hr>
+
+<a id="const-f32"></a>
+
+<h3><code>const F32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:42</span>
+
+<hr>
+
+<a id="const-f64"></a>
+
+<h3><code>const F64</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:43</span>
+
+<hr>
+
+<a id="const-usize"></a>
+
+<h3><code>const USIZE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:44</span>
+
+<hr>
+
+<a id="const-const"></a>
+
+<h3><code>const CONST</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:45</span>
+
+<hr>
+
+<a id="const-string"></a>
+
+<h3><code>const STRING</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:46</span>
+
+<hr>
+
+<a id="const-generic_param"></a>
+
+<h3><code>const GENERIC_PARAM</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:47</span>
+
+<hr>
+
+<a id="const-poison"></a>
+
+<h3><code>const POISON</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:48</span>
+
+<hr>
+
+<a id="const-builtin"></a>
+
+<h3><code>const BUILTIN</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:49</span>
+
+<hr>
+
+<a id="const-main"></a>
+
+<h3><code>const MAIN</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:50</span>
+
+<hr>
+
+<a id="const-num_of_type_infos"></a>
+
+<h3><code>const NUM_OF_TYPE_INFOS</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:51</span>
+
+<hr>
+
+<a id="const-type_infos"></a>
+
+<h3><code>const TYPE_INFOS</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:52</span>
+
+<hr>
+
+<a id="const-profile_tag"></a>
+
+<h3><code>const PROFILE_TAG</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:53</span>
+
+<hr>
+
+<a id="const-profile_entries"></a>
+
+<h3><code>const PROFILE_ENTRIES</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:54</span>
+
+<hr>
+
+<a id="const-if"></a>
+
+<h3><code>const IF</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:56</span>
+
+<hr>
+
+<a id="const-static_if"></a>
+
+<h3><code>const STATIC_IF</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:57</span>
+
+<hr>
+
+<a id="const-else"></a>
+
+<h3><code>const ELSE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:58</span>
+
+<hr>
+
+<a id="const-elseif"></a>
+
+<h3><code>const ELSEIF</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:59</span>
+
+<hr>
+
+<a id="const-precheck"></a>
+
+<h3><code>const PRECHECK</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:60</span>
+
+<hr>
+
+<a id="const-postcheck"></a>
+
+<h3><code>const POSTCHECK</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:61</span>
+
+<hr>
+
+<a id="const-postparse"></a>
+
+<h3><code>const POSTPARSE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:62</span>
+
+<hr>
+
+<a id="const-end"></a>
+
+<h3><code>const END</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:63</span>
+
+<hr>
+
+<a id="const-else_error"></a>
+
+<h3><code>const ELSE_ERROR</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:64</span>
+
+<hr>
+
+<a id="const-include"></a>
+
+<h3><code>const INCLUDE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:67</span>
+
+<hr>
+
+<a id="const-raw"></a>
+
+<h3><code>const RAW</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:68</span>
+
+<hr>
+
+<a id="const-inline"></a>
+
+<h3><code>const INLINE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:69</span>
+
+<hr>
+
+<a id="const-noinline"></a>
+
+<h3><code>const NOINLINE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:70</span>
+
+<hr>
+
+<a id="const-static"></a>
+
+<h3><code>const STATIC</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:71</span>
+
+<hr>
+
+<a id="const-atomic"></a>
+
+<h3><code>const ATOMIC</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:72</span>
+
+<hr>
+
+<a id="const-register"></a>
+
+<h3><code>const REGISTER</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:73</span>
+
+<hr>
+
+<a id="const-threadlocal"></a>
+
+<h3><code>const THREADLOCAL</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:74</span>
+
+<hr>
+
+<a id="const-export"></a>
+
+<h3><code>const EXPORT</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:75</span>
+
+<hr>
+
+<a id="const-packed"></a>
+
+<h3><code>const PACKED</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:76</span>
+
+<hr>
+
+<a id="const-cc"></a>
+
+<h3><code>const CC</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:77</span>
+
+<hr>
+
+<a id="const-cfile"></a>
+
+<h3><code>const CFILE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:78</span>
+
+<hr>
+
+<a id="const-cinclude"></a>
+
+<h3><code>const CINCLUDE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:79</span>
+
+<hr>
+
+<a id="const-foreign"></a>
+
+<h3><code>const FOREIGN</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:80</span>
+
+<hr>
+
+<a id="const-alias"></a>
+
+<h3><code>const ALIAS</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:81</span>
+
+<hr>
+
+<a id="const-asstr"></a>
+
+<h3><code>const ASSTR</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:82</span>
+
+<hr>
+
+<a id="const-tostr"></a>
+
+<h3><code>const TOSTR</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:83</span>
+
+<hr>
+
+<a id="const-compiler_option"></a>
+
+<h3><code>const COMPILER_OPTION</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:84</span>
+
+<hr>
+
+<a id="const-string_type"></a>
+
+<h3><code>const STRING_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:87</span>
+
+<hr>
+
+<a id="const-any_type"></a>
+
+<h3><code>const ANY_TYPE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/intern.lita:88</span>
+
+<hr>
+
+</body>
+</html>

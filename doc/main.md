@@ -30,7 +30,7 @@
 
 ### func ApplyArgs(parser: \*CmdParser, options: \*[LitaOptions](lita.md#struct-litaoptions)) : [ParseStatus](main.md#enum-parsestatus)
 
-*public* | *src/main.lita:260*
+*public* | *src/main.lita:261*
 
 ---
 

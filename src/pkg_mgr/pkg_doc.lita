@@ -2,58 +2,55 @@ import "pkg_mgr"
 import "main"
 import "lita"
 import "doc"
+import "error_codes"
+import "phase_result"
 
+import "std/array"
 import "std/mem"
 import "std/libc"
 import "std/io"
 import "std/string/buffer"
 import "std/string"
+import "std/string/builder"
 import "std/system"
 import "std/json"
 
 public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
-    // Build LitaOptions for the compilation step, copying from the caller
-    var litaOptions = new<LitaOptions>()
-    defer defaultAllocator.free(litaOptions)
-
-    memcpy(litaOptions, options, sizeof(:LitaOptions))
-
-    // Set up source path and input file the same way pkg_build does
     var temp: [MAX_PATH]char;
 
     // Default srcPath to {projectPath}/src if not supplied via -srcDir
-    if(litaOptions.srcPath.empty()) {
+    if(options.srcPath.empty()) {
         var srcBuf = StringBufferInit(temp, MAX_PATH, 0)
         srcBuf.format("%s/src", options.projectPath)
-        StringCopy(.src = srcBuf.cStr(), .dest = litaOptions.srcPath, .size = MAX_PATH)
+        StringCopy(.src = srcBuf.cStr(), .dest = options.srcPath, .size = MAX_PATH)
     }
 
     // Resolve srcPath to absolute path
-    if(!StringInit(litaOptions.srcPath as (*const char)).startsWith($"/")) {
+    if(!(options.srcPath as (*const char)).toString().startsWith($"/")) {
         var absSrc: [MAX_PATH]char;
-        GetAbsolutePath(CurrentWorkingPath(), litaOptions.srcPath, absSrc)
-        StringCopy(.src = absSrc, .dest = litaOptions.srcPath, .size = MAX_PATH)
+        GetAbsolutePath(CurrentWorkingPath(), options.srcPath, absSrc)
+        StringCopy(.src = absSrc, .dest = options.srcPath, .size = MAX_PATH)
     }
 
     // Default entry file to main.lita inside the srcPath
-    if(litaOptions.inputFile.empty()) {
+    if(options.inputFile.empty()) {
         var inputBuf = StringBufferInit(temp, MAX_PATH, 0)
-        inputBuf.format("%s/main.lita", litaOptions.srcPath)
-        StringCopy(.src = inputBuf.cStr(), .dest = litaOptions.inputFile, .size = MAX_PATH)
+        inputBuf.format("%s/main.lita", options.srcPath)
+        StringCopy(.src = inputBuf.cStr(), .dest = options.inputFile, .size = MAX_PATH)
 
-        if(!FileExists(litaOptions.inputFile)) {
+        if(!FileExists(options.inputFile)) {
             pm.errors.append(
                 "could not find entry file '%s'; supply an input .lita file, e.g.: litac doc -srcDir %s %s/main.lita\n",
-                litaOptions.inputFile,
-                litaOptions.srcPath,
-                litaOptions.srcPath
+                options.inputFile,
+                options.srcPath,
+                options.srcPath
             )
             return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
         }
     }
 
     // Only run through type-checking, skip C codegen
-    litaOptions.checkerOnly = true
+    options.checkerOnly = true
 
     // Ensure doc output directory exists
     var docDirBuf = StringBufferInit(temp, MAX_PATH, 0)
@@ -61,7 +58,7 @@ public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
         docDirBuf.format("%s/doc", options.projectPath)
     }
     else {
-        var docDirStr = StringInit(options.docDir as (*const char))
+        var docDirStr = (options.docDir as (*const char)).toString()
         if(docDirStr.startsWith($"/") || docDirStr.startsWith($"./") || docDirStr.startsWith($"../")) {
             docDirBuf.format("%s", options.docDir)
         }
@@ -80,37 +77,36 @@ public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
 
     if(pm.isVerbose()) {
         printf("Generating docs for '%s' -> '%s'\n",
-            litaOptions.inputFile,
+            options.inputFile,
             docDirBuf.cStr()
         )
     }
 
     // Run the compiler through parse + type-check
     var lita = Lita{}
-    lita.init(litaOptions)
+    lita.init(options)
     defer lita.free()
 
     var root = lita.parse()
-    if(!root) {
-        pm.errors.append("parse failed; cannot generate docs\n")
+    if(!root || !lita.result.errors.empty()) {
+        printCompilerErrors(&lita, options)
         return PkgStatus.ERROR_RUNNING_COMMAND
     }
 
-    if(!lita.typeCheck(root)) {
-        pm.errors.append("type-check failed; cannot generate docs\n")
+    if(!lita.typeCheck(root) || !lita.result.errors.empty()) {
+        printCompilerErrors(&lita, options)
         return PkgStatus.ERROR_RUNNING_COMMAND
     }
 
     // Generate docs from the fully resolved AST
     var docOptions = DocOptions {
-        .docDir       = docDirBuf.cStr(),
-        .includeAll   = options.docAll,
-        .projectPath  = options.projectPath,
-        .srcPath      = litaOptions.srcPath as (*const char),
-        .pkgName      = pm.pkg.json ? pm.pkg.json.getStr("name", "") : "",
-        .pkgNameLen   = -1,
-        .pkgVersion   = pm.pkg.json ? pm.pkg.json.getStr("version", "") : "",
-        .pkgVersionLen = -1,
+        .docDir      = docDirBuf.cStr(),
+        .includeAll  = options.docAll,
+        .format      = options.docHtml ? DocFormat.HTML : DocFormat.MARKDOWN,
+        .projectPath = options.projectPath,
+        .srcPath     = options.srcPath as (*const char),
+        .pkgName     = pm.pkg.json ? pm.pkg.json.getStr("name", "").toString() : "".toString(),
+        .pkgVersion  = pm.pkg.json ? pm.pkg.json.getStr("version", "").toString() : "".toString(),
     }
 
     if(!GenerateDocs(&lita, &docOptions)) {
@@ -123,4 +119,16 @@ public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
     }
 
     return PkgStatus.OK
+}
+
+func printCompilerErrors(lita: *Lita, options: *LitaOptions) {
+    var sb = StringBuilderInit(1024)
+    defer sb.free()
+
+    for(var i = 0; i < lita.result.errors.size(); i += 1) {
+        PrintError(options.isColoredOutput, sb, lita.result.errors.get(i))
+        printf("%s\n", sb.cStr())
+        sb.clear()
+    }
+    printf("Total error(s): %d\n", lita.result.errors.size())
 }

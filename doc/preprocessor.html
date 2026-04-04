@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>preprocessor</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>preprocessor</h1>
+<h2>Functions</h2>
+<a id="func-preprocessorinit"></a>
+
+<h3><code>func PreprocessorInit(lita: *<a href="lita.html#struct-lita">Lita</a>) : <a href="preprocessor.html#struct-preprocessor">Preprocessor</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:87</span>
+
+<hr>
+
+<a id="func-init"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) init(lita: *<a href="lita.html#struct-lita">Lita</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:94</span>
+
+<hr>
+
+<a id="func-free"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) free() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:112</span>
+
+<hr>
+
+<a id="func-eval"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) eval(comp: *<a href="ast.html#struct-compstmt">CompStmt</a>) : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:117</span>
+
+<hr>
+
+<a id="func-evaluateformodule"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) evaluateForModule(module: *<a href="module.html#struct-module">Module</a>, moduleStmt: *<a href="ast.html#struct-modulestmt">ModuleStmt</a>, comp: *<a href="ast.html#struct-compstmt">CompStmt</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:145</span>
+
+<hr>
+
+<a id="func-evaluateforfunction"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) evaluateForFunction(checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>, comp: *<a href="ast.html#struct-compstmt">CompStmt</a>, isFirst: bool) : *<a href="ast.html#struct-stmt">Stmt</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:215</span>
+
+<hr>
+
+<a id="func-preresolvesymbols"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) preResolveSymbols(checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>, isIncrementalBuild: bool) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:269</span>
+
+<hr>
+
+<a id="func-postresolvesymbols"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) postResolveSymbols(checker: *<a href="checker.html#struct-typechecker">TypeChecker</a>, isIncrementalBuild: bool) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:293</span>
+
+<hr>
+
+<a id="func-drainqueue"></a>
+
+<h3><code>func (this: *<a href="preprocessor.html#struct-preprocessor">Preprocessor</a>) drainQueue() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:318</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="struct-preprocessor"></a>
+
+<h3><code>struct Preprocessor</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:38</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>lita</code></td><td>*<a href="lita.html#struct-lita">Lita</a></td><td></td></tr>
+<tr><td><code>runtime</code></td><td><a href="preprocessor::api.html#struct-scriptruntime">ScriptRuntime</a></td><td></td></tr>
+<tr><td><code>callContext</code></td><td><a href="preprocessor.html#struct-callcontext">CallContext</a></td><td></td></tr>
+<tr><td><code>preCheckers</code></td><td>Array&lt;<a href="preprocessor.html#struct-checkercontext">CheckerContext</a>&gt;</td><td></td></tr>
+<tr><td><code>postCheckers</code></td><td>Array&lt;<a href="preprocessor.html#struct-checkercontext">CheckerContext</a>&gt;</td><td></td></tr>
+<tr><td><code>declQueue</code></td><td>Array&lt;<a href="preprocessor.html#struct-scriptdecl">ScriptDecl</a>&gt;</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-callcontext"></a>
+
+<h3><code>struct CallContext</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:48</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>pp</code></td><td>*<a href="preprocessor.html#struct-preprocessor">Preprocessor</a></td><td></td></tr>
+<tr><td><code>checker</code></td><td>*<a href="checker.html#struct-typechecker">TypeChecker</a></td><td></td></tr>
+<tr><td><code>comp</code></td><td>*<a href="ast.html#struct-compstmt">CompStmt</a></td><td></td></tr>
+<tr><td><code>buffer</code></td><td>StringBuilder</td><td></td></tr>
+<tr><td><code>resolveSymbols</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-checkercontext"></a>
+
+<h3><code>struct CheckerContext</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:57</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>module</code></td><td>*<a href="module.html#struct-module">Module</a></td><td></td></tr>
+<tr><td><code>stmt</code></td><td>*<a href="ast.html#struct-compstmt">CompStmt</a></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-declcontext"></a>
+
+<h3><code>struct DeclContext</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:62</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>checker</code></td><td>*<a href="checker.html#struct-typechecker">TypeChecker</a></td><td></td></tr>
+<tr><td><code>comp</code></td><td>*<a href="ast.html#struct-compstmt">CompStmt</a></td><td></td></tr>
+<tr><td><code>resolveSymbols</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-scriptdecl"></a>
+
+<h3><code>struct ScriptDecl</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/preprocessor/preprocessor.lita:72</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>ctx</code></td><td><a href="preprocessor.html#struct-declcontext">DeclContext</a></td><td></td></tr>
+<tr><td><code>module</code></td><td>*<a href="module.html#struct-module">Module</a></td><td></td></tr>
+<tr><td><code>declarations</code></td><td>*<a href="ast.html#struct-modulestmt">ModuleStmt</a></td><td></td></tr>
+<tr><td><code>replacement</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+</body>
+</html>

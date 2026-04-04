@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pkg_mgr</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>pkg_mgr</h1>
+<h2>Functions</h2>
+<a id="func-init"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) init(options: <a href="pkg_mgr.html#struct-packageoptions">PackageOptions</a>, allocator: *const Allocator) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:187</span>
+
+<hr>
+
+<a id="func-free"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) free() : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:199</span>
+
+<hr>
+
+<a id="func-isverbose"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) isVerbose() : bool</code></h3>
+<span class="badge badge-internal">internal</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:214</span>
+
+<hr>
+
+<a id="func-initcommand"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) initCommand(options: <a href="pkg_mgr.html#struct-packageinitoptions">PackageInitOptions</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:240</span>
+
+<p>
+    Initializes a new LitaC project, writing out scaffolding files
+</p>
+
+<hr>
+
+<a id="func-buildcommand"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) buildCommand(options: <a href="pkg_mgr.html#struct-packagebuildoptions">PackageBuildOptions</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:248</span>
+
+<p>
+    Initializes a new LitaC project, writing out scaffolding files
+</p>
+
+<hr>
+
+<a id="func-installcommand"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) installCommand(options: <a href="pkg_mgr.html#struct-packageinstalloptions">PackageInstallOptions</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:284</span>
+
+<p>
+    Installs all packages defined the pkg.json to the file system.
+</p>
+
+<hr>
+
+<a id="func-createbuildfile"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) createBuildFile(buildFile: *<a href="build.html#struct-buildfile">BuildFile</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:318</span>
+
+<p>
+    Updates the build.json file with any dependent package information.  This
+    should be called after a sync is made.
+</p>
+
+<hr>
+
+<a id="func-writebuildfile"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) writeBuildFile() : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:338</span>
+
+<hr>
+
+<a id="func-runcommand"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) runCommand(cmd: *const char) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:375</span>
+
+<p>
+    Run a command from the pkg.json:commands[{argument}]
+</p>
+
+<hr>
+
+<a id="func-testcommand"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) testCommand(options: *<a href="lita.html#struct-litaoptions">LitaOptions</a>) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:389</span>
+
+<p>
+    Recursively scan directory for *_test.lita files and run each test file.
+</p>
+
+<hr>
+
+<a id="func-doccommand"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) docCommand(options: *<a href="lita.html#struct-litaoptions">LitaOptions</a>) : <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:397</span>
+
+<p>
+    Generates Markdown documentation for the project's public and internal declarations.
+</p>
+
+<hr>
+
+<a id="func-hasprojectpkg"></a>
+
+<h3><code>func (this: *<a href="pkg_mgr.html#struct-packagemanager">PackageManager</a>) hasProjectPkg() : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:418</span>
+
+<hr>
+
+<a id="func-pkgstatusasstr"></a>
+
+<h3><code>func PkgStatusAsStr(enumType: <a href="pkg_mgr.html#enum-pkgstatus">PkgStatus</a>) : *const char</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:1</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="struct-packageoptions"></a>
+
+<h3><code>struct PackageOptions</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:116</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>projectPath</code></td><td>*const char</td><td></td></tr>
+<tr><td><code>pkgDir</code></td><td>*const char</td><td></td></tr>
+<tr><td><code>litaOptions</code></td><td>*<a href="lita.html#struct-litaoptions">LitaOptions</a></td><td></td></tr>
+<tr><td><code>cmdArgCount</code></td><td>i32</td><td></td></tr>
+<tr><td><code>cmdArgs</code></td><td>**char</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-packageinitoptions"></a>
+
+<h3><code>struct PackageInitOptions</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:127</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code></td><td>*const char</td><td></td></tr>
+<tr><td><code>version</code></td><td>*const char</td><td></td></tr>
+<tr><td><code>type</code></td><td>*const char</td><td></td></tr>
+<tr><td><code>repo</code></td><td>*const char</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-packagebuildoptions"></a>
+
+<h3><code>struct PackageBuildOptions</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:134</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>isRelease</code></td><td>bool</td><td></td></tr>
+<tr><td><code>isTest</code></td><td>bool</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-packageinstalloptions"></a>
+
+<h3><code>struct PackageInstallOptions</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:139</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>fullSync</code></td><td>bool</td><td></td></tr>
+<tr><td><code>httpOptions</code></td><td>HttpOptions</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="enum-pkgstatus"></a>
+
+<h3><code>enum PkgStatus</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:145</span>
+
+<table>
+<thead><tr><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>OK</code></td><td></td></tr>
+<tr><td><code>ERROR_NO_PROJECT_PKG_FOUND</code></td><td></td></tr>
+<tr><td><code>ERROR_COMMAND_NOT_DEFINED</code></td><td></td></tr>
+<tr><td><code>ERROR_RUNNING_COMMAND</code></td><td></td></tr>
+<tr><td><code>ERROR_CREATING_PKG_DIR</code></td><td></td></tr>
+<tr><td><code>ERROR_CLEANING_PKG</code></td><td></td></tr>
+<tr><td><code>ERROR_UNABLE_TO_OPEN_FILE</code></td><td></td></tr>
+<tr><td><code>ERROR_UNABLE_TO_OPEN_PKG_FILE</code></td><td></td></tr>
+<tr><td><code>ERROR_UNABLE_TO_EXTRACT_PKG_FILE</code></td><td></td></tr>
+<tr><td><code>ERROR_UNABLE_TO_PROCESS_PKG_FILE</code></td><td></td></tr>
+<tr><td><code>ERROR_OPENING_LOCAL_FILE_PKG</code></td><td></td></tr>
+<tr><td><code>ERROR_READING_LOCAL_FILE_PKG</code></td><td></td></tr>
+<tr><td><code>ERROR_WRITING_LOCAL_FILE_PKG</code></td><td></td></tr>
+<tr><td><code>ERROR_OPENING_BUILD_FILE</code></td><td></td></tr>
+<tr><td><code>ERROR_WRITING_BUILD_FILE</code></td><td></td></tr>
+<tr><td><code>ERROR_FINALIZING_LOCAL_FILE_PKG</code></td><td></td></tr>
+<tr><td><code>ERROR_PARSING_PKG_JSON</code></td><td></td></tr>
+<tr><td><code>ERROR_READING_PKG_FILE</code></td><td></td></tr>
+<tr><td><code>ERROR_HTTP_STATUS</code></td><td></td></tr>
+<tr><td><code>ERROR_INVALID_DIRECTORY</code></td><td></td></tr>
+<tr><td><code>ERROR_INVALID_REPO</code></td><td></td></tr>
+<tr><td><code>ERROR_INIT_PACKAGE</code></td><td></td></tr>
+<tr><td><code>ERROR_PARSING_BUILD_OPTIONS</code></td><td></td></tr>
+<tr><td><code>ERROR_INVALID_BUILD_TARGET</code></td><td></td></tr>
+<tr><td><code>ERROR_INVALID_BUILD_OS</code></td><td></td></tr>
+<tr><td><code>ERROR_INVALID_BUILD_ARCH</code></td><td></td></tr>
+<tr><td><code>ERROR_TEST_SUITE_FAILED</code></td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<a id="struct-packagemanager"></a>
+
+<h3><code>struct PackageManager</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/pkg_mgr/pkg_mgr.lita:176</span>
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>options</code></td><td><a href="pkg_mgr.html#struct-packageoptions">PackageOptions</a></td><td></td></tr>
+<tr><td><code>allocator</code></td><td>*const Allocator</td><td></td></tr>
+<tr><td><code>packages</code></td><td>Map&lt;*const char, *<a href="pkg_mgr::pkg.html#struct-packagedef">PackageDef</a>&gt;</td><td></td></tr>
+<tr><td><code>pkg</code></td><td>*<a href="pkg_mgr::pkg.html#struct-packagedef">PackageDef</a></td><td></td></tr>
+<tr><td><code>errors</code></td><td>StringBuilder</td><td></td></tr>
+<tr><td><code>warnings</code></td><td>StringBuilder</td><td></td></tr>
+</tbody>
+</table>
+
+<hr>
+
+</body>
+</html>

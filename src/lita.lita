@@ -175,6 +175,7 @@ public struct LitaOptions {
 
     docDir: [MAX_PATH]char         // the directory to write generated docs to
     docAll: bool                   // if private declarations should be included in docs
+    docHtml: bool                  // if true, emit HTML instead of Markdown
 }
 
 

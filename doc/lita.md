@@ -6,7 +6,7 @@
 
 ### func (this: \*[Lita](lita.md#struct-lita)) init(options: \*[LitaOptions](lita.md#struct-litaoptions)) : void
 
-*public* | *src/lita.lita:181*
+*public* | *src/lita.lita:182*
 
 ---
 
@@ -14,7 +14,7 @@
 
 ### func (this: \*[Lita](lita.md#struct-lita)) reset() : void
 
-*public* | *src/lita.lita:210*
+*public* | *src/lita.lita:211*
 
 Resets the state reading for another compile
 
@@ -24,7 +24,7 @@ Resets the state reading for another compile
 
 ### func free(lita: \*[Lita](lita.md#struct-lita)) : void
 
-*public* | *src/lita.lita:250*
+*public* | *src/lita.lita:251*
 
 ---
 
@@ -32,7 +32,7 @@ Resets the state reading for another compile
 
 ### func printf(lita: \*[Lita](lita.md#struct-lita), format: \*const char, ...) : void
 
-*public* | *src/lita.lita:255*
+*public* | *src/lita.lita:256*
 
 ---
 
@@ -40,7 +40,7 @@ Resets the state reading for another compile
 
 ### func addModule(lita: \*[Lita](lita.md#struct-lita), module: \*[Module](module.md#struct-module)) : void
 
-*public* | *src/lita.lita:279*
+*public* | *src/lita.lita:280*
 
 ---
 
@@ -48,7 +48,7 @@ Resets the state reading for another compile
 
 ### func getModule(lita: \*[Lita](lita.md#struct-lita), filename: \*const char) : \*[Module](module.md#struct-module)
 
-*public* | *src/lita.lita:283*
+*public* | *src/lita.lita:284*
 
 ---
 
@@ -56,7 +56,7 @@ Resets the state reading for another compile
 
 ### func getModuleByName(lita: \*[Lita](lita.md#struct-lita), name: \*const char) : \*[Module](module.md#struct-module)
 
-*public* | *src/lita.lita:291*
+*public* | *src/lita.lita:292*
 
 Extremely slow, this is a linear probe
 
@@ -66,7 +66,7 @@ Extremely slow, this is a linear probe
 
 ### func startCapture(lita: \*[Lita](lita.md#struct-lita), type: [MetricType](lita.md#enum-metrictype)) : void
 
-*public* | *src/lita.lita:318*
+*public* | *src/lita.lita:319*
 
 ---
 
@@ -74,7 +74,7 @@ Extremely slow, this is a linear probe
 
 ### func endCapture(lita: \*[Lita](lita.md#struct-lita), type: [MetricType](lita.md#enum-metrictype)) : void
 
-*public* | *src/lita.lita:327*
+*public* | *src/lita.lita:328*
 
 ---
 
@@ -82,7 +82,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) incrementalBuild(module: \*[Module](module.md#struct-module)) : void
 
-*public* | *src/lita.lita:337*
+*public* | *src/lita.lita:338*
 
 ---
 
@@ -90,7 +90,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) parse() : \*[Module](module.md#struct-module)
 
-*public* | *src/lita.lita:410*
+*public* | *src/lita.lita:411*
 
 ---
 
@@ -98,7 +98,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) typeCheck(module: \*[Module](module.md#struct-module), flags: i32) : bool
 
-*public* | *src/lita.lita:455*
+*public* | *src/lita.lita:456*
 
 ---
 
@@ -106,7 +106,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) transpile(module: \*[Module](module.md#struct-module)) : bool
 
-*public* | *src/lita.lita:467*
+*public* | *src/lita.lita:468*
 
 ---
 
@@ -114,7 +114,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) compileWithLibtcc(module: \*[Module](module.md#struct-module), binaryFilename: \*const char) : bool
 
-*public* | *src/lita.lita:530*
+*public* | *src/lita.lita:531*
 
 ---
 
@@ -122,7 +122,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) emitC(module: \*[Module](module.md#struct-module), cFilename: \*const char) : bool
 
-*public* | *src/lita.lita:602*
+*public* | *src/lita.lita:603*
 
 ---
 
@@ -130,7 +130,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) compileC(module: \*[Module](module.md#struct-module), sourceFilename: \*const char, binaryFilename: \*const char) : bool
 
-*public* | *src/lita.lita:619*
+*public* | *src/lita.lita:620*
 
 ---
 
@@ -138,7 +138,7 @@ Extremely slow, this is a linear probe
 
 ### func (this: \*[Lita](lita.md#struct-lita)) run() : i32
 
-*public* | *src/lita.lita:704*
+*public* | *src/lita.lita:705*
 
 ---
 
@@ -146,7 +146,7 @@ Extremely slow, this is a linear probe
 
 ### func FindModulePath(lita: \*[Lita](lita.md#struct-lita), moduleName: String, filename: \[\]char) : bool
 
-*public* | *src/lita.lita:764*
+*public* | *src/lita.lita:765*
 
 ---
 
@@ -154,7 +154,7 @@ Extremely slow, this is a linear probe
 
 ### func LoadModule(lita: \*[Lita](lita.md#struct-lita), packageName: String, srcPos: [SrcPos](lex.md#struct-srcpos)) : \*[Module](module.md#struct-module)
 
-*public* | *src/lita.lita:944*
+*public* | *src/lita.lita:945*
 
 ---
 
@@ -162,7 +162,7 @@ Extremely slow, this is a linear probe
 
 ### func GetPackageName(srcPath: \*const char, inputFile: \*const char) : String
 
-*public* | *src/lita.lita:965*
+*public* | *src/lita.lita:966*
 
 ---
 
@@ -355,6 +355,7 @@ Extremely slow, this is a linear probe
 | `pkgOptions` | [PkgOptions](lita.md#struct-pkgoptions) |  |
 | `docDir` | \[\]char |  |
 | `docAll` | bool |  |
+| `docHtml` | bool |  |
 
 ---
 

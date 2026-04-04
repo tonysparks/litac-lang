@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>tcc::libtcc</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>tcc::libtcc</h1>
+<h2>Functions</h2>
+<a id="func-islibtccavailable"></a>
+
+<h3><code>func IsLibtccAvailable() : bool</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:46</span>
+
+<hr>
+
+<a id="func-tcc_new"></a>
+
+<h3><code>func tcc_new() : *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a></code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:62</span>
+
+<hr>
+
+<a id="func-tcc_delete"></a>
+
+<h3><code>func tcc_delete(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:66</span>
+
+<hr>
+
+<a id="func-tcc_set_lib_path"></a>
+
+<h3><code>func tcc_set_lib_path(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, path: *const char) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:70</span>
+
+<hr>
+
+<a id="func-tcc_set_error_func"></a>
+
+<h3><code>func tcc_set_error_func(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, error_opaque: *void, error_func: TCCErrorFunc) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:74</span>
+
+<hr>
+
+<a id="func-tcc_get_error_func"></a>
+
+<h3><code>func tcc_get_error_func(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>) : TCCErrorFunc</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:78</span>
+
+<hr>
+
+<a id="func-tcc_get_error_opaque"></a>
+
+<h3><code>func tcc_get_error_opaque(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>) : *void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:82</span>
+
+<hr>
+
+<a id="func-tcc_set_options"></a>
+
+<h3><code>func tcc_set_options(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, str: *const char) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:86</span>
+
+<hr>
+
+<a id="func-tcc_add_include_path"></a>
+
+<h3><code>func tcc_add_include_path(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, pathname: *const char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:93</span>
+
+<hr>
+
+<a id="func-tcc_add_sysinclude_path"></a>
+
+<h3><code>func tcc_add_sysinclude_path(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, pathname: *const char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:97</span>
+
+<hr>
+
+<a id="func-tcc_define_symbol"></a>
+
+<h3><code>func tcc_define_symbol(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, sym: *const char, value: *const char) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:101</span>
+
+<hr>
+
+<a id="func-tcc_undefine_symbol"></a>
+
+<h3><code>func tcc_undefine_symbol(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, sym: *const char) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:105</span>
+
+<hr>
+
+<a id="func-tcc_add_file"></a>
+
+<h3><code>func tcc_add_file(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, filename: *const char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:112</span>
+
+<hr>
+
+<a id="func-tcc_compile_string"></a>
+
+<h3><code>func tcc_compile_string(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, buf: *const char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:116</span>
+
+<hr>
+
+<a id="func-tcc_set_output_type"></a>
+
+<h3><code>func tcc_set_output_type(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, output_type: i32) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:123</span>
+
+<hr>
+
+<a id="func-tcc_add_library_path"></a>
+
+<h3><code>func tcc_add_library_path(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, pathname: *const char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:138</span>
+
+<hr>
+
+<a id="func-tcc_add_library"></a>
+
+<h3><code>func tcc_add_library(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, libraryname: *const char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:142</span>
+
+<hr>
+
+<a id="func-tcc_add_symbol"></a>
+
+<h3><code>func tcc_add_symbol(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, name: *const char, val: *const void) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:146</span>
+
+<hr>
+
+<a id="func-tcc_output_file"></a>
+
+<h3><code>func tcc_output_file(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, filename: *const char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:151</span>
+
+<hr>
+
+<a id="func-tcc_run"></a>
+
+<h3><code>func tcc_run(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, argc: i32, argv: **char) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:156</span>
+
+<hr>
+
+<a id="func-tcc_relocate"></a>
+
+<h3><code>func tcc_relocate(s1: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, tpr: *void) : i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:160</span>
+
+<hr>
+
+<a id="func-tcc_get_symbol"></a>
+
+<h3><code>func tcc_get_symbol(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, name: *const char) : *void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:171</span>
+
+<hr>
+
+<a id="func-tcc_list_symbols"></a>
+
+<h3><code>func tcc_list_symbols(s: *<a href="tcc::libtcc.html#struct-tccstate">TCCState</a>, ctx: *void, symbol_cb: func(*void, *const char, *const void) : void) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:175</span>
+
+<hr>
+
+<h2>Types</h2>
+<a id="struct-tccstate"></a>
+
+<h3><code>struct TCCState</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:55</span>
+
+<hr>
+
+<a id="typedef-tccerrorfunc"></a>
+
+<h3><code>typedef TCCErrorFunc = func(*void, *const char) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:58</span>
+
+<hr>
+
+<h2>Variables and Constants</h2>
+<a id="const-tcc_output_memory"></a>
+
+<h3><code>const TCC_OUTPUT_MEMORY: i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:126</span>
+
+<hr>
+
+<a id="const-tcc_output_exe"></a>
+
+<h3><code>const TCC_OUTPUT_EXE</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:128</span>
+
+<hr>
+
+<a id="const-tcc_output_dll"></a>
+
+<h3><code>const TCC_OUTPUT_DLL</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:130</span>
+
+<hr>
+
+<a id="const-tcc_output_obj"></a>
+
+<h3><code>const TCC_OUTPUT_OBJ</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:132</span>
+
+<hr>
+
+<a id="const-tcc_output_preprocess"></a>
+
+<h3><code>const TCC_OUTPUT_PREPROCESS: i32</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:134</span>
+
+<hr>
+
+<a id="const-tcc_relocate_auto"></a>
+
+<h3><code>const TCC_RELOCATE_AUTO: *void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/tcc/libtcc.lita:167</span>
+
+<hr>
+
+</body>
+</html>

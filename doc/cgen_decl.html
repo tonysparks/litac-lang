@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cgen_decl</title>
+<style>
+body{font-family:sans-serif;max-width:960px;margin:2em auto;padding:0 1em;color:#222}
+code,pre{background:#f4f4f4;border-radius:3px;padding:2px 5px;font-size:.92em}
+h1,h2,h3{border-bottom:1px solid #e0e0e0;padding-bottom:.25em}
+h3{font-family:monospace;font-size:1em;font-weight:normal}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.8em;font-weight:bold}
+.badge-public{background:#d4edda;color:#155724}
+.badge-internal{background:#fff3cd;color:#856404}
+.badge-private{background:#f8d7da;color:#721c24}
+.src{color:#6c757d;font-size:.82em;margin-left:.5em}
+hr{border:none;border-top:1px solid #e8e8e8;margin:1.5em 0}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #ddd;padding:5px 10px;text-align:left;vertical-align:top}
+th{background:#f8f8f8}
+blockquote{border-left:3px solid #ccc;margin:.5em 0;padding:.25em 1em;color:#555}
+nav{margin-bottom:1.5em}
+nav a{color:#0366d6;text-decoration:none}
+a{color:#0366d6}
+</style>
+</head>
+<body>
+<nav><a href="index.html">&#8592; Index</a></nav>
+<h1>cgen_decl</h1>
+<h2>Functions</h2>
+<a id="func-emitvardecl"></a>
+
+<h3><code>func (this: *<a href="cgen.html#struct-cgen">CGen</a>) emitVarDecl(decl: *<a href="ast.html#struct-vardecl">VarDecl</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/cgen_decl.lita:19</span>
+
+<hr>
+
+<a id="func-emitdefaultinitvalue"></a>
+
+<h3><code>func (this: *<a href="cgen.html#struct-cgen">CGen</a>) emitDefaultInitValue(sym: *<a href="symbols.html#struct-symbol">Symbol</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/cgen_decl.lita:76</span>
+
+<hr>
+
+<a id="func-emitfuncdeclsignature"></a>
+
+<h3><code>func (this: *<a href="cgen.html#struct-cgen">CGen</a>) emitFuncDeclSignature(decl: *<a href="ast.html#struct-funcdecl">FuncDecl</a>, name: *const char) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/cgen_decl.lita:87</span>
+
+<hr>
+
+<a id="func-emitfuncdecl"></a>
+
+<h3><code>func (this: *<a href="cgen.html#struct-cgen">CGen</a>) emitFuncDecl(decl: *<a href="ast.html#struct-funcdecl">FuncDecl</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/cgen_decl.lita:155</span>
+
+<hr>
+
+<a id="func-emitaggregatedecl"></a>
+
+<h3><code>func (this: *<a href="cgen.html#struct-cgen">CGen</a>) emitAggregateDecl(decl: *<a href="ast.html#struct-aggregatedecl">AggregateDecl</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/cgen_decl.lita:180</span>
+
+<hr>
+
+<a id="func-emitenumdecl"></a>
+
+<h3><code>func (this: *<a href="cgen.html#struct-cgen">CGen</a>) emitEnumDecl(decl: *<a href="ast.html#struct-enumdecl">EnumDecl</a>) : void</code></h3>
+<span class="badge badge-public">public</span> <span class="src">src/cgen_decl.lita:257</span>
+
+<hr>
+
+</body>
+</html>
