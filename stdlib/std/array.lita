@@ -353,22 +353,22 @@ func QuickSort<T>(array: *Array<T>, comp: SortFunc<T>) {
                     array.elements[R] = array.elements[L];
                     R -= 1
                 }
+            }
 
-                array.elements[L] = piv;
-                beg[i+1] = L+1;
-                end[i+1] = end[i];
-                end[i+0] = L;
-                i+=1
+            array.elements[L] = piv;
+            beg[i+1] = L+1;
+            end[i+1] = end[i];
+            end[i+0] = L;
+            i+=1
 
-                if (end[i]-beg[i]>end[i-1]-beg[i-1]) {
-                    swap = beg[i];
-                    beg[i] = beg[i-1];
-                    beg[i-1] = swap;
+            if (end[i]-beg[i]>end[i-1]-beg[i-1]) {
+                swap = beg[i];
+                beg[i] = beg[i-1];
+                beg[i-1] = swap;
 
-                    swap = end[i];
-                    end[i] = end[i-1];
-                    end[i-1] = swap;
-                }
+                swap = end[i];
+                end[i] = end[i-1];
+                end[i-1] = swap;
             }
         }
         else {

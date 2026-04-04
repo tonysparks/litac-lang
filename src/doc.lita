@@ -160,6 +160,9 @@ func (this: *DocContext) generateAll() : bool {
         mods.add(mod)
     }
 
+    // Sort modules alphabetically by package name
+    mods.sort(compareModulesByName)
+
     // Generate per-module files
     for(var i = 0; i < mods.size(); i += 1) {
         if(!this.generateModuleDoc(mods.get(i))) {
@@ -859,6 +862,10 @@ func getFirstDocNote(notes: *Array<*NoteStmt>) : String {
     return String{}
 }
 
+func compareModulesByName(a: *Module, b: *Module) : i32 {
+    return a.id.packageName.view.compare(b.id.packageName.view)
+}
+
 func extractModuleDoc(notes: *Array<*NoteStmt>) : String {
     return getFirstDocNote(notes)
 }
@@ -1060,12 +1067,7 @@ func (this: *DocContext) generateIndex(mods: *Array<*Module>) : bool {
             var mod = mods.get(i)
             var pkgName = mod.id.packageName.view
             var rel = this.moduleDocRelPath(mod)
-            var doc = extractModuleDoc(&mod.ast.notes)
-            sb.append("<li><a href=\"%s\">%.*s</a>", rel, pkgName.length, pkgName.buffer)
-            if(doc.length > 0) {
-                sb.append(" &#8212; %.*s", doc.length, doc.buffer)
-            }
-            sb.append("</li>\n")
+            sb.append("<li><a href=\"%s\">%.*s</a></li>\n", rel, pkgName.length, pkgName.buffer)
         }
         sb.append("</ul>\n</body>\n</html>\n")
     } else {
@@ -1086,13 +1088,8 @@ func (this: *DocContext) generateIndex(mods: *Array<*Module>) : bool {
             var mod = mods.get(i)
             var pkgName = mod.id.packageName.view
             var rel = this.moduleDocRelPath(mod)
-            var doc = extractModuleDoc(&mod.ast.notes)
 
-            sb.append("- [%.*s](%s)", pkgName.length, pkgName.buffer, rel)
-            if(doc.length > 0) {
-                sb.append(" — %.*s", doc.length, doc.buffer)
-            }
-            sb.append("\n")
+            sb.append("- [%.*s](%s)\n", pkgName.length, pkgName.buffer, rel)
         }
     }
 
