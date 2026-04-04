@@ -70,8 +70,6 @@ public func (this: *UriParams) getBool(key: *const char, defaultVal: bool) : boo
 //      .name = $"mydb",
 //      .connect = MyConnect
 //   }
-//   $"mydb".copyTo(driver.name, MAX_DRIVER_LEN)
-//   driver.connect = MyConnect
 //   RegisterDriver(driver)
 //
 //   // Then use it:
