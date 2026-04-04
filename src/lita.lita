@@ -113,6 +113,7 @@ public enum PkgCommand {
     PKG_INIT,
     PKG_BUILD,
     PKG_TEST,
+    PKG_DOC,
 }
 
 public struct PkgOptions {
@@ -171,6 +172,9 @@ public struct LitaOptions {
 
     proxy: *const char             // the proxy server to use
     pkgOptions: PkgOptions         // Package Manager options
+
+    docDir: [MAX_PATH]char         // the directory to write generated docs to
+    docAll: bool                   // if private declarations should be included in docs
 }
 
 

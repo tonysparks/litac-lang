@@ -1,0 +1,897 @@
+/**
+    LitaC Documentation Generator
+
+    Walks the fully type-checked AST and emits Markdown files into the
+    configured output directory.  One .md file is produced per source module.
+    An index.md is produced at the root of the output directory.
+
+    Filtering rules (default):
+        public   -> always included
+        internal -> always included
+        private  -> only included when DocOptions.includeAll is true
+
+    Cross-links: any TypeSpec whose resolved type is declared in the same
+    documented project is rendered as a relative Markdown link.
+*/
+
+import "std/mem"
+import "std/libc"
+import "std/io"
+import "std/system"
+import "std/string"
+import "std/string/buffer"
+import "std/string/builder"
+import "std/array"
+import "std/map"
+import "std/hash"
+import "std/assert"
+
+import "lita"
+import "ast"
+import "symbols"
+import "module"
+import "types"
+import "intern"
+import "common"
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+public struct DocOptions {
+    docDir:        *const char   // absolute path to the output directory
+    includeAll:    bool          // if true, include private declarations too
+    projectPath:   *const char   // absolute project root
+    srcPath:       *const char   // absolute src/ directory
+
+    pkgName:       *const char
+    pkgNameLen:    i32
+    pkgVersion:    *const char
+    pkgVersionLen: i32
+}
+
+@doc("Entry point: generate all docs from a fully type-checked Lita instance.")
+public func GenerateDocs(lita: *Lita, options: *DocOptions) : bool {
+    var ctx = DocContext{}
+    ctx.init(lita, options)
+    defer ctx.free()
+
+    ctx.buildTypeIndex()
+    return ctx.generateAll()
+}
+
+// ---------------------------------------------------------------------------
+// Internal types
+// ---------------------------------------------------------------------------
+
+// Per-declaration cross-link entry
+struct LinkEntry {
+    // relative path from docDir to the module's .md file  (e.g. "pkg_mgr/pkg.md")
+    filePath:  *const char
+    // markdown anchor (e.g. "func-foobar")
+    anchor:    *const char
+}
+
+struct DocContext {
+    lita:      *Lita
+    options:   *DocOptions
+    allocator: *const Allocator
+
+    // qualifiedName -> LinkEntry  (only for project-internal types)
+    typeIndex: Map<InternedString, LinkEntry>
+}
+
+func (this: *DocContext) init(lita: *Lita, options: *DocOptions) {
+    this.lita      = lita
+    this.options   = options
+    this.allocator = lita.allocator
+    this.typeIndex = InternMap<LinkEntry>(LinkEntry{}, 256, this.allocator)
+}
+
+func (this: *DocContext) free() {
+    this.typeIndex.free()
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — build the type index for cross-links
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) buildTypeIndex() {
+    for(var it = this.lita.modules.iter(); it.hasNext();) {
+        var entry = it.next()
+        var mod = entry.value
+        if(!mod || mod.ast == null) {
+            continue
+        }
+        if(!this.isProjectModule(mod)) {
+            continue
+        }
+
+        var relPath = this.moduleDocRelPath(mod)
+
+        var decls = &mod.ast.declarations
+        for(var i = 0; i < decls.size(); i += 1) {
+            var decl = decls.get(i)
+            if(!decl || !decl.sym) {
+                continue
+            }
+            if(!this.shouldInclude(decl)) {
+                continue
+            }
+
+            var anchor = this.makeAnchor(decl, this.allocator)
+            var link = LinkEntry {
+                .filePath = relPath,
+                .anchor   = anchor,
+            }
+            ;this.typeIndex.put(decl.sym.qualifiedName, link)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 — generate a .md file for every project module
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) generateAll() : bool {
+    // Collect project modules first so we can build the index page
+    var mods = ArrayInit<*Module>(32, this.allocator)
+
+    for(var it = this.lita.modules.iter(); it.hasNext();) {
+        var entry = it.next()
+        var mod = entry.value
+        if(!mod || mod.ast == null) {
+            continue
+        }
+        if(!this.isProjectModule(mod)) {
+            continue
+        }
+        mods.add(mod)
+    }
+
+    // Generate per-module files
+    for(var i = 0; i < mods.size(); i += 1) {
+        if(!this.generateModuleDoc(mods.get(i))) {
+            return false
+        }
+    }
+
+    // Generate the index
+    if(!this.generateIndex(&mods)) {
+        return false
+    }
+
+    return true
+}
+
+func (this: *DocContext) generateModuleDoc(mod: *Module) : bool {
+    var sb = StringBuilderInit(4 * KiB as (i32), this.allocator)
+    defer sb.free()
+
+    var pkgName = mod.id.packageName.view
+    sb.append("# %.*s\n\n", pkgName.length, pkgName.buffer)
+
+    // Module-level @doc
+    var modDoc = extractModuleDoc(&mod.ast.notes)
+    if(modDoc.length > 0) {
+        sb.append("> %.*s\n\n", modDoc.length, modDoc.buffer)
+    }
+
+    // Collect declarations by category
+    var funcs    = ArrayInit<*Decl>(16, this.allocator)
+    var types    = ArrayInit<*Decl>(16, this.allocator)
+    var vars     = ArrayInit<*Decl>(16, this.allocator)
+
+    var decls = &mod.ast.declarations
+    for(var i = 0; i < decls.size(); i += 1) {
+        var decl = decls.get(i)
+        if(!decl) {
+            continue
+        }
+        if(!this.shouldInclude(decl)) {
+            continue
+        }
+
+        switch(decl.node.kind) {
+            case StmtKind.FUNC_DECL: {
+                funcs.add(decl)
+                break;
+            }
+            case StmtKind.STRUCT_DECL:
+            case StmtKind.UNION_DECL:
+            case StmtKind.TRAIT_DECL:
+            case StmtKind.ENUM_DECL:
+            case StmtKind.TYPEDEF_DECL: {
+                types.add(decl)
+                break;
+            }
+            case StmtKind.CONST_DECL:
+            case StmtKind.VAR_DECL: {
+                vars.add(decl)
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    if(!funcs.empty()) {
+        sb.append("## Functions\n\n")
+        for(var i = 0; i < funcs.size(); i += 1) {
+            this.emitFuncDecl(sb, funcs.get(i) as (*FuncDecl), mod)
+        }
+    }
+
+    if(!types.empty()) {
+        sb.append("## Types\n\n")
+        for(var i = 0; i < types.size(); i += 1) {
+            this.emitTypeDecl(sb, types.get(i), mod)
+        }
+    }
+
+    if(!vars.empty()) {
+        sb.append("## Variables and Constants\n\n")
+        for(var i = 0; i < vars.size(); i += 1) {
+            this.emitVarDecl(sb, vars.get(i) as (*VarDecl), mod)
+        }
+    }
+
+    // Write the file
+    var outPath = this.moduleDocAbsPath(mod)
+    // Ensure parent directories exist
+    var parentBuf: [MAX_PATH]char;
+    memset(parentBuf, 0, MAX_PATH)
+    FileParent(outPath, parentBuf)
+    if(parentBuf[0] != '\0') {
+        Mkdirs(parentBuf)
+    }
+
+    if(WriteFile(outPath, sb.buffer, sb.length as (usize)) != FileStatus.Ok) {
+        printf("error: could not write '%s'\n", outPath)
+        return false
+    }
+
+    return true
+}
+
+// ---------------------------------------------------------------------------
+// Declaration emitters
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) emitFuncDecl(
+    sb:   *StringBuilder,
+    decl: *FuncDecl,
+    mod:  *Module
+) {
+    var baseDecl = decl as (*Decl)
+    var name = baseDecl.name.str.view
+    var anchor = this.makeAnchor(baseDecl, this.allocator)
+    sb.append("<a id=\"%s\"></a>\n\n", anchor)
+    sb.append("### func ")
+
+    // Method receiver: `(this: *ReceiverType)`
+    if(decl.params != null && decl.params.size() > 0) {
+        var firstParam = decl.params.get(0)
+        if(firstParam.decl.name.str.view.equalsString("this")) {
+            sb.append("(this: ")
+            this.emitTypeSpec(sb, firstParam.type, mod)
+            sb.append(") ")
+        }
+    }
+
+    sb.append("%.*s", name.length, name.buffer)
+    this.emitGenericParams(sb, &decl.genericParams)
+    sb.append("(")
+
+    var startIdx = 0
+    if(decl.params != null && decl.params.size() > 0) {
+        var firstParam = decl.params.get(0)
+        if(firstParam.decl.name.str.view.equalsString("this")) {
+            startIdx = 1
+        }
+    }
+
+    if(decl.params != null) {
+        var first = true
+        for(var i = startIdx; i < decl.params.size(); i += 1) {
+            if(!first) sb.append(", ")
+            first = false
+            var param = decl.params.get(i)
+            var pname = param.decl.name.str.view
+            sb.append("%.*s: ", pname.length, pname.buffer)
+            this.emitTypeSpec(sb, param.type, mod)
+        }
+        if(decl.params.isVararg) {
+            if(!first) sb.append(", ")
+            sb.append("...")
+        }
+    }
+    sb.append(")")
+
+    if(decl.returnType != null) {
+        sb.append(" : ")
+        this.emitTypeSpec(sb, decl.returnType, mod)
+    }
+
+    sb.append("\n\n")
+    this.emitVisibilityBadge(sb, baseDecl)
+    this.emitSourceLink(sb, baseDecl)
+    sb.append("\n\n")
+    this.emitDocNote(sb, &baseDecl.attributes.notes)
+    sb.append("---\n\n")
+}
+
+func (this: *DocContext) emitTypeDecl(
+    sb:   *StringBuilder,
+    decl: *Decl,
+    mod:  *Module
+) {
+    switch(decl.node.kind) {
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.UNION_DECL:
+        case StmtKind.TRAIT_DECL: {
+            this.emitAggregateDecl(sb, decl as (*AggregateDecl), mod)
+            break;
+        }
+        case StmtKind.ENUM_DECL: {
+            this.emitEnumDecl(sb, decl as (*EnumDecl), mod)
+            break;
+        }
+        case StmtKind.TYPEDEF_DECL: {
+            this.emitTypedefDecl(sb, decl as (*TypedefDecl), mod)
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+}
+
+func (this: *DocContext) emitAggregateDecl(
+    sb:   *StringBuilder,
+    decl: *AggregateDecl,
+    mod:  *Module
+) {
+    var baseDecl = decl as (*Decl)
+    var name = baseDecl.name.str.view
+    var anchor = this.makeAnchor(baseDecl, this.allocator)
+    sb.append("<a id=\"%s\"></a>\n\n", anchor)
+
+    var keyword = "struct"
+    if(baseDecl.node.kind == StmtKind.UNION_DECL) {
+        keyword = "union"
+    }
+    else if(baseDecl.node.kind == StmtKind.TRAIT_DECL) {
+        keyword = "trait"
+    }
+
+    sb.append("### %s ", keyword)
+    sb.append("%.*s", name.length, name.buffer)
+    this.emitGenericParams(sb, &decl.genericParams)
+    sb.append("\n\n")
+    this.emitVisibilityBadge(sb, baseDecl)
+    this.emitSourceLink(sb, baseDecl)
+    sb.append("\n\n")
+    this.emitDocNote(sb, &baseDecl.attributes.notes)
+
+    // Field table
+    if(!decl.fields.empty()) {
+        sb.append("| Field | Type | Description |\n")
+        sb.append("|-------|------|-------------|\n")
+        for(var i = 0; i < decl.fields.size(); i += 1) {
+            var field = decl.fields.getPtr(i)
+            this.emitFieldRow(sb, field, mod)
+        }
+        sb.append("\n")
+    }
+
+    sb.append("---\n\n")
+}
+
+func (this: *DocContext) emitEnumDecl(
+    sb:   *StringBuilder,
+    decl: *EnumDecl,
+    mod:  *Module
+) {
+    var baseDecl = decl as (*Decl)
+    var name = baseDecl.name.str.view
+    var anchor = this.makeAnchor(baseDecl, this.allocator)
+    sb.append("<a id=\"%s\"></a>\n\n", anchor)
+    sb.append("### enum %.*s\n\n", name.length, name.buffer)
+    this.emitVisibilityBadge(sb, baseDecl)
+    this.emitSourceLink(sb, baseDecl)
+    sb.append("\n\n")
+    this.emitDocNote(sb, &baseDecl.attributes.notes)
+
+    if(!decl.fields.empty()) {
+        sb.append("| Value | Description |\n")
+        sb.append("|-------|-------------|\n")
+        for(var i = 0; i < decl.fields.size(); i += 1) {
+            var field = decl.fields.get(i)
+            var fname = (field as (*Decl)).name.str.view
+            var fdoc = getFirstDocNote(&(field as (*Decl)).attributes.notes)
+            sb.append("| `%.*s` | %.*s |\n",
+                fname.length, fname.buffer,
+                fdoc.length, fdoc.buffer)
+        }
+        sb.append("\n")
+    }
+
+    sb.append("---\n\n")
+}
+
+func (this: *DocContext) emitTypedefDecl(
+    sb:   *StringBuilder,
+    decl: *TypedefDecl,
+    mod:  *Module
+) {
+    var baseDecl = decl as (*Decl)
+    var name = baseDecl.name.str.view
+    var anchor = this.makeAnchor(baseDecl, this.allocator)
+    sb.append("<a id=\"%s\"></a>\n\n", anchor)
+    sb.append("### typedef %.*s", name.length, name.buffer)
+    this.emitGenericParams(sb, &decl.genericParams)
+    sb.append(" = ")
+    this.emitTypeSpec(sb, decl.type, mod)
+    sb.append("\n\n")
+    this.emitVisibilityBadge(sb, baseDecl)
+    this.emitSourceLink(sb, baseDecl)
+    sb.append("\n\n")
+    this.emitDocNote(sb, &baseDecl.attributes.notes)
+    sb.append("---\n\n")
+}
+
+func (this: *DocContext) emitVarDecl(
+    sb:   *StringBuilder,
+    decl: *VarDecl,
+    mod:  *Module
+) {
+    if(!decl) return;
+
+    var baseDecl = decl as (*Decl)
+    var name = baseDecl.name.str.view
+    var anchor = this.makeAnchor(baseDecl, this.allocator)
+    sb.append("<a id=\"%s\"></a>\n\n", anchor)
+
+    var keyword = "var"
+    if(baseDecl.node.kind == StmtKind.CONST_DECL) {
+        keyword = "const"
+    }
+    sb.append("### %s %.*s", keyword, name.length, name.buffer)
+
+    if(decl.typeSpec != null) {
+        sb.append(": ")
+        this.emitTypeSpec(sb, decl.typeSpec, mod)
+    }
+    sb.append("\n\n")
+    this.emitVisibilityBadge(sb, baseDecl)
+    this.emitSourceLink(sb, baseDecl)
+    sb.append("\n\n")
+    this.emitDocNote(sb, &baseDecl.attributes.notes)
+    sb.append("---\n\n")
+}
+
+// ---------------------------------------------------------------------------
+// Field row helper
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) emitFieldRow(
+    sb:    *StringBuilder,
+    field: *FieldStmt,
+    mod:   *Module
+) {
+    switch(field.kind) {
+        case StmtKind.VAR_FIELD_DECL: {
+            var vf = field.varField
+            var vfDecl = vf as (*Decl)
+            var fname = vfDecl.name.str.view
+            var fdoc  = getFirstDocNote(&vfDecl.attributes.notes)
+            sb.append("| `%.*s` | ", fname.length, fname.buffer)
+            this.emitTypeSpec(sb, vf.type, mod)
+            sb.append(" | %.*s |\n", fdoc.length, fdoc.buffer)
+            break;
+        }
+        case StmtKind.TRAIT_FIELD_DECL: {
+            var tf = field.traitField
+            var tfDecl = tf as (*Decl)
+            var fname = tfDecl.name.str.view
+            var fdoc  = getFirstDocNote(&tfDecl.attributes.notes)
+            sb.append("| `%.*s` | ", fname.length, fname.buffer)
+            this.emitTypeSpec(sb, tf.type, mod)
+            sb.append(" | %.*s |\n", fdoc.length, fdoc.buffer)
+            break;
+        }
+        case StmtKind.STRUCT_DECL:
+        case StmtKind.UNION_DECL: {
+            // anonymous embedded aggregate — show it with a synthetic name
+            var agg = field.aggregateField
+            var aggDecl = agg as (*Decl)
+            var fname = aggDecl.name.str.view
+            if(fname.length > 0) {
+                var fdoc = getFirstDocNote(&aggDecl.attributes.notes)
+                var keyword = field.kind == StmtKind.STRUCT_DECL ? "struct" : "union"
+                sb.append("| `%.*s` | *%s* | %.*s |\n",
+                    fname.length, fname.buffer,
+                    keyword,
+                    fdoc.length, fdoc.buffer)
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypeSpec renderer — emits linked or plain text depending on the index
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) emitTypeSpec(
+    sb:   *StringBuilder,
+    ts:   *TypeSpec,
+    from: *Module
+) {
+    if(ts == null) {
+        sb.append("void")
+        return;
+    }
+
+    switch(ts.kind) {
+        case TypeSpecKind.NAME: {
+            this.emitNamedTypeSpec(sb, ts, from)
+            break;
+        }
+        case TypeSpecKind.PTR: {
+            sb.append("\\*")
+            this.emitTypeSpec(sb, ts.base, from)
+            break;
+        }
+        case TypeSpecKind.CONST: {
+            sb.append("const ")
+            this.emitTypeSpec(sb, ts.base, from)
+            break;
+        }
+        case TypeSpecKind.ARRAY: {
+            sb.append("\\[\\]")
+            this.emitTypeSpec(sb, ts.base, from)
+            break;
+        }
+        case TypeSpecKind.FUNC_PTR: {
+            sb.append("func(")
+            var first = true
+            for(var i = 0; i < ts.args.size(); i += 1) {
+                if(!first) sb.append(", ")
+                first = false
+                this.emitTypeSpec(sb, ts.args.get(i), from)
+            }
+            sb.append(")")
+            if(ts.ret != null) {
+                sb.append(" : ")
+                this.emitTypeSpec(sb, ts.ret, from)
+            }
+            break;
+        }
+        default: {
+            var name = ts.name.view
+            sb.append("%.*s", name.length, name.buffer)
+            break;
+        }
+    }
+}
+
+func (this: *DocContext) emitNamedTypeSpec(
+    sb:   *StringBuilder,
+    ts:   *TypeSpec,
+    from: *Module
+) {
+    var name = ts.name.view
+
+    // Try to resolve a cross-link via the resolved typeInfo symbol
+    if(ts.typeInfo != null && ts.typeInfo.sym != null) {
+        var sym = ts.typeInfo.sym
+        var link = this.typeIndex.get(sym.qualifiedName)
+        if(link.filePath != null) {
+            // Compute relative path from the module's doc file to the target
+            var relFrom = this.moduleDocRelPath(from)
+            var rel = this.relativeLink(relFrom, link.filePath, link.anchor, this.allocator)
+            sb.append("[%.*s](%s)", name.length, name.buffer, rel)
+            // Emit generic args if present
+            if(!ts.genericArgs.empty()) {
+                sb.append("\\<")
+                for(var i = 0; i < ts.genericArgs.size(); i += 1) {
+                    if(i > 0) sb.append(", ")
+                    var arg = ts.genericArgs.getPtr(i)
+                    if(arg.kind == GenericArgKind.TYPE) {
+                        this.emitTypeSpec(sb, arg.type, from)
+                    }
+                }
+                sb.append("\\>")
+            }
+            return;
+        }
+    }
+
+    // No link available — plain text
+    sb.append("%.*s", name.length, name.buffer)
+    if(!ts.genericArgs.empty()) {
+        sb.append("\\<")
+        for(var i = 0; i < ts.genericArgs.size(); i += 1) {
+            if(i > 0) sb.append(", ")
+            var arg = ts.genericArgs.getPtr(i)
+            if(arg.kind == GenericArgKind.TYPE) {
+                this.emitTypeSpec(sb, arg.type, from)
+            }
+        }
+        sb.append("\\>")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Generic params  `<T, U: Constraint>`
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) emitGenericParams(
+    sb:     *StringBuilder,
+    params: *Array<GenericParam>
+) {
+    if(!params || params.empty()) {
+        return;
+    }
+    sb.append("\\<")
+    for(var i = 0; i < params.size(); i += 1) {
+        if(i > 0) sb.append(", ")
+        var p = params.getPtr(i)
+        var pname = p.name.str.view
+        sb.append("%.*s", pname.length, pname.buffer)
+        if(p.typeConstraint != null) {
+            sb.append(": ")
+            // Emit plain — constraints are usually primitive names
+            var cname = p.typeConstraint.name.view
+            sb.append("%.*s", cname.length, cname.buffer)
+        }
+    }
+    sb.append("\\>")
+}
+
+// ---------------------------------------------------------------------------
+// Visibility badge and source location
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) emitVisibilityBadge(sb: *StringBuilder, decl: *Decl) {
+    switch(decl.attributes.visibility) {
+        case Visibility.PUBLIC: {
+            sb.append("*public*")
+            break;
+        }
+        case Visibility.INTERNAL: {
+            sb.append("*internal*")
+            break;
+        }
+        default: {
+            sb.append("*private*")
+            break;
+        }
+    }
+}
+
+func (this: *DocContext) emitSourceLink(sb: *StringBuilder, decl: *Decl) {
+    var pos = decl.node.startPos
+    if(pos.filename == null) {
+        return;
+    }
+    // Strip the project path prefix to keep the link relative
+    var filename = StringInit(pos.filename)
+    var projectStr = StringInit(this.options.projectPath)
+    if(filename.startsWith(projectStr)) {
+        filename = filename.substring(.start = projectStr.length + 1, .end = -1)
+    }
+    sb.append(" | *%.*s:%d*", filename.length, filename.buffer, pos.lineNumber)
+}
+
+// ---------------------------------------------------------------------------
+// @doc note helpers
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) emitDocNote(sb: *StringBuilder, notes: *Array<*NoteStmt>) {
+    var text = getFirstDocNote(notes)
+    if(text.length > 0) {
+        sb.append("%.*s\n\n", text.length, text.buffer)
+    }
+}
+
+func getFirstDocNote(notes: *Array<*NoteStmt>) : String {
+    if(!notes || notes.empty()) {
+        return String{}
+    }
+    for(var i = 0; i < notes.size(); i += 1) {
+        var note = notes.get(i)
+        if(!note) continue;
+        if(!note.type) continue;
+        if(note.type.kind != TypeSpecKind.NAME) continue;
+        if(!note.type.name.view.equalsString("doc")) continue;
+        if(note.arguments.empty()) continue;
+        var argExpr = note.arguments.get(0).argExpr
+        if(!argExpr) continue;
+        if(argExpr.node.kind != StmtKind.STRING_EXPR) continue;
+        var strExpr = argExpr as (*StringExpr)
+        return strExpr.string.str
+    }
+    return String{}
+}
+
+func extractModuleDoc(notes: *Array<*NoteStmt>) : String {
+    return getFirstDocNote(notes)
+}
+
+// ---------------------------------------------------------------------------
+// Filtering
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) shouldInclude(decl: *Decl) : bool {
+    if(!decl) return false;
+    // Skip compiler-generated symbols
+    if(decl.attributes.isGenerated) return false;
+    if(decl.sym != null && (decl.sym.flags & SymbolFlags.IS_GENERATED)) return false;
+
+    switch(decl.attributes.visibility) {
+        case Visibility.PUBLIC:   return true;
+        case Visibility.INTERNAL: return true;
+        case Visibility.PRIVATE:  return this.options.includeAll;
+        default:                  return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Module filtering
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) isProjectModule(mod: *Module) : bool {
+    if(mod.flags & ModuleFlags.IS_BUILTIN) {
+        return false
+    }
+    var filename = StringInit(mod.id.filename as (*const char))
+    if(filename.length == 0) {
+        return false
+    }
+    // Must live under the project's src directory
+    var srcStr = StringInit(this.options.srcPath)
+    return filename.startsWith(srcStr)
+}
+
+// ---------------------------------------------------------------------------
+// Path helpers
+// ---------------------------------------------------------------------------
+
+// Returns a heap-allocated absolute path for the module's output .md file
+func (this: *DocContext) moduleDocAbsPath(mod: *Module) : *const char {
+    var pkgName = mod.id.packageName.view
+    var buf = StringBuilderInit(MAX_PATH, this.allocator)
+    buf.append("%s/%.*s.md", this.options.docDir, pkgName.length, pkgName.buffer)
+    return buf.cStr()
+}
+
+// Returns a heap-allocated relative path (from docDir) for the module's .md file
+// e.g. "pkg_mgr/pkg.md"
+func (this: *DocContext) moduleDocRelPath(mod: *Module) : *const char {
+    var pkgName = mod.id.packageName.view
+    var buf = StringBuilderInit(128, this.allocator)
+    buf.append("%.*s.md", pkgName.length, pkgName.buffer)
+    return buf.cStr()
+}
+
+// Compute a relative URL from `fromFile` to `toFile#anchor`
+// Both are relative paths from docDir, e.g. "pkg_mgr/pkg.md"
+func (this: *DocContext) relativeLink(
+    fromFile: *const char,
+    toFile:   *const char,
+    anchor:   *const char,
+    allocator: *const Allocator
+) : *const char {
+    // Count how many directory levels `fromFile` has
+    var from = StringInit(fromFile)
+    var levels = 0
+    for(var i = 0; i < from.length; i += 1) {
+        if(from.buffer[i] == '/') {
+            levels += 1
+        }
+    }
+
+    var sb = StringBuilderInit(MAX_PATH, allocator)
+    for(var i = 0; i < levels; i += 1) {
+        sb.append("../")
+    }
+    sb.append("%s#%s", toFile, anchor)
+    return sb.cStr()
+}
+
+// ---------------------------------------------------------------------------
+// Anchor generation
+// ---------------------------------------------------------------------------
+
+// Produces a stable anchor from a declaration's kind + name
+// e.g. FuncDecl "fooBar" -> "func-foobar"
+func (this: *DocContext) makeAnchor(decl: *Decl, allocator: *const Allocator) : *const char {
+    var prefix = declKindPrefix(decl)
+    var name   = decl.name.str.view
+
+    var sb = StringBuilderInit(128, allocator)
+    sb.append("%s-", prefix)
+    for(var i = 0; i < name.length; i += 1) {
+        var c = name.buffer[i]
+        if(c >= 'A' && c <= 'Z') {
+            sb.append("%c", c + 32)  // lowercase
+        }
+        else if(c == '_' || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+            sb.append("%c", c)
+        }
+        else {
+            sb.append("-")
+        }
+    }
+    return sb.cStr()
+}
+
+func declKindPrefix(decl: *Decl) : *const char {
+    switch(decl.node.kind) {
+        case StmtKind.FUNC_DECL:    return "func";
+        case StmtKind.STRUCT_DECL:  return "struct";
+        case StmtKind.UNION_DECL:   return "union";
+        case StmtKind.TRAIT_DECL:   return "trait";
+        case StmtKind.ENUM_DECL:    return "enum";
+        case StmtKind.TYPEDEF_DECL: return "typedef";
+        case StmtKind.CONST_DECL:   return "const";
+        case StmtKind.VAR_DECL:     return "var";
+        default:                    return "decl";
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Index page
+// ---------------------------------------------------------------------------
+
+func (this: *DocContext) generateIndex(mods: *Array<*Module>) : bool {
+    var sb = StringBuilderInit(4 * KiB as (i32), this.allocator)
+    defer sb.free()
+
+    var opts = this.options
+    if(opts.pkgName != null && opts.pkgName[0] != '\0') {
+        var nameLen  = opts.pkgNameLen  >= 0 ? opts.pkgNameLen  : strlen(opts.pkgName)  as (i32)
+        var verLen   = opts.pkgVersionLen >= 0 ? opts.pkgVersionLen : (opts.pkgVersion != null ? strlen(opts.pkgVersion) as (i32) : 0)
+        sb.append("# %.*s", nameLen, opts.pkgName)
+        if(opts.pkgVersion != null && opts.pkgVersion[0] != '\0' && verLen > 0) {
+            sb.append(" `%.*s`", verLen, opts.pkgVersion)
+        }
+        sb.append("\n\n")
+    }
+    else {
+        sb.append("# API Reference\n\n")
+    }
+
+    sb.append("## Modules\n\n")
+
+    for(var i = 0; i < mods.size(); i += 1) {
+        var mod = mods.get(i)
+        var pkgName = mod.id.packageName.view
+        var rel = this.moduleDocRelPath(mod)
+        var doc = extractModuleDoc(&mod.ast.notes)
+
+        sb.append("- [%.*s](%s)", pkgName.length, pkgName.buffer, rel)
+        if(doc.length > 0) {
+            sb.append(" — %.*s", doc.length, doc.buffer)
+        }
+        sb.append("\n")
+    }
+
+    var indexBuf: [MAX_PATH]char;
+    var indexPath = StringBufferInit(indexBuf, MAX_PATH, 0)
+    indexPath.format("%s/index.md", opts.docDir)
+
+    if(WriteFile(indexPath.cStr(), sb.buffer, sb.length as (usize)) != FileStatus.Ok) {
+        printf("error: could not write '%s'\n", indexPath.cStr())
+        return false
+    }
+
+    return true
+}

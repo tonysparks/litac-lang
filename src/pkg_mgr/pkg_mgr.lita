@@ -107,6 +107,7 @@ import "pkg_mgr/pkg_build"
 import "pkg_mgr/pkg_run"
 import "pkg_mgr/pkg_init"
 import "pkg_mgr/pkg_test"
+import "pkg_mgr/pkg_doc"
 
 import "build"
 import "lita"
@@ -388,6 +389,30 @@ public func (this: *PackageManager) runCommand(cmd: *const char) : PkgStatus {
 public func (this: *PackageManager) testCommand(options: *LitaOptions) : i32 {
     defer this.printMessages()
     return PackageTest(this, options)
+}
+
+@doc("""
+    Generates Markdown documentation for the project's public and internal declarations.
+""")
+public func (this: *PackageManager) docCommand(options: *LitaOptions) : PkgStatus {
+    defer this.printMessages()
+
+    var status = this.readProjectPkg()
+    if(status != PkgStatus.OK) {
+        if(status == PkgStatus.ERROR_PARSING_PKG_JSON) {
+            this.errors.append(
+                "The existing 'pkg.json' project package file was found but was unable to be parsed."
+            )
+        }
+        if(status == PkgStatus.ERROR_NO_PROJECT_PKG_FOUND) {
+            this.errors.append(
+                "Missing a 'pkg.json' project package file. Create one via the 'init' command."
+            )
+        }
+        return status;
+    }
+
+    return PackageDoc(this, options)
 }
 
 public func (this: *PackageManager) hasProjectPkg(): bool {
