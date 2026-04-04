@@ -50,4 +50,13 @@ public enum ConsoleColors {
 
     @asStr("\x1b[38;5;7m")
     WHITE,
+
+    @asStr("\x1b[38;5;8m")
+    DARK_GRAY,
+
+    @asStr("\x1b[1;38;5;1m")
+    BOLD_RED,
+
+    @asStr("\x1b[1;38;5;3m")
+    BOLD_YELLOW,
 }

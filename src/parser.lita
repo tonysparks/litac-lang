@@ -112,7 +112,7 @@ public func ParserInit(filename: *const char,
     while(!lex.eof()) {
         var token = lex.nextToken()
         if(token.type == TokenType.ERROR) {
-            parser.result.addError(token.pos, "Error token: %s", lex.errorMsg)
+            parser.result.addError(token.pos, "error token: %s", lex.errorMsg)
         }
 
         parser.tokens.add(token)
@@ -3261,7 +3261,7 @@ func (p: *Parser) errorUnexpectedToken(token: *Token, errorCode: ErrorCode) {
 
         p.panicMode = true
         //Error("Current index: %d out of %d\n", p.current, p.tokens.size())
-        p.result.addError(p.pos(), "Unexpected token: '%s' - %s", tokenText[token.type], errorCodeText[errorCode])
+        p.result.addError(p.pos(), "unexpected token: '%s' - %s", tokenText[token.type], errorCodeText[errorCode])
     }
     else {
         p.errorAtPos(p.pos(), errorCode)

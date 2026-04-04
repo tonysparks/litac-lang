@@ -105,7 +105,7 @@
                 var s = $ "Hello\"World"
                 assert(s.equals("Hello\"World"))
             `,
-            "error": "Unexpected token"
+            "error": "unexpected token"
         },
         {
             "name" : "Native Strings With Default Args Constructor",

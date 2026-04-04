@@ -29,7 +29,7 @@
             "code": `
 
             `,
-            "error" : "Invalid bit field constant expression, only integer values are supported"
+            "error" : "invalid bit field constant expression, only integer values are supported"
         },
         {
             "name": "BitField invalid integer type bool",
@@ -41,7 +41,7 @@
             "code": `
 
             `,
-            "error" : "Invalid bit field constant expression, only integer values are supported"
+            "error" : "invalid bit field constant expression, only integer values are supported"
         },
         {
             "name": "BitField invalid integer type null",
@@ -53,7 +53,7 @@
             "code": `
 
             `,
-            "error" : "Invalid bit field constant expression, only integer values are supported"
+            "error" : "invalid bit field constant expression, only integer values are supported"
         },
         {
             "name": "BitField invalid integer type string",
@@ -65,7 +65,7 @@
             "code": `
 
             `,
-            "error" : "Invalid bit field constant expression, only integer values are supported"
+            "error" : "invalid bit field constant expression, only integer values are supported"
         },
         {
             "name": "BitField missing const expression",
@@ -78,7 +78,7 @@
             "code": `
 
             `,
-            "error" : "Invalid bit field constant expression, only integer values are supported"
+            "error" : "invalid bit field constant expression, only integer values are supported"
         },
         {
             "name": "BitField invalid from constant variable",
@@ -92,7 +92,7 @@
             "code": `
 
             `,
-            "error" : "Invalid bit field constant expression, only integer values are supported"
+            "error" : "invalid bit field constant expression, only integer values are supported"
         },
         {
             "name": "BitField field is not an integer but is enum",
@@ -108,7 +108,7 @@
             "code": `
 
             `,
-            "error" : "only integer like fields are allowed on bit field definitions, 'a' is of type 'lita_test::Another'"
+            "error" : "only integer-like fields are allowed in bit field definitions, 'a' is of type 'lita_test::Another'"
         },
         {
             "name": "BitField field is not an integer but is f32",
@@ -121,7 +121,7 @@
             "code": `
 
             `,
-            "error" : "only integer like fields are allowed on bit field definitions, 'a' is of type 'f32'"
+            "error" : "only integer-like fields are allowed in bit field definitions, 'a' is of type 'f32'"
         },
         {
             "name": "BitField field is not an integer but is struct",
@@ -136,7 +136,7 @@
             "code": `
 
             `,
-            "error" : "only integer like fields are allowed on bit field definitions, 'a' is of type 'lita_test::Another'"
+            "error" : "only integer-like fields are allowed in bit field definitions, 'a' is of type 'lita_test::Another'"
         },
         {
             "name": "BitField valid bit fields",
@@ -312,7 +312,7 @@
 
                 var x1:X = X{}
             `,
-            "error": "Invalid default assignment statement, only allowed for 'struct'"
+            "error": "invalid default assignment statement, only allowed for 'struct'"
         },
     ]
 }

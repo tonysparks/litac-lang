@@ -60,85 +60,119 @@ public enum ErrorCode {
 
 
 public const errorCodeText = []*const char {
-    [ErrorCode.INVALID_ASSIGNMENT] = "Invalid assignment statement",
-    [ErrorCode.INVALID_CONST_EXPR] = "Invalid constant expression",
-    [ErrorCode.INVALID_BIT_FIELD_EXPR] = "Invalid bit field constant expression, only integer values are supported",
-    [ErrorCode.INVALID_ARRAY_DIMENSION_EXPR] = "Invalid array dimension expression",
-    [ErrorCode.INVALID_CHARACTER] = "Invalid character",
-    [ErrorCode.INVALID_NUMBER] = "Invalid number",
-    [ErrorCode.INVALID_FIELD] = "Invalid field member",
-    [ErrorCode.INVALID_IMPORT_ACCESS] = "Invalid import access",
-    [ErrorCode.INVALID_CONTINUE] = "Invalid continue statement",
-    [ErrorCode.INVALID_BREAK] = "Invalid break statement",
-    [ErrorCode.INVALID_OBJECT_INIT] = "Invalid structure initializer",
-    [ErrorCode.INVALID_MODULE_ACCESS] = "Invalid module access",
-    [ErrorCode.INVALID_VARARG_POSITION] = "Invalid variable argument position",
-    [ErrorCode.INVALID_NOTE_DECL] = "Invalid note declaration, must preceed either a 'var' or 'const' declaration",
-    [ErrorCode.INVALID_LABEL_STMT] = "Invalid label statement, goto labels are only valid in functions",
-    [ErrorCode.INVALID_COMP_STMT] = "Invalid compile time statement",
-    [ErrorCode.INVALID_DEFAULT_ASSIGNMENT] = "Invalid default assignment statement, only allowed for 'struct'",
-    [ErrorCode.INVALID_TRAIT_MEMBER] = "Invalid trait member, only function pointers are allowed",
-    [ErrorCode.INVALID_TYPE_IDENTIFIER] = "Invalid fully qualified type identifier.  Qualified names must follow this format 'std.example::MyType'",
+    [ErrorCode.INVALID_ASSIGNMENT] = "invalid assignment statement",
+    [ErrorCode.INVALID_CONST_EXPR] = "invalid constant expression",
+    [ErrorCode.INVALID_BIT_FIELD_EXPR] = "invalid bit field constant expression, only integer values are supported",
+    [ErrorCode.INVALID_ARRAY_DIMENSION_EXPR] = "invalid array dimension expression",
+    [ErrorCode.INVALID_CHARACTER] = "invalid character",
+    [ErrorCode.INVALID_NUMBER] = "invalid number",
+    [ErrorCode.INVALID_FIELD] = "invalid field member",
+    [ErrorCode.INVALID_IMPORT_ACCESS] = "invalid import access",
+    [ErrorCode.INVALID_CONTINUE] = "invalid continue statement",
+    [ErrorCode.INVALID_BREAK] = "invalid break statement",
+    [ErrorCode.INVALID_OBJECT_INIT] = "invalid structure initializer",
+    [ErrorCode.INVALID_MODULE_ACCESS] = "invalid module access",
+    [ErrorCode.INVALID_VARARG_POSITION] = "invalid variable argument position",
+    [ErrorCode.INVALID_NOTE_DECL] = "invalid note declaration, must precede either a 'var' or 'const' declaration",
+    [ErrorCode.INVALID_LABEL_STMT] = "invalid label statement, goto labels are only valid in functions",
+    [ErrorCode.INVALID_COMP_STMT] = "invalid compile time statement",
+    [ErrorCode.INVALID_DEFAULT_ASSIGNMENT] = "invalid default assignment statement, only allowed for 'struct'",
+    [ErrorCode.INVALID_TRAIT_MEMBER] = "invalid trait member, only function pointers are allowed",
+    [ErrorCode.INVALID_TYPE_IDENTIFIER] = "invalid fully qualified type identifier. Qualified names must follow this format 'std.example::MyType'",
 
-    [ErrorCode.MISSING_COMMA] = "Missing ,",
-    [ErrorCode.MISSING_SEMICOLON] = "Missing ;",
-    [ErrorCode.MISSING_RIGHT_BRACE] = "Missing }",
-    [ErrorCode.MISSING_EQUALS] = "Missing =",
-    [ErrorCode.MISSING_IDENTIFIER] = "Missing identifier",
-    [ErrorCode.MISSING_RIGHT_BRACKET] = "Missing ]",
-    [ErrorCode.MISSING_RIGHT_PAREN] = "Missing )",
-    [ErrorCode.MISSING_LEFT_PAREN] = "Missing (",
-    [ErrorCode.MISSING_LEFT_BRACE] = "Missing {",
-    [ErrorCode.MISSING_ARRAY_BRACKETS] = "Missing []",
-    [ErrorCode.MISSING_COLON] = "Missing :",
-    [ErrorCode.MISSING_WHILE] = "Missing 'while'",
-    [ErrorCode.MISSING_AS] = "Missing 'as'",
-    [ErrorCode.MISSING_GENERIC_END] = "Missing >",
-    [ErrorCode.MISSING_COMP_STMT_END] = "Missing #end",
-    [ErrorCode.MISSING_ERROR_MESSAGE] = "Missing error message",
+    [ErrorCode.MISSING_COMMA] = "expected ','",
+    [ErrorCode.MISSING_SEMICOLON] = "expected ';'",
+    [ErrorCode.MISSING_RIGHT_BRACE] = "expected '}'",
+    [ErrorCode.MISSING_EQUALS] = "expected '='",
+    [ErrorCode.MISSING_IDENTIFIER] = "expected identifier",
+    [ErrorCode.MISSING_RIGHT_BRACKET] = "expected ']'",
+    [ErrorCode.MISSING_RIGHT_PAREN] = "expected ')'",
+    [ErrorCode.MISSING_LEFT_PAREN] = "expected '('",
+    [ErrorCode.MISSING_LEFT_BRACE] = "expected '{'",
+    [ErrorCode.MISSING_ARRAY_BRACKETS] = "expected '[]'",
+    [ErrorCode.MISSING_COLON] = "expected ':'",
+    [ErrorCode.MISSING_WHILE] = "expected 'while'",
+    [ErrorCode.MISSING_AS] = "expected 'as'",
+    [ErrorCode.MISSING_GENERIC_END] = "expected '>'",
+    [ErrorCode.MISSING_COMP_STMT_END] = "expected '#end'",
+    [ErrorCode.MISSING_ERROR_MESSAGE] = "expected error message",
 
-    [ErrorCode.RANGE_INTEGER] = "Integer literal out of range",
-    [ErrorCode.RANGE_LONG] = "Long literal out of range",
-    [ErrorCode.RANGE_REAL] = "Real literal out of range",
+    [ErrorCode.RANGE_INTEGER] = "integer literal out of range",
+    [ErrorCode.RANGE_LONG] = "long literal out of range",
+    [ErrorCode.RANGE_REAL] = "real literal out of range",
 
-    [ErrorCode.UNEXPECTED_EOF] = "Unexpected end of file",
-    [ErrorCode.UNEXPECTED_TOKEN] = "Unexpected token",
-    [ErrorCode.UNIMPLEMENTED] = "Unimplemented feature",
+    [ErrorCode.UNEXPECTED_EOF] = "unexpected end of file",
+    [ErrorCode.UNEXPECTED_TOKEN] = "unexpected token",
+    [ErrorCode.UNIMPLEMENTED] = "unimplemented feature",
 
-    [ErrorCode.UNKNOWN_ERROR] = "An unknown error occured",
-    [ErrorCode.TOO_MANY_ERRORS] = "Too many syntax errors",
+    [ErrorCode.UNKNOWN_ERROR] = "an unknown error occurred",
+    [ErrorCode.TOO_MANY_ERRORS] = "too many syntax errors",
 
     [ErrorCode.MAX_NUM_ERROR_CODES] = ""
 }
 
 
 public func PrintError(useColors: bool, sb: *StringBuilder, error: PhaseError) {
-    if(!error.pos.lineStart) {
-        sb.append("%s\n", error.message)
-        return;
-    }
+    var isWarning = error.type == ErrorType.WARN
+    var label = isWarning ? "warning" : "error"
 
+    // Header: "error: message" or "warning: message"
     if(useColors) {
-        sb.append("%s:%d:%d %serror%s: %s\n",
-            error.pos.filename,
-            error.pos.lineNumber,
-            error.pos.position,
-            ConsoleColorsAsStr(ConsoleColors.RED),
+        var labelColor = isWarning ? ConsoleColors.BOLD_YELLOW : ConsoleColors.BOLD_RED
+        sb.append("%s%s%s: %s\n",
+            ConsoleColorsAsStr(labelColor),
+            label,
             ConsoleColorsAsStr(ConsoleColors.CLEAR),
             error.message
         )
     }
     else {
-        sb.append("%s:%d:%d error: %s\n",
-            error.pos.filename,
-            error.pos.lineNumber,
-            error.pos.position,
-            error.message
-        )
+        sb.append("%s: %s\n", label, error.message)
     }
 
-    const len = error.pos.getLineLength()
-    const maxLength = MIN(len, 255)
+    if(!error.pos.lineStart) {
+        return;
+    }
+
+    // Compute line number display width (minimum 2)
+    var lineNumWidth = snprintf(null, 0, "%d", error.pos.lineNumber)
+    if(lineNumWidth < 2) lineNumWidth = 2
+
+    // Location: "  --> filename:line:col"
+    if(useColors) {
+        sb.append("  %s-->%s %s:%d:%d\n",
+            ConsoleColorsAsStr(ConsoleColors.DARK_GRAY),
+            ConsoleColorsAsStr(ConsoleColors.CLEAR),
+            error.pos.filename,
+            error.pos.lineNumber,
+            error.pos.position
+        )
+        // Empty gutter line
+        sb.append("  %s%*s |%s\n",
+            ConsoleColorsAsStr(ConsoleColors.DARK_GRAY),
+            lineNumWidth, "",
+            ConsoleColorsAsStr(ConsoleColors.CLEAR)
+        )
+    }
+    else {
+        sb.append("  --> %s:%d:%d\n", error.pos.filename, error.pos.lineNumber, error.pos.position)
+        sb.append("  %*s |\n", lineNumWidth, "")
+    }
+
+    // Source line with gutter: "42 | var x = ..."
+    if(useColors) {
+        sb.append("  %s%*d |%s ",
+            ConsoleColorsAsStr(ConsoleColors.DARK_GRAY),
+            lineNumWidth, error.pos.lineNumber,
+            ConsoleColorsAsStr(ConsoleColors.CLEAR)
+        )
+    }
+    else {
+        sb.append("  %*d | ", lineNumWidth, error.pos.lineNumber)
+    }
+
+    const lineLen = error.pos.getLineLength()
+    const maxLength = MIN(lineLen, 255)
 
     var spaceCount = 0
     var atStart = false
@@ -162,17 +196,60 @@ public func PrintError(useColors: bool, sb: *StringBuilder, error: PhaseError) {
         }
 
         sb.appendChar(c)
-
         if(!atStart) {
             spaceCount += 1
         }
     }
     sb.append("\n")
 
-    for(var i = 0; i < spaceCount; i += 1) {
-        sb.append(" ")
+    // Caret line: "   |   ^^^^"
+    var spanLen = 1
+    if(error.pos.end && error.pos.end > error.pos.start) {
+        var span = (error.pos.end - error.pos.start) as (i32)
+        if(span > 0 && span < 256) {
+            spanLen = span
+        }
     }
-    sb.append("^\n*** %s\n", error.message)
+
+    if(useColors) {
+        var caretColor = isWarning ? ConsoleColors.BOLD_YELLOW : ConsoleColors.BOLD_RED
+        sb.append("  %s%*s |%s %*s%s",
+            ConsoleColorsAsStr(ConsoleColors.DARK_GRAY),
+            lineNumWidth, "",
+            ConsoleColorsAsStr(ConsoleColors.CLEAR),
+            spaceCount, "",
+            ConsoleColorsAsStr(caretColor)
+        )
+    }
+    else {
+        sb.append("  %*s | %*s",
+            lineNumWidth, "",
+            spaceCount, ""
+        )
+    }
+
+    for(var i = 0; i < spanLen; i+=1) {
+        sb.appendChar('^')
+    }
+
+    if(useColors) {
+        sb.append("%s\n", ConsoleColorsAsStr(ConsoleColors.CLEAR))
+    }
+    else {
+        sb.append("\n")
+    }
+
+    // Closing gutter line
+    if(useColors) {
+        sb.append("  %s%*s |%s\n",
+            ConsoleColorsAsStr(ConsoleColors.DARK_GRAY),
+            lineNumWidth, "",
+            ConsoleColorsAsStr(ConsoleColors.CLEAR)
+        )
+    }
+    else {
+        sb.append("  %*s |\n", lineNumWidth, "")
+    }
 }
 
 @test

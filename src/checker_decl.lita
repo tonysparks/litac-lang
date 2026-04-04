@@ -629,7 +629,7 @@ func (this: *TypeChecker) checkTraitMethodNotVararg(aggDecl: *AggregateDecl, fie
 
     if(field.typeInfo.hasVarargs || field.typeInfo.hasNativeVarargs) {
         this.result.addError(varField.startPos,
-            "trait method: '%.*s' contains variable arguments which are currently not supported in trait functions",
+            "trait method '%.*s' cannot use variable arguments",
             varField.name.str.length, varField.name.str.buffer
         )
         return;
@@ -643,7 +643,7 @@ func (this: *TypeChecker) checkBitField(aggDecl: *AggregateDecl, field: *FieldSt
         var sb = StringBuilderInit(256, this.allocator)
         field.typeInfo.toString(sb, .fullyQualify = true)
         this.result.addError(varField.startPos,
-            "only integer like fields are allowed on bit field definitions, '%.*s' is of type '%.*s'",
+            "only integer-like fields are allowed in bit field definitions, '%.*s' is of type '%.*s'",
             varField.name.str.length, varField.name.str.buffer,
             sb.length, sb.buffer
         )

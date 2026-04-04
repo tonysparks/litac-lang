@@ -117,7 +117,7 @@ report:
                 printf("%s\n", sb.cStr())
                 sb.clear()
             }
-            printf("Total errors: %d\n", lita.result.errors.size())
+            printf("Total error(s): %d\n", lita.result.errors.size())
         }
     }
 

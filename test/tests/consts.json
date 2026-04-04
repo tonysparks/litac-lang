@@ -132,7 +132,7 @@
                 assert(Y == 4)
                 assert(Z == 6)
             `,
-            "error": "can't reassign constant variable 'X'"
+            "error": "cannot assign to constant 'X'"
         },
         {
             "name": "Constant Scoping",

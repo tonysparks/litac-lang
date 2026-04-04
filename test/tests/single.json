@@ -119,7 +119,7 @@
             "code": `
                 switch(1) { default: {}} ?: assert(false);
             `,
-            "error": "must either be a var or const declaration or expression before the ?:"
+            "error": "expected a 'var', 'const', or expression before '?:'"
         },
         {
             "name" : "Post else with generics",

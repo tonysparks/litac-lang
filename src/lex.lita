@@ -633,6 +633,8 @@ public func (l: *Lexer) eofToken() : Token {
     l.token.pos.lineStart = l.lineStart
     l.token.pos.lineNumber = l.lineNumber
     l.token.pos.position = l.position
+    l.token.pos.start = l.stream
+    l.token.pos.end   = l.stream
     return l.token
 }
 
@@ -641,6 +643,7 @@ func (l: *Lexer) errorToken() : Token {
     l.token.pos.lineStart = l.lineStart
     l.token.pos.lineNumber = l.lineNumber
     l.token.pos.position = l.position
+    l.token.pos.end = l.stream
     return l.token
 }
 

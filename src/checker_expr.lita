@@ -1621,7 +1621,7 @@ func (this: *TypeChecker) resolveTernaryExpr(expr: *TernaryExpr) : bool {
 
     var condType = expr.cond.operand.typeInfo
     if(!IsBooleanable(condType)) {
-        this.result.addError(expr.cond.startPos, "must be a boolean expression")
+        this.result.addError(expr.cond.startPos, "condition must be a boolean expression")
         return false
     }
 
@@ -2509,7 +2509,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
 
     if(!sym) {
         if(!expr.operand.typeInfo) {
-            this.result.addError(expr.startPos, "no type information")
+            this.result.addError(expr.startPos, "cannot determine type")
             return false;
         }
 
@@ -2522,7 +2522,7 @@ func (this: *TypeChecker) checkConstant(expr: *Expr) : bool {
     }
 
     if(sym.flags & SymbolFlags.IS_CONSTANT) {
-        this.result.addError(expr.startPos, "can't reassign constant variable '%.*s'", sym.name.length, sym.name.buffer)
+        this.result.addError(expr.startPos, "cannot assign to constant '%.*s'", sym.name.length, sym.name.buffer)
         return false
     }
 
@@ -2548,7 +2548,7 @@ internal func (this: *TypeChecker) checkTruthyness(expr: *Expr, type: *TypeInfo)
 func (this: *TypeChecker) checkRightValue(expr: *Expr) : bool {
     assert(expr != null)
     if(expr.operand.isRightValue) {
-        this.result.addError(expr.startPos, "rvalue can't be assigned to")
+        this.result.addError(expr.startPos, "cannot assign to an rvalue")
         return false
     }
     return true
