@@ -74,11 +74,19 @@
 
 ---
 
+<a id="func-compare"></a>
+
+### func compare(b: String, other: String) : i32
+
+*public* | *stdlib/std/string/string.lita:114*
+
+---
+
 <a id="func-equalsignorecase"></a>
 
 ### func equalsIgnoreCase(b: String, str: String) : bool
 
-*public* | *stdlib/std/string/string.lita:114*
+*public* | *stdlib/std/string/string.lita:121*
 
 ---
 
@@ -86,7 +94,7 @@
 
 ### func contains(b: String, str: String) : bool
 
-*public* | *stdlib/std/string/string.lita:139*
+*public* | *stdlib/std/string/string.lita:146*
 
 ---
 
@@ -94,7 +102,7 @@
 
 ### func endIndexOf(b: String, str: String) : i32
 
-*public* | *stdlib/std/string/string.lita:143*
+*public* | *stdlib/std/string/string.lita:150*
 
 ---
 
@@ -102,7 +110,7 @@
 
 ### func endIndexOfAt(b: String, str: String, fromIndex: i32) : i32
 
-*public* | *stdlib/std/string/string.lita:147*
+*public* | *stdlib/std/string/string.lita:154*
 
 ---
 
@@ -110,7 +118,7 @@
 
 ### func indexOf(b: String, str: String) : i32
 
-*public* | *stdlib/std/string/string.lita:153*
+*public* | *stdlib/std/string/string.lita:160*
 
 ---
 
@@ -118,7 +126,7 @@
 
 ### func indexOfAt(b: String, str: String, fromIndex: i32) : i32
 
-*public* | *stdlib/std/string/string.lita:157*
+*public* | *stdlib/std/string/string.lita:164*
 
 ---
 
@@ -126,7 +134,7 @@
 
 ### func lastIndexOfAt(b: String, str: String, fromIndex: i32) : i32
 
-*public* | *stdlib/std/string/string.lita:201*
+*public* | *stdlib/std/string/string.lita:208*
 
 ---
 
@@ -134,7 +142,7 @@
 
 ### func (this: \*[SplitIter](std_string.md#struct-splititer)) hasNext() : bool
 
-*public* | *stdlib/std/string/string.lita:262*
+*public* | *stdlib/std/string/string.lita:269*
 
 ---
 
@@ -142,7 +150,7 @@
 
 ### func (this: \*[SplitIter](std_string.md#struct-splititer)) next() : String
 
-*public* | *stdlib/std/string/string.lita:267*
+*public* | *stdlib/std/string/string.lita:274*
 
 ---
 
@@ -150,7 +158,7 @@
 
 ### func (this: \*[SplitIter](std_string.md#struct-splititer)) remaining() : String
 
-*public* | *stdlib/std/string/string.lita:276*
+*public* | *stdlib/std/string/string.lita:283*
 
 ---
 
@@ -158,7 +166,7 @@
 
 ### func (this: String) split(str: String) : [SplitIter](std_string.md#struct-splititer)
 
-*public* | *stdlib/std/string/string.lita:288*
+*public* | *stdlib/std/string/string.lita:295*
 
 ---
 
@@ -166,7 +174,7 @@
 
 ### func (this: String) leftTrim() : String
 
-*public* | *stdlib/std/string/string.lita:297*
+*public* | *stdlib/std/string/string.lita:304*
 
 ---
 
@@ -174,7 +182,7 @@
 
 ### func (this: String) rightTrim() : String
 
-*public* | *stdlib/std/string/string.lita:309*
+*public* | *stdlib/std/string/string.lita:316*
 
 ---
 
@@ -182,7 +190,7 @@
 
 ### func (this: String) trim() : String
 
-*public* | *stdlib/std/string/string.lita:321*
+*public* | *stdlib/std/string/string.lita:328*
 
 ---
 
@@ -190,7 +198,7 @@
 
 ### func copyTo(b: String, buf: \*char, len: i32, addZero: bool) : i32
 
-*public* | *stdlib/std/string/string.lita:326*
+*public* | *stdlib/std/string/string.lita:333*
 
 ---
 
@@ -198,7 +206,7 @@
 
 ### func copy(s: String, allocator: \*const mem::Allocator) : String
 
-*public* | *stdlib/std/string/string.lita:343*
+*public* | *stdlib/std/string/string.lita:350*
 
 ---
 
@@ -206,7 +214,7 @@
 
 ### func forEach(b: String, fn: func(char) : bool) : void
 
-*public* | *stdlib/std/string/string.lita:362*
+*public* | *stdlib/std/string/string.lita:369*
 
 ---
 
@@ -214,7 +222,7 @@
 
 ### func empty(b: String) : bool
 
-*public* | *stdlib/std/string/string.lita:370*
+*public* | *stdlib/std/string/string.lita:377*
 
 ---
 
@@ -222,7 +230,7 @@
 
 ### func size(b: String) : i32
 
-*public* | *stdlib/std/string/string.lita:374*
+*public* | *stdlib/std/string/string.lita:381*
 
 ---
 
@@ -230,7 +238,7 @@
 
 ### func get(b: String, index: i32) : char
 
-*public* | *stdlib/std/string/string.lita:378*
+*public* | *stdlib/std/string/string.lita:385*
 
 ---
 
@@ -238,7 +246,7 @@
 
 ### func toCStr(b: String, allocator: \*const mem::Allocator) : \*char
 
-*public* | *stdlib/std/string/string.lita:386*
+*public* | *stdlib/std/string/string.lita:393*
 
 ---
 
@@ -246,7 +254,7 @@
 
 ### func StringClone(original: \*const char, len: i32, allocator: \*const mem::Allocator) : \*char
 
-*public* | *stdlib/std/string/string.lita:391*
+*public* | *stdlib/std/string/string.lita:398*
 
 ---
 
@@ -254,7 +262,7 @@
 
 ### func StringCopy(src: \*const char, dest: \*char, size: usize) : \*char
 
-*public* | *stdlib/std/string/string.lita:411*
+*public* | *stdlib/std/string/string.lita:418*
 
 ---
 
@@ -262,7 +270,7 @@
 
 ### func StringHashLen(str: \*const char, size: usize) : u32
 
-*public* | *stdlib/std/string/string.lita:426*
+*public* | *stdlib/std/string/string.lita:433*
 
 ---
 
@@ -270,7 +278,7 @@
 
 ### func StringHash(str: \*const char) : u32
 
-*public* | *stdlib/std/string/string.lita:438*
+*public* | *stdlib/std/string/string.lita:445*
 
 ---
 
@@ -278,7 +286,7 @@
 
 ### func StringEqualLen(a: \*const char, b: \*const char, size: usize) : bool
 
-*public* | *stdlib/std/string/string.lita:448*
+*public* | *stdlib/std/string/string.lita:455*
 
 ---
 
@@ -286,7 +294,7 @@
 
 ### func StringEqual(a: \*const char, b: \*const char) : bool
 
-*public* | *stdlib/std/string/string.lita:455*
+*public* | *stdlib/std/string/string.lita:462*
 
 ---
 
@@ -294,7 +302,7 @@
 
 ### func hash(str: \*const char) : u32
 
-*public* | *stdlib/std/string/string.lita:462*
+*public* | *stdlib/std/string/string.lita:469*
 
 ---
 
@@ -302,7 +310,7 @@
 
 ### func equals(str: \*const char, other: \*const char) : bool
 
-*public* | *stdlib/std/string/string.lita:466*
+*public* | *stdlib/std/string/string.lita:473*
 
 ---
 
@@ -310,7 +318,7 @@
 
 ### func equalsString(str: \*const char, other: String) : bool
 
-*public* | *stdlib/std/string/string.lita:473*
+*public* | *stdlib/std/string/string.lita:480*
 
 ---
 
@@ -318,7 +326,7 @@
 
 ### func length(str: \*const char) : i32
 
-*public* | *stdlib/std/string/string.lita:477*
+*public* | *stdlib/std/string/string.lita:484*
 
 ---
 
@@ -326,7 +334,7 @@
 
 ### func empty(str: \*const char) : bool
 
-*public* | *stdlib/std/string/string.lita:482*
+*public* | *stdlib/std/string/string.lita:489*
 
 ---
 
@@ -334,7 +342,7 @@
 
 ### func toString(str: \*const char) : String
 
-*public* | *stdlib/std/string/string.lita:486*
+*public* | *stdlib/std/string/string.lita:493*
 
 ---
 
@@ -344,7 +352,7 @@
 
 ### struct SplitIter
 
-*public* | *stdlib/std/string/string.lita:254*
+*public* | *stdlib/std/string/string.lita:261*
 
 | Field | Type | Description |
 |-------|------|-------------|
