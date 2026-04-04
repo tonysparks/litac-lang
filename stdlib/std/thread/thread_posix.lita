@@ -168,6 +168,22 @@ struct TimeSpec {
     }
 }
 
+func (ts: *TimeSpec) get(base: i32) : i32 {
+    return timespec_get(&ts.ts, base)
+}
+
+func deadlineFromMs(durationMs: i64) : TimeSpec {
+    var ts: TimeSpec
+    ts.get(TIME_UTC)
+    ts.sec  += durationMs / 1000
+    ts.nsec += (durationMs % 1000) * 1_000_000
+    if (ts.nsec >= 1_000_000_000) {
+        ts.sec  += 1
+        ts.nsec -= 1_000_000_000
+    }
+    return ts
+}
+
 @foreign
 func timespec_get(ts: *timespec, base: i32) : i32;
 
@@ -319,11 +335,11 @@ public func (this: *Mutex) unlock() : ThreadStatus {
         ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
 }
 
-public func (this: *Mutex) timedLock(timeSpec: *TimeSpec) : ThreadStatus {
-    var ts = timeSpec.ts;
+public func (this: *Mutex) timedLock(durationMs: i64) : ThreadStatus {
+    var ts = deadlineFromMs(durationMs).ts
 
 #static_if defined(_POSIX_TIMEOUTS) && (_POSIX_TIMEOUTS >= 200112L) && defined(_POSIX_THREADS) && (_POSIX_THREADS >= 200112L)
-    switch (pthread_mutex_timedlock(this.mtx, ts)) {
+    switch (pthread_mutex_timedlock(this.mtx, &ts)) {
         case 0:
             return ThreadStatus.SUCCESS;
         case ETIMEDOUT:
@@ -337,7 +353,7 @@ public func (this: *Mutex) timedLock(timeSpec: *TimeSpec) : ThreadStatus {
     var dur: timespec;
 
     // Try to acquire the lock and, if we fail, sleep for 5ms.
-    while ((rc = pthread_mutex_trylock (this.mtx)) == EBUSY) {
+    while ((rc = pthread_mutex_trylock(this.mtx)) == EBUSY) {
         timespec_get(&cur, TIME_UTC);
 
         if ((cur.tv_sec > ts.tv_sec) || ((cur.tv_sec == ts.tv_sec) && (cur.tv_nsec >= ts.tv_nsec))) {
@@ -409,13 +425,13 @@ public func (this: *Cond) wait(mtx: *Mutex) : ThreadStatus {
         ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
 }
 
-public func (this: *Cond) timedWait(mtx: *Mutex, ts: *const TimeSpec) : ThreadStatus {
-
-    var ret = pthread_cond_timedwait(this.cond, mtx.mtx, ts);
+public func (this: *Cond) timedWait(mtx: *Mutex, durationMs: i64) : ThreadStatus {
+    var deadline = deadlineFromMs(durationMs)
+    var ret = pthread_cond_timedwait(this.cond, mtx.mtx, &deadline.ts)
     if (ret == ETIMEDOUT) {
-        return ThreadStatus.TIMEDOUT;
+        return ThreadStatus.TIMEDOUT
     }
-    return ret == 0 ? ThreadStatus.SUCCESS : ThreadStatus.ERROR;
+    return ret == 0 ? ThreadStatus.SUCCESS : ThreadStatus.ERROR
 }
 
 

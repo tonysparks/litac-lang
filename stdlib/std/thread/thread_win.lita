@@ -553,30 +553,14 @@ public func (mtx: *Mutex) unlock() : ThreadStatus {
     return ThreadStatus.SUCCESS;
 }
 
-public func (mtx: *Mutex) timedLock(ts: *TimeSpec) : ThreadStatus {
-    var current_ts : TimeSpec;
-    var timeoutMs : DWORD;
-
+public func (mtx: *Mutex) timedLock(durationMs: i64) : ThreadStatus {
     if (!mtx.mTimed) {
         return ThreadStatus.ERROR;
     }
 
-    current_ts.get(TIME_UTC);
-
-    if ((current_ts.sec > ts.sec) ||
-        ((current_ts.sec == ts.sec) &&
-         (current_ts.nsec >= ts.nsec))) {
-        timeoutMs = 0;
-    }
-    else {
-        timeoutMs  = (ts.sec  - current_ts.sec) * 1_000_i64;
-        timeoutMs += (ts.nsec - current_ts.nsec) / 1_000_000_i64;
-        timeoutMs += 1;
-    }
-
     /* TODO: the timeout for WaitForSingleObject doesn't include time
        while the computer is asleep. */
-    switch (WaitForSingleObject(mtx.mHandle.mut, timeoutMs)) {
+    switch (WaitForSingleObject(mtx.mHandle.mut, durationMs as (DWORD))) {
         case WAIT_OBJECT_0:
             break;
         case WAIT_TIMEOUT:
@@ -730,17 +714,8 @@ public func (cond: *Cond) wait(mtx: *Mutex) : ThreadStatus {
     return cond._timedWait(mtx, INFINITE)
 }
 
-public func (cond: *Cond) timedWait(mtx: *Mutex, ts: *const TimeSpec) : ThreadStatus {
-    var now: TimeSpec;
-    if (now.get(TIME_UTC) == TIME_UTC) {
-        var nowInMilliseconds: u64 = now.sec * 1_000_u64 + now.nsec / 1_000_000_u64;
-        var tsInMilliseconds: u64  = ts.sec * 1_000_u64 + ts.nsec / 1_000_000_u64;
-        var delta = (tsInMilliseconds > nowInMilliseconds) ?
-                        (tsInMilliseconds - nowInMilliseconds) as (DWORD) : 0 as (DWORD);
-        return cond._timedWait(mtx, delta);
-    }
-
-    return ThreadStatus.ERROR;
+public func (cond: *Cond) timedWait(mtx: *Mutex, durationMs: i64) : ThreadStatus {
+    return cond._timedWait(mtx, durationMs as (DWORD))
 }
 
 /*==============================================================
