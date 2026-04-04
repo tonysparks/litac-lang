@@ -205,8 +205,10 @@ public func BuildArgs(parser: *CmdParser) {
     parser.addCommand("lsp", "Start the LitaC language server")
 
     var docCmd = parser.addCommand("doc", "Generates document output")
-        .addOption("docDir",         '\0', "Directory where the generated documents are written to, defaults to './output'", OptionFlag.HAS_ARGUMENT, null)
-        .addOption("all",            '\0', "Includes non-public types in the documentation generation", 0, null)
+        .addOption("docDir",         '\0', "Directory where the generated documents are written to, defaults to './doc'", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("srcDir",         '\0', "Directory to scan for .lita source files, defaults to './src'", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("format",         '\0', "Output format: 'md' (default) or 'html'", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("all",            '\0', "Includes private types in the documentation generation", 0, null)
 
     var testCmd = parser.addCommand("test", "Recursively scan for *_test.lita files and run each. \nOptionally pass a directory to scan (default: current directory).")
         .addOption("file",           '\0', "Runs functions annotated with @test in the supplied source file only", OptionFlag.HAS_ARGUMENT, null)
@@ -513,11 +515,34 @@ public func ApplyArgs(
         options.pkgOptions.pkgName = cmd.getArgValue()
     }
     else if(cmd.name.equals("doc")) {
-        // TODO
-        //options.pkgOptions.pkgCmd = PkgCommand.PKG_TEST
-        //options.testsOnly = true
-        printf("Sorry, not implemented yet.")
-        goto err;
+        options.pkgOptions.pkgCmd = PkgCommand.PKG_DOC
+        options.docAll  = cmd.hasOption("all")
+        options.docHtml = cmd.hasOption("format") &&
+                          cmd.getOption("format").value.toString().equals($"html")
+
+        var docDir = cmd.hasOption("docDir") ? cmd.getOption("docDir").value : null as (*const char)
+        if(docDir == null || StringInit(docDir).empty()) {
+            docDir = "./doc"
+        }
+        StringCopy(.src = docDir, .dest = options.docDir, .size = MAX_PATH)
+        TrimPath(options.docDir)
+
+        if(cmd.hasOption("srcDir")) {
+            StringCopy(.src = cmd.getOption("srcDir").value, .dest = options.srcPath, .size = MAX_PATH)
+            TrimPath(options.srcPath)
+        }
+
+        // optional positional arg: input file
+        if(parser.args.size() > 1) {
+            var inputFile = parser.args.get(1)
+            if(!inputFile.equals("--")) {
+                GetAbsolutePath(CurrentWorkingPath(), parser.args.get(1), options.inputFile)
+                if(!FileExists(options.inputFile)) {
+                    printf("Could not find input file: '%s'\n", options.inputFile)
+                    goto err;
+                }
+            }
+        }
     }
     else if(cmd.name.equals("lsp")) {
         // TODO
@@ -598,6 +623,9 @@ func HandlePkgCommand(options: *LitaOptions, len: i32, args: **char) : i32 {
         case PkgCommand.PKG_TEST: {
             return RunPkgTest(options, &pm)
         }
+        case PkgCommand.PKG_DOC: {
+            return RunPkgDoc(options, &pm)
+        }
         default:
             return 0;
     }
@@ -661,4 +689,12 @@ func RunPkgTest(options: *LitaOptions, pm: *PackageManager) : i32 {
         return buildResult
     }
     return pm.testCommand(options)
+}
+
+func RunPkgDoc(options: *LitaOptions, pm: *PackageManager) : i32 {
+    var status = pm.docCommand(options)
+    if(status != PkgStatus.OK) {
+        return 1;
+    }
+    return 0;
 }

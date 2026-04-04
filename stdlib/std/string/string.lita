@@ -111,6 +111,13 @@ public func (b: String) equals(other: String) : bool {
     return b.equalsString(other.buffer, other.length)
 }
 
+public func (b: String) compare(other: String) : i32 {
+    var minLen = b.length < other.length ? b.length : other.length
+    var cmp = strncmp(b.buffer, other.buffer, minLen as (usize))
+    if(cmp != 0) return cmp;
+    return b.length - other.length
+}
+
 public func (b: String) equalsIgnoreCase(str: String) : bool {
     if(b.length != str.length) {
         return false;

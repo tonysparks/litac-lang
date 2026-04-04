@@ -806,7 +806,7 @@ public func (thr: Thread) equal(other: Thread) : bool {
     return thr.id() == other.id()
 }
 
-public func (thr: Thread) join(res: *i32) : ThreadStatus {
+public func (thr: Thread) join(res: *i32 = null) : ThreadStatus {
     var dwRes: DWORD;
 
     if (WaitForSingleObject(thr.hnd, INFINITE) == WAIT_FAILED) {

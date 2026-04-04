@@ -1,0 +1,108 @@
+import "pkg_mgr"
+import "main"
+import "lita"
+import "doc"
+import "error_codes"
+import "phase_result"
+
+import "std/array"
+import "std/mem"
+import "std/libc"
+import "std/io"
+import "std/string/buffer"
+import "std/string"
+import "std/string/builder"
+import "std/system"
+import "std/json"
+
+public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
+    var temp: [MAX_PATH]char;
+
+    // Default srcPath to {projectPath}/src if not supplied via -srcDir
+    if(options.srcPath.empty()) {
+        var srcBuf = StringBufferInit(temp, MAX_PATH, 0)
+        srcBuf.format("%s/src", options.projectPath)
+        StringCopy(.src = srcBuf.cStr(), .dest = options.srcPath, .size = MAX_PATH)
+    }
+
+    // Resolve srcPath to absolute path
+    if(!(options.srcPath as (*const char)).toString().startsWith($"/")) {
+        var absSrc: [MAX_PATH]char;
+        GetAbsolutePath(CurrentWorkingPath(), options.srcPath, absSrc)
+        StringCopy(.src = absSrc, .dest = options.srcPath, .size = MAX_PATH)
+    }
+
+    // Ensure doc output directory exists
+    var docDirBuf = StringBufferInit(temp, MAX_PATH, 0)
+    if(options.docDir.empty()) {
+        docDirBuf.format("%s/doc", options.projectPath)
+    }
+    else {
+        var docDirStr = (options.docDir as (*const char)).toString()
+        if(docDirStr.startsWith($"/") || docDirStr.startsWith($"./") || docDirStr.startsWith($"../")) {
+            docDirBuf.format("%s", options.docDir)
+        }
+        else {
+            docDirBuf.format("%s/%s", options.projectPath, options.docDir)
+        }
+    }
+
+    if(!Mkdirs(docDirBuf.cStr())) {
+        pm.errors.append(
+            "could not create doc output directory '%s'\n",
+            docDirBuf.cStr()
+        )
+        return PkgStatus.ERROR_CREATING_PKG_DIR
+    }
+
+    if(pm.isVerbose()) {
+        printf("Generating docs for '%s' -> '%s'\n",
+            options.srcPath,
+            docDirBuf.cStr()
+        )
+    }
+
+    // Parse all .lita files under srcPath (no type-checking required)
+    var lita = Lita{}
+    lita.init(options)
+    defer lita.free()
+
+    if(!lita.parseDir(options.srcPath)) {
+        printCompilerErrors(&lita, options)
+        return PkgStatus.ERROR_RUNNING_COMMAND
+    }
+
+    // Generate docs from the parsed AST
+    var docOptions = DocOptions {
+        .docDir      = docDirBuf.cStr(),
+        .includeAll  = options.docAll,
+        .format      = options.docHtml ? DocFormat.HTML : DocFormat.MARKDOWN,
+        .projectPath = options.projectPath,
+        .srcPath     = options.srcPath as (*const char),
+        .pkgName     = pm.pkg.json ? pm.pkg.json.getStr("name", "").toString() : "".toString(),
+        .pkgVersion  = pm.pkg.json ? pm.pkg.json.getStr("version", "").toString() : "".toString(),
+    }
+
+    if(!GenerateDocs(&lita, &docOptions)) {
+        pm.errors.append("documentation generation failed\n")
+        return PkgStatus.ERROR_RUNNING_COMMAND
+    }
+
+    if(pm.isVerbose()) {
+        printf("Documentation written to '%s'\n", docDirBuf.cStr())
+    }
+
+    return PkgStatus.OK
+}
+
+func printCompilerErrors(lita: *Lita, options: *LitaOptions) {
+    var sb = StringBuilderInit(1024)
+    defer sb.free()
+
+    for(var i = 0; i < lita.result.errors.size(); i += 1) {
+        PrintError(options.isColoredOutput, sb, lita.result.errors.get(i))
+        printf("%s\n", sb.cStr())
+        sb.clear()
+    }
+    printf("Total error(s): %d\n", lita.result.errors.size())
+}
