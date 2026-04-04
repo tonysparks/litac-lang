@@ -9,6 +9,7 @@ import "std/system"
 import "std/string/builder"
 import "std/string"
 import "std/string/buffer"
+import "std/fs"
 import "std/process" as sub
 import "std/json"
 import "std/json/from_json"
@@ -451,6 +452,36 @@ public func (this: *Lita) parse() : *Module {
     root.ast.imports.insertAt(0, builtinImport)
 
     return root
+}
+
+@doc("Parse all .lita files found recursively under srcPath without type-checking. Used by the doc generator.")
+public func (this: *Lita) parseDir(srcPath: *const char) : bool {
+    this.startCapture(MetricType.PARSING)
+    defer this.endCapture(MetricType.PARSING)
+
+    // Initialize builtins
+    var builtin = BuiltinsInit(this)
+    this.addModule(builtin)
+    if(!ParseModule(this, builtin, SrcPos{})) {
+        this.result.addError(SrcPos{}, "unable to parse builtins.lita")
+        return false
+    }
+
+    // Collect all .lita files under srcPath
+    var files = ArrayInit<String>(64, this.allocator)
+    ListFiles(srcPath.toString(), &files, ListFileFlags.RECURSE_DIRECTORIES, this.allocator)
+
+    for(var i = 0; i < files.size(); i += 1) {
+        var file = files.get(i)
+        if(!file.endsWith($".lita")) {
+            continue
+        }
+        var packageName = GetPackageName(srcPath, file.buffer)
+        // LoadModule caches already-parsed modules, so safe to call for each file
+        LoadModule(this, packageName, SrcPos{})
+    }
+
+    return true
 }
 
 public func (this: *Lita) typeCheck(module: *Module, flags: i32 = 0) : bool {

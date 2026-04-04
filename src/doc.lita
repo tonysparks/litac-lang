@@ -28,7 +28,6 @@ import "std/assert"
 
 import "lita"
 import "ast"
-import "symbols"
 import "module"
 import "types"
 import "intern"
@@ -124,7 +123,7 @@ func (this: *DocContext) buildTypeIndex() {
         var decls = &mod.ast.declarations
         for(var i = 0; i < decls.size(); i += 1) {
             var decl = decls.get(i)
-            if(!decl || !decl.sym) {
+            if(!decl) {
                 continue
             }
             if(!this.shouldInclude(decl)) {
@@ -136,7 +135,7 @@ func (this: *DocContext) buildTypeIndex() {
                 .filePath = relPath,
                 .anchor   = anchor,
             }
-            ;this.typeIndex.put(decl.sym.qualifiedName, link)
+            ;this.typeIndex.put(decl.name.str, link)
         }
     }
 }
@@ -700,33 +699,30 @@ func (this: *DocContext) emitNamedTypeSpec(
     var name = ts.name.view
     var html = this.isHtml()
 
-    // Try to resolve a cross-link via the resolved typeInfo symbol
-    if(ts.typeInfo != null && ts.typeInfo.sym != null) {
-        var sym = ts.typeInfo.sym
-        var link = this.typeIndex.get(sym.qualifiedName)
-        if(link.filePath != null) {
-            // Compute relative path from the module's doc file to the target
-            var relFrom = this.moduleDocRelPath(from)
-            var rel = this.relativeLink(relFrom, link.filePath, link.anchor, this.allocator)
-            if(html) {
-                sb.append("<a href=\"%s\">%.*s</a>", rel, name.length, name.buffer)
-            } else {
-                sb.append("[%.*s](%s)", name.length, name.buffer, rel)
-            }
-            // Emit generic args if present
-            if(!ts.genericArgs.empty()) {
-                sb.append(html ? "&lt;" : "\\<")
-                for(var i = 0; i < ts.genericArgs.size(); i += 1) {
-                    if(i > 0) sb.append(", ")
-                    var arg = ts.genericArgs.getPtr(i)
-                    if(arg.kind == GenericArgKind.TYPE) {
-                        this.emitTypeSpec(sb, arg.type, from)
-                    }
-                }
-                sb.append(html ? "&gt;" : "\\>")
-            }
-            return;
+    // Try a name-based cross-link lookup
+    var link = this.typeIndex.get(ts.name)
+    if(link.filePath != null) {
+        // Compute relative path from the module's doc file to the target
+        var relFrom = this.moduleDocRelPath(from)
+        var rel = this.relativeLink(relFrom, link.filePath, link.anchor, this.allocator)
+        if(html) {
+            sb.append("<a href=\"%s\">%.*s</a>", rel, name.length, name.buffer)
+        } else {
+            sb.append("[%.*s](%s)", name.length, name.buffer, rel)
         }
+        // Emit generic args if present
+        if(!ts.genericArgs.empty()) {
+            sb.append(html ? "&lt;" : "\\<")
+            for(var i = 0; i < ts.genericArgs.size(); i += 1) {
+                if(i > 0) sb.append(", ")
+                var arg = ts.genericArgs.getPtr(i)
+                if(arg.kind == GenericArgKind.TYPE) {
+                    this.emitTypeSpec(sb, arg.type, from)
+                }
+            }
+            sb.append(html ? "&gt;" : "\\>")
+        }
+        return;
     }
 
     // No link available — plain text
@@ -875,7 +871,6 @@ func (this: *DocContext) shouldInclude(decl: *Decl) : bool {
     if(!decl) return false;
     // Skip compiler-generated symbols
     if(decl.attributes.isGenerated) return false;
-    if(decl.sym != null && (decl.sym.flags & SymbolFlags.IS_GENERATED)) return false;
 
     switch(decl.attributes.visibility) {
         case Visibility.PUBLIC:   return true;

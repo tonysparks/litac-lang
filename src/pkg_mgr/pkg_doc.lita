@@ -32,26 +32,6 @@ public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
         StringCopy(.src = absSrc, .dest = options.srcPath, .size = MAX_PATH)
     }
 
-    // Default entry file to main.lita inside the srcPath
-    if(options.inputFile.empty()) {
-        var inputBuf = StringBufferInit(temp, MAX_PATH, 0)
-        inputBuf.format("%s/main.lita", options.srcPath)
-        StringCopy(.src = inputBuf.cStr(), .dest = options.inputFile, .size = MAX_PATH)
-
-        if(!FileExists(options.inputFile)) {
-            pm.errors.append(
-                "could not find entry file '%s'; supply an input .lita file, e.g.: litac doc -srcDir %s %s/main.lita\n",
-                options.inputFile,
-                options.srcPath,
-                options.srcPath
-            )
-            return PkgStatus.ERROR_NO_PROJECT_PKG_FOUND
-        }
-    }
-
-    // Only run through type-checking, skip C codegen
-    options.checkerOnly = true
-
     // Ensure doc output directory exists
     var docDirBuf = StringBufferInit(temp, MAX_PATH, 0)
     if(options.docDir.empty()) {
@@ -77,28 +57,22 @@ public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
 
     if(pm.isVerbose()) {
         printf("Generating docs for '%s' -> '%s'\n",
-            options.inputFile,
+            options.srcPath,
             docDirBuf.cStr()
         )
     }
 
-    // Run the compiler through parse + type-check
+    // Parse all .lita files under srcPath (no type-checking required)
     var lita = Lita{}
     lita.init(options)
     defer lita.free()
 
-    var root = lita.parse()
-    if(!root || !lita.result.errors.empty()) {
+    if(!lita.parseDir(options.srcPath)) {
         printCompilerErrors(&lita, options)
         return PkgStatus.ERROR_RUNNING_COMMAND
     }
 
-    if(!lita.typeCheck(root) || !lita.result.errors.empty()) {
-        printCompilerErrors(&lita, options)
-        return PkgStatus.ERROR_RUNNING_COMMAND
-    }
-
-    // Generate docs from the fully resolved AST
+    // Generate docs from the parsed AST
     var docOptions = DocOptions {
         .docDir      = docDirBuf.cStr(),
         .includeAll  = options.docAll,
