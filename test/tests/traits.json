@@ -1344,7 +1344,7 @@
                 var r2 = date.minus(2, 2, 2)
                 assert(r2 == 10)
             `,
-            "error": "trait method: 'minus' contains variable arguments which are currently not supported in trait functions"
+            "error": "trait method 'minus' cannot use variable arguments"
         },
         {
             "name" : "Trait type as generic Array element",

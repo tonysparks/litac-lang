@@ -94,7 +94,7 @@
 
                 assert(i == 1)
             `,
-            "error": "*** Invalid break statement"
+            "error": "invalid break statement"
         },
         {
             "name": "Defer with Return",

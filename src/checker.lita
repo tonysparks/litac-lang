@@ -586,7 +586,7 @@ public func (this: *TypeChecker) createDeclSymbol(decl: *Decl) : *Symbol {
 
                 // TODO: Fix bug with aliased types function names not resolving correctly
                 if(!funcDecl.getName(buffer)) {
-                    this.result.addError(decl.startPos, "invalid function name or invalid method caller type")
+                    this.result.addError(decl.startPos, "invalid function name or method receiver type")
                     goto err;
                 }
 
@@ -834,7 +834,7 @@ public func (this: *TypeChecker) resolveSymbol(sym: *Symbol) {
     }
 
     if(sym.state == SymbolState.RESOLVING) {
-        this.result.addError(sym.decl.startPos, "cyclic dependency found with '%.*s'", sym.name.length, sym.name.buffer)
+        this.result.addError(sym.decl.startPos, "cyclic dependency detected involving '%.*s'", sym.name.length, sym.name.buffer)
         goto err;
     }
 
@@ -1744,7 +1744,7 @@ public func (this: *TypeChecker) resolveStmt(stmt: *Stmt) : bool {
             if(!cond) {
                 this.result.addError(
                     postStmt.cond.startPos,
-                    "must either be a var or const declaration or expression before the ?:"
+                    "expected a 'var', 'const', or expression before '?:'"
                 )
                 return false
             }

@@ -340,7 +340,7 @@
                 x = 10
                 assert(x == 1024)
             `,
-            "error": "can't reassign constant variable 'x'"
+            "error": "cannot assign to constant 'x'"
         },
         {
             "name": "Typedef primitives",

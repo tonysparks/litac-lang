@@ -703,7 +703,7 @@
                 var c = sizeof (Test < b > 0)
                 assert(c == false)
             `,
-            "error": "Missing )"
+            "error": "expected ')'"
         },
         {
             "name": "ReadME Generics",
