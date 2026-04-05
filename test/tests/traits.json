@@ -1393,6 +1393,162 @@
             `,
         },
         {
+            "name" : "Traits Impl Via Transitive Module",
+            "description": "The impl module is NOT directly imported by the test file — only reachable through an intermediate module. The trait cast happens inside the intermediate module, so AddTraitImport must synthetically import the impl module into checker.current before the generated wrapper functions are parsed.",
+            "modules": [
+                {
+                    "name": "impl",
+                    "program": `
+                    public struct Counter {
+                        value: i32
+                    }
+
+                    public func (this: *Counter) count() : i32 {
+                        return this.value
+                    }
+                    `
+                },
+                {
+                    "name": "middleware",
+                    "program": `
+                    import "impl"
+
+                    public trait Countable {
+                        count: func() : i32
+                    }
+
+                    public var globalCounter = Counter { .value = 42 }
+
+                    // The conversion from *Counter -> Countable happens here,
+                    // NOT in the test file.
+                    public func makeCountable() : Countable {
+                        return &globalCounter
+                    }
+                    `
+                }
+            ],
+            "definitions": `
+                import "middleware"
+            `,
+            "code": `
+                var c = makeCountable()
+                assert(c.count() == 42)
+            `,
+        },
+        {
+            "name" : "Traits Impl Via Multiple Transitive Modules",
+            "description": "Two different impl modules are each reachable only transitively. Both must be synthetically imported so their wrappers compile.",
+            "modules": [
+                {
+                    "name": "impl_a",
+                    "program": `
+                    public struct Adder {
+                        n: i32
+                    }
+
+                    public func (this: *Adder) compute() : i32 {
+                        return this.n + 1
+                    }
+                    `
+                },
+                {
+                    "name": "impl_b",
+                    "program": `
+                    public struct Multiplier {
+                        n: i32
+                    }
+
+                    public func (this: *Multiplier) compute() : i32 {
+                        return this.n * 2
+                    }
+                    `
+                },
+                {
+                    "name": "registry",
+                    "program": `
+                    import "impl_a"
+                    import "impl_b"
+
+                    public trait Computable {
+                        compute: func() : i32
+                    }
+
+                    public var adder      = Adder      { .n = 3 }
+                    public var multiplier = Multiplier { .n = 5 }
+
+                    public func getAdder()      : Computable { return &adder }
+                    public func getMultiplier() : Computable { return &multiplier }
+                    `
+                }
+            ],
+            "definitions": `
+                import "registry"
+            `,
+            "code": `
+                var a = getAdder()
+                var b = getMultiplier()
+                assert(a.compute() == 4)   // 3 + 1
+                assert(b.compute() == 10)  // 5 * 2
+            `,
+        },
+        {
+            "name" : "Traits Impl Registered Via Function Parameter In Transitive Module",
+            "description": "Mirrors the addMetricsMiddleware pattern: the *ConcreteType -> Trait conversion happens entirely inside the intermediate module. The test file only imports the intermediate module and never names the concrete impl type, so AddTraitImport must synthetically import the impl module.",
+            "modules": [
+                {
+                    "name": "processor_impl",
+                    "program": `
+                    public struct Processor {
+                        calls: i32
+                    }
+
+                    public func (this: *Processor) process() : i32 {
+                        this.calls += 1
+                        return this.calls
+                    }
+                    `
+                },
+                {
+                    "name": "pipeline",
+                    "program": `
+                    import "processor_impl"
+
+                    public trait Processable {
+                        process: func() : i32
+                    }
+
+                    // global lives in this module — the test file never names Processor
+                    public var globalProc = Processor { .calls = 0 }
+
+                    public struct Pipeline {
+                        handler: Processable
+                    }
+
+                    // *Processor -> Processable conversion happens here,
+                    // not at the call site in the test file.
+                    public func buildPipeline() : Pipeline {
+                        return Pipeline {
+                            .handler = &globalProc
+                        }
+                    }
+
+                    public func (this: *Pipeline) run() : i32 {
+                        return this.handler.process()
+                    }
+                    `
+                }
+            ],
+            "definitions": `
+                import "pipeline"
+            `,
+            "code": `
+                var pipe = buildPipeline()
+                assert(pipe.run() == 1)
+                assert(pipe.run() == 2)
+                assert(globalProc.calls == 2)
+            `,
+        },
+        {
             "name" : "Trait native var args",
             "disabled": true,
             "definitions": `

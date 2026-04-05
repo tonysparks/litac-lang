@@ -10,6 +10,7 @@ import "std/string/buffer"
 import "types"
 import "lita"
 import "symbols"
+import "intern"
 import "ast"
 import "ast_copy"
 import "parser"
@@ -113,6 +114,11 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
         }
 
         var impls = checker.interfaceImpls.getPtr(traitSym.type.typeid)
+        AddTraitImport(
+            checker,
+            impls
+        )
+
         GenerateWrapperFunctions(
             checker,
             traitSym,
@@ -139,11 +145,40 @@ public func CreateTraitWrappers(checker: *TypeChecker) : Array<*Decl> {
     return stmts.declarations
 }
 
+func AddTraitImport(
+    checker: *TypeChecker,
+    impls: *Array<Typeid>
+) {
+    for(var j = 0; j < impls.size(); j += 1) {
+        var implSym = FindSymbolByTypeid(checker.symbolTypes, impls.get(j))
+        if(!implSym || !implSym.declared || implSym.declared.isBuiltin()) {
+            continue
+        }
+
+        var implModule = implSym.declared
+
+        // No need to import the current module into itself
+        if(implModule == checker.current) {
+            continue
+        }
+
+        // Skip if the module is already registered as an import alias
+        if(checker.current.importAliases.contains(implModule.id.name)) {
+            continue
+        }
+
+        // Synthetically import the module so its symbols (including methods)
+        // are reachable from checker.current during generated-wrapper type-checking.
+        checker.current.importAliases.put(implModule.id.name, implModule)
+        checker.current.importModuleSymbols(SrcPos{}, implModule, &implModule.id.name, false)
+    }
+}
+
 func GenerateVTable(
-        traitSym: *Symbol,
-        traitDecl: *AggregateDecl,
-        traitName: String,
-        sb: *StringBuilder
+    traitSym: *Symbol,
+    traitDecl: *AggregateDecl,
+    traitName: String,
+    sb: *StringBuilder
 ) {
     sb.append("@hidden struct %.*s__VirtualTable", traitName.length, traitName.buffer)
     sb.append(" {\n")
@@ -181,13 +216,14 @@ func GenerateVTable(
 
 
 func GenerateWrapperFunctions(
-        checker: *TypeChecker,
-        traitSym: *Symbol,
-        traitDecl: *AggregateDecl,
-        traitName: String,
-        sb: *StringBuilder,
-        traitFieldBuffer: *StringBuilder,
-        impls: *Array<Typeid>) {
+    checker: *TypeChecker,
+    traitSym: *Symbol,
+    traitDecl: *AggregateDecl,
+    traitName: String,
+    sb: *StringBuilder,
+    traitFieldBuffer: *StringBuilder,
+    impls: *Array<Typeid>
+) {
     sb.append("// Trait: '%.*s' has %d impls\n", traitDecl.name.str.length, traitDecl.name.str.buffer, impls.size())
 
     // Generate Wrapper functions
