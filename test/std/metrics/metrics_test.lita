@@ -1,0 +1,361 @@
+import "std/metrics"
+import "std/string/builder"
+import "std/string"
+import "std/assert"
+import "std/libc"
+import "std/thread"
+import "std/atomic"
+
+// ---------------------------------------------------------------
+// Counter tests
+// ---------------------------------------------------------------
+
+@test("counter starts at zero")
+func testCounterInit() {
+    var c: Counter;
+    c.init()
+    assert(c.get() == 0)
+}
+
+@test("counter inc increments by one")
+func testCounterInc() {
+    var c: Counter;
+    c.init()
+    c.inc()
+    c.inc()
+    c.inc()
+    assert(c.get() == 3)
+}
+
+@test("counter add increments by n")
+func testCounterAdd() {
+    var c: Counter;
+    c.init()
+    c.add(10)
+    c.add(5)
+    assert(c.get() == 15)
+}
+
+// ---------------------------------------------------------------
+// Gauge tests
+// ---------------------------------------------------------------
+
+@test("gauge starts at zero")
+func testGaugeInit() {
+    var g: Gauge;
+    g.init()
+    assert(g.get() == 0)
+}
+
+@test("gauge set replaces the value")
+func testGaugeSet() {
+    var g: Gauge;
+    g.init()
+    g.set(42)
+    assert(g.get() == 42)
+    g.set(7)
+    assert(g.get() == 7)
+}
+
+@test("gauge add and sub")
+func testGaugeAddSub() {
+    var g: Gauge;
+    g.init()
+    g.add(10)
+    g.add(5)
+    assert(g.get() == 15)
+    g.sub(3)
+    assert(g.get() == 12)
+}
+
+@test("gauge can go negative")
+func testGaugeNegative() {
+    var g: Gauge;
+    g.init()
+    g.sub(5)
+    assert(g.get() == -5)
+}
+
+// ---------------------------------------------------------------
+// Histogram tests
+// ---------------------------------------------------------------
+
+@test("histogram starts empty")
+func testHistogramInit() {
+    var bounds = [3]f64 { 1.0, 5.0, 10.0 }
+    var h: Histogram;
+    h.init(bounds, 3)
+    assert(h.totalCount.get() == 0)
+    assert(h.sum.get() == 0.0)
+}
+
+@test("histogram observe routes to correct bucket")
+func testHistogramObserveBuckets() {
+    var bounds = [3]f64 { 1.0, 5.0, 10.0 }
+    var h: Histogram;
+    h.init(bounds, 3)
+
+    h.observe(0.5)   // bucket 0: <= 1.0
+    h.observe(3.0)   // bucket 1: <= 5.0
+    h.observe(7.0)   // bucket 2: <= 10.0
+    h.observe(99.0)  // bucket 3: +Inf
+
+    assert(h.counts[0].get() == 1)
+    assert(h.counts[1].get() == 1)
+    assert(h.counts[2].get() == 1)
+    assert(h.counts[3].get() == 1)
+    assert(h.totalCount.get() == 4)
+}
+
+@test("histogram observe accumulates sum")
+func testHistogramSum() {
+    var bounds = [2]f64 { 5.0, 10.0 }
+    var h: Histogram;
+    h.init(bounds, 2)
+
+    h.observe(1.0)
+    h.observe(2.0)
+    h.observe(3.0)
+
+    assert(h.totalCount.get() == 3)
+    // sum should be 6.0 — allow a tiny epsilon for floating point
+    var diff = h.sum.get() - 6.0
+    if(diff < 0.0) { diff = -diff }
+    assert(diff < 0.0001)
+}
+
+@test("histogram exact bucket boundary lands in that bucket")
+func testHistogramBoundaryValue() {
+    var bounds = [2]f64 { 5.0, 10.0 }
+    var h: Histogram;
+    h.init(bounds, 2)
+
+    h.observe(5.0)  // exactly on boundary — should land in bucket 0 (val <= 5.0)
+    assert(h.counts[0].get() == 1)
+    assert(h.counts[1].get() == 0)
+    assert(h.counts[2].get() == 0)
+}
+
+@test("histogram value above all bounds goes to +Inf bucket")
+func testHistogramInfBucket() {
+    var bounds = [2]f64 { 1.0, 2.0 }
+    var h: Histogram;
+    h.init(bounds, 2)
+
+    h.observe(100.0)
+    assert(h.counts[0].get() == 0)
+    assert(h.counts[1].get() == 0)
+    assert(h.counts[2].get() == 1)  // +Inf
+    assert(h.totalCount.get() == 1)
+}
+
+// ---------------------------------------------------------------
+// Registry tests
+// ---------------------------------------------------------------
+
+@test("registry counter get-or-create")
+func testRegistryCounter() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var c1 = reg.counter("my_counter", "a test counter")
+    assert(c1 != null)
+    c1.inc()
+    c1.inc()
+
+    // same name returns same counter
+    var c2 = reg.counter("my_counter")
+    assert(c2 == c1)
+    assert(c2.get() == 2)
+}
+
+@test("registry gauge get-or-create")
+func testRegistryGauge() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var g = reg.gauge("connections", "active connections")
+    assert(g != null)
+    g.set(5)
+
+    var g2 = reg.gauge("connections")
+    assert(g2 == g)
+    assert(g2.get() == 5)
+}
+
+@test("registry histogram get-or-create")
+func testRegistryHistogram() {
+    var bounds = [3]f64 { 1.0, 5.0, 10.0 }
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var h = reg.histogram("latency", bounds, 3, "request latency")
+    assert(h != null)
+    h.observe(2.0)
+
+    var h2 = reg.histogram("latency", bounds, 3)
+    assert(h2 == h)
+    assert(h2.totalCount.get() == 1)
+}
+
+@test("registry distinct names are independent")
+func testRegistryDistinctMetrics() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var a = reg.counter("alpha")
+    var b = reg.counter("beta")
+    assert(a != b)
+    a.add(3)
+    b.add(7)
+    assert(a.get() == 3)
+    assert(b.get() == 7)
+}
+
+// ---------------------------------------------------------------
+// Prometheus scrape output tests
+// ---------------------------------------------------------------
+
+@test("scrape counter emits correct lines")
+func testScrapeCounter() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var c = reg.counter("hits_total", "total hits")
+    c.add(42)
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+    reg.scrapePrometheus(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"# HELP hits_total total hits"))
+    assert(out.contains($"# TYPE hits_total counter"))
+    assert(out.contains($"hits_total 42"))
+}
+
+@test("scrape gauge emits correct lines")
+func testScrapeGauge() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var g = reg.gauge("queue_depth", "items in queue")
+    g.set(7)
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+    reg.scrapePrometheus(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"# TYPE queue_depth gauge"))
+    assert(out.contains($"queue_depth 7"))
+}
+
+@test("scrape histogram emits bucket, sum, count lines")
+func testScrapeHistogram() {
+    var bounds = [2]f64 { 5.0, 10.0 }
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var h = reg.histogram("dur_ms", bounds, 2, "duration ms")
+    h.observe(3.0)   // bucket 0
+    h.observe(7.0)   // bucket 1
+    h.observe(50.0)  // +Inf
+
+    var sb = StringBuilderInit(512)
+    defer sb.free()
+    reg.scrapePrometheus(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"# TYPE dur_ms histogram"))
+    // cumulative counts: bucket0=1, bucket1=2, +Inf=3
+    assert(out.contains($"dur_ms_bucket{le=\"5\"} 1"))
+    assert(out.contains($"dur_ms_bucket{le=\"10\"} 2"))
+    assert(out.contains($"dur_ms_bucket{le=\"+Inf\"} 3"))
+    assert(out.contains($"dur_ms_count 3"))
+}
+
+// ---------------------------------------------------------------
+// Thread-safety: concurrent counter increments
+// ---------------------------------------------------------------
+
+struct CounterStressState {
+    counter: Counter
+    iters:   i32
+}
+
+func counterStressWorker(arg: *void) : i32 {
+    var state = arg as (*CounterStressState)
+    for (var i = 0; i < state.iters; i += 1) {
+        state.counter.inc()
+    }
+    return 0
+}
+
+@test("counter is safe under concurrent increments")
+func testCounterConcurrent() {
+    const NUM_THREADS = 4
+    const ITERS_PER_THREAD = 10_000
+
+    var state: CounterStressState;
+    state.counter.init()
+    state.iters = ITERS_PER_THREAD
+
+    var threads: [NUM_THREADS]Thread;
+    for (var i = 0; i < NUM_THREADS; i += 1) {
+        assert(threads[i].create(counterStressWorker, &state) == ThreadStatus.SUCCESS)
+    }
+    for (var i = 0; i < NUM_THREADS; i += 1) {
+        threads[i].join(null)
+    }
+
+    assert(state.counter.get() == NUM_THREADS * ITERS_PER_THREAD)
+}
+
+// ---------------------------------------------------------------
+// Thread-safety: concurrent histogram observations
+// ---------------------------------------------------------------
+
+struct HistogramStressState {
+    histogram: Histogram
+    iters:     i32
+}
+
+func histogramStressWorker(arg: *void) : i32 {
+    var state = arg as (*HistogramStressState)
+    for (var i = 0; i < state.iters; i += 1) {
+        state.histogram.observe(1.0)
+    }
+    return 0
+}
+
+@test("histogram is safe under concurrent observations")
+func testHistogramConcurrent() {
+    const NUM_THREADS = 4
+    const ITERS_PER_THREAD = 10_000
+
+    var bounds = [3]f64 { 1.0, 5.0, 10.0 }
+    var state: HistogramStressState;
+    state.histogram.init(bounds, 3)
+    state.iters = ITERS_PER_THREAD
+
+    var threads: [NUM_THREADS]Thread;
+    for (var i = 0; i < NUM_THREADS; i += 1) {
+        assert(threads[i].create(histogramStressWorker, &state) == ThreadStatus.SUCCESS)
+    }
+    for (var i = 0; i < NUM_THREADS; i += 1) {
+        threads[i].join(null)
+    }
+
+    var total = NUM_THREADS * ITERS_PER_THREAD
+    assert(state.histogram.totalCount.get() == total)
+    // all observations == 1.0, so bucket 0 (le=1.0) holds all of them
+    assert(state.histogram.counts[0].get() == total)
+}

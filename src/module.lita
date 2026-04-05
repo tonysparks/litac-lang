@@ -383,7 +383,7 @@ public func (this: *Module) importModule(importDecl: *ImportDecl, moduleToImport
 }
 
 
-func (this: *Module) importModuleSymbols(
+public func (this: *Module) importModuleSymbols(
     importSrcPos: SrcPos,
     moduleToImport: *Module,
     moduleName: *InternedString,
