@@ -51,3 +51,35 @@ public func (this: *Atomic<T>) getAdd<T>(amount: T) : T {
 public func (this: *Atomic<T>) getSub<T>(amount: T) : T {
     return atomic_fetch_sub<T>(&this.value, amount)
 }
+
+@foreign
+func atomic_compare_exchange_weak<T>(obj: *T, expected: *T, desired: T) : bool;
+
+/**
+ * Atomic f64 — uses a CAS loop because C11 does not define
+ * atomic_fetch_add for floating-point types.
+ */
+public struct AtomicF64 {
+    @atomic
+    value: f64
+}
+
+public func (this: *AtomicF64) init(value: f64) {
+    atomic_init<f64>(&this.value, value)
+}
+
+public func (this: *AtomicF64) get() : f64 {
+    return atomic_load<f64>(&this.value)
+}
+
+public func (this: *AtomicF64) set(value: f64) {
+    atomic_store<f64>(&this.value, value)
+}
+
+public func (this: *AtomicF64) add(amount: f64) {
+    var expected = atomic_load<f64>(&this.value)
+    var desired = expected + amount
+    while(!atomic_compare_exchange_weak<f64>(&this.value, &expected, desired)) {
+        desired = expected + amount
+    }
+}

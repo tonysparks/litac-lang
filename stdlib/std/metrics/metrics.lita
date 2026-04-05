@@ -1,0 +1,271 @@
+import "std/atomic"
+import "std/map"
+import "std/array"
+import "std/mem"
+import "std/string/builder"
+import "std/libc"
+import "std/assert"
+
+// Maximum number of histogram bucket boundaries (not counting +Inf)
+public const MAX_HISTOGRAM_BUCKETS = 16
+
+public enum MetricKind {
+    COUNTER,
+    GAUGE,
+    HISTOGRAM,
+}
+
+// ---------------------------------------------------------------
+// Counter — monotonically increasing i64
+// ---------------------------------------------------------------
+
+public struct Counter {
+    value: Atomic<i64>
+}
+
+public func (this: *Counter) init() {
+    this.value.init(0)
+}
+
+public func (this: *Counter) inc() {
+    this.value.getAdd(1)
+}
+
+public func (this: *Counter) add(n: i64) {
+    this.value.getAdd(n)
+}
+
+public func (this: *Counter) get() : i64 {
+    return this.value.get()
+}
+
+// ---------------------------------------------------------------
+// Gauge — arbitrary i64 value
+// ---------------------------------------------------------------
+
+public struct Gauge {
+    value: Atomic<i64>
+}
+
+public func (this: *Gauge) init() {
+    this.value.init(0)
+}
+
+public func (this: *Gauge) set(v: i64) {
+    this.value.set(v)
+}
+
+public func (this: *Gauge) add(n: i64) {
+    this.value.getAdd(n)
+}
+
+public func (this: *Gauge) sub(n: i64) {
+    this.value.getSub(n)
+}
+
+public func (this: *Gauge) get() : i64 {
+    return this.value.get()
+}
+
+// ---------------------------------------------------------------
+// Histogram — fixed-size bucket array, cumulative at scrape time
+//
+// Observation is O(n) scan (n <= MAX_HISTOGRAM_BUCKETS).
+// Each bucket stores the count of observations that fall strictly
+// into that band; cumulative sums are computed at scrape time.
+// The last slot (index numBounds) is the +Inf bucket.
+// ---------------------------------------------------------------
+
+public struct Histogram {
+    numBounds:  i32
+    bounds:     [MAX_HISTOGRAM_BUCKETS]f64
+    // counts[i] holds observations where bounds[i-1] < v <= bounds[i]
+    // counts[numBounds] is the +Inf bucket
+    counts:     [MAX_HISTOGRAM_BUCKETS + 1]Atomic<i64>
+    sum:        AtomicF64
+    totalCount: Atomic<i64>
+}
+
+public func (this: *Histogram) init(bounds: *f64, numBounds: i32) {
+    assert(numBounds <= MAX_HISTOGRAM_BUCKETS)
+    this.numBounds = numBounds
+    for(var i = 0; i < numBounds; i += 1) {
+        this.bounds[i] = bounds[i]
+    }
+    for(var i = 0; i <= MAX_HISTOGRAM_BUCKETS; i += 1) {
+        this.counts[i].init(0)
+    }
+    this.sum.init(0.0)
+    this.totalCount.init(0)
+}
+
+public func (this: *Histogram) observe(val: f64) {
+    this.totalCount.getAdd(1)
+    this.sum.add(val)
+
+    // Find the first bucket whose upper bound >= val
+    var i = 0
+    while(i < this.numBounds && val > this.bounds[i]) {
+        i += 1
+    }
+    // i == numBounds means +Inf bucket
+    this.counts[i].getAdd(1)
+}
+
+// ---------------------------------------------------------------
+// MetricEntry — tagged union held by the Registry
+// ---------------------------------------------------------------
+
+struct MetricEntry {
+    kind: MetricKind
+    name: *const char
+    help: *const char
+    union {
+        counter:   Counter
+        gauge:     Gauge
+        histogram: Histogram
+    }
+}
+
+// ---------------------------------------------------------------
+// Registry
+//
+// Thread safety model:
+//   - Registration (counter/gauge/histogram) must happen before
+//     serving requests (single-threaded startup).
+//   - Metric updates (inc/add/observe/set) are fully lock-free via
+//     atomics and safe from any thread.
+//   - scrapePrometheus is safe to call concurrently with updates.
+// ---------------------------------------------------------------
+
+public struct Registry {
+    entries:   Map<*const char, *MetricEntry>
+    allocator: *const Allocator
+}
+
+public func (this: *Registry) init(allocator: *const Allocator = null) {
+    if(!allocator) {
+        allocator = defaultAllocator
+    }
+    this.allocator = allocator
+    this.entries = StrMap<*MetricEntry>(null, 32, allocator)
+}
+
+public func (this: *Registry) free() {
+    var iter = this.entries.iter()
+    while(iter.hasNext()) {
+        var e = iter.next()
+        this.allocator.free(e.value as (*void))
+    }
+    this.entries.free()
+}
+
+public func (this: *Registry) counter(name: *const char, help: *const char = "") : *Counter {
+    var existing = this.entries.get(name)
+    if(existing != null) {
+        assert(existing.kind == MetricKind.COUNTER)
+        return &existing.counter
+    }
+
+    var entry = this.allocator.alloc(sizeof(:MetricEntry)) as (*MetricEntry)
+    entry.kind = MetricKind.COUNTER
+    entry.name = name
+    entry.help = help
+    entry.counter.init()
+
+    this.entries.put(name, entry)
+    return &entry.counter
+}
+
+public func (this: *Registry) gauge(name: *const char, help: *const char = "") : *Gauge {
+    var existing = this.entries.get(name)
+    if(existing != null) {
+        assert(existing.kind == MetricKind.GAUGE)
+        return &existing.gauge
+    }
+
+    var entry = this.allocator.alloc(sizeof(:MetricEntry)) as (*MetricEntry)
+    entry.kind = MetricKind.GAUGE
+    entry.name = name
+    entry.help = help
+    entry.gauge.init()
+
+    this.entries.put(name, entry)
+    return &entry.gauge
+}
+
+public func (this: *Registry) histogram(
+    name:      *const char,
+    bounds:    *f64,
+    numBounds: i32,
+    help:      *const char = ""
+) : *Histogram {
+    var existing = this.entries.get(name)
+    if(existing != null) {
+        assert(existing.kind == MetricKind.HISTOGRAM)
+        return &existing.histogram
+    }
+
+    var entry = this.allocator.alloc(sizeof(:MetricEntry)) as (*MetricEntry)
+    entry.kind = MetricKind.HISTOGRAM
+    entry.name = name
+    entry.help = help
+    entry.histogram.init(bounds, numBounds)
+
+    this.entries.put(name, entry)
+    return &entry.histogram
+}
+
+// scrapePrometheus writes all metrics in Prometheus text exposition format.
+// Safe to call from any thread concurrently with metric updates.
+public func (this: *Registry) scrapePrometheus(buf: *StringBuilder) {
+    var iter = this.entries.iter()
+    while(iter.hasNext()) {
+        var e = iter.next()
+        var entry = e.value
+
+        if(entry.help != null && entry.help[0] != '\0') {
+            buf.append("# HELP %s %s\n", entry.name, entry.help)
+        }
+
+        switch(entry.kind) {
+            case MetricKind.COUNTER: {
+                buf.append("# TYPE %s counter\n", entry.name)
+                buf.append("%s %lld\n", entry.name, entry.counter.get())
+                break
+            }
+            case MetricKind.GAUGE: {
+                buf.append("# TYPE %s gauge\n", entry.name)
+                buf.append("%s %lld\n", entry.name, entry.gauge.get())
+                break
+            }
+            case MetricKind.HISTOGRAM: {
+                buf.append("# TYPE %s histogram\n", entry.name)
+                var h = &entry.histogram
+                var cumulative: i64 = 0
+                for(var i = 0; i < h.numBounds; i += 1) {
+                    cumulative += h.counts[i].get()
+                    buf.append("%s_bucket{le=\"%.6g\"} %lld\n",
+                        entry.name, h.bounds[i], cumulative)
+                }
+                cumulative += h.counts[h.numBounds].get()
+                buf.append("%s_bucket{le=\"+Inf\"} %lld\n", entry.name, cumulative)
+                buf.append("%s_sum %.6g\n", entry.name, h.sum.get())
+                buf.append("%s_count %lld\n", entry.name, h.totalCount.get())
+                break
+            }
+            default: {}
+        }
+        buf.append("\n")
+    }
+}
+
+// ---------------------------------------------------------------
+// Default global registry — convenience for simple use cases
+// ---------------------------------------------------------------
+
+public var defaultRegistry: Registry
+
+public func MetricsInit(allocator: *const Allocator = null) {
+    defaultRegistry.init(allocator)
+}
