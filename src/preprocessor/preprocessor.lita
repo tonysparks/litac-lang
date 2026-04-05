@@ -275,7 +275,9 @@ public func (this: *Preprocessor) preResolveSymbols(checker: *TypeChecker, isInc
     if(isIncrementalBuild) {
         for(var i = 0; i < this.preCheckers.size(); i += 1) {
             var ctx = this.preCheckers.get(i)
-            if(ctx.module.flags & ModuleFlags.INCREMENTAL_COMPILATION) {
+            // Always run builtin precheckers (e.g. @asStr generation) so that
+            // preprocessor-generated symbols for the rebuilt module are recreated.
+            if(ctx.module.flags & ModuleFlags.INCREMENTAL_COMPILATION || ctx.module.isBuiltin()) {
                 this.callContext.comp = ctx.stmt
                 this.eval(ctx.stmt)
             }
@@ -393,6 +395,17 @@ public func (this: *Preprocessor) drainQueue() {
 
                 for(var i = 0; i < stmts.declarations.size(); i += 1) {
                     var decl = stmts.declarations.get(i)
+
+                    // During incremental builds the builtins precheck always runs.
+                    // Skip regenerating preprocessor symbols that already exist in
+                    // modules that are NOT being rebuilt — they are still valid.
+                    if(!(module.flags & ModuleFlags.INCREMENTAL_COMPILATION)) {
+                        var existingSym = module.symbols.symbolFuncs.get(decl.name.str)
+                        if(existingSym && (existingSym.flags & SymbolFlags.IS_FROM_PREPROCESSOR)) {
+                            continue
+                        }
+                    }
+
                     var sym = context.checker.createDeclSymbol(decl)
 
                     // make sure every import of this module's symbol
