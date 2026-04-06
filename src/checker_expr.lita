@@ -297,7 +297,7 @@ func (this: *TypeChecker) coerceFuncArg(expr: *FuncCallExpr,
             return false
         }
     }
-    
+
     var argInfo = argExpr.operand.typeInfo
 
     if(argInfo.kind == TypeKind.ARRAY) {
@@ -1307,6 +1307,7 @@ func (this: *TypeChecker) addDefaultArguments(type: *TypeInfo, expr: *InitExpr) 
 
         if(!byName && !(!hasNamedArgs && byPos)) {
             var arg = NewInitArgExpr(expr.startPos, expr.endPos, field.varField.name, position, field.varField.defaultExpr, this.allocator) as (*InitArgExpr)
+            arg.isDefault = true
             expr.node.becomeParentOf(arg)
             defaultArgs.add(arg)
         }
@@ -1522,8 +1523,22 @@ func (this: *TypeChecker) resolveInitExpr(expr: *InitExpr) : bool {
 
     for(var i = 0; i < expr.arguments.size(); i += 1) {
         var arg = expr.arguments.get(i)
-        if(!this.resolveInitArgExpr(arg)) {
-            return false
+        if(arg.isDefault && IsAggregate(type)) {
+            // Default field expressions are parsed in the declaring module's scope.
+            // Temporarily switch to that module so identifier lookups (e.g. enum
+            // values, type names) resolve correctly, regardless of which module
+            // instantiates the struct.
+            this.enterModule(type.sym.declared)
+            defer this.leaveModule()
+
+            if(!this.resolveInitArgExpr(arg)) {
+                return false
+            }
+        }
+        else {
+            if(!this.resolveInitArgExpr(arg)) {
+                return false
+            }
         }
     }
 
