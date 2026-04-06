@@ -260,6 +260,65 @@ public func (this: *Registry) scrapePrometheus(buf: *StringBuilder) {
     }
 }
 
+// scrapeJSON writes all metrics as a JSON object of the form:
+// {"metrics":[{"name":"...","help":"...","type":"counter","value":N},
+//             {"name":"...","type":"histogram","sum":F,"count":N,"buckets":[{"le":F,"count":N},...]}]}
+// Safe to call from any thread concurrently with metric updates.
+public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
+    buf.append("{\"metrics\":[")
+    var iter = this.entries.iter()
+    var first = true
+    while(iter.hasNext()) {
+        var e = iter.next()
+        var entry = e.value
+
+        if(!first) {
+            buf.append(",")
+        }
+        first = false
+
+        buf.append("{\"name\":\"%s\"", entry.name)
+
+        if(entry.help != null && entry.help[0] != '\0') {
+            buf.append(",\"help\":\"%s\"", entry.help)
+        }
+
+        switch(entry.kind) {
+            case MetricKind.COUNTER: {
+                buf.append(",\"type\":\"counter\",\"value\":%lld}", entry.counter.get())
+                break
+            }
+            case MetricKind.GAUGE: {
+                buf.append(",\"type\":\"gauge\",\"value\":%lld}", entry.gauge.get())
+                break
+            }
+            case MetricKind.HISTOGRAM: {
+                var h = &entry.histogram
+                buf.append(",\"type\":\"histogram\"")
+                buf.append(",\"sum\":%.6g", h.sum.get())
+                buf.append(",\"count\":%lld", h.totalCount.get())
+                buf.append(",\"buckets\":[")
+                var cumulative: i64 = 0
+                for(var i = 0; i < h.numBounds; i += 1) {
+                    cumulative += h.counts[i].get()
+                    if(i > 0) {
+                        buf.append(",")
+                    }
+                    buf.append("{\"le\":%.6g,\"count\":%lld}", h.bounds[i], cumulative)
+                }
+                cumulative += h.counts[h.numBounds].get()
+                if(h.numBounds > 0) {
+                    buf.append(",")
+                }
+                buf.append("{\"le\":\"+Inf\",\"count\":%lld}]}", cumulative)
+                break
+            }
+            default: {}
+        }
+    }
+    buf.append("]}")
+}
+
 // ---------------------------------------------------------------
 // Default global registry — convenience for simple use cases
 // ---------------------------------------------------------------
