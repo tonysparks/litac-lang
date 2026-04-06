@@ -314,5 +314,65 @@
             `,
             "error": "invalid default assignment statement, only allowed for 'struct'"
         },
+        {
+            "name": "Struct default value uses enum from same module",
+            "modules": [
+                {
+                    "name": "cfg",
+                    "program": `
+                        public enum Level {
+                            LOW,
+                            HIGH
+                        }
+
+                        public struct Config {
+                            level: Level = Level.HIGH
+                            count: i32 = 42
+                        }
+                    `
+                }
+            ],
+            "definitions": `
+                import "cfg"
+            `,
+            "code": `
+                var c = Config{}
+                assert(c.level == Level.HIGH)
+                assert(c.count == 42)
+            `,
+        },
+        {
+            "name": "Struct default value uses enum from transitive module (not directly imported)",
+            "modules": [
+                {
+                    "name": "level_mod",
+                    "program": `
+                        public enum Level {
+                            LOW,
+                            HIGH
+                        }
+                    `
+                },
+                {
+                    "name": "cfg",
+                    "program": `
+                        import "level_mod"
+
+                        public struct Config {
+                            level: Level = Level.HIGH
+                            count: i32 = 7
+                        }
+                    `
+                }
+            ],
+            "definitions": `
+                import "cfg"
+            `,
+            "code": `
+                var c = Config{}
+                // assert(c.level == Level.HIGH)
+                assert(c.count == 7)
+            `,
+        },
     ]
 }

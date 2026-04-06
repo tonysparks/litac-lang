@@ -541,6 +541,7 @@ public struct InitArgExpr {
     fieldName: Identifier
     argPosition: i32
     value: *Expr
+    isDefault: bool
 }
 
 public struct InitExpr {
