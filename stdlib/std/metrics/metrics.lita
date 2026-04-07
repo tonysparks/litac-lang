@@ -1,14 +1,21 @@
 import "std/atomic"
 import "std/map"
 import "std/array"
+import "std/bucket_list"
 import "std/mem"
+import "std/string"
 import "std/string/builder"
+import "std/string/buffer"
 import "std/libc"
 import "std/assert"
 import "std/json"
+import "std/thread"
 
 // Maximum number of histogram bucket boundaries (not counting +Inf)
 public const MAX_HISTOGRAM_BUCKETS = 16
+
+// Maximum byte length of the canonical label key stored per series
+const MAX_KEY_LENGTH = 64
 
 public enum MetricKind {
     COUNTER,
@@ -17,100 +24,369 @@ public enum MetricKind {
 }
 
 // ---------------------------------------------------------------
-// Counter — monotonically increasing i64
+// MetricAttr — a key/value label supplied at update time
 // ---------------------------------------------------------------
 
-public struct Counter {
+public struct MetricAttr {
+    name:  *const char
+    value: *const char
+}
+
+// ---------------------------------------------------------------
+// Internal helpers — build a canonical key from an attr array
+// and copy it to the heap
+// ---------------------------------------------------------------
+
+func buildKey(attrs: *MetricAttr, numAttrs: i32, buf: *StringBuffer) {
+    buf.clear()
+    for(var i = 0; i < numAttrs; i += 1) {
+        if(i > 0) {
+            buf.appendChar(',')
+        }
+        buf.appendStr(attrs[i].name)
+        buf.appendChar('=')
+        buf.appendStr(attrs[i].value)
+    }
+}
+
+// ---------------------------------------------------------------
+// Collect MetricAttr varargs into a stack array.
+// Returns the number of attrs collected.
+// ---------------------------------------------------------------
+
+const MAX_INLINE_ATTRS = 16
+
+func collectAttrs(
+    list: *va_list,
+    vargs: NativeVararg,
+    out: *MetricAttr
+) : i32 {
+    assert(vargs.numberOfArgs <= MAX_INLINE_ATTRS)
+    for(var i = 0; i < vargs.numberOfArgs; i += 1) {
+        assert(vargs.args[i] == typeof(:MetricAttr))
+        out[i] = va_arg<MetricAttr>(*list)
+    }
+    return vargs.numberOfArgs
+}
+
+// ---------------------------------------------------------------
+// Counter
+// ---------------------------------------------------------------
+
+struct CounterSeries {
+    key:   [MAX_KEY_LENGTH]char
+    attrs: Array<MetricAttr>
     value: Atomic<i64>
 }
 
-public func (this: *Counter) init() {
-    this.value.init(0)
+public struct Counter {
+    series:    BucketList<CounterSeries>
+    mutex:     Mutex
+    allocator: *const Allocator
 }
 
-public func (this: *Counter) inc() {
-    this.value.getAdd(1)
+public func (this: *Counter) init(allocator: *const Allocator) {
+    this.allocator = allocator
+    this.series.init(4, allocator)
+    this.mutex.init()
 }
 
-public func (this: *Counter) add(n: i64) {
-    this.value.getAdd(n)
+public func (this: *Counter) free() {
+    for(var i = 0; i < this.series.size(); i += 1) {
+        this.series.getPtr(i).attrs.free()
+    }
+    this.series.free()
+    this.mutex.destroy()
+}
+
+func (this: *Counter) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<i64> {
+    var keyBufData: [MAX_KEY_LENGTH]char;
+    var keyBuf = StringBufferInit(keyBufData, MAX_KEY_LENGTH, 0)
+    buildKey(attrs, numAttrs, &keyBuf)
+
+    // lock-free scan — getPtr returns a stable pointer into a bucket; buckets
+    // are never freed or moved when the list grows.
+    for(var i = 0; i < this.series.size(); i += 1) {
+        var s = this.series.getPtr(i)
+        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+            return &s.value
+        }
+    }
+
+    // create new series under lock
+    this.mutex.lock()
+    defer this.mutex.unlock()
+
+    // double-check under lock
+    for(var i = 0; i < this.series.size(); i += 1) {
+        var s = this.series.getPtr(i)
+        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+            return &s.value
+        }
+    }
+
+    var newSeries: CounterSeries;
+    var keyDst = StringBufferInit(newSeries.key, MAX_KEY_LENGTH, 0)
+    keyDst.appendStrn(keyBuf.buffer, keyBuf.length)
+    newSeries.attrs.init(numAttrs, this.allocator)
+    for(var i = 0; i < numAttrs; i += 1) {
+        newSeries.attrs.add(attrs[i])
+    }
+    newSeries.value.init(0)
+    this.series.add(newSeries)
+    return &this.series.lastPtr().value
+}
+
+public func (this: *Counter) inc($...) {
+    var list: va_list;
+    va_start(list, this)
+    var vargs = va_arg<NativeVararg>(list)
+    var attrs: [MAX_INLINE_ATTRS]MetricAttr;
+    var numAttrs = collectAttrs(&list, vargs, attrs)
+    va_end(list)
+    this.findOrCreate(attrs, numAttrs).getAdd(1)
+}
+
+public func (this: *Counter) add(n: i64, $...) {
+    var list: va_list;
+    va_start(list, n)
+    var vargs = va_arg<NativeVararg>(list)
+    var attrs: [MAX_INLINE_ATTRS]MetricAttr;
+    var numAttrs = collectAttrs(&list, vargs, attrs)
+    va_end(list)
+    this.findOrCreate(attrs, numAttrs).getAdd(n)
 }
 
 public func (this: *Counter) get() : i64 {
-    return this.value.get()
+    var total: i64 = 0
+    for(var i = 0; i < this.series.size(); i += 1) {
+        total += this.series.getPtr(i).value.get()
+    }
+    return total
 }
 
 // ---------------------------------------------------------------
-// Gauge — arbitrary i64 value
+// Gauge
 // ---------------------------------------------------------------
 
-public struct Gauge {
+struct GaugeSeries {
+    key:   [MAX_KEY_LENGTH]char
+    attrs: Array<MetricAttr>
     value: Atomic<i64>
 }
 
-public func (this: *Gauge) init() {
-    this.value.init(0)
+public struct Gauge {
+    series:    BucketList<GaugeSeries>
+    mutex:     Mutex
+    allocator: *const Allocator
 }
 
-public func (this: *Gauge) set(v: i64) {
-    this.value.set(v)
+public func (this: *Gauge) init(allocator: *const Allocator) {
+    this.allocator = allocator
+    this.series.init(4, allocator)
+    this.mutex.init()
 }
 
-public func (this: *Gauge) add(n: i64) {
-    this.value.getAdd(n)
+public func (this: *Gauge) free() {
+    for(var i = 0; i < this.series.size(); i += 1) {
+        this.series.getPtr(i).attrs.free()
+    }
+    this.series.free()
+    this.mutex.destroy()
 }
 
-public func (this: *Gauge) sub(n: i64) {
-    this.value.getSub(n)
+func (this: *Gauge) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<i64> {
+    var keyBufData: [MAX_KEY_LENGTH]char;
+    var keyBuf = StringBufferInit(keyBufData, MAX_KEY_LENGTH, 0)
+    buildKey(attrs, numAttrs, &keyBuf)
+
+    for(var i = 0; i < this.series.size(); i += 1) {
+        var s = this.series.getPtr(i)
+        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+            return &s.value
+        }
+    }
+
+    this.mutex.lock()
+    defer this.mutex.unlock()
+
+    for(var i = 0; i < this.series.size(); i += 1) {
+        var s = this.series.getPtr(i)
+        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+            return &s.value
+        }
+    }
+
+    var newSeries: GaugeSeries;
+    var keyDst = StringBufferInit(newSeries.key, MAX_KEY_LENGTH, 0)
+    keyDst.appendStrn(keyBuf.buffer, keyBuf.length)
+    newSeries.attrs.init(numAttrs, this.allocator)
+    for(var i = 0; i < numAttrs; i += 1) {
+        newSeries.attrs.add(attrs[i])
+    }
+    newSeries.value.init(0)
+    this.series.add(newSeries)
+    return &this.series.lastPtr().value
+}
+
+public func (this: *Gauge) set(v: i64, $...) {
+    var list: va_list;
+    va_start(list, v)
+    var vargs = va_arg<NativeVararg>(list)
+    var attrs: [MAX_INLINE_ATTRS]MetricAttr;
+    var numAttrs = collectAttrs(&list, vargs, attrs)
+    va_end(list)
+    this.findOrCreate(attrs, numAttrs).set(v)
+}
+
+public func (this: *Gauge) add(n: i64, $...) {
+    var list: va_list;
+    va_start(list, n)
+    var vargs = va_arg<NativeVararg>(list)
+    var attrs: [MAX_INLINE_ATTRS]MetricAttr;
+    var numAttrs = collectAttrs(&list, vargs, attrs)
+    va_end(list)
+    this.findOrCreate(attrs, numAttrs).getAdd(n)
+}
+
+public func (this: *Gauge) sub(n: i64, $...) {
+    var list: va_list;
+    va_start(list, n)
+    var vargs = va_arg<NativeVararg>(list)
+    var attrs: [MAX_INLINE_ATTRS]MetricAttr;
+    var numAttrs = collectAttrs(&list, vargs, attrs)
+    va_end(list)
+    this.findOrCreate(attrs, numAttrs).getSub(n)
 }
 
 public func (this: *Gauge) get() : i64 {
-    return this.value.get()
+    var total: i64 = 0
+    for(var i = 0; i < this.series.size(); i += 1) {
+        total += this.series.getPtr(i).value.get()
+    }
+    return total
 }
 
 // ---------------------------------------------------------------
 // Histogram — fixed-size bucket array, cumulative at scrape time
-//
-// Observation is O(n) scan (n <= MAX_HISTOGRAM_BUCKETS).
-// Each bucket stores the count of observations that fall strictly
-// into that band; cumulative sums are computed at scrape time.
-// The last slot (index numBounds) is the +Inf bucket.
 // ---------------------------------------------------------------
 
-public struct Histogram {
-    numBounds:  i32
-    bounds:     [MAX_HISTOGRAM_BUCKETS]f64
-    // counts[i] holds observations where bounds[i-1] < v <= bounds[i]
-    // counts[numBounds] is the +Inf bucket
-    counts:     [MAX_HISTOGRAM_BUCKETS + 1]Atomic<i64>
-    sum:        AtomicF64
-    totalCount: Atomic<i64>
+struct HistogramSeries {
+    key:    [MAX_KEY_LENGTH]char
+    attrs:  Array<MetricAttr>
+    counts: [MAX_HISTOGRAM_BUCKETS + 1]Atomic<i64>
+    sum:    AtomicF64
+    count:  Atomic<i64>
 }
 
-public func (this: *Histogram) init(bounds: *f64, numBounds: i32) {
+func (this: *HistogramSeries) init(allocator: *const Allocator,
+                                   attrs: *MetricAttr, numAttrs: i32) {
+    for(var i = 0; i <= MAX_HISTOGRAM_BUCKETS; i += 1) {
+        this.counts[i].init(0)
+    }
+    this.sum.init(0.0)
+    this.count.init(0)
+    this.attrs.init(numAttrs, allocator)
+    for(var i = 0; i < numAttrs; i += 1) {
+        this.attrs.add(attrs[i])
+    }
+}
+
+public struct Histogram {
+    numBounds: i32
+    bounds:    [MAX_HISTOGRAM_BUCKETS]f64
+    series:    BucketList<HistogramSeries>
+    mutex:     Mutex
+    allocator: *const Allocator
+}
+
+public func (this: *Histogram) init(bounds: *f64, numBounds: i32,
+                                    allocator: *const Allocator) {
     assert(numBounds <= MAX_HISTOGRAM_BUCKETS)
     this.numBounds = numBounds
     for(var i = 0; i < numBounds; i += 1) {
         this.bounds[i] = bounds[i]
     }
-    for(var i = 0; i <= MAX_HISTOGRAM_BUCKETS; i += 1) {
-        this.counts[i].init(0)
-    }
-    this.sum.init(0.0)
-    this.totalCount.init(0)
+    this.allocator = allocator
+    this.series.init(4, allocator)
+    this.mutex.init()
 }
 
-public func (this: *Histogram) observe(val: f64) {
-    this.totalCount.getAdd(1)
-    this.sum.add(val)
+public func (this: *Histogram) free() {
+    for(var i = 0; i < this.series.size(); i += 1) {
+        this.series.getPtr(i).attrs.free()
+    }
+    this.series.free()
+    this.mutex.destroy()
+}
 
-    // Find the first bucket whose upper bound >= val
+func (this: *Histogram) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *HistogramSeries {
+    var keyBufData: [MAX_KEY_LENGTH]char;
+    var keyBuf = StringBufferInit(keyBufData, MAX_KEY_LENGTH, 0)
+    buildKey(attrs, numAttrs, &keyBuf)
+
+    // lock-free scan — getPtr returns a stable pointer into a bucket; buckets
+    // are never freed or moved when the list grows.
+    for(var i = 0; i < this.series.size(); i += 1) {
+        var s = this.series.getPtr(i)
+        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+            return s
+        }
+    }
+
+    this.mutex.lock()
+    defer this.mutex.unlock()
+
+    for(var i = 0; i < this.series.size(); i += 1) {
+        var s = this.series.getPtr(i)
+        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+            return s
+        }
+    }
+
+    var newSeries: HistogramSeries;
+    var keyDst = StringBufferInit(newSeries.key, MAX_KEY_LENGTH, 0)
+    keyDst.appendStrn(keyBuf.buffer, keyBuf.length)
+    newSeries.init(this.allocator, attrs, numAttrs)
+    this.series.add(newSeries)
+    return this.series.lastPtr()
+}
+
+// totalCount returns the sum of observations across all series.
+public func (this: *Histogram) totalCount() : i64 {
+    var n: i64 = 0
+    for(var i = 0; i < this.series.size(); i += 1) {
+        n += this.series.getPtr(i).count.get()
+    }
+    return n
+}
+
+// bucketCount returns the raw (non-cumulative) count for bucket idx across all series.
+public func (this: *Histogram) bucketCount(idx: i32) : i64 {
+    var n: i64 = 0
+    for(var i = 0; i < this.series.size(); i += 1) {
+        n += this.series.getPtr(i).counts[idx].get()
+    }
+    return n
+}
+
+public func (this: *Histogram) observe(val: f64, $...) {
+    var list: va_list;
+    va_start(list, val)
+    var vargs = va_arg<NativeVararg>(list)
+    var attrs: [MAX_INLINE_ATTRS]MetricAttr;
+    var numAttrs = collectAttrs(&list, vargs, attrs)
+    va_end(list)
+
+    var s = this.findOrCreate(attrs, numAttrs)
+    s.count.getAdd(1)
+    s.sum.add(val)
+
     var i = 0
     while(i < this.numBounds && val > this.bounds[i]) {
         i += 1
     }
-    // i == numBounds means +Inf bucket
-    this.counts[i].getAdd(1)
+    s.counts[i].getAdd(1)
 }
 
 // ---------------------------------------------------------------
@@ -134,9 +410,11 @@ struct MetricEntry {
 // Thread safety model:
 //   - Registration (counter/gauge/histogram) must happen before
 //     serving requests (single-threaded startup).
-//   - Metric updates (inc/add/observe/set) are fully lock-free via
-//     atomics and safe from any thread.
-//   - scrapePrometheus is safe to call concurrently with updates.
+//   - Metric updates (inc/add/observe/set/sub) are safe from any
+//     thread: new series are created under a per-metric mutex;
+//     value updates use lock-free atomics.
+//   - scrapePrometheus / scrapeJSON are safe to call concurrently
+//     with updates but should not race with new series creation.
 // ---------------------------------------------------------------
 
 public struct Registry {
@@ -156,12 +434,22 @@ public func (this: *Registry) free() {
     var iter = this.entries.iter()
     while(iter.hasNext()) {
         var e = iter.next()
-        this.allocator.free(e.value as (*void))
+        var entry = e.value
+        switch(entry.kind) {
+            case MetricKind.COUNTER:   { entry.counter.free();   break }
+            case MetricKind.GAUGE:     { entry.gauge.free();     break }
+            case MetricKind.HISTOGRAM: { entry.histogram.free(); break }
+            default: {}
+        }
+        this.allocator.free(entry as (*void))
     }
     this.entries.free()
 }
 
-public func (this: *Registry) counter(name: *const char, help: *const char = "") : *Counter {
+public func (this: *Registry) counter(
+    name: *const char,
+    help: *const char = ""
+) : *Counter {
     var existing = this.entries.get(name)
     if(existing != null) {
         assert(existing.kind == MetricKind.COUNTER)
@@ -172,13 +460,16 @@ public func (this: *Registry) counter(name: *const char, help: *const char = "")
     entry.kind = MetricKind.COUNTER
     entry.name = name
     entry.help = help
-    entry.counter.init()
+    entry.counter.init(this.allocator)
 
     this.entries.put(name, entry)
     return &entry.counter
 }
 
-public func (this: *Registry) gauge(name: *const char, help: *const char = "") : *Gauge {
+public func (this: *Registry) gauge(
+    name: *const char,
+    help: *const char = ""
+) : *Gauge {
     var existing = this.entries.get(name)
     if(existing != null) {
         assert(existing.kind == MetricKind.GAUGE)
@@ -189,7 +480,7 @@ public func (this: *Registry) gauge(name: *const char, help: *const char = "") :
     entry.kind = MetricKind.GAUGE
     entry.name = name
     entry.help = help
-    entry.gauge.init()
+    entry.gauge.init(this.allocator)
 
     this.entries.put(name, entry)
     return &entry.gauge
@@ -211,10 +502,41 @@ public func (this: *Registry) histogram(
     entry.kind = MetricKind.HISTOGRAM
     entry.name = name
     entry.help = help
-    entry.histogram.init(bounds, numBounds)
+    entry.histogram.init(bounds, numBounds, this.allocator)
 
     this.entries.put(name, entry)
     return &entry.histogram
+}
+
+// ---------------------------------------------------------------
+// Prometheus scrape helpers
+// ---------------------------------------------------------------
+
+func appendPrometheusLabels(buf: *StringBuilder, attrs: *Array<MetricAttr>) {
+    if(attrs.size() <= 0) {
+        return;
+    }
+    buf.appendChar('{')
+    for(var i = 0; i < attrs.size(); i += 1) {
+        if(i > 0) {
+            buf.appendChar(',')
+        }
+        var a = attrs.get(i)
+        buf.append("%s=\"%s\"", a.name, a.value)
+    }
+    buf.appendChar('}')
+}
+
+func appendPrometheusHistogramLabels(buf: *StringBuilder, le: *const char,
+                                     attrs: *Array<MetricAttr>) {
+    buf.appendStr("{le=\"")
+    buf.appendStr(le)
+    buf.appendChar('"')
+    for(var i = 0; i < attrs.size(); i += 1) {
+        var a = attrs.get(i)
+        buf.append(",%s=\"%s\"", a.name, a.value)
+    }
+    buf.appendChar('}')
 }
 
 // scrapePrometheus writes all metrics in Prometheus text exposition format.
@@ -232,27 +554,54 @@ public func (this: *Registry) scrapePrometheus(buf: *StringBuilder) {
         switch(entry.kind) {
             case MetricKind.COUNTER: {
                 buf.append("# TYPE %s counter\n", entry.name)
-                buf.append("%s %lld\n", entry.name, entry.counter.get())
+                for(var i = 0; i < entry.counter.series.size(); i += 1) {
+                    var s = entry.counter.series.getPtr(i)
+                    buf.appendStr(entry.name)
+                    appendPrometheusLabels(buf, &s.attrs)
+                    buf.append(" %lld\n", s.value.get())
+                }
                 break
             }
             case MetricKind.GAUGE: {
                 buf.append("# TYPE %s gauge\n", entry.name)
-                buf.append("%s %lld\n", entry.name, entry.gauge.get())
+                for(var i = 0; i < entry.gauge.series.size(); i += 1) {
+                    var s = entry.gauge.series.getPtr(i)
+                    buf.appendStr(entry.name)
+                    appendPrometheusLabels(buf, &s.attrs)
+                    buf.append(" %lld\n", s.value.get())
+                }
                 break
             }
             case MetricKind.HISTOGRAM: {
                 buf.append("# TYPE %s histogram\n", entry.name)
                 var h = &entry.histogram
-                var cumulative: i64 = 0
-                for(var i = 0; i < h.numBounds; i += 1) {
-                    cumulative += h.counts[i].get()
-                    buf.append("%s_bucket{le=\"%.6g\"} %lld\n",
-                        entry.name, h.bounds[i], cumulative)
+                var leBufData: [32]char;
+                var leBuf = StringBufferInit(leBufData, 32, 0)
+                for(var si = 0; si < h.series.size(); si += 1) {
+                    var s = h.series.getPtr(si)
+                    var cumulative: i64 = 0
+                    for(var i = 0; i < h.numBounds; i += 1) {
+                        cumulative += s.counts[i].get()
+                        leBuf.format("%.6g", h.bounds[i])
+                        buf.appendStr(entry.name)
+                        buf.appendStr("_bucket")
+                        appendPrometheusHistogramLabels(buf, leBuf.cStrConst(), &s.attrs)
+                        buf.append(" %lld\n", cumulative)
+                    }
+                    cumulative += s.counts[h.numBounds].get()
+                    buf.appendStr(entry.name)
+                    buf.appendStr("_bucket")
+                    appendPrometheusHistogramLabels(buf, "+Inf", &s.attrs)
+                    buf.append(" %lld\n", cumulative)
+                    buf.appendStr(entry.name)
+                    buf.appendStr("_sum")
+                    appendPrometheusLabels(buf, &s.attrs)
+                    buf.append(" %.6g\n", s.sum.get())
+                    buf.appendStr(entry.name)
+                    buf.appendStr("_count")
+                    appendPrometheusLabels(buf, &s.attrs)
+                    buf.append(" %lld\n", s.count.get())
                 }
-                cumulative += h.counts[h.numBounds].get()
-                buf.append("%s_bucket{le=\"+Inf\"} %lld\n", entry.name, cumulative)
-                buf.append("%s_sum %.6g\n", entry.name, h.sum.get())
-                buf.append("%s_count %lld\n", entry.name, h.totalCount.get())
                 break
             }
             default: {}
@@ -261,61 +610,106 @@ public func (this: *Registry) scrapePrometheus(buf: *StringBuilder) {
     }
 }
 
-// scrapeJSON writes all metrics as a JSON object of the form:
-// {"metrics":[{"name":"...","help":"...","type":"counter","value":N},
-//             {"name":"...","type":"histogram","sum":F,"count":N,"buckets":[{"le":F,"count":N},...]}]}
+// ---------------------------------------------------------------
+// JSON scrape helpers
+// ---------------------------------------------------------------
+
+func appendJSONAttrs(buf: *StringBuilder, attrs: *Array<MetricAttr>) {
+    if(attrs.size() <= 0) {
+        return;
+    }
+    buf.appendStr(",\"attributes\":{")
+    for(var i = 0; i < attrs.size(); i += 1) {
+        if(i > 0) {
+            buf.appendChar(',')
+        }
+        var a = attrs.get(i)
+        buf.appendChar('"')
+        JsonEscapeString(buf, a.name, strlen(a.name))
+        buf.appendStr("\":\"")
+        JsonEscapeString(buf, a.value, strlen(a.value))
+        buf.appendChar('"')
+    }
+    buf.appendChar('}')
+}
+
+// scrapeJSON writes all metrics as a JSON object.
+// Each series within a metric is emitted as a separate entry in the array.
 // Safe to call from any thread concurrently with metric updates.
 public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
     buf.appendStr("{\"metrics\":[")
     var iter = this.entries.iter()
-    var first = true
+    var firstEntry = true
     while(iter.hasNext()) {
         var e = iter.next()
         var entry = e.value
 
-        if(!first) {
-            buf.appendChar(',')
-        }
-        first = false
-
-        buf.appendStr("{\"name\":\"")
-        JsonEscapeString(buf, entry.name, strlen(entry.name))
-        buf.appendChar('"')
-
-        if(entry.help != null && entry.help[0] != '\0') {
-            buf.appendStr(",\"help\":\"")
-            JsonEscapeString(buf, entry.help, strlen(entry.help))
-            buf.appendChar('"')
-        }
-
         switch(entry.kind) {
             case MetricKind.COUNTER: {
-                buf.append(",\"type\":\"counter\",\"value\":%lld}", entry.counter.get())
+                for(var i = 0; i < entry.counter.series.size(); i += 1) {
+                    var s = entry.counter.series.getPtr(i)
+                    if(!firstEntry) { buf.appendChar(',') }
+                    firstEntry = false
+                    buf.appendStr("{\"name\":\"")
+                    JsonEscapeString(buf, entry.name, strlen(entry.name))
+                    buf.appendChar('"')
+                    if(entry.help != null && entry.help[0] != '\0') {
+                        buf.appendStr(",\"help\":\"")
+                        JsonEscapeString(buf, entry.help, strlen(entry.help))
+                        buf.appendChar('"')
+                    }
+                    appendJSONAttrs(buf, &s.attrs)
+                    buf.append(",\"type\":\"counter\",\"value\":%lld}", s.value.get())
+                }
                 break
             }
             case MetricKind.GAUGE: {
-                buf.append(",\"type\":\"gauge\",\"value\":%lld}", entry.gauge.get())
+                for(var i = 0; i < entry.gauge.series.size(); i += 1) {
+                    var s = entry.gauge.series.getPtr(i)
+                    if(!firstEntry) { buf.appendChar(',') }
+                    firstEntry = false
+                    buf.appendStr("{\"name\":\"")
+                    JsonEscapeString(buf, entry.name, strlen(entry.name))
+                    buf.appendChar('"')
+                    if(entry.help != null && entry.help[0] != '\0') {
+                        buf.appendStr(",\"help\":\"")
+                        JsonEscapeString(buf, entry.help, strlen(entry.help))
+                        buf.appendChar('"')
+                    }
+                    appendJSONAttrs(buf, &s.attrs)
+                    buf.append(",\"type\":\"gauge\",\"value\":%lld}", s.value.get())
+                }
                 break
             }
             case MetricKind.HISTOGRAM: {
                 var h = &entry.histogram
-                buf.append(",\"type\":\"histogram\"")
-                buf.append(",\"sum\":%.6g", h.sum.get())
-                buf.append(",\"count\":%lld", h.totalCount.get())
-                buf.appendStr(",\"buckets\":[")
-                var cumulative: i64 = 0
-                for(var i = 0; i < h.numBounds; i += 1) {
-                    cumulative += h.counts[i].get()
-                    if(i > 0) {
-                        buf.appendChar(',')
+                for(var si = 0; si < h.series.size(); si += 1) {
+                    var s = h.series.getPtr(si)
+                    if(!firstEntry) { buf.appendChar(',') }
+                    firstEntry = false
+                    buf.appendStr("{\"name\":\"")
+                    JsonEscapeString(buf, entry.name, strlen(entry.name))
+                    buf.appendChar('"')
+                    if(entry.help != null && entry.help[0] != '\0') {
+                        buf.appendStr(",\"help\":\"")
+                        JsonEscapeString(buf, entry.help, strlen(entry.help))
+                        buf.appendChar('"')
                     }
-                    buf.append("{\"le\":%.6g,\"count\":%lld}", h.bounds[i], cumulative)
+                    appendJSONAttrs(buf, &s.attrs)
+                    buf.append(",\"type\":\"histogram\"")
+                    buf.append(",\"sum\":%.6g", s.sum.get())
+                    buf.append(",\"count\":%lld", s.count.get())
+                    buf.appendStr(",\"buckets\":[")
+                    var cumulative: i64 = 0
+                    for(var i = 0; i < h.numBounds; i += 1) {
+                        cumulative += s.counts[i].get()
+                        if(i > 0) { buf.appendChar(',') }
+                        buf.append("{\"le\":%.6g,\"count\":%lld}", h.bounds[i], cumulative)
+                    }
+                    cumulative += s.counts[h.numBounds].get()
+                    if(h.numBounds > 0) { buf.appendChar(',') }
+                    buf.append("{\"le\":\"+Inf\",\"count\":%lld}]}", cumulative)
                 }
-                cumulative += h.counts[h.numBounds].get()
-                if(h.numBounds > 0) {
-                    buf.appendChar(',')
-                }
-                buf.append("{\"le\":\"+Inf\",\"count\":%lld}]}", cumulative)
                 break
             }
             default: {}
