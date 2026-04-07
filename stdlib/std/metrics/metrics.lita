@@ -3,6 +3,7 @@ import "std/map"
 import "std/array"
 import "std/mem"
 import "std/string/builder"
+import "std/string/buffer"
 import "std/libc"
 import "std/assert"
 import "std/json"
@@ -114,13 +115,24 @@ public func (this: *Histogram) observe(val: f64) {
 }
 
 // ---------------------------------------------------------------
+// MetricAttr — a key/value label attached to a metric at registration
+// ---------------------------------------------------------------
+
+public struct MetricAttr {
+    name:  *const char
+    value: *const char
+}
+
+// ---------------------------------------------------------------
 // MetricEntry — tagged union held by the Registry
 // ---------------------------------------------------------------
 
 struct MetricEntry {
-    kind: MetricKind
-    name: *const char
-    help: *const char
+    kind:     MetricKind
+    name:     *const char
+    help:     *const char
+    attrs:    *MetricAttr
+    numAttrs: i32
     union {
         counter:   Counter
         gauge:     Gauge
@@ -161,7 +173,12 @@ public func (this: *Registry) free() {
     this.entries.free()
 }
 
-public func (this: *Registry) counter(name: *const char, help: *const char = "") : *Counter {
+public func (this: *Registry) counter(
+    name:     *const char,
+    help:     *const char = "",
+    attrs:    *MetricAttr = null,
+    numAttrs: i32 = 0
+) : *Counter {
     var existing = this.entries.get(name)
     if(existing != null) {
         assert(existing.kind == MetricKind.COUNTER)
@@ -169,16 +186,23 @@ public func (this: *Registry) counter(name: *const char, help: *const char = "")
     }
 
     var entry = this.allocator.alloc(sizeof(:MetricEntry)) as (*MetricEntry)
-    entry.kind = MetricKind.COUNTER
-    entry.name = name
-    entry.help = help
+    entry.kind     = MetricKind.COUNTER
+    entry.name     = name
+    entry.help     = help
+    entry.attrs    = attrs
+    entry.numAttrs = numAttrs
     entry.counter.init()
 
     this.entries.put(name, entry)
     return &entry.counter
 }
 
-public func (this: *Registry) gauge(name: *const char, help: *const char = "") : *Gauge {
+public func (this: *Registry) gauge(
+    name:     *const char,
+    help:     *const char = "",
+    attrs:    *MetricAttr = null,
+    numAttrs: i32 = 0
+) : *Gauge {
     var existing = this.entries.get(name)
     if(existing != null) {
         assert(existing.kind == MetricKind.GAUGE)
@@ -186,9 +210,11 @@ public func (this: *Registry) gauge(name: *const char, help: *const char = "") :
     }
 
     var entry = this.allocator.alloc(sizeof(:MetricEntry)) as (*MetricEntry)
-    entry.kind = MetricKind.GAUGE
-    entry.name = name
-    entry.help = help
+    entry.kind     = MetricKind.GAUGE
+    entry.name     = name
+    entry.help     = help
+    entry.attrs    = attrs
+    entry.numAttrs = numAttrs
     entry.gauge.init()
 
     this.entries.put(name, entry)
@@ -199,7 +225,9 @@ public func (this: *Registry) histogram(
     name:      *const char,
     bounds:    *f64,
     numBounds: i32,
-    help:      *const char = ""
+    help:      *const char = "",
+    attrs:     *MetricAttr = null,
+    numAttrs:  i32 = 0
 ) : *Histogram {
     var existing = this.entries.get(name)
     if(existing != null) {
@@ -208,13 +236,41 @@ public func (this: *Registry) histogram(
     }
 
     var entry = this.allocator.alloc(sizeof(:MetricEntry)) as (*MetricEntry)
-    entry.kind = MetricKind.HISTOGRAM
-    entry.name = name
-    entry.help = help
+    entry.kind     = MetricKind.HISTOGRAM
+    entry.name     = name
+    entry.help     = help
+    entry.attrs    = attrs
+    entry.numAttrs = numAttrs
     entry.histogram.init(bounds, numBounds)
 
     this.entries.put(name, entry)
     return &entry.histogram
+}
+
+// appendPrometheusLabels writes "{k="v",...}" when there are attrs, or nothing.
+func appendPrometheusLabels(buf: *StringBuilder, attrs: *MetricAttr, numAttrs: i32) {
+    if(numAttrs <= 0) {
+        return;
+    }
+    buf.appendChar('{')
+    for(var i = 0; i < numAttrs; i += 1) {
+        if(i > 0) {
+            buf.appendChar(',')
+        }
+        buf.append("%s=\"%s\"", attrs[i].name, attrs[i].value)
+    }
+    buf.appendChar('}')
+}
+
+// appendPrometheusHistogramLabels writes "{le="<le>",k="v",...}".
+func appendPrometheusHistogramLabels(buf: *StringBuilder, le: *const char, attrs: *MetricAttr, numAttrs: i32) {
+    buf.appendStr("{le=\"")
+    buf.appendStr(le)
+    buf.appendChar('"')
+    for(var i = 0; i < numAttrs; i += 1) {
+        buf.append(",%s=\"%s\"", attrs[i].name, attrs[i].value)
+    }
+    buf.appendChar('}')
 }
 
 // scrapePrometheus writes all metrics in Prometheus text exposition format.
@@ -232,27 +288,45 @@ public func (this: *Registry) scrapePrometheus(buf: *StringBuilder) {
         switch(entry.kind) {
             case MetricKind.COUNTER: {
                 buf.append("# TYPE %s counter\n", entry.name)
-                buf.append("%s %lld\n", entry.name, entry.counter.get())
+                buf.appendStr(entry.name)
+                appendPrometheusLabels(buf, entry.attrs, entry.numAttrs)
+                buf.append(" %lld\n", entry.counter.get())
                 break
             }
             case MetricKind.GAUGE: {
                 buf.append("# TYPE %s gauge\n", entry.name)
-                buf.append("%s %lld\n", entry.name, entry.gauge.get())
+                buf.appendStr(entry.name)
+                appendPrometheusLabels(buf, entry.attrs, entry.numAttrs)
+                buf.append(" %lld\n", entry.gauge.get())
                 break
             }
             case MetricKind.HISTOGRAM: {
                 buf.append("# TYPE %s histogram\n", entry.name)
                 var h = &entry.histogram
                 var cumulative: i64 = 0
+                var leBufData: [32]char;
+                var leBuf = StringBufferInit(leBufData, 32, 0)
                 for(var i = 0; i < h.numBounds; i += 1) {
                     cumulative += h.counts[i].get()
-                    buf.append("%s_bucket{le=\"%.6g\"} %lld\n",
-                        entry.name, h.bounds[i], cumulative)
+                    leBuf.format("%.6g", h.bounds[i])
+                    buf.appendStr(entry.name)
+                    buf.appendStr("_bucket")
+                    appendPrometheusHistogramLabels(buf, leBuf.cStrConst(), entry.attrs, entry.numAttrs)
+                    buf.append(" %lld\n", cumulative)
                 }
                 cumulative += h.counts[h.numBounds].get()
-                buf.append("%s_bucket{le=\"+Inf\"} %lld\n", entry.name, cumulative)
-                buf.append("%s_sum %.6g\n", entry.name, h.sum.get())
-                buf.append("%s_count %lld\n", entry.name, h.totalCount.get())
+                buf.appendStr(entry.name)
+                buf.appendStr("_bucket")
+                appendPrometheusHistogramLabels(buf, "+Inf", entry.attrs, entry.numAttrs)
+                buf.append(" %lld\n", cumulative)
+                buf.appendStr(entry.name)
+                buf.appendStr("_sum")
+                appendPrometheusLabels(buf, entry.attrs, entry.numAttrs)
+                buf.append(" %.6g\n", h.sum.get())
+                buf.appendStr(entry.name)
+                buf.appendStr("_count")
+                appendPrometheusLabels(buf, entry.attrs, entry.numAttrs)
+                buf.append(" %lld\n", h.totalCount.get())
                 break
             }
             default: {}
@@ -261,8 +335,27 @@ public func (this: *Registry) scrapePrometheus(buf: *StringBuilder) {
     }
 }
 
+// appendJSONAttributes writes ,"attributes":{...} when there are attrs.
+func appendJSONAttributes(buf: *StringBuilder, attrs: *MetricAttr, numAttrs: i32) {
+    if(numAttrs <= 0) {
+        return;
+    }
+    buf.appendStr(",\"attributes\":{")
+    for(var i = 0; i < numAttrs; i += 1) {
+        if(i > 0) {
+            buf.appendChar(',')
+        }
+        buf.appendChar('"')
+        JsonEscapeString(buf, attrs[i].name, strlen(attrs[i].name))
+        buf.appendStr("\":\"")
+        JsonEscapeString(buf, attrs[i].value, strlen(attrs[i].value))
+        buf.appendChar('"')
+    }
+    buf.appendChar('}')
+}
+
 // scrapeJSON writes all metrics as a JSON object of the form:
-// {"metrics":[{"name":"...","help":"...","type":"counter","value":N},
+// {"metrics":[{"name":"...","help":"...","type":"counter","value":N,"attributes":{...}},
 //             {"name":"...","type":"histogram","sum":F,"count":N,"buckets":[{"le":F,"count":N},...]}]}
 // Safe to call from any thread concurrently with metric updates.
 public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
@@ -287,6 +380,8 @@ public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
             JsonEscapeString(buf, entry.help, strlen(entry.help))
             buf.appendChar('"')
         }
+
+        appendJSONAttributes(buf, entry.attrs, entry.numAttrs)
 
         switch(entry.kind) {
             case MetricKind.COUNTER: {
