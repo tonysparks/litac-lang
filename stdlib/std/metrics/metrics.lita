@@ -1,6 +1,7 @@
 import "std/atomic"
 import "std/map"
 import "std/array"
+import "std/bucket_list"
 import "std/mem"
 import "std/string"
 import "std/string/builder"
@@ -79,7 +80,7 @@ struct CounterSeries {
 }
 
 public struct Counter {
-    series:    Array<CounterSeries>
+    series:    BucketList<CounterSeries>
     mutex:     Mutex
     allocator: *const Allocator
 }
@@ -103,7 +104,8 @@ func (this: *Counter) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<
     var keyBuf = StringBufferInit(keyBufData, MAX_KEY_LENGTH, 0)
     buildKey(attrs, numAttrs, &keyBuf)
 
-    // lock-free scan for existing series
+    // lock-free scan — getPtr returns a stable pointer into a bucket; buckets
+    // are never freed or moved when the list grows.
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
         if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
@@ -174,7 +176,7 @@ struct GaugeSeries {
 }
 
 public struct Gauge {
-    series:    Array<GaugeSeries>
+    series:    BucketList<GaugeSeries>
     mutex:     Mutex
     allocator: *const Allocator
 }
@@ -293,7 +295,7 @@ func (this: *HistogramSeries) init(allocator: *const Allocator,
 public struct Histogram {
     numBounds: i32
     bounds:    [MAX_HISTOGRAM_BUCKETS]f64
-    series:    Array<HistogramSeries>
+    series:    BucketList<HistogramSeries>
     mutex:     Mutex
     allocator: *const Allocator
 }
@@ -323,6 +325,8 @@ func (this: *Histogram) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Histo
     var keyBuf = StringBufferInit(keyBufData, MAX_KEY_LENGTH, 0)
     buildKey(attrs, numAttrs, &keyBuf)
 
+    // lock-free scan — getPtr returns a stable pointer into a bucket; buckets
+    // are never freed or moved when the list grows.
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
         if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
