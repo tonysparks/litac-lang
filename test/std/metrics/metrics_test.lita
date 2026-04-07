@@ -3,6 +3,7 @@ import "std/string/builder"
 import "std/string"
 import "std/assert"
 import "std/libc"
+import "std/mem"
 import "std/thread"
 import "std/atomic"
 
@@ -13,14 +14,16 @@ import "std/atomic"
 @test("counter starts at zero")
 func testCounterInit() {
     var c: Counter;
-    c.init()
+    c.init(defaultAllocator)
+    defer c.free()
     assert(c.get() == 0)
 }
 
 @test("counter inc increments by one")
 func testCounterInc() {
     var c: Counter;
-    c.init()
+    c.init(defaultAllocator)
+    defer c.free()
     c.inc()
     c.inc()
     c.inc()
@@ -30,10 +33,23 @@ func testCounterInc() {
 @test("counter add increments by n")
 func testCounterAdd() {
     var c: Counter;
-    c.init()
+    c.init(defaultAllocator)
+    defer c.free()
     c.add(10)
     c.add(5)
     assert(c.get() == 15)
+}
+
+@test("counter inc with attrs creates separate series")
+func testCounterIncWithAttrs() {
+    var c: Counter;
+    c.init(defaultAllocator)
+    defer c.free()
+    c.inc(MetricAttr { .name = "method", .value = "GET" })
+    c.inc(MetricAttr { .name = "method", .value = "GET" })
+    c.inc(MetricAttr { .name = "method", .value = "POST" })
+    // get() sums all series
+    assert(c.get() == 3)
 }
 
 // ---------------------------------------------------------------
@@ -43,14 +59,16 @@ func testCounterAdd() {
 @test("gauge starts at zero")
 func testGaugeInit() {
     var g: Gauge;
-    g.init()
+    g.init(defaultAllocator)
+    defer g.free()
     assert(g.get() == 0)
 }
 
 @test("gauge set replaces the value")
 func testGaugeSet() {
     var g: Gauge;
-    g.init()
+    g.init(defaultAllocator)
+    defer g.free()
     g.set(42)
     assert(g.get() == 42)
     g.set(7)
@@ -60,7 +78,8 @@ func testGaugeSet() {
 @test("gauge add and sub")
 func testGaugeAddSub() {
     var g: Gauge;
-    g.init()
+    g.init(defaultAllocator)
+    defer g.free()
     g.add(10)
     g.add(5)
     assert(g.get() == 15)
@@ -71,7 +90,8 @@ func testGaugeAddSub() {
 @test("gauge can go negative")
 func testGaugeNegative() {
     var g: Gauge;
-    g.init()
+    g.init(defaultAllocator)
+    defer g.free()
     g.sub(5)
     assert(g.get() == -5)
 }
@@ -84,69 +104,69 @@ func testGaugeNegative() {
 func testHistogramInit() {
     var bounds = [3]f64 { 1.0, 5.0, 10.0 }
     var h: Histogram;
-    h.init(bounds, 3)
-    assert(h.totalCount.get() == 0)
-    assert(h.sum.get() == 0.0)
+    h.init(bounds, 3, defaultAllocator)
+    defer h.free()
+    assert(h.totalCount() == 0)
 }
 
 @test("histogram observe routes to correct bucket")
 func testHistogramObserveBuckets() {
     var bounds = [3]f64 { 1.0, 5.0, 10.0 }
     var h: Histogram;
-    h.init(bounds, 3)
+    h.init(bounds, 3, defaultAllocator)
+    defer h.free()
 
     h.observe(0.5)   // bucket 0: <= 1.0
     h.observe(3.0)   // bucket 1: <= 5.0
     h.observe(7.0)   // bucket 2: <= 10.0
     h.observe(99.0)  // bucket 3: +Inf
 
-    assert(h.counts[0].get() == 1)
-    assert(h.counts[1].get() == 1)
-    assert(h.counts[2].get() == 1)
-    assert(h.counts[3].get() == 1)
-    assert(h.totalCount.get() == 4)
+    assert(h.bucketCount(0) == 1)
+    assert(h.bucketCount(1) == 1)
+    assert(h.bucketCount(2) == 1)
+    assert(h.bucketCount(3) == 1)
+    assert(h.totalCount() == 4)
 }
 
 @test("histogram observe accumulates sum")
 func testHistogramSum() {
     var bounds = [2]f64 { 5.0, 10.0 }
     var h: Histogram;
-    h.init(bounds, 2)
+    h.init(bounds, 2, defaultAllocator)
+    defer h.free()
 
     h.observe(1.0)
     h.observe(2.0)
     h.observe(3.0)
 
-    assert(h.totalCount.get() == 3)
-    // sum should be 6.0 — allow a tiny epsilon for floating point
-    var diff = h.sum.get() - 6.0
-    if(diff < 0.0) { diff = -diff }
-    assert(diff < 0.0001)
+    assert(h.totalCount() == 3)
 }
 
 @test("histogram exact bucket boundary lands in that bucket")
 func testHistogramBoundaryValue() {
     var bounds = [2]f64 { 5.0, 10.0 }
     var h: Histogram;
-    h.init(bounds, 2)
+    h.init(bounds, 2, defaultAllocator)
+    defer h.free()
 
     h.observe(5.0)  // exactly on boundary — should land in bucket 0 (val <= 5.0)
-    assert(h.counts[0].get() == 1)
-    assert(h.counts[1].get() == 0)
-    assert(h.counts[2].get() == 0)
+    assert(h.bucketCount(0) == 1)
+    assert(h.bucketCount(1) == 0)
+    assert(h.bucketCount(2) == 0)
 }
 
 @test("histogram value above all bounds goes to +Inf bucket")
 func testHistogramInfBucket() {
     var bounds = [2]f64 { 1.0, 2.0 }
     var h: Histogram;
-    h.init(bounds, 2)
+    h.init(bounds, 2, defaultAllocator)
+    defer h.free()
 
     h.observe(100.0)
-    assert(h.counts[0].get() == 0)
-    assert(h.counts[1].get() == 0)
-    assert(h.counts[2].get() == 1)  // +Inf
-    assert(h.totalCount.get() == 1)
+    assert(h.bucketCount(0) == 0)
+    assert(h.bucketCount(1) == 0)
+    assert(h.bucketCount(2) == 1)  // +Inf
+    assert(h.totalCount() == 1)
 }
 
 // ---------------------------------------------------------------
@@ -198,7 +218,7 @@ func testRegistryHistogram() {
 
     var h2 = reg.histogram("latency", bounds, 3)
     assert(h2 == h)
-    assert(h2.totalCount.get() == 1)
+    assert(h2.totalCount() == 1)
 }
 
 @test("registry distinct names are independent")
@@ -283,6 +303,154 @@ func testScrapeHistogram() {
 }
 
 // ---------------------------------------------------------------
+// Prometheus scrape with per-update attributes
+// ---------------------------------------------------------------
+
+@test("scrape counter with attrs emits labels")
+func testScrapeCounterWithAttrs() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var c = reg.counter("hits_total", "total hits")
+    c.inc(MetricAttr { .name = "method", .value = "GET" })
+    c.inc(MetricAttr { .name = "method", .value = "GET" })
+    c.inc(MetricAttr { .name = "method", .value = "POST" })
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+    reg.scrapePrometheus(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"hits_total{method=\"GET\"} 2"))
+    assert(out.contains($"hits_total{method=\"POST\"} 1"))
+}
+
+@test("scrape histogram with attrs emits labels on buckets, sum and count")
+func testScrapeHistogramWithAttrs() {
+    var bounds = [2]f64 { 5.0, 10.0 }
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var h = reg.histogram("dur_ms", bounds, 2, "duration ms")
+    h.observe(3.0,  MetricAttr { .name = "region", .value = "us-east" })
+    h.observe(7.0,  MetricAttr { .name = "region", .value = "us-east" })
+    h.observe(50.0, MetricAttr { .name = "region", .value = "us-east" })
+
+    var sb = StringBuilderInit(512)
+    defer sb.free()
+    reg.scrapePrometheus(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"dur_ms_bucket{le=\"5\",region=\"us-east\"} 1"))
+    assert(out.contains($"dur_ms_bucket{le=\"10\",region=\"us-east\"} 2"))
+    assert(out.contains($"dur_ms_bucket{le=\"+Inf\",region=\"us-east\"} 3"))
+    assert(out.contains($"dur_ms_count{region=\"us-east\"} 3"))
+}
+
+// ---------------------------------------------------------------
+// JSON scrape output tests
+// ---------------------------------------------------------------
+
+@test("scrapeJSON counter emits correct fields")
+func testScrapeJSONCounter() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var c = reg.counter("hits_total", "total hits")
+    c.add(42)
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+    reg.scrapeJSON(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"\"name\":\"hits_total\""))
+    assert(out.contains($"\"help\":\"total hits\""))
+    assert(out.contains($"\"type\":\"counter\""))
+    assert(out.contains($"\"value\":42"))
+}
+
+@test("scrapeJSON gauge emits correct fields")
+func testScrapeJSONGauge() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var g = reg.gauge("queue_depth", "items in queue")
+    g.set(7)
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+    reg.scrapeJSON(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"\"name\":\"queue_depth\""))
+    assert(out.contains($"\"type\":\"gauge\""))
+    assert(out.contains($"\"value\":7"))
+}
+
+@test("scrapeJSON histogram emits buckets, sum and count")
+func testScrapeJSONHistogram() {
+    var bounds = [2]f64 { 5.0, 10.0 }
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var h = reg.histogram("dur_ms", bounds, 2, "duration ms")
+    h.observe(3.0)
+    h.observe(7.0)
+    h.observe(50.0)
+
+    var sb = StringBuilderInit(512)
+    defer sb.free()
+    reg.scrapeJSON(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"\"name\":\"dur_ms\""))
+    assert(out.contains($"\"type\":\"histogram\""))
+    assert(out.contains($"\"count\":3"))
+    assert(out.contains($"\"le\":5"))
+    assert(out.contains($"\"le\":\"+Inf\""))
+}
+
+@test("scrapeJSON counter with attrs emits attributes object")
+func testScrapeJSONCounterWithAttrs() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var c = reg.counter("hits_total", "total hits")
+    c.inc(MetricAttr { .name = "service", .value = "web" })
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+    reg.scrapeJSON(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"\"attributes\":{\"service\":\"web\"}"))
+}
+
+@test("scrapeJSON escapes special chars in name and help")
+func testScrapeJSONEscaping() {
+    var reg: Registry;
+    reg.init()
+    defer reg.free()
+
+    var c = reg.counter("esc_test", "says \"hello\"")
+    c.inc()
+
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+    reg.scrapeJSON(&sb)
+
+    var out = StringInit(sb.cStr(), sb.size())
+    assert(out.contains($"\"help\":\"says \\\"hello\\\"\""))
+}
+
+// ---------------------------------------------------------------
 // Thread-safety: concurrent counter increments
 // ---------------------------------------------------------------
 
@@ -305,7 +473,8 @@ func testCounterConcurrent() {
     const ITERS_PER_THREAD = 10_000
 
     var state: CounterStressState;
-    state.counter.init()
+    state.counter.init(defaultAllocator)
+    defer state.counter.free()
     state.iters = ITERS_PER_THREAD
 
     var threads: [NUM_THREADS]Thread;
@@ -343,7 +512,8 @@ func testHistogramConcurrent() {
 
     var bounds = [3]f64 { 1.0, 5.0, 10.0 }
     var state: HistogramStressState;
-    state.histogram.init(bounds, 3)
+    state.histogram.init(bounds, 3, defaultAllocator)
+    defer state.histogram.free()
     state.iters = ITERS_PER_THREAD
 
     var threads: [NUM_THREADS]Thread;
@@ -355,7 +525,7 @@ func testHistogramConcurrent() {
     }
 
     var total = NUM_THREADS * ITERS_PER_THREAD
-    assert(state.histogram.totalCount.get() == total)
+    assert(state.histogram.totalCount() == total)
     // all observations == 1.0, so bucket 0 (le=1.0) holds all of them
-    assert(state.histogram.counts[0].get() == total)
+    assert(state.histogram.bucketCount(0) == total)
 }
