@@ -5,6 +5,7 @@ import "std/mem"
 import "std/string/builder"
 import "std/libc"
 import "std/assert"
+import "std/json"
 
 // Maximum number of histogram bucket boundaries (not counting +Inf)
 public const MAX_HISTOGRAM_BUCKETS = 16
@@ -265,7 +266,7 @@ public func (this: *Registry) scrapePrometheus(buf: *StringBuilder) {
 //             {"name":"...","type":"histogram","sum":F,"count":N,"buckets":[{"le":F,"count":N},...]}]}
 // Safe to call from any thread concurrently with metric updates.
 public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
-    buf.append("{\"metrics\":[")
+    buf.appendStr("{\"metrics\":[")
     var iter = this.entries.iter()
     var first = true
     while(iter.hasNext()) {
@@ -273,14 +274,18 @@ public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
         var entry = e.value
 
         if(!first) {
-            buf.append(",")
+            buf.appendChar(',')
         }
         first = false
 
-        buf.append("{\"name\":\"%s\"", entry.name)
+        buf.appendStr("{\"name\":\"")
+        JsonEscapeString(buf, entry.name, strlen(entry.name))
+        buf.appendChar('"')
 
         if(entry.help != null && entry.help[0] != '\0') {
-            buf.append(",\"help\":\"%s\"", entry.help)
+            buf.appendStr(",\"help\":\"")
+            JsonEscapeString(buf, entry.help, strlen(entry.help))
+            buf.appendChar('"')
         }
 
         switch(entry.kind) {
@@ -297,18 +302,18 @@ public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
                 buf.append(",\"type\":\"histogram\"")
                 buf.append(",\"sum\":%.6g", h.sum.get())
                 buf.append(",\"count\":%lld", h.totalCount.get())
-                buf.append(",\"buckets\":[")
+                buf.appendStr(",\"buckets\":[")
                 var cumulative: i64 = 0
                 for(var i = 0; i < h.numBounds; i += 1) {
                     cumulative += h.counts[i].get()
                     if(i > 0) {
-                        buf.append(",")
+                        buf.appendChar(',')
                     }
                     buf.append("{\"le\":%.6g,\"count\":%lld}", h.bounds[i], cumulative)
                 }
                 cumulative += h.counts[h.numBounds].get()
                 if(h.numBounds > 0) {
-                    buf.append(",")
+                    buf.appendChar(',')
                 }
                 buf.append("{\"le\":\"+Inf\",\"count\":%lld}]}", cumulative)
                 break
@@ -316,7 +321,7 @@ public func (this: *Registry) scrapeJSON(buf: *StringBuilder) {
             default: {}
         }
     }
-    buf.append("]}")
+    buf.appendStr("]}")
 }
 
 // ---------------------------------------------------------------
