@@ -382,6 +382,8 @@ exit:
     return 1
 }
 
+#if false
+
 import "std/libc"
 func exampleTask(threadContext: ThreadContext, taskContext: TaskContext) : TaskStatus {
     var id = taskContext as (*i32)
@@ -441,3 +443,4 @@ func testThreadPool() {
     pool.destroy()
     printf("Example done.\n")
 }
+#end
