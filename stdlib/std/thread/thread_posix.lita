@@ -621,7 +621,7 @@ struct Arg {
 
 func threadFunction(arg: *void) : i32 {
     var x = arg as (*Arg)
-    printf("Processing thread: %ld with value: %d\n", ThreadCurrent().id(), x.state)
+    //printf("Processing thread: %ld with value: %d\n", ThreadCurrent().id(), x.state)
 
     x.mtx.lock()
     x.state += 1
