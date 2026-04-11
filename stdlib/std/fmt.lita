@@ -92,8 +92,6 @@ public struct ParseF32Result {
     len:   i32
 }
 
-@foreign public func strtof(str: *const char, end: **char) : f32;
-
 /**
  * Parse a double-precision float from the beginning of `str`.
  *
