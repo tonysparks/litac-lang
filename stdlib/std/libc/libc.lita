@@ -71,6 +71,7 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func memset(ptr: *void, value: i32, num: usize) : *void;
 @foreign public func memcpy (dest: *void, src: *const void, num: usize) : *void;
 @foreign public func memmove (dest: *void, src: *const void, num: usize) : *void;
+@foreign public func memcmp (s1: *const void, s2: *const void, num: usize) : i32;
 
 // io
 @foreign public struct FILE;
