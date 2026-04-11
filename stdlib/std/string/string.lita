@@ -147,6 +147,24 @@ public func (b: String) contains(str: String) : bool {
     return b.indexOf(str) > -1;
 }
 
+public func (b: String) containsIgnoreCase(str: String) : bool {
+    if(str.length == 0) return false;
+    if(b.length < str.length) return false;
+
+    var limit = b.length - str.length
+    for(var i = 0; i <= limit; i += 1) {
+        var match = true
+        for(var j = 0; j < str.length; j += 1) {
+            if(tolower(b.buffer[i + j]) != tolower(str.buffer[j])) {
+                match = false
+                break
+            }
+        }
+        if(match) return true;
+    }
+    return false
+}
+
 public func (b: String) endIndexOf(str: String) : i32 {
     return b.endIndexOfAt(str, 0)
 }
@@ -527,6 +545,24 @@ func testContains() {
     assert(a.contains($"Which".substring(0, 1)) == true)
     assert(e.contains($"World") == false)
     assert(a.contains(e) == false)
+}
+
+@test("containsIgnoreCase")
+func testContainsIgnoreCase() {
+    var a = $"Hello World"
+    var e = StringInit(null)
+
+    assert(a.containsIgnoreCase($"world") == true)
+    assert(a.containsIgnoreCase($"WORLD") == true)
+    assert(a.containsIgnoreCase($"World") == true)
+    assert(a.containsIgnoreCase($"HELLO") == true)
+    assert(a.containsIgnoreCase($"hello world") == true)
+    assert(a.containsIgnoreCase($"HELLO WORLD") == true)
+    assert(a.containsIgnoreCase($"llo W") == true)
+    assert(a.containsIgnoreCase($"xyz") == false)
+    assert(a.containsIgnoreCase($"Hello World!") == false)
+    assert(e.containsIgnoreCase($"world") == false)
+    assert(a.containsIgnoreCase(e) == false)
 }
 
 @test("startsWith")
