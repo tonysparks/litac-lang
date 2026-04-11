@@ -1,0 +1,179 @@
+import "std/string"
+import "std/libc"
+
+// ---------------------------------------------------------------
+// Integer parsing
+// ---------------------------------------------------------------
+
+/**
+ * Result of parsing an integer from a String.
+ * `.len` is the number of characters consumed; 0 means no valid digit was found.
+ * `.value` is only meaningful when `.len > 0`.
+ */
+public struct ParseIntResult {
+    value: i64
+    len:   i32
+}
+
+/**
+ * Parse an integer from the beginning of `str` using the given base (2–36).
+ *
+ * - Safe for non-null-terminated strings: only reads up to `str.length` bytes.
+ * - Stops at the first character that is not a valid digit for `base`.
+ * - Does NOT skip leading whitespace.
+ * - Does NOT handle a leading '+' or '-' sign.
+ * - Returns `ParseIntResult{.len = 0}` when no valid digit is found at position 0.
+ */
+public func (str: String) parseInt(base: i32 = 10) : ParseIntResult {
+    var value: i64 = 0
+    var i = 0
+
+    while(i < str.length) {
+        var c = str.buffer[i]
+        var digit: i32
+
+        if(c >= '0' && c <= '9') {
+            digit = (c - '0') as (i32)
+        } else if(c >= 'a' && c <= 'z') {
+            digit = (c - 'a' + 10) as (i32)
+        } else if(c >= 'A' && c <= 'Z') {
+            digit = (c - 'A' + 10) as (i32)
+        } else {
+            break
+        }
+
+        if(digit >= base) {
+            break
+        }
+
+        value = value * (base as (i64)) + digit
+        i += 1
+    }
+
+    return ParseIntResult {
+        .value = value,
+        .len   = i,
+    }
+}
+
+/**
+ * Parse an unsigned decimal integer from the start of `str`.
+ * Convenience wrapper around `parseInt(10)`.
+ */
+public func (str: String) parseU64() : ParseIntResult {
+    return str.parseInt(10)
+}
+
+/**
+ * Parse an unsigned hexadecimal integer from the start of `str`.
+ * Accepts both upper- and lower-case hex digits; stops at any non-hex character
+ * (including chunk-extension ';'). Convenience wrapper around `parseInt(16)`.
+ */
+public func (str: String) parseHex() : ParseIntResult {
+    return str.parseInt(16)
+}
+
+// ---------------------------------------------------------------
+// Float parsing
+// ---------------------------------------------------------------
+
+/**
+ * Result of parsing a floating-point number from a String.
+ * `.len` is the number of characters consumed; 0 means no valid float was found.
+ * `.value` is only meaningful when `.len > 0`.
+ */
+public struct ParseF64Result {
+    value: f64
+    len:   i32
+}
+
+public struct ParseF32Result {
+    value: f32
+    len:   i32
+}
+
+@foreign public func strtof(str: *const char, end: **char) : f32;
+
+/**
+ * Parse a double-precision float from the beginning of `str`.
+ *
+ * Accepts the same syntax as strtod: optional sign, decimal digits, optional
+ * fractional part, optional exponent (e/E).  Stops at the first character that
+ * cannot be part of a floating-point literal.
+ *
+ * Safe for non-null-terminated strings: scans only up to `str.length` bytes,
+ * copies the candidate into a stack buffer, then delegates to strtod for
+ * accurate conversion.
+ *
+ * Returns `ParseF64Result{.len = 0}` when no valid float is found.
+ */
+public func (str: String) parseF64() : ParseF64Result {
+    var i = 0
+
+    // optional leading sign
+    if(i < str.length && (str.buffer[i] == '+' || str.buffer[i] == '-')) {
+        i += 1
+    }
+
+    var hasDigit = false
+
+    // integer part
+    while(i < str.length && str.buffer[i] >= '0' && str.buffer[i] <= '9') {
+        hasDigit = true
+        i += 1
+    }
+
+    // fractional part
+    if(i < str.length && str.buffer[i] == '.') {
+        i += 1
+        while(i < str.length && str.buffer[i] >= '0' && str.buffer[i] <= '9') {
+            hasDigit = true
+            i += 1
+        }
+    }
+
+    if(!hasDigit) {
+        return ParseF64Result{}
+    }
+
+    // optional exponent
+    if(i < str.length && (str.buffer[i] == 'e' || str.buffer[i] == 'E')) {
+        var epos = i
+        i += 1
+        if(i < str.length && (str.buffer[i] == '+' || str.buffer[i] == '-')) {
+            i += 1
+        }
+        var hasExpDigit = false
+        while(i < str.length && str.buffer[i] >= '0' && str.buffer[i] <= '9') {
+            hasExpDigit = true
+            i += 1
+        }
+        if(!hasExpDigit) {
+            i = epos   // rewind — exponent marker with no digits is not part of the number
+        }
+    }
+
+    // Copy to a null-terminated stack buffer and delegate to strtod.
+    var buf = [64]char{}
+    var copyLen = MIN(i, 63)
+    memcpy(buf, str.buffer, copyLen as (usize))
+    buf[copyLen] = '\0' as (char)
+
+    var value = strtod(buf, null)
+    return ParseF64Result {
+        .value = value,
+        .len   = i,
+    }
+}
+
+/**
+ * Parse a single-precision float from the beginning of `str`.
+ * Parses with the same rules as parseF64 then narrows to f32.
+ */
+public func (str: String) parseF32() : ParseF32Result {
+    var r = str.parseF64()
+    return ParseF32Result {
+        .value = r.value as (f32),
+        .len   = r.len,
+    }
+}

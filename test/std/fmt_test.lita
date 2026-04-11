@@ -1,0 +1,139 @@
+import "std/fmt"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+// ---------------------------------------------------------------
+// parseInt
+// ---------------------------------------------------------------
+
+@test("parseInt base 10")
+func testParseIntDec() {
+    assert(StringInit("0").parseInt(10).value    == 0)
+    assert(StringInit("0").parseInt(10).len      == 1)
+    assert(StringInit("42").parseInt(10).value   == 42)
+    assert(StringInit("42").parseInt(10).len     == 2)
+    assert(StringInit("99x").parseInt(10).value  == 99)
+    assert(StringInit("99x").parseInt(10).len    == 2)
+    assert(StringInit("12 34").parseInt(10).value == 12)
+    assert(StringInit("12 34").parseInt(10).len   == 2)
+    // no valid digit
+    assert(StringInit("x").parseInt(10).len      == 0)
+    assert(StringInit("").parseInt(10).len       == 0)
+}
+
+@test("parseInt base 16 (hex)")
+func testParseIntHex() {
+    assert(StringInit("ff").parseInt(16).value     == 255)
+    assert(StringInit("FF").parseInt(16).value     == 255)
+    assert(StringInit("1A").parseInt(16).value     == 26)
+    assert(StringInit("1a").parseInt(16).value     == 26)
+    assert(StringInit("10").parseInt(16).value     == 16)
+    assert(StringInit("0").parseInt(16).value      == 0)
+    assert(StringInit("1f").parseInt(16).value     == 31)
+    assert(StringInit("DeAdBeEf").parseInt(16).value == 0xDEADBEEF)
+    // chunk extension: stops at ';'
+    assert(StringInit("a;ext=val").parseInt(16).value == 10)
+    assert(StringInit("a;ext=val").parseInt(16).len   == 1)
+    // no valid hex digit
+    assert(StringInit(";ext").parseInt(16).len     == 0)
+    assert(StringInit("").parseInt(16).len         == 0)
+}
+
+@test("parseInt base 2 (binary)")
+func testParseIntBin() {
+    assert(StringInit("1010").parseInt(2).value == 10)
+    assert(StringInit("1010").parseInt(2).len   == 4)
+    // stops at non-binary digit
+    assert(StringInit("102").parseInt(2).value  == 2)
+    assert(StringInit("102").parseInt(2).len    == 2)
+}
+
+@test("parseU64 and parseHex wrappers")
+func testParseIntWrappers() {
+    assert(StringInit("1234").parseU64().value == 1234)
+    assert(StringInit("1234").parseU64().len   == 4)
+    assert(StringInit("ff").parseHex().value   == 255)
+    assert(StringInit("ff").parseHex().len     == 2)
+}
+
+// ---------------------------------------------------------------
+// parseF64
+// ---------------------------------------------------------------
+
+@test("parseF64 basic values")
+func testParseF64Basic() {
+    assert(StringInit("0").parseF64().value    == 0.0)
+    assert(StringInit("0").parseF64().len      == 1)
+    assert(StringInit("1").parseF64().value    == 1.0)
+    assert(StringInit("42").parseF64().value   == 42.0)
+    assert(StringInit("3.14").parseF64().value == 3.14)
+    assert(StringInit("3.14").parseF64().len   == 4)
+}
+
+@test("parseF64 sign handling")
+func testParseF64Sign() {
+    assert(StringInit("-1.5").parseF64().value == -1.5)
+    assert(StringInit("-1.5").parseF64().len   == 4)
+    assert(StringInit("+2.0").parseF64().value == 2.0)
+    assert(StringInit("+2.0").parseF64().len   == 4)
+    // sign alone is not a valid float
+    assert(StringInit("-").parseF64().len      == 0)
+    assert(StringInit("+").parseF64().len      == 0)
+}
+
+@test("parseF64 exponent")
+func testParseF64Exponent() {
+    assert(StringInit("1e3").parseF64().value   == 1000.0)
+    assert(StringInit("1e3").parseF64().len     == 3)
+    assert(StringInit("1E3").parseF64().value   == 1000.0)
+    assert(StringInit("2.5e2").parseF64().value == 250.0)
+    assert(StringInit("1e-2").parseF64().value  == 0.01)
+    assert(StringInit("1e+2").parseF64().value  == 100.0)
+    // 'e' with no digits: stops before the 'e'
+    assert(StringInit("1e").parseF64().value    == 1.0)
+    assert(StringInit("1e").parseF64().len      == 1)
+    // 'e' with sign but no digits: stops before the 'e'
+    assert(StringInit("1e+").parseF64().value   == 1.0)
+    assert(StringInit("1e+").parseF64().len     == 1)
+}
+
+@test("parseF64 stops at non-float character")
+func testParseF64StopsCorrectly() {
+    assert(StringInit("3.14abc").parseF64().value == 3.14)
+    assert(StringInit("3.14abc").parseF64().len   == 4)
+    assert(StringInit("10/2").parseF64().value    == 10.0)
+    assert(StringInit("10/2").parseF64().len      == 2)
+    // no valid float
+    assert(StringInit("abc").parseF64().len       == 0)
+    assert(StringInit("").parseF64().len          == 0)
+    assert(StringInit(".").parseF64().len         == 0)
+}
+
+@test("parseF64 fractional only")
+func testParseF64FractionalOnly() {
+    assert(StringInit(".5").parseF64().value  == 0.5)
+    assert(StringInit(".5").parseF64().len    == 2)
+    assert(StringInit(".25").parseF64().value == 0.25)
+}
+
+// ---------------------------------------------------------------
+// parseF32
+// ---------------------------------------------------------------
+
+@test("parseF32 basic values")
+func testParseF32Basic() {
+    var r = StringInit("3.14").parseF32()
+    assert(r.len == 4)
+    // f32 precision: check within epsilon
+    var diff = fabs(r.value - 3.14_f32)
+    assert(diff < 0.00001_f32)
+}
+
+@test("parseF32 sign and exponent")
+func testParseF32SignExp() {
+    assert(StringInit("-1.0").parseF32().value == -1.0_f32)
+    assert(StringInit("1e2").parseF32().value  == 100.0_f32)
+    assert(StringInit("1e2").parseF32().len    == 3)
+    assert(StringInit("bad").parseF32().len    == 0)
+}
