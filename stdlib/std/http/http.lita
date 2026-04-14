@@ -40,6 +40,16 @@ public func HeadersInit(initialSize: i32 = 16, allocator: *const Allocator = def
     return headers
 }
 
+public func HttpResponseInit(
+    bodyCapacity: i32 = 4096,
+    allocator: *const Allocator = defaultAllocator
+) : HttpResponse {
+    var resp = HttpResponse{}
+    resp.body    = StringBuilderInit(bodyCapacity, allocator)
+    resp.headers = HeadersInit(16, allocator)
+    return resp
+}
+
 public enum HttpBodyKind {
     NONE,
     BODY,
@@ -71,7 +81,13 @@ public struct HttpResponse {
 }
 
 public struct HttpOptions {
+    // Proxy URL, e.g. "http://proxy.example.com:3128".  null = no proxy.
     proxy: *const char
+
+    // true  → CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE: speak HTTP/2 without the
+    //         HTTP/1.1 Upgrade round-trip.  Use this for h2c servers.
+    // false → default curl negotiation (HTTP/1.1 or h2 via ALPN).
+    priorKnowledge: bool
 }
 
 public struct Http {
@@ -212,6 +228,13 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, false);
     // curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_CAINFO, "%windir%\\system32\\curl-ca-bundle.crt");
 
+    // HTTP version negotiation
+    if(this.options.priorKnowledge) {
+        curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_HTTP_VERSION,
+            CURLhttpversion.CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE as (i64))
+        curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_PIPEWAIT, 1_i64)
+    }
+
     if(this.options.proxy) {
         curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_PROXY, this.options.proxy);
     }
@@ -261,30 +284,31 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
         curl_easy_setopt(curl, CURLoption.CURLOPT_INFILESIZE_LARGE, req.body.data.buffer);
     }
 
+    // slist declared outside the if-block so it outlives curl_easy_perform.
+    var slist: *curl_slist = null
     if(!req.headers.empty()) {
-        //var buffer: [1024]char;
-        //var sb = StringBufferInit(buffer, 1024, 0)
         var sb = StringBuilderInit(1024, this.allocator)
-        defer sb.free()
-
-        var headers: *curl_slist = null
 
         var iter = req.headers.iter()
         while(iter.hasNext()) {
             var header = iter.next()
-
             sb.append("%.*s: %.*s",
                 header.key.length, header.key.buffer,
                 header.value.length, header.value.buffer
             )
-            headers = curl_slist_append(headers, sb.cStr())
+            slist = curl_slist_append(slist, sb.cStr())
             sb.clear()
         }
+        sb.free()
 
-        curl_easy_setopt<*curl_slist>(curl, CURLoption.CURLOPT_HTTPHEADER, headers)
+        curl_easy_setopt<*curl_slist>(curl, CURLoption.CURLOPT_HTTPHEADER, slist)
     }
 
     var curlRes = curl_easy_perform(curl)
+    if(slist) {
+        curl_slist_free_all(slist)
+    }
+
     if(curlRes) {
         var body = curl_easy_strerror(curlRes)
         HttpWriteCallback(body as (*void), body.length(), 1, resp)
