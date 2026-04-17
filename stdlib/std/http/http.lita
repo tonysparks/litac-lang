@@ -84,10 +84,19 @@ public struct HttpOptions {
     // Proxy URL, e.g. "http://proxy.example.com:3128".  null = no proxy.
     proxy: *const char
 
-    // true  → CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE: speak HTTP/2 without the
-    //         HTTP/1.1 Upgrade round-trip.  Use this for h2c servers.
-    // false → default curl negotiation (HTTP/1.1 or h2 via ALPN).
+    // true  → CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE: speak HTTP/2 cleartext without
+    //         the HTTP/1.1 Upgrade round-trip.  Use this for h2c (plaintext) servers.
     priorKnowledge: bool
+
+    // true  → CURL_HTTP_VERSION_2_0: attempt HTTP/2, negotiating via TLS ALPN for
+    //         https:// URLs or upgrading for http:// URLs.
+    // Leave false for plain HTTP/1.1.
+    http2: bool
+
+    // true  → verify the server's TLS certificate and hostname (production default).
+    // false → skip both CURLOPT_SSL_VERIFYPEER and CURLOPT_SSL_VERIFYHOST (useful
+    //         for self-signed certs in tests or internal services).
+    verifySsl: bool
 }
 
 public struct Http {
@@ -223,15 +232,18 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_NOPROGRESS, 1_i64);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_FOLLOWLOCATION, 1_i64);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_MAXREDIRS, 8_i64);
-    // WARNING: What a damn mess, for now don't validate certificates -- yikes!
-    // TODO: include CA in litac and allow for overriding location
-    curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, false);
+    curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, this.options.verifySsl);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_SSL_VERIFYHOST, this.options.verifySsl ? 2_i64 : 0_i64);
     // curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_CAINFO, "%windir%\\system32\\curl-ca-bundle.crt");
 
     // HTTP version negotiation
     if(this.options.priorKnowledge) {
         curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_HTTP_VERSION,
             CURLhttpversion.CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE as (i64))
+        curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_PIPEWAIT, 1_i64)
+    } else if(this.options.http2) {
+        curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_HTTP_VERSION,
+            CURLhttpversion.CURL_HTTP_VERSION_2_0 as (i64))
         curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_PIPEWAIT, 1_i64)
     }
 
