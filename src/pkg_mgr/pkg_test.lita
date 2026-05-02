@@ -58,6 +58,8 @@ public func PackageTest(pm: *PackageManager, options: *LitaOptions) : PkgStatus 
         return PkgStatus.OK
     }
 
+    testPaths.sort(CompareCString)
+
     var testPackage = $""
     var buffer = [MAX_PATH]char{0}
     if(options.testPackage != null) {
@@ -335,4 +337,9 @@ func FindTestFiles(scanDirStr: String, allFiles: *Array<String>, allocator: *con
         return PkgStatus.ERROR_INVALID_DIRECTORY
     }
     return PkgStatus.OK
+}
+
+// TODO move sorting functions into module
+func CompareCString(a: *char, b: *char): i32 {
+    return strcmp(a as (*const char), b as (*const char));
 }
