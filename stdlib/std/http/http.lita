@@ -97,6 +97,12 @@ public struct HttpOptions {
     // false → skip both CURLOPT_SSL_VERIFYPEER and CURLOPT_SSL_VERIFYHOST (useful
     //         for self-signed certs in tests or internal services).
     verifySsl: bool
+
+    // Maximum time in seconds for the entire request (0 = use default of 30).
+    timeoutInSec: i64
+
+    // Maximum time in seconds to establish the connection (0 = use default of 10).
+    connectTimeoutInSec: i64
 }
 
 public struct Http {
@@ -235,6 +241,10 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, this.options.verifySsl);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_SSL_VERIFYHOST, this.options.verifySsl ? 2_i64 : 0_i64);
     // curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_CAINFO, "%windir%\\system32\\curl-ca-bundle.crt");
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_TIMEOUT,
+        this.options.timeoutInSec > 0 ? this.options.timeoutInSec : 30_i64);
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_CONNECTTIMEOUT,
+        this.options.connectTimeoutInSec > 0 ? this.options.connectTimeoutInSec : 10_i64);
 
     // HTTP version negotiation
     if(this.options.priorKnowledge) {
