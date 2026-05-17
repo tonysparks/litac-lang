@@ -1,0 +1,294 @@
+import "std/mem" as mem;
+import "std/assert";
+import "std/string";
+
+struct SetEntry<K> {
+    hash: u32
+    key: K
+}
+
+public struct Set<K> {
+    length: i32
+    capacity: i32
+    allocator: *const mem::Allocator
+    entries: *SetEntry<K>
+    emptyKey: K
+}
+
+public struct SetIterator<K> {
+    s: *Set<K>
+    it: i32
+    prevIt: i32
+    count: i32
+}
+
+
+public func StrSet(initialSize: i32 = 16,
+                   allocator: *const mem::Allocator = null) : Set<*const char> {
+    var s = Set<*const char>{}
+    s.init<*const char>(initialSize, allocator)
+    return s
+}
+
+public func StringSet(initialSize: i32 = 16,
+                      allocator: *const mem::Allocator = null) : Set<String> {
+    var s = Set<String>{}
+    s.init<String>(initialSize, allocator, String{.buffer = 0, .length = 0})
+    return s
+}
+
+
+public func (this: *Set<K>) init<K>(initialSize: i32 = 16,
+                                    allocator: *const mem::Allocator = null,
+                                    emptyKey: K = 0) {
+    if(!allocator) {
+        allocator = mem::defaultAllocator
+    }
+
+    this.length = 0
+    this.capacity = 0
+    this.entries = null
+    this.allocator = allocator
+    this.emptyKey = emptyKey
+
+    initialSize = nextPowerOf2(initialSize) as (i32)
+    SetGrow<K>(this, initialSize)
+}
+
+public func (this: *Set<K>) free<K>() {
+    if(this) {
+        this.capacity = 0
+        this.length = 0
+        if(this.entries) {
+            this.allocator.free(this.entries as (*void))
+        }
+        this.entries = null
+    }
+}
+
+@inline
+public func (this: *Set<K>) size<K>() : i32 {
+    return this.length
+}
+
+public func (this: *Set<K>) empty<K>() : bool {
+    return this.length == 0
+}
+
+// add inserts key into the set.
+// Returns  1 if the key was newly inserted,
+//          0 if the key already existed (no-op),
+//         -1 on allocation failure.
+public func (this: *Set<K>) add<K>(key: K) : i32 {
+    if(2 * this.length >= this.capacity) {
+        if(!SetGrow<K>(this, 2 * this.capacity)) {
+            return -1
+        }
+    }
+
+    var hash = key.hash() + 2
+    var i = hash
+    for(;;) {
+        i &= this.capacity - 1
+        var e = &this.entries[i]
+
+        if(e.hash < 2) {
+            this.length += 1
+            e.key = key
+            e.hash = hash
+            return 1
+        }
+        if(e.hash == hash && e.key.equals(key)) {
+            return 0
+        }
+
+        i += 1
+    }
+
+    return 0
+}
+
+public func (this: *Set<K>) contains<K>(key: K) : bool {
+    if(this.length == 0) {
+        return false
+    }
+
+    var hash = key.hash() + 2
+    var i = hash
+    for(;;) {
+        i &= this.capacity - 1
+        var e = &this.entries[i]
+
+        if(e.hash < 1) {
+            return false
+        }
+        if(e.hash == hash && e.key.equals(key)) {
+            return true
+        }
+
+        i += 1
+    }
+
+    return false
+}
+
+// remove deletes key from the set.
+// Returns true if the key was present and removed, false if not found.
+public func (this: *Set<K>) remove<K>(key: K) : bool {
+    if(this.length == 0) {
+        return false
+    }
+
+    var hash = key.hash() + 2
+    var i = hash
+    for(;;) {
+        i &= this.capacity - 1
+        var e = &this.entries[i]
+
+        if(e.hash < 1) {
+            return false
+        }
+        if(e.hash == hash && e.key.equals(key)) {
+            e.hash = 1
+            e.key = this.emptyKey
+            this.length -= 1
+            return true
+        }
+
+        i += 1
+    }
+
+    return false
+}
+
+public func (this: *Set<K>) clear<K>() {
+    this.length = 0
+    for(var i = 0; i < this.capacity; i += 1) {
+        var e = &this.entries[i]
+        e.hash = 0
+        e.key = this.emptyKey
+    }
+}
+
+// addAll adds all keys from other into this set (in-place union).
+public func (this: *Set<K>) addAll<K>(other: *Set<K>) {
+    var iter = other.iter<K>()
+    while(iter.hasNext<K>()) {
+        this.add<K>(iter.next<K>())
+    }
+}
+
+// removeAll removes all keys present in other from this set (in-place difference).
+public func (this: *Set<K>) removeAll<K>(other: *Set<K>) {
+    var iter = other.iter<K>()
+    while(iter.hasNext<K>()) {
+        this.remove<K>(iter.next<K>())
+    }
+}
+
+// retainAll removes all keys NOT present in other (in-place intersection).
+public func (this: *Set<K>) retainAll<K>(other: *Set<K>) {
+    var iter = this.iter<K>()
+    while(iter.hasNext<K>()) {
+        var key = iter.next<K>()
+        if(!other.contains<K>(key)) {
+            iter.remove<K>()
+        }
+    }
+}
+
+
+func SetGrow<K>(s: *Set<K>, newlength: i32) : bool {
+    if(newlength < 16) {
+        newlength = 16
+    }
+
+    var newEntries = s.allocator.calloc(newlength, sizeof(:SetEntry<K>)) as (*SetEntry<K>)
+    if(!newEntries) {
+        return false
+    }
+
+    var newSet = Set<K> {
+        .length: 0,
+        .capacity: newlength,
+        .entries: newEntries,
+        .emptyKey = s.emptyKey,
+        .allocator: s.allocator
+    }
+
+    for(var i = 0; i < s.capacity; i += 1) {
+        var e = &s.entries[i]
+        if(e.hash < 2) {
+            continue
+        }
+        newSet.add<K>(e.key)
+    }
+
+    s.free<K>()
+    ;*s = newSet
+    return true
+}
+
+
+// -------------------------------------------------------
+
+public func (this: *Set<K>) iter<K>() : SetIterator<K> {
+    return SetIterator<K> {
+        .s: this,
+        .it: 0,
+        .prevIt: 0,
+        .count: 0
+    }
+}
+
+public func (iter: *SetIterator<K>) hasNext<K>() : bool {
+    return iter.count < iter.s.length
+}
+
+public func (iter: *SetIterator<K>) next<K>() : K {
+    var i = iter.it
+    assert(i < iter.s.capacity)
+
+    defer iter.it = i + 1
+
+    for(; i < iter.s.capacity; i += 1) {
+        var e = &iter.s.entries[i]
+        if(e.hash < 2) {
+            continue
+        }
+
+        iter.count += 1
+        iter.prevIt = i
+        return e.key
+    }
+
+    return iter.s.emptyKey
+}
+
+public func (iter: *SetIterator<K>) remove<K>() {
+    var i = iter.prevIt
+    assert(i > -1 && i < iter.s.capacity)
+
+    var e = &iter.s.entries[i]
+    e.hash = 1
+    e.key = iter.s.emptyKey
+
+    iter.s.length -= 1
+    iter.count -= 1
+}
+
+
+func nextPowerOf2(v: u32) : u32 {
+    var count = 0
+
+    if(v && !(v & (v - 1))) {
+        return v
+    }
+
+    while(v != 0) {
+        v >>= 1
+        count += 1
+    }
+
+    return 1 << count
+}

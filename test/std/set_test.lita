@@ -1,0 +1,447 @@
+import "std/set"
+import "std/assert"
+import "std/string"
+
+func (this: i32) hash() : u32 {
+    return 3
+}
+
+func (this: i32) equals(other: i32) : bool {
+    return this == other
+}
+
+struct Point {
+    x: i32
+    y: i32
+}
+
+func (this: Point) hash() : u32 {
+    return (this.x * 31 + this.y) as (u32)
+}
+
+func (this: Point) equals(other: Point) : bool {
+    return this.x == other.x && this.y == other.y
+}
+
+@test
+func testSetInitAndEmpty() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    assert(s.empty())
+    assert(s.size() == 0)
+}
+
+@test
+func testSetAddAndContains() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    assert(!s.contains(1))
+    var r1 = s.add(1)
+    var r2 = s.add(2)
+    var r3 = s.add(3)
+    assert(r1 == 1)
+    assert(r2 == 1)
+    assert(r3 == 1)
+    assert(s.size() == 3)
+    assert(s.contains(1))
+    assert(s.contains(2))
+    assert(s.contains(3))
+    assert(!s.contains(99))
+}
+
+@test
+func testSetAddDuplicate() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    s.add(1)
+    var r = s.add(1)
+    assert(r == 0)
+    assert(s.size() == 1)
+    assert(s.contains(1))
+}
+
+@test
+func testSetRemove() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    s.add(1)
+    s.add(2)
+    s.add(3)
+    var ok = s.remove(2)
+    assert(ok)
+    assert(s.size() == 2)
+    assert(s.contains(1))
+    assert(!s.contains(2))
+    assert(s.contains(3))
+}
+
+@test
+func testSetRemoveMissing() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    s.add(1)
+    var ok = s.remove(99)
+    assert(!ok)
+    assert(s.size() == 1)
+}
+
+@test
+func testSetRemoveEmpty() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    var ok = s.remove(1)
+    assert(!ok)
+}
+
+@test
+func testSetClear() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    s.add(1)
+    s.add(2)
+    s.add(3)
+    s.clear()
+    assert(s.empty())
+    assert(s.size() == 0)
+    assert(!s.contains(1))
+    assert(!s.contains(2))
+    assert(!s.contains(3))
+}
+
+@test
+func testSetClearThenReuse() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    s.add(1)
+    s.add(2)
+    s.clear()
+    s.add(3)
+    assert(s.size() == 1)
+    assert(!s.contains(1))
+    assert(s.contains(3))
+}
+
+@test
+func testSetGrow() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 4)
+    defer s.free()
+    for(var i = 0; i < 20; i += 1) {
+        s.add(i)
+    }
+    assert(s.size() == 20)
+    for(var i = 0; i < 20; i += 1) {
+        assert(s.contains(i))
+    }
+}
+
+@test
+func testSetIterator() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    s.add(1)
+    s.add(2)
+    s.add(3)
+    var count: i32 = 0
+    var sum: i32 = 0
+    var iter = s.iter()
+    while(iter.hasNext()) {
+        var k = iter.next()
+        count += 1
+        sum += k
+    }
+    assert(count == 3)
+    assert(sum == 6)
+}
+
+@test
+func testSetIteratorEmpty() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    var iter = s.iter()
+    assert(!iter.hasNext())
+}
+
+@test
+func testSetIteratorRemove() {
+    var s = Set<i32>{}
+    s.init(.initialSize = 16)
+    defer s.free()
+    s.add(1)
+    s.add(2)
+    s.add(3)
+    var iter = s.iter()
+    while(iter.hasNext()) {
+        var k = iter.next()
+        if(k == 2) {
+            iter.remove()
+        }
+    }
+    assert(s.size() == 2)
+    assert(s.contains(1))
+    assert(!s.contains(2))
+    assert(s.contains(3))
+}
+
+@test
+func testSetAddAll() {
+    var a = Set<i32>{}
+    a.init(.initialSize = 16)
+    defer a.free()
+    var b = Set<i32>{}
+    b.init(.initialSize = 16)
+    defer b.free()
+
+    a.add(1)
+    a.add(2)
+    b.add(2)
+    b.add(3)
+    b.add(4)
+
+    a.addAll(&b)
+    assert(a.size() == 4)
+    assert(a.contains(1))
+    assert(a.contains(2))
+    assert(a.contains(3))
+    assert(a.contains(4))
+}
+
+@test
+func testSetAddAllEmpty() {
+    var a = Set<i32>{}
+    a.init(.initialSize = 16)
+    defer a.free()
+    var b = Set<i32>{}
+    b.init(.initialSize = 16)
+    defer b.free()
+
+    a.add(1)
+    a.addAll(&b)
+    assert(a.size() == 1)
+    assert(a.contains(1))
+}
+
+@test
+func testSetRemoveAll() {
+    var a = Set<i32>{}
+    a.init(.initialSize = 16)
+    defer a.free()
+    var b = Set<i32>{}
+    b.init(.initialSize = 16)
+    defer b.free()
+
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    b.add(2)
+    b.add(3)
+    b.add(4)
+
+    a.removeAll(&b)
+    assert(a.size() == 1)
+    assert(a.contains(1))
+    assert(!a.contains(2))
+    assert(!a.contains(3))
+}
+
+@test
+func testSetRetainAll() {
+    var a = Set<i32>{}
+    a.init(.initialSize = 16)
+    defer a.free()
+    var b = Set<i32>{}
+    b.init(.initialSize = 16)
+    defer b.free()
+
+    a.add(1)
+    a.add(2)
+    a.add(3)
+    b.add(2)
+    b.add(3)
+    b.add(4)
+
+    a.retainAll(&b)
+    assert(a.size() == 2)
+    assert(!a.contains(1))
+    assert(a.contains(2))
+    assert(a.contains(3))
+    assert(!a.contains(4))
+}
+
+@test
+func testSetRetainAllDisjoint() {
+    var a = Set<i32>{}
+    a.init(.initialSize = 16)
+    defer a.free()
+    var b = Set<i32>{}
+    b.init(.initialSize = 16)
+    defer b.free()
+
+    a.add(1)
+    a.add(2)
+    b.add(3)
+    b.add(4)
+
+    a.retainAll(&b)
+    assert(a.empty())
+}
+
+@test
+func testStrSet() {
+    var s = StrSet()
+    defer s.free()
+    s.add("hello")
+    s.add("world")
+    assert(s.size() == 2)
+    assert(s.contains("hello"))
+    assert(s.contains("world"))
+    assert(!s.contains("foo"))
+    var ok = s.remove("hello")
+    assert(ok)
+    assert(s.size() == 1)
+    assert(!s.contains("hello"))
+    assert(s.contains("world"))
+}
+
+@test
+func testStrSetDuplicate() {
+    var s = StrSet()
+    defer s.free()
+    s.add("abc")
+    var r = s.add("abc")
+    assert(r == 0)
+    assert(s.size() == 1)
+}
+
+@test
+func testStringSet() {
+    var s = StringSet()
+    defer s.free()
+    var k1 = StringInit("foo", 3)
+    var k2 = StringInit("bar", 3)
+    var k3 = StringInit("baz", 3)
+    s.add(k1)
+    s.add(k2)
+    assert(s.size() == 2)
+    assert(s.contains(k1))
+    assert(s.contains(k2))
+    assert(!s.contains(k3))
+    var ok = s.remove(k1)
+    assert(ok)
+    assert(s.size() == 1)
+    assert(!s.contains(k1))
+    assert(s.contains(k2))
+}
+
+@test
+func testPointSetAddAndContains() {
+    var s = Set<Point>{}
+    s.init<Point>(16, null, Point{})
+    defer s.free()
+
+    var p1 = Point{.x = 1, .y = 2}
+    var p2 = Point{.x = 3, .y = 4}
+    var p3 = Point{.x = 5, .y = 6}
+
+    assert(s.add(p1) == 1)
+    assert(s.add(p2) == 1)
+    assert(s.size() == 2)
+    assert(s.contains(p1))
+    assert(s.contains(p2))
+    assert(!s.contains(p3))
+}
+
+@test
+func testPointSetDuplicate() {
+    var s = Set<Point>{}
+    s.init<Point>(16, null, Point{})
+    defer s.free()
+
+    var p = Point{.x = 10, .y = 20}
+    assert(s.add(p) == 1)
+    assert(s.add(p) == 0)
+    assert(s.size() == 1)
+}
+
+@test
+func testPointSetRemove() {
+    var s = Set<Point>{}
+    s.init<Point>(16, null, Point{})
+    defer s.free()
+
+    var p1 = Point{.x = 1, .y = 1}
+    var p2 = Point{.x = 2, .y = 2}
+    var p3 = Point{.x = 3, .y = 3}
+    s.add(p1)
+    s.add(p2)
+    s.add(p3)
+
+    assert(s.remove(p2))
+    assert(s.size() == 2)
+    assert(s.contains(p1))
+    assert(!s.contains(p2))
+    assert(s.contains(p3))
+    assert(!s.remove(p2))
+}
+
+@test
+func testPointSetIterator() {
+    var s = Set<Point>{}
+    s.init<Point>(16, null, Point{})
+    defer s.free()
+
+    s.add(Point{.x = 1, .y = 0})
+    s.add(Point{.x = 2, .y = 0})
+    s.add(Point{.x = 3, .y = 0})
+
+    var count: i32 = 0
+    var sumX: i32 = 0
+    var iter = s.iter()
+    while(iter.hasNext()) {
+        var p = iter.next()
+        count += 1
+        sumX += p.x
+    }
+    assert(count == 3)
+    assert(sumX == 6)
+}
+
+@test
+func testPointSetSetOps() {
+    var a = Set<Point>{}
+    a.init<Point>(16, null, Point{})
+    defer a.free()
+    var b = Set<Point>{}
+    b.init<Point>(16, null, Point{})
+    defer b.free()
+
+    var p1 = Point{.x = 1, .y = 1}
+    var p2 = Point{.x = 2, .y = 2}
+    var p3 = Point{.x = 3, .y = 3}
+    var p4 = Point{.x = 4, .y = 4}
+
+    a.add(p1)
+    a.add(p2)
+    a.add(p3)
+    b.add(p2)
+    b.add(p3)
+    b.add(p4)
+
+    // intersection
+    a.retainAll(&b)
+    assert(a.size() == 2)
+    assert(!a.contains(p1))
+    assert(a.contains(p2))
+    assert(a.contains(p3))
+    assert(!a.contains(p4))
+}
