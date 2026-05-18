@@ -1,0 +1,62 @@
+@include(
+    "<sys/event.h>",
+    "<sys/time.h>",
+    "<sys/ioctl.h>"
+);
+
+@raw("""
+typedef struct kevent kevent_t;
+""");
+
+@foreign("kevent_t")
+public struct kevent {
+    ident:  usize   // identifier for this event (fd, timer id, etc.)
+    filter: i16     // filter for event
+    flags:  u16     // general flags
+    fflags: u32     // filter-specific flags
+    data:   i64     // filter-specific data (bytes available for EVFILT_READ)
+    udata:  *void   // opaque user data
+}
+
+@foreign
+public struct timespec {
+    tv_sec:  i64
+    tv_nsec: i64
+}
+
+@foreign
+public func kqueue() : i32;
+
+@foreign("kevent")
+public func KEventCall(
+    kq:         i32,
+    changelist: *const kevent,
+    nchanges:   i32,
+    eventlist:  *kevent,
+    nevents:    i32,
+    timeout:    *const timespec
+) : i32;
+
+@foreign public const EVFILT_READ:  i16;
+@foreign public const EVFILT_WRITE: i16;
+@foreign public const EVFILT_TIMER: i16;
+
+@foreign public const EV_ADD:     u16;
+@foreign public const EV_DELETE:  u16;
+@foreign public const EV_ENABLE:  u16;
+@foreign public const EV_DISABLE: u16;
+@foreign public const EV_ONESHOT: u16;
+@foreign public const EV_CLEAR:   u16;
+@foreign public const EV_EOF:     u16;
+@foreign public const EV_ERROR:   u16;
+
+// fflags for EVFILT_TIMER — by default data is in milliseconds (fflags = 0).
+// These override the unit:
+@foreign public const NOTE_SECONDS:  u32;
+@foreign public const NOTE_USECONDS: u32;
+@foreign public const NOTE_NSECONDS: u32;
+
+// FIONREAD: query bytes available in the socket receive buffer.
+// Value is the macOS _IOR('f', 127, int) expansion — stable across macOS versions.
+public const FIONREAD: i64 = 0x4004667f
+@foreign public func ioctl(fd: i32, request: i64, arg: *i32) : i32;

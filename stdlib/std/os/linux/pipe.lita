@@ -1,0 +1,8 @@
+@include("<fcntl.h>", "<unistd.h>");
+
+@foreign public const O_DIRECT:            i32;
+@foreign public const O_NOTIFICATION_PIPE: i32;
+@foreign public const SPLICE_F_MORE:       i32;
+
+@foreign public func pipe2(pipefd: [2]i32, flags: i32) : i32;
+@foreign public func splice(fd_in: i32, off_in: *i64, fd_out: i32, off_out: *i64, len: usize, flags: u32) : i64;

@@ -1,0 +1,20 @@
+#if (OS == "LINUX")
+    @include("<sys/sendfile.h>");
+
+    @foreign
+    public func sendfile(out_fd: i32, in_fd: i32, offset: *i64, count: usize) : i64;
+#elseif (OS == "MAC")
+    // Always forward-declare with the exact macOS signature.
+    // A compatible redeclaration is harmless if sys/socket.h already provides it.
+    @raw("""
+    #ifndef _STD_OS_POSIX_SENDFILE_DECL
+    #define _STD_OS_POSIX_SENDFILE_DECL
+    struct sf_hdtr;
+    int sendfile(int fd, int s, off_t offset, off_t *len, struct sf_hdtr *hdtr, int flags);
+    #endif
+    """);
+
+    @foreign
+    public func sendfile(fd: i32, s: i32, offset: i64, len: *i64, hdtr: *void, flags: i32) : i32;
+#else_error "sendfile not supported on this platform"
+#end
