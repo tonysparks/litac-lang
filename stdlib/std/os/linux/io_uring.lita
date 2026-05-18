@@ -1,0 +1,480 @@
+import "std/net/posix_socket"
+
+@include("liburing.h");
+
+@compiler_option(
+    .os = "linux",
+    .options = "-luring -D_GNU_SOURCE"
+);
+
+@raw("""
+typedef struct io_uring io_uring;
+typedef struct io_uring_sqe io_uring_sqe;
+typedef struct io_uring_cqe io_uring_cqe;
+
+typedef struct io_uring_params io_uring_params;
+
+typedef struct iovec iovec;
+
+typedef struct __kernel_timespec __kernel_timespec;
+""");
+
+@foreign
+public struct io_uring_sqe {
+   opcode: u8
+   flags: u8
+   ioprio: u16
+   fd: i32
+   len: u32
+}
+
+@foreign
+public struct io_uring_cqe {
+   user_data: u64
+   res: i32
+   flags: u32
+}
+
+@foreign
+public struct io_uring_probe;
+
+@foreign
+public struct io_uring_params {
+    sq_entries: u32
+    cq_entries: u32
+    flags: u32
+    sq_thread_cpu: u32
+    sq_thread_idle: u32
+    features: u32
+    wq_fd: i32
+    resv: [4]u32
+}
+
+@foreign
+public struct io_uring_restriction;
+
+@foreign
+public struct __kernel_timespec {
+    tv_sec: i64
+    tv_nsec: i64
+};
+
+@foreign
+public struct sigset_t;
+
+@foreign
+public struct cpu_set_t;
+
+@foreign
+public typedef usize as off_t;
+
+@foreign
+public struct mode_t;
+@foreign
+public struct open_how;
+
+@foreign
+public struct io_uring_sq {
+   khead: *u32
+   ktail: *u32
+   kring_mask: *u32
+   kring_entries: *u32
+   kflags: *u32
+   kdropped: *u32
+   array: *u32
+   sqes: *io_uring_sqe
+   sqe_head: u32
+   sqe_tail: u32
+   ring_sz: usize
+   ring_ptr: *void
+   pad: [4]u32
+}
+
+@foreign
+public struct io_uring_cq {
+   khead: *u32
+   ktail: *u32
+   kring_mask: *u32
+   kring_entries: *u32
+   kflags: *u32
+   koverflow: *u32
+   cqes: *io_uring_cqe
+   ring_sz: usize
+   ring_ptr: *void
+   pad: [4]u32
+}
+
+@foreign
+public struct io_uring {
+   sq: io_uring_sq
+   cq: io_uring_cq
+   flags: u32
+   ring_fd: i32
+   features: u32
+   enter_ring_fd: i32  // actual kernel fd (ring_fd may be a registered-ring index in newer liburing)
+   pad: [2]u32
+}
+
+@foreign
+public func io_uring_get_probe_ring(p0: *io_uring) : *io_uring_probe;
+
+@foreign
+public func io_uring_get_probe() : *io_uring_probe;
+
+@foreign
+public func io_uring_free_probe(p0: *io_uring_probe) : void;
+
+@foreign
+public func io_uring_opcode_supported(p0: *const io_uring_probe, p1: i32) : i32;
+
+@foreign
+public func io_uring_queue_init_params(p0: u32, p1: *io_uring, p2: *io_uring_params) : i32;
+
+@foreign
+public func io_uring_queue_init(p0: u32, p1: *io_uring, p2: u32) : i32;
+
+@foreign
+public func io_uring_queue_mmap(p0: i32, p1: *io_uring_params, p2: *io_uring) : i32;
+
+@foreign
+public func io_uring_ring_dontfork(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_queue_exit(p0: *io_uring) : void;
+
+@foreign
+public func io_uring_peek_batch_cqe(p0: *io_uring, p1: **io_uring_cqe, p2: u32) : u32;
+
+@foreign
+public func io_uring_wait_cqes(p0: *io_uring, p1: **io_uring_cqe, p2: u32, p3: *__kernel_timespec, p4: *sigset_t) : i32;
+
+@foreign
+public func io_uring_wait_cqe_timeout(p0: *io_uring, p1: **io_uring_cqe, p2: *__kernel_timespec) : i32;
+
+@foreign
+public func io_uring_submit(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_submit_and_wait(p0: *io_uring, p1: u32) : i32;
+
+@foreign
+public func io_uring_get_sqe(p0: *io_uring) : *io_uring_sqe;
+
+@foreign
+public func io_uring_register_buffers(p0: *io_uring, p1: *const iovec, p2: u32) : i32;
+
+@foreign
+public func io_uring_register_buffers_tags(p0: *io_uring, p1: *const iovec, p2: *const u64, p3: u32) : i32;
+
+@foreign
+public func io_uring_register_buffers_update_tag(p0: *io_uring, p1: u32, p2: *const iovec, p3: *const u64, p4: u32) : i32;
+
+@foreign
+public func io_uring_unregister_buffers(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_register_files(p0: *io_uring, p1: *const i32, p2: u32) : i32;
+
+@foreign
+public func io_uring_register_files_tags(p0: *io_uring, p1: *const i32, p2: *const u64, p3: u32) : i32;
+
+@foreign
+public func io_uring_register_files_update_tag(p0: *io_uring, p1: u32, p2: *const i32, p3: *const u64, p4: u32) : i32;
+
+@foreign
+public func io_uring_unregister_files(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_register_files_update(p0: *io_uring, p1: u32, p2: *i32, p3: u32) : i32;
+
+@foreign
+public func io_uring_register_eventfd(p0: *io_uring, p1: i32) : i32;
+
+@foreign
+public func io_uring_register_eventfd_async(p0: *io_uring, p1: i32) : i32;
+
+@foreign
+public func io_uring_unregister_eventfd(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_register_probe(p0: *io_uring, p1: *io_uring_probe, p2: u32) : i32;
+
+@foreign
+public func io_uring_register_personality(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_unregister_personality(p0: *io_uring, p1: i32) : i32;
+
+@foreign
+public func io_uring_register_restrictions(p0: *io_uring, p1: *io_uring_restriction, p2: u32) : i32;
+
+@foreign
+public func io_uring_enable_rings(p0: *io_uring) : i32;
+
+@foreign
+public func __io_uring_sqring_wait(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_register_iowq_aff(p0: *io_uring, p1: usize, p2: *const cpu_set_t) : i32;
+
+@foreign
+public func io_uring_unregister_iowq_aff(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_register_iowq_max_workers(p0: *io_uring, p1: *u32) : i32;
+
+@foreign
+public func __io_uring_get_cqe(p0: *io_uring, p1: **io_uring_cqe, p2: u32, p3: u32, p4: *sigset_t) : i32;
+
+@foreign
+public func io_uring_cq_advance(p0: *io_uring, p1: u32) : void;
+
+@foreign
+public func io_uring_cqe_seen(p0: *io_uring, p1: *io_uring_cqe) : void;
+
+@foreign
+public func io_uring_sqe_set_data(p0: *io_uring_sqe, p1: *void) : void;
+
+public func io_uring_sqe_set_data64(p0: *io_uring_sqe, data: u64) : void {
+    io_uring_sqe_set_data(p0, data as (*void))
+}
+
+@foreign
+public func io_uring_cqe_get_data(p0: *const io_uring_cqe) : *void;
+
+public func io_uring_cqe_get_data64(p0: *const io_uring_cqe) : u64 {
+    var value = io_uring_cqe_get_data(p0)
+    return value as (u64)
+}
+
+@foreign
+public func io_uring_sqe_set_flags(p0: *io_uring_sqe, p1: u32) : void;
+
+@foreign
+public func __io_uring_set_target_fixed_file(p0: *io_uring_sqe, p1: u32) : void;
+
+@foreign
+public func io_uring_prep_rw(p0: i32, p1: *io_uring_sqe, p2: i32, p3: *const void, p4: u32, p5: u64) : void;
+
+@foreign
+public func io_uring_prep_splice(p0: *io_uring_sqe, p1: i32, p2: i64, p3: i32, p4: i64, p5: u32, p6: u32) : void;
+
+@foreign
+public func io_uring_prep_tee(p0: *io_uring_sqe, p1: i32, p2: i32, p3: u32, p4: u32) : void;
+
+@foreign
+public func io_uring_prep_readv(p0: *io_uring_sqe, p1: i32, p2: *const iovec, p3: u32, p4: u64) : void;
+
+@foreign
+public func io_uring_prep_read_fixed(p0: *io_uring_sqe, p1: i32, p2: *void, p3: u32, p4: u64, p5: i32) : void;
+
+@foreign
+public func io_uring_prep_writev(p0: *io_uring_sqe, p1: i32, p2: *const iovec, p3: u32, p4: u64) : void;
+
+@foreign
+public func io_uring_prep_write_fixed(p0: *io_uring_sqe, p1: i32, p2: *const void, p3: u32, p4: u64, p5: i32) : void;
+
+@foreign
+public func io_uring_prep_recvmsg(p0: *io_uring_sqe, p1: i32, p2: *msghdr, p3: u32) : void;
+
+@foreign
+public func io_uring_prep_sendmsg(p0: *io_uring_sqe, p1: i32, p2: *const msghdr, p3: u32) : void;
+
+@foreign
+public func __io_uring_prep_poll_mask(p0: u32) : u32;
+
+@foreign
+public func io_uring_prep_poll_add(p0: *io_uring_sqe, p1: i32, p2: u32) : void;
+
+@foreign
+public func io_uring_prep_poll_multishot(p0: *io_uring_sqe, p1: i32, p2: u32) : void;
+
+@foreign
+public func io_uring_prep_poll_remove(p0: *io_uring_sqe, p1: *void) : void;
+
+@foreign
+public func io_uring_prep_poll_update(p0: *io_uring_sqe, p1: *void, p2: *void, p3: u32, p4: u32) : void;
+
+@foreign
+public func io_uring_prep_fsync(p0: *io_uring_sqe, p1: i32, p2: u32) : void;
+
+@foreign
+public func io_uring_prep_nop(p0: *io_uring_sqe) : void;
+
+@foreign
+public func io_uring_prep_timeout(p0: *io_uring_sqe, p1: *__kernel_timespec, p2: u32, p3: u32) : void;
+
+@foreign
+public func io_uring_prep_timeout_remove(p0: *io_uring_sqe, p1: u64, p2: u32) : void;
+
+@foreign
+public func io_uring_prep_timeout_update(p0: *io_uring_sqe, p1: *__kernel_timespec, p2: u64, p3: u32) : void;
+
+@foreign
+public func io_uring_prep_accept(p0: *io_uring_sqe, p1: i32, p2: *sockaddr, p3: *socklen_t, p4: i32) : void;
+
+@foreign
+public func io_uring_prep_multishot_accept(p0: *io_uring_sqe, p1: i32, p2: *sockaddr, p3: *socklen_t, p4: i32) : void;
+
+@foreign
+public func io_uring_prep_accept_direct(p0: *io_uring_sqe, p1: i32, p2: *sockaddr, p3: *socklen_t, p4: i32, p5: u32) : void;
+
+@foreign
+public func io_uring_prep_link_timeout(p0: *io_uring_sqe, p1: *__kernel_timespec, p2: u32) : void;
+
+@foreign
+public func io_uring_prep_msg_ring_cqe_flags(sqe: *io_uring_sqe, fd: i32, len: u32, data: u64, flags: u32, cqe_flags: u32) : void;
+
+@foreign
+public func io_uring_prep_msg_ring(sqe: *io_uring_sqe, fd: i32, len: u32, data: u64, flags: u32) : void;
+
+@foreign
+public func io_uring_prep_msg_ring_fd(sqe: *io_uring_sqe, fd: i32, source_fd: i32, target_fd: i32, data: u64, flags: u32) : void;
+
+@foreign
+public func io_uring_prep_msg_ring_fd_alloc(sqe: *io_uring_sqe, fd: i32, source_fd: i32, data: u64, flags: u32) : void;
+
+@foreign
+public func io_uring_prep_connect(p0: *io_uring_sqe, p1: i32, p2: *const sockaddr, p3: socklen_t) : void;
+
+@foreign
+public func io_uring_prep_files_update(p0: *io_uring_sqe, p1: *i32, p2: u32, p3: i32) : void;
+
+@foreign
+public func io_uring_prep_fallocate(p0: *io_uring_sqe, p1: i32, p2: i32, p3: off_t, p4: off_t) : void;
+
+@foreign
+public func io_uring_prep_openat(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: i32, p4: mode_t) : void;
+
+@foreign
+public func io_uring_prep_openat_direct(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: i32, p4: mode_t, p5: u32) : void;
+
+@foreign
+public func io_uring_prep_close(p0: *io_uring_sqe, p1: i32) : void;
+
+@foreign
+public func io_uring_prep_read(p0: *io_uring_sqe, p1: i32, p2: *void, p3: u32, p4: u64) : void;
+
+@foreign
+public func io_uring_prep_write(p0: *io_uring_sqe, p1: i32, p2: *const void, p3: u32, p4: u64) : void;
+
+@foreign
+public func io_uring_prep_cancel64(p0: *io_uring_sqe, user_data: i64, flags: i32) : void;
+
+@foreign
+public func io_uring_prep_cancel(p0: *io_uring_sqe, user_data: *void, flags: i32) : void;
+
+@foreign
+public func io_uring_prep_cancel_fd(p0: *io_uring_sqe, fd: i32, flags: i32) : void;
+
+@foreign
+public struct statx {
+}
+
+@foreign
+public func io_uring_prep_statx(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: i32, p4: u32, p5: *statx) : void;
+
+@foreign
+public func io_uring_prep_fadvise(p0: *io_uring_sqe, p1: i32, p2: u64, p3: off_t, p4: i32) : void;
+
+@foreign
+public func io_uring_prep_madvise(p0: *io_uring_sqe, p1: *void, p2: off_t, p3: i32) : void;
+
+@foreign
+public func io_uring_prep_send(p0: *io_uring_sqe, p1: i32, p2: *const void, p3: usize, p4: i32) : void;
+
+@foreign
+public func io_uring_prep_recv(p0: *io_uring_sqe, p1: i32, p2: *void, p3: usize, p4: i32) : void;
+
+@foreign
+public func io_uring_prep_openat2(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: *open_how) : void;
+
+@foreign
+public func io_uring_prep_openat2_direct(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: *open_how, p4: u32) : void;
+
+@foreign
+public struct epoll_event {
+}
+
+@foreign
+public func io_uring_prep_epoll_ctl(p0: *io_uring_sqe, p1: i32, p2: i32, p3: i32, p4: *epoll_event) : void;
+
+@foreign
+public func io_uring_prep_provide_buffers(p0: *io_uring_sqe, p1: *void, p2: i32, p3: i32, p4: i32, p5: i32) : void;
+
+@foreign
+public func io_uring_prep_remove_buffers(p0: *io_uring_sqe, p1: i32, p2: i32) : void;
+
+@foreign
+public func io_uring_prep_shutdown(p0: *io_uring_sqe, p1: i32, p2: i32) : void;
+
+@foreign
+public func io_uring_prep_unlinkat(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: i32) : void;
+
+@foreign
+public func io_uring_prep_renameat(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: i32, p4: *const char, p5: i32) : void;
+
+@foreign
+public func io_uring_prep_sync_file_range(p0: *io_uring_sqe, p1: i32, p2: u32, p3: u64, p4: i32) : void;
+
+@foreign
+public func io_uring_prep_mkdirat(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: mode_t) : void;
+
+@foreign
+public func io_uring_prep_symlinkat(p0: *io_uring_sqe, p1: *const char, p2: i32, p3: *const char) : void;
+
+@foreign
+public func io_uring_prep_linkat(p0: *io_uring_sqe, p1: i32, p2: *const char, p3: i32, p4: *const char, p5: i32) : void;
+
+@foreign
+public func io_uring_sq_ready(p0: *const io_uring) : u32;
+
+@foreign
+public func io_uring_sq_space_left(p0: *const io_uring) : u32;
+
+@foreign
+public func io_uring_sqring_wait(p0: *io_uring) : i32;
+
+@foreign
+public func io_uring_cq_ready(p0: *const io_uring) : u32;
+
+@foreign
+public func io_uring_cq_eventfd_enabled(p0: *const io_uring) : bool;
+
+@foreign
+public func io_uring_cq_eventfd_toggle(p0: *io_uring, p1: bool) : i32;
+
+@foreign
+public func io_uring_wait_cqe_nr(p0: *io_uring, p1: **io_uring_cqe, p2: u32) : i32;
+
+@foreign
+public func io_uring_peek_cqe(p0: *io_uring, p1: **io_uring_cqe) : i32;
+
+@foreign
+public func io_uring_wait_cqe(p0: *io_uring, p1: **io_uring_cqe) : i32;
+
+@foreign
+public func io_uring_mlock_size(p0: u32, p1: u32) : usize;
+
+@foreign
+public func io_uring_mlock_size_params(p0: u32, p1: *io_uring_params) : usize;
+
+@foreign public func uring_unlikely(cond: bool): i32;
+@foreign public func uring_likely(cond: bool): i32;
+@foreign public const LIBURING_UDATA_TIMEOUT: i32;
+
+@foreign public const IOSQE_IO_LINK:          u8;
+@foreign public const IOSQE_IO_HARDLINK:      u8;
+@foreign public const IOSQE_FIXED_FILE:       u8;
+@foreign public const IOSQE_CQE_SKIP_SUCCESS: u8;
+@foreign public const IORING_SQ_NEED_WAKEUP:  u8;
+
+@foreign public const IORING_SETUP_SINGLE_ISSUER: u8;
+@foreign public const IORING_SETUP_COOP_TASKRUN:  u8;
+@foreign public const IORING_SETUP_DEFER_TASKRUN: u8;
+@foreign public const IORING_SETUP_ATTACH_WQ:     u8;
+@foreign public const IORING_SETUP_SUBMIT_ALL:    u8;
+@foreign public const IORING_SETUP_SQPOLL:        u32;
+
+@foreign public const IORING_FEAT_NODROP:           u32;
+@foreign public const IORING_TIMEOUT_ETIME_SUCCESS: u32;

@@ -1,0 +1,14 @@
+@include("<errno.h>");
+
+@foreign public const EAGAIN:       i32;
+@foreign public const EINTR:        i32;
+@foreign public const ENOENT:       i32;
+@foreign public const EINVAL:       i32;
+@foreign public const EPIPE:        i32;
+@foreign public const ECANCELED:    i32;
+@foreign public const EALREADY:     i32;
+@foreign public const EINPROGRESS:  i32;
+@foreign public const EWOULDBLOCK:  i32;
+@foreign public const ECONNRESET:   i32;
+@foreign public const ECONNREFUSED: i32;
+@foreign public const EADDRINUSE:   i32;
