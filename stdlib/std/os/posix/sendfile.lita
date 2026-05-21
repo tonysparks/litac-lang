@@ -9,6 +9,7 @@
     @raw("""
     #ifndef _STD_OS_POSIX_SENDFILE_DECL
     #define _STD_OS_POSIX_SENDFILE_DECL
+    #include <sys/types.h>
     struct sf_hdtr;
     int sendfile(int fd, int s, off_t offset, off_t *len, struct sf_hdtr *hdtr, int flags);
     #endif
