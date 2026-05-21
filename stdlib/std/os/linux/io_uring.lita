@@ -62,8 +62,16 @@ public struct __kernel_timespec {
 @foreign
 public struct sigset_t;
 
+
 @foreign
 public struct cpu_set_t;
+
+// network entities
+// @foreign
+// public struct sockaddr;
+
+// @foreign
+// public struct socklen_t;
 
 @foreign
 public typedef usize as off_t;
@@ -235,12 +243,20 @@ public func io_uring_cqe_seen(p0: *io_uring, p1: *io_uring_cqe) : void;
 @foreign
 public func io_uring_sqe_set_data(p0: *io_uring_sqe, p1: *void) : void;
 
+// Not available in default version of liburing
+// @foreign
+// public func io_uring_sqe_set_data64(p0: *io_uring_sqe, data: u64) : void;
+
 public func io_uring_sqe_set_data64(p0: *io_uring_sqe, data: u64) : void {
     io_uring_sqe_set_data(p0, data as (*void))
 }
 
 @foreign
 public func io_uring_cqe_get_data(p0: *const io_uring_cqe) : *void;
+
+// Not available in default version of liburing
+// @foreign
+// public func io_uring_cqe_get_data64(p0: *const io_uring_cqe) : u64;
 
 public func io_uring_cqe_get_data64(p0: *const io_uring_cqe) : u64 {
     var value = io_uring_cqe_get_data(p0)
@@ -367,6 +383,7 @@ public func io_uring_prep_cancel(p0: *io_uring_sqe, user_data: *void, flags: i32
 @foreign
 public func io_uring_prep_cancel_fd(p0: *io_uring_sqe, fd: i32, flags: i32) : void;
 
+
 @foreign
 public struct statx {
 }
@@ -458,23 +475,26 @@ public func io_uring_mlock_size(p0: u32, p1: u32) : usize;
 
 @foreign
 public func io_uring_mlock_size_params(p0: u32, p1: *io_uring_params) : usize;
-
+// empty macro!!
+// empty macro!!
 @foreign public func uring_unlikely(cond: bool): i32;
 @foreign public func uring_likely(cond: bool): i32;
 @foreign public const LIBURING_UDATA_TIMEOUT: i32;
+// @foreign public const io_uring_for_each_cqe: i32;
 
-@foreign public const IOSQE_IO_LINK:          u8;
-@foreign public const IOSQE_IO_HARDLINK:      u8;
-@foreign public const IOSQE_FIXED_FILE:       u8;
-@foreign public const IOSQE_CQE_SKIP_SUCCESS: u8;
-@foreign public const IORING_SQ_NEED_WAKEUP:  u8;
+// https://man7.org/linux/man-pages/man2/io_uring_enter.2.html
+@foreign public const IOSQE_IO_LINK:u8;
+@foreign public const IOSQE_IO_HARDLINK:u8;
+@foreign public const IOSQE_FIXED_FILE:u8;
+@foreign public const IOSQE_CQE_SKIP_SUCCESS:u8;
+@foreign public const IORING_SQ_NEED_WAKEUP: u8;
 
 @foreign public const IORING_SETUP_SINGLE_ISSUER: u8;
-@foreign public const IORING_SETUP_COOP_TASKRUN:  u8;
+@foreign public const IORING_SETUP_COOP_TASKRUN: u8;
 @foreign public const IORING_SETUP_DEFER_TASKRUN: u8;
-@foreign public const IORING_SETUP_ATTACH_WQ:     u8;
-@foreign public const IORING_SETUP_SUBMIT_ALL:    u8;
-@foreign public const IORING_SETUP_SQPOLL:        u32;
+@foreign public const IORING_SETUP_ATTACH_WQ: u8;
+@foreign public const IORING_SETUP_SUBMIT_ALL: u8;
+@foreign public const IORING_SETUP_SQPOLL: u32;
 
-@foreign public const IORING_FEAT_NODROP:           u32;
+@foreign public const IORING_FEAT_NODROP: u32;
 @foreign public const IORING_TIMEOUT_ETIME_SUCCESS: u32;

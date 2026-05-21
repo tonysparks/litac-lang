@@ -4,6 +4,7 @@
 @foreign public func pipe(pipefd: [2]i32) : i32;
 @foreign public func read(fd: i32, buf: *void, count: usize) : i64;
 @foreign public func write(fd: i32, buf: *const void, count: usize) : i64;
+@foreign public func dup(fd: i32) : i32;
 
 @foreign public const F_GETFL:    i32;
 @foreign public const F_SETFL:    i32;
