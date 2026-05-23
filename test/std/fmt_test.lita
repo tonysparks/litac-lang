@@ -11,15 +11,23 @@ import "std/libc"
 func testParseIntDec() {
     assert(StringInit("0").parseInt(10).value    == 0)
     assert(StringInit("0").parseInt(10).len      == 1)
+    assert(StringInit("0").parseInt(10).error    == ParseError.NONE)
     assert(StringInit("42").parseInt(10).value   == 42)
     assert(StringInit("42").parseInt(10).len     == 2)
+    assert(StringInit("42").parseInt(10).error   == ParseError.NONE)
     assert(StringInit("99x").parseInt(10).value  == 99)
     assert(StringInit("99x").parseInt(10).len    == 2)
+    assert(StringInit("99x").parseInt(10).error  == ParseError.NONE)
     assert(StringInit("12 34").parseInt(10).value == 12)
     assert(StringInit("12 34").parseInt(10).len   == 2)
+    assert(StringInit("12 34").parseInt(10).error == ParseError.NONE)
     // no valid digit
     assert(StringInit("x").parseInt(10).len      == 0)
     assert(StringInit("").parseInt(10).len       == 0)
+    // overflow
+    var overflow = StringInit("99999999999999999999").parseInt(10)
+    assert(overflow.error == ParseError.ERROR_RESULT_OUT_OF_RANGE)
+    assert(overflow.len   == 20)
 }
 
 @test("parseInt base 16 (hex)")
@@ -136,4 +144,30 @@ func testParseF32SignExp() {
     assert(StringInit("1e2").parseF32().value  == 100.0_f32)
     assert(StringInit("1e2").parseF32().len    == 3)
     assert(StringInit("bad").parseF32().len    == 0)
+}
+
+@test("parseF64 overflow returns ERROR_RESULT_OUT_OF_RANGE")
+func testParseF64Overflow() {
+    var r = StringInit("1e999").parseF64()
+    assert(r.error == ParseError.ERROR_RESULT_OUT_OF_RANGE)
+    assert(r.len   == 5)
+}
+
+@test("parseF64 normal values have NONE error")
+func testParseF64ErrorNone() {
+    assert(StringInit("1.5").parseF64().error  == ParseError.NONE)
+    assert(StringInit("1e3").parseF64().error  == ParseError.NONE)
+}
+
+@test("parseF32 overflow returns ERROR_RESULT_OUT_OF_RANGE")
+func testParseF32Overflow() {
+    var r = StringInit("1e999").parseF32()
+    assert(r.error == ParseError.ERROR_RESULT_OUT_OF_RANGE)
+    assert(r.len   == 5)
+}
+
+@test("parseF32 normal values have NONE error")
+func testParseF32ErrorNone() {
+    assert(StringInit("1.5").parseF32().error  == ParseError.NONE)
+    assert(StringInit("1e3").parseF32().error  == ParseError.NONE)
 }

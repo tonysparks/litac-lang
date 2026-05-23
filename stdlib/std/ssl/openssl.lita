@@ -1,0 +1,230 @@
+// OpenSSL @foreign bindings for TLS support in ringhttp.
+//
+// macOS: links against Homebrew OpenSSL 3 at /opt/homebrew/opt/openssl@3.
+// Linux: links against the system libssl/libcrypto (-lssl -lcrypto).
+
+@include("<openssl/ssl.h>");
+@include("<openssl/err.h>");
+
+#if (OS == "MAC")
+    @compiler_option(
+        .os = "mac",
+        .options = "-I/opt/homebrew/opt/openssl@3/include"
+    );
+    @compiler_option(
+        .os = "mac",
+        .options = "-L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto"
+    );
+#else
+    @compiler_option(
+        .os = "linux",
+        .options = "-lssl -lcrypto"
+    );
+#end
+
+// ---------------------------------------------------------------------------
+// Opaque types
+// ---------------------------------------------------------------------------
+
+@foreign
+public struct SSL_CTX {}
+
+@foreign
+public struct SSL {}
+
+@foreign
+public struct SSL_METHOD {}
+
+// ---------------------------------------------------------------------------
+// Constants — hardcoded because these are C preprocessor macros, not symbols.
+// Values are stable across all OpenSSL/LibreSSL versions.
+// ---------------------------------------------------------------------------
+
+public const SSL_FILETYPE_PEM    = 1
+public const SSL_ERROR_NONE      = 0
+public const SSL_ERROR_SSL       = 1
+public const SSL_ERROR_WANT_READ = 2
+public const SSL_ERROR_WANT_WRITE= 3
+public const SSL_ERROR_SYSCALL   = 5
+public const SSL_ERROR_ZERO_RETURN = 6
+
+// ALPN callback return codes (SSL_TLSEXT_ERR_*)
+public const SSL_TLSEXT_ERR_OK    = 0
+public const SSL_TLSEXT_ERR_NOACK = 3
+
+// SSL_select_next_proto result codes
+public const OPENSSL_NPN_NEGOTIATED = 1
+public const OPENSSL_NPN_NO_OVERLAP = 0
+
+// ---------------------------------------------------------------------------
+// Context / method
+// ---------------------------------------------------------------------------
+
+@foreign
+public func TLS_server_method() : *const SSL_METHOD;
+
+@foreign
+public func TLS_client_method() : *const SSL_METHOD;
+
+@foreign
+public func SSL_CTX_new(method: *const SSL_METHOD) : *SSL_CTX;
+
+@foreign
+public func SSL_CTX_free(ctx: *SSL_CTX);
+
+@foreign
+public func SSL_CTX_use_certificate_file(ctx: *SSL_CTX, file: *const char, type: i32) : i32;
+
+@foreign
+public func SSL_CTX_use_PrivateKey_file(ctx: *SSL_CTX, file: *const char, type: i32) : i32;
+
+@foreign
+public func SSL_CTX_check_private_key(ctx: *SSL_CTX) : i32;
+
+// SSL_VERIFY_NONE: skip peer certificate verification (useful for test clients).
+public const SSL_VERIFY_NONE: i32 = 0
+
+// Set the verification mode for a context.  Pass null for the callback to use default.
+public typedef func(*SSL, i32) : i32 as SslVerifyCallback;
+@foreign
+public func SSL_CTX_set_verify(ctx: *SSL_CTX, mode: i32, cb: SslVerifyCallback);
+
+// Client-side ALPN: wire-format list (length-prefixed), e.g. "\x02h2\x08http/1.1".
+// Returns 0 on success (note: inverted from most OpenSSL functions).
+@foreign
+public func SSL_CTX_set_alpn_protos(ctx: *SSL_CTX, protos: *const u8, protos_len: u32) : i32;
+
+// ALPN — server-side selection callback.
+// Signature: int cb(SSL*, const u8** out, u8* outlen, const u8* in, uint inlen, void* arg)
+public typedef func(*SSL, **const u8, *u8, *const u8, u32, *void) : i32 as AlpnSelectCallback;
+
+@foreign
+public func SSL_CTX_set_alpn_select_cb(ctx: *SSL_CTX, cb: AlpnSelectCallback, arg: *void);
+
+// Wire-format ALPN string helpers (length-prefixed protocol list).
+@foreign
+public func SSL_select_next_proto(
+    out    : **u8,
+    outlen : *u8,
+    server : *const u8,
+    server_len: u32,
+    client : *const u8,
+    client_len: u32
+) : i32;
+
+
+// ---------------------------------------------------------------------------
+// Per-connection SSL object
+// ---------------------------------------------------------------------------
+
+@foreign
+public func SSL_new(ctx: *SSL_CTX) : *SSL;
+
+@foreign
+public func SSL_free(ssl: *SSL);
+
+@foreign
+public func SSL_set_fd(ssl: *SSL, fd: i32) : i32;
+
+@foreign
+public func SSL_get_fd(ssl: *const SSL) : i32;
+
+// SSL_accept: perform the TLS handshake as server.
+// Returns 1 on success, <=0 on error/pending.
+@foreign
+public func SSL_accept(ssl: *SSL) : i32;
+
+// SSL_connect: perform the TLS handshake as client.
+// Returns 1 on success, <=0 on error/pending.
+@foreign
+public func SSL_connect(ssl: *SSL) : i32;
+
+// SSL_shutdown: initiate a graceful TLS close_notify shutdown.
+// Returns 1 when complete, 0 when the peer's close_notify is still pending.
+@foreign
+public func SSL_shutdown(ssl: *SSL) : i32;
+
+// Returns one of the SSL_ERROR_* constants.
+@foreign
+public func SSL_get_error(ssl: *SSL, ret: i32) : i32;
+
+// ---------------------------------------------------------------------------
+// I/O
+// ---------------------------------------------------------------------------
+
+@foreign
+public func SSL_read(ssl: *SSL, buf: *void, num: i32) : i32;
+
+@foreign
+public func SSL_write(ssl: *SSL, buf: *const void, num: i32) : i32;
+
+// Returns bytes already decrypted and buffered inside OpenSSL (not yet read by the app).
+// After SSL_accept/SSL_connect, the peer may have sent application data in the same TCP
+// segment as the final handshake message; those bytes are buffered here, invisible to kqueue.
+@foreign
+public func SSL_pending(ssl: *const SSL) : i32;
+
+// Returns 1 if ssl has ANY data buffered internally — either decrypted bytes ready
+// to be read (SSL_pending > 0) OR undecrypted bytes in the SSL input buffer that
+// have been read from the socket but not yet returned to the app.  Use this instead
+// of SSL_pending when checking whether another SSL_read call is safe on a blocking fd:
+// SSL_read will not block if SSL_has_pending returns 1.
+@foreign
+public func SSL_has_pending(ssl: *const SSL) : i32;
+
+// ---------------------------------------------------------------------------
+// ALPN result (after handshake)
+// ---------------------------------------------------------------------------
+
+// Writes a pointer + length for the negotiated protocol name (not NUL-terminated).
+@foreign
+public func SSL_get0_alpn_selected(ssl: *const SSL, data: **const u8, len: *u32);
+
+// ---------------------------------------------------------------------------
+// Memory BIO (for io_uring: keeps all I/O through io_uring READ/SENDMSG)
+// ---------------------------------------------------------------------------
+
+@foreign
+public struct BIO {}
+
+@foreign
+public struct BIO_METHOD {}
+
+// Returns the BIO_METHOD for in-memory (no-fd) BIOs.
+@foreign
+public func BIO_s_mem() : *BIO_METHOD;
+
+// Create a new BIO of the given type.
+@foreign
+public func BIO_new(type: *BIO_METHOD) : *BIO;
+
+// Free a BIO that has not been transferred to an SSL object.
+@foreign
+public func BIO_free(bio: *BIO);
+
+// Transfer ownership of rbio/wbio to ssl. After this call, SSL_free frees them.
+@foreign
+public func SSL_set_bio(ssl: *SSL, rbio: *BIO, wbio: *BIO);
+
+// Retrieve the read / write BIO from an SSL object (no ownership transfer).
+@foreign
+public func SSL_get_rbio(ssl: *const SSL) : *BIO;
+
+@foreign
+public func SSL_get_wbio(ssl: *const SSL) : *BIO;
+
+// Write data into a BIO; returns bytes written or <=0 on error.
+@foreign
+public func BIO_write(bio: *BIO, data: *const void, len: i32) : i32;
+
+// Read data out of a BIO; returns bytes read or <=0 when empty.
+@foreign
+public func BIO_read(bio: *BIO, data: *void, len: i32) : i32;
+
+// BIO_ctrl command: query how many bytes are available to read.
+// (Maps to the BIO_pending(b) macro which expands to BIO_ctrl(b,10,0,NULL).)
+public const BIO_CTRL_PENDING: i32 = 10
+
+@foreign
+public func BIO_ctrl(bio: *BIO, cmd: i32, larg: i64, parg: *void) : i64;
+

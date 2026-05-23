@@ -1,18 +1,25 @@
 import "std/string"
 import "std/libc"
+import "std/limits"
 
 // ---------------------------------------------------------------
 // Integer parsing
 // ---------------------------------------------------------------
 
+public enum ParseError {
+    NONE,
+    ERROR_RESULT_OUT_OF_RANGE,
+}
+
 /**
  * Result of parsing an integer from a String.
- * `.len` is the number of characters consumed; 0 means no valid digit was found.
- * `.value` is only meaningful when `.len > 0`.
+ * `.len` is the number of characters consumed (always valid, even on error).
+ * `.value` is only meaningful when `.error == ParseError.NONE`.
  */
 public struct ParseIntResult {
     value: i64
     len:   i32
+    error: ParseError
 }
 
 /**
@@ -22,7 +29,9 @@ public struct ParseIntResult {
  * - Stops at the first character that is not a valid digit for `base`.
  * - Does NOT skip leading whitespace.
  * - Does NOT handle a leading '+' or '-' sign.
- * - Returns `ParseIntResult{.len = 0}` when no valid digit is found at position 0.
+ * - Returns `.len = 0` when no valid digit is found at position 0.
+ * - Returns `.error = ERROR_RESULT_OUT_OF_RANGE` if the value exceeds i64 max;
+ *   `.len` still reflects all digit characters consumed.
  */
 public func (str: String) parseInt(base: i32 = 10) : ParseIntResult {
     var value: i64 = 0
@@ -46,6 +55,21 @@ public func (str: String) parseInt(base: i32 = 10) : ParseIntResult {
             break
         }
 
+        if(value > (MAX_I64 - (digit as (i64))) / (base as (i64))) {
+            // consume remaining digits so len reflects the full token
+            while(i < str.length) {
+                var d = str.buffer[i]
+                if(!((d >= '0' && d <= '9') || (d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z'))) {
+                    break
+                }
+                i += 1
+            }
+            return ParseIntResult {
+                .len   = i,
+                .error = ParseError.ERROR_RESULT_OUT_OF_RANGE,
+            }
+        }
+
         value = value * (base as (i64)) + digit
         i += 1
     }
@@ -53,6 +77,7 @@ public func (str: String) parseInt(base: i32 = 10) : ParseIntResult {
     return ParseIntResult {
         .value = value,
         .len   = i,
+        .error = ParseError.NONE,
     }
 }
 
@@ -80,16 +105,18 @@ public func (str: String) parseHex() : ParseIntResult {
 /**
  * Result of parsing a floating-point number from a String.
  * `.len` is the number of characters consumed; 0 means no valid float was found.
- * `.value` is only meaningful when `.len > 0`.
+ * `.value` is only meaningful when `.error == ParseError.NONE`.
  */
 public struct ParseF64Result {
     value: f64
     len:   i32
+    error: ParseError
 }
 
 public struct ParseF32Result {
     value: f32
     len:   i32
+    error: ParseError
 }
 
 /**
@@ -103,7 +130,8 @@ public struct ParseF32Result {
  * copies the candidate into a stack buffer, then delegates to strtod for
  * accurate conversion.
  *
- * Returns `ParseF64Result{.len = 0}` when no valid float is found.
+ * Returns `.len = 0` when no valid float is found.
+ * Returns `.error = ERROR_RESULT_OUT_OF_RANGE` on overflow (e.g. "1e999").
  */
 public func (str: String) parseF64() : ParseF64Result {
     var i = 0
@@ -158,20 +186,85 @@ public func (str: String) parseF64() : ParseF64Result {
     buf[copyLen] = '\0' as (char)
 
     var value = strtod(buf, null)
+    if(isinf(value)) {
+        return ParseF64Result {
+            .len   = i,
+            .error = ParseError.ERROR_RESULT_OUT_OF_RANGE,
+        }
+    }
     return ParseF64Result {
         .value = value,
         .len   = i,
+        .error = ParseError.NONE,
     }
 }
 
 /**
  * Parse a single-precision float from the beginning of `str`.
- * Parses with the same rules as parseF64 then narrows to f32.
+ * Parses with the same rules as parseF64 then delegates to strtof for
+ * accurate f32 conversion, including f32-range overflow detection.
  */
 public func (str: String) parseF32() : ParseF32Result {
-    var r = str.parseF64()
+    var i = 0
+
+    // optional leading sign
+    if(i < str.length && (str.buffer[i] == '+' || str.buffer[i] == '-')) {
+        i += 1
+    }
+
+    var hasDigit = false
+
+    // integer part
+    while(i < str.length && str.buffer[i] >= '0' && str.buffer[i] <= '9') {
+        hasDigit = true
+        i += 1
+    }
+
+    // fractional part
+    if(i < str.length && str.buffer[i] == '.') {
+        i += 1
+        while(i < str.length && str.buffer[i] >= '0' && str.buffer[i] <= '9') {
+            hasDigit = true
+            i += 1
+        }
+    }
+
+    if(!hasDigit) {
+        return ParseF32Result{}
+    }
+
+    // optional exponent
+    if(i < str.length && (str.buffer[i] == 'e' || str.buffer[i] == 'E')) {
+        var epos = i
+        i += 1
+        if(i < str.length && (str.buffer[i] == '+' || str.buffer[i] == '-')) {
+            i += 1
+        }
+        var hasExpDigit = false
+        while(i < str.length && str.buffer[i] >= '0' && str.buffer[i] <= '9') {
+            hasExpDigit = true
+            i += 1
+        }
+        if(!hasExpDigit) {
+            i = epos
+        }
+    }
+
+    var buf = [64]char{}
+    var copyLen = MIN(i, 63)
+    memcpy(buf, str.buffer, copyLen as (usize))
+    buf[copyLen] = '\0' as (char)
+
+    var value = strtof(buf, null)
+    if(isinf(value as (f64))) {
+        return ParseF32Result {
+            .len   = i,
+            .error = ParseError.ERROR_RESULT_OUT_OF_RANGE,
+        }
+    }
     return ParseF32Result {
-        .value = r.value as (f32),
-        .len   = r.len,
+        .value = value,
+        .len   = i,
+        .error = ParseError.NONE,
     }
 }

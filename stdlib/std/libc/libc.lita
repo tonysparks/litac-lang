@@ -117,6 +117,7 @@ size_t strnlen(const char * s, size_t len) {
 @foreign public func sinf(v: f32) : f32;
 @foreign public func asinf(v: f32) : f32;
 @foreign public func fabs(v: f32) : f32;
+@foreign public func isinf(v: f64) : i32;
 @foreign public func tan(v: f64) : f64;
 @foreign public func exp2(v: f64) : f64;
 @foreign public func pow(base: f64, exponent: f64) : f64;
@@ -165,6 +166,7 @@ public func va_arg<T>(args: *va_list) : T {
 @foreign public func strtol(str: *const char, end: **char, base: i32) : i64;
 @foreign public func strtoul(str: *const char, end: **char, base: i32) : u64;
 @foreign public func strtod(str: *const char, end: **char) : f64;
+@foreign public func strtof(str: *const char, end: **char) : f32;
 @foreign public func sscanf(str: *const char, format: *const char, ...) : i32;
 @foreign public func isdigit(arg: i32) : i32;
 @foreign public func isxdigit(arg: i32) : i32;
@@ -191,7 +193,8 @@ public func va_arg<T>(args: *va_list) : T {
 @foreign public const LONG_MIN: i32;
 @foreign public const LONG_MAX: i32;
 @foreign public const ULLONG_MAX: i64;
-@foreign public const HUGE_VAL: f64;
+@foreign public const HUGE_VAL:  f64;
+@foreign public const HUGE_VALF: f32;
 
 
 @foreign
