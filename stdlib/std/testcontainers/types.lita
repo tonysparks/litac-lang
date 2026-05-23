@@ -1,0 +1,39 @@
+import "std/string"
+import "std/array"
+
+public enum ContainerStatus {
+    OK = 0,
+    ERROR_DOCKER_RUN,    // docker run failed — daemon unreachable, bad image, or bad config
+    ERROR_PORT_MAPPING,  // could not resolve a host port after the container started
+    ERROR_WAIT_TIMEOUT,  // container started but readiness check timed out
+}
+
+// Key/value pair used to set container environment variables.
+public struct EnvVar {
+    key: String
+    value: String
+}
+
+public enum WaitStrategyKind {
+    PORT,
+    LOG,
+    HTTP,
+}
+
+public struct WaitStrategy {
+    kind: WaitStrategyKind
+    port: i32
+    path: String      // HTTP only: e.g. "/health"
+    pattern: String   // LOG only: substring to match
+    timeoutMs: i64    // 0 uses the default (30 000 ms)
+    pollMs: i64       // 0 uses the default (500 ms)
+}
+
+public struct ContainerConfig {
+    image: String
+    tag: String         // empty falls back to "latest"
+    ports: Array<i32>
+    env: Array<EnvVar>
+    cmd: Array<String>  // optional command override
+    wait: WaitStrategy
+}

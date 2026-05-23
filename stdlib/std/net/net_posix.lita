@@ -109,6 +109,12 @@ public func (this: *Socket) socketAddress() : *SocketAddress {
     return &this.address
 }
 
+public func (this: *Socket) connectTo(addr: *SocketAddress) : bool {
+    var sa = (&addr.addr) as (*sockaddr)
+    var len = sizeof(addr.addr) as (socklen_t)
+    return connect(this.socket, sa, len) == 0
+}
+
 @generated
 public func (this: *Socket) bind() : bool {
     var addr = (&this.address.addr) as (*sockaddr);

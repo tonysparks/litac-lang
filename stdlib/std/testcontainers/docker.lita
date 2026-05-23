@@ -1,0 +1,152 @@
+import "std/string"
+import "std/string/builder"
+import "std/system"
+import "std/libc"
+import "std/mem"
+import "std/array"
+import "std/fmt"
+import "std/testcontainers/types"
+
+// Runs a command via popen, appending stdout+stderr to `out`.
+// Returns the process exit code.
+func ShellExec(cmd: *StringBuilder, out: *StringBuilder) : i32 {
+    var proc = SystemExec(cmd.cStrConst())
+    var buf: [4096]char
+    var n = proc.readOutput(buf, sizeof(buf) - 1)
+    while(n > 0) {
+        out.appendStrn(buf, n as (i32))
+        n = proc.readOutput(buf, sizeof(buf) - 1)
+    }
+    return proc.close()
+}
+
+// Starts a detached container with random host port assignments (-P).
+// Writes the container ID (null-terminated) into idBuf.
+// Returns true on success.
+public func DockerRun(
+    config: *ContainerConfig,
+    idBuf: *char,
+    idBufLen: i32,
+    alloc: *const Allocator
+) : bool {
+    var sb = StringBuilderInit(512, alloc)
+    defer sb.free()
+
+    sb.appendStr("docker run -d")
+
+    if(config.ports.size() > 0) {
+        sb.appendStr(" -P")
+    }
+
+    for(var i = 0; i < config.env.size(); i += 1) {
+        var e = config.env.get(i)
+        sb.append(" -e %.*s=%.*s", e.key.length, e.key.buffer, e.value.length, e.value.buffer)
+    }
+
+    if(config.tag.length > 0) {
+        sb.append(" %.*s:%.*s", config.image.length, config.image.buffer, config.tag.length, config.tag.buffer)
+    } else {
+        sb.append(" %.*s", config.image.length, config.image.buffer)
+    }
+
+    for(var i = 0; i < config.cmd.size(); i += 1) {
+        var arg = config.cmd.get(i)
+        sb.append(" %.*s", arg.length, arg.buffer)
+    }
+
+    var out = StringBuilderInit(128, alloc)
+    defer out.free()
+
+    if(ShellExec(&sb, &out) != 0) {
+        return false;
+    }
+
+    // copy container ID, stripping trailing whitespace
+    var src = out.cStrConst()
+    var n = 0
+    while(src[n] != '\0' && src[n] != '\n' && src[n] != '\r' && n < idBufLen - 1) {
+        idBuf[n] = src[n]
+        n += 1
+    }
+    idBuf[n] = '\0'
+    return n > 0
+}
+
+// Returns the host port mapped to containerPort, or -1 on failure.
+// Output from `docker port` is like "0.0.0.0:32768\n:::32768\n".
+public func DockerPort(
+    containerId: *const char,
+    containerPort: i32,
+    alloc: *const Allocator
+) : i32 {
+    var sb = StringBuilderInit(128, alloc)
+    defer sb.free()
+    sb.append("docker port %s %d", containerId, containerPort)
+
+    var out = StringBuilderInit(64, alloc)
+    defer out.free()
+
+    if(ShellExec(&sb, &out) != 0) {
+        return -1;
+    }
+
+    // use first line, find last ':', parse number after it
+    var s = StringInit(out.cStrConst(), out.size())
+    var lineEnd = s.indexOf(StringInit("\n"))
+    var line = s.substring(0, lineEnd < 0 ? s.length : lineEnd)
+    var colon = line.lastIndexOfAt(StringInit(":"))
+    if(colon < 0) {
+        return -1;
+    }
+
+    var result = line.substring(colon + 1).parseInt()
+    if(result.error != ParseError.NONE || result.len == 0) {
+        return -1;
+    }
+    return result.value as (i32)
+}
+
+// Stops and removes the container. Output is captured and discarded.
+// Uses 2>&1 (supported by both POSIX shells and Windows cmd) to keep
+// stderr from leaking to the test console.
+public func DockerStop(containerId: *const char, alloc: *const Allocator) : bool {
+    var sb = StringBuilderInit(128, alloc)
+    defer sb.free()
+    sb.append("docker stop %s 2>&1 && docker rm -f %s 2>&1", containerId, containerId)
+
+    var out = StringBuilderInit(64, alloc)
+    defer out.free()
+    return ShellExec(&sb, &out) == 0
+}
+
+// Appends container stdout+stderr to `out`. Returns true on success.
+public func DockerLogs(containerId: *const char, out: *StringBuilder, alloc: *const Allocator) : bool {
+    var sb = StringBuilderInit(128, alloc)
+    defer sb.free()
+    sb.append("docker logs %s 2>&1", containerId)
+    return ShellExec(&sb, out) == 0
+}
+
+// Runs a command inside the container via `docker exec`. Returns exit code.
+// Uses `sh -c` since containers are Linux regardless of the host OS.
+public func DockerExec(containerId: *const char, cmd: String, alloc: *const Allocator) : i32 {
+    var sb = StringBuilderInit(256, alloc)
+    defer sb.free()
+    sb.append("docker exec %s sh -c \"%.*s\"", containerId, cmd.length, cmd.buffer)
+
+    var out = StringBuilderInit(16, alloc)
+    defer out.free()
+    return ShellExec(&sb, &out)
+}
+
+// Returns true if the docker daemon is reachable.
+// ShellExec drains all output so the pipe never fills — no null-device redirect needed.
+public func DockerAvailable(alloc: *const Allocator = defaultAllocator) : bool {
+    var sb = StringBuilderInit(64, alloc)
+    defer sb.free()
+    sb.appendStr("docker version 2>&1")
+
+    var out = StringBuilderInit(512, alloc)
+    defer out.free()
+    return ShellExec(&sb, &out) == 0
+}

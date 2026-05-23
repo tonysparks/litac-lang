@@ -1,0 +1,107 @@
+import "std/string"
+import "std/string/builder"
+import "std/system"
+import "std/thread"
+import "std/mem"
+import "std/net"
+import "std/http"
+import "std/testcontainers/docker"
+
+const DEFAULT_TIMEOUT_MS: i64 = 30_000_i64
+const DEFAULT_POLL_MS: i64    =    500_i64
+
+// Attempts a TCP connect to localhost:port. Returns true on success.
+func TcpProbe(port: i32) : bool {
+    var addr: SocketAddress
+    FromIPAddress("127.0.0.1", port as (u16), &addr)
+
+    var sock: Socket
+    if(!sock.create(SocketType.STREAM)) {
+        return false;
+    }
+    var ok = sock.connectTo(&addr)
+    ;sock.close()
+    return ok
+}
+
+// Waits until hostPort accepts TCP connections. Returns false on timeout.
+public func WaitForPort(
+    hostPort: i32,
+    timeoutMs: i64 = DEFAULT_TIMEOUT_MS,
+    pollMs: i64 = DEFAULT_POLL_MS
+) : bool {
+    var deadline = SystemTimeMSec() + (timeoutMs as (f64))
+    while(SystemTimeMSec() < deadline) {
+        if(TcpProbe(hostPort)) {
+            return true;
+        }
+        ThreadSleepMSec(pollMs)
+    }
+    return false
+}
+
+// Waits until docker logs for `containerId` contain `pattern` as a substring.
+public func WaitForLog(
+    containerId: *const char,
+    pattern: String,
+    timeoutMs: i64 = DEFAULT_TIMEOUT_MS,
+    pollMs: i64 = DEFAULT_POLL_MS,
+    alloc: *const Allocator = defaultAllocator
+) : bool {
+    var deadline = SystemTimeMSec() + (timeoutMs as (f64))
+    while(SystemTimeMSec() < deadline) {
+        var out = StringBuilderInit(4096, alloc)
+        DockerLogs(containerId, &out, alloc)
+        var found = StringInit(out.cStrConst(), out.size()).contains(pattern)
+        out.free()
+        if(found) {
+            return true;
+        }
+        ThreadSleepMSec(pollMs)
+    }
+    return false
+}
+
+// Waits until GET localhost:hostPort/path returns an HTTP 2xx status.
+// Uses std/http (libcurl) for a proper cross-platform HTTP check.
+public func WaitForHttp(
+    hostPort: i32,
+    path: String,
+    timeoutMs: i64 = DEFAULT_TIMEOUT_MS,
+    pollMs: i64 = DEFAULT_POLL_MS,
+    alloc: *const Allocator = defaultAllocator
+) : bool {
+    var deadline = SystemTimeMSec() + (timeoutMs as (f64))
+
+    var options = HttpOptions{}
+    options.connectTimeoutInSec = 1
+
+    var http = Http{}
+    if(!http.init(&options, alloc)) {
+        return false;
+    }
+    defer http.free()
+
+    var url = StringBuilderInit(256, alloc)
+    defer url.free()
+
+    while(SystemTimeMSec() < deadline) {
+        url.clear()
+        if(path.length > 0) {
+            url.append("http://localhost:%d%.*s", hostPort, path.length, path.buffer)
+        } else {
+            url.append("http://localhost:%d/", hostPort)
+        }
+
+        var resp = HttpResponseInit(256, alloc)
+        var ok = http.get(url.cStrConst(), &resp)
+        var status = resp.statusCode
+        resp.body.free()
+
+        if(ok && status >= 200 && status < 300) {
+            return true;
+        }
+        ThreadSleepMSec(pollMs)
+    }
+    return false
+}

@@ -1,0 +1,164 @@
+import "std/mem"
+import "std/array"
+import "std/string"
+import "std/string/builder"
+import "std/libc"
+import using "std/testcontainers/types"
+import "std/testcontainers/docker"
+import "std/testcontainers/wait"
+
+@include("<stdlib.h>")
+@foreign func atexit(fn: func() : void) : i32;
+
+struct PortEntry {
+    containerPort: i32
+    hostPort: i32
+}
+
+const ID_SIZE = 72
+
+public struct Container {
+    _id: [ID_SIZE]char
+    _ports: Array<PortEntry>
+    _alloc: *const Allocator
+}
+
+// Returns the container ID as a String view.
+public func (c: *Container) id() : String {
+    return StringInit(c._id)
+}
+
+// Returns the host port assigned to containerPort, or -1 if not found.
+public func (c: *Container) getPort(containerPort: i32) : i32 {
+    for(var i = 0; i < c._ports.size(); i += 1) {
+        var e = c._ports.get(i)
+        if(e.containerPort == containerPort) {
+            return e.hostPort
+        }
+    }
+    return -1
+}
+
+// Starts the container from `config` and waits for readiness.
+// The caller owns the Container allocation (stack or heap).
+// Returns ContainerStatus.OK on success; the container is registered for atexit cleanup.
+public func (c: *Container) start(
+    config: *ContainerConfig,
+    alloc: *const Allocator = defaultAllocator
+) : ContainerStatus {
+    c._alloc = alloc
+    c._ports = ArrayInit<PortEntry>(config.ports.size() + 1, alloc)
+
+    if(!DockerRun(config, c._id, ID_SIZE, alloc)) {
+        c._ports.free()
+        return ContainerStatus.ERROR_DOCKER_RUN;
+    }
+
+    for(var i = 0; i < config.ports.size(); i += 1) {
+        var cp = config.ports.get(i)
+        var hp = DockerPort(c._id, cp, alloc)
+        if(hp < 0) {
+            DockerStop(c._id, alloc)
+            c._ports.free()
+            return ContainerStatus.ERROR_PORT_MAPPING;
+        }
+        c._ports.add(PortEntry{cp, hp})
+    }
+
+    if(!WaitReady(c, config)) {
+        DockerStop(c._id, alloc)
+        c._ports.free()
+        return ContainerStatus.ERROR_WAIT_TIMEOUT;
+    }
+
+    _regAdd(c)
+    return ContainerStatus.OK
+}
+
+// Stops and removes the container. Also deregisters it from global cleanup.
+public func (c: *Container) stop() : bool {
+    _regRemove(c)
+    var ok = DockerStop(c._id, c._alloc)
+    c._ports.free()
+    return ok
+}
+
+// Appends the container's stdout+stderr to `out`.
+public func (c: *Container) logs(out: *StringBuilder) : bool {
+    return DockerLogs(c._id, out, c._alloc)
+}
+
+// Runs a shell command inside the container. Returns the exit code.
+public func (c: *Container) exec(cmd: String) : i32 {
+    return DockerExec(c._id, cmd, c._alloc)
+}
+
+// ── Global cleanup registry ───────────────────────────────────────────────────
+// Containers are registered on start() and deregistered on stop().
+// The atexit handler stops any containers that outlive their test.
+
+var _reg: _Registry
+
+struct _Registry {
+    containers: Array<*Container>
+    initialized: bool
+}
+
+func _ensureRegistry() {
+    if(!_reg.initialized) {
+        _reg.containers = ArrayInit<*Container>(8, defaultAllocator)
+        _reg.initialized = true
+        atexit(_regCleanup)
+    }
+}
+
+func _regCleanup() {
+    for(var i = 0; i < _reg.containers.size(); i += 1) {
+        DockerStop(_reg.containers.get(i)._id, defaultAllocator)
+    }
+    _reg.containers.clear()
+}
+
+func _regAdd(c: *Container) {
+    _ensureRegistry()
+    _reg.containers.add(c)
+}
+
+func _regRemove(c: *Container) {
+    for(var i = 0; i < _reg.containers.size(); i += 1) {
+        if(_reg.containers.get(i) == c) {
+            _reg.containers.removeAt(i)
+            return;
+        }
+    }
+}
+
+// ── Readiness dispatch ────────────────────────────────────────────────────────
+
+func ResolveMs(configured: i64, def: i64) : i64 {
+    return configured > 0 ? configured : def
+}
+
+func WaitReady(c: *Container, config: *ContainerConfig) : bool {
+    var w = &config.wait
+    var tms = ResolveMs(w.timeoutMs, 30_000_i64)
+    var pms = ResolveMs(w.pollMs,       500_i64)
+
+    if(w.kind == WaitStrategyKind.PORT) {
+        var hp = c.getPort(w.port)
+        if(hp < 0) { return false; }
+        return WaitForPort(hp, tms, pms)
+    }
+
+    if(w.kind == WaitStrategyKind.LOG) {
+        return WaitForLog(c._id, w.pattern, tms, pms, c._alloc)
+    }
+
+    if(w.kind == WaitStrategyKind.HTTP) {
+        var hp = c.getPort(w.port)
+        if(hp < 0) { return false; }
+        return WaitForHttp(hp, w.path, tms, pms, c._alloc)
+    }
+
+    return true  // no wait strategy configured
+}
