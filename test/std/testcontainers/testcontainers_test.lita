@@ -6,6 +6,7 @@ import "std/testcontainers/presets"
 @test
 func testRedisStartStop() {
     var cfg = RedisContainer()
+    defer cfg.free()
     var c: Container
     assert(c.start(&cfg) == ContainerStatus.OK)
 
@@ -18,6 +19,7 @@ func testRedisStartStop() {
 @test
 func testContainerIdNonEmpty() {
     var cfg = RedisContainer()
+    defer cfg.free()
     var c: Container
     assert(c.start(&cfg) == ContainerStatus.OK)
 
@@ -29,6 +31,7 @@ func testContainerIdNonEmpty() {
 @test
 func testContainerLogs() {
     var cfg = RedisContainer()
+    defer cfg.free()
     var c: Container
     assert(c.start(&cfg) == ContainerStatus.OK)
 
@@ -44,6 +47,7 @@ func testContainerLogs() {
 @test
 func testUnknownPortReturnsNegOne() {
     var cfg = RedisContainer()
+    defer cfg.free()
     var c: Container
     assert(c.start(&cfg) == ContainerStatus.OK)
 

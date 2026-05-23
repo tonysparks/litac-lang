@@ -37,3 +37,9 @@ public struct ContainerConfig {
     cmd: Array<String>  // optional command override
     wait: WaitStrategy
 }
+
+public func (cfg: *ContainerConfig) free() {
+    cfg.ports.free()
+    cfg.env.free()
+    cfg.cmd.free()
+}
