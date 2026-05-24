@@ -169,7 +169,7 @@ jobs:
       - name: Install Docker (colima)
         run: |
           brew install colima docker
-          colima start --wait --cpu 2 --memory 4
+          colima start --cpu 2 --memory 4
           docker info
 
       # Install libpq (PostgreSQL client library for db tests)
