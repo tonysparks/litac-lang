@@ -1,3 +1,4 @@
+#if (DOCKER_AVAILABLE)
 import "std/assert"
 import "std/string/builder"
 import "std/testcontainers"
@@ -55,3 +56,4 @@ func testUnknownPortReturnsNegOne() {
 
     c.stop()
 }
+#end
