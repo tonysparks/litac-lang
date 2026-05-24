@@ -110,6 +110,7 @@ public func (this: *SqlConnection) queryMany<T>(
     stmt.execute(&resultSet)
 
     while(resultSet.hasNext()) {
+        resultSet.next()
         result.add(T{})
 
         var row = result.lastPtr()
@@ -170,10 +171,11 @@ public func (this: *SqlConnection) insertMany<T>(
 
     var inserts = 0
     for(var i = 0; i < items.size(); i +=1) {
-        var item = items.get(i)
+        var item = items.getPtr(i)
         item.bindValues(&stmt)
 
         if (stmt.step().isOk()) {
+            item.setId(this.lastInsertId())
             inserts += 1
         }
         stmt.reset()
@@ -198,6 +200,7 @@ public func (this: *SqlConnection) insertOne<T>(
 
     var inserts = 0
     if (stmt.step().isOk()) {
+        item.setId(this.lastInsertId())
         inserts += 1
     }
 

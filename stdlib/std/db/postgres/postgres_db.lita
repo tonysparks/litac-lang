@@ -1,0 +1,539 @@
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/mem"
+import "std/array"
+import "std/time"
+import "std/libc"
+import "std/db"
+import "std/db/postgres/libpq"
+
+// OID constants used for columnType() mapping
+const _OID_BOOL:        Oid = 16_u32
+const _OID_INT2:        Oid = 21_u32
+const _OID_INT4:        Oid = 23_u32
+const _OID_INT8:        Oid = 20_u32
+const _OID_FLOAT4:      Oid = 700_u32
+const _OID_FLOAT8:      Oid = 701_u32
+const _OID_TEXT:        Oid = 25_u32
+const _OID_VARCHAR:     Oid = 1043_u32
+const _OID_DATE:        Oid = 1082_u32
+const _OID_TIMESTAMP:   Oid = 1114_u32
+const _OID_TIMESTAMPTZ: Oid = 1184_u32
+
+const MAX_PG_PARAMS  = 64
+const MAX_STMT_NAME  = 32
+
+struct PgParamInfo {
+    offset: i32   // byte offset into paramBuf; -1 means SQL NULL
+    length: i32
+}
+
+// ── Structs ───────────────────────────────────────────────────────────────────
+
+public struct PgConnection {
+    pg:         *PGconn
+    error:      SqlResult
+    allocator:  *const Allocator
+    _stmtSeq:   i32
+    connection: SqlConnection
+}
+
+public struct PgStatement {
+    conn:       *PgConnection
+    name:       [MAX_STMT_NAME]char
+    paramCount: i32
+    params:     Array<PgParamInfo>
+    paramBuf:   StringBuilder
+    results:    PgResultSet
+}
+
+public struct PgResultSet {
+    stmt:       *PgStatement
+    result:     *PGresult
+    rowCount:   i32
+    currentRow: i32
+}
+
+// ── Connect ───────────────────────────────────────────────────────────────────
+
+// Connects to PostgreSQL using individual host/port/dbname/user/password fields.
+public func Connect(
+    host:     *const char,
+    port:     i32,
+    dbname:   *const char,
+    user:     *const char,
+    password: *const char,
+    conn:     *PgConnection,
+    alloc:    *const Allocator = defaultAllocator
+) : SqlResult {
+    var sb = StringBuilderInit(256, alloc)
+    defer sb.free()
+    sb.append("host=%s port=%d dbname=%s user=%s password=%s",
+              host, port, dbname, user, password)
+    return ConnectDSN(sb.cStrConst(), conn, alloc)
+}
+
+// Connects using a libpq connection string, e.g.
+// "host=localhost port=5432 dbname=mydb user=foo password=bar"
+public func ConnectDSN(
+    conninfo: *const char,
+    conn:     *PgConnection,
+    alloc:    *const Allocator = defaultAllocator
+) : SqlResult {
+    conn.allocator  = alloc
+    conn._stmtSeq   = 0
+    conn.error      = SqlResult{.type = SqlResultType.OK, .description = $"OK"}
+    conn.connection = conn
+
+    conn.pg = PQconnectdb(conninfo)
+    if(conn.pg == null) {
+        conn.error = SqlResult{.type = SqlResultType.ERROR, .description = $"out of memory"}
+        return conn.error
+    }
+    if(PQstatus(conn.pg) != CONNECTION_OK) {
+        // Keep conn.pg alive so description pointer stays valid until close() is called.
+        conn.error = SqlResult{.type = SqlResultType.ERROR, .description = PQerrorMessage(conn.pg).toString()}
+    }
+    return conn.error
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+func _pgError(msg: *const char) : SqlResult {
+    return SqlResult{
+        .type        = SqlResultType.ERROR,
+        .errorCode   = -1,
+        .description = msg.toString()
+    }
+}
+
+// Pure status check. Sets conn.error on failure. Does NOT call PQclear.
+// Caller is responsible for clearing the result in all paths.
+func _checkResult(conn: *PgConnection, result: *PGresult) : bool {
+    if(result == null) {
+        conn.error = _pgError(PQerrorMessage(conn.pg))
+        return false;
+    }
+    var status = PQresultStatus(result)
+    if(status != PGRES_COMMAND_OK && status != PGRES_TUPLES_OK && status != PGRES_EMPTY_QUERY) {
+        conn.error = _pgError(PQresultErrorMessage(result))
+        return false;
+    }
+    return true
+}
+
+// Executes a raw SQL string via PQexec and clears the result. Returns false on error.
+func _execRaw(conn: *PgConnection, sql: *const char) : bool {
+    var result = PQexec(conn.pg, sql)
+    var ok = _checkResult(conn, result)
+    if(result != null) {
+        PQclear(result)
+    }
+    return ok
+}
+
+// ── PgConnection ──────────────────────────────────────────────────────────────
+
+public func (this: *PgConnection) conn() : SqlConnection {
+    return this
+}
+
+public func (this: *PgConnection) getAllocator() : *const Allocator {
+    return this.allocator
+}
+
+public func (this: *PgConnection) lastError() : String {
+    return this.error.description
+}
+
+public func (this: *PgConnection) lastResult() : SqlResult {
+    return this.error
+}
+
+public func (this: *PgConnection) hasError() : bool {
+    return this.error.isError()
+}
+
+public func (this: *PgConnection) clearError() {
+    this.error = SqlResult{.type = SqlResultType.OK, .description = $"OK"}
+}
+
+public func (this: *PgConnection) setError(error: SqlResult) {
+    this.error = error
+}
+
+public func (this: *PgConnection) execute(sql: *const char) : SqlResult {
+    if(this.hasError()) { return this.error; }
+    _execRaw(this, sql)
+    return this.error
+}
+
+public func (this: *PgConnection) begin() : SqlResult {
+    return this.execute("BEGIN")
+}
+
+public func (this: *PgConnection) commit() : SqlResult {
+    return this.execute("COMMIT")
+}
+
+// Always attempts ROLLBACK regardless of current error state so a failed
+// statement inside a transaction can be properly undone.
+public func (this: *PgConnection) rollback() : SqlResult {
+    this.clearError()
+    _execRaw(this, "ROLLBACK")
+    return this.error
+}
+
+public func (this: *PgConnection) close() : SqlResult {
+    if(this.pg != null) {
+        PQfinish(this.pg)
+        this.pg = null
+    }
+    return this.error
+}
+
+public func (this: *PgConnection) lastInsertId() : i64 {
+    var result = PQexec(this.pg, "SELECT lastval()")
+    if(result == null) { return 0_i64; }
+    var id = 0_i64
+    if(PQresultStatus(result) == PGRES_TUPLES_OK) {
+        var s = PQgetvalue(result, 0, 0)
+        if(s != null) { id = strtol(s, null, 10) }
+    }
+    PQclear(result)
+    return id
+}
+
+public func (this: *PgConnection) ddlType(bindType: String) : String {
+    if(bindType.equals($"AutoInt32")) { return $"SERIAL PRIMARY KEY" }
+    if(bindType.equals($"AutoInt64")) { return $"BIGSERIAL PRIMARY KEY" }
+    if(bindType.equals($"Int32")) { return $"INTEGER" }
+    if(bindType.equals($"Int64")) { return $"BIGINT" }
+    if(bindType.equals($"Double") || bindType.equals($"Float64")) { return $"DOUBLE PRECISION" }
+    if(bindType.equals($"DateTime") || bindType.equals($"Text")) { return $"TEXT" }
+    return $"TEXT"
+}
+
+public func (this: *PgConnection) prepare(statement: *SqlStatement, sql: String) : SqlResult {
+    if(this.hasError()) { return this.error; }
+
+    var stmt = new<PgStatement>(this.allocator)
+    if(stmt == null) {
+        this.error = SqlResult{
+            .type        = SqlResultType.ERROR,
+            .category    = SqlResultCategory.OUT_OF_MEMORY,
+            .description = $"out of memory"
+        }
+        return this.error
+    }
+
+    stmt.conn       = this
+    stmt.paramCount = 0
+    stmt.params     = ArrayInit<PgParamInfo>(8, this.allocator)
+    stmt.paramBuf   = StringBuilderInit(256, this.allocator)
+    stmt.results    = PgResultSet{.stmt = stmt, .result = null, .rowCount = 0, .currentRow = -1}
+
+    // Give this prepared statement a unique server-side name.
+    var nameBuf = StringBufferInit(stmt.name, MAX_STMT_NAME, 0)
+    nameBuf.append("s%d", this._stmtSeq)
+    this._stmtSeq += 1
+
+    var result = PQprepare(this.pg, stmt.name, sql.buffer, 0, null)
+    var ok = _checkResult(this, result)
+    if(result != null) {
+        PQclear(result)
+    }
+    if(!ok) {
+        stmt.params.free()
+        stmt.paramBuf.free()
+        this.allocator.free(stmt as (*void))
+        return this.error
+    }
+
+    *statement = stmt
+    return this.error
+}
+
+public func (this: *PgConnection) release(stmt: SqlStatement) : SqlResult {
+    stmt.close()
+    var mem = stmt.__this
+    this.allocator.free(mem)
+    return this.error
+}
+
+// ── PgStatement ───────────────────────────────────────────────────────────────
+
+func (this: *PgStatement) _ensureParam(index: i32) {
+    while(this.params.size() < index) {
+        this.params.add(PgParamInfo{-1, 0})
+    }
+    if(index > this.paramCount) {
+        this.paramCount = index
+    }
+}
+
+func (this: *PgStatement) _setParam(index: i32, offset: i32, length: i32) {
+    this._ensureParam(index)
+    var p = this.params.getPtr(index - 1)
+    p.offset = offset
+    p.length = length
+}
+
+public func (this: *PgStatement) bindNull(index: i32) : SqlResult {
+    this._ensureParam(index)
+    this.params.getPtr(index - 1).offset = -1
+    return this.conn.error
+}
+
+public func (this: *PgStatement) bindInt32(index: i32, value: i32) : SqlResult {
+    var offset = this.paramBuf.size()
+    this.paramBuf.appendI32(value)
+    this.paramBuf.appendChar('\0')
+    this._setParam(index, offset, this.paramBuf.size() - offset - 1)
+    return this.conn.error
+}
+
+public func (this: *PgStatement) bindInt64(index: i32, value: i64) : SqlResult {
+    var offset = this.paramBuf.size()
+    this.paramBuf.appendI64(value)
+    this.paramBuf.appendChar('\0')
+    this._setParam(index, offset, this.paramBuf.size() - offset - 1)
+    return this.conn.error
+}
+
+public func (this: *PgStatement) bindFloat64(index: i32, value: f64) : SqlResult {
+    var offset = this.paramBuf.size()
+    this.paramBuf.appendFloat(value)
+    this.paramBuf.appendChar('\0')
+    this._setParam(index, offset, this.paramBuf.size() - offset - 1)
+    return this.conn.error
+}
+
+public func (this: *PgStatement) bindText(index: i32, data: *const char, len: i32) : SqlResult {
+    var offset = this.paramBuf.size()
+    this.paramBuf.appendStrn(data, len)
+    this.paramBuf.appendChar('\0')
+    this._setParam(index, offset, len)
+    return this.conn.error
+}
+
+public func (this: *PgStatement) bindText64(index: i32, data: *const char, len: u64, enc: u8) : SqlResult {
+    return this.bindText(index, data, len as (i32))
+}
+
+public func (this: *PgStatement) bindString(index: i32, str: String) : SqlResult {
+    return this.bindText(index, str.buffer, str.length)
+}
+
+public func (this: *PgStatement) bindBlob(index: i32, data: *const void, size: i32) : SqlResult {
+    return this.bindText(index, data as (*const char), size)
+}
+
+public func (this: *PgStatement) bindBlob64(index: i32, data: *const void, size: u64) : SqlResult {
+    return this.bindText(index, data as (*const char), size as (i32))
+}
+
+public func (this: *PgStatement) bindPointer(index: i32, ptr: *void, type: *const char) : SqlResult {
+    return this.conn.error
+}
+
+public func (this: *PgStatement) bindDateTime(index: i32, dateTime: DateTime) : SqlResult {
+    if(dateTime.year == 0 && dateTime.month == 0 && dateTime.day == 0) {
+        return this.bindNull(index)
+    }
+    var buf: [64]char
+    var sb = StringBufferInit(buf, 64, 0)
+    dateTime.isoFormat(&sb)
+    return this.bindText(index, sb.buffer, sb.length)
+}
+
+public func (this: *PgStatement) parameterCount() : i32 {
+    return this.paramCount
+}
+
+public func (this: *PgStatement) parameterName(index: i32) : *const char {
+    return null
+}
+
+public func (this: *PgStatement) parameterIndex(name: *const char) : i32 {
+    return -1
+}
+
+public func (this: *PgStatement) clearBindings() : SqlResult {
+    this.params.clear()
+    this.paramBuf.clear()
+    this.paramCount = 0
+    return this.conn.error
+}
+
+func (this: *PgStatement) _execPrepared() : *PGresult {
+    var paramValues: [MAX_PG_PARAMS]*const char
+    var base = this.paramBuf.buffer as (*const char)
+    var n = this.paramCount < MAX_PG_PARAMS ? this.paramCount : MAX_PG_PARAMS
+    for(var i = 0; i < n; i += 1) {
+        var p = this.params.get(i)
+        var ptr: *const char = null
+        if(p.offset >= 0) {
+            ptr = base + p.offset
+        }
+        paramValues[i] = ptr
+    }
+    return PQexecPrepared(this.conn.pg, this.name, n, paramValues, null, null, 0)
+}
+
+// step() executes the prepared statement without a result set.
+// Use for DML (INSERT/UPDATE/DELETE) that returns no rows.
+public func (this: *PgStatement) step() : SqlResult {
+    if(this.conn.hasError()) { return this.conn.error; }
+    var result = this._execPrepared()
+    _checkResult(this.conn, result)
+    if(result != null) {
+        PQclear(result)
+    }
+    return this.conn.error
+}
+
+// execute() runs the prepared statement and wires up resultSet for row iteration.
+public func (this: *PgStatement) execute(resultSet: *SqlResultSet) : SqlResult {
+    *resultSet = &this.results
+
+    if(this.results.result != null) {
+        PQclear(this.results.result)
+        this.results.result = null
+    }
+
+    if(this.conn.hasError()) { return this.conn.error; }
+
+    var result = this._execPrepared()
+    if(!_checkResult(this.conn, result)) {
+        if(result != null) {
+            PQclear(result)
+        }
+        return this.conn.error
+    }
+
+    this.results.result     = result
+    this.results.rowCount   = PQntuples(result)
+    this.results.currentRow = -1
+    return this.conn.error
+}
+
+public func (this: *PgStatement) release(resultSet: SqlResultSet) : SqlResult {
+    return this.conn.error
+}
+
+public func (this: *PgStatement) reset() : SqlResult {
+    this.params.clear()
+    this.paramBuf.clear()
+    this.paramCount = 0
+    if(this.results.result != null) {
+        PQclear(this.results.result)
+        this.results.result = null
+    }
+    this.results.rowCount   = 0
+    this.results.currentRow = -1
+    return this.conn.error
+}
+
+public func (this: *PgStatement) finalize() : SqlResult {
+    return this.close()
+}
+
+public func (this: *PgStatement) close() : SqlResult {
+    if(this.results.result != null) {
+        PQclear(this.results.result)
+        this.results.result = null
+    }
+    if(this.conn.pg != null) {
+        var sb = StringBuilderInit(48, this.conn.allocator)
+        defer sb.free()
+        sb.append("DEALLOCATE %s", this.name)
+        _execRaw(this.conn, sb.cStrConst())
+    }
+    this.params.free()
+    this.paramBuf.free()
+    return this.conn.error
+}
+
+public func (this: *PgStatement) connection() : SqlConnection {
+    return this.conn
+}
+
+// ── PgResultSet ───────────────────────────────────────────────────────────────
+
+public func (this: *PgResultSet) statement() : SqlStatement {
+    return this.stmt
+}
+
+public func (this: *PgResultSet) closeAndReleaseAll() : SqlResult {
+    var conn = this.stmt.conn
+    conn.release(this.stmt)
+    return conn.lastResult()
+}
+
+public func (this: *PgResultSet) hasNext() : bool {
+    return this.currentRow + 1 < this.rowCount
+}
+
+public func (this: *PgResultSet) next() : SqlResult {
+    this.currentRow += 1
+    return this.stmt.conn.error
+}
+
+public func (this: *PgResultSet) columnCount() : i32 {
+    return PQnfields(this.result)
+}
+
+public func (this: *PgResultSet) columnBlob(column: i32) : *const void {
+    return PQgetvalue(this.result, this.currentRow, column) as (*const void)
+}
+
+public func (this: *PgResultSet) columnInt32(column: i32) : i32 {
+    if(PQgetisnull(this.result, this.currentRow, column) != 0) { return 0; }
+    var s = PQgetvalue(this.result, this.currentRow, column)
+    return s != null ? atoi(s) : 0
+}
+
+public func (this: *PgResultSet) columnInt64(column: i32) : i64 {
+    if(PQgetisnull(this.result, this.currentRow, column) != 0) { return 0_i64; }
+    var s = PQgetvalue(this.result, this.currentRow, column)
+    return s != null ? strtol(s, null, 10) : 0_i64
+}
+
+public func (this: *PgResultSet) columnDouble(column: i32) : f64 {
+    if(PQgetisnull(this.result, this.currentRow, column) != 0) { return 0.0; }
+    var s = PQgetvalue(this.result, this.currentRow, column)
+    return s != null ? strtod(s, null) : 0.0
+}
+
+public func (this: *PgResultSet) columnText(column: i32) : *const char {
+    if(PQgetisnull(this.result, this.currentRow, column) != 0) { return null; }
+    return PQgetvalue(this.result, this.currentRow, column)
+}
+
+public func (this: *PgResultSet) columnString(column: i32) : String {
+    var text = this.columnText(column)
+    if(text == null) { return $""; }
+    var len = PQgetlength(this.result, this.currentRow, column)
+    return StringInit(text, len)
+}
+
+public func (this: *PgResultSet) columnDateTime(column: i32) : DateTime {
+    var ptr = this.columnText(column)
+    if(ptr == null) { return DateTime{}; }
+    var value = ptr.toString()
+    if(value.empty()) { return DateTime{}; }
+    return DateTimeFromIso(value)
+}
+
+public func (this: *PgResultSet) columnType(column: i32) : SqlColumnType {
+    var oid = PQftype(this.result, column)
+    if(oid == _OID_BOOL || oid == _OID_INT2 || oid == _OID_INT4) { return SqlColumnType.INT; }
+    if(oid == _OID_INT8)                                          { return SqlColumnType.BIGINT; }
+    if(oid == _OID_FLOAT4 || oid == _OID_FLOAT8)                  { return SqlColumnType.DOUBLE; }
+    if(oid == _OID_TEXT || oid == _OID_VARCHAR)                    { return SqlColumnType.TEXT; }
+    if(oid == _OID_DATE)                                          { return SqlColumnType.DATE; }
+    if(oid == _OID_TIMESTAMP || oid == _OID_TIMESTAMPTZ)          { return SqlColumnType.DATETIME; }
+    return SqlColumnType.UNKNOWN
+}

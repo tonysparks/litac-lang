@@ -1,0 +1,183 @@
+import "std/assert"
+import "std/string"
+import "std/string/builder"
+import "std/thread"
+import "std/testcontainers"
+import "std/testcontainers/presets"
+import "std/db"
+import "std/db/postgres/postgres_db"
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+func connectContainer(c: *Container) : PgConnection {
+    var cfg = PostgresContainer(.password = $"secret", .db = $"testdb")
+    defer cfg.free()
+    assert(c.start(&cfg) == ContainerStatus.OK)
+
+    // Use 127.0.0.1 to avoid IPv6 ambiguity; sslmode=disable since the
+    // container has no TLS configured.
+    var dsn = StringBuilderInit(128)
+    defer dsn.free()
+    dsn.append("host=127.0.0.1 port=%d dbname=testdb user=postgres password=secret sslmode=disable",
+               c.getPort(5432))
+
+    // The postgres Docker image restarts the server once during init (user/db creation).
+    // The first "ready" log appears during that setup phase.  Retry connecting until
+    // the second (final) server start is fully ready.
+    var conn: PgConnection
+    var result: SqlResult
+    for(var i = 0; i < 30; i += 1) {
+        result = ConnectDSN(dsn.cStrConst(), &conn)
+        if(result.isOk()) { break; }
+        conn.close()
+        ThreadSleepMSec(1000_i64)
+    }
+    assert(result.isOk())
+    return conn
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+@test
+func testConnectAndPing() {
+    var c: Container
+    var conn = connectContainer(&c)
+    defer c.stop()
+    defer conn.close()
+
+    var result = conn.execute("SELECT 1")
+    assert(result.isOk())
+    assert(!conn.hasError())
+}
+
+@test
+func testCreateAndInsert() {
+    var c: Container
+    var conn = connectContainer(&c)
+    defer c.stop()
+    defer conn.close()
+
+    assert(conn.execute("CREATE TABLE users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, age INT)").isOk())
+
+    var stmt: SqlStatement
+    assert(conn.prepare(&stmt, $"INSERT INTO users (name, age) VALUES ($1, $2)").isOk())
+    defer conn.release(stmt)
+
+    stmt.bindString(1, $"Alice")
+    stmt.bindInt32(2, 30)
+    assert(stmt.step().isOk())
+
+    stmt.reset()
+    stmt.bindString(1, $"Bob")
+    stmt.bindInt32(2, 25)
+    assert(stmt.step().isOk())
+}
+
+@test
+func testSelect() {
+    var c: Container
+    var conn = connectContainer(&c)
+    defer c.stop()
+    defer conn.close()
+
+    assert(conn.execute("CREATE TABLE items (id SERIAL PRIMARY KEY, label TEXT, score DOUBLE PRECISION)").isOk())
+    assert(conn.execute("INSERT INTO items (label, score) VALUES ('alpha', 1.5), ('beta', 2.7), ('gamma', 3.14)").isOk())
+
+    var stmt: SqlStatement
+    assert(conn.prepare(&stmt, $"SELECT id, label, score FROM items WHERE score > $1 ORDER BY score").isOk())
+    defer conn.release(stmt)
+
+    stmt.bindFloat64(1, 1.6)
+
+    var rs: SqlResultSet
+    assert(stmt.execute(&rs).isOk())
+
+    var count = 0
+    while(rs.hasNext()) {
+        assert(rs.next().isOk())
+        var id    = rs.columnInt32(0)
+        var label = rs.columnString(1)
+        var score = rs.columnDouble(2)
+        assert(id > 0)
+        assert(label.length > 0)
+        assert(score > 1.6)
+        count += 1
+    }
+    assert(count == 2)
+}
+
+@test
+func testNullColumn() {
+    var c: Container
+    var conn = connectContainer(&c)
+    defer c.stop()
+    defer conn.close()
+
+    assert(conn.execute("CREATE TABLE nullable_test (id SERIAL PRIMARY KEY, val TEXT)").isOk())
+    assert(conn.execute("INSERT INTO nullable_test (val) VALUES (NULL)").isOk())
+
+    var stmt: SqlStatement
+    assert(conn.prepare(&stmt, $"SELECT id, val FROM nullable_test").isOk())
+    defer conn.release(stmt)
+
+    var rs: SqlResultSet
+    assert(stmt.execute(&rs).isOk())
+    assert(rs.hasNext())
+    assert(rs.next().isOk())
+
+    assert(rs.columnInt32(0) > 0)
+    assert(rs.columnText(1) == null)
+    assert(rs.columnString(1).equals($""))
+}
+
+@test
+func testTransaction() {
+    var c: Container
+    var conn = connectContainer(&c)
+    defer c.stop()
+    defer conn.close()
+
+    assert(conn.execute("CREATE TABLE accounts (id SERIAL PRIMARY KEY, balance INT NOT NULL)").isOk())
+    assert(conn.execute("INSERT INTO accounts (balance) VALUES (100)").isOk())
+
+    assert(conn.begin().isOk())
+    assert(conn.execute("UPDATE accounts SET balance = balance - 50 WHERE id = 1").isOk())
+    assert(conn.commit().isOk())
+
+    // Verify final balance
+    var stmt: SqlStatement
+    assert(conn.prepare(&stmt, $"SELECT balance FROM accounts WHERE id = 1").isOk())
+    defer conn.release(stmt)
+
+    var rs: SqlResultSet
+    assert(stmt.execute(&rs).isOk())
+    assert(rs.hasNext())
+    assert(rs.next().isOk())
+    assert(rs.columnInt32(0) == 50)
+}
+
+@test
+func testRollback() {
+    var c: Container
+    var conn = connectContainer(&c)
+    defer c.stop()
+    defer conn.close()
+
+    assert(conn.execute("CREATE TABLE counters (id SERIAL PRIMARY KEY, n INT NOT NULL)").isOk())
+    assert(conn.execute("INSERT INTO counters (n) VALUES (10)").isOk())
+
+    assert(conn.begin().isOk())
+    assert(conn.execute("UPDATE counters SET n = 999 WHERE id = 1").isOk())
+    assert(conn.rollback().isOk())
+
+    // Value should be unchanged after rollback
+    var stmt: SqlStatement
+    assert(conn.prepare(&stmt, $"SELECT n FROM counters WHERE id = 1").isOk())
+    defer conn.release(stmt)
+
+    var rs: SqlResultSet
+    assert(stmt.execute(&rs).isOk())
+    assert(rs.hasNext())
+    assert(rs.next().isOk())
+    assert(rs.columnInt32(0) == 10)
+}

@@ -21,8 +21,8 @@ public func PostgresContainer(
     cfg.env.add(EnvVar{$"POSTGRES_DB",       db})
     cfg.cmd = ArrayInit<String>(0)
     cfg.wait = WaitStrategy{
-        .kind      = WaitStrategyKind.PORT,
-        .port      = 5432,
+        .kind      = WaitStrategyKind.LOG,
+        .pattern   = $"database system is ready to accept connections",
         .timeoutMs = 60_000_i64,
     }
     return cfg
