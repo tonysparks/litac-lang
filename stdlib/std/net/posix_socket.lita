@@ -116,6 +116,9 @@ public func accept(socket: i32, addr: *sockaddr, addrlen: *socklen_t) : i32;
 public func listen(socket: i32, backlog: i32) : i32;
 
 @foreign
+public func connect(socket: i32, addr: *sockaddr, addrlen: socklen_t) : i32;
+
+@foreign
 public func recv(socket: i32, buf: *void, len: usize, flags: i32) : i64;
 
 @foreign

@@ -1,0 +1,59 @@
+#if (DOCKER_AVAILABLE)
+import "std/assert"
+import "std/string/builder"
+import "std/testcontainers"
+import "std/testcontainers/presets"
+
+@test
+func testRedisStartStop() {
+    var cfg = RedisContainer()
+    defer cfg.free()
+    var c: Container
+    assert(c.start(&cfg) == ContainerStatus.OK)
+
+    var hostPort = c.getPort(6379)
+    assert(hostPort > 0)
+
+    c.stop()
+}
+
+@test
+func testContainerIdNonEmpty() {
+    var cfg = RedisContainer()
+    defer cfg.free()
+    var c: Container
+    assert(c.start(&cfg) == ContainerStatus.OK)
+
+    assert(c.id().length > 0)
+
+    c.stop()
+}
+
+@test
+func testContainerLogs() {
+    var cfg = RedisContainer()
+    defer cfg.free()
+    var c: Container
+    assert(c.start(&cfg) == ContainerStatus.OK)
+
+    var out = StringBuilderInit(4096)
+    defer out.free()
+
+    c.logs(&out)
+    assert(out.size() > 0)
+
+    c.stop()
+}
+
+@test
+func testUnknownPortReturnsNegOne() {
+    var cfg = RedisContainer()
+    defer cfg.free()
+    var c: Container
+    assert(c.start(&cfg) == ContainerStatus.OK)
+
+    assert(c.getPort(9999) == -1)
+
+    c.stop()
+}
+#end

@@ -45,6 +45,12 @@ jobs:
           sudo apt-get install -y libcurl4-openssl-dev
           curl --version
 
+      # Install libpq (PostgreSQL client library for db tests)
+      - name: Install libpq
+        run: |
+          echo Install libpq
+          sudo apt-get install -y libpq-dev
+
       # Print compiler information
       - name: Compiler Info
         run: |
@@ -88,6 +94,22 @@ jobs:
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: 16.0.6
+
+      # Locate pre-installed PostgreSQL and export PG_ROOT for libpq.lita's {env:PG_ROOT}.
+      # PG tests are skipped on Windows (#if OS != "WINDOWS") so no service setup needed.
+      - name: Set up PostgreSQL
+        shell: pwsh
+        run: |
+          $pgDir = Get-Item "C:\Program Files\PostgreSQL\*" |
+                   Sort-Object Name -Descending |
+                   Select-Object -First 1
+          if (-not $pgDir) {
+            choco install postgresql16 --no-progress -y
+            $pgDir = Get-Item "C:\Program Files\PostgreSQL\16"
+          }
+          $pgPath = $pgDir.FullName -replace '\\', '/'
+          echo "PG_ROOT=$pgPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "$($pgDir.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       # Print compiler information
       - name: Compiler Info
@@ -142,6 +164,15 @@ jobs:
           make
           cd ../..
           cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a
+
+      # Install libpq (PostgreSQL client library; Docker/container tests run on Linux only)
+      - name: Install libpq
+        run: |
+          brew install libpq
+          if [ ! -d /opt/homebrew/opt/libpq ]; then
+            sudo mkdir -p /opt/homebrew/opt
+            sudo ln -sf "$(brew --prefix libpq)" /opt/homebrew/opt/libpq
+          fi
 
       # Print compiler information
       - name: Compiler Info

@@ -74,6 +74,9 @@ public trait SqlConnection {
     prepare: func(stmt: *SqlStatement, sql: String): SqlResult;
     release: func(stmt: SqlStatement): SqlResult;
     close: func(): SqlResult;
+
+    ddlType: func(bindType: String): String;
+    lastInsertId: func(): i64;
 }
 
 

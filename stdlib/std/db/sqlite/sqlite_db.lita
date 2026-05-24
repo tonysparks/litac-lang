@@ -194,6 +194,20 @@ public func (this: *SqliteConnection) disableWAL() : SqlResult {
     return this.execute("PRAGMA journal_mode=DELETE;")
 }
 
+public func (this: *SqliteConnection) lastInsertId() : i64 {
+    return sqlite3_last_insert_rowid(this.db)
+}
+
+public func (this: *SqliteConnection) ddlType(bindType: String) : String {
+    if(bindType.equals($"AutoInt32") || bindType.equals($"AutoInt64")) {
+        return $"INTEGER PRIMARY KEY AUTOINCREMENT"
+    }
+    if(bindType.equals($"Int32") || bindType.equals($"Int64")) { return $"INTEGER" }
+    if(bindType.equals($"Double") || bindType.equals($"Float64")) { return $"REAL" }
+    if(bindType.equals($"DateTime") || bindType.equals($"Text")) { return $"TEXT" }
+    return $"TEXT"
+}
+
 public func (this: *SqliteConnection) begin() : SqlResult {
     return this.execute("BEGIN TRANSACTION;")
 }

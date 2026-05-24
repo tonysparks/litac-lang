@@ -1,0 +1,91 @@
+@include("<libpq-fe.h>");
+
+@compiler_option(
+    .os = "mac",
+    .key = "pq",
+    .default_path = "/opt/homebrew/opt/libpq",
+    .options = "-I{path}/include"
+);
+
+@compiler_option(
+    .os = "mac",
+    .key = "pq",
+    .default_path = "/opt/homebrew/opt/libpq",
+    .options = "-L{path}/lib -lpq"
+);
+
+@compiler_option(
+    .os = "linux",
+    .key = "pq",
+    .default_path = "/usr/include/postgresql",
+    .options = "-I{path} -lpq"
+);
+
+@compiler_option(
+    .os = "windows",
+    .key = "pq",
+    .options = "-I{path}/include"
+);
+
+@compiler_option(
+    .os = "windows",
+    .key = "pq",
+    .options = "-L{path}/lib -llibpq"
+);
+
+import "std/libc"
+
+public typedef u32 as Oid
+
+// ConnStatusType
+@foreign public const CONNECTION_OK: i32;
+@foreign public const CONNECTION_BAD: i32;
+
+// ExecStatusType
+@foreign public const PGRES_EMPTY_QUERY: i32;
+@foreign public const PGRES_COMMAND_OK: i32;
+@foreign public const PGRES_TUPLES_OK: i32;
+@foreign public const PGRES_BAD_RESPONSE: i32;
+@foreign public const PGRES_NONFATAL_ERROR: i32;
+@foreign public const PGRES_FATAL_ERROR: i32;
+
+@foreign public struct PGconn {}
+@foreign public struct PGresult {}
+
+@foreign public func PQconnectdb(conninfo: *const char) : *PGconn;
+@foreign public func PQstatus(conn: *PGconn) : i32;
+@foreign public func PQerrorMessage(conn: *PGconn) : *const char;
+@foreign public func PQfinish(conn: *PGconn);
+
+@foreign public func PQexec(conn: *PGconn, query: *const char) : *PGresult;
+
+@foreign public func PQprepare(
+    conn: *PGconn,
+    stmtName: *const char,
+    query: *const char,
+    nParams: i32,
+    paramTypes: *Oid
+) : *PGresult;
+
+@foreign public func PQexecPrepared(
+    conn: *PGconn,
+    stmtName: *const char,
+    nParams: i32,
+    paramValues: **const char,
+    paramLengths: *i32,
+    paramFormats: *i32,
+    resultFormat: i32
+) : *PGresult;
+
+@foreign public func PQresultStatus(res: *PGresult) : i32;
+@foreign public func PQresultErrorMessage(res: *PGresult) : *const char;
+@foreign public func PQclear(res: *PGresult);
+
+@foreign public func PQntuples(res: *PGresult) : i32;
+@foreign public func PQnfields(res: *PGresult) : i32;
+@foreign public func PQgetvalue(res: *PGresult, rowNum: i32, colNum: i32) : *char;
+@foreign public func PQgetisnull(res: *PGresult, rowNum: i32, colNum: i32) : i32;
+@foreign public func PQgetlength(res: *PGresult, rowNum: i32, colNum: i32) : i32;
+@foreign public func PQftype(res: *PGresult, colNum: i32) : Oid;
+@foreign public func PQcmdTuples(res: *PGresult) : *const char;
+@foreign public func PQfreemem(ptr: *void);

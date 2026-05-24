@@ -39,7 +39,7 @@ func testParseIntHex() {
     assert(StringInit("10").parseInt(16).value     == 16)
     assert(StringInit("0").parseInt(16).value      == 0)
     assert(StringInit("1f").parseInt(16).value     == 31)
-    assert(StringInit("DeAdBeEf").parseInt(16).value == 0xDEADBEEF)
+    assert(StringInit("DeAdBeEf").parseInt(16).value == 0xDEADBEEF_i64)
     // chunk extension: stops at ';'
     assert(StringInit("a;ext=val").parseInt(16).value == 10)
     assert(StringInit("a;ext=val").parseInt(16).len   == 1)

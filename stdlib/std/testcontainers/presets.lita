@@ -1,0 +1,97 @@
+import "std/string"
+import "std/array"
+import "std/testcontainers/testcontainers"
+
+// Returns a ContainerConfig for postgres:16-alpine.
+// Exposes port 5432 and waits for TCP readiness (up to 60 s).
+public func PostgresContainer(
+    password: String,
+    db: String = $"test",
+    user: String = $"postgres",
+    tag: String = $"16-alpine"
+) : ContainerConfig {
+    var cfg = ContainerConfig{}
+    cfg.image = $"postgres"
+    cfg.tag = tag
+    cfg.ports = ArrayInit<i32>(1)
+    cfg.ports.add(5432)
+    cfg.env = ArrayInit<EnvVar>(3)
+    cfg.env.add(EnvVar{$"POSTGRES_PASSWORD", password})
+    cfg.env.add(EnvVar{$"POSTGRES_USER",     user})
+    cfg.env.add(EnvVar{$"POSTGRES_DB",       db})
+    cfg.cmd = ArrayInit<String>(0)
+    cfg.wait = WaitStrategy{
+        .kind      = WaitStrategyKind.LOG,
+        .pattern   = $"database system is ready to accept connections",
+        .timeoutMs = 60_000_i64,
+    }
+    return cfg
+}
+
+// Returns a ContainerConfig for redis:7-alpine.
+// Exposes port 6379 and waits for TCP readiness.
+public func RedisContainer(
+    tag: String = $"7-alpine"
+) : ContainerConfig {
+    var cfg = ContainerConfig{}
+    cfg.image = $"redis"
+    cfg.tag = tag
+    cfg.ports = ArrayInit<i32>(1)
+    cfg.ports.add(6379)
+    cfg.env = ArrayInit<EnvVar>(0)
+    cfg.cmd = ArrayInit<String>(0)
+    cfg.wait = WaitStrategy{
+        .kind = WaitStrategyKind.PORT,
+        .port = 6379,
+    }
+    return cfg
+}
+
+// Returns a ContainerConfig for mysql:8.
+// Exposes port 3306 and waits for TCP readiness (up to 60 s).
+public func MySQLContainer(
+    password: String,
+    db: String = $"test",
+    user: String = $"root",
+    tag: String = $"8"
+) : ContainerConfig {
+    var cfg = ContainerConfig{}
+    cfg.image = $"mysql"
+    cfg.tag = tag
+    cfg.ports = ArrayInit<i32>(1)
+    cfg.ports.add(3306)
+    cfg.env = ArrayInit<EnvVar>(3)
+    cfg.env.add(EnvVar{$"MYSQL_ROOT_PASSWORD", password})
+    cfg.env.add(EnvVar{$"MYSQL_USER",          user})
+    cfg.env.add(EnvVar{$"MYSQL_DATABASE",      db})
+    cfg.cmd = ArrayInit<String>(0)
+    cfg.wait = WaitStrategy{
+        .kind      = WaitStrategyKind.PORT,
+        .port      = 3306,
+        .timeoutMs = 60_000_i64,
+    }
+    return cfg
+}
+
+// Returns a ContainerConfig for a generic HTTP service.
+// Waits for GET healthPath to return HTTP 2xx.
+public func HttpContainer(
+    image: String,
+    tag: String,
+    port: i32,
+    healthPath: String = $"/"
+) : ContainerConfig {
+    var cfg = ContainerConfig{}
+    cfg.image = image
+    cfg.tag = tag
+    cfg.ports = ArrayInit<i32>(1)
+    cfg.ports.add(port)
+    cfg.env = ArrayInit<EnvVar>(0)
+    cfg.cmd = ArrayInit<String>(0)
+    cfg.wait = WaitStrategy{
+        .kind = WaitStrategyKind.HTTP,
+        .port = port,
+        .path = healthPath,
+    }
+    return cfg
+}
