@@ -16,7 +16,9 @@
 
 @compiler_option(
     .os = "linux",
-    .options = "-lpq"
+    .key = "pq",
+    .default_path = "/usr/include/postgresql",
+    .options = "-I{path} -lpq"
 );
 
 @compiler_option(
