@@ -165,14 +165,7 @@ jobs:
           cd ../..
           cp -f libtcc-cmake/build/libtcc.a $GITHUB_WORKSPACE/lib/libtcc.a
 
-      # Install Docker via colima (needed for testcontainer-based db tests)
-      - name: Install Docker (colima)
-        run: |
-          brew install colima docker
-          colima start --cpu 2 --memory 4
-          docker info
-
-      # Install libpq (PostgreSQL client library for db tests)
+      # Install libpq (PostgreSQL client library; Docker/container tests run on Linux only)
       - name: Install libpq
         run: |
           brew install libpq
