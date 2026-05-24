@@ -40,8 +40,6 @@ public func (this: *Preprocessor) registerApi() {
 //    ape_set_gc_interval(this.runtime.ape, 1000000)
     // ape_set_memory_functions(lita as (*void), &litaMalloc, lita as (*void), &noOpFree)
 
-    // TODO: Read options from LitaOptions; allow for custom command line options
-    //ape_set_global_constant(this.runtime.ape, "OS", ape_object_make_string(this.runtime.ape, "LINUX"))
     ape_set_global_constant(this.runtime.ape, "OS", ape_object_make_string(this.runtime.ape, OSAsStr(GetOS())))
     ape_set_global_constant(this.runtime.ape, "ARCH", ape_object_make_string(this.runtime.ape, ArchAsStr(GetArch())))
     ape_set_global_constant(this.runtime.ape, "DEBUG", ape_object_make_bool(this.lita.options.isDebug))
@@ -51,6 +49,21 @@ public func (this: *Preprocessor) registerApi() {
     ape_set_global_constant(this.runtime.ape, "INSTRUMENT", ape_object_make_bool(this.lita.options.instrument))
     ape_set_global_constant(this.runtime.ape, "OUTPUT_NAME", ape_object_make_string(this.runtime.ape, this.lita.options.outputFile))
     ape_set_global_constant(this.runtime.ape, "OUTPUT_PATH", ape_object_make_string(this.runtime.ape, this.lita.options.outputPath))
+
+    // User-defined symbols from -DNAME or -DNAME=VALUE command-line flags.
+    // Bare -DNAME registers as boolean true; -DNAME=VALUE registers as a string.
+    for(var i = 0; i < this.lita.options.defines.size(); i += 1) {
+        var define = this.lita.options.defines.get(i)
+        var defineStr = StringInit(define)
+        var eqIndex = defineStr.indexOf($"=")
+        if(eqIndex < 0) {
+            ape_set_global_constant(this.runtime.ape, define, ape_object_make_bool(true))
+        } else {
+            var nameBuf: [256]char
+            defineStr.substring(0, eqIndex).copyTo(nameBuf, eqIndex)
+            ape_set_global_constant(this.runtime.ape, nameBuf, ape_object_make_string(this.runtime.ape, define + eqIndex + 1))
+        }
+    }
 
     ape_set_native_function(this.runtime.ape, "getTypeKind", ApeGetTypeKind, &this.callContext)
     ape_set_native_function(this.runtime.ape, "isPrimitive", ApeIsPrimitive, &this.callContext)
@@ -89,6 +102,13 @@ public func (this: *Preprocessor) execute(comp: *CompStmt, code: String) : bool 
 
     if(ape_has_errors(this.runtime.ape)) {
         var error = ape_get_error(this.runtime.ape, 0)
+        // Compilation errors indicate an undefined symbol (e.g. -DFOO not supplied).
+        // Treat those as false so #if (FOO) works like an optional define check.
+        // Parsing errors are real mistakes and should be reported.
+        var typeStr = StringInit(ape_error_get_type_string(error))
+        if(typeStr.equals($"COMPILATION")) {
+            return false
+        }
         var pos = SrcPos {
             .filename: comp.startPos.filename,
             .lineStart: comp.startPos.lineStart,

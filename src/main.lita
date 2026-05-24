@@ -168,7 +168,20 @@ public func ParseArgs(
 
     defer parser.free()
 
-    if(parser.parse(n, args) != CmdParserStatus.OK) {
+    // Pre-scan for -DNAME[=VALUE] defines before the option parser sees them,
+    // since the parser doesn't support repeated flags with no space.
+    options.defines.init(8, defaultAllocator)
+    var filteredArgs = ArrayInit<*char>(n, defaultAllocator)
+    defer filteredArgs.free()
+    for(var i = 0; i < n; i += 1) {
+        if(args[i][0] == '-' && args[i][1] == 'D' && args[i][2] != '\0') {
+            options.defines.add(args[i] + 2)
+        } else {
+            filteredArgs.add(args[i])
+        }
+    }
+
+    if(parser.parse(filteredArgs.size(), filteredArgs.elements) != CmdParserStatus.OK) {
         parser.printAll()
         return ParseStatus.ERROR
     }

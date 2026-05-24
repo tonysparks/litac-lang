@@ -1295,6 +1295,8 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             .arch = Arch.Lita_ArchType_UNKNOWN,
             .options = String{},
         }
+        var ccKey = String{}
+        var ccDefaultPath = String{}
 
         var temp:[MAX_PATH]char;
         // this constant is "{relativePath}"..length()
@@ -1334,6 +1336,12 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 else if(attr.argName.str.equalsStr("options")) {
                     ccOption.options = value
                 }
+                else if(attr.argName.str.equalsStr("key")) {
+                    ccKey = value
+                }
+                else if(attr.argName.str.equalsStr("default_path")) {
+                    ccDefaultPath = value
+                }
             }
             else {
                 if(i == 0) {
@@ -1346,6 +1354,137 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                     ccOption.arch = ArchFromStr(value.buffer, value.length)
                 }
             }
+        }
+
+        // Substitute {path}, {env:VAR_NAME} in the options string, but only when
+        // the OS matches — so Windows-only options don't error on macOS/Linux for
+        // vars like PG_ROOT that don't need to be set on those platforms.
+        if(ccOption.options.length > 0 &&
+           (ccOption.os == OS.Lita_OSType_OTHER || ccOption.os == GetOS())
+        ) {
+
+            var optBuf = StringBuilderInit(MAX_PATH, this.lita.allocator)
+            optBuf.append("%.*s", ccOption.options.length, ccOption.options.buffer)
+
+            // {path} substitution: resolved via .key priority chain
+            //   1. -D{key}-path=VALUE  from CLI defines
+            //   2. ${KEY}_PATH         from environment
+            //   3. .default_path       from the attribute
+            if(ccKey.length > 0 && optBuf.toString().indexOf($"{path}") >= 0) {
+                // Zero-init backing arrays so the last byte is always '\0',
+                // guaranteeing null-termination even when StringBuffer fills to capacity.
+                var defineKeyBuf = [256]char{0}
+                var envKeyBuf    = [256]char{0}
+                var resolvedBuf  = [MAX_PATH]char{0}
+
+                // Use capacity-1 so appendStr/appendChar always leave room for '\0'
+                var defineKey = StringBufferInit(defineKeyBuf, 255, 0)
+                var envKey    = StringBufferInit(envKeyBuf,    255, 0)
+                var resolved  = StringBufferInit(resolvedBuf,  MAX_PATH - 1, 0)
+
+                // Build "{key}-path" for the -D lookup
+                defineKey.appendStrn(ccKey.buffer, ccKey.length)
+                defineKey.appendStr("-path")
+
+                // Build "KEY_PATH" for the env lookup (uppercase, '-' -> '_')
+                for(var i = 0; i < ccKey.length; i += 1) {
+                    var c = ccKey.buffer[i]
+                    envKey.appendChar((c == '-') ? '_' : toupper(c as (i32)) as (char))
+                }
+                envKey.appendStr("_PATH")
+
+                var pathFound = false
+
+                // 1. Check CLI defines for "{key}-path=VALUE"
+                for(var i = 0; i < this.lita.options.defines.size() && !pathFound; i += 1) {
+                    var define = this.lita.options.defines.get(i)
+                    var defineStr = StringInit(define)
+                    var eqIdx = defineStr.indexOf($"=")
+                    if(eqIdx < 0) {
+                        continue
+                    }
+                    if(defineStr.substring(0, eqIdx).equals(defineKey.toString())) {
+                        var val = defineStr.substring(eqIdx + 1, defineStr.length)
+                        resolved.appendStrn(val.buffer, val.length)
+                        pathFound = true
+                    }
+                }
+
+                // 2. Check env var
+                if(!pathFound) {
+                    var envVal = GetEnv(envKey.cStr())
+                    if(envVal != null) {
+                        resolved.appendStr(envVal)
+                        pathFound = true
+                    }
+                }
+
+                // 3. Use .default_path
+                if(!pathFound && ccDefaultPath.length > 0) {
+                    resolved.appendStrn(ccDefaultPath.buffer, ccDefaultPath.length)
+                    pathFound = true
+                }
+
+                if(!pathFound) {
+                    this.result.addError(
+                        note.startPos,
+                        "no path found for key '%.*s': supply -D%s or set $%s in the environment, or add .default_path to @compiler_option",
+                        ccKey.length, ccKey.buffer,
+                        defineKey.cStr(),
+                        envKey.cStr()
+                    )
+                }
+                else {
+                    var replacement = resolved.toString()
+                    var pathPlaceholder = $"{path}"
+                    var searchFrom = 0
+                    while(true) {
+                        var s = optBuf.toString()
+                        var idx = s.indexOfAt(pathPlaceholder, searchFrom)
+                        if(idx < 0) {
+                            break
+                        }
+                        optBuf.replace(idx, idx + pathPlaceholder.length, replacement)
+                        searchFrom = idx + replacement.length
+                    }
+                }
+            }
+
+            // {env:VAR_NAME} substitution
+            var envPrefix = $"{env:"
+            var searchFrom = 0
+            while(true) {
+                var searchStr = optBuf.toString()
+                var index = searchStr.indexOfAt(envPrefix, searchFrom)
+                if(index < 0) {
+                    break
+                }
+
+                var closeIndex = searchStr.indexOfAt($"}", index + envPrefix.length)
+                if(closeIndex < 0) {
+                    break
+                }
+
+                var varNameStr = searchStr.substring(index + envPrefix.length, closeIndex)
+                var varName:[256]char
+                varNameStr.copyTo(varName, varNameStr.length)
+
+                var envVal = GetEnv(varName)
+                if(envVal == null) {
+                    this.result.addError(
+                        note.startPos,
+                        "environment variable '%s' is not set (referenced in @compiler_option)",
+                        varName
+                    )
+                    break
+                }
+
+                var replacement = StringInit(envVal, strlen(envVal))
+                optBuf.replace(index, closeIndex + 1, replacement)
+                searchFrom = index + replacement.length
+            }
+
+            ccOption.options = optBuf.toString()
         }
 
         this.lita.compilerOptions.add(ccOption)

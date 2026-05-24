@@ -17,45 +17,47 @@ import "std/db"
 import "std/db/sqlite"
 import "std/db/sqlite/sqlite_db"
 import "std/db/orm"
-import "std/db/postgres/postgres_db" as pgdb
-import "std/testcontainers"
-import "std/testcontainers/presets"
+#if (DOCKER_AVAILABLE)
+    import "std/db/postgres/postgres_db" as pgdb
+    import "std/testcontainers"
+    import "std/testcontainers/presets"
 
-// ── Shared PostgreSQL container (one per test run) ────────────────────────────
+    // ── Shared PostgreSQL container (one per test run) ────────────────────────
 
-var _pgContainer: Container
-var _pgPort: i32 = 0
-var _pgSchemaSeq: i32 = 0
+    var _pgContainer: Container
+    var _pgPort: i32 = 0
+    var _pgSchemaSeq: i32 = 0
 
-@module_init
-public func pgModuleInit() {
-    var cfg = PostgresContainer(.password = $"secret", .db = $"testdb")
-    defer cfg.free()
-    assert(_pgContainer.start(&cfg) == ContainerStatus.OK)
-    _pgPort = _pgContainer.getPort(5432)
+    @module_init
+    public func pgModuleInit() {
+        var cfg = PostgresContainer(.password = $"secret", .db = $"testdb")
+        defer cfg.free()
+        assert(_pgContainer.start(&cfg) == ContainerStatus.OK)
+        _pgPort = _pgContainer.getPort(5432)
 
-    // The postgres image restarts once during init; retry until the second
-    // server start is fully ready.
-    var dsn = StringBuilderInit(128)
-    defer dsn.free()
-    dsn.append("host=127.0.0.1 port=%d dbname=testdb user=postgres password=secret sslmode=disable", _pgPort)
+        // The postgres image restarts once during init; retry until the second
+        // server start is fully ready.
+        var dsn = StringBuilderInit(128)
+        defer dsn.free()
+        dsn.append("host=127.0.0.1 port=%d dbname=testdb user=postgres password=secret sslmode=disable", _pgPort)
 
-    var probe: pgdb::PgConnection
-    var result: SqlResult
-    for(var i = 0; i < 30; i += 1) {
-        result = pgdb::ConnectDSN(dsn.cStrConst(), &probe)
-        if(result.isOk()) { break; }
+        var probe: pgdb::PgConnection
+        var result: SqlResult
+        for(var i = 0; i < 30; i += 1) {
+            result = pgdb::ConnectDSN(dsn.cStrConst(), &probe)
+            if(result.isOk()) { break; }
+            probe.close()
+            ThreadSleepMSec(1000_i64)
+        }
+        assert(result.isOk())
         probe.close()
-        ThreadSleepMSec(1000_i64)
     }
-    assert(result.isOk())
-    probe.close()
-}
 
-@module_destroy
-public func pgModuleDestroy() {
-    _pgContainer.stop()
-}
+    @module_destroy
+    public func pgModuleDestroy() {
+        _pgContainer.stop()
+    }
+#end
 
 // ── ORM entity ────────────────────────────────────────────────────────────────
 
@@ -89,6 +91,7 @@ func openSqliteDb(conn: *SqliteConnection) : SqlConnection {
     return conn.connection
 }
 
+#if (DOCKER_AVAILABLE)
 // Opens a fresh connection to the shared container in its own schema so table
 // names don't collide between tests that all share the same database.
 func pgConnect(conn: *pgdb::PgConnection) {
@@ -109,6 +112,7 @@ func pgConnect(conn: *pgdb::PgConnection) {
     conn.execute(sql.cStrConst())
     assert(!conn.hasError())
 }
+#end
 
 // ── ORM helpers ───────────────────────────────────────────────────────────────
 
@@ -560,6 +564,7 @@ func testSqliteCloseAndReleaseAll() {
 
 // ── PostgreSQL @test wrappers ─────────────────────────────────────────────────
 
+#if (DOCKER_AVAILABLE)
 @test
 func testPgConnectionExecute() {
     var conn: pgdb::PgConnection
@@ -671,6 +676,7 @@ func testPgCloseAndReleaseAll() {
     defer conn.close()
     doCloseAndReleaseAll(conn.connection)
 }
+#end
 
 // ── SQLite-only: named parameter introspection ────────────────────────────────
 
@@ -1003,6 +1009,7 @@ func testSqliteOrmDateTimeRoundTrip() {
 
 // ── PostgreSQL ORM @test wrappers ─────────────────────────────────────────────
 
+#if (DOCKER_AVAILABLE)
 @test
 func testPgOrmInsertOneAndQueryOneById() {
     var allocator = BucketAllocator{}
@@ -1112,3 +1119,4 @@ func testPgOrmDateTimeRoundTrip() {
     defer conn.close()
     doOrmDateTimeRoundTrip(conn.connection, &allocator.allocator)
 }
+#end

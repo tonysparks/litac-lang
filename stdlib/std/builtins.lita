@@ -31,6 +31,8 @@ public @note compiler_option {
     os: *const char = "default"
     arch: *const char = "default"
     options: *const char
+    key: *const char = null
+    default_path: *const char = null
 }
 
 public @note foreign {

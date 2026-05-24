@@ -2,17 +2,33 @@
 
 @compiler_option(
     .os = "mac",
-    .options = "-I/opt/homebrew/opt/libpq/include"
+    .key = "pq",
+    .default_path = "/opt/homebrew/opt/libpq",
+    .options = "-I{path}/include"
 );
 
 @compiler_option(
     .os = "mac",
-    .options = "-L/opt/homebrew/opt/libpq/lib -lpq"
+    .key = "pq",
+    .default_path = "/opt/homebrew/opt/libpq",
+    .options = "-L{path}/lib -lpq"
 );
 
 @compiler_option(
     .os = "linux",
     .options = "-lpq"
+);
+
+@compiler_option(
+    .os = "windows",
+    .key = "pq",
+    .options = "-I{path}/include"
+);
+
+@compiler_option(
+    .os = "windows",
+    .key = "pq",
+    .options = "-L{path}/lib -llibpq"
 );
 
 import "std/libc"
