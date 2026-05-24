@@ -2643,38 +2643,39 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             }
 
             var type = expr.operand.typeInfo
-            if(!isHex && !isBin) {
-                switch(type.kind) {
-                    case TypeKind.F32: {
+            switch(type.kind) {
+                case TypeKind.F32: {
+                    if(!isHex && !isBin) {
                         if(!hasDecimal) {
                             this.emitStrn(".", 1)
                         }
                         this.emitStrn("f", 1)
-                        break;
                     }
-                    case TypeKind.F64: {
+                    break;
+                }
+                case TypeKind.F64: {
+                    if(!isHex && !isBin) {
                         if(!hasDecimal) {
                             this.emitStrn(".0", 2)
                         }
-                        break;
                     }
-                    case TypeKind.U8:
-                    case TypeKind.U16:
-                    case TypeKind.U32: {
-                        this.emitStrn("U", 1)
-                        break;
-                    }
-                    case TypeKind.U64: {
-                        this.emitStrn("UL", 2)
-                        break;
-                    }
-                    case TypeKind.I64: {
-                        this.emitStrn("L", 1)
-                        break;
-                    }
-                    default: {
-
-                    }
+                    break;
+                }
+                case TypeKind.U8:
+                case TypeKind.U16:
+                case TypeKind.U32: {
+                    this.emitStrn("U", 1)
+                    break;
+                }
+                case TypeKind.U64: {
+                    this.emitStrn("ULL", 3)
+                    break;
+                }
+                case TypeKind.I64: {
+                    this.emitStrn("LL", 2)
+                    break;
+                }
+                default: {
                 }
             }
             return;
