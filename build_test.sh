@@ -35,6 +35,10 @@ run_tests() {
             ./bin/output/litac test $DOCKER_DEFINE -file "./test/std/db/db_api_test.lita" -output "litac_tests"
             result=$?
         fi
+        if [ -n "$DOCKER_DEFINE" ] && [ $result -eq 0 ]; then
+            ./bin/output/litac test $DOCKER_DEFINE -file "./test/std/db/postgres/postgres_test.lita" -output "litac_tests"
+            result=$?
+        fi
     fi
 
     if [ $result -gt 0 ]; then
