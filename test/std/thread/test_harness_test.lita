@@ -1,0 +1,129 @@
+import "std/thread"
+import "std/test"
+import "std/assert"
+import "std/libc"
+
+// -----------------------------------------------------------------------
+// Test 1: _threadCase is set to the parent's TestCase inside a worker thread
+// -----------------------------------------------------------------------
+
+struct ThreadLocalCheck {
+    caseIsSet: bool
+    caseMatchesParent: bool
+    parentCase: *TestCase
+}
+
+func checkThreadLocalFn(arg: *void) : i32 {
+    var check = arg as (*ThreadLocalCheck)
+    check.caseIsSet        = _threadCase != null
+    check.caseMatchesParent = _threadCase == check.parentCase
+    return 0
+}
+
+@test
+func testThreadLocalCaseIsSet() {
+    var check = ThreadLocalCheck{
+        .caseIsSet         = false,
+        .caseMatchesParent = false,
+        .parentCase        = testSuite.currentCase
+    }
+    var t = Thread{}
+    t.create(checkThreadLocalFn, &check)
+    t.join()
+    assert(check.caseIsSet)
+    assert(check.caseMatchesParent)
+}
+
+// -----------------------------------------------------------------------
+// Test 2: passing assertions inside a thread don't affect the parent test
+// -----------------------------------------------------------------------
+
+func threadWithPassingAssertsFn(arg: *void) : i32 {
+    assert(true)
+    assert(1 == 1)
+    assert(2 > 1)
+    return 0
+}
+
+@test
+func testThreadPassingAssertions() {
+    var t = Thread{}
+    t.create(threadWithPassingAssertsFn, null)
+    t.join()
+    // reaching here without longjmp means the thread didn't fail
+}
+
+// -----------------------------------------------------------------------
+// Test 3: multiple concurrent threads all passing
+// -----------------------------------------------------------------------
+
+struct CounterData {
+    id: i32
+    completed: *bool
+}
+
+func threadCounterFn(arg: *void) : i32 {
+    var data = arg as (*CounterData)
+    assert(data.id >= 0)
+    assert(data.id < 4)
+    ;*(data.completed) = true
+    return 0
+}
+
+@test
+func testMultipleThreadsPass() {
+    var completed: [4]bool
+    var data: [4]CounterData
+    var threads: [4]Thread
+
+    for(var i = 0; i < 4; i += 1) {
+        completed[i] = false
+        data[i] = CounterData{.id = i, .completed = &completed[i]}
+        threads[i].create(threadCounterFn, &data[i])
+    }
+    for(var i = 0; i < 4; i += 1) {
+        threads[i].join()
+    }
+    for(var i = 0; i < 4; i += 1) {
+        assert(completed[i])
+    }
+}
+
+// -----------------------------------------------------------------------
+// Test 4: addError is mutex-protected — 10 concurrent writes must all land
+// -----------------------------------------------------------------------
+
+struct AddErrorData {
+    testCase: *TestCase
+}
+
+func addErrorThreadFn(arg: *void) : i32 {
+    var data = arg as (*AddErrorData)
+    data.testCase.addError("concurrent error")
+    return 0
+}
+
+@test
+func testThreadAddErrorThreadSafe() {
+    // Use a standalone suite+case so errors don't pollute the real test case
+    var suite = TestSuite{}
+    suite.init()
+    defer suite.free()
+
+    var tempCase = TestCase{}
+    tempCase.init(&suite)
+    defer tempCase.free()
+
+    var data = AddErrorData{.testCase = &tempCase}
+    var threads: [10]Thread
+
+    for(var i = 0; i < 10; i += 1) {
+        threads[i].create(addErrorThreadFn, &data)
+    }
+    for(var i = 0; i < 10; i += 1) {
+        threads[i].join()
+    }
+
+    // all 10 concurrent writes must have landed without corruption
+    assert(tempCase.errors.length == 10)
+}

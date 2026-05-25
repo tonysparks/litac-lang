@@ -244,6 +244,10 @@ static void NTAPI _tinycthread_tss_callback(PVOID h, DWORD dwReason, PVOID pv)
 import "std/libc" as c
 import "std/mem"
 
+#if TESTING
+    import "std/test"
+#end
+
 @generated
 public enum ThreadStatus {
     ERROR    = 0,
@@ -724,18 +728,62 @@ public func (cond: *Cond) timedWait(mtx: *Mutex, durationMs: i64) : ThreadStatus
 */
 
 public typedef func(*void) : i32 as ThreadStartFn;
+#if TESTING
+public struct Thread {
+    hnd: HANDLE
+    testFailed: bool
+}
+#else
 public struct Thread {
     hnd: HANDLE
 }
+#end
 
 /** Information to pass to the new thread (what to run). */
+#if TESTING
+public struct ThreadStartInfo {
+    mFunction: ThreadStartFn
+    mArg: *void
+    allocator: *const Allocator
+    thread: *Thread
+    parentCase: *TestCase
+}
+#else
 public struct ThreadStartInfo {
     mFunction: ThreadStartFn; /**< Pointer to the function to be executed. */
     mArg: *void;              /**< Function argument for the thread function. */
     allocator: *const Allocator
 }
+#end
 
 
+#if TESTING
+@raw("WINAPI ")
+func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
+    var ti: *ThreadStartInfo = aArg as (*ThreadStartInfo);
+    var fun = ti.mFunction;
+    var arg = ti.mArg;
+    var thread = ti.thread
+    var parentCase = ti.parentCase
+    ti.allocator.free(ti as (*void));
+
+    _threadCase = parentCase
+    var res: i32 = 0
+    if(setjmp(_threadEnv) == 0) {
+        res = fun(arg)
+    }
+    else {
+        thread.testFailed = true
+    }
+    _threadCase = null
+
+    if (_tinycthread_tss_head != null) {
+        _tinycthread_tss_cleanup();
+    }
+
+    return res as (DWORD)
+}
+#else
 @raw("WINAPI ")
 func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
 
@@ -756,6 +804,7 @@ func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
 
     return res as (DWORD);
 }
+#end
 
 public func (thr: *Thread) create(
     fun: ThreadStartFn,
@@ -770,6 +819,10 @@ public func (thr: *Thread) create(
     ti.mFunction = fun;
     ti.mArg = arg;
     ti.allocator = allocator;
+    #if TESTING
+    ti.thread = thr
+    ti.parentCase = testSuite.currentCase
+    #end
 
     var state = 0; // suspend ? CREATE_SUSPENDED : 0
 
@@ -806,7 +859,7 @@ public func (thr: Thread) equal(other: Thread) : bool {
     return thr.id() == other.id()
 }
 
-public func (thr: Thread) join(res: *i32 = null) : ThreadStatus {
+public func (thr: *Thread) join(res: *i32 = null) : ThreadStatus {
     var dwRes: DWORD;
 
     if (WaitForSingleObject(thr.hnd, INFINITE) == WAIT_FAILED) {
@@ -821,6 +874,12 @@ public func (thr: Thread) join(res: *i32 = null) : ThreadStatus {
         }
     }
     CloseHandle(thr.hnd as (HANDLE));
+
+    #if TESTING
+    if(thr.testFailed) {
+        onThreadFail()
+    }
+    #end
 
     return ThreadStatus.SUCCESS;
 }
