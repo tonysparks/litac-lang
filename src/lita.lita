@@ -725,6 +725,10 @@ func (this: *Lita) applyCompilerOptions(commandStr: *StringBuilder) {
         buffer.appendStrn(option.options.buffer, option.options.length)
     }
 
+    for(var i = 0; i < this.options.defines.size(); i+=1) {
+        buffer.append(" -D%s", this.options.defines.get(i))
+    }
+
     if(this.options.isStrict) {
         var index = commandStr.indexOf($"%options%")
         if(index >= 0) {

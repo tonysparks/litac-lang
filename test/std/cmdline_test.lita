@@ -1,0 +1,448 @@
+import "std/cmdline"
+import "std/assert"
+import "std/array"
+import "std/string"
+import "std/string/builder"
+import "std/libc" as c
+
+@test
+func ParseArgsWithCommands() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Compile and build")
+        .addOption("lib", '\0', "stuff", 0, null)
+        .addOption("debug", '\0', "stuff", 0, null)
+
+    parser.addCommand("test", "Compile and build then test")
+        .addOption("file", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
+        .addOption("func", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
+
+    parser.addCommand("run", "run command", true)
+
+    parser
+        .addOption("colors", '\0', "stuff", 0, null)
+        .addOption("maxMemory", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
+
+    var args = []*const char {
+        "./litac",
+        "build",
+        "-lib",
+        "-colors",
+        "-maxMemory",
+        "1KiB"
+    };
+    var n = 6
+
+    var sb = StringBuilderInit(1024)
+    parser.printHelp(sb)
+    assert(
+$"""
+    -colors              stuff
+    -maxMemory <arg>     stuff
+
+build                    Compile and build
+    -lib                 stuff
+    -debug               stuff
+
+test                     Compile and build then test
+    -file <arg>          stuff
+    -func <arg>          stuff
+
+run <arg>                run command
+""".trim().equals(StringInit(sb.cStr()).trim())
+    )
+    c::printf("%s\n", sb.cStr())
+
+    assert(parser.parse(n, args as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasOption("colors"))
+    assert(parser.hasOption("maxMemory"))
+    var maxMem = parser.getOption("maxMemory")
+    assert(maxMem != null)
+    assert(maxMem.value.equals("1KiB"))
+
+    assert(parser.hasCmd())
+    var cmd = parser.getCmd()
+    assert(cmd != null)
+    assert(cmd.name.equals("build"))
+    assert(cmd.hasOption("lib"))
+    assert(cmd.hasOption("debug") == false)
+    assert(cmd.hasOption("does-not-exist") == false)
+
+    // Test overrides
+    {
+        var args = []*const char {
+            "./litac",
+            "build",
+            "-lib",
+            "-colors",
+            "-maxMemory",
+            "1KiB"
+        };
+        var n = 6
+        assert(parser.merge(n, args as (**char)) == CmdParserStatus.OK)
+    }
+
+}
+
+@test
+func ParseMultiAndFusedOptions() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addOption(
+        "define", 'D',
+        "Preprocessor define",
+        OptionFlag.HAS_ARGUMENT | OptionFlag.IS_MULTI | OptionFlag.IS_FUSED,
+        null
+    )
+    parser.addOption("output", 'o', "Output file", OptionFlag.HAS_ARGUMENT, null)
+
+    // Mix of fused and spaced multi-values
+    var args = []*const char {
+        "./prog",
+        "-DFOO",
+        "-DBAR=1",
+        "-D",
+        "BAZ",
+        "-o",
+        "out.bin"
+    }
+    var n = 7
+
+    assert(parser.parse(n, args as (**char)) == CmdParserStatus.OK)
+
+    var defineOpt = parser.getOption("define")
+    assert(defineOpt != null)
+    assert(defineOpt.flags & OptionFlag.IS_USED)
+
+    var vals = defineOpt.getValues()
+    assert(vals != null)
+    assert(vals.size() == 3)
+    assert(vals.get(0).equals("FOO"))
+    assert(vals.get(1).equals("BAR=1"))
+    assert(vals.get(2).equals("BAZ"))
+
+    // value should be the last one
+    assert(defineOpt.value.equals("BAZ"))
+
+    var outOpt = parser.getOption("output")
+    assert(outOpt != null)
+    assert(outOpt.value.equals("out.bin"))
+    assert(outOpt.getValues() == null)  // not IS_MULTI
+}
+
+@test
+func MergeMultiOptions() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addOption(
+        "define", 'D',
+        "Preprocessor define",
+        OptionFlag.HAS_ARGUMENT | OptionFlag.IS_MULTI | OptionFlag.IS_FUSED,
+        null
+    )
+
+    var args1 = []*const char { "./prog", "-DFOO", "-DBAR" }
+    assert(parser.parse(3, args1 as (**char)) == CmdParserStatus.OK)
+
+    var args2 = []*const char { "./prog", "-DBAZ" }
+    assert(parser.merge(2, args2 as (**char)) == CmdParserStatus.OK)
+
+    var defineOpt = parser.getOption("define")
+    assert(defineOpt != null)
+
+    var vals = defineOpt.getValues()
+    assert(vals != null)
+    assert(vals.size() == 3)
+    assert(vals.get(0).equals("FOO"))
+    assert(vals.get(1).equals("BAR"))
+    assert(vals.get(2).equals("BAZ"))
+}
+
+// --- parse() fallback paths ---
+
+// Short option not on the active command falls back to defaultCmd
+@test
+func FallbackToDefaultCmdShortOpt() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Build")
+    parser.addOption("verbose", 'v', "Verbose", 0, null)  // global
+
+    var args = []*const char { "./prog", "build", "-v" }
+    assert(parser.parse(3, args as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasCmd())
+    assert(parser.getCmd().name.equals("build"))
+    assert(parser.hasOption("verbose"))
+}
+
+// Long option not on the active command falls back to defaultCmd
+@test
+func FallbackToDefaultCmdLongOpt() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Build")
+    parser.addOption("verbose", '\0', "Verbose", 0, null)  // global
+
+    var args = []*const char { "./prog", "build", "-verbose" }
+    assert(parser.parse(3, args as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasOption("verbose"))
+}
+
+// Fused option not on the active command falls back to defaultCmd
+@test
+func FusedFallbackToDefaultCmd() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Build")
+    parser.addOption("define", 'D', "Define",
+        OptionFlag.HAS_ARGUMENT | OptionFlag.IS_FUSED | OptionFlag.IS_MULTI, null)
+
+    var args = []*const char { "./prog", "build", "-DFOO" }
+    assert(parser.parse(3, args as (**char)) == CmdParserStatus.OK)
+
+    var opt = parser.getOption("define")
+    assert(opt != null)
+    assert(opt.flags & OptionFlag.IS_USED)
+    assert(opt.value.equals("FOO"))
+}
+
+// IS_FUSED without HAS_ARGUMENT: fused path not taken, arg falls into parser.args
+@test
+func FusedIgnoredWithoutHasArgument() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    // IS_FUSED alone, no HAS_ARGUMENT
+    parser.addOption("define", 'D', "Define", OptionFlag.IS_FUSED, null)
+
+    var args = []*const char { "./prog", "-DFOO" }
+    assert(parser.parse(2, args as (**char)) == CmdParserStatus.OK)
+
+    // -DFOO had no long option and fused was rejected; treated as unknown arg
+    assert(parser.args.size() == 2)  // argv[0] + "-DFOO"
+    assert(parser.args.get(1).equals("-DFOO"))
+    assert(!(parser.getOption("define").flags & OptionFlag.IS_USED))
+}
+
+// HAS_ARGUMENT without IS_FUSED: fused syntax not recognised
+@test
+func FusedIgnoredWithoutIsFused() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    // HAS_ARGUMENT alone, no IS_FUSED
+    parser.addOption("define", 'D', "Define", OptionFlag.HAS_ARGUMENT, null)
+
+    var args = []*const char { "./prog", "-DFOO" }
+    assert(parser.parse(2, args as (**char)) == CmdParserStatus.OK)
+
+    // -DFOO is not a long option "DFOO" and fused is not enabled
+    assert(parser.args.size() == 2)
+    assert(parser.args.get(1).equals("-DFOO"))
+    assert(!(parser.getOption("define").flags & OptionFlag.IS_USED))
+}
+
+// Flag that requires an argument but is the last token → MISSING_ARGUMENT
+@test
+func MissingArgumentError() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addOption("output", 'o', "Output", OptionFlag.HAS_ARGUMENT, null)
+
+    var args = []*const char { "./prog", "-o" }
+    assert(parser.parse(2, args as (**char)) == CmdParserStatus.MISSING_ARGUMENT)
+}
+
+// Non-option, non-command tokens accumulate in parser.args
+@test
+func UnknownArgsCollectedInParserArgs() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    var args = []*const char { "./prog", "foo", "bar" }
+    assert(parser.parse(3, args as (**char)) == CmdParserStatus.OK)
+    assert(!parser.hasCmd())
+    // argv[0] + "foo" + "bar"
+    assert(parser.args.size() == 3)
+    assert(parser.args.get(1).equals("foo"))
+    assert(parser.args.get(2).equals("bar"))
+}
+
+// argc == 1: nothing parsed, no command, args empty
+@test
+func ParseWithNoArgs() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    var args = []*const char { "./prog" }
+    assert(parser.parse(1, args as (**char)) == CmdParserStatus.OK)
+    assert(!parser.hasCmd())
+    assert(parser.args.size() == 0)
+}
+
+// argv[1] matches no command: it falls through to parser.args
+@test
+func UnrecognizedCommandFallsToArgs() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Build")
+
+    var args = []*const char { "./prog", "unknown" }
+    assert(parser.parse(2, args as (**char)) == CmdParserStatus.OK)
+    assert(!parser.hasCmd())
+    assert(parser.args.size() == 2)
+    assert(parser.args.get(1).equals("unknown"))
+}
+
+// Command with hasArg=true captures the positional argument
+@test
+func CommandArgValue() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("run", "Run", true)
+
+    var args = []*const char { "./prog", "run", "myfile.lita" }
+    assert(parser.parse(3, args as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasCmd())
+    var cmd = parser.getCmd()
+    assert(cmd.hasArgValue())
+    assert(cmd.getArgValue().equals("myfile.lita"))
+}
+
+// argc == 2 with hasArg command: not enough tokens, argValue not captured
+@test
+func CommandArgNotCapturedWhenArgcEq2() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("run", "Run", true)
+
+    var args = []*const char { "./prog", "run" }
+    assert(parser.parse(2, args as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasCmd())
+    assert(!parser.getCmd().hasArgValue())
+}
+
+// --- merge() error paths ---
+
+// Merging two parsers where one matched a command and the other didn't
+@test
+func MergeErrorOneHasCmd() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Build")
+
+    var args1 = []*const char { "./prog", "build" }
+    assert(parser.parse(2, args1 as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasCmd())
+
+    // merge with args that have no command
+    var args2 = []*const char { "./prog" }
+    assert(parser.merge(1, args2 as (**char)) == CmdParserStatus.ERROR_MERGING_ARGS)
+}
+
+// Merging parsers where both have commands but they differ
+@test
+func MergeErrorMismatchedCommands() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Build")
+    parser.addCommand("test", "Test")
+
+    var args1 = []*const char { "./prog", "build" }
+    assert(parser.parse(2, args1 as (**char)) == CmdParserStatus.OK)
+
+    var args2 = []*const char { "./prog", "test" }
+    assert(parser.merge(2, args2 as (**char)) == CmdParserStatus.ERROR_MERGING_ARGS)
+}
+
+// Parse failure inside merge propagates the error status
+@test
+func MergeFailurePropagation() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addOption("output", 'o', "Output", OptionFlag.HAS_ARGUMENT, null)
+
+    var args1 = []*const char { "./prog", "-o", "out.bin" }
+    assert(parser.parse(3, args1 as (**char)) == CmdParserStatus.OK)
+
+    // -o at end of args, no value → MISSING_ARGUMENT inside merge
+    var args2 = []*const char { "./prog", "-o" }
+    assert(parser.merge(2, args2 as (**char)) == CmdParserStatus.MISSING_ARGUMENT)
+}
+
+// Options not present in the merge args keep their original values
+@test
+func MergePreservesUnsetOptions() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addOption("verbose", 'v', "Verbose", 0, null)
+    parser.addOption("output", 'o', "Output", OptionFlag.HAS_ARGUMENT, null)
+
+    var args1 = []*const char { "./prog", "-v", "-o", "first.bin" }
+    assert(parser.parse(4, args1 as (**char)) == CmdParserStatus.OK)
+    assert(parser.hasOption("verbose"))
+
+    // merge only overrides -o, leaves -v untouched
+    var args2 = []*const char { "./prog", "-o", "second.bin" }
+    assert(parser.merge(3, args2 as (**char)) == CmdParserStatus.OK)
+
+    assert(parser.hasOption("verbose"))  // preserved from original parse
+    assert(parser.getOption("output").value.equals("second.bin"))
+}
+
+// merge() updates a command's positional arg value
+@test
+func MergeUpdatesCmdArgValue() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("run", "Run", true)
+
+    var args1 = []*const char { "./prog", "run", "original.lita" }
+    assert(parser.parse(3, args1 as (**char)) == CmdParserStatus.OK)
+    assert(parser.getCmd().getArgValue().equals("original.lita"))
+
+    var args2 = []*const char { "./prog", "run", "updated.lita" }
+    assert(parser.merge(3, args2 as (**char)) == CmdParserStatus.OK)
+    assert(parser.getCmd().getArgValue().equals("updated.lita"))
+}
+
+// IS_MULTI on a command-scoped option is merged correctly
+@test
+func MergeCommandScopedMultiOptions() {
+    var parser = CmdParserInit()
+    defer parser.free()
+
+    parser.addCommand("build", "Build")
+        .addOption("define", 'D', "Define",
+            OptionFlag.HAS_ARGUMENT | OptionFlag.IS_MULTI | OptionFlag.IS_FUSED, null)
+
+    var args1 = []*const char { "./prog", "build", "-DFOO", "-DBAR" }
+    assert(parser.parse(4, args1 as (**char)) == CmdParserStatus.OK)
+
+    var args2 = []*const char { "./prog", "build", "-DBAZ" }
+    assert(parser.merge(3, args2 as (**char)) == CmdParserStatus.OK)
+
+    var opt = parser.getCmd().getOption("define")
+    assert(opt != null)
+    var vals = opt.getValues()
+    assert(vals != null)
+    assert(vals.size() == 3)
+    assert(vals.get(0).equals("FOO"))
+    assert(vals.get(1).equals("BAR"))
+    assert(vals.get(2).equals("BAZ"))
+}
