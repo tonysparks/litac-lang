@@ -10,6 +10,7 @@ import "std/system"
 import "std/json"
 import "std/json/from_json"
 import "std/json/to_json"
+import "std/thread"
 
 
 @include("<setjmp.h>");
@@ -24,6 +25,16 @@ func longjmp(env: jmp_buf, result: i32);
 public func setjmp(env: jmp_buf) : i32;
 
 public var testSuite = TestSuite{}
+
+@threadlocal
+public var _threadCase: *TestCase = null
+
+@threadlocal
+public var _threadEnv: jmp_buf
+
+public func onThreadFail() {
+    longjmp(testSuite.env, 1)
+}
 
 /**
     Common message protocol for testing harness
@@ -66,6 +77,7 @@ public struct TestCase {
     errors: Array<AssertEntry>
     startTime: f64
     isDisabled: bool
+    mutex: Mutex
 
     name: *const char
     userData: *void
@@ -160,10 +172,12 @@ public func (this: *TestSuite) printDynamicTest(isJsonFormat: bool) {
 public func (this: *TestCase) init(testSuite: *TestSuite) {
     this.testSuite = testSuite
     this.errors = ArrayInit<AssertEntry>(32, testSuite.allocator)
+    this.mutex.init()
 }
 
 public func (this: *TestCase) free() {
     this.errors.free()
+    this.mutex.destroy()
 }
 
 public func (this: *TestCase) reset() {
@@ -175,6 +189,7 @@ public func (this: *TestCase) addError(
     filename: *const char = __FILE__,
     lineNumber: usize = __LINE__
 ) {
+    this.mutex.lock()
     this.errors.add(
         AssertEntry {
             .filename = filename,
@@ -182,6 +197,7 @@ public func (this: *TestCase) addError(
             .errorMessage = error
         }
     )
+    this.mutex.unlock()
 }
 
 public func (this: *TestCase) printResults(
@@ -283,6 +299,20 @@ public func AssertFloat<F>(
 }
 
 
+public func SkipCurrentTest() {
+    var testCase = _threadCase ? _threadCase : testSuite.currentCase
+    if(!testSuite.allocator || !testCase) {
+        return;
+    }
+    testCase.isDisabled = true
+    if(_threadCase != null) {
+        longjmp(_threadEnv, 1)
+    }
+    else {
+        longjmp(testSuite.env, 1)
+    }
+}
+
 public func Assert(
     cond: bool,
     filename: *const char = __FILE__,
@@ -294,20 +324,19 @@ public func Assert(
     }
 
     if(!cond) {
-        var sb = StringBuilderInit(256, testSuite.allocator)
+        var testCase = _threadCase ? _threadCase : testSuite.currentCase
+        var sb = StringBuilderInit(256, defaultAllocator)
         sb.append(
             "%s:%zu: Assertion failed",
             filename,
             lineNumber
         )
-        testSuite.currentCase.errors.add(
-            AssertEntry {
-                .filename = filename,
-                .lineNumber = lineNumber,
-                .errorMessage = sb.cStr()
-            }
-        )
-        // jump to the next test case, we've failed this one
-        longjmp(testSuite.env, 1)
+        testCase.addError(sb.cStr(), filename, lineNumber)
+        if(_threadCase != null) {
+            longjmp(_threadEnv, 1)
+        }
+        else {
+            longjmp(testSuite.env, 1)
+        }
     }
 }

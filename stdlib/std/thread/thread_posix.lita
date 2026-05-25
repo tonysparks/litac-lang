@@ -98,6 +98,10 @@ typedef struct timespec timespec;
 */
 import "std/libc"
 
+#if TESTING
+    import "std/test"
+#end
+
 @foreign
 struct pthread_mutex_t;
 
@@ -440,37 +444,67 @@ public func (this: *Cond) timedWait(mtx: *Mutex, durationMs: i64) : ThreadStatus
   ==============================================================
 */
 
+#if TESTING
 func _thrd_wrapper_function(aArg: *void): *void {
-    /* Get thread startup information */
     var ti = aArg as (*ThreadStartInfo);
     var fun = ti.mFunction;
     var arg = ti.mArg;
-
-    // ti.thread.threadId = gettid() as (i32)
-
-    /* The thread is responsible for freeing the startup information */
+    var thread = ti.thread
+    var parentCase = ti.parentCase
     ti.allocator.free(ti as (*void));
 
-    /* Call the actual client thread function */
+    _threadCase = parentCase
+    var res: i32 = 0
+    if(setjmp(_threadEnv) == 0) {
+        res = fun(arg)
+    }
+    else {
+        thread.testFailed = true
+    }
+    _threadCase = null
+    return (res as (usize)) as (*void)
+}
+#else
+func _thrd_wrapper_function(aArg: *void): *void {
+    var ti = aArg as (*ThreadStartInfo);
+    var fun = ti.mFunction;
+    var arg = ti.mArg;
+    ti.allocator.free(ti as (*void));
     var res = fun(arg);
-
     return (res as (usize)) as (*void);
 }
+#end
 
 public typedef func(*void) : i32 as ThreadStartFn;
+
+#if TESTING
 public struct Thread {
     thrd: pthread_t
-    //threadId: i32
+    testFailed: bool
 }
-
+#else
+public struct Thread {
+    thrd: pthread_t
+}
+#end
 
 // Information to pass to the new thread (what to run).
+#if TESTING
 struct ThreadStartInfo {
-    mFunction: ThreadStartFn; // < Pointer to the function to be executed.
-    mArg: *void;              // < Function argument for the thread function.
-    allocator: *const Allocator;
+    mFunction: ThreadStartFn
+    mArg: *void
+    allocator: *const Allocator
+    thread: *Thread
+    parentCase: *TestCase
+}
+#else
+struct ThreadStartInfo {
+    mFunction: ThreadStartFn
+    mArg: *void
+    allocator: *const Allocator
     thread: *Thread
 }
+#end
 
 
 public func (this: *Thread) create(
@@ -488,6 +522,9 @@ public func (this: *Thread) create(
     ti.mArg = arg;
     ti.allocator = allocator;
     ti.thread = this
+    #if TESTING
+    ti.parentCase = testSuite.currentCase
+    #end
 /*
     // var attr: pthread_attr_t;
     // pthread_attr_init(&attr);
@@ -530,7 +567,7 @@ public func (this: Thread) equal(other: Thread) : bool {
     return pthread_equal(this.thrd, other.thrd);
 }
 
-public func (this: Thread) join(res: *i32 = null) : ThreadStatus {
+public func (this: *Thread) join(res: *i32 = null) : ThreadStatus {
     var pres: *void;
     if (pthread_join(this.thrd, &pres) != 0) {
         return ThreadStatus.ERROR;
@@ -539,6 +576,11 @@ public func (this: Thread) join(res: *i32 = null) : ThreadStatus {
     if (res != null) {
         *res = (pres as (usize)) as (i32);
     }
+    #if TESTING
+    if(this.testFailed) {
+        onThreadFail()
+    }
+    #end
     return ThreadStatus.SUCCESS;
 }
 
