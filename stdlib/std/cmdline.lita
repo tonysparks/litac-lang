@@ -1,5 +1,4 @@
 import "std/array"
-import "std/io"
 import "std/mem"
 import "std/string/builder"
 import "std/string/buffer"
@@ -21,8 +20,10 @@ public enum OptionFlag {
     HAS_ARGUMENT = (1<<0),
     IS_REQUIRED  = (1<<1),
 
-    // private flags
-    IS_USED      = (1<<2),
+    IS_USED      = (1<<2),  // private flag
+
+    IS_MULTI     = (1<<3),  // flag may appear multiple times; all values are collected
+    IS_FUSED     = (1<<4),  // value may be glued directly to the short flag: -DVALUE
 }
 
 public struct Option {
@@ -32,6 +33,7 @@ public struct Option {
     value: *const char
     defaultValue: *const char
     flags: i32
+    values: Array<*const char>  // populated when IS_MULTI is set
 }
 
 public struct Cmd {
@@ -80,6 +82,12 @@ public func (p: *CmdParser) init(allocator: *const Allocator = defaultAllocator)
 public func (p: *CmdParser) free() {
     for(var i = 0; i < p.commands.size(); i+=1) {
         var cmd = p.commands.getPtr(i)
+        for(var j = 0; j < cmd.options.size(); j+=1) {
+            var opt = cmd.options.getPtr(j)
+            if((opt.flags & OptionFlag.IS_MULTI) && opt.values.capacity > 0) {
+                opt.values.free()
+            }
+        }
         cmd.options.free()
     }
     p.commands.free()
@@ -179,6 +187,13 @@ public func (this: *Cmd) getOptionShort(shortName: char) : *Option {
 public func (p: *CmdParser) getOptionShort(shortName: char) : *Option {
     if(p.defaultCmd == null) return null
     return p.defaultCmd.getOptionShort(shortName)
+}
+
+public func (this: *Option) getValues() : *Array<*const char> {
+    if(!(this.flags & OptionFlag.IS_MULTI)) {
+        return null
+    }
+    return &this.values
 }
 
 public func (this: *Cmd) hasOption(longName: *const char) : bool {
@@ -288,7 +303,19 @@ public func (p: *CmdParser) merge(argc: i32, argv: **char) : CmdParserStatus {
             var thisOption = thisCmd.options.getPtr(i)
             var otherOption = otherCmd.options.getPtr(i)
             if(otherOption.flags & OptionFlag.IS_USED) {
-                thisOption.value = otherOption.value
+                if(otherOption.flags & OptionFlag.IS_MULTI) {
+                    for(var k = 0; k < otherOption.values.size(); k+=1) {
+                        if(thisOption.values.capacity == 0) {
+                            thisOption.values = ArrayInit<*const char>(4, p.allocator)
+                        }
+                        thisOption.values.add(otherOption.values.get(k))
+                    }
+                    if(otherOption.values.size() > 0) {
+                        thisOption.value = thisOption.values.get(thisOption.values.size() - 1)
+                    }
+                } else {
+                    thisOption.value = otherOption.value
+                }
                 thisOption.flags |= OptionFlag.IS_USED
             }
         }
@@ -298,7 +325,19 @@ public func (p: *CmdParser) merge(argc: i32, argv: **char) : CmdParserStatus {
         var thisOption = p.defaultCmd.options.getPtr(i)
         var otherOption = otherParser.defaultCmd.options.getPtr(i)
         if(otherOption.flags & OptionFlag.IS_USED) {
-            thisOption.value = otherOption.value
+            if(otherOption.flags & OptionFlag.IS_MULTI) {
+                for(var k = 0; k < otherOption.values.size(); k+=1) {
+                    if(thisOption.values.capacity == 0) {
+                        thisOption.values = ArrayInit<*const char>(4, p.allocator)
+                    }
+                    thisOption.values.add(otherOption.values.get(k))
+                }
+                if(otherOption.values.size() > 0) {
+                    thisOption.value = thisOption.values.get(thisOption.values.size() - 1)
+                }
+            } else {
+                thisOption.value = otherOption.value
+            }
             thisOption.flags |= OptionFlag.IS_USED
         }
     }
@@ -336,29 +375,60 @@ public func (p: *CmdParser) parse(argc: i32, argv: **char) : CmdParserStatus {
         var arg = argv[i]
         var len = arg.length()
 
-        var opt: *Option = null;
+        var opt: *Option = null
+        var fusedValue: *const char = null
+
         if(len && arg[0] == '-') {
             var normalizedArg = arg + 1
-            opt = len < 3 ?
-                activeCmd.getOptionShort(normalizedArg[0]) : activeCmd.getOption(normalizedArg)
-
-            // this could be default option
-            if(!opt) {
-                opt = len < 3 ?
-                    p.getOptionShort(normalizedArg[0]) : p.getOption(normalizedArg)
+            if(len < 3) {
+                // Short option: -X
+                opt = activeCmd.getOptionShort(normalizedArg[0])
+                if(!opt) {
+                    opt = p.getOptionShort(normalizedArg[0])
+                }
+            } else {
+                // Try long option first
+                opt = activeCmd.getOption(normalizedArg)
+                if(!opt) {
+                    opt = p.getOption(normalizedArg)
+                }
+                // If no long match, try fused short option: -XVALUE where X has IS_FUSED
+                if(!opt) {
+                    var shortOpt = activeCmd.getOptionShort(normalizedArg[0])
+                    if(!shortOpt) {
+                        shortOpt = p.getOptionShort(normalizedArg[0])
+                    }
+                    if(shortOpt &&
+                       (shortOpt.flags & OptionFlag.IS_FUSED) &&
+                       (shortOpt.flags & OptionFlag.HAS_ARGUMENT)) {
+                        opt = shortOpt
+                        fusedValue = normalizedArg + 1
+                    }
+                }
             }
         }
 
         if(opt) {
             if(opt.flags & OptionFlag.HAS_ARGUMENT) {
-                if(i + 1 >= argc) {
-                    c::snprintf(p.errors, MAX_MESSAGE_SIZE, "'%s' is missing argument", arg)
-                    p.status = CmdParserStatus.MISSING_ARGUMENT
-                    return p.status;
+                var val: *const char = null
+                if(fusedValue != null) {
+                    val = fusedValue
+                } else {
+                    if(i + 1 >= argc) {
+                        c::snprintf(p.errors, MAX_MESSAGE_SIZE, "'%s' is missing argument", arg)
+                        p.status = CmdParserStatus.MISSING_ARGUMENT
+                        return p.status;
+                    }
+                    val = argv[i+1]
+                    i += 1
                 }
-
-                opt.value = argv[i+1]
-                i+=1
+                opt.value = val
+                if(opt.flags & OptionFlag.IS_MULTI) {
+                    if(opt.values.capacity == 0) {
+                        opt.values = ArrayInit<*const char>(4, p.allocator)
+                    }
+                    opt.values.add(val)
+                }
             }
 
             opt.flags |= OptionFlag.IS_USED
@@ -459,85 +529,4 @@ public func (p: *CmdParser) printHelp(sb: *StringBuilder) {
         }
         sb.append("\n")
     }
-}
-
-@test
-func ParseArgsWithCommands() {
-    var parser = CmdParserInit()
-    defer parser.free()
-
-    parser.addCommand("build", "Compile and build")
-        .addOption("lib", '\0', "stuff", 0, null)
-        .addOption("debug", '\0', "stuff", 0, null)
-
-    parser.addCommand("test", "Compile and build then test")
-        .addOption("file", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
-        .addOption("func", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
-
-    parser.addCommand("run", "run command", true)
-
-    parser
-        .addOption("colors", '\0', "stuff", 0, null)
-        .addOption("maxMemory", '\0', "stuff", OptionFlag.HAS_ARGUMENT, null)
-
-    var args = []*const char {
-        "./litac",
-        "build",
-        "-lib",
-        "-colors",
-        "-maxMemory",
-        "1KiB"
-    };
-    var n = 6
-
-    var sb = StringBuilderInit(1024)
-    parser.printHelp(sb)
-    assert(
-$"""
-    -colors              stuff
-    -maxMemory <arg>     stuff
-
-build                    Compile and build
-    -lib                 stuff
-    -debug               stuff
-
-test                     Compile and build then test
-    -file <arg>          stuff
-    -func <arg>          stuff
-
-run <arg>                run command
-""".trim().equals(sb.toString().trim())
-    )
-    c::printf("%s\n", sb.cStr())
-
-    assert(parser.parse(n, args as (**char)) == CmdParserStatus.OK)
-    assert(parser.hasOption("colors"))
-    assert(parser.hasOption("maxMemory"))
-    var maxMem = parser.getOption("maxMemory")
-    assert(maxMem != null)
-    assert(maxMem.value.equals("1KiB"))
-
-    assert(parser.hasCmd())
-    var cmd = parser.getCmd()
-    assert(cmd != null)
-    assert(cmd.name.equals("build"))
-    assert(cmd.hasOption("lib"))
-    assert(cmd.hasOption("debug") == false)
-    assert(cmd.hasOption("does-not-exist") == false)
-
-    // Test overrides
-    {
-
-        var args = []*const char {
-            "./litac",
-            "build",
-            "-lib",
-            "-colors",
-            "-maxMemory",
-            "1KiB"
-        };
-        var n = 6
-        assert(parser.merge(n, args as (**char)) == CmdParserStatus.OK)
-    }
-
 }

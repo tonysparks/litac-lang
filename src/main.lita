@@ -168,20 +168,7 @@ public func ParseArgs(
 
     defer parser.free()
 
-    // Pre-scan for -DNAME[=VALUE] defines before the option parser sees them,
-    // since the parser doesn't support repeated flags with no space.
-    options.defines.init(8, defaultAllocator)
-    var filteredArgs = ArrayInit<*char>(n, defaultAllocator)
-    defer filteredArgs.free()
-    for(var i = 0; i < n; i += 1) {
-        if(args[i][0] == '-' && args[i][1] == 'D' && args[i][2] != '\0') {
-            options.defines.add(args[i] + 2)
-        } else {
-            filteredArgs.add(args[i])
-        }
-    }
-
-    if(parser.parse(filteredArgs.size(), filteredArgs.elements) != CmdParserStatus.OK) {
+    if(parser.parse(n, args) != CmdParserStatus.OK) {
         parser.printAll()
         return ParseStatus.ERROR
     }
@@ -268,6 +255,7 @@ public func BuildArgs(parser: *CmdParser) {
     parser.addOption("colors",       '\0', "Disables console colors for output", 0, null)
     parser.addOption("proxy",        '\0', "Defines a proxy server to use when making network calls.  Ex. -proxy https://proxy.com:443", OptionFlag.HAS_ARGUMENT, null)
     parser.addOption("maxMemory",    '\0', "The max amount of memory allowed for allocation. NOTE: This is a temporary option", OptionFlag.HAS_ARGUMENT, null)
+    parser.addOption("define",       'D', "Defines a preprocessor symbol, e.g. -DNAME or -DNAME=VALUE.  May be repeated.", OptionFlag.HAS_ARGUMENT | OptionFlag.IS_MULTI | OptionFlag.IS_FUSED, null)
     parser.addOption("--",           '\0', "Signals any arguments after are to be passed to the compile program when -run is set", 0, null)
 }
 
@@ -574,6 +562,17 @@ public func ApplyArgs(
             options.args = (parser.cmdArgs + i)
             options.nargs = parser.cmdArgCount - i
             break;
+        }
+    }
+
+    var defineOpt = parser.getOption("define")
+    if(defineOpt != null && (defineOpt.flags & OptionFlag.IS_USED)) {
+        var vals = defineOpt.getValues()
+        if(vals != null) {
+            options.defines.init(vals.size(), defaultAllocator)
+            for(var i = 0; i < vals.size(); i += 1) {
+                options.defines.add(vals.get(i))
+            }
         }
     }
 
