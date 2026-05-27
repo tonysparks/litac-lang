@@ -1,0 +1,75 @@
+import "std/db"
+import "std/db/pool"
+import "std/db/postgres/postgres_db"
+import "std/libc"
+import "std/mem"
+
+// PgDriverConnect implements DbDriverFn so a PgConnection can be managed
+// by a ConnectionPool.
+//
+// URI format:
+//   ldbc://postgres/<dbname>[?host=<h>&port=<p>&user=<u>&password=<pw>&sslmode=<m>]
+//
+// Query params:
+//   host     – server hostname (default "localhost")
+//   port     – server port    (default 5432)
+//   user     – login role
+//   password – login password
+//   sslmode  – passed directly to libpq (e.g. "disable", "require")
+//
+// Remaining libpq options can be forwarded by appending extra key=value pairs;
+// they are collected into a DSN string and passed to PQconnectdb.
+public func PgDriverConnect(
+    path:      *const char,
+    params:    *UriParams,
+    conn:      *SqlConnection,
+    allocator: *const Allocator
+) : SqlResult {
+    var pgConn = new<PgConnection>(allocator)
+    if (pgConn == null) {
+        return SqlResult {
+            .type     = SqlResultType.ERROR,
+            .category = SqlResultCategory.OUT_OF_MEMORY,
+            .description = $"out of memory allocating PgConnection"
+        }
+    }
+
+    var host     = params.get("host")
+    var portStr  = params.get("port")
+    var user     = params.get("user")
+    var password = params.get("password")
+
+    var hostVal     = host     ? host     : "localhost"
+    var portVal     = portStr  ? atoi(portStr) : 5432
+    var userVal     = user     ? user     : ""
+    var passwordVal = password ? password : ""
+
+    var result = Connect(hostVal, portVal, path, userVal, passwordVal, pgConn, allocator)
+    if (result.isError()) {
+        allocator.free(pgConn as (*void))
+        return result
+    }
+
+    var ptr = pgConn;
+    *conn = ptr
+    return result
+}
+
+// RegisterPostgresDriver registers the built-in PostgreSQL driver with the
+// global connection-pool driver registry.  Call this once at program startup,
+// before the first ConnectionPoolInit call that uses the "postgres" scheme.
+//
+// Example:
+//
+//   RegisterPostgresDriver()
+//   var result = ConnectionPoolInit(
+//       "ldbc://postgres/mydb?host=localhost&port=5432&user=app&password=s3cr3t",
+//       &pool,
+//       PoolConfig{.maxSize = 10, .minSize = 2}
+//   )
+public func RegisterPostgresDriver() {
+    RegisterDriver(DbDriver{
+        .name    = $"postgres",
+        .connect = PgDriverConnect
+    })
+}
