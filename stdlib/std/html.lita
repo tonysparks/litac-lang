@@ -1,0 +1,15 @@
+import "std/string"
+import "std/string/builder"
+
+// HtmlEscape writes str to out, replacing <, >, &, ", and ' with their HTML entities.
+public func HtmlEscape(out: *StringBuilder, str: String) {
+    for(var i = 0; i < str.length; i += 1) {
+        var c = str.buffer[i]
+        if(c == '<')       { out.appendStr("&lt;")   }
+        else if(c == '>')  { out.appendStr("&gt;")   }
+        else if(c == '&')  { out.appendStr("&amp;")  }
+        else if(c == '"')  { out.appendStr("&quot;") }
+        else if(c == '\'') { out.appendStr("&#39;")  }
+        else               { out.appendChar(c)        }
+    }
+}

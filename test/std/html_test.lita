@@ -1,0 +1,63 @@
+import "std/assert"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/mem"
+
+import "std/html"
+
+@test
+func testHtmlEscapeNoSpecialChars() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    HtmlEscape(&out, $"hello world")
+    assert(out.toString().equals($"hello world"))
+}
+
+@test
+func testHtmlEscapeLtGt() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    HtmlEscape(&out, $"<b>bold</b>")
+    assert(out.toString().equals($"&lt;b&gt;bold&lt;/b&gt;"))
+}
+
+@test
+func testHtmlEscapeAmpersand() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    HtmlEscape(&out, $"foo & bar")
+    assert(out.toString().equals($"foo &amp; bar"))
+}
+
+@test
+func testHtmlEscapeDoubleQuote() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    HtmlEscape(&out, $"say \"hello\"")
+    assert(out.toString().equals($"say &quot;hello&quot;"))
+}
+
+@test
+func testHtmlEscapeSingleQuote() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    HtmlEscape(&out, $"it's here")
+    assert(out.toString().equals($"it&#39;s here"))
+}
+
+@test
+func testHtmlEscapeXss() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    HtmlEscape(&out, $"<script>alert('xss')</script>")
+    assert(out.toString().equals($"&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;"))
+}
+
+@test
+func testHtmlEscapeEmpty() {
+    var out = StringBuilderInit(64, defaultAllocator)
+    defer out.free()
+    HtmlEscape(&out, $"")
+    assert(out.toString().equals($""))
+}
