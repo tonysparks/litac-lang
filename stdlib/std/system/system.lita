@@ -348,6 +348,10 @@ struct FileStat {
     public const PATH_SEPARATOR = "/"
 #end
 
+public func GetSystemPathSeparator() : String {
+    return StringInit(PATH_SEPARATOR)
+}
+
 @foreign
 func getenv(varname: *const char) : *char;
 
