@@ -2,7 +2,9 @@ import "std/libc"
 import "std/mem"
 import "std/thread"
 import "std/time"
+import "std/string"
 import "std/string/buffer"
+import "std/system"
 
 @asStr
 public enum LogLevel {
@@ -24,11 +26,13 @@ var mtx: Mutex;
 var logLevel: LogLevel = LogLevel.TRACE
 
 public func LogInit(
-    outputFileName: *const char,
+    outputFileName: String,
     level: LogLevel = LogLevel.TRACE
 ) {
-    if(outputFileName) {
-        outputFile = fopen(outputFileName, "w")
+    if(!outputFileName.empty()) {
+        var buf: [MAX_PATH]char
+        outputFileName.copyTo(buf, MAX_PATH - 1)
+        outputFile = fopen(buf, "w")
     }
 
     if(!outputFile) {
