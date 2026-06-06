@@ -1,0 +1,136 @@
+import "std/json"
+import "std/string"
+import "std/string/builder"
+import "std/libc"
+import "std/assert"
+
+// Parse a JSON object {"k": "<value>"} and return the string value of key "k".
+// Asserts that parsing succeeded and the key exists.
+func parseStr(json: *const char) : *const char {
+    var parser = JsonParserInit()
+    var node = parser.parseJson(json)
+    assert(!parser.hasError())
+    assert(node != null)
+    var val = node.getStr("k")
+    assert(val != null)
+    return val
+}
+
+// Parse and assert the parser fails (hasError, returns null).
+func assertParseError(json: *const char) {
+    var parser = JsonParserInit()
+    var node = parser.parseJson(json)
+    assert(parser.hasError())
+}
+
+@test
+func testUnicodeEscapeAsciiRange() {
+    // =  is '='  (0x3D)
+    assert(strcmp(parseStr("{\"k\":\"\\u003d\"}"), "=") == 0)
+
+    // A  is 'A'  (0x41)
+    assert(strcmp(parseStr("{\"k\":\"\\u0041\"}"), "A") == 0)
+
+    // !  is '!'  (0x21)
+    assert(strcmp(parseStr("{\"k\":\"\\u0021\"}"), "!") == 0)
+
+    //  is '\0' — decoded byte is 0; result string starts with null byte
+    var node0 = JsonParserInit()
+    var parsed0 = node0.parseJson("{\"k\":\"\\u0000\"}")
+    assert(!node0.hasError())
+    assert(parsed0 != null)
+    assert(parsed0.getStr("k")[0] == '\0')
+}
+
+@test
+func testUnicodeEscapeTwoByte() {
+    // é → é, UTF-8: 0xC3 0xA9
+    var val = parseStr("{\"k\":\"\\u00e9\"}")
+    assert((val[0] as (u8)) == 0xC3_u8)
+    assert((val[1] as (u8)) == 0xA9_u8)
+    assert(val[2] == '\0')
+}
+
+@test
+func testUnicodeEscapeThreeByte() {
+    // 中 → 中, UTF-8: 0xE4 0xB8 0xAD
+    var val = parseStr("{\"k\":\"\\u4e2d\"}")
+    assert((val[0] as (u8)) == 0xE4_u8)
+    assert((val[1] as (u8)) == 0xB8_u8)
+    assert((val[2] as (u8)) == 0xAD_u8)
+    assert(val[3] == '\0')
+}
+
+@test
+func testUnicodeEscapeMixedWithLiteral() {
+    // "José" → "José"
+    var val = parseStr("{\"k\":\"Jos\\u00e9\"}")
+    assert(val[0] == 'J')
+    assert(val[1] == 'o')
+    assert(val[2] == 's')
+    assert((val[3] as (u8)) == 0xC3_u8)
+    assert((val[4] as (u8)) == 0xA9_u8)
+    assert(val[5] == '\0')
+}
+
+@test
+func testUnicodeEscapeUpperAndLowerHex() {
+    // Both upper and lower case hex digits must be accepted
+    assert(strcmp(parseStr("{\"k\":\"\\u003D\"}"), "=") == 0)  // upper
+    assert(strcmp(parseStr("{\"k\":\"\\u003d\"}"), "=") == 0)  // lower
+    assert(strcmp(parseStr("{\"k\":\"\\u003D\"}"),
+                  parseStr("{\"k\":\"\\u003d\"}")) == 0)
+}
+
+@test
+func testUnicodeEscapeMultipleInString() {
+    // Multiple \u escapes in one string: "ABC" → "ABC"
+    assert(strcmp(parseStr("{\"k\":\"\\u0041\\u0042\\u0043\"}"), "ABC") == 0)
+}
+
+@test
+func testUnicodeEscapeRealWorldGooglePicture() {
+    // The exact sequence that triggered the original bug: = in a URL
+    var json = "{\"k\":\"https://example.com/photo\\u003ds96-c\"}"
+    assert(strcmp(parseStr(json), "https://example.com/photo=s96-c") == 0)
+
+    // Full Google userinfo-style object with = in picture field
+    var userinfo = """
+    {
+        "sub": "12345",
+        "name": "Test User",
+        "picture": "https://example.com/photo=s96-c",
+        "email": "test@example.com"
+    }
+    """
+    var parser = JsonParserInit()
+    var node = parser.parseJson(userinfo)
+    assert(!parser.hasError())
+    assert(node != null)
+    assert(strcmp(node.getStr("email"), "test@example.com") == 0)
+    assert(strcmp(node.getStr("name"), "Test User") == 0)
+}
+
+@test
+func testUnicodeEscapeTruncated() {
+    // Fewer than 4 hex digits — parser must error
+    assertParseError("{\"k\":\"\\u00\"}")    // only 2 digits
+    assertParseError("{\"k\":\"\\u0\"}")     // only 1 digit
+    assertParseError("{\"k\":\"\\u\"}")      // 0 digits
+}
+
+@test
+func testUnicodeEscapeNonHexDigit() {
+    // Non-hex character in the 4-digit sequence — parser must error
+    assertParseError("{\"k\":\"\\uGHIJ\"}")  // all invalid
+    assertParseError("{\"k\":\"\\u00GH\"}")  // invalid in positions 3-4
+    assertParseError("{\"k\":\"\\u0 3d\"}")  // space is not hex
+}
+
+@test
+func testUnicodeEscapeInvalidCodepoint() {
+    // Surrogate codepoints (U+D800..U+DFFF) are not valid Unicode scalar values
+    assertParseError("{\"k\":\"\\uD800\"}")  // high surrogate
+    assertParseError("{\"k\":\"\\uDFFF\"}")  // low surrogate
+    assertParseError("{\"k\":\"\\ud800\"}")  // lower-case hex, still a surrogate
+}

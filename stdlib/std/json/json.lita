@@ -822,6 +822,12 @@ const charToDigit = [256]i32 {
     ['f'] = 15, ['F'] = 15,
 };
 
+func isHexChar(c: char): bool {
+    return (c >= '0' && c <= '9') ||
+           (c >= 'a' && c <= 'f') ||
+           (c >= 'A' && c <= 'F')
+}
+
 const escapeToChar = [256]char {
     ['0'] = '\0',
     ['\''] = '\'',
@@ -1273,6 +1279,27 @@ func (p: using *JsonParser) scanStr() {
                 if (*stream == 'x') {
                     //  TODO
                     // val = scan_hex_escape();
+                } else if (*stream == 'u') {
+                    stream += 1;
+                    // Validate all 4 hex digits are present before reading.
+                    for(var hi = 0; hi < 4; hi += 1) {
+                        if(stream[hi] == '\0' || !isHexChar(stream[hi])) {
+                            p.error("Invalid \\uXXXX escape: expected 4 hex digits")
+                            break
+                        }
+                    }
+                    var codepoint = Utf8HexDecode(stream, 4)
+                    stream += 4
+                    if(!Utf8CodepointValid(codepoint)) {
+                        p.error("Invalid Unicode codepoint U+%04X in \\u escape", codepoint as (u32))
+                        break
+                    }
+                    var encoded: [4]u8
+                    var encLen = Utf8Encode(codepoint, encoded)
+                    if(encLen > 0) {
+                        buffer.appendStrn(encoded as (*const char), encLen)
+                    }
+                    continue
                 } else {
                     val = escapeToChar[(*stream) as (i32)];
                     if (val == 0 && *stream != '0') {
