@@ -1,0 +1,103 @@
+import "std/url/encoding"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/assert"
+
+func testUrlRoundtrip(unencoded: *const char, expected: *const char) {
+    var encoded = StringBuilderInit(256)
+    defer encoded.free()
+    UrlEncode(StringInit(unencoded), &encoded)
+    assert(encoded.toString().equalsString(expected))
+
+    var decoded = StringBuilderInit(256)
+    defer decoded.free()
+    UrlDecode(encoded.toString(), &decoded)
+    assert(decoded.toString().equalsString(unencoded))
+}
+
+func testFormUrlRoundtrip(unencoded: *const char, expected: *const char) {
+    var encoded = StringBuilderInit(256)
+    defer encoded.free()
+    FormUrlEncode(StringInit(unencoded), &encoded)
+    assert(encoded.toString().equalsString(expected))
+
+    var decoded = StringBuilderInit(256)
+    defer decoded.free()
+    FormUrlDecode(encoded.toString(), &decoded)
+    assert(decoded.toString().equalsString(unencoded))
+}
+
+@test
+func testUrlEncoding() {
+    testUrlRoundtrip("name=JohnDoe",                           "name%3DJohnDoe")
+    testUrlRoundtrip("hello world",                            "hello%20world")
+    testUrlRoundtrip("name=John Doe&address=123 Main St",      "name%3DJohn%20Doe%26address%3D123%20Main%20St")
+    testUrlRoundtrip("key=value&name=John@domain.com",         "key%3Dvalue%26name%3DJohn%40domain.com")
+    testUrlRoundtrip("path=/user/docs/file.txt?search=apple&count=5",
+                     "path%3D%2Fuser%2Fdocs%2Ffile.txt%3Fsearch%3Dapple%26count%3D5")
+    testUrlRoundtrip("username=john_doe&location=NewYork-01",  "username%3Djohn_doe%26location%3DNewYork-01")
+    testUrlRoundtrip("",                                       "")
+    testUrlRoundtrip("name=José",                              "name%3DJos%C3%A9")
+
+    testFormUrlRoundtrip("name=JohnDoe",                           "name=JohnDoe")
+    testFormUrlRoundtrip("hello world",                            "hello+world")
+    testFormUrlRoundtrip("name=John Doe&address=123 Main St",      "name=John+Doe&address=123+Main+St")
+    testFormUrlRoundtrip("key=value&name=John@domain.com",         "key=value&name=John%40domain.com")
+    testFormUrlRoundtrip("path=/user/docs/file.txt?search=apple&count=5",
+                         "path=%2Fuser%2Fdocs%2Ffile.txt%3Fsearch=apple&count=5")
+    testFormUrlRoundtrip("username=john_doe&location=NewYork-01",  "username=john_doe&location=NewYork-01")
+    testFormUrlRoundtrip("",                                       "")
+    testFormUrlRoundtrip("name=José",                              "name=Jos%C3%A9")
+}
+
+@test
+func testUrlDecodeMalformed() {
+    // Lone '%' at end — i+2 guard fails → '%' dropped
+    var r1 = StringBuilderInit(64)
+    defer r1.free()
+    UrlDecode(StringInit("hello%"), &r1)
+    assert(r1.toString().equalsString("hello"))
+
+    // '%' followed by one char then end-of-string → '%' dropped, '2' kept in next iter
+    var r2 = StringBuilderInit(64)
+    defer r2.free()
+    UrlDecode(StringInit("a%2"), &r2)
+    assert(r2.toString().equalsString("a2"))
+
+    // '%ZZ' — isHexDigit('Z') fails → '%' dropped; 'Z','Z' kept as literals
+    var r3 = StringBuilderInit(64)
+    defer r3.free()
+    UrlDecode(StringInit("x%ZZy"), &r3)
+    assert(r3.toString().equalsString("xZZy"))
+
+    // Upper-case hex must decode: %2B = 0x2B = '+'
+    var r4 = StringBuilderInit(64)
+    defer r4.free()
+    UrlDecode(StringInit("%2B"), &r4)
+    assert(r4.length == 1)
+    assert(r4.buffer[0] == '+')
+}
+
+@test
+func testFormUrlDecodeEdgeCases() {
+    var r1 = StringBuilderInit(64)
+    defer r1.free()
+    FormUrlDecode(StringInit("+hello"), &r1)
+    assert(r1.toString().equalsString(" hello"))
+
+    var r2 = StringBuilderInit(64)
+    defer r2.free()
+    FormUrlDecode(StringInit("hello+"), &r2)
+    assert(r2.toString().equalsString("hello "))
+
+    var r3 = StringBuilderInit(64)
+    defer r3.free()
+    FormUrlDecode(StringInit("+++"), &r3)
+    assert(r3.toString().equalsString("   "))
+
+    var r4 = StringBuilderInit(64)
+    defer r4.free()
+    FormUrlDecode(StringInit("a+b%21c"), &r4)
+    assert(r4.toString().equalsString("a b!c"))
+}

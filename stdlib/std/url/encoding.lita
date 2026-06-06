@@ -1,0 +1,100 @@
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/ascii"
+
+const URL_HEX = "0123456789ABCDEF"
+
+// Percent-encodes a string per RFC 3986 (unreserved chars pass through).
+public func UrlEncode(url: String, result: *StringBuilder) {
+    for(var i = 0; i < url.length; i += 1) {
+        var c = url.buffer[i]
+        if(c.isAlphanumeric() || c == '-' || c == '_' || c == '.' || c == '~') {
+            result.appendChar(c)
+        } else {
+            result.appendChar('%')
+            result.appendChar(URL_HEX[(c >> 4) & 0xF])
+            result.appendChar(URL_HEX[c & 0xF])
+        }
+    }
+}
+
+// Decodes a percent-encoded string. Malformed %-sequences (lone %, short sequence,
+// or non-hex digits) are silently dropped; subsequent chars are kept as-is.
+public func UrlDecode(url: String, result: *StringBuilder) {
+    var i = 0
+    while(i < url.length) {
+        var c = url.buffer[i]
+        if(c == '%') {
+            if(i + 2 < url.length) {
+                var hi = url.buffer[i + 1]
+                var lo = url.buffer[i + 2]
+                if(isHexDigit(hi) && isHexDigit(lo)) {
+                    result.appendChar(((hi.asHex() << 4) | lo.asHex()) as (char))
+                    i += 3
+                    continue
+                }
+            }
+            // Malformed: drop the '%' and advance
+        } else {
+            result.appendChar(c)
+        }
+        i += 1
+    }
+}
+
+// Percent-encodes a form value per application/x-www-form-urlencoded
+// (spaces become '+'; '=', '&' pass through to allow pre-assembled form bodies).
+public func FormUrlEncode(url: String, result: *StringBuilder) {
+    for(var i = 0; i < url.length; i += 1) {
+        var c = url.buffer[i]
+        if(c.isAlphanumeric() ||
+           c == '-' || c == '_' || c == '.' || c == '~' ||
+           c == '=' || c == '&') {
+            result.appendChar(c)
+        } else if(c == ' ') {
+            result.appendChar('+')
+        } else {
+            result.appendChar('%')
+            result.appendChar(URL_HEX[(c >> 4) & 0xF])
+            result.appendChar(URL_HEX[c & 0xF])
+        }
+    }
+}
+
+// Decodes an application/x-www-form-urlencoded string ('+' becomes ' ').
+// Malformed %-sequences are silently dropped.
+public func FormUrlDecode(url: String, result: *StringBuilder) {
+    var i = 0
+    while(i < url.length) {
+        var c = url.buffer[i]
+        if(c == '%') {
+            if(i + 2 < url.length) {
+                var hi = url.buffer[i + 1]
+                var lo = url.buffer[i + 2]
+                if(isHexDigit(hi) && isHexDigit(lo)) {
+                    result.appendChar(((hi.asHex() << 4) | lo.asHex()) as (char))
+                    i += 3
+                    continue
+                }
+            }
+            // Malformed: drop the '%' and advance
+        } else if(c == '+') {
+            result.appendChar(' ')
+        } else {
+            result.appendChar(c)
+        }
+        i += 1
+    }
+}
+
+// UrlEncode appended to this StringBuilder — convenience for chaining appends.
+public func (this: *StringBuilder) encodeAppend(value: String) {
+    UrlEncode(value, this)
+}
+
+func isHexDigit(c: char): bool {
+    return (c >= '0' && c <= '9') ||
+           (c >= 'A' && c <= 'F') ||
+           (c >= 'a' && c <= 'f')
+}
