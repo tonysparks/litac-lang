@@ -94,6 +94,19 @@ public func AES256GCMEncrypt(key: *const u8, plaintext: *const u8, plaintextLen:
 }
 
 /*
+ * Decodes a base64-encoded AES-256-GCM key into `out` (must point to >= 32 bytes).
+ * Returns true if exactly 32 bytes were decoded.
+ */
+public func AES256GCMKeyFromBase64(encoded: String, out: *u8) : bool {
+    var decoded = base64_decode(
+        encoded.buffer as (*const u8),
+        out,
+        encoded.length as (usize)
+    ) as (i32)
+    return decoded == AES256GCM_KEY_SIZE
+}
+
+/*
  * Decrypts base64(nonce || ciphertext || tag) and writes plaintext into sb.
  * Returns false on authentication failure or malformed input.
  */
