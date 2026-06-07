@@ -276,9 +276,10 @@ func (this: *PackageManager) buildCommandArgs(
         }
     }
 
+    var shouldRun = this.options.litaOptions.run || runType == RunType.PRE_BUILD || runType == RunType.POST_BUILD
     // TEMP: should move into specific commands?
     {
-        if(this.options.litaOptions.run) {
+        if(shouldRun) {
             programArgs.add("-run")
         }
     }
@@ -289,7 +290,7 @@ func (this: *PackageManager) buildCommandArgs(
 
     programArgs.add(mainFile)
 
-    if(this.options.litaOptions.run && this.options.litaOptions.nargs > 0) {
+    if(shouldRun && this.options.litaOptions.nargs > 0) {
         programArgs.add("--")
         for(var i = 0; i < this.options.litaOptions.nargs; i+=1) {
             programArgs.add(this.options.litaOptions.args[i])
