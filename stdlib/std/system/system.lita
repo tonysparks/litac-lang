@@ -883,7 +883,7 @@ public func LoadEnv(
     defer sb.free()
 
     var status = ReadFileFully(
-        envFile,
+        envFile.toString(),
         &sb
     )
     if(status != FileStatus.Ok) {

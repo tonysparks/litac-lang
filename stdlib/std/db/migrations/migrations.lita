@@ -445,7 +445,7 @@ func (m: *Migrator) applyMigration(mig: *Migration, err: *MigrationError) : bool
     var sb = StringBuilderInit(4096, m.allocator)
     defer sb.free()
 
-    var status = ReadFileFully(mig.filename, &sb)
+    var status = ReadFileFully(mig.filename.toString(), &sb)
     if(status != FileStatus.Ok) {
         err.status = MigrationStatus.IO_ERROR
         var msg = StringBufferInit(err.message, MSG_MAX, 0)
@@ -784,7 +784,7 @@ func ComputeChecksum(
     var sb = StringBuilderInit(4096, alloc)
     defer sb.free()
 
-    var status = ReadFileFullyStr(path, &sb)
+    var status = ReadFileFully(path, &sb)
     if(status != FileStatus.Ok) {
         err.status = MigrationStatus.IO_ERROR
         var msg = StringBufferInit(err.message, MSG_MAX, 0)

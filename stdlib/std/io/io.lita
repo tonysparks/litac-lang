@@ -1,5 +1,6 @@
 import "std/mem"
 import "std/assert"
+import "std/string"
 import "std/string/builder"
 import "std/string/buffer"
 import "std/libc"
@@ -207,32 +208,19 @@ public func FileLength(fileName: *const char) : i64 {
     return len;
 }
 
-public func ReadFileFullyStr(
+public func ReadFileFully(
     fileName: String,
     buffer: *StringBuilder
 ) : FileStatus {
-    // TODO: fix compiler bug with unknown variable from std/system
-    // due to circular dependency with importing using system_os
-    const MAX_PATHX = 256;
 
-    var path:[MAX_PATHX]char;
-    var strPath = StringBufferInit(path, MAX_PATHX, 0)
-    strPath.format("%.*s", fileName.length, fileName.buffer)
-    return ReadFileFully(
-        strPath.cStr(),
-        buffer
-    )
-}
-
-public func ReadFileFully(
-    fileName: *const char,
-    buffer: *StringBuilder
-) : FileStatus {
-
-    assert(fileName != null)
     assert(buffer != null)
 
-    var fp = fopen(fileName, "rb")
+    // PATH_MAX — avoid importing std/system (circular dependency)
+    const PATH_MAX_LEN = 4096;
+    var path: [PATH_MAX_LEN]char
+    fileName.copyTo(path, PATH_MAX_LEN - 1)
+
+    var fp = fopen(path, "rb")
     if(fp == null) {
         return FileStatus.FileNotFoundError;
     }
