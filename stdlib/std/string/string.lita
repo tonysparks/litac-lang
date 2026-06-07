@@ -351,10 +351,8 @@ public func (this: String) trim(): String {
 public func (b: String) copyTo(buf: *char, len: i32, addZero: bool = true) : i32 {
     if(!buf || len == 0) return 0;
 
-    var bytesCopied = len
-    if(b.length < len) {
-        bytesCopied = b.length
-    }
+    var maxCopy = (addZero && len > 0) ? len - 1 : len
+    var bytesCopied = b.length < maxCopy ? b.length : maxCopy
 
     memcpy(buf as (*void),
           (&b.buffer[0]) as (*const void),
@@ -362,7 +360,7 @@ public func (b: String) copyTo(buf: *char, len: i32, addZero: bool = true) : i32
 
     if(addZero) buf[bytesCopied] = '\0'
 
-    return (bytesCopied)
+    return bytesCopied
 }
 
 public func (s: String) copy(allocator: *const mem::Allocator = mem::defaultAllocator) : String {

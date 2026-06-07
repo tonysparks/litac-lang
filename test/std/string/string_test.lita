@@ -88,13 +88,27 @@ func testStringCopyTo() {
 
 @test
 func testStringCopyToTruncate() {
+    // capacity 4: at most 3 content bytes + null at buf[3]
     var s = StringInit("hello")
     var buf = [4]char{0}
-    var n = s.copyTo(buf, 3, true)
+    var n = s.copyTo(buf, 4)
     assert(n == 3)
     assert(buf[0] == 'h')
     assert(buf[1] == 'e')
     assert(buf[2] == 'l')
+    assert(buf[3] == '\0')
+}
+
+@test
+func testStringCopyToNullInBounds() {
+    // string length == capacity: null must land at buf[capacity-1], not past the end
+    var s = StringInit("abcd")
+    var buf = [4]char{'x', 'x', 'x', 'x'}
+    var n = s.copyTo(buf, 4)
+    assert(n == 3)
+    assert(buf[0] == 'a')
+    assert(buf[1] == 'b')
+    assert(buf[2] == 'c')
     assert(buf[3] == '\0')
 }
 
