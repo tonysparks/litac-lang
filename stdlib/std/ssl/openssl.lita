@@ -5,6 +5,7 @@
 
 @include("<openssl/ssl.h>");
 @include("<openssl/err.h>");
+@include("<openssl/evp.h>");
 
 #if (OS == "MAC")
     @compiler_option(
@@ -227,4 +228,59 @@ public const BIO_CTRL_PENDING: i32 = 10
 
 @foreign
 public func BIO_ctrl(bio: *BIO, cmd: i32, larg: i64, parg: *void) : i64;
+
+// ---------------------------------------------------------------------------
+// EVP symmetric cipher (AES-256-GCM and others)
+// ---------------------------------------------------------------------------
+
+@foreign
+public struct EVP_CIPHER_CTX {}
+
+@foreign
+public struct EVP_CIPHER {}
+
+@foreign
+public func EVP_CIPHER_CTX_new() : *EVP_CIPHER_CTX;
+
+@foreign
+public func EVP_CIPHER_CTX_free(ctx: *EVP_CIPHER_CTX);
+
+@foreign
+public func EVP_aes_256_gcm() : *const EVP_CIPHER;
+
+// Pass type=null on second call to reuse cipher without reinit.
+// Pass key=null, iv=null on first call to set cipher before key/iv.
+@foreign
+public func EVP_EncryptInit_ex(ctx: *EVP_CIPHER_CTX, type_: *const EVP_CIPHER,
+                                impl: *void, key: *const u8, iv: *const u8) : i32;
+
+@foreign
+public func EVP_EncryptUpdate(ctx: *EVP_CIPHER_CTX,
+                               out: *u8, outl: *i32,
+                               in_: *const u8, inl: i32) : i32;
+
+@foreign
+public func EVP_EncryptFinal_ex(ctx: *EVP_CIPHER_CTX, out: *u8, outl: *i32) : i32;
+
+@foreign
+public func EVP_DecryptInit_ex(ctx: *EVP_CIPHER_CTX, type_: *const EVP_CIPHER,
+                                impl: *void, key: *const u8, iv: *const u8) : i32;
+
+@foreign
+public func EVP_DecryptUpdate(ctx: *EVP_CIPHER_CTX,
+                               out: *u8, outl: *i32,
+                               in_: *const u8, inl: i32) : i32;
+
+// Returns <= 0 if GCM tag verification fails.
+@foreign
+public func EVP_DecryptFinal_ex(ctx: *EVP_CIPHER_CTX, out: *u8, outl: *i32) : i32;
+
+// GCM control: set IV length, get/set authentication tag.
+@foreign
+public func EVP_CIPHER_CTX_ctrl(ctx: *EVP_CIPHER_CTX, type_: i32, arg: i32, ptr: *void) : i32;
+
+// EVP_CTRL_GCM_* constants (OpenSSL preprocessor macros)
+public const EVP_CTRL_GCM_SET_IVLEN: i32 = 0x9
+public const EVP_CTRL_GCM_GET_TAG:   i32 = 0x10
+public const EVP_CTRL_GCM_SET_TAG:   i32 = 0x11
 

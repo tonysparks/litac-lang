@@ -1,0 +1,129 @@
+import "std/crypto/aes"
+import "std/string/builder"
+import "std/assert"
+import "std/libc"
+
+func makeTestKey(key: *u8) {
+    for(var i = 0; i < AES256GCM_KEY_SIZE; i += 1) {
+        key[i] = i as (u8)
+    }
+}
+
+@test
+func testEncryptDecryptRoundtrip() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var plaintext: *const char = "access-sandbox-abc123xyz"
+    var plaintextLen = strlen(plaintext)
+
+    var encrypted = StringBuilderInit(256)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), plaintext as (*const u8), plaintextLen, &encrypted))
+    assert(encrypted.length > 0)
+
+    var decrypted = StringBuilderInit(256)
+    defer decrypted.free()
+
+    assert(AES256GCMDecrypt(key as (*const u8), encrypted.buffer as (*const u8), encrypted.length, &decrypted))
+    assert(decrypted.length == plaintextLen)
+    assert(strncmp(decrypted.buffer, plaintext, plaintextLen as (usize)) == 0)
+}
+
+@test
+func testTamperedCiphertextFails() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var plaintext: *const char = "access-sandbox-abc123xyz"
+
+    var encrypted = StringBuilderInit(256)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), plaintext as (*const u8), strlen(plaintext), &encrypted))
+
+    // Flip a byte in the middle of the encoded ciphertext
+    if(encrypted.length > 10) {
+        encrypted.buffer[10] ^= 0xFF_i8
+    }
+
+    var decrypted = StringBuilderInit(256)
+    defer decrypted.free()
+
+    assert(!AES256GCMDecrypt(key as (*const u8), encrypted.buffer as (*const u8), encrypted.length, &decrypted))
+}
+
+@test
+func testWrongKeyFails() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var wrongKey: [32]u8
+    memset((&wrongKey[0]) as (*void), 0xFF, 32_usize)
+
+    var plaintext: *const char = "access-sandbox-abc123xyz"
+
+    var encrypted = StringBuilderInit(256)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), plaintext as (*const u8), strlen(plaintext), &encrypted))
+
+    var decrypted = StringBuilderInit(256)
+    defer decrypted.free()
+
+    assert(!AES256GCMDecrypt(wrongKey as (*const u8), encrypted.buffer as (*const u8), encrypted.length, &decrypted))
+}
+
+@test
+func testEmptyPlaintext() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var encrypted = StringBuilderInit(256)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), null, 0, &encrypted))
+    assert(encrypted.length > 0)
+
+    var decrypted = StringBuilderInit(256)
+    defer decrypted.free()
+
+    assert(AES256GCMDecrypt(key as (*const u8), encrypted.buffer as (*const u8), encrypted.length, &decrypted))
+    assert(decrypted.length == 0)
+}
+
+@test
+func testFreshNonceEachEncrypt() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var plaintext: *const char = "access-sandbox-abc123xyz"
+
+    var enc1 = StringBuilderInit(256)
+    defer enc1.free()
+
+    var enc2 = StringBuilderInit(256)
+    defer enc2.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), plaintext as (*const u8), strlen(plaintext), &enc1))
+    assert(AES256GCMEncrypt(key as (*const u8), plaintext as (*const u8), strlen(plaintext), &enc2))
+
+    // Same plaintext must produce different ciphertext due to random nonce
+    assert(enc1.length == enc2.length)
+    assert(strncmp(enc1.buffer, enc2.buffer, enc1.length as (usize)) != 0)
+}
+
+@test
+func testTruncatedInputFails() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // Too short to contain nonce + tag
+    var garbage: *const char = "tooshort"
+
+    var decrypted = StringBuilderInit(256)
+    defer decrypted.free()
+
+    assert(!AES256GCMDecrypt(key as (*const u8), garbage as (*const u8), strlen(garbage), &decrypted))
+}
