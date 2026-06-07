@@ -381,8 +381,8 @@ func (m: *Migrator) loadApplied(
         rec.version = rs.columnInt64(0)
         var chk = rs.columnString(1)
         var at  = rs.columnString(2)
-        chk.copyTo(rec.checksum,  CHECKSUM_SIZE - 1)
-        at.copyTo( rec.appliedAt, TIMESTAMP_MAX - 1)
+        chk.copyTo(rec.checksum,  CHECKSUM_SIZE)
+        at.copyTo( rec.appliedAt, TIMESTAMP_MAX)
         out.add(rec)
     }
 
@@ -764,10 +764,10 @@ func ParseMigrationFile(
         descLen = DESCRIPTION_MAX - 1
     }
     var desc = name.substring(descStart, descStart + descLen)
-    desc.copyTo(mig.description, DESCRIPTION_MAX - 1)
+    desc.copyTo(mig.description, DESCRIPTION_MAX)
     mig.descLen = descLen
 
-    path.copyTo(mig.filename, FILENAME_MAX - 1)
+    path.copyTo(mig.filename, FILENAME_MAX)
     mig.filenameLen = path.length
 
     return true

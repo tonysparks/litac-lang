@@ -16,11 +16,11 @@ import "std/system"
 import "std/json"
 
 public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
-    var temp: [MAX_PATH]char;
+    var temp: PathBuf;
 
     // Default srcPath to {projectPath}/src if not supplied via -srcDir
     if(options.srcPath.empty()) {
-        var srcBuf = StringBufferInit(temp, MAX_PATH, 0)
+        var srcBuf = temp.toStringBuffer()
         srcBuf.format("%s/src", options.projectPath)
         StringCopy(.src = srcBuf.cStr(), .dest = options.srcPath, .size = MAX_PATH)
     }
@@ -33,7 +33,7 @@ public func PackageDoc(pm: *PackageManager, options: *LitaOptions) : PkgStatus {
     }
 
     // Ensure doc output directory exists
-    var docDirBuf = StringBufferInit(temp, MAX_PATH, 0)
+    var docDirBuf = temp.toStringBuffer()
     if(options.docDir.empty()) {
         docDirBuf.format("%s/doc", options.projectPath)
     }

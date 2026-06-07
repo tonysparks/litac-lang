@@ -1526,8 +1526,8 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     }
     else if(note.type.name.equals(&CFILE)) {
         const BUFFER_SIZE = 1024*10;
-        var filename = [MAX_PATH]char {0};
-        var filenameStr = StringBufferInit(filename, MAX_PATH, 0)
+        var filename: PathBuf;
+        var filenameStr = filename.toStringBuffer()
         var filedata = [BUFFER_SIZE]char{0};
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
@@ -1538,7 +1538,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
             var value = arg.argExpr.operand.val.str
 
-            FilePath(note.startPos.filename, filename)
+            FilePath(note.startPos.filename, filenameStr.cStr())
 
             filenameStr.adjust()
             filenameStr.append("/%.*s", value.length, value.buffer)
@@ -1553,7 +1553,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 continue;
             }
 
-            var file = fopen(filename, "r");
+            var file = fopen(filenameStr.cStr(), "r");
             defer if(file) fclose(file)
 
             if(!file) {
@@ -1565,7 +1565,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
             this.emitStrn("\n", 1)
 
             if(!this.options.disableLineSync) {
-                this.emit("#line %d \"%s\"\n", 0, filename)
+                this.emit("#line %d \"%s\"\n", 0, filenameStr.cStr())
             }
 
             var bytesRead = 0_usize;
@@ -1581,8 +1581,8 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
     }
     else if(note.type.name.equals(&CINCLUDE)) {
         const BUFFER_SIZE = 1024*10;
-        var filename = [MAX_PATH]char {0};
-        var filenameStr = StringBufferInit(filename, MAX_PATH, 0)
+        var filename: PathBuf;
+        var filenameStr = filename.toStringBuffer()
 
         for(var i = 0; i < note.arguments.size(); i += 1) {
             var arg = note.arguments.get(i)
@@ -1592,7 +1592,7 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
 
             var value = arg.argExpr.operand.val.str
 
-            FilePath(note.startPos.filename, filename)
+            FilePath(note.startPos.filename, filenameStr.cStr())
 
             filenameStr.adjust()
             filenameStr.append("/%.*s", value.length, value.buffer)
@@ -1607,9 +1607,9 @@ func (this: using *CGen) emitPreludeNote(note: *NoteStmt) {
                 continue;
             }
             if(!this.options.disableLineSync) {
-                this.emit("#line %d \"%s\"\n", 0, filename)
+                this.emit("#line %d \"%s\"\n", 0, filenameStr.cStr())
             }
-            this.emit("#include \"%s\"\n", filename)
+            this.emit("#include \"%s\"\n", filenameStr.cStr())
         }
     }
 }

@@ -39,8 +39,8 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
     }
 
     if(options.fullSync) {
-        var temp:[MAX_PATH]char;
-        var pkgPath = StringBufferInit(temp, MAX_PATH, 0)
+        var temp: PathBuf;
+        var pkgPath = temp.toStringBuffer()
         pkgPath.format("%s/%s", pm.options.projectPath, pm.options.pkgDir)
 
         if(pm.isVerbose()) {
@@ -138,8 +138,8 @@ public func PackageInstall(pm: *PackageManager, options: PackageInstallOptions) 
 }
 
 func isPackageInstalled(pm: *PackageManager, pkgId: *PackageId, pkgDir: *const char) : bool {
-    var temp:[MAX_PATH]char;
-    var lockFile = StringBufferInit(temp, MAX_PATH, 0);
+    var temp: PathBuf;
+    var lockFile = temp.toStringBuffer();
     lockFile.format("%s/%s", pkgDir, INSTALL_COMPLETED_FILE)
 
     if(FileExists(lockFile.cStr())) {
@@ -150,8 +150,8 @@ func isPackageInstalled(pm: *PackageManager, pkgId: *PackageId, pkgDir: *const c
 }
 
 func cleanPackageDirectory(pm: *PackageManager, pkgPath: *const char) : PkgStatus {
-    var temp:[MAX_PATH]char;
-    var path = StringBufferInit(temp, MAX_PATH, 0)
+    var temp: PathBuf;
+    var path = temp.toStringBuffer()
     path.append("%s", pkgPath)
 
     return deleteDir(pm, path)
@@ -162,8 +162,8 @@ func deleteDir(pm: *PackageManager, path: *StringBuffer) : PkgStatus {
         return PkgStatus.OK
     }
 
-    var buffer = [MAX_PATH]char;
-    var packageRoot = StringBufferInit(buffer, MAX_PATH, 0)
+    var buffer: PathBuf;
+    var packageRoot = buffer.toStringBuffer()
     packageRoot.format("%s/%s", pm.options.projectPath, pm.options.pkgDir)
 
     // Do not delete files outside of the package root directory
@@ -276,8 +276,8 @@ func downloadPackage(
         return PkgStatus.ERROR_INVALID_REPO
     }
 
-    var temp:[MAX_PATH]char;
-    var uri = StringBufferInit(temp, MAX_PATH, 0)
+    var temp: PathBuf;
+    var uri = temp.toStringBuffer()
 
     var repo = pkgId.repo()
     // var name = pkgId.name()
@@ -436,11 +436,11 @@ func installPackage(
     // Move any dynamic libraries if necessary to this
     // project bin directory
     {
-        var temp1:[MAX_PATH]char;
-        var libPath = StringBufferInit(temp1, MAX_PATH, 0)
+        var temp1: PathBuf;
+        var libPath = temp1.toStringBuffer()
 
-        var temp2:[MAX_PATH]char;
-        var destPath = StringBufferInit(temp2, MAX_PATH, 0)
+        var temp2: PathBuf;
+        var destPath = temp2.toStringBuffer()
 
         for(var i = 0; i < pkg.dynamicLibraries.size(); i+=1) {
             var lib = pkg.dynamicLibraries.get(i)
@@ -487,8 +487,8 @@ func readPackage(
     // var name = pkgId.name()
     // var version = pkgId.version()
 
-    var temp:[MAX_PATH]char;
-    var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
+    var temp: PathBuf;
+    var pkgDef = temp.toStringBuffer()
     pkgDef.format("%s%s/pkg.json", pkgPath, pkgParentPath)
 
     if(!FileExists(pkgDef.cStr())) {
@@ -540,11 +540,11 @@ func dealWithGithubBS(
     }
 
 
-    var temp1:[MAX_PATH]char;
-    var srcPath = StringBufferInit(temp1, MAX_PATH, 0)
+    var temp1: PathBuf;
+    var srcPath = temp1.toStringBuffer()
 
-    var temp2:[MAX_PATH]char;
-    var destPath = StringBufferInit(temp2, MAX_PATH, 0)
+    var temp2: PathBuf;
+    var destPath = temp2.toStringBuffer()
 
     var root = extractedFiles.get(0)
 
@@ -599,8 +599,8 @@ func zipLocalPackage(
 
 @test
 func testSanitizeFilename() {
-    var temp: [MAX_PATH]char;
-    var pkgDirectory = StringBufferInit(temp, MAX_PATH, 0);
+    var temp: PathBuf;
+    var pkgDirectory = temp.toStringBuffer();
     pkgDirectory.format("%s/%s/%s", "http://root", "name-complex", "1.0.3")
 
     sanitizeFilename(pkgDirectory.cStr(), pkgDirectory.cStr())

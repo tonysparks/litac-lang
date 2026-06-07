@@ -98,8 +98,8 @@ public func BuiltinsInit(lita: *Lita) : *Module {
     builtins.lita = lita
     builtins.typeSpecAllocator.init(lita.allocator)
 
-    var filename: [MAX_PATH]char;
-    var pathStr = StringBufferInit(filename, MAX_PATH, 0);
+    var filename: PathBuf;
+    var pathStr = filename.toStringBuffer();
     pathStr.format("%s/stdlib/std/builtins.lita", lita.options.litaPath)
     builtins.id.fromFile(lita, StringInit("std/builtins"), pathStr.cStr())
 

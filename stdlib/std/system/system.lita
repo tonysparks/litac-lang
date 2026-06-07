@@ -352,6 +352,14 @@ public func GetSystemPathSeparator() : String {
     return StringInit(PATH_SEPARATOR)
 }
 
+public struct PathBuf {
+    buffer: [MAX_PATH]char
+}
+
+public func (this: *PathBuf) toStringBuffer() : StringBuffer {
+    return StringBufferInit(this.buffer, MAX_PATH, 0)
+}
+
 @foreign
 func getenv(varname: *const char) : *char;
 

@@ -238,8 +238,8 @@ public func (this: *Lita) reset() {
 
     // see if there is a .build.json file
     {
-        var temp: [MAX_PATH]char;
-        var build = StringBufferInit(temp, MAX_PATH, 0)
+        var temp: PathBuf;
+        var build = temp.toStringBuffer()
         build.format("%s/.build.json", this.options.projectPath)
 
         memset((&this.buildFile) as (*void), 0, sizeof(:BuildFile))
@@ -803,8 +803,8 @@ public func FindModulePath(lita: *Lita,
                            moduleName: String,
                            filename: [MAX_PATH]char) : bool {
 
-    var path = [MAX_PATH]char{0}
-    var pathStr = StringBufferInit(path, MAX_PATH, 0);
+    var path: PathBuf;
+    var pathStr = path.toStringBuffer();
     defer {
         GetAbsolutePath(CurrentWorkingPath(), pathStr.cStr(), filename)
     }

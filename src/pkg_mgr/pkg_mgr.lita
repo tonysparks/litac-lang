@@ -344,8 +344,8 @@ public func (this: *PackageManager) writeBuildFile() : PkgStatus {
         return status;
     }
 
-    var temp: [MAX_PATH]char;
-    var build = StringBufferInit(temp, MAX_PATH, 0)
+    var temp: PathBuf;
+    var build = temp.toStringBuffer()
     build.format("%s/.build.json", this.options.projectPath)
 
     var file = File{}
@@ -424,9 +424,9 @@ public func (this: *PackageManager) hasProjectPkg(): bool {
     return this.readProjectPkg() == PkgStatus.OK
 }
 func (this: *PackageManager) readProjectPkg() : PkgStatus {
-    var temp:[MAX_PATH]char;
+    var temp: PathBuf;
 
-    var pkgDef = StringBufferInit(temp, MAX_PATH, 0)
+    var pkgDef = temp.toStringBuffer()
     pkgDef.format("%s/pkg.json", this.options.projectPath)
 
     if(!FileExists(pkgDef.cStr())) {

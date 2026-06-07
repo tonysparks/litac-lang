@@ -53,8 +53,8 @@ public func (this: *Workspace) setup(rootPath: *const char, rootUri: *const char
 
     var lita = this.lsp.lita
 
-    var filepath = [MAX_PATH]char{0};
-    var pathStr = StringBufferInit(filepath, MAX_PATH, 0);
+    var filepath: PathBuf;
+    var pathStr = filepath.toStringBuffer();
 
     // TODO:
     // Defer full build compilation if no main is found

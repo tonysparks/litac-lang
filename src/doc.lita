@@ -1093,8 +1093,8 @@ func (this: *DocContext) generateIndex(mods: *Array<*Module>) : bool {
         }
     }
 
-    var indexBuf: [MAX_PATH]char;
-    var indexPath = StringBufferInit(indexBuf, MAX_PATH, 0)
+    var indexBuf: PathBuf;
+    var indexPath = indexBuf.toStringBuffer()
     indexPath.format("%s/index%s", opts.docDir, this.fileExt())
 
     if(WriteFile(indexPath.cStr(), sb.buffer, sb.length as (usize)) != FileStatus.Ok) {
