@@ -8,6 +8,7 @@ import "std/mem"
 import "std/mem/bucket_allocator"
 import "std/string"
 import "std/string/builder"
+import "std/string/buffer"
 import "std/array"
 import "std/time"
 import "std/assert"
@@ -44,7 +45,7 @@ import "std/db/orm"
         var probe: pgdb::PgConnection
         var result: SqlResult
         for(var i = 0; i < 30; i += 1) {
-            result = pgdb::ConnectDSN(dsn.cStrConst(), &probe)
+            result = pgdb::ConnectDSN(dsn.toString(), &probe)
             if(result.isOk()) { break; }
             probe.close()
             ThreadSleepMSec(1000_i64)
@@ -86,7 +87,7 @@ public struct Item {
 // ── Connection helpers ────────────────────────────────────────────────────────
 
 func openSqliteDb(conn: *SqliteConnection) : SqlConnection {
-    var r = Connect(":memory:", conn, .enableWAL = false)
+    var r = Connect($":memory:", conn, .enableWAL = false)
     assert(r.isOk())
     return conn.connection
 }
@@ -98,7 +99,7 @@ func pgConnect(conn: *pgdb::PgConnection) {
     var dsn = StringBuilderInit(128)
     defer dsn.free()
     dsn.append("host=127.0.0.1 port=%d dbname=testdb user=postgres password=secret sslmode=disable", _pgPort)
-    var result = pgdb::ConnectDSN(dsn.cStrConst(), conn)
+    var result = pgdb::ConnectDSN(dsn.toString(), conn)
     assert(result.isOk())
 
     _pgSchemaSeq += 1

@@ -40,7 +40,7 @@ public struct SqliteResultSet {
 }
 
 public func Connect(
-    filename: *const char,
+    filename: String,
     conn: *SqliteConnection,
     flags: i32 = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
     enableWAL: bool = true,
@@ -55,7 +55,9 @@ public func Connect(
         .description = $""
     }
 
-    var errorCode = sqlite3_open_v2(filename, &conn.db, flags, null)
+    var filenameBuf: [512]char
+    filename.copyTo(filenameBuf, 512)
+    var errorCode = sqlite3_open_v2(filenameBuf, &conn.db, flags, null)
     if (errorCode != SQLITE_OK) {
         conn.error = CreateError(conn, null, errorCode)
     }
@@ -64,7 +66,7 @@ public func Connect(
 }
 
 public func ConnectReadOnly(
-    filename: *const char,
+    filename: String,
     conn: *SqliteConnection,
     flags: i32 = 0,
     allocator: *const Allocator = defaultAllocator

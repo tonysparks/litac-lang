@@ -59,25 +59,29 @@ public struct PgResultSet {
 
 // Connects to PostgreSQL using individual host/port/dbname/user/password fields.
 public func Connect(
-    host:     *const char,
+    host:     String,
     port:     i32,
-    dbname:   *const char,
-    user:     *const char,
-    password: *const char,
+    dbname:   String,
+    user:     String,
+    password: String,
     conn:     *PgConnection,
     alloc:    *const Allocator = defaultAllocator
 ) : SqlResult {
     var sb = StringBuilderInit(256, alloc)
     defer sb.free()
-    sb.append("host=%s port=%d dbname=%s user=%s password=%s",
-              host, port, dbname, user, password)
-    return ConnectDSN(sb.cStrConst(), conn, alloc)
+    sb.append("host=%.*s port=%d dbname=%.*s user=%.*s password=%.*s",
+              host.length, host.buffer,
+              port,
+              dbname.length, dbname.buffer,
+              user.length, user.buffer,
+              password.length, password.buffer)
+    return ConnectDSN(sb.cStrConst().toString(), conn, alloc)
 }
 
 // Connects using a libpq connection string, e.g.
 // "host=localhost port=5432 dbname=mydb user=foo password=bar"
 public func ConnectDSN(
-    conninfo: *const char,
+    conninfo: String,
     conn:     *PgConnection,
     alloc:    *const Allocator = defaultAllocator
 ) : SqlResult {
@@ -86,7 +90,9 @@ public func ConnectDSN(
     conn.error      = SqlResult{.type = SqlResultType.OK, .description = $"OK"}
     conn.connection = conn
 
-    conn.pg = PQconnectdb(conninfo)
+    var conninfoBuf: [1024]char
+    conninfo.copyTo(conninfoBuf, 1024)
+    conn.pg = PQconnectdb(conninfoBuf)
     if(conn.pg == null) {
         conn.error = SqlResult{.type = SqlResultType.ERROR, .description = $"out of memory"}
         return conn.error

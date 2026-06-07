@@ -57,7 +57,7 @@ public func (this: *UriParams) getBool(key: *const char, defaultVal: bool) : boo
 //
 // Custom driver example:
 //
-//   func MyConnect(path: *const char, params: *UriParams,
+//   func MyConnect(path: String, params: *UriParams,
 //                  conn: *SqlConnection, alloc: *const Allocator) : SqlResult {
 //       var c = new<MyConnection>(alloc)
 //       ...
@@ -77,7 +77,7 @@ public func (this: *UriParams) getBool(key: *const char, defaultVal: bool) : boo
 //
 // =========================================================================
 
-public typedef func(path: *const char,
+public typedef func(path: String,
                     params: *UriParams,
                     conn: *SqlConnection,
                     allocator: *const Allocator) : SqlResult as DbDriverFn
@@ -142,7 +142,7 @@ public struct ConnectionPool {
 //   wal=true|false    enable WAL mode (default true)
 //   readonly=true     open read-only (default false)
 public func ConnectionPoolInit(
-    uri:    *const char,
+    uri:    String,
     pool:   *ConnectionPool,
     config: PoolConfig
 ) : SqlResult {
@@ -347,13 +347,13 @@ func CreateConnection(pool: *ConnectionPool, conn: *SqlConnection) : SqlResult {
     // user-registered drivers take precedence over built-ins
     for (var i = 0; i < _driverCount; i += 1) {
         if (_drivers[i].name.equalsString(pool.driver)) {
-            return _drivers[i].connect(pool.path, &pool.params, conn, pool.allocator)
+            return _drivers[i].connect(pool.path.toString(), &pool.params, conn, pool.allocator)
         }
     }
 
     // built-in: sqlite
     if (pool.driver.equals("sqlite")) {
-        return SqliteDriverConnect(pool.path, &pool.params, conn, pool.allocator)
+        return SqliteDriverConnect(pool.path.toString(), &pool.params, conn, pool.allocator)
     }
 
     return SqlResult {
@@ -362,10 +362,8 @@ func CreateConnection(pool: *ConnectionPool, conn: *SqlConnection) : SqlResult {
     }
 }
 
-func ParseUri(uri: *const char, pool: *ConnectionPool) : SqlResult {
-    var uriStr = uri.toString()
-
-    if (!uriStr.startsWith($"ldbc://")) {
+func ParseUri(uri: String, pool: *ConnectionPool) : SqlResult {
+    if (!uri.startsWith($"ldbc://")) {
         return SqlResult {
             .type = SqlResultType.ERROR,
             .description = $"invalid URI: must start with ldbc://"
@@ -373,7 +371,7 @@ func ParseUri(uri: *const char, pool: *ConnectionPool) : SqlResult {
     }
 
     // everything after "ldbc://"
-    var rest = uriStr.substring(LDBC_SCHEME_LEN)
+    var rest = uri.substring(LDBC_SCHEME_LEN)
 
     // driver name: up to the first '/'
     var slashIdx = rest.indexOf($"/")
@@ -414,13 +412,13 @@ func ParseUri(uri: *const char, pool: *ConnectionPool) : SqlResult {
     pathStr.copyTo(pool.path, MAX_URI_LEN)
 
     // store the full URI for reference
-    if (uriStr.length >= MAX_URI_LEN) {
+    if (uri.length >= MAX_URI_LEN) {
         return SqlResult {
             .type = SqlResultType.ERROR,
             .description = $"invalid URI: too long"
         }
     }
-    uriStr.copyTo(pool.uri, MAX_URI_LEN)
+    uri.copyTo(pool.uri, MAX_URI_LEN)
 
     // query params (everything after '?')
     pool.params.count = 0
@@ -460,7 +458,7 @@ func ParseQueryParams(query: String, params: *UriParams) {
 // =========================================================================
 
 func SqliteDriverConnect(
-    path:      *const char,
+    path:      String,
     params:    *UriParams,
     conn:      *SqlConnection,
     allocator: *const Allocator

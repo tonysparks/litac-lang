@@ -17,7 +17,7 @@ func testPoolInit() {
         .minSize = 2,
     }
     var pool: ConnectionPool;
-    var result = ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    var result = ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
     assert(!result.isError())
     assert(pool.totalSize == 2)
     pool.destroy()
@@ -31,7 +31,7 @@ func testPoolInit() {
 func testAcquireRelease() {
     var config = PoolConfig { .maxSize = 3, .minSize = 1 }
     var pool: ConnectionPool;
-    var result = ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    var result = ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
     assert(!result.isError())
 
     var conn: SqlConnection;
@@ -54,7 +54,7 @@ func testAcquireRelease() {
 func testTryAcquireExhausted() {
     var config = PoolConfig { .maxSize = 1, .minSize = 1 }
     var pool: ConnectionPool;
-    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     // drain the single connection
     var conn: SqlConnection;
@@ -77,7 +77,7 @@ func testTryAcquireExhausted() {
 func testLazyGrowth() {
     var config = PoolConfig { .maxSize = 3, .minSize = 1 }
     var pool: ConnectionPool;
-    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     assert(pool.totalSize == 1)
 
@@ -107,7 +107,7 @@ func testLazyGrowth() {
 func testReuseAfterRelease() {
     var config = PoolConfig { .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
-    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     var conn: SqlConnection;
     pool.acquire(&conn)
@@ -130,7 +130,7 @@ func testReuseAfterRelease() {
 func testUriParamWalFalse() {
     var config = PoolConfig { .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
-    var result = ConnectionPoolInit("ldbc://sqlite/:memory:?wal=false", &pool, config)
+    var result = ConnectionPoolInit($"ldbc://sqlite/:memory:?wal=false", &pool, config)
     assert(!result.isError())
     pool.destroy()
 }
@@ -143,7 +143,7 @@ func testUriParamWalFalse() {
 func testInvalidUri() {
     var config = PoolConfig { .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
-    var result = ConnectionPoolInit("jdbc://sqlite/:memory:", &pool, config)
+    var result = ConnectionPoolInit($"jdbc://sqlite/:memory:", &pool, config)
     assert(result.isError())
 }
 
@@ -151,7 +151,7 @@ func testInvalidUri() {
 // RegisterDriver: custom no-op driver
 // -----------------------------------------------------------------------
 
-func noopConnect(path: *const char, params: *UriParams,
+func noopConnect(path: String, params: *UriParams,
                  conn: *SqlConnection, allocator: *const Allocator) : SqlResult {
     // deliberately return error so we can detect the call was dispatched
     return SqlResult {
@@ -168,7 +168,7 @@ func noopConnect(path: *const char, params: *UriParams,
 func testAcquireTimedSuccess() {
     var config = PoolConfig { .maxSize = 2, .minSize = 1 }
     var pool: ConnectionPool;
-    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     var conn: SqlConnection;
     var result = pool.acquireTimed(1000, &conn)
@@ -186,7 +186,7 @@ func testAcquireTimedSuccess() {
 func testAcquireTimedTimeout() {
     var config = PoolConfig { .maxSize = 1, .minSize = 1 }
     var pool: ConnectionPool;
-    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     // drain the single connection
     var conn: SqlConnection;
@@ -225,7 +225,7 @@ func blockedAcquireThread(arg: *void) : i32 {
 func testCloseInterruptsWaiter() {
     var config = PoolConfig { .maxSize = 1, .minSize = 1 }
     var pool: ConnectionPool;
-    ConnectionPoolInit("ldbc://sqlite/:memory:", &pool, config)
+    ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
 
     // drain the only connection so the next acquire will block
     var conn: SqlConnection;
@@ -260,7 +260,7 @@ func testRegisterDriver() {
 
     var config = PoolConfig { .maxSize = 1, .minSize = 1 }
     var pool: ConnectionPool;
-    var result = ConnectionPoolInit("ldbc://noop/somedb", &pool, config)
+    var result = ConnectionPoolInit($"ldbc://noop/somedb", &pool, config)
     // the noop driver always returns error, so init should fail
     assert(result.isError())
 }

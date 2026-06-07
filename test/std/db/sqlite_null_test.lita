@@ -82,7 +82,7 @@ func testOrmNullTextColumn() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createNullableTable(&conn)
 
@@ -118,7 +118,7 @@ func testOrmNullTextColumn() {
 func testColumnDateTimeNull() {
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, .enableWAL = false)
+    Connect($":memory:", &conn, .enableWAL = false)
 
     conn.execute("CREATE TABLE dt_null_test (ts TEXT);")
     assert(!conn.hasError())
@@ -154,7 +154,7 @@ func testOrmNullDateTimeColumn() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createNullableTable(&conn)
 
@@ -195,7 +195,7 @@ func testOrmNonNullTextAndDateTimeRoundTrip() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createNullableTable(&conn)
 
@@ -230,7 +230,7 @@ func testOrmNonNullTextAndDateTimeRoundTrip() {
 func testNullIntegerColumnReturnsZero() {
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, .enableWAL = false)
+    Connect($":memory:", &conn, .enableWAL = false)
 
     conn.execute(
         """
@@ -275,7 +275,7 @@ func testDbIgnoreFieldExcludedFromOrm() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     // Table has only the two mapped columns — no column for `computed`
     conn.execute(

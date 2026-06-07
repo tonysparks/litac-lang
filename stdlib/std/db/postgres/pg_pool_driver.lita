@@ -20,7 +20,7 @@ import "std/mem"
 // Remaining libpq options can be forwarded by appending extra key=value pairs;
 // they are collected into a DSN string and passed to PQconnectdb.
 public func PgDriverConnect(
-    path:      *const char,
+    path:      String,
     params:    *UriParams,
     conn:      *SqlConnection,
     allocator: *const Allocator
@@ -39,10 +39,10 @@ public func PgDriverConnect(
     var user     = params.get("user")
     var password = params.get("password")
 
-    var hostVal     = host     ? host     : "localhost"
-    var portVal     = portStr  ? atoi(portStr) : 5432
-    var userVal     = user     ? user     : ""
-    var passwordVal = password ? password : ""
+    var hostVal     = host     ? host.toString()     : $"localhost"
+    var portVal     = portStr  ? atoi(portStr)        : 5432
+    var userVal     = user     ? user.toString()     : $""
+    var passwordVal = password ? password.toString() : $""
 
     var result = Connect(hostVal, portVal, path, userVal, passwordVal, pgConn, allocator)
     if (result.isError()) {

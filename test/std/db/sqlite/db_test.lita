@@ -78,7 +78,7 @@ func testDatabase() {
     defer conn.close()
 
     Connect(
-        ":memory:",
+        $":memory:",
         &conn,
         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
         true,
@@ -285,7 +285,7 @@ func testErrorHandling() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     // Fresh connection – no error
     assert(!conn.hasError())
@@ -333,7 +333,7 @@ func testTransactionRollback() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     insertNFLTeams(&conn)
@@ -373,7 +373,7 @@ func testRawStatementApi() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     insertNFLTeams(&conn)
@@ -460,7 +460,7 @@ func testColumnTypes() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     conn.execute(
         """
@@ -559,7 +559,7 @@ func testBindBlob64AndText64() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     conn.execute("CREATE TABLE b64_test (name TEXT, data BLOB);")
     assert(!conn.hasError())
@@ -605,7 +605,7 @@ func testBindAndColumnDateTime() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     conn.execute("CREATE TABLE dt_test (ts TEXT);")
     assert(!conn.hasError())
@@ -650,7 +650,7 @@ func testStatementConnection() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
 
@@ -676,7 +676,7 @@ func testQueryVarargs() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     conn.execute(
         """
@@ -737,7 +737,7 @@ func testOrmUpdateOne() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     insertNFLTeams(&conn)
@@ -780,7 +780,7 @@ func testOrmUpdateMany() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     insertNFLTeams(&conn)
@@ -828,7 +828,7 @@ func testOrmDeleteOne() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     insertNFLTeams(&conn)
@@ -877,7 +877,7 @@ func testOrmDeleteMany() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     insertNFLTeams(&conn)
@@ -924,7 +924,7 @@ func testOrmQueryNoResults() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     // No rows inserted
@@ -960,7 +960,7 @@ func testEnableDisableWAL() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     // enableWAL on :memory: succeeds (SQLite silently keeps "memory" mode)
     var r1 = conn.enableWAL()
@@ -987,7 +987,7 @@ func testResultSetStatementAccessor() {
 
     var conn = SqliteConnection{}
     defer conn.close()
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
 
     createTeamTable(&conn)
     insertNFLTeams(&conn)
@@ -1015,7 +1015,7 @@ func testConnectionClose() {
     defer allocator.free()
 
     var conn = SqliteConnection{}
-    Connect(":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
     var r = conn.close()
     assert(r.isOk())
 }

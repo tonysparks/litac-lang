@@ -2,6 +2,7 @@
 import "std/assert"
 import "std/string"
 import "std/string/builder"
+import "std/string/buffer"
 import "std/thread"
 import "std/testcontainers"
 import "std/testcontainers/presets"
@@ -28,7 +29,7 @@ func connectContainer(c: *Container) : PgConnection {
     var conn: PgConnection
     var result: SqlResult
     for(var i = 0; i < 30; i += 1) {
-        result = ConnectDSN(dsn.cStrConst(), &conn)
+        result = ConnectDSN(dsn.toString(), &conn)
         if(result.isOk()) { break; }
         conn.close()
         ThreadSleepMSec(1000_i64)

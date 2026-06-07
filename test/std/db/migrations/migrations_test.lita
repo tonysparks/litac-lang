@@ -16,7 +16,7 @@ import "std/mem"
 // -----------------------------------------------------------------------
 
 func openMemDb(conn: *SqliteConnection) {
-    var r = Connect(":memory:", conn, .enableWAL = false)
+    var r = Connect($":memory:", conn, .enableWAL = false)
     assert(r.isOk())
 }
 
