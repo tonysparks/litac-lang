@@ -54,3 +54,4 @@ bootstrap/output/**
 .DS_Store
 bin/file_test
 bin/profile.data.txt
+test_output/lita_test.lita

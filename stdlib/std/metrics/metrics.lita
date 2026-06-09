@@ -15,7 +15,7 @@ import "std/thread"
 public const MAX_HISTOGRAM_BUCKETS = 16
 
 // Maximum byte length of the canonical label key stored per series
-const MAX_KEY_LENGTH = 64
+const MAX_KEY_LENGTH = 256
 
 public enum MetricKind {
     COUNTER,
@@ -74,9 +74,10 @@ func collectAttrs(
 // ---------------------------------------------------------------
 
 struct CounterSeries {
-    key:   [MAX_KEY_LENGTH]char
-    attrs: Array<MetricAttr>
-    value: Atomic<i64>
+    key:    [MAX_KEY_LENGTH]char
+    keyLen: i32
+    attrs:  Array<MetricAttr>
+    value:  Atomic<i64>
 }
 
 public struct Counter {
@@ -108,7 +109,7 @@ func (this: *Counter) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<
     // are never freed or moved when the list grows.
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
-        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+        if(s.keyLen == keyBuf.length && memcmp(s.key, keyBuf.buffer, keyBuf.length as (usize)) == 0) {
             return &s.value
         }
     }
@@ -120,7 +121,7 @@ func (this: *Counter) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<
     // double-check under lock
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
-        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+        if(s.keyLen == keyBuf.length && memcmp(s.key, keyBuf.buffer, keyBuf.length as (usize)) == 0) {
             return &s.value
         }
     }
@@ -128,6 +129,7 @@ func (this: *Counter) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<
     var newSeries: CounterSeries;
     var keyDst = StringBufferInit(newSeries.key, MAX_KEY_LENGTH, 0)
     keyDst.appendStrn(keyBuf.buffer, keyBuf.length)
+    newSeries.keyLen = keyBuf.length
     newSeries.attrs.init(numAttrs, this.allocator)
     for(var i = 0; i < numAttrs; i += 1) {
         newSeries.attrs.add(attrs[i])
@@ -170,9 +172,10 @@ public func (this: *Counter) get() : i64 {
 // ---------------------------------------------------------------
 
 struct GaugeSeries {
-    key:   [MAX_KEY_LENGTH]char
-    attrs: Array<MetricAttr>
-    value: Atomic<i64>
+    key:    [MAX_KEY_LENGTH]char
+    keyLen: i32
+    attrs:  Array<MetricAttr>
+    value:  Atomic<i64>
 }
 
 public struct Gauge {
@@ -202,7 +205,7 @@ func (this: *Gauge) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<i6
 
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
-        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+        if(s.keyLen == keyBuf.length && memcmp(s.key, keyBuf.buffer, keyBuf.length as (usize)) == 0) {
             return &s.value
         }
     }
@@ -212,7 +215,7 @@ func (this: *Gauge) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<i6
 
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
-        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+        if(s.keyLen == keyBuf.length && memcmp(s.key, keyBuf.buffer, keyBuf.length as (usize)) == 0) {
             return &s.value
         }
     }
@@ -220,6 +223,7 @@ func (this: *Gauge) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Atomic<i6
     var newSeries: GaugeSeries;
     var keyDst = StringBufferInit(newSeries.key, MAX_KEY_LENGTH, 0)
     keyDst.appendStrn(keyBuf.buffer, keyBuf.length)
+    newSeries.keyLen = keyBuf.length
     newSeries.attrs.init(numAttrs, this.allocator)
     for(var i = 0; i < numAttrs; i += 1) {
         newSeries.attrs.add(attrs[i])
@@ -273,6 +277,7 @@ public func (this: *Gauge) get() : i64 {
 
 struct HistogramSeries {
     key:    [MAX_KEY_LENGTH]char
+    keyLen: i32
     attrs:  Array<MetricAttr>
     counts: [MAX_HISTOGRAM_BUCKETS + 1]Atomic<i64>
     sum:    AtomicF64
@@ -329,7 +334,7 @@ func (this: *Histogram) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Histo
     // are never freed or moved when the list grows.
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
-        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+        if(s.keyLen == keyBuf.length && memcmp(s.key, keyBuf.buffer, keyBuf.length as (usize)) == 0) {
             return s
         }
     }
@@ -339,7 +344,7 @@ func (this: *Histogram) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Histo
 
     for(var i = 0; i < this.series.size(); i += 1) {
         var s = this.series.getPtr(i)
-        if((s.key as (*const char)).equals(keyBuf.cStrConst())) {
+        if(s.keyLen == keyBuf.length && memcmp(s.key, keyBuf.buffer, keyBuf.length as (usize)) == 0) {
             return s
         }
     }
@@ -347,6 +352,7 @@ func (this: *Histogram) findOrCreate(attrs: *MetricAttr, numAttrs: i32) : *Histo
     var newSeries: HistogramSeries;
     var keyDst = StringBufferInit(newSeries.key, MAX_KEY_LENGTH, 0)
     keyDst.appendStrn(keyBuf.buffer, keyBuf.length)
+    newSeries.keyLen = keyBuf.length
     newSeries.init(this.allocator, attrs, numAttrs)
     this.series.add(newSeries)
     return this.series.lastPtr()

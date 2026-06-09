@@ -157,6 +157,9 @@ public func (node: *JsonNode) asNumber() : f64 {
 
 @inline
 public func (node: *JsonNode) asFloat() : f64 {
+    if(node.type == JsonType.INT_NUMBER) {
+        return node.value.intValue as (f64)
+    }
     return node.value.doubleValue
 }
 
@@ -1462,8 +1465,19 @@ repeat:
         case '-':
             if (isdigit(stream[1])) {
                 stream += 1
-                p.scanInt()
-                token.intNumValue *= -1
+                // peek ahead to detect negative float (mirrors positive number case)
+                while (isdigit(*stream)) {
+                    stream += 1;
+                }
+                var c: char = *stream;
+                stream = token.start + 1;  // reset to first digit (past the '-')
+                if (c == '.' || tolower(c) == 'e') {
+                    p.scanFloat()
+                    token.realNumValue = -token.realNumValue
+                } else {
+                    p.scanInt()
+                    token.intNumValue *= -1
+                }
             }
             break;
         case '0':

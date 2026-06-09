@@ -53,5 +53,23 @@
                 var x22 = 0__f64
             `,
         },
+        {
+            "name": "Scientific Notation Float Literals",
+            "definitions": `
+            `,
+            "code": `
+                var a: f64 = 9.22e18
+                var b: f64 = 1e6
+                var c: f64 = 1.5e-3
+                var d: f64 = 2.0e+10
+                var e: f64 = -9.22e18
+
+                assert(a > 9.0e18)
+                assert(b == 1000000.0)
+                assert(c < 0.01)
+                assert(d > 1.0e10)
+                assert(e < -9.0e18)
+            `,
+        },
     ]
 }

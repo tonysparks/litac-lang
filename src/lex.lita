@@ -1012,6 +1012,7 @@ func (l: *Lexer) scanNumber() : Token {
 
     var hasDecimal = false
     var hasExpo = false
+    var justSawExponent = false
     var isHex = false
     while(!l.eof()) {
         var c = *l.stream
@@ -1020,12 +1021,18 @@ func (l: *Lexer) scanNumber() : Token {
                 break;
             }
             hasDecimal = true
+            justSawExponent = false
         }
         else if(tolower(c) == 'e' && !isHex) {
             if(hasExpo) {
                 break;
             }
             hasExpo = true
+            justSawExponent = true
+        }
+        else if((c == '+' || c == '-') && justSawExponent) {
+            // sign immediately after e/E in scientific notation (e.g. 1.5e-3, 2.0e+10)
+            justSawExponent = false
         }
         else if(!isdigit(c) && c != '_') {
             if(c == 'x' || c == 'X') {
@@ -1039,6 +1046,10 @@ func (l: *Lexer) scanNumber() : Token {
             else {
                 break
             }
+            justSawExponent = false
+        }
+        else {
+            justSawExponent = false
         }
 
         if(c != '_') {

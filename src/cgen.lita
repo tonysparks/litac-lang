@@ -2586,6 +2586,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             var expr = s as (*NumberExpr)
 
             var hasDecimal = false
+            var hasExponent = false
             var isHex = false
             var isBin = false
             var length: usize = expr.startPos.end - expr.startPos.start
@@ -2613,6 +2614,21 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
                 else if(isalpha(c)) {
                     if(!isHex && !isBin) {
+                        // Allow e/E for scientific notation (e.g. 9.22e18, 1e6, 1.5e-3)
+                        var lc = tolower(c)
+                        if(lc == 'e') {
+                            hasExponent = true
+                            buf.appendChar(*start)
+                            // consume optional +/- sign
+                            if(start + 1 != expr.startPos.end) {
+                                var next = *(start + 1)
+                                if(next == '+' || next == '-') {
+                                    start += 1
+                                    buf.appendChar(*start)
+                                }
+                            }
+                            continue
+                        }
                         break;
                     }
 
@@ -2646,7 +2662,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             switch(type.kind) {
                 case TypeKind.F32: {
                     if(!isHex && !isBin) {
-                        if(!hasDecimal) {
+                        if(!hasDecimal && !hasExponent) {
                             this.emitStrn(".", 1)
                         }
                         this.emitStrn("f", 1)
@@ -2655,7 +2671,7 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
                 }
                 case TypeKind.F64: {
                     if(!isHex && !isBin) {
-                        if(!hasDecimal) {
+                        if(!hasDecimal && !hasExponent) {
                             this.emitStrn(".0", 2)
                         }
                     }

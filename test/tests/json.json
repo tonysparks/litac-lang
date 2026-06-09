@@ -233,5 +233,72 @@
                 assert( strcmp(parser.errorMsg, "Expected token ], got int") == 0)
             `,
         },
+        {
+            "name": "Json Negative Float",
+            "definitions": `
+                import "std/json";
+                import "std/string/builder";
+                import "std/libc";
+
+            `,
+            "code": `
+                var buf : StringBuilder;
+                buf.init(16)
+
+                var parser = JsonParser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson("""
+                    {
+                        "amount": -4.22,
+                        "credit": -100.5,
+                        "debit": 9.99,
+                        "neg_int": -7,
+                        "zero": 0.0
+                    }
+                """)
+
+                assert(node != null)
+                assert(!parser.hasError())
+                assert(node.getFloat("amount", 0.0) == -4.22)
+                assert(node.getFloat("credit", 0.0) == -100.5)
+                assert(node.getFloat("debit", 0.0) == 9.99)
+                assert(node.getInt("neg_int", 0) == -7)
+                assert(node.getFloat("zero", 1.0) == 0.0)
+                node.free()
+            `,
+        },
+        {
+            "name": "Json Negative Float In Array",
+            "definitions": `
+                import "std/json";
+                import "std/string/builder";
+                import "std/libc";
+
+            `,
+            "code": `
+                var buf : StringBuilder;
+                buf.init(16)
+
+                var parser = JsonParser{}
+                parser.init()
+                defer parser.free()
+
+                var node = parser.parseJson("""
+                    [-4.22, -100.5, 9.99, -7, 0.0]
+                """)
+
+                assert(node != null)
+                assert(!parser.hasError())
+                assert(node.size() == 5)
+                assert(node.at(0).asFloat() == -4.22)
+                assert(node.at(1).asFloat() == -100.5)
+                assert(node.at(2).asFloat() == 9.99)
+                assert(node.at(3).asInt() == -7)
+                assert(node.at(4).asFloat() == 0.0)
+                node.free()
+            `,
+        },
     ]
 }
