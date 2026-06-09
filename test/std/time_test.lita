@@ -279,6 +279,15 @@ func testDateTimeFromIsoAndBack() {
 }
 
 @test
+func testDateTimeFromDateOnly() {
+    // Plaid-style date-only strings: "YYYY-MM-DD"
+    var dt = DateTimeFrom($"%Y-%m-%d", $"2024-03-15")
+    assert(dt.year == 2024)
+    assert(dt.month == 3_u8)
+    assert(dt.day == 15_u8)
+}
+
+@test
 func testDateTimeFromIsoEmptyString() {
     // Empty string must return zero DateTime, not year=1900
     var dt = DateTimeFromIso(String{})
