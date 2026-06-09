@@ -277,3 +277,31 @@ func testDateTimeFromIsoAndBack() {
     assert(result.buffer[5]  == '1')
     assert(result.buffer[8]  == '3')
 }
+
+@test
+func testDateTimeFromIsoEmptyString() {
+    // Empty string must return zero DateTime, not year=1900
+    var dt = DateTimeFromIso(String{})
+    assert(dt.year == 0)
+    assert(dt.month == 0_u8)
+    assert(dt.day == 0_u8)
+}
+
+@test
+func testDateTimeFromIsoNullBufferString() {
+    // null-buffer String (length 0) must return zero DateTime
+    var s = String{}
+    var dt = DateTimeFromIso(s)
+    assert(dt.year == 0)
+    assert(dt.month == 0_u8)
+    assert(dt.day == 0_u8)
+}
+
+@test
+func testDateTimeFromIsoInvalidFormat() {
+    // Garbage that strptime cannot parse must return zero DateTime
+    var dt = DateTimeFromIso($"not-a-date")
+    assert(dt.year == 0)
+    assert(dt.month == 0_u8)
+    assert(dt.day == 0_u8)
+}

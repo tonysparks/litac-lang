@@ -334,6 +334,9 @@ internal func DateTimeFormat(
 }
 
 internal func _DateTimeFrom(format: String, value: String) : DateTime {
+    if(value.length < 1) {
+        return DateTime{}
+    }
 
     var formatStr  = [32]char{}
     format.copyTo(formatStr, 31)
@@ -342,7 +345,9 @@ internal func _DateTimeFrom(format: String, value: String) : DateTime {
     value.copyTo(valueStr, 63)
 
     var tm = tm {}
-    strptime(valueStr, formatStr, &tm)
+    if(strptime(valueStr, formatStr, &tm) == null) {
+        return DateTime{}
+    }
 
     return FromTM(&tm)
 }

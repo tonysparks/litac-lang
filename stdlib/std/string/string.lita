@@ -354,9 +354,11 @@ public func (b: String) copyTo(buf: *char, len: i32, addZero: bool = true) : i32
     var maxCopy = (addZero && len > 0) ? len - 1 : len
     var bytesCopied = b.length < maxCopy ? b.length : maxCopy
 
-    memcpy(buf as (*void),
-          (&b.buffer[0]) as (*const void),
-           bytesCopied * sizeof(:char))
+    if(bytesCopied > 0 && b.buffer) {
+        memcpy(buf as (*void),
+              b.buffer as (*const void),
+               bytesCopied * sizeof(:char))
+    }
 
     if(addZero) buf[bytesCopied] = '\0'
 

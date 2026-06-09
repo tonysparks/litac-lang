@@ -1019,3 +1019,40 @@ func testConnectionClose() {
     var r = conn.close()
     assert(r.isOk())
 }
+
+// -----------------------------------------------------------------------
+// Verify closeAndReleaseAll after a failed query does not crash
+// (regression: finalize() passed freed stmt handle to CreateError which
+// then called sqlite3_expanded_sql on it => SEGV in pthread_mutex_lock)
+// -----------------------------------------------------------------------
+
+@test
+func testCloseAndReleaseAllAfterFailedQuery() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+    defer conn.close()
+
+    // Create table with UNIQUE constraint and no ON CONFLICT clause
+    conn.execute("""
+        CREATE TABLE items (id INTEGER PRIMARY KEY, val TEXT UNIQUE NOT NULL);
+    """)
+    assert(!conn.hasError())
+
+    conn.execute("INSERT INTO items (id, val) VALUES (1, 'hello');")
+    assert(!conn.hasError())
+
+    // Insert duplicate val — SQLite will step with SQLITE_CONSTRAINT,
+    // then finalize returns the step error.  closeAndReleaseAll must not crash.
+    var rs: SqlResultSet
+    conn.connection.query(&rs, $"INSERT INTO items (id, val) VALUES (2, 'hello')")
+    rs.hasNext()
+    rs.closeAndReleaseAll()
+
+    // Connection should report an error (SQLITE_CONSTRAINT), not SEGV
+    assert(conn.hasError())
+    assert(!conn.error.isOk())
+}

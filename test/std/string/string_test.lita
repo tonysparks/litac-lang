@@ -210,3 +210,43 @@ func testConstCharHashEquals() {
     assert(a.equals(b))
     assert(!a.equals("world"))
 }
+
+@test
+func testCopyToNullBuffer() {
+    // String with null buffer (zero-initialized) must not crash or UB in copyTo
+    var s = String{}
+    var buf = [16]char{}
+    var n = s.copyTo(buf, 16)
+    assert(n == 0)
+    assert(buf[0] == '\0')
+}
+
+@test
+func testCopyToEmptyString() {
+    var s = $""
+    var buf = [16]char{}
+    var n = s.copyTo(buf, 16)
+    assert(n == 0)
+    assert(buf[0] == '\0')
+}
+
+@test
+func testCopyToNormalString() {
+    var s = $"hello"
+    var buf = [16]char{}
+    var n = s.copyTo(buf, 16)
+    assert(n == 5)
+    assert(buf[0] == 'h')
+    assert(buf[4] == 'o')
+    assert(buf[5] == '\0')
+}
+
+@test
+func testCopyToTruncates() {
+    var s = $"hello world"
+    var buf = [8]char{}
+    var n = s.copyTo(buf, 8)
+    // addZero=true reserves one byte for null terminator, so max copy = 7
+    assert(n == 7)
+    assert(buf[7] == '\0')
+}

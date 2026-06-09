@@ -446,7 +446,7 @@ public func (this: *SqliteStatement) finalize() : SqlResult {
     if (this.conn.hasError()) return this.conn.error
 
     var errorCode = sqlite3_finalize(this.stmt)
-    this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    this.conn.error = CreateError(this.conn, null, errorCode)
     return this.conn.error
 }
 
@@ -457,7 +457,8 @@ public func (this: *SqliteStatement) close() : SqlResult {
     this.results.checkError = false
 
     var errorCode = sqlite3_finalize(this.stmt)
-    this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    // pass null: stmt is already finalized and its handle is invalid
+    this.conn.error = CreateError(this.conn, null, errorCode)
     return this.conn.error
 }
 
