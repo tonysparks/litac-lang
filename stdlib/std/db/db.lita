@@ -140,6 +140,7 @@ public trait SqlResultSet {
     columnType: func(column: i32) : SqlColumnType
 
     statement: func(): SqlStatement
+    rowsAffected: func(): i64
 
     // Closes this result set, the statement and releases both
     closeAndReleaseAll: func(): SqlResult
@@ -159,30 +160,13 @@ public func (this: SqlResult) isEmptyResults() : bool {
            this.category == SqlResultCategory.EMPTY_RESULTS
 }
 
-public func (this: *SqlConnection) query(
-    resultSet: *SqlResultSet,
-    sql: String,
-    $...
-) : SqlResult {
-    if (this.hasError()) return this.lastResult()
-
-    var stmt: SqlStatement;
-    this.prepare(
-        &stmt,
-        sql
-    )
-
-    if(this.hasError()) {
-        return this.lastResult()
-    }
-
+func _bindParams(
+    conn: *SqlConnection,
+    stmt: SqlStatement,
+    list: *va_list,
+    vargs: NativeVararg
+) : bool {
     var index = 1
-
-    var list: va_list
-    va_start(list, sql)
-    defer va_end(list)
-
-    var vargs = va_arg<NativeVararg>(list)
     for(var i = 0; i < vargs.numberOfArgs; i+=1) {
         var typeid = vargs.args[i]
         switch(typeid) {
@@ -193,51 +177,101 @@ public func (this: *SqlConnection) query(
             case typeof(:u16):
             case typeof(:u32):
             case typeof(:i32): {
-                stmt.bindInt32(index, va_arg<i32>(list))
+                stmt.bindInt32(index, va_arg<i32>(*list))
                 break
             }
             case typeof(:usize):
             case typeof(:u64):
             case typeof(:i64): {
-                stmt.bindInt64(index, va_arg<i64>(list))
+                stmt.bindInt64(index, va_arg<i64>(*list))
                 break
             }
             case typeof(:f32):
             case typeof(:f64): {
-                stmt.bindFloat64(index, va_arg<f64>(list))
+                stmt.bindFloat64(index, va_arg<f64>(*list))
                 break
             }
             case typeof(:String): {
-                var str = va_arg<String>(list)
+                var str = va_arg<String>(*list)
                 stmt.bindString(index, str)
                 break
             }
             case typeof(:*const char):
             case typeof(""): {
-                var str = va_arg<*const char>(list)
+                var str = va_arg<*const char>(*list)
                 stmt.bindText(index, str, strlen(str))
                 break
             }
             case typeof(:DateTime): {
-                var datetime = va_arg<DateTime>(list)
+                var datetime = va_arg<DateTime>(*list)
                 stmt.bindDateTime(index, datetime)
                 break
             }
             default: {
-                // TODO: Make this more descriptive error message
-                //var msg = StringBuilderInit(256, defaultAllocator/*this.allocator*/)
-                //msg.append("Unsupported parameter type: %s", nameof(typeid))
-                this.setError(
+                conn.setError(
                     SqlResult {
                         .type = SqlResultType.ERROR,
                         .description = $"Unsupported parameter type"
                     }
                 )
-                return this.lastResult()
+                return false
             }
         }
         index += 1
     }
+    return true
+}
+
+public func (this: *SqlConnection) query(
+    resultSet: *SqlResultSet,
+    sql: String,
+    $...
+) : SqlResult {
+    if (this.hasError()) return this.lastResult()
+
+    var stmt: SqlStatement;
+    this.prepare(&stmt, sql)
+    if(this.hasError()) {
+        return this.lastResult()
+    }
+
+    var list: va_list
+    va_start(list, sql)
+    defer va_end(list)
+
+    var vargs = va_arg<NativeVararg>(list)
+    if(!_bindParams(this, stmt, &list, vargs)) {
+        return this.lastResult()
+    }
 
     return stmt.execute(resultSet)
+}
+
+public func (this: *SqlConnection) update(
+    sql: String,
+    $...
+) : i64 {
+    if (this.hasError()) return 0_i64
+
+    var stmt: SqlStatement;
+    this.prepare(&stmt, sql)
+    if(this.hasError()) {
+        return 0_i64
+    }
+
+    var list: va_list
+    va_start(list, sql)
+    defer va_end(list)
+
+    var vargs = va_arg<NativeVararg>(list)
+    if(!_bindParams(this, stmt, &list, vargs)) {
+        return 0_i64
+    }
+
+    var resultSet: SqlResultSet
+    stmt.execute(&resultSet)
+    resultSet.hasNext()
+    var count = resultSet.rowsAffected()
+    resultSet.closeAndReleaseAll()
+    return count
 }

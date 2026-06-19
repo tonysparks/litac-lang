@@ -1005,6 +1005,48 @@ func testResultSetStatementAccessor() {
 }
 
 // -----------------------------------------------------------------------
+// update() returns rows affected and cleans up automatically
+// -----------------------------------------------------------------------
+
+@test
+func testUpdate() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createTeamTable(&conn)
+    insertNFLTeams(&conn)
+
+    // Update two rows (WI and IL teams to the same division)
+    var affected = conn.connection.update(
+        $"UPDATE team SET state = ? WHERE state = ? OR state = ?",
+        $"NFC", $"WI", $"IL"
+    )
+    assert(!conn.hasError())
+    assert(affected == 2)
+
+    // Verify the other two rows are untouched
+    var rs: SqlResultSet
+    conn.connection.query(&rs, $"SELECT count(*) FROM team WHERE state = ?", $"NFC")
+    assert(rs.hasNext())
+    rs.next()
+    assert(rs.columnInt32(0) == 2)
+    rs.closeAndReleaseAll()
+
+    // Update with no matching rows returns 0
+    var none = conn.connection.update(
+        $"UPDATE team SET state = ? WHERE state = ?",
+        $"XX", $"ZZ"
+    )
+    assert(!conn.hasError())
+    assert(none == 0)
+}
+
+// -----------------------------------------------------------------------
 // Verify connection is idempotently closeable (double-close safety)
 // -----------------------------------------------------------------------
 

@@ -487,6 +487,10 @@ public func (this: *SqliteResultSet) statement() : SqlStatement {
     return this.stmt
 }
 
+public func (this: *SqliteResultSet) rowsAffected() : i64 {
+    return sqlite3_changes(this.stmt.conn.db) as (i64)
+}
+
 public func (this: *SqliteResultSet) closeAndReleaseAll() : SqlResult {
     // release() calls close() internally, so avoid calling close() here
     // to prevent double-finalizing the underlying sqlite3_stmt.

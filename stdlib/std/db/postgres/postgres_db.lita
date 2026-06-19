@@ -5,6 +5,7 @@ import "std/mem"
 import "std/array"
 import "std/time"
 import "std/libc"
+import "std/fmt"
 import "std/db"
 import "std/db/postgres/libpq"
 
@@ -470,6 +471,13 @@ public func (this: *PgStatement) connection() : SqlConnection {
 
 public func (this: *PgResultSet) statement() : SqlStatement {
     return this.stmt
+}
+
+public func (this: *PgResultSet) rowsAffected() : i64 {
+    if(this.result == null) { return 0_i64; }
+    var cmdTuples = PQcmdTuples(this.result)
+    if(cmdTuples == null || *cmdTuples == '\0') { return 0_i64; }
+    return cmdTuples.toString().parseInt().value
 }
 
 public func (this: *PgResultSet) closeAndReleaseAll() : SqlResult {
