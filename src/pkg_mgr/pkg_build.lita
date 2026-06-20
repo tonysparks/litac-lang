@@ -92,8 +92,10 @@ func (this: *PackageManager) build(
     // Inner builds (pre_build, build, post_build) must never run in test mode,
     // even when invoked via 'litac test -prebuild'. testsOnly=true causes the
     // compiler to replace main() with a no-op test runner, breaking pre_build.
-    litaOptions.testsOnly = false
-    litaOptions.testFileOnly = false
+    if(runType != RunType.BUILD) {
+        litaOptions.testsOnly = false
+        litaOptions.testFileOnly = false
+    }
 
     var args = CommandArgs{}
     var result = this.buildCommandArgs(buildCommand, options, &args, runType)
