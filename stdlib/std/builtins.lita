@@ -106,6 +106,10 @@ public @note test {
     disabled: bool = false
 }
 
+public @note replace {
+    target: *const char
+}
+
 public @note packed {
 }
 

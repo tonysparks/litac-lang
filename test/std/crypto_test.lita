@@ -1,4 +1,5 @@
 import "std/crypto/aes"
+import "std/encoding/base64"
 import "std/string/builder"
 import "std/assert"
 import "std/libc"
@@ -126,4 +127,292 @@ func testTruncatedInputFails() {
     defer decrypted.free()
 
     assert(!AES256GCMDecrypt(key as (*const u8), garbage as (*const u8), strlen(garbage), &decrypted))
+}
+
+@test
+func testKeyFromBase64Valid() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // Base64-encode the key, then round-trip through AES256GCMKeyFromBase64
+    var encodedBuf: [64]u8
+    var encodedLen = base64_encode(key as (*u8), encodedBuf as (*u8), 32_usize, 0) as (i32)
+
+    var encodedStr = String {
+        .buffer = encodedBuf as (*const char),
+        .length = encodedLen
+    }
+
+    var decoded: [32]u8
+    assert(AES256GCMKeyFromBase64(encodedStr, decoded as (*u8)))
+    assert(memcmp(key as (*const void), decoded as (*const void), 32_usize) == 0)
+}
+
+@test
+func testKeyFromBase64WrongLength() {
+    // "test" base64 = 4 bytes decoded — not 32
+    var shortB64: *const char = "dGVzdA=="
+    var s = String {
+        .buffer = shortB64,
+        .length = strlen(shortB64) as (i32)
+    }
+    var out: [32]u8
+    assert(!AES256GCMKeyFromBase64(s, out as (*u8)))
+}
+
+@test
+func testBinaryPlaintext() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // Build payload with all 256 byte values (includes null bytes)
+    var payload: [256]u8
+    for(var i = 0; i < 256; i += 1) {
+        payload[i] = i as (u8)
+    }
+
+    var encrypted = StringBuilderInit(512)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), payload as (*const u8), 256, &encrypted))
+
+    var decrypted = StringBuilderInit(512)
+    defer decrypted.free()
+
+    assert(AES256GCMDecrypt(key as (*const u8), encrypted.buffer as (*const u8), encrypted.length, &decrypted))
+    assert(decrypted.length == 256)
+    assert(memcmp(payload as (*const void), decrypted.buffer as (*const void), 256_usize) == 0)
+}
+
+@test
+func testSingleBytePlaintext() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var plaintext: u8 = 0x42_u8
+
+    var encrypted = StringBuilderInit(64)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), &plaintext, 1, &encrypted))
+
+    var decrypted = StringBuilderInit(64)
+    defer decrypted.free()
+
+    assert(AES256GCMDecrypt(key as (*const u8), encrypted.buffer as (*const u8), encrypted.length, &decrypted))
+    assert(decrypted.length == 1)
+    assert(decrypted.buffer[0] == plaintext as (i8))
+}
+
+@test
+func testMultiBlockPayload() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // 1000 bytes — many AES blocks, tests block chaining correctness
+    var payload: [1000]u8
+    for(var i = 0; i < 1000; i += 1) {
+        payload[i] = (i % 251) as (u8)   // 251 is prime, gives non-trivial pattern
+    }
+
+    var encrypted = StringBuilderInit(2000)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), payload as (*const u8), 1000, &encrypted))
+
+    var decrypted = StringBuilderInit(2000)
+    defer decrypted.free()
+
+    assert(AES256GCMDecrypt(key as (*const u8), encrypted.buffer as (*const u8), encrypted.length, &decrypted))
+    assert(decrypted.length == 1000)
+    assert(memcmp(payload as (*const void), decrypted.buffer as (*const void), 1000_usize) == 0)
+}
+
+@test
+func testSequentialOperations() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // Multiple sequential encrypt/decrypt pairs — verifies no state leaks between calls
+    var msg0: *const char = "first"
+    var msg1: *const char = "second message"
+    var msg2: *const char = "third message is the longest of the three payloads here"
+
+    var msgs: [3]*const char
+    msgs[0] = msg0
+    msgs[1] = msg1
+    msgs[2] = msg2
+
+    for(var i = 0; i < 3; i += 1) {
+        var msg = msgs[i]
+        var msgLen = strlen(msg) as (i32)
+
+        var enc = StringBuilderInit(256)
+        defer enc.free()
+
+        assert(AES256GCMEncrypt(key as (*const u8), msg as (*const u8), msgLen, &enc))
+
+        var dec = StringBuilderInit(256)
+        defer dec.free()
+
+        assert(AES256GCMDecrypt(key as (*const u8), enc.buffer as (*const u8), enc.length, &dec))
+        assert(dec.length == msgLen)
+        assert(strncmp(dec.buffer, msg, msgLen as (usize)) == 0)
+    }
+}
+
+@test
+func testEncryptedOutputIsBase64() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var plaintext: *const char = "hello"
+
+    var encrypted = StringBuilderInit(128)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), plaintext as (*const u8), strlen(plaintext), &encrypted))
+
+    // Valid base64 contains only A-Z a-z 0-9 + / and = padding
+    for(var i = 0; i < encrypted.length; i += 1) {
+        var c = encrypted.buffer[i] as (u8)
+        var isUpper  = c >= 'A' as (u8) && c <= 'Z' as (u8)
+        var isLower  = c >= 'a' as (u8) && c <= 'z' as (u8)
+        var isDigit  = c >= '0' as (u8) && c <= '9' as (u8)
+        var isSymbol = c == '+' as (u8) || c == '/' as (u8) || c == '=' as (u8)
+        assert(isUpper || isLower || isDigit || isSymbol)
+    }
+
+    // Length must be a multiple of 4
+    assert(encrypted.length % 4 == 0)
+}
+
+@test
+func testEncryptedLengthMatchesOverhead() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // For N bytes of plaintext the binary payload is N + AES256GCM_OVERHEAD bytes.
+    // Base64 of that is ceil((N + 28) / 3) * 4 bytes.
+    var plaintext: *const char = "hello world!"
+    var ptLen = strlen(plaintext) as (i32)
+
+    var encrypted = StringBuilderInit(128)
+    defer encrypted.free()
+
+    assert(AES256GCMEncrypt(key as (*const u8), plaintext as (*const u8), ptLen, &encrypted))
+
+    var binaryLen = ptLen + AES256GCM_OVERHEAD
+    var expectedEncodedLen = ((binaryLen + 2) / 3) * 4
+    assert(encrypted.length == expectedEncodedLen)
+}
+
+// ---------------------------------------------------------------------------
+// Buffer overrun / overflow guard tests
+// ---------------------------------------------------------------------------
+
+@test
+func testEncryptNegativeLen() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    assert(!AES256GCMEncrypt(key as (*const u8), null, -1, &sb))
+}
+
+@test
+func testEncryptOversizeLen() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    // One byte over the 64 MiB ceiling — rejected before any allocation
+    assert(!AES256GCMEncrypt(key as (*const u8), null, 64 * 1024 * 1024 + 1, &sb))
+}
+
+@test
+func testEncryptMaxI32Len() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    // MAX_I32 would overflow (AES256GCM_OVERHEAD + MAX_I32); the limit guard must catch it
+    assert(!AES256GCMEncrypt(key as (*const u8), null, 0x7fffffff, &sb))
+}
+
+@test
+func testDecryptNegativeLen() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    assert(!AES256GCMDecrypt(key as (*const u8), null, -1, &sb))
+}
+
+@test
+func testDecryptOversizeLen() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    assert(!AES256GCMDecrypt(key as (*const u8), null, 64 * 1024 * 1024 + 1, &sb))
+}
+
+@test
+func testDecryptMaxI32Len() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    // MAX_I32 would overflow internal length arithmetic; the limit guard must catch it
+    assert(!AES256GCMDecrypt(key as (*const u8), null, 0x7fffffff, &sb))
+}
+
+@test
+func testDecryptDecodesToJustUnderOverhead() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // 27 bytes < AES256GCM_OVERHEAD (28) — must be rejected after base64 decode
+    var raw: [27]u8
+    memset(raw as (*void), 0x41, 27_usize)
+
+    var encoded: [40]u8
+    var encodedLen = base64_encode(raw as (*u8), encoded as (*u8), 27_usize, 0) as (i32)
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    assert(!AES256GCMDecrypt(key as (*const u8), encoded as (*const u8), encodedLen, &sb))
+}
+
+@test
+func testDecryptGarbageAtExactOverhead() {
+    var key: [32]u8
+    makeTestKey(key as (*u8))
+
+    // 28 bytes decoded = nonce(12) + tag(16), ctLen = 0.
+    // Passes the length checks but authentication must fail for random garbage.
+    var raw: [28]u8
+    memset(raw as (*void), 0x42, 28_usize)
+
+    var encoded: [44]u8
+    var encodedLen = base64_encode(raw as (*u8), encoded as (*u8), 28_usize, 0) as (i32)
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    assert(!AES256GCMDecrypt(key as (*const u8), encoded as (*const u8), encodedLen, &sb))
 }

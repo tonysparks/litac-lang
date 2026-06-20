@@ -159,9 +159,18 @@ public func (this: using *CGen) emitFuncDecl(decl: *FuncDecl) {
         return;
     }
 
+    if(decl.sym.flags & SymbolFlags.IS_REPLACE) {
+        return;
+    }
+
     decl.sym.flags |= SymbolFlags.IS_EMITTED
 
     var name = this.cName(decl.sym)
+
+    if(this.lita.options.testsOnly && decl.sym.replacedBySym != null) {
+        decl = decl.sym.replacedBySym.decl as (*FuncDecl)
+    }
+
     this.emitFuncDeclSignature(decl, name)
     this.emitStrn(" {", 2)
     // mark our current index into this function, so that

@@ -1,0 +1,30 @@
+import "std/assert"
+import "std/libc"
+import "replace_helper"
+
+@replace("replace_helper::add")
+func mock_add(a: i32, b: i32) : i32 {
+    return 100
+}
+
+@replace("replace_helper::multiply")
+func mock_multiply(a: i32, b: i32) : i32 {
+    return 999
+}
+
+@test
+func testReplaceBasic() {
+    assert(add(1, 2) == 100)
+}
+
+@test
+func testReplaceMultipleFunctions() {
+    assert(multiply(3, 4) == 999)
+    assert(add(10, 20) == 100)
+}
+
+@test
+func testOriginalBodyNotCalled() {
+    // if replacement body isn't used, add(0, 0) returns 0, not 100
+    assert(add(0, 0) == 100)
+}
