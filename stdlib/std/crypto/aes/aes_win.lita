@@ -152,11 +152,11 @@ public func AES256GCMEncrypt(key: *const u8, plaintext: *const u8, plaintextLen:
     authInfo.cbTag   = AES256GCM_TAG_SIZE as (u32)
 
     // For empty plaintext, use a valid dummy pointer; BCrypt still produces the tag
-    var emptyByte: u8 = 0
+    var emptyByte: u8 = 0_u8
     var ptPtr = (plaintextLen > 0) ? plaintext as (*u8) : &emptyByte
     var ctPtr = (plaintextLen > 0) ? ctBuf      : &emptyByte
 
-    var written: u32 = 0
+    var written: u32 = 0_u32
     if(BCryptEncrypt(hKey, ptPtr, plaintextLen as (u32), (&authInfo) as (*void),
                      null, 0_u32, ctPtr, plaintextLen as (u32), &written, 0_u32) < 0) {
         return false
@@ -256,11 +256,11 @@ public func AES256GCMDecrypt(key: *const u8, encoded: *const u8, encodedLen: i32
     authInfo.pbTag   = tagBuf
     authInfo.cbTag   = AES256GCM_TAG_SIZE as (u32)
 
-    var emptyByte: u8 = 0
+    var emptyByte: u8 = 0_u8
     var ctPtr = (ctLen > 0) ? ctBuf        : &emptyByte
     var ptPtr = (ctLen > 0) ? plaintextBuf : &emptyByte
 
-    var written: u32 = 0
+    var written: u32 = 0_u32
     if(BCryptDecrypt(hKey, ctPtr, ctLen as (u32), (&authInfo) as (*void),
                      null, 0_u32, ptPtr, ctLen as (u32), &written, 0_u32) < 0) {
         return false
