@@ -815,3 +815,81 @@ public func (this: *TypeChecker) resolveTypedefDecl(typedefDecl: *TypedefDecl) :
     // nothing to type check
     return true
 }
+
+func FuncSignaturesMatch(a: *TypeInfo, b: *TypeInfo) : bool {
+    if(a.funcDecl.params.size() != b.funcDecl.params.size()) {
+        return false
+    }
+    if(!a.returnType.strictEquals(b.returnType)) {
+        return false
+    }
+    for(var i = 0; i < a.funcDecl.params.size(); i += 1) {
+        var pa = a.funcDecl.params.get(i)
+        var pb = b.funcDecl.params.get(i)
+        if(!pa.typeInfo.strictEquals(pb.typeInfo)) {
+            return false
+        }
+    }
+    return true
+}
+
+public func (this: *TypeChecker) resolveReplacements() {
+    for(var i = 0; i < this.replaceSyms.size(); i += 1) {
+        var sym = this.replaceSyms.get(i)
+        var funcDecl = sym.decl as (*FuncDecl)
+        var note = funcDecl.getNote("replace")
+        if(!note || note.arguments.empty()) {
+            this.result.addError(funcDecl.startPos, "@replace requires a target function name argument")
+            continue
+        }
+
+        var arg = note.arguments.get(0)
+        if(arg.argExpr.kind != StmtKind.STRING_EXPR) {
+            this.result.addError(funcDecl.startPos, "@replace argument must be a string literal")
+            continue
+        }
+
+        var targetName = (arg.argExpr as (*StringExpr)).string.str
+        var internedTarget = this.lita.strings.internCopy(targetName.buffer, targetName.length)
+
+        this.enterModule(sym.declared)
+        var errorsBefore = this.errors()
+        var targetSym = this.getTypeByName(internedTarget, SearchType.FUNC)
+        this.leaveModule()
+
+        if(!targetSym) {
+            if(this.errors() == errorsBefore) {
+                this.result.addError(funcDecl.startPos,
+                    "@replace: target function '%.*s' not found",
+                    targetName.length, targetName.buffer)
+            }
+            continue
+        }
+
+        if(targetSym.flags & SymbolFlags.IS_FOREIGN) {
+            this.result.addError(funcDecl.startPos,
+                "@replace: cannot replace '@foreign' function '%.*s'",
+                targetName.length, targetName.buffer)
+            continue
+        }
+
+        if(targetSym.replacedBySym != null) {
+            var existing = targetSym.replacedBySym
+            this.result.addError(funcDecl.startPos,
+                "@replace: '%.*s' already has a replacement defined at %s:%d",
+                targetName.length, targetName.buffer,
+                existing.decl.startPos.filename,
+                existing.decl.startPos.lineNumber)
+            continue
+        }
+
+        if(!FuncSignaturesMatch(sym.type, targetSym.type)) {
+            this.result.addError(funcDecl.startPos,
+                "@replace: signature of replacement does not match '%.*s'",
+                targetName.length, targetName.buffer)
+            continue
+        }
+
+        targetSym.replacedBySym = sym
+    }
+}
