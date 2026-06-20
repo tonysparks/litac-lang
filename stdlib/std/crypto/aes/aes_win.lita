@@ -1,0 +1,271 @@
+import "std/mem" as mem
+import "std/string/builder"
+import "std/encoding/base64"
+import "std/libc"
+import "std/crypto/random"
+
+@raw("""
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <bcrypt.h>
+""");
+
+@compiler_option(
+    .os = "windows",
+    .options = "-lbcrypt"
+);
+
+// ---------------------------------------------------------------------------
+// BCrypt CNG bindings
+// ---------------------------------------------------------------------------
+
+@foreign const BCRYPT_AES_ALGORITHM:   *u16;
+@foreign const BCRYPT_CHAINING_MODE:   *u16;
+@foreign const BCRYPT_CHAIN_MODE_GCM:  *u16;
+
+// sizeof(BCRYPT_CHAIN_MODE_GCM) = sizeof(L"ChainingModeGCM") = 16 chars * 2 bytes
+const BCRYPT_CHAIN_MODE_GCM_SIZE: u32 = 32
+
+@foreign
+struct BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO {
+    cbSize:        u32
+    dwInfoVersion: u32
+    pbNonce:       *u8
+    cbNonce:       u32
+    pbAuthData:    *u8
+    cbAuthData:    u32
+    pbTag:         *u8
+    cbTag:         u32
+    pbMacContext:  *u8
+    cbMacContext:  u32
+    cbAAD:         u32
+    cbData:        u64
+    dwFlags:       u32
+}
+
+@foreign
+func BCryptOpenAlgorithmProvider(phAlg: **void, pszAlgId: *u16, pszImpl: *u16, dwFlags: u32) : i32;
+
+@foreign
+func BCryptCloseAlgorithmProvider(hAlg: *void, dwFlags: u32) : i32;
+
+@foreign
+func BCryptSetProperty(hObj: *void, pszProp: *u16, pbInput: *u8, cbInput: u32, dwFlags: u32) : i32;
+
+@foreign
+func BCryptGenerateSymmetricKey(hAlg: *void, phKey: **void, pbKeyObj: *u8, cbKeyObj: u32,
+                                pbSecret: *u8, cbSecret: u32, dwFlags: u32) : i32;
+
+@foreign
+func BCryptDestroyKey(hKey: *void) : i32;
+
+@foreign
+func BCryptEncrypt(hKey: *void, pbInput: *u8, cbInput: u32, pPadding: *void,
+                   pbIV: *u8, cbIV: u32, pbOutput: *u8, cbOutput: u32,
+                   pcbResult: *u32, dwFlags: u32) : i32;
+
+@foreign
+func BCryptDecrypt(hKey: *void, pbInput: *u8, cbInput: u32, pPadding: *void,
+                   pbIV: *u8, cbIV: u32, pbOutput: *u8, cbOutput: u32,
+                   pcbResult: *u32, dwFlags: u32) : i32;
+
+// ---------------------------------------------------------------------------
+// Public API (same wire format as aes_openssl: base64(nonce || ciphertext || tag))
+// ---------------------------------------------------------------------------
+
+public const AES256GCM_KEY_SIZE:   i32 = 32
+public const AES256GCM_NONCE_SIZE: i32 = 12
+public const AES256GCM_TAG_SIZE:   i32 = 16
+public const AES256GCM_OVERHEAD:   i32 = 28   // nonce (12) + tag (16)
+
+const AES256GCM_MAX_PLAINTEXT_LEN: i32 = 64 * 1024 * 1024
+
+func initAuthInfo(authInfo: *BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO) {
+    memset(authInfo as (*void), 0, sizeof(:BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO))
+    authInfo.cbSize        = sizeof(:BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO) as (u32)
+    authInfo.dwInfoVersion = 1_u32  // BCRYPT_AUTHENTICATED_TAG_LENGTH_FACTOR
+}
+
+func openAesGcm(phAlg: **void) : bool {
+    if(BCryptOpenAlgorithmProvider(phAlg, BCRYPT_AES_ALGORITHM, null, 0_u32) < 0) {
+        return false
+    }
+    return BCryptSetProperty(*phAlg, BCRYPT_CHAINING_MODE,
+                             BCRYPT_CHAIN_MODE_GCM as (*u8),
+                             BCRYPT_CHAIN_MODE_GCM_SIZE, 0_u32) >= 0
+}
+
+func loadKey(hAlg: *void, key: *const u8, phKey: **void) : bool {
+    return BCryptGenerateSymmetricKey(hAlg, phKey, null, 0_u32,
+                                      key as (*u8), AES256GCM_KEY_SIZE as (u32), 0_u32) >= 0
+}
+
+/*
+ * Encrypts plaintext and writes base64(nonce || ciphertext || tag) into sb.
+ * key must be AES256GCM_KEY_SIZE bytes. Returns false on failure.
+ */
+public func AES256GCMEncrypt(key: *const u8, plaintext: *const u8, plaintextLen: i32,
+                             sb: *StringBuilder,
+                             alloc: *const mem::Allocator = mem::defaultAllocator) : bool {
+    if(plaintextLen < 0 || plaintextLen > AES256GCM_MAX_PLAINTEXT_LEN) {
+        return false
+    }
+
+    // binary = [12 nonce][plaintextLen ciphertext][16 tag]
+    var binaryLen = AES256GCM_OVERHEAD + plaintextLen
+    var binary = alloc.alloc(binaryLen as (usize)) as (*u8)
+    if(!binary) {
+        return false
+    }
+    defer alloc.free(binary as (*void))
+
+    var r1 = SecureRandom64()
+    var r2 = SecureRandom64()
+    memcpy((&binary[0]) as (*void), (&r1) as (*const void), 8_usize)
+    memcpy((&binary[8]) as (*void), (&r2) as (*const void), 4_usize)
+
+    var nonce  = binary as (*const u8)
+    var ctBuf  = &binary[AES256GCM_NONCE_SIZE]
+    var tagBuf = &binary[AES256GCM_NONCE_SIZE + plaintextLen]
+
+    var hAlg: *void = null
+    var hKey: *void = null
+    var ok = false
+
+    defer {
+        if(hKey != null) { ;BCryptDestroyKey(hKey) }
+        if(hAlg != null) { ;BCryptCloseAlgorithmProvider(hAlg, 0_u32) }
+    }
+
+    if(!openAesGcm(&hAlg)) {
+        return false
+    }
+    if(!loadKey(hAlg, key, &hKey)) {
+        return false
+    }
+
+    var authInfo: BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO
+    initAuthInfo(&authInfo)
+    authInfo.pbNonce = nonce as (*u8)
+    authInfo.cbNonce = AES256GCM_NONCE_SIZE as (u32)
+    authInfo.pbTag   = tagBuf
+    authInfo.cbTag   = AES256GCM_TAG_SIZE as (u32)
+
+    // For empty plaintext, use a valid dummy pointer; BCrypt still produces the tag
+    var emptyByte: u8 = 0
+    var ptPtr = (plaintextLen > 0) ? plaintext as (*u8) : &emptyByte
+    var ctPtr = (plaintextLen > 0) ? ctBuf      : &emptyByte
+
+    var written: u32 = 0
+    if(BCryptEncrypt(hKey, ptPtr, plaintextLen as (u32), (&authInfo) as (*void),
+                     null, 0_u32, ctPtr, plaintextLen as (u32), &written, 0_u32) < 0) {
+        return false
+    }
+
+    ok = true
+
+    var encodedMaxLen = ((binaryLen + 2) / 3) * 4 + 1
+    var encoded = alloc.alloc(encodedMaxLen as (usize)) as (*u8)
+    if(!encoded) {
+        return false
+    }
+    defer alloc.free(encoded as (*void))
+
+    var encodedLen = base64_encode(binary, encoded, binaryLen as (usize), 0) as (i32)
+    sb.appendStrn(encoded as (*const char), encodedLen)
+    return true
+}
+
+/*
+ * Decodes a base64-encoded AES-256-GCM key into `out` (must point to >= 32 bytes).
+ * Returns true if exactly 32 bytes were decoded.
+ */
+public func AES256GCMKeyFromBase64(encoded: String, out: *u8) : bool {
+    var decoded = base64_decode(
+        encoded.buffer as (*const u8),
+        out,
+        encoded.length as (usize)
+    ) as (i32)
+    return decoded == AES256GCM_KEY_SIZE
+}
+
+/*
+ * Decrypts base64(nonce || ciphertext || tag) and writes plaintext into sb.
+ * Returns false on authentication failure or malformed input.
+ */
+public func AES256GCMDecrypt(key: *const u8, encoded: *const u8, encodedLen: i32,
+                             sb: *StringBuilder,
+                             alloc: *const mem::Allocator = mem::defaultAllocator) : bool {
+    if(encodedLen < 0 || encodedLen > AES256GCM_MAX_PLAINTEXT_LEN) {
+        return false
+    }
+
+    var binary = alloc.alloc(encodedLen as (usize)) as (*u8)
+    if(!binary) {
+        return false
+    }
+    defer {
+        memset(binary as (*void), 0, encodedLen as (usize))
+        alloc.free(binary as (*void))
+    }
+
+    var decodedLen = base64_decode(encoded, binary, encodedLen as (usize)) as (i32)
+    if(decodedLen < AES256GCM_OVERHEAD) {
+        return false
+    }
+
+    var nonce       = binary as (*const u8)
+    var ctAndTagLen = decodedLen - AES256GCM_NONCE_SIZE
+    var ctLen       = ctAndTagLen - AES256GCM_TAG_SIZE
+    if(ctLen < 0) {
+        return false
+    }
+
+    var ctBuf  = &binary[AES256GCM_NONCE_SIZE]
+    var tagBuf = &binary[AES256GCM_NONCE_SIZE + ctLen]
+
+    // +1 so zero-length plaintext still has a valid allocation to zero on exit
+    var plaintextBuf = alloc.alloc((ctLen + 1) as (usize)) as (*u8)
+    if(!plaintextBuf) {
+        return false
+    }
+    defer {
+        memset(plaintextBuf as (*void), 0, (ctLen + 1) as (usize))
+        alloc.free(plaintextBuf as (*void))
+    }
+
+    var hAlg: *void = null
+    var hKey: *void = null
+
+    defer {
+        if(hKey != null) { ;BCryptDestroyKey(hKey) }
+        if(hAlg != null) { ;BCryptCloseAlgorithmProvider(hAlg, 0_u32) }
+    }
+
+    if(!openAesGcm(&hAlg)) {
+        return false
+    }
+    if(!loadKey(hAlg, key, &hKey)) {
+        return false
+    }
+
+    var authInfo: BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO
+    initAuthInfo(&authInfo)
+    authInfo.pbNonce = nonce as (*u8)
+    authInfo.cbNonce = AES256GCM_NONCE_SIZE as (u32)
+    authInfo.pbTag   = tagBuf
+    authInfo.cbTag   = AES256GCM_TAG_SIZE as (u32)
+
+    var emptyByte: u8 = 0
+    var ctPtr = (ctLen > 0) ? ctBuf        : &emptyByte
+    var ptPtr = (ctLen > 0) ? plaintextBuf : &emptyByte
+
+    var written: u32 = 0
+    if(BCryptDecrypt(hKey, ctPtr, ctLen as (u32), (&authInfo) as (*void),
+                     null, 0_u32, ptPtr, ctLen as (u32), &written, 0_u32) < 0) {
+        return false
+    }
+
+    sb.appendStrn(plaintextBuf as (*const char), ctLen)
+    return true
+}
