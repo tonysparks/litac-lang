@@ -83,13 +83,13 @@ public func MigratorInit(
     conn:          SqlConnection,
     migrationsDir: String,
     tableName:     String = $"schema_migrations",
-    alloc:         *const Allocator = defaultAllocator
+    allocator:     *const Allocator = defaultAllocator
 ) : Migrator {
     return Migrator {
         .conn          = conn,
         .migrationsDir = migrationsDir,
         .tableName     = tableName,
-        .allocator     = alloc,
+        .allocator     = allocator,
     }
 }
 
