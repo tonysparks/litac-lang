@@ -161,6 +161,34 @@
         },
 
         {
+            "name" : "Named Ptr-to-Aggregate Arg With Aggregate Param At Same Position",
+            "definitions": `
+                struct Foo { x: i32 }
+                struct Bar { y: i32 }
+
+                func Test(
+                    a: Foo,
+                    b: *Bar
+                ) : i32 {
+                    if(b == null) {
+                        return -1
+                    }
+                    return a.x + b.y
+                }
+            `,
+            "code": `
+                var bar = Bar{.y = 99}
+                // regression: coerceFuncArgs used to look up the positional param
+                // type for named args. Here .b comes first in suppliedArgs (index 0),
+                // so it was matched against param a (Foo) instead of param b (*Bar).
+                // IsAggregate(Foo) && IsPtrAggregate(*Bar) fired, wrapping &bar in *
+                // and turning *Bar into Bar, causing a type mismatch.
+                assert(Test(.b = &bar, .a = Foo{.x = 1}) == 100)
+                assert(Test(.a = Foo{.x = 5}, .b = &bar) == 104)
+            `,
+        },
+
+        {
             "name" : "Invalid Named Parameters With Func Ptr",
             "definitions": `
                 func Test(a: i32=1, b: i32=2) : i32 {

@@ -270,8 +270,21 @@ func (this: *TypeChecker) coerceFuncArgs(expr: *FuncCallExpr,
     else {
         var funcInfo  = funcType
         for(var i = 0; i < funcInfo.funcDecl.params.size() && i < suppliedArgs.size(); i += 1) {
-            var argExpr = suppliedArgs.get(i).argExpr
+            var callArg = suppliedArgs.getPtr(i)
+            var argExpr = callArg.argExpr
             var paramInfo = funcInfo.funcDecl.params.get(i).typeInfo
+
+            // Named args don't have to be in parameter order; look up the
+            // correct parameter so coerceFuncArg uses the right type
+            if(callArg.argName.token.type == TokenType.IDENTIFIER) {
+                for(var j = 0; j < funcInfo.funcDecl.params.size(); j += 1) {
+                    var param = funcInfo.funcDecl.params.get(j)
+                    if(param.name.str.equals(callArg.argName.str)) {
+                        paramInfo = param.typeInfo
+                        break
+                    }
+                }
+            }
 
             if(!this.coerceFuncArg(expr, i, argExpr, paramInfo, suppliedArgs)) {
                 return false
