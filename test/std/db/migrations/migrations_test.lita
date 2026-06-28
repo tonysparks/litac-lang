@@ -230,12 +230,12 @@ func testMigrateRecordsTrackingRow() {
     rs.next()
 
     assert(rs.columnInt64(0) == 7_i64)
-    assert(rs.columnString(1).equalsString("some_change"))
+    assert(rs.columnStringView(1).equalsString("some_change"))
 
-    var checksum = rs.columnString(2)
+    var checksum = rs.columnStringView(2)
     assert(checksum.length == 40)   // 40-char hex SHA1
 
-    var appliedAt = rs.columnString(3)
+    var appliedAt = rs.columnStringView(3)
     assert(appliedAt.length > 0)    // ISO 8601 timestamp was recorded
 
     rs.closeAndReleaseAll()
@@ -397,7 +397,7 @@ func testMigrateSemicolonInsideStringLiteral() {
     assert(r.isOk())
     assert(rs.hasNext())
     rs.next()
-    assert(rs.columnString(0).equalsString("a;b;c"))
+    assert(rs.columnStringView(0).equalsString("a;b;c"))
     rs.closeAndReleaseAll()
 }
 

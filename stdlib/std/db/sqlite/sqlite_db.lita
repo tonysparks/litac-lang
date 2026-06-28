@@ -531,8 +531,15 @@ public func (this: *SqliteResultSet) columnCount() : i32 {
     return sqlite3_data_count(this.stmt.stmt)
 }
 
-public func (this: *SqliteResultSet) columnBlob(column: i32) : *const void {
+public func (this: *SqliteResultSet) columnBlobView(column: i32) : *const void {
     return sqlite3_column_blob(this.stmt.stmt, column)
+}
+
+public func (this: *SqliteResultSet) columnBlobCopy(column: i32, allocator: *const Allocator) : String {
+    var ptr = sqlite3_column_blob(this.stmt.stmt, column) as (*const char)
+    if(ptr == null) { return $"" }
+    var size = sqlite3_column_bytes(this.stmt.stmt, column)
+    return StringInit(ptr, size).copy(allocator)
 }
 
 public func (this: *SqliteResultSet) columnDouble(column: i32) : f64 {
@@ -547,16 +554,26 @@ public func (this: *SqliteResultSet) columnInt64(column: i32) : i64 {
     return sqlite3_column_int64(this.stmt.stmt, column)
 }
 
-public func (this: *SqliteResultSet) columnText(column: i32) : *const char {
+public func (this: *SqliteResultSet) columnTextView(column: i32) : *const char {
     return sqlite3_column_text(this.stmt.stmt, column) as (*const char)
 }
 
-public func (this: *SqliteResultSet) columnString(column: i32) : String {
-    return this.columnText(column).toString()
+public func (this: *SqliteResultSet) columnTextCopy(column: i32, allocator: *const Allocator) : String {
+    return this.columnStringView(column).copy(allocator)
+}
+
+public func (this: *SqliteResultSet) columnStringView(column: i32) : String {
+    var ptr = this.columnTextView(column)
+    if(ptr == null) { return $"" }
+    return ptr.toString()
+}
+
+public func (this: *SqliteResultSet) columnStringCopy(column: i32, allocator: *const Allocator) : String {
+    return this.columnStringView(column).copy(allocator)
 }
 
 public func (this: *SqliteResultSet) columnDateTime(column: i32) : DateTime {
-    var ptr = this.columnText(column)
+    var ptr = this.columnTextView(column)
     if(ptr == null) {
         return DateTime{}
     }

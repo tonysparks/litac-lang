@@ -499,8 +499,16 @@ public func (this: *PgResultSet) columnCount() : i32 {
     return PQnfields(this.result)
 }
 
-public func (this: *PgResultSet) columnBlob(column: i32) : *const void {
+public func (this: *PgResultSet) columnBlobView(column: i32) : *const void {
     return PQgetvalue(this.result, this.currentRow, column) as (*const void)
+}
+
+public func (this: *PgResultSet) columnBlobCopy(column: i32, allocator: *const Allocator) : String {
+    if(PQgetisnull(this.result, this.currentRow, column) != 0) { return $"" }
+    var ptr = PQgetvalue(this.result, this.currentRow, column)
+    if(ptr == null) { return $"" }
+    var size = PQgetlength(this.result, this.currentRow, column)
+    return StringInit(ptr, size).copy(allocator)
 }
 
 public func (this: *PgResultSet) columnInt32(column: i32) : i32 {
@@ -521,20 +529,28 @@ public func (this: *PgResultSet) columnDouble(column: i32) : f64 {
     return s != null ? strtod(s, null) : 0.0
 }
 
-public func (this: *PgResultSet) columnText(column: i32) : *const char {
+public func (this: *PgResultSet) columnTextView(column: i32) : *const char {
     if(PQgetisnull(this.result, this.currentRow, column) != 0) { return null; }
     return PQgetvalue(this.result, this.currentRow, column)
 }
 
-public func (this: *PgResultSet) columnString(column: i32) : String {
-    var text = this.columnText(column)
+public func (this: *PgResultSet) columnTextCopy(column: i32, allocator: *const Allocator) : String {
+    return this.columnStringView(column).copy(allocator)
+}
+
+public func (this: *PgResultSet) columnStringView(column: i32) : String {
+    var text = this.columnTextView(column)
     if(text == null) { return $""; }
     var len = PQgetlength(this.result, this.currentRow, column)
     return StringInit(text, len)
 }
 
+public func (this: *PgResultSet) columnStringCopy(column: i32, allocator: *const Allocator) : String {
+    return this.columnStringView(column).copy(allocator)
+}
+
 public func (this: *PgResultSet) columnDateTime(column: i32) : DateTime {
-    var ptr = this.columnText(column)
+    var ptr = this.columnTextView(column)
     if(ptr == null) { return DateTime{}; }
     var value = ptr.toString()
     if(value.empty()) { return DateTime{}; }

@@ -428,7 +428,7 @@ fn EmitDBFunctions(sym) {
                 emit(
                 `
                 {
-                    var _colVal = resultSet.columnText(fromIndex += 1)
+                    var _colVal = resultSet.columnTextView(fromIndex += 1)
                     if(_colVal != null) {
                         len = sb.append("%%s", _colVal)
                         this.${columnName} = StringInit(sb.buffer + (sb.length - len), len)

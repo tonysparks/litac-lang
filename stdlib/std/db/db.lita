@@ -130,12 +130,15 @@ public trait SqlResultSet {
     hasNext: func() : bool
     next: func() : SqlResult
     columnCount: func() : i32
-    columnBlob: func(column: i32) : *const void
+    columnBlobView: func(column: i32) : *const void
+    columnBlobCopy: func(column: i32, allocator: *const Allocator) : String
     columnDouble: func(column: i32) : f64
     columnInt32: func(column: i32) : i32
     columnInt64: func(column: i32) : i64
-    columnText: func(column: i32) : *const char
-    columnString: func(column: i32) : String
+    columnTextView: func(column: i32) : *const char
+    columnTextCopy: func(column: i32, allocator: *const Allocator) : String
+    columnStringView: func(column: i32) : String
+    columnStringCopy: func(column: i32, allocator: *const Allocator) : String
     columnDateTime: func(column: i32) : DateTime
     columnType: func(column: i32) : SqlColumnType
 

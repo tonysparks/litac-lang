@@ -98,7 +98,7 @@ func testSelect() {
     while(rs.hasNext()) {
         assert(rs.next().isOk())
         var id    = rs.columnInt32(0)
-        var label = rs.columnString(1)
+        var label = rs.columnStringView(1)
         var score = rs.columnDouble(2)
         assert(id > 0)
         assert(label.length > 0)
@@ -128,8 +128,8 @@ func testNullColumn() {
     assert(rs.next().isOk())
 
     assert(rs.columnInt32(0) > 0)
-    assert(rs.columnText(1) == null)
-    assert(rs.columnString(1).equals($""))
+    assert(rs.columnTextView(1) == null)
+    assert(rs.columnStringView(1).equals($""))
 }
 
 @test

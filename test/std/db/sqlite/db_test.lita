@@ -414,12 +414,12 @@ func testRawStatementApi() {
     var id = rs.columnInt64(0)
     assert(id > 0)
 
-    // columnText
-    var nameText = rs.columnText(1)
+    // columnTextView
+    var nameText = rs.columnTextView(1)
     assert(strcmp(nameText, "Green Bay Packers") == 0)
 
-    // columnString
-    var cityStr = rs.columnString(2)
+    // columnStringView
+    var cityStr = rs.columnStringView(2)
     assert(cityStr.equals($"Green Bay"))
 
     // columnType
@@ -438,7 +438,7 @@ func testRawStatementApi() {
     stmt.execute(&rs)
     assert(rs.hasNext())
     rs.next()
-    assert(strcmp(rs.columnText(1), "Chicago Bears") == 0)
+    assert(strcmp(rs.columnTextView(1), "Chicago Bears") == 0)
 
     // finalize explicitly
     stmt.finalize()
@@ -448,8 +448,8 @@ func testRawStatementApi() {
 // -----------------------------------------------------------------------
 // bindInt32, bindInt64, bindFloat64, bindNull, bindBlob, bindBlob64,
 // bindText, bindText64, bindString
-// columnInt32, columnInt64, columnDouble, columnText, columnString,
-// columnBlob, columnType, columnCount
+// columnInt32, columnInt64, columnDouble, columnTextView, columnStringView,
+// columnBlobView, columnType, columnCount
 // -----------------------------------------------------------------------
 
 @test
@@ -527,15 +527,15 @@ func testColumnTypes() {
 
     // text_col (bindText)
     assert(rs.columnType(3) == SqlColumnType.TEXT)
-    assert(strcmp(rs.columnText(3), "hello") == 0)
+    assert(strcmp(rs.columnTextView(3), "hello") == 0)
 
     // str_col (bindString)
     assert(rs.columnType(4) == SqlColumnType.TEXT)
-    assert(rs.columnString(4).equals($"world"))
+    assert(rs.columnStringView(4).equals($"world"))
 
     // blob_col
     assert(rs.columnType(5) == SqlColumnType.BLOB)
-    var blob = rs.columnBlob(5) as (*const char)
+    var blob = rs.columnBlobView(5) as (*const char)
     assert(blob != null)
     assert(strncmp(blob, "BLOBDATA", 8) == 0)
 
@@ -545,6 +545,131 @@ func testColumnTypes() {
 
     qstmt.close()
     assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
+// columnStringCopy / columnTextCopy / columnBlobCopy
+// Verifies that copied values survive after the statement is closed.
+// -----------------------------------------------------------------------
+
+@test
+func testColumnCopiesOutliveStatement() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute(
+        """
+        CREATE TABLE copy_test (
+            text_col TEXT,
+            str_col  TEXT,
+            blob_col BLOB
+        );
+        """
+    )
+    assert(!conn.hasError())
+
+    var ins: SqlStatement
+    conn.prepare(&ins, $"INSERT INTO copy_test VALUES (?, ?, ?)")
+    ins.bindText(1, "hello", 5)
+    ins.bindString(2, $"world")
+    ins.bindBlob(3, "BLOBDATA" as (*const void), 8)
+    ins.step()
+    ins.close()
+    assert(!conn.hasError())
+
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT text_col, str_col, blob_col FROM copy_test")
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    var textCopy = rs.columnTextCopy(0, &allocator.allocator)
+    var strCopy  = rs.columnStringCopy(1, &allocator.allocator)
+    var blobCopy = rs.columnBlobCopy(2, &allocator.allocator)
+
+    // Driver memory freed here — copies must still be valid
+    rs.closeAndReleaseAll()
+
+    assert(textCopy.equals($"hello"))
+    assert(strCopy.equals($"world"))
+    assert(blobCopy.length == 8)
+    assert(strncmp(blobCopy.buffer, "BLOBDATA", 8) == 0)
+}
+
+@test
+func testColumnCopyNullReturnsEmpty() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute("CREATE TABLE null_copy_test (a TEXT, b BLOB);")
+    assert(!conn.hasError())
+
+    var ins: SqlStatement
+    conn.prepare(&ins, $"INSERT INTO null_copy_test VALUES (NULL, NULL)")
+    ins.step()
+    ins.close()
+
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT a, b FROM null_copy_test")
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    var strCopy  = rs.columnStringCopy(0, &allocator.allocator)
+    var blobCopy = rs.columnBlobCopy(1, &allocator.allocator)
+
+    rs.closeAndReleaseAll()
+
+    assert(strCopy.empty())
+    assert(blobCopy.empty())
+}
+
+@test
+func testColumnCopyAcrossMultipleRows() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute("CREATE TABLE multi_copy_test (name TEXT);")
+    conn.execute("INSERT INTO multi_copy_test VALUES ('alpha');")
+    conn.execute("INSERT INTO multi_copy_test VALUES ('beta');")
+    conn.execute("INSERT INTO multi_copy_test VALUES ('gamma');")
+    assert(!conn.hasError())
+
+    var copies = ArrayInit<String>(4, &allocator.allocator)
+
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT name FROM multi_copy_test ORDER BY name")
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+
+    while(rs.hasNext()) {
+        rs.next()
+        copies.add(rs.columnStringCopy(0, &allocator.allocator))
+    }
+    // Close after collecting all copies
+    rs.closeAndReleaseAll()
+
+    assert(copies.size() == 3)
+    assert(copies.get(0).equals($"alpha"))
+    assert(copies.get(1).equals($"beta"))
+    assert(copies.get(2).equals($"gamma"))
 }
 
 // -----------------------------------------------------------------------
@@ -585,8 +710,8 @@ func testBindBlob64AndText64() {
     assert(rs.hasNext())
     rs.next()
 
-    assert(strcmp(rs.columnText(0), "Saints") == 0)
-    var b = rs.columnBlob(1) as (*const char)
+    assert(strcmp(rs.columnTextView(0), "Saints") == 0)
+    var b = rs.columnBlobView(1) as (*const char)
     assert(b != null)
     assert(strncmp(b, "RAWBLOB", 7) == 0)
 
@@ -701,7 +826,7 @@ func testQueryVarargs() {
     )
     assert(rs.hasNext())
     rs.next()
-    assert(strcmp(rs.columnText(0), "Alice") == 0)
+    assert(strcmp(rs.columnTextView(0), "Alice") == 0)
     assert(!rs.hasNext())
 
     // String vararg

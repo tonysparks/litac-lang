@@ -226,7 +226,7 @@ func doQueryVarargs(db: SqlConnection) {
         85_i32, 4.0_f64)
     assert(rs.hasNext())
     rs.next()
-    assert(strcmp(rs.columnText(0), "Alice") == 0)
+    assert(strcmp(rs.columnTextView(0), "Alice") == 0)
     assert(!rs.hasNext())
 
     db.query(&rs, $"SELECT score FROM scores WHERE name = $1", $"Bob")
@@ -304,12 +304,12 @@ func doBindAllTypes(db: SqlConnection) {
     var d = rs.columnDouble(2)
     assert(d > 3.13 && d < 3.15)
 
-    assert(strcmp(rs.columnText(3), "hello") == 0)
-    assert(rs.columnString(4).equals($"world"))
+    assert(strcmp(rs.columnTextView(3), "hello") == 0)
+    assert(rs.columnStringView(4).equals($"world"))
 
     // NULL column: columnType differs (SQLite: NULL, PostgreSQL: INT per column OID).
     // Verify via accessor return values which are consistent across backends.
-    assert(rs.columnText(5) == null)
+    assert(rs.columnTextView(5) == null)
     assert(rs.columnInt32(5) == 0)
 
     var dt = rs.columnDateTime(6)
@@ -380,10 +380,10 @@ func doResultSetColumnTypes(db: SqlConnection) {
     assert(d > 2.71 && d < 2.72)
 
     assert(rs.columnType(3) == SqlColumnType.TEXT)
-    assert(strcmp(rs.columnText(3), "hi") == 0)
+    assert(strcmp(rs.columnTextView(3), "hi") == 0)
 
     // NULL value readable; columnType differs (SQLite: NULL, PostgreSQL: INT).
-    assert(rs.columnText(4) == null)
+    assert(rs.columnTextView(4) == null)
     assert(rs.columnInt32(4) == 0)
 }
 

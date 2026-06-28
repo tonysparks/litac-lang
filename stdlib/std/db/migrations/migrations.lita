@@ -379,8 +379,8 @@ func (m: *Migrator) loadApplied(
         rs.next()
         var rec: AppliedRecord
         rec.version = rs.columnInt64(0)
-        var chk = rs.columnString(1)
-        var at  = rs.columnString(2)
+        var chk = rs.columnStringView(1)
+        var at  = rs.columnStringView(2)
         chk.copyTo(rec.checksum,  CHECKSUM_SIZE)
         at.copyTo( rec.appliedAt, TIMESTAMP_MAX)
         out.add(rec)
