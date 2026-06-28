@@ -1,0 +1,562 @@
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/libc"
+import "std/assert"
+
+// -------------------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------------------
+
+// Calls toJson on s and asserts the raw output (including surrounding quotes)
+// equals expected.
+func assertToJson(s: String, expected: *const char) {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    s.toJson(&sb)
+    assert(strcmp(sb.cStr(), expected) == 0)
+}
+
+// Parses the JSON object {"k":<jsonText>}, calls String.fromJson, and returns
+// the decoded string. The returned buffer is owned by the parser's allocator
+// (lives as long as the parser, which leaks in tests — fine for assertions).
+func decodeJsonToString(jsonObj: *const char) : String {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(jsonObj)
+    assert(!parser.hasError())
+    assert(node != null)
+    var s = String{}
+    s.fromJson(&ctx, node.get("k"))
+    return s
+}
+
+// Parses and calls StringBuffer.fromJson; caller supplies the backing array.
+func decodeJsonToStringBuffer(jsonObj: *const char, buf: *char, cap: i32) : StringBuffer {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(jsonObj)
+    assert(!parser.hasError())
+    assert(node != null)
+    var sb = StringBufferInit(buf, cap)
+    sb.fromJson(&ctx, node.get("k"))
+    return sb
+}
+
+// Parses and calls StringBuilder.fromJson into a caller-supplied builder.
+func decodeJsonToStringBuilder(jsonObj: *const char, sb: *StringBuilder) {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(jsonObj)
+    assert(!parser.hasError())
+    assert(node != null)
+    sb.fromJson(&ctx, node.get("k"))
+}
+
+// -------------------------------------------------------------------------
+// to_json — baseline
+// -------------------------------------------------------------------------
+
+@test
+func testToJsonStringEmpty() {
+    assertToJson($"", "\"\"")
+}
+
+@test
+func testToJsonStringPlain() {
+    assertToJson($"hello", "\"hello\"")
+}
+
+// -------------------------------------------------------------------------
+// to_json — each escape sequence
+// -------------------------------------------------------------------------
+
+@test
+func testToJsonStringDoubleQuote() {
+    assertToJson($"\"", "\"\\\"\"")
+}
+
+@test
+func testToJsonStringBackspace() {
+    assertToJson($"\b", "\"\\b\"")
+}
+
+@test
+func testToJsonStringFormFeed() {
+    assertToJson($"\f", "\"\\f\"")
+}
+
+@test
+func testToJsonStringNewline() {
+    assertToJson($"\n", "\"\\n\"")
+}
+
+@test
+func testToJsonStringCarriageReturn() {
+    assertToJson($"\r", "\"\\r\"")
+}
+
+@test
+func testToJsonStringTab() {
+    assertToJson($"\t", "\"\\t\"")
+}
+
+@test
+func testToJsonStringBackslash() {
+    // Build via raw array: $"\\" is ambiguous in LitaC string literals.
+    var raw: [1]char
+    raw[0] = '\\'
+    assertToJson(StringInit(raw, 1), "\"\\\\\"")
+}
+
+@test
+func testToJsonStringNullByte() {
+    var raw: [1]char
+    raw[0] = '\0'
+    assertToJson(StringInit(raw, 1), "\"\\0\"")
+}
+
+// -------------------------------------------------------------------------
+// to_json — multi-char / mixed
+// -------------------------------------------------------------------------
+
+@test
+func testToJsonStringAllEscapesInSequence() {
+    // "  \b  \f  \n  \r  \t  \\
+    var raw: [7]char
+    raw[0] = '"'
+    raw[1] = '\b'
+    raw[2] = '\f'
+    raw[3] = '\n'
+    raw[4] = '\r'
+    raw[5] = '\t'
+    raw[6] = '\\'
+    assertToJson(StringInit(raw, 7), "\"\\\"\\b\\f\\n\\r\\t\\\\\"")
+}
+
+@test
+func testToJsonStringEscapesInterleavedWithPlain() {
+    assertToJson($"a\nb", "\"a\\nb\"")
+}
+
+@test
+func testToJsonStringMultipleNewlines() {
+    assertToJson($"\n\n", "\"\\n\\n\"")
+}
+
+@test
+func testToJsonStringEmailBodyRegression() {
+    // The original bug: literal newlines in email body produced invalid JSON.
+    assertToJson($"line1\n\nline2\n", "\"line1\\n\\nline2\\n\"")
+}
+
+// -------------------------------------------------------------------------
+// to_json — StringBuffer and StringBuilder
+// -------------------------------------------------------------------------
+
+@test
+func testToJsonStringBufferEscapes() {
+    var raw: [32]char
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    var sbuf = StringBufferInit(raw, 32)
+    sbuf.appendStr("a\tb\nc")
+    sbuf.toJson(&sb)
+    assert(strcmp(sb.cStr(), "\"a\\tb\\nc\"") == 0)
+}
+
+@test
+func testToJsonStringBuilderEscapes() {
+    var src = StringBuilderInit(32)
+    defer src.free()
+    src.appendStr("say \"hi\"\n")
+
+    var out = StringBuilderInit(64)
+    defer out.free()
+    src.toJson(&out)
+    assert(strcmp(out.cStr(), "\"say \\\"hi\\\"\\n\"") == 0)
+}
+
+// -------------------------------------------------------------------------
+// from_json — each escape sequence (String)
+// -------------------------------------------------------------------------
+
+@test
+func testFromJsonStringDoubleQuote() {
+    // JSON: {"k":"\""}  → decoded: "
+    var s = decodeJsonToString("{\"k\":\"\\\"\"}")
+    assert(s.length == 1)
+    assert(s.buffer[0] == '"')
+}
+
+@test
+func testFromJsonStringBackspace() {
+    // JSON: {"k":"\b"}  → decoded: 0x08
+    var s = decodeJsonToString("{\"k\":\"\\b\"}")
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\b')
+}
+
+@test
+func testFromJsonStringFormFeed() {
+    // JSON: {"k":"\f"}  → decoded: 0x0C
+    var s = decodeJsonToString("{\"k\":\"\\f\"}")
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\f')
+}
+
+@test
+func testFromJsonStringNewline() {
+    // JSON: {"k":"\n"}  → decoded: 0x0A
+    var s = decodeJsonToString("{\"k\":\"\\n\"}")
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\n')
+}
+
+@test
+func testFromJsonStringCarriageReturn() {
+    // JSON: {"k":"\r"}  → decoded: 0x0D
+    var s = decodeJsonToString("{\"k\":\"\\r\"}")
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\r')
+}
+
+@test
+func testFromJsonStringTab() {
+    // JSON: {"k":"\t"}  → decoded: 0x09
+    var s = decodeJsonToString("{\"k\":\"\\t\"}")
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\t')
+}
+
+@test
+func testFromJsonStringBackslash() {
+    // JSON: {"k":"\\"}  → decoded: single backslash
+    var s = decodeJsonToString("{\"k\":\"\\\\\"}")
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\\')
+}
+
+@test
+func testFromJsonStringNullByte() {
+    // \0 is a non-standard extension; the parser decodes it but String.fromJson
+    // wraps the result via StringInit(*const char) which calls strlen — strlen
+    // stops at the first null byte so length comes back as 0.  We verify the
+    // decoded byte is correct by inspecting buffer[0] directly.
+    var s = decodeJsonToString("{\"k\":\"\\0\"}")
+    assert(s.buffer[0] == '\0')
+}
+
+// -------------------------------------------------------------------------
+// from_json — StringBuffer
+// -------------------------------------------------------------------------
+
+@test
+func testFromJsonStringBufferNewline() {
+    var raw: [32]char
+    var sb = decodeJsonToStringBuffer("{\"k\":\"\\n\"}", raw, 32)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '\n')
+}
+
+@test
+func testFromJsonStringBufferTab() {
+    var raw: [32]char
+    var sb = decodeJsonToStringBuffer("{\"k\":\"\\t\"}", raw, 32)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '\t')
+}
+
+@test
+func testFromJsonStringBufferBackslash() {
+    var raw: [32]char
+    var sb = decodeJsonToStringBuffer("{\"k\":\"\\\\\"}", raw, 32)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '\\')
+}
+
+@test
+func testFromJsonStringBufferDoubleQuote() {
+    var raw: [32]char
+    var sb = decodeJsonToStringBuffer("{\"k\":\"\\\"\"}", raw, 32)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '"')
+}
+
+// -------------------------------------------------------------------------
+// from_json — StringBuilder
+// -------------------------------------------------------------------------
+
+@test
+func testFromJsonStringBuilderNewline() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    decodeJsonToStringBuilder("{\"k\":\"\\n\"}", &sb)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '\n')
+}
+
+@test
+func testFromJsonStringBuilderTab() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    decodeJsonToStringBuilder("{\"k\":\"\\t\"}", &sb)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '\t')
+}
+
+@test
+func testFromJsonStringBuilderBackslash() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    decodeJsonToStringBuilder("{\"k\":\"\\\\\"}", &sb)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '\\')
+}
+
+@test
+func testFromJsonStringBuilderDoubleQuote() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    decodeJsonToStringBuilder("{\"k\":\"\\\"\"}", &sb)
+    assert(sb.length == 1)
+    assert(sb.buffer[0] == '"')
+}
+
+// -------------------------------------------------------------------------
+// from_json — multi-char
+// -------------------------------------------------------------------------
+
+@test
+func testFromJsonStringMixed() {
+    // JSON: {"k":"a\tb\nc"}  → decoded: a <TAB> b <LF> c
+    var s = decodeJsonToString("{\"k\":\"a\\tb\\nc\"}")
+    assert(s.length == 5)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\t')
+    assert(s.buffer[2] == 'b')
+    assert(s.buffer[3] == '\n')
+    assert(s.buffer[4] == 'c')
+}
+
+@test
+func testFromJsonStringAllEscapesInSequence() {
+    // JSON text (7 escape sequences): "\"\\\b\f\n\r\t"
+    // C literal for that JSON object:  {"k":"\"\\\\\\b\\f\\n\\r\\t"}
+    var s = decodeJsonToString("{\"k\":\"\\\"\\\\\\b\\f\\n\\r\\t\"}")
+    assert(s.length == 7)
+    assert(s.buffer[0] == '"')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == '\b')
+    assert(s.buffer[3] == '\f')
+    assert(s.buffer[4] == '\n')
+    assert(s.buffer[5] == '\r')
+    assert(s.buffer[6] == '\t')
+}
+
+// -------------------------------------------------------------------------
+// Round-trip — each escape sequence
+// -------------------------------------------------------------------------
+
+// Encodes a single char to JSON, wraps it in {"k":...}, parses back, and
+// asserts the decoded char matches the original.
+func assertRoundTrip(c: char) {
+    var input: [1]char
+    input[0] = c
+    var s = StringInit(input, 1)
+
+    // to_json
+    var encoded = StringBuilderInit(32)
+    defer encoded.free()
+    s.toJson(&encoded)
+
+    // wrap for parser
+    var wrapped = StringBuilderInit(64)
+    defer wrapped.free()
+    wrapped.append("{\"k\":%.*s}", encoded.length, encoded.buffer)
+
+    // from_json
+    var decoded = decodeJsonToString(wrapped.cStr())
+    assert(decoded.length == 1)
+    assert(decoded.buffer[0] == c)
+}
+
+@test
+func testRoundTripDoubleQuote() {
+    assertRoundTrip('"')
+}
+
+@test
+func testRoundTripBackspace() {
+    assertRoundTrip('\b')
+}
+
+@test
+func testRoundTripFormFeed() {
+    assertRoundTrip('\f')
+}
+
+@test
+func testRoundTripNewline() {
+    assertRoundTrip('\n')
+}
+
+@test
+func testRoundTripCarriageReturn() {
+    assertRoundTrip('\r')
+}
+
+@test
+func testRoundTripTab() {
+    assertRoundTrip('\t')
+}
+
+@test
+func testRoundTripBackslash() {
+    assertRoundTrip('\\')
+}
+
+@test
+func testRoundTripEmailBody() {
+    // Multi-char string with multiple escape types — the original regression.
+    var original = $"hello\tworld\n\"quoted\"\r\n"
+
+    var encoded = StringBuilderInit(64)
+    defer encoded.free()
+    original.toJson(&encoded)
+
+    var wrapped = StringBuilderInit(128)
+    defer wrapped.free()
+    wrapped.append("{\"k\":%.*s}", encoded.length, encoded.buffer)
+
+    var decoded = decodeJsonToString(wrapped.cStr())
+    assert(decoded.length == original.length)
+    assert(strncmp(decoded.buffer, original.buffer, original.length as (usize)) == 0)
+}
+
+// -------------------------------------------------------------------------
+// *const char toJson — each escape sequence
+// -------------------------------------------------------------------------
+
+func assertToJsonCStr(s: *const char, expected: *const char) {
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    s.toJson(&sb)
+    assert(strcmp(sb.cStr(), expected) == 0)
+}
+
+@test
+func testToJsonCStrNull() {
+    var p: *const char = null
+    assertToJsonCStr(p, "null")
+}
+
+@test
+func testToJsonCStrEmpty() {
+    assertToJsonCStr("", "\"\"")
+}
+
+@test
+func testToJsonCStrPlain() {
+    assertToJsonCStr("hello", "\"hello\"")
+}
+
+@test
+func testToJsonCStrDoubleQuote() {
+    assertToJsonCStr("\"", "\"\\\"\"")
+}
+
+@test
+func testToJsonCStrBackspace() {
+    // Build via a char array — \b in C string literals is reliable here.
+    var raw: [2]char
+    raw[0] = '\b'
+    raw[1] = '\0'
+    assertToJsonCStr(raw, "\"\\b\"")
+}
+
+@test
+func testToJsonCStrFormFeed() {
+    var raw: [2]char
+    raw[0] = '\f'
+    raw[1] = '\0'
+    assertToJsonCStr(raw, "\"\\f\"")
+}
+
+@test
+func testToJsonCStrNewline() {
+    assertToJsonCStr("a\nb", "\"a\\nb\"")
+}
+
+@test
+func testToJsonCStrCarriageReturn() {
+    assertToJsonCStr("\r", "\"\\r\"")
+}
+
+@test
+func testToJsonCStrTab() {
+    assertToJsonCStr("\t", "\"\\t\"")
+}
+
+@test
+func testToJsonCStrBackslash() {
+    assertToJsonCStr("\\", "\"\\\\\"")
+}
+
+@test
+func testToJsonCStrMixed() {
+    assertToJsonCStr("say \"hi\"\n", "\"say \\\"hi\\\"\\n\"")
+}
+
+// -------------------------------------------------------------------------
+// *const char round-trip
+// -------------------------------------------------------------------------
+
+func assertCStrRoundTrip(s: *const char) {
+    var encoded = StringBuilderInit(64)
+    defer encoded.free()
+    s.toJson(&encoded)
+
+    var wrapped = StringBuilderInit(128)
+    defer wrapped.free()
+    wrapped.append("{\"k\":%.*s}", encoded.length, encoded.buffer)
+
+    var parser = JsonParserInit()
+    var node = parser.parseJson(wrapped.cStr())
+    assert(!parser.hasError())
+    assert(node != null)
+    assert(strcmp(node.getStr("k"), s) == 0)
+}
+
+@test
+func testRoundTripCStrDoubleQuote() {
+    assertCStrRoundTrip("\"")
+}
+
+@test
+func testRoundTripCStrNewline() {
+    assertCStrRoundTrip("line1\nline2")
+}
+
+@test
+func testRoundTripCStrTab() {
+    assertCStrRoundTrip("\t")
+}
+
+@test
+func testRoundTripCStrCarriageReturn() {
+    assertCStrRoundTrip("\r")
+}
+
+@test
+func testRoundTripCStrBackslash() {
+    assertCStrRoundTrip("\\")
+}
+
+@test
+func testRoundTripCStrMixed() {
+    assertCStrRoundTrip("a\tb\nc\\d\"e")
+}

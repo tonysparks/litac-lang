@@ -4,6 +4,7 @@ import "std/string";
 import "std/map";
 import "std/array";
 import "std/time";
+import "std/json";
 
 public func (this: u8) toJson(sb: *StringBuilder) {
     sb.append("%d", this)
@@ -46,23 +47,30 @@ public func (this: bool) toJson(sb: *StringBuilder) {
 
 public func (this: *const char) toJson(sb: *StringBuilder) {
     if(!this) {
-        sb.append("null")
+        sb.appendStrn("null", 4)
+        return;
     }
-    else {
-        sb.append("\"%s\"", this)
-    }
+    sb.appendChar('"')
+    JsonEscapeString(sb, this, this.length())
+    sb.appendChar('"')
 }
 
 public func (this: String) toJson(sb: *StringBuilder) {
-    sb.append("\"%.*s\"", this.length, this.buffer)
+    sb.appendChar('"')
+    JsonEscapeString(sb, this.buffer, this.length)
+    sb.appendChar('"')
 }
 
 public func (this: StringBuffer) toJson(sb: *StringBuilder) {
-    sb.append("\"%.*s\"", this.length, this.buffer)
+    sb.appendChar('"')
+    JsonEscapeString(sb, this.buffer, this.length)
+    sb.appendChar('"')
 }
 
 public func (this: StringBuilder) toJson(sb: *StringBuilder) {
-    sb.append("\"%.*s\"", this.length, this.buffer)
+    sb.appendChar('"')
+    JsonEscapeString(sb, this.buffer, this.length)
+    sb.appendChar('"')
 }
 
 public func (this: DateTime) toJson(sb: *StringBuilder) {

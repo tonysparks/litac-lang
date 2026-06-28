@@ -1,0 +1,201 @@
+import "std/http/libcurl"
+import "std/string/builder"
+import "std/string"
+import "std/array"
+import "std/mem"
+import "std/libc"
+
+public struct SmtpOptions {
+    host:     String
+    port:     i32
+    username: String
+    password: String
+    useTls:   bool
+}
+
+public struct EmailMessage {
+    from:    String
+    to:      Array<String>
+    cc:      Array<String>
+    subject: String
+    body:    String
+    isHtml:  bool
+}
+
+@asStr
+public enum EmailStatus {
+    Ok = 0,
+    ConnectionError,
+    AuthError,
+    SendError,
+    InvalidMessage,
+}
+
+public struct EmailClient {
+    options:   SmtpOptions
+    allocator: *const Allocator
+}
+
+public func EmailClientInit(
+    options: SmtpOptions,
+    allocator: *const Allocator = defaultAllocator
+) : EmailClient {
+    return EmailClient {
+        .options = options,
+        .allocator = allocator,
+    }
+}
+
+struct SmtpReadState {
+    data:   *const char
+    offset: usize
+    length: usize
+}
+
+func smtpReadCallback(ptr: *void, size: usize, nmemb: usize, userdata: *void) : usize {
+    var state = userdata as (*SmtpReadState)
+    var available = state.length - state.offset
+    if(available == 0) {
+        return 0
+    }
+    var toSend = size * nmemb
+    if(toSend > available) {
+        toSend = available
+    }
+    memcpy(ptr, (&state.data[state.offset]) as (*void), toSend)
+    state.offset += toSend
+    return toSend
+}
+
+public func (this: *EmailClient) send(msg: *EmailMessage) : EmailStatus {
+    if(msg.from.length < 1 || msg.to.length < 1) {
+        return EmailStatus.InvalidMessage
+    }
+
+    var curl = curl_easy_init()
+    if(!curl) {
+        return EmailStatus.ConnectionError
+    }
+    defer curl_easy_cleanup(curl)
+
+    // Build SMTP URL
+    var urlBuf = StringBuilderInit(256, this.allocator)
+    if(this.options.useTls) {
+        urlBuf.append("smtps://")
+    } else {
+        urlBuf.append("smtp://")
+    }
+    urlBuf.append("%.*s:%d", this.options.host.length, this.options.host.buffer, this.options.port)
+    curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_URL, urlBuf.cStr())
+    urlBuf.free()
+
+    // Credentials
+    var userBuf = StringBuilderInit(this.options.username.length + 1, this.allocator)
+    userBuf.append("%.*s", this.options.username.length, this.options.username.buffer)
+    curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_USERNAME, userBuf.cStr())
+    userBuf.free()
+
+    var passBuf = StringBuilderInit(this.options.password.length + 1, this.allocator)
+    passBuf.append("%.*s", this.options.password.length, this.options.password.buffer)
+    curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_PASSWORD, passBuf.cStr())
+    passBuf.free()
+
+    if(this.options.useTls) {
+        curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_USE_SSL, CURLusessl.CURLUSESSL_ALL as (i64))
+    }
+
+    // MAIL FROM
+    var fromBuf = StringBuilderInit(msg.from.length + 3, this.allocator)
+    fromBuf.append("<%.*s>", msg.from.length, msg.from.buffer)
+    curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_MAIL_FROM, fromBuf.cStr())
+    fromBuf.free()
+
+    // RCPT TO list (to + cc)
+    var recipients: *curl_slist = null
+    var rcptBuf = StringBuilderInit(256, this.allocator)
+
+    for(var i = 0; i < msg.to.length; i += 1) {
+        var addr = msg.to.elements[i]
+        rcptBuf.clear()
+        rcptBuf.append("<%.*s>", addr.length, addr.buffer)
+        recipients = curl_slist_append(recipients, rcptBuf.cStr())
+    }
+    for(var i = 0; i < msg.cc.length; i += 1) {
+        var addr = msg.cc.elements[i]
+        rcptBuf.clear()
+        rcptBuf.append("<%.*s>", addr.length, addr.buffer)
+        recipients = curl_slist_append(recipients, rcptBuf.cStr())
+    }
+    rcptBuf.free()
+
+    curl_easy_setopt<*curl_slist>(curl, CURLoption.CURLOPT_MAIL_RCPT, recipients)
+
+    // Build RFC 5322 message
+    var msgBuf = StringBuilderInit(512 + msg.body.length, this.allocator)
+
+    msgBuf.append("From: %.*s\r\n", msg.from.length, msg.from.buffer)
+
+    for(var i = 0; i < msg.to.length; i += 1) {
+        var addr = msg.to.elements[i]
+        if(i == 0) {
+            msgBuf.append("To: %.*s", addr.length, addr.buffer)
+        } else {
+            msgBuf.append(", %.*s", addr.length, addr.buffer)
+        }
+    }
+    msgBuf.append("\r\n")
+
+    if(msg.cc.length > 0) {
+        for(var i = 0; i < msg.cc.length; i += 1) {
+            var addr = msg.cc.elements[i]
+            if(i == 0) {
+                msgBuf.append("Cc: %.*s", addr.length, addr.buffer)
+            } else {
+                msgBuf.append(", %.*s", addr.length, addr.buffer)
+            }
+        }
+        msgBuf.append("\r\n")
+    }
+
+    msgBuf.append("Subject: %.*s\r\n", msg.subject.length, msg.subject.buffer)
+    msgBuf.append("MIME-Version: 1.0\r\n")
+
+    if(msg.isHtml) {
+        msgBuf.append("Content-Type: text/html; charset=UTF-8\r\n")
+    } else {
+        msgBuf.append("Content-Type: text/plain; charset=UTF-8\r\n")
+    }
+
+    msgBuf.append("\r\n")
+    msgBuf.append("%.*s", msg.body.length, msg.body.buffer)
+
+    var readState = SmtpReadState {
+        .data   = msgBuf.buffer,
+        .offset = 0_usize,
+        .length = msgBuf.length as (usize),
+    }
+
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_UPLOAD, 1_i64)
+    curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_READFUNCTION, (&smtpReadCallback) as (*void))
+    curl_easy_setopt<*void>(curl, CURLoption.CURLOPT_READDATA, &readState)
+    curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_INFILESIZE_LARGE, msgBuf.length as (i64))
+
+    var res = curl_easy_perform(curl)
+
+    msgBuf.free()
+    if(recipients) {
+        curl_slist_free_all(recipients)
+    }
+
+    if(res == CURLcode.CURLE_LOGIN_DENIED || res == CURLcode.CURLE_AUTH_ERROR) {
+        return EmailStatus.AuthError
+    }
+    if(res == CURLcode.CURLE_COULDNT_CONNECT || res == CURLcode.CURLE_COULDNT_RESOLVE_HOST) {
+        return EmailStatus.ConnectionError
+    }
+    if(res != CURLcode.CURLE_OK) {
+        return EmailStatus.SendError
+    }
+
+    return EmailStatus.Ok
+}
