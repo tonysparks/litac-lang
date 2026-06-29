@@ -337,7 +337,7 @@ func (q: *JobQueue) fetchClaimed(lockedBy: *char, lockedByLen: i32, job: *Job) :
     var gkView = rs.columnStringView(2)
     job.groupKeyLen = 0
     job.groupKey[0] = '\0'
-    if(gkView.buffer != null && gkView.length > 0) {
+    if(!gkView.empty()) {
         job.groupKeyLen = gkView.copyTo(job.groupKey, GROUP_KEY_MAX)
     }
 
