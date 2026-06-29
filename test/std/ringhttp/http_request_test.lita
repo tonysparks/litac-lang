@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/string"
 import "std/string/builder"
 import "std/string/buffer"
@@ -544,3 +545,4 @@ func testPathTemplateOverflow() {
     assert(status2 == Status.OK)
     assert(template2.numberOfEntries == 32)
 }
+#end

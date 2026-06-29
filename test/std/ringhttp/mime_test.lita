@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/mem"
 import "std/assert"
 import "std/string"
@@ -130,3 +131,4 @@ func testMimeDotsInDirectorySegments() {
     // Directory ".hidden" but file has known extension → correct type
     assert(db.getMimeType($"/path/.config/style.css").equals($"text/css"))
 }
+#end

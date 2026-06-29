@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/assert"
 import "std/string"
 import "std/mem"
@@ -36,3 +37,4 @@ func testParseMultipartBoundary() {
     // "boundary=" with no value must error (not return an empty-boundary result)
     assertBoundaryParsing("multipart/form-data; boundary=", "", false)
 }
+#end

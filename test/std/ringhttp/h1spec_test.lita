@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 // HTTP/1.1 RFC 7230/7231 conformance tests for ringhttp.
 //
 // Starts the ring server in-process on a background thread and probes it with
@@ -1465,3 +1466,4 @@ func testIdenticalDuplicateCL() {
 
     printf("  %d passed, %d failed\n", p, f); assert(f == 0)
 }
+#end

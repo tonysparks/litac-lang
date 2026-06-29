@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/libc"
 import "std/mem"
 import "std/assert"
@@ -107,3 +108,4 @@ func testContextPoolBoundaryIndices() {
     assert(pool.get(-1) == null)
     assert(pool.get(9999) == null)
 }
+#end

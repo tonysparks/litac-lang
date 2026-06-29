@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/assert"
 import "std/mem"
 import "std/string"
@@ -122,3 +123,4 @@ public func launchFilterServer(ts: *FilterTestServer) {
 
     ts.barrier.wait()
 }
+#end

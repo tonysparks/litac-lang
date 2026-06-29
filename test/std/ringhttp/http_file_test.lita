@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/string"
 import "std/mem"
 import "std/libc"
@@ -90,3 +91,4 @@ func testOpenFileInfoNotFound() {
     var result = OpenFileInfo(StringInit("/tmp"), StringInit(""), StringInit("no_such_file_abc123.html"))
     assert(result.status == Status.ERROR_FILE_NOT_FOUND)
 }
+#end

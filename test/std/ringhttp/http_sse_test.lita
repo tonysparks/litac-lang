@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 
 import "std/libc"
 import "std/assert"
@@ -257,3 +258,4 @@ func test_sse_unknown_path() {
     var status = sendMethodRaw("GET", "/sse/nonexistent")
     assert(status == 404)
 }
+#end

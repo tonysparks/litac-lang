@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/string"
 import "std/string/builder"
 import "std/array"
@@ -1138,3 +1139,4 @@ func testOverflowContentLength() {
     var input = StringInit("GET / HTTP/1.1\r\nContent-Length: 99999999999999999999\r\n\r\n")
     assert(parser.parse(input, &result) == Status.ERROR_INVALID_CONTENT_LENGTH)
 }
+#end

@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/assert"
 import "std/array"
 import "std/mem"
@@ -292,3 +293,4 @@ func testEmptyFilterAndPostLists() {
     assert(routeCalled)
     assert(ctx.response.status == 200)
 }
+#end

@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/http" as http
 import "std/assert"
 import "std/string"
@@ -221,3 +222,4 @@ func test_unknown_route_counted() {
     var m = get("/metrics")
     assert(m.body.contains($"status=\"4xx\""))
 }
+#end

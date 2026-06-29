@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/assert"
 import "std/string"
 import "std/string/builder"
@@ -145,3 +146,4 @@ func testGenerateBodyRawOutput() {
     // make sure it is NOT wrapped in HtmlEscape
     assert(!content.contains($"HtmlEscape(out, rawHtml)"))
 }
+#end

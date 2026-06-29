@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 
 import "std/libc"
 import "std/assert"
@@ -818,3 +819,4 @@ func test_websocket_frag_limit_exceeded() {
     var r = recv(sock, buf, 16, 0)
     assert(r <= 0)
 }
+#end

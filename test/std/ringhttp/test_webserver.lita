@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/libc"
 import "std/array"
 import "std/string/builder"
@@ -564,3 +565,4 @@ func testExample() {
     launch(&testServer)
     ThreadSleepMSec(2500000)
 }
+#end

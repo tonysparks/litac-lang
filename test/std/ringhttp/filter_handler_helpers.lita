@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/mem"
 import "std/string/builder"
 import "std/system"
@@ -75,3 +76,4 @@ public func (this: *RecordingPostHandler) postHandle(ctx: *RequestHandlerContext
     this.lastMethod    = ctx.request.method
     this.hadRouteMatch = ctx.match != null
 }
+#end

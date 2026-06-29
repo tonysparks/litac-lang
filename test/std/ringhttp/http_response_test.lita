@@ -1,3 +1,4 @@
+#if OS != "WINDOWS"
 import "std/assert"
 import "std/mem"
 import "std/string/builder"
@@ -39,3 +40,4 @@ func testResponseReset() {
     assert(resp.numberOfHeaders == 0)
     assert(resp.type == ResponseType.NONE)
 }
+#end
