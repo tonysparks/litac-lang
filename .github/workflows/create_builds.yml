@@ -44,6 +44,12 @@ jobs:
           sudo apt-get install -y libcurl4-openssl-dev
           curl --version
 
+      # Install liburing (required by io_uring backend for ringhttp tests)
+      - name: Install liburing
+        run: |
+          echo Install liburing
+          sudo apt-get install -y liburing-dev
+
       # Install libpq (PostgreSQL client library for db tests)
       - name: Install libpq
         run: |

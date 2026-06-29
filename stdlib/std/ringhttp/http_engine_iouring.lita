@@ -23,8 +23,6 @@ import "std/os/posix/fcntl"
 import "std/os/linux/pipe"
 import "std/os/linux/io_uring"
 import "std/thread/barrier"
-import "std/ssl/openssl"
-
 import "std/ringhttp/http_connection"
 import "std/ringhttp/http_parser"
 import "std/ringhttp/http_common"
@@ -36,7 +34,6 @@ import "std/ringhttp/http_router"
 import "std/ringhttp/http_context"
 import "std/ringhttp/http_websocket"
 import "std/ringhttp/http_worker"
-import "std/ringhttp/http_tls"
 
 internal struct HttpRingEngine {
     config: using *HttpConfig
@@ -55,9 +52,6 @@ internal struct HttpRingEngine {
     clientAddrLen: socklen_t;
 
     server: *HttpServer
-
-    // Non-null when TLS is configured (tlsCertFile + tlsKeyFile in HttpConfig).
-    sslCtx: *SSL_CTX
 }
 
 internal func (this: *HttpRingEngine) init(
@@ -123,13 +117,6 @@ internal func (this: *HttpRingEngine) listen() : Status {
         Info("Initialized worker thread: %d with ringfd: %d\n", worker.thread.id(), worker.ring.ring_fd)
     }
 
-    // TLS context setup — only when cert + key are configured.
-    this.sslCtx = setupSslCtx(this.config)
-    if(!this.config.tlsCertFile.empty() && !this.sslCtx) {
-        Error("Failed to initialize TLS context (cert: '%.*s')\n", this.config.tlsCertFile.length, this.config.tlsCertFile.buffer)
-        return Status.ERROR_UNABLE_TO_CREATE_SERVER_SOCKET
-    }
-
     if(!this.serverSocket.create()) {
         Error("Failed to create server socket\n")
         return Status.ERROR_UNABLE_TO_CREATE_SERVER_SOCKET
@@ -189,11 +176,6 @@ internal func (this: *HttpRingEngine) close() {
     if(this.ring.ring_fd >= 0) {
         io_uring_queue_exit(&this.ring)
         this.ring.ring_fd = -1
-    }
-
-    if(this.sslCtx) {
-        SSL_CTX_free(this.sslCtx)
-        this.sslCtx = null
     }
 }
 

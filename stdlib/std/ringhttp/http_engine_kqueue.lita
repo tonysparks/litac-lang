@@ -16,8 +16,6 @@ import "std/net/posix_socket"
 import "std/os/darwin/kqueue"
 import "std/os/posix/fcntl"
 import "std/thread/barrier"
-import "std/ssl/openssl"
-
 import "std/ringhttp/http_connection"
 import "std/ringhttp/http_websocket"
 import "std/ringhttp/http_context"
@@ -27,7 +25,6 @@ import "std/ringhttp/http_response"
 
 import "std/ringhttp/http_server"
 import "std/ringhttp/http_worker"
-import "std/ringhttp/http_tls"
 
 const MAX_ENGINE_EVENTS : i32 = 64
 
@@ -48,9 +45,6 @@ internal struct HttpRingEngine {
     clientAddrLen: socklen_t
 
     server: *HttpServer
-
-    // Non-null when TLS is configured (tlsCertFile + tlsKeyFile in HttpConfig).
-    sslCtx: *SSL_CTX
 }
 
 internal func (this: *HttpRingEngine) init(
@@ -103,13 +97,6 @@ internal func (this: *HttpRingEngine) listen() : Status {
     for(var i = 0; i < this.workers.length; i+=1) {
         var worker = this.workers.getPtr(i)
         Info("Initialized worker thread: %d\n", worker.thread.id())
-    }
-
-    // TLS context setup — only when cert + key are configured.
-    this.sslCtx = setupSslCtx(this.config)
-    if(!this.config.tlsCertFile.empty() && !this.sslCtx) {
-        Error("Failed to initialize TLS context (cert: '%.*s')\n", this.config.tlsCertFile.length, this.config.tlsCertFile.buffer)
-        return Status.ERROR_UNABLE_TO_CREATE_SERVER_SOCKET
     }
 
     if(!this.serverSocket.create()) {
@@ -228,11 +215,6 @@ internal func (this: *HttpRingEngine) close() {
     if(this.kq >= 0) {
         close(this.kq)
         this.kq = -1
-    }
-
-    if(this.sslCtx) {
-        SSL_CTX_free(this.sslCtx)
-        this.sslCtx = null
     }
 }
 

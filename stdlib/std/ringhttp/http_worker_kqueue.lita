@@ -23,14 +23,12 @@ import "std/ringhttp/http_context"
 import "std/ringhttp/http_websocket"
 import "std/ringhttp/http_sse"
 import "std/ringhttp/http_worker"
-import "std/ringhttp/http2_connection"
 import "std/ringhttp/mime"
 
 import "std/os/darwin/kqueue"
 import "std/os/posix/sendfile"
 import "std/os/posix/fcntl"
 import "std/thread/barrier"
-import "std/ssl/openssl"
 
 import "std/crypto/sha1"
 import "std/encoding/base64"
@@ -70,25 +68,13 @@ func (this: *WorkerThread) doSend(session: *SessionContext) : i32 {
     }
 
     var src = writeBuffer.buffer + session.submissions as (i32)
-    var sent: i32 = 0
 
-    if(session.ssl) {
-        sent = SSL_write(session.ssl, src as (*const void), remaining)
-        if(sent <= 0) {
-            var err = SSL_get_error(session.ssl, sent)
-            if(err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
-                return 1  // register EVFILT_WRITE
-            }
-            return -1
-        }
-    } else {
-        sent = send(connection.handle(), src as (*void), remaining as (usize), 0) as (i32)
-        if(sent < 0) {
-            return 1  // EAGAIN/EINTR
-        }
-        if(sent == 0) {
-            return -1  // peer closed
-        }
+    var sent = send(connection.handle(), src as (*void), remaining as (usize), 0) as (i32)
+    if(sent < 0) {
+        return 1  // EAGAIN/EINTR
+    }
+    if(sent == 0) {
+        return -1  // peer closed
     }
 
     session.submissions += sent as (u32)
@@ -99,22 +85,7 @@ func (this: *WorkerThread) doSend(session: *SessionContext) : i32 {
     return 1  // partial
 }
 
-// TLS-aware recv wrapper.  Returns bytes read (>0), 0 for peer-closed, <0 for error/retry.
 func (this: *WorkerThread) doRecv(session: *SessionContext, buf: *void, bufLen: i32) : i64 {
-    if(session.ssl) {
-        var n = SSL_read(session.ssl, buf, bufLen)
-        if(n <= 0) {
-            var err = SSL_get_error(session.ssl, n)
-            if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
-                return -1  // EAGAIN equivalent
-            }
-            if(err == SSL_ERROR_ZERO_RETURN) {
-                return 0  // clean TLS close
-            }
-            return -1
-        }
-        return n as (i64)
-    }
     return recv(session.connection.handle(), buf, bufLen as (usize), 0)
 }
 
@@ -409,13 +380,7 @@ func (this: *WorkerThread) resetRequest(session: *SessionContext) {
         return;
     }
 
-    // Preserve TLS state across session.begin() — begin() resets ssl to null, but a
-    // keep-alive connection reuses the same SSL object for subsequent requests.
-    var savedSsl   = session.ssl
-    var savedProto = session.protocolVersion
     session.begin(connection.handle())
-    session.ssl             = savedSsl
-    session.protocolVersion = savedProto
 
     var change = kevent {
         .ident  = connection.handle() as (usize),
@@ -656,130 +621,20 @@ func (this: *WorkerThread) drainPipe() {
             continue
         }
 
-        // If TLS is configured, start the non-blocking SSL handshake.
-        var sslCtx = this.server.engine.sslCtx
-        if(sslCtx) {
-            var ssl = SSL_new(sslCtx)
-            if(!ssl) {
-                Error("TLS: SSL_new failed for fd %d\n", clientFd)
-                this.closeSession(session)
-                continue
-            }
-            SSL_set_fd(ssl, clientFd)
-            session.ssl   = ssl
-            session.state = SessionState.TLS_HANDSHAKING
-
-            var change = kevent {
-                .ident  = clientFd as (usize),
-                .filter = EVFILT_READ,
-                .flags  = EV_ADD | EV_ENABLE | EV_CLEAR,
-                .fflags = 0_u32,
-                .data   = 0_i64,
-                .udata  = session,
-            }
-            KEventCall(this.kq, &change, 1, null, 0, null)
-
-            // Try to complete the handshake immediately (may finish in one shot).
-            this.continueTlsHandshake(session)
-        } else {
-            var change = kevent {
-                .ident  = clientFd as (usize),
-                .filter = EVFILT_READ,
-                .flags  = EV_ADD | EV_ENABLE | EV_CLEAR,
-                .fflags = 0_u32,
-                .data   = 0_i64,
-                .udata  = session,
-            }
-            KEventCall(this.kq, &change, 1, null, 0, null)
-
-            session.state = SessionState.READ_REQUEST_LINE
+        var change = kevent {
+            .ident  = clientFd as (usize),
+            .filter = EVFILT_READ,
+            .flags  = EV_ADD | EV_ENABLE | EV_CLEAR,
+            .fflags = 0_u32,
+            .data   = 0_i64,
+            .udata  = session,
         }
-    }
-}
-
-// Attempt to advance (or complete) the TLS handshake.
-// Called from both handleReadReady and handleWriteReady while in TLS_HANDSHAKING.
-func (this: *WorkerThread) continueTlsHandshake(session: *SessionContext) {
-    var ret = SSL_accept(session.ssl)
-    if(ret == 1) {
-        // Handshake complete — check negotiated ALPN protocol.
-        var proto: *const u8 = null
-        var protoLen: u32 = 0
-        SSL_get0_alpn_selected(session.ssl, &proto, &protoLen)
-
-        if(protoLen == 2 && proto[0] == 'h' as (u8) && proto[1] == '2' as (u8)) {
-            Debug("TLS: ALPN negotiated h2 on socket %d\n", session.connection.handle())
-            session.protocolVersion = ProtocolVersion.HTTP2
-            session.state = SessionState.HTTP2_OPEN
-            session.http2.init(&session.requestAllocator.allocator)
-        } else {
-            Debug("TLS: ALPN negotiated http/1.1 on socket %d\n", session.connection.handle())
-            session.protocolVersion = ProtocolVersion.HTTP1
-            session.state = SessionState.READ_REQUEST_LINE
-        }
-
-        // The peer may have sent application data (e.g. HTTP/2 preface + SETTINGS) in
-        // the same TCP segment as the final handshake message.  SSL_accept() reads the
-        // entire segment, decrypting each TLS record in turn, leaving application-data
-        // records in OpenSSL's internal buffer.  Because the raw socket buffer is now
-        // empty, kqueue won't fire again — drain every buffered record here so the
-        // connection isn't silently stalled.
-        while(SSL_has_pending(session.ssl) > 0) {
-            this.handleReadReady(session)
-            if(!session.connection.isConnected()) { return; }
-        }
-        return;
-    }
-
-    var err = SSL_get_error(session.ssl, ret)
-    if(err == SSL_ERROR_WANT_READ) {
-        // Already registered for EVFILT_READ — nothing to do, wait for next event.
-        return;
-    }
-    if(err == SSL_ERROR_WANT_WRITE) {
-        this.registerWrite(session)
-        return;
-    }
-
-    // Fatal handshake error.
-    Debug("TLS: handshake failed on socket %d (err=%d)\n", session.connection.handle(), err)
-    this.closeSession(session)
-}
-
-// Handle an HTTP/2 read event: run the frame state machine and flush
-// any response frames.  This is the kqueue-specific flush; the io_uring
-// backend will provide its own version using SQEs.
-func (this: *WorkerThread) handleHttp2Data(session: *SessionContext, bytesRead: i32) {
-    var connection = &session.connection
-    var status = this.processHttp2Data(session, bytesRead)
-    if(status == Status.PARTIAL_REQUEST_DISPATCHING_READ) {
-        return;
-    }
-    if(status != Status.OK) {
-        // processHttp2Data may have written a GOAWAY — flush it before closing
-        if(connection.writeBuffer.length > 0) {
-            this.doSend(session)
-        }
-        this.closeSession(session)
-        return;
-    }
-    if(connection.writeBuffer.length > 0) {
-        var result = this.doSend(session)
-        if(result < 0) {
-            this.closeSession(session)
-        } else if(result > 0) {
-            this.registerWrite(session)
-        }
+        KEventCall(this.kq, &change, 1, null, 0, null)
+        session.state = SessionState.READ_REQUEST_LINE
     }
 }
 
 func (this: *WorkerThread) handleReadReady(session: *SessionContext) {
-    // TLS handshake is still in progress — retry SSL_accept on each read/write event.
-    if(session.state == SessionState.TLS_HANDSHAKING) {
-        this.continueTlsHandshake(session)
-        return;
-    }
-
     var connection = &session.connection
     var readBuffer = &connection.readBuffer
 
@@ -799,43 +654,7 @@ func (this: *WorkerThread) handleReadReady(session: *SessionContext) {
         return;
     }
 
-    // Protocol detection: peek at the first bytes once per connection.
-    // NOTE: recv appended bytes at readBuffer.buffer[readBuffer.length];
-    // readBuffer.length is not yet updated — tryDetectProtocol handles that.
-    if(session.protocolVersion == ProtocolVersion.UNKNOWN) {
-        if(!this.tryDetectProtocol(session, bytesRead as (i32))) {
-            return;  // too few bytes to decide — buffered, wait for next read
-        }
-    }
-
     switch(session.state) {
-        case SessionState.HTTP2_OPEN: {
-            this.handleHttp2Data(session, bytesRead as (i32))
-            // EV_CLEAR makes EVFILT_READ edge-triggered: kqueue fires once per data
-            // arrival and resets the counter.  After SSL_read returns one TLS record,
-            // remaining records may still be in the socket kernel buffer (FIONREAD > 0)
-            // or in SSL's internal read-ahead buffer (SSL_has_pending > 0) — in both
-            // cases kqueue won't re-fire.  Drain everything before returning.
-            var socketBytes: i32 = 0
-            if(session.ssl != null) {
-                ioctl(connection.handle(), FIONREAD, &socketBytes)
-            }
-            while(session.ssl != null && session.connection.isConnected() &&
-                  (SSL_has_pending(session.ssl) > 0 || socketBytes > 0)) {
-                var moreBytes = this.doRecv(
-                    session,
-                    &readBuffer.buffer[readBuffer.length],
-                    readBuffer.remaining() as (i32)
-                )
-                if(moreBytes <= 0) { break }
-                this.handleHttp2Data(session, moreBytes as (i32))
-                socketBytes = 0
-                if(session.ssl != null) {
-                    ioctl(connection.handle(), FIONREAD, &socketBytes)
-                }
-            }
-            return;
-        }
         case SessionState.READ_REQUEST_LINE: {
             var status = this.handlePartialHttpRequest(session, bytesRead as (i32))
 
@@ -933,24 +752,6 @@ func (this: *WorkerThread) handleReadReady(session: *SessionContext) {
 
 func (this: *WorkerThread) handleWriteReady(session: *SessionContext) {
     switch(session.state) {
-        case SessionState.TLS_HANDSHAKING: {
-            this.continueTlsHandshake(session)
-            break
-        }
-        case SessionState.HTTP2_OPEN: {
-            // Continue flushing a partially-sent HTTP/2 frame batch.
-            var result = this.doSend(session)
-            if(result < 0) {
-                this.closeSession(session)
-                break
-            }
-            if(result > 0) {
-                this.registerWrite(session)
-                break
-            }
-            // Write complete — session stays open, waiting for more frames.
-            break
-        }
         case SessionState.WRITTEN_HTTP_RESPONSE:
         case SessionState.WRITTEN_HTTP_RESPONSE_MORE: {
             this.flushResponse(session)

@@ -23,16 +23,12 @@ import "std/ringhttp/http_router"
 import "std/ringhttp/http_context"
 import "std/ringhttp/http_websocket"
 import "std/ringhttp/http_worker"
-import "std/ringhttp/http2_connection"
-import "std/ringhttp/http2_frame"
-import "std/ringhttp/http2_stream"
 import "std/ringhttp/http_sse"
 import "std/ringhttp/mime"
 
 import "std/crypto/sha1"
 import "std/encoding/base64"
 
-import "std/ssl/openssl"
 import "std/os/linux/pipe"
 import "std/os/linux/io_uring"
 import "std/os/posix/fcntl"
@@ -128,7 +124,7 @@ internal func (this: *WorkerThread) queueSend(session: *SessionContext) : Status
     // to hint the kernel to batch headers with the first data write.
     // RFC 7231 §4.3.2: HEAD must not include a body — treat like a plain response.
     var isHeadFile = (response.type == ResponseType.FILE && session.request.method == HttpMethod.HEAD)
-    var useMoreFlag = !session.ssl && !isHeadFile &&
+    var useMoreFlag = !isHeadFile &&
                       (response.type == ResponseType.FILE || response.type == ResponseType.STREAM)
 
     var sqeFlags = 0_u8
@@ -136,9 +132,7 @@ internal func (this: *WorkerThread) queueSend(session: *SessionContext) : Status
         sqeFlags |= IOSQE_IO_LINK
     }
 
-    // Encrypt TLS BODY responses in-place; FILE/STREAM/SSE use streaming paths.
-    var useTls = session.ssl != null && response.type == ResponseType.BODY
-    var status = this.queueWriteBufferSend(ring, session, useTls, useMoreFlag, sqeFlags)
+    var status = this.queueWriteBufferSend(ring, session, useMoreFlag, sqeFlags)
         ?: return status
 
     if(isHeadFile) {
@@ -236,52 +230,14 @@ error:
     return Status.ERROR_IOURING_ERROR;
 }
 
-// Single write path: optionally encrypt via TLS, then submit a SENDMSG SQE.
-// useTls=true  — plaintext is in writeBuffer; SSL_write encrypts it before sending.
-// useTls=false — writeBuffer is already ready (plain) or BIO has handshake output to drain.
 func (this: *WorkerThread) queueWriteBufferSend(
     ring: *io_uring,
     session: *SessionContext,
-    useTls: bool = false,
     moreContents: bool = false,
     sqeFlags: u8 = 0
 ): Status {
     var connection  = &session.connection
     var writeBuffer = &connection.writeBuffer
-
-    if(session.ssl) {
-        if(useTls && writeBuffer.length > 0) {
-            var written = SSL_write(session.ssl, writeBuffer.buffer as (*const void), writeBuffer.length)
-            if(written <= 0) {
-                Error("TLS: SSL_write failed on socket %d\n", connection.handle())
-                var status = this.queueCancelAndClose(ring, session)
-                    ?: return status
-                return Status.ERROR_SSL_ERROR
-            }
-        }
-
-        // Drain write BIO into writeBuffer (covers both app-data encryption and handshake output).
-        writeBuffer.clear()
-        var pending = BIO_ctrl(SSL_get_wbio(session.ssl), BIO_CTRL_PENDING, 0, null) as (i32)
-        if(pending > 0) {
-            if(!writeBuffer.reserve(pending)) {
-                Error("TLS: OOM on socket %d\n", connection.handle())
-                this.queueCancelAndClose(ring, session)
-                return Status.ERROR_OUT_OF_MEMORY
-            }
-            var n = BIO_read(SSL_get_wbio(session.ssl), writeBuffer.buffer as (*void), pending)
-            if(n <= 0) {
-                Error("TLS: BIO_read failed on socket %d\n", connection.handle())
-                this.queueCancelAndClose(ring, session)
-                return Status.ERROR_SSL_ERROR
-            }
-            writeBuffer.length = n
-        }
-
-        if(writeBuffer.length == 0) {
-            return Status.OK
-        }
-    }
 
     var sqe = io_uring_get_sqe(ring)
     if(!sqe) {
@@ -360,7 +316,7 @@ func (this: *WorkerThread) queueReadHttpRequest(
     var connection = &session.connection
 
     Debug("Reading HTTP request for socket: %d state: %s\n", connection.handle(), SessionStateAsStr(session.state))
-    return this.queueReadBufferRecv(ring, session, session.ssl != null)
+    return this.queueReadBufferRecv(ring, session)
 }
 
 
@@ -614,201 +570,6 @@ error:
 }
 
 // ---------------------------------------------------------------
-// TLS helpers (memory BIO path)
-// ---------------------------------------------------------------
-
-
-// Queue the next READ SQE: TLS staging buffer when TLS, H2-plain read when H2, else HTTP/1 read.
-func (this: *WorkerThread) queueNextRead(
-    ring:    *io_uring,
-    session: *SessionContext
-) : Status {
-    if(session.state == SessionState.HTTP2_OPEN) {
-        return this.queueReadBufferRecv(ring, session)
-    }
-
-    return this.queueReadHttpRequest(ring, session)
-}
-
-
-// Create SSL with memory BIOs and begin the TLS handshake.
-func (this: *WorkerThread) queueTlsBeginHandshake(
-    ring:    *io_uring,
-    session: *SessionContext,
-    sslCtx:  *SSL_CTX
-) : Status {
-    var ssl = SSL_new(sslCtx)
-    if(!ssl) {
-        Error("TLS: SSL_new failed for socket %d\n", session.connection.handle())
-        var status = this.queueCancelAndClose(ring, session)
-            ?: return status
-        return Status.ERROR_SSL_ERROR
-    }
-
-    var rbio = BIO_new(BIO_s_mem())
-    var wbio = BIO_new(BIO_s_mem())
-    if(rbio == null || wbio == null) {
-        if(rbio) { BIO_free(rbio) }
-        if(wbio) { BIO_free(wbio) }
-        SSL_free(ssl)
-
-        var status = this.queueCancelAndClose(ring, session)
-            ?: return status
-        return Status.ERROR_OUT_OF_MEMORY
-    }
-
-    SSL_set_bio(ssl, rbio, wbio)
-    session.ssl   = ssl
-    session.state = SessionState.TLS_HANDSHAKING
-    return this.queueReadBufferRecv(ring, session, .clearBuffer = true)
-}
-
-// Advance the TLS handshake using raw bytes that io_uring just delivered.
-// Transitions session state to HTTP2_OPEN or READ_REQUEST_LINE on success.
-func (this: *WorkerThread) queueTlsContinueHandshake(
-    ring:       *io_uring,
-    session:    *SessionContext,
-    bytesRead:  i32
-) : Status {
-    // Feed raw TLS bytes into OpenSSL's read BIO
-    var readBuffer = &session.connection.readBuffer
-    BIO_write(SSL_get_rbio(session.ssl), readBuffer.buffer as (*const void), bytesRead)
-    readBuffer.clear()
-
-    var ret = SSL_accept(session.ssl)
-
-    if(ret == 1) {
-        // Handshake complete — check negotiated ALPN protocol.
-        var proto: *const u8 = null
-        var protoLen: u32 = 0
-        SSL_get0_alpn_selected(session.ssl, &proto, &protoLen)
-
-        if(protoLen == 2 && proto[0] == 'h' as (u8) && proto[1] == '2' as (u8)) {
-            session.protocolVersion = ProtocolVersion.HTTP2
-            session.state = SessionState.HTTP2_OPEN
-            session.http2.init(&session.requestAllocator.allocator)
-        } else {
-            session.protocolVersion = ProtocolVersion.HTTP1
-            session.state = SessionState.READ_REQUEST_LINE
-        }
-    }
-
-    // Flush any handshake output (ServerHello, Finished, etc.) via SENDMSG.
-    // useTls=false: BIO already has the handshake records from SSL_accept; no SSL_write needed.
-    // The SENDMSG CQE will queue the next READ when submissions reaches 0.
-    var flushStatus = this.queueWriteBufferSend(ring, session)
-        ?: return flushStatus
-
-    if(session.submissions > 0) {
-        // SENDMSG CQE handler will re-arm the read.
-        return Status.OK
-    }
-
-    // No output to send — queue the next read now.
-    if(ret == 1) {
-        return this.queueReadBufferRecv(ring, session, .clearBuffer = true)
-    }
-
-    var err = SSL_get_error(session.ssl, ret)
-    if(err == SSL_ERROR_WANT_READ) {
-        return this.queueReadBufferRecv(ring, session, .clearBuffer = true)
-    }
-
-    Debug("TLS: handshake failed on socket %d (err=%d)\n", session.connection.handle(), err)
-    return this.queueCancelAndClose(ring, session)
-}
-
-
-// Decrypt raw TLS ciphertext already in readBuffer back into readBuffer (in-place).
-// Returns number of decrypted bytes, 0 if more wire bytes are needed (WANT_READ),
-// or -1 on fatal error (session already closed).
-func (this: *WorkerThread) tlsDecryptToReadBuffer(
-    ring:          *io_uring,
-    session:       *SessionContext,
-    rawBytesRead:  i32
-) : i32 {
-    var readBuffer = &session.connection.readBuffer
-    BIO_write(SSL_get_rbio(session.ssl), readBuffer.buffer as (*const void), rawBytesRead)
-    readBuffer.clear()
-
-    var total = 0
-
-    while(readBuffer.capacity - total > 0) {
-        var n = SSL_read(session.ssl, (readBuffer.buffer + total) as (*void), readBuffer.capacity - total)
-        if(n <= 0) {
-            break
-        }
-        total += n
-    }
-
-    if(total == 0) {
-        var lastN: i32 = 0
-        var err = SSL_get_error(session.ssl, lastN)
-        if(err == SSL_ERROR_WANT_READ) {
-            this.queueReadBufferRecv(ring, session, .clearBuffer = true)
-                ?: return -1
-
-            return 0
-        }
-        this.queueCancelAndClose(ring, session)
-        return -1
-    }
-    return total
-}
-
-// ---------------------------------------------------------------
-// HTTP/2 helpers
-// ---------------------------------------------------------------
-
-
-// Run the H2 frame machine on `bytesRead` plaintext bytes sitting in readBuffer
-// (not yet committed — processHttp2Data will advance readBuffer.length).
-// Caller must ensure decryption has already been done for TLS sessions.
-func (this: *WorkerThread) queueDispatchH2DataSend(
-    ring:      *io_uring,
-    session:   *SessionContext,
-    bytesRead: i32
-): Status {
-    var connection = &session.connection
-    var status = this.processHttp2Data(session, bytesRead)
-    if(status == Status.PARTIAL_REQUEST_DISPATCHING_READ) {
-        return this.queueReadBufferRecv(ring, session)
-    }
-
-    if(status != Status.OK) {
-        // processHttp2Data may have written a GOAWAY — flush before closing.
-        if(connection.writeBuffer.length > 0) {
-            this.queueWriteBufferSend(ring, session, session.ssl != null)
-        }
-        this.queueCancelAndClose(ring, session)
-        return status;
-    }
-    if(connection.writeBuffer.length > 0) {
-        // SENDMSG CQE will re-arm the read.
-        return this.queueWriteBufferSend(ring, session, session.ssl != null)
-    }
-
-    return this.queueReadBufferRecv(ring, session)
-}
-
-// io_uring-specific HTTP/2 data handler (called from handleCompletionRing READ path).
-// rawBytesRead is cqe.res: raw TLS bytes for TLS sessions, plaintext for non-TLS.
-func (this: *WorkerThread) handleHttp2Data(session: *SessionContext, rawBytesRead: i32) {
-    var ring      = &this.ring
-    var bytesRead = rawBytesRead
-
-    if(session.ssl) {
-        bytesRead = this.tlsDecryptToReadBuffer(ring, session, rawBytesRead)
-        if(bytesRead <= 0) {
-            return;  // 0 = WANT_READ (already re-armed); -1 = error (already closed)
-        }
-    }
-
-    var status = this.queueDispatchH2DataSend(ring, session, bytesRead)
-    // TODO: Handle status, return something from this callback..
-}
-
-// ---------------------------------------------------------------
 // io_uring event loop
 // ---------------------------------------------------------------
 
@@ -1000,64 +761,13 @@ func (this: *WorkerThread) handleCompletionRing(
 
     switch(session.state) {
         case SessionState.CONNECTED: {
-            var sslCtx = this.server.engine.sslCtx
-            if(sslCtx) {
-                return this.queueTlsBeginHandshake(ring, session, sslCtx)
-            }
             Debug("Reading HTTP request for socket: %d\n", connection.handle())
             return this.queueReadHttpRequest(ring, session)
         }
-        case SessionState.TLS_HANDSHAKING: {
-            switch(operation.opcode()) {
-                case RingOpcode.READ: {
-                    var bytesRead = cqe.res
-                    if(bytesRead == 0) {
-                        return this.queueCancelAndClose(ring, session)
-                    }
-                    return this.queueTlsContinueHandshake(ring, session, bytesRead)
-                }
-                case RingOpcode.SENDMSG: {
-                    session.submissions -= 1
-                    if(session.submissions == 0) {
-                        // Handshake output sent — re-arm read.
-                        // State was already updated in queueTlsContinueHandshake if done.
-                        return this.queueReadHttpRequest(ring, session)
-                    }
-                    break
-                }
-                default: break
-            }
-            break
-        }
-        case SessionState.HTTP2_OPEN: {
-            switch(operation.opcode()) {
-                case RingOpcode.READ: {
-                    var bytesRead = cqe.res
-                    if(bytesRead == 0) {
-                        return this.queueCancelAndClose(ring, session)
-                    }
-                    this.handleHttp2Data(session, bytesRead)
-                    break
-                }
-                case RingOpcode.SENDMSG: {
-                    session.submissions -= 1
-                    if(session.submissions == 0) {
-                        return this.queueReadBufferRecv(ring, session)
-                    }
-                    break
-                }
-                default: break
-            }
-            break
-        }
         case SessionState.READ_REQUEST_LINE: {
-            // A SENDMSG CQE can arrive here when the TLS handshake sends its
-            // final flight (server Finished / session ticket) AFTER state
-            // transitions from TLS_HANDSHAKING to READ_REQUEST_LINE.
             if(operation.opcode() == RingOpcode.SENDMSG) {
                 session.submissions -= 1
                 if(session.submissions == 0) {
-                    //this.queueNextRead(ring, session)
                     return this.queueReadHttpRequest(ring, session)
                 }
                 break
@@ -1071,32 +781,11 @@ func (this: *WorkerThread) handleCompletionRing(
                 return this.queueCancelAndClose(ring, session)
             }
 
-            if(session.ssl) {
-                bytesRead = this.tlsDecryptToReadBuffer(ring, session, bytesRead)
-                if(bytesRead <= 0) {
-                    break  // WANT_READ already re-armed, or error already closed
-                }
-            }
-
-            // Detect H2 prior-knowledge (PRI prefix) on plain connections.
-            if(session.protocolVersion == ProtocolVersion.UNKNOWN) {
-                if(!this.tryDetectProtocol(session, bytesRead)) {
-                    return this.queueNextRead(ring, session)
-                }
-            }
-
-            if(session.state == SessionState.HTTP2_OPEN) {
-                // Bytes already decrypted (or plaintext) — skip the TLS layer in dispatchH2Data.
-                var s = this.queueDispatchH2DataSend(ring, session, bytesRead)
-                    ?: return s
-                break
-            }
-
             var status = this.handlePartialHttpRequest(session, bytesRead)
             if(status != Status.OK) {
                 switch(status) {
                     case Status.PARTIAL_REQUEST_DISPATCHING_READ: {
-                        return this.queueNextRead(ring, session)
+                        return this.queueReadHttpRequest(ring, session)
                     }
                     case Status.CONTINUE_SEND: {
                         return this.send100Continue(session)
@@ -1234,7 +923,7 @@ func (this: *WorkerThread) handleCompletionRing(
                 // next read will append the body so handlePartialHttpRequest can
                 // complete the request without re-parsing from scratch.
                 if(session.response.status == 100) {
-                    return this.queueNextRead(ring, session)
+                    return this.queueReadHttpRequest(ring, session)
                 }
                 // RFC 7230 §6.6: close when Connection: close or HTTP/1.0 without keep-alive.
                 if(connection.disableKeepAlive) {
@@ -1242,11 +931,8 @@ func (this: *WorkerThread) handleCompletionRing(
                     return Status.OK
                 }
                 Debug("Preparing connection for another HTTP request for socket: %d\n", connection.handle())
-                var savedSsl = session.ssl
                 session.begin(connection.handle())
-                // Preserve TLS state across HTTP/1.1 keep-alive; begin() nulls ssl.
-                session.ssl = savedSsl
-                return this.queueNextRead(ring, session)
+                return this.queueReadHttpRequest(ring, session)
             }
             break
         }

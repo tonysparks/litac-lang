@@ -3,13 +3,6 @@ import "std/string"
 /** Standard max URL length */
 public const MAX_URL_LENGTH_DEFAULT = 8_000;
 
-// Wire protocol spoken on a given TCP connection
-public enum ProtocolVersion {
-    UNKNOWN = 0,  // not yet detected (default zero value)
-    HTTP1,
-    HTTP2,
-}
-
 @asStr
 public enum Status {
     OK,
@@ -31,7 +24,6 @@ public enum Status {
     ERROR_IO_ERROR,
     ERROR_IOURING_ERROR,
     ERROR_PIPE_ERROR,
-    ERROR_SSL_ERROR,
 
 
     // Http specific errors
