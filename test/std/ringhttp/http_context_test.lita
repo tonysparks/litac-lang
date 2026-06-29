@@ -1,0 +1,109 @@
+import "std/libc"
+import "std/mem"
+import "std/assert"
+import "std/array"
+
+import "std/ringhttp/http_ring"
+
+// ---------------------------------------------------------------------------
+// Minimal server setup helper — just enough to initialise a ContextPool
+// without starting a listening socket.
+// ---------------------------------------------------------------------------
+func makeMinimalServer(config: *HttpConfig, server: *HttpServer) {
+    config.allocator   = defaultAllocator
+    config.maxPoolSize = 3
+    // maxRequestSizeInBytes must be > 0 for pool slot allocation.
+    config.maxRequestSizeInBytes = 64 * KiB
+    config.disableSignal = true
+    config.isLogEnabled  = false
+
+    server.init(config)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: pool exhaustion — alloc() must return -1 when all slots are taken
+// ---------------------------------------------------------------------------
+@test
+func testContextPoolExhaustion() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalServer(&config, &server)
+    // server.free() triggers a deep MimeDB recursion in test; skip teardown
+
+    var pool: ContextPool
+    pool.init(&server)
+    defer pool.free()
+
+    // Exhaust all three slots.
+    var a = pool.alloc()
+    var b = pool.alloc()
+    var c = pool.alloc()
+    assert(a >= 0)
+    assert(b >= 0)
+    assert(c >= 0)
+    assert(a != b && b != c && a != c)
+
+    // Next alloc must signal exhaustion.
+    var d = pool.alloc()
+    assert(d == -1)
+
+    // After releasing slot b, that same index must be re-allocatable.
+    pool.dealloc(b)
+    var e = pool.alloc()
+    assert(e == b)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: dealloc guard — double-dealloc must not corrupt the free-list
+// ---------------------------------------------------------------------------
+@test
+func testContextPoolDoubleDeallocSafe() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalServer(&config, &server)
+    // server.free() triggers a deep MimeDB recursion in test; skip teardown
+
+    var pool: ContextPool
+    pool.init(&server)
+    defer pool.free()
+
+    var idx = pool.alloc()
+    assert(idx >= 0)
+
+    // First dealloc is normal.
+    pool.dealloc(idx)
+    // Second dealloc must be a silent no-op (inUse == false guard).
+    pool.dealloc(idx)
+
+    // The slot must appear exactly once in the free-list.
+    var count = 0
+    for(var i = 0; i < pool.freeList.size(); i+=1) {
+        if(pool.freeList.get(i) == idx) {
+            count += 1
+        }
+    }
+    assert(count == 1)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: out-of-range index — alloc/dealloc on invalid indices must be safe
+// ---------------------------------------------------------------------------
+@test
+func testContextPoolBoundaryIndices() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalServer(&config, &server)
+    // server.free() triggers a deep MimeDB recursion in test; skip teardown
+
+    var pool: ContextPool
+    pool.init(&server)
+    defer pool.free()
+
+    // Dealloc of -1 and an index past the pool must be no-ops (no crash).
+    pool.dealloc(-1)
+    pool.dealloc(9999)
+
+    // get() on out-of-range must return null.
+    assert(pool.get(-1) == null)
+    assert(pool.get(9999) == null)
+}

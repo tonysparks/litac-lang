@@ -1,0 +1,1216 @@
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/mem"
+import "std/libc"
+import "std/thread"
+import "std/atomic"
+import "std/assert"
+import "std/log"
+import "std/system"
+import "std/array"
+
+import "std/ringhttp/http_connection"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_file"
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_websocket"
+import "std/ringhttp/http_sse"
+import "std/ringhttp/http2_connection"
+import "std/ringhttp/http2_frame"
+import "std/ringhttp/http2_hpack"
+import "std/ringhttp/http2_stream"
+import "std/ringhttp/mime"
+
+import "std/crypto/sha1"
+import "std/encoding/base64"
+
+import "std/net/posix_socket"
+#if (OS == "MAC")
+    import using "std/ringhttp/http_worker_kqueue"
+#elseif (OS == "LINUX")
+    import using "std/ringhttp/http_worker_iouring"
+#else_error "Unsupported Operating System target"
+#end
+
+// ---------------------------------------------------------------
+// Shared HTTP methods
+// Backend provides: queueSend, closeSession, rearmTimeout, sendWebSocketFrame,
+//                   handleHttp2Data
+// ---------------------------------------------------------------
+
+internal func (this: *WorkerThread) handleAccept(clientSocket: i32) : *SessionContext {
+    var index = this.sessions.alloc()
+    if(index < 0) {
+        Warn("SessionContext pool exhausted, dropping connection\n")
+        return null
+    }
+
+    var session = this.sessions.get(index)
+    assert(session != null)
+
+    session.begin(clientSocket)
+    return session
+}
+
+internal func (this: *WorkerThread) serverError(
+    requestContext: *RequestHandlerContext,
+    status: Status
+) {
+    var request  = requestContext.request
+    var response = requestContext.response
+
+    Error("Internal error: %s %.*s\n",
+        HttpMethodAsStr(request.method),
+        request.path.length, request.path.buffer
+    )
+
+    response.status = 500
+    if(this.server.errorHandler.__this) {
+        this.server.errorHandler.handle(requestContext, status)
+    }
+    else {
+        response.type = ResponseType.BODY
+        response.body.append("Internal Error handling the request.")
+    }
+}
+
+internal func (this: *WorkerThread) server404(
+    requestContext: *RequestHandlerContext,
+    status: Status
+) {
+    var request  = requestContext.request
+    var response = requestContext.response
+
+    response.status = 404
+    if(this.server.notFoundHandler.__this) {
+        this.server.notFoundHandler.handle(requestContext, status)
+    }
+    else {
+        response.type = ResponseType.BODY
+        response.body.append("No route bound.")
+    }
+}
+
+func (this: *WorkerThread) writeAllowHeader(
+    requestContext: *RequestHandlerContext,
+    allowedMethods: i32
+) {
+    var response = requestContext.response
+    var allowBuf = requestContext.allocator.alloc(128) as (*char)
+    var allowLen = 0
+    // OPTIONS is always allowed if we are here.
+    var allMethods = allowedMethods | (1 << HttpMethod.OPTIONS as (i32))
+    for(var m = 1; m < MAX_METHODS; m += 1) {
+        if(allMethods & (1 << m)) {
+            if(allowLen > 0) {
+                allowBuf[allowLen] = ','
+                allowBuf[allowLen + 1] = ' '
+                allowLen += 2
+            }
+            var methodName = HttpMethodAsStr(m as (HttpMethod))
+            var methodLen = methodName.length()
+            memcpy(allowBuf + allowLen, methodName, methodLen as (usize))
+            allowLen += methodLen
+        }
+    }
+    response.addHeader($"Allow", String{.buffer = allowBuf, .length = allowLen})
+}
+
+// RFC 7231 §4.3.7: OPTIONS auto-response — 200 with an Allow header.
+// Used when no handler is registered for OPTIONS on the given path.
+internal func (this: *WorkerThread) serverOptions(
+    requestContext: *RequestHandlerContext,
+    allowedMethods: i32
+) {
+    var response = requestContext.response
+
+    response.status = 200
+    response.type   = ResponseType.BODY
+
+    this.writeAllowHeader(requestContext, allowedMethods)
+    response.addHeader($"Content-Length", $"0")
+}
+
+// RFC 7231 §6.5.5: 405 Must Not Allowed MUST include an Allow header listing
+// the methods that are valid for the requested resource.
+internal func (this: *WorkerThread) server405(
+    requestContext: *RequestHandlerContext,
+    allowedMethods: i32
+) {
+    var request  = requestContext.request
+    var response = requestContext.response
+
+    response.status = 405
+    response.type   = ResponseType.BODY
+    response.body.append("Method Not Allowed\n")
+
+    this.writeAllowHeader(requestContext, allowedMethods)
+}
+
+
+internal func (this: *WorkerThread) send100Continue(
+    context: *SessionContext
+): Status {
+    var httpRequest = HttpRequest{}
+    var requestContext = RequestHandlerContext {
+        .allocator = &context.requestAllocator.allocator,
+        .request   = &httpRequest,
+        .response  = &context.response,
+        .userData  = null,
+        .match     = null
+    }
+
+    var response = requestContext.response
+    response.status = 100
+    response.type   = ResponseType.BODY
+
+    return this.queueSend(context)
+}
+
+internal func (this: *WorkerThread) sendBadRequest(
+    context: *SessionContext,
+    status:  Status
+): Status {
+    var httpRequest = HttpRequest{}
+    var requestContext = RequestHandlerContext {
+        .allocator = &context.requestAllocator.allocator,
+        .request   = &httpRequest,
+        .response  = &context.response,
+        .userData  = null,
+        .match     = null
+    }
+
+    var response = requestContext.response
+    response.status = 400
+    response.type   = ResponseType.BODY
+
+    switch(status) {
+        case Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT:
+            response.status = 414
+            response.body.append(
+                "Request URI exceeds the maximum of %d bytes\n",
+                this.config.maxHttpRequestLineSizeInBytes
+            )
+            break
+        case Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT:
+            response.body.append(
+                "Request exceeded the max request limit of %d bytes for headers\n",
+                this.config.maxHttpHeaderSizeInBytes
+            )
+            break
+        case Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT:
+            response.status = 413
+            response.body.append(
+                "Request exceeded the max request limit of %d bytes for body\n",
+                this.config.maxHttpBodySizeInBytes
+            )
+            break
+        case Status.ERROR_UNKNOWN_BODY_LENGTH:
+            response.status = 411
+            response.body.append("Missing Content-Length or Transfer-Encoding\n")
+            break
+        case Status.ERROR_PARSING_HTTP_REQUEST:
+            response.status = 422
+            response.body.append("Unprocessable request body\n")
+            break
+        case Status.ERROR_WEB_SOCKET_SECURITY_KEY:
+            response.body.append("Missing or invalid Sec-WebSocket-Key\n")
+            break
+        case Status.ERROR_UNSUPPORTED_UPGRADE_PROTOCOL:
+            response.status = 426
+            response.body.append("The requested protocol upgrade is not supported\n")
+            break
+        case Status.ERROR_MISSING_HOST_HEADER:
+            response.body.append("HTTP/1.1 requests must include a Host header\n")
+            break
+        case Status.ERROR_DUPLICATE_HOST_HEADER:
+            response.body.append("HTTP/1.1 requests must not send more than one Host header\n")
+            break
+        case Status.ERROR_HTTP_VERSION_NOT_SUPPORTED:
+            response.status = 505
+            response.body.append("HTTP Version Not Supported\n")
+            break
+        case Status.ERROR_CONFLICTING_BODY_HEADERS:
+            response.body.append("Request must not carry both Transfer-Encoding and Content-Length\n")
+            break
+        case Status.ERROR_CONFLICTING_CONTENT_LENGTH:
+            response.body.append("Duplicate Content-Length headers with differing values\n")
+            break
+        case Status.ERROR_INVALID_CONTENT_LENGTH:
+            response.body.append("Content-Length header value is not a valid integer\n")
+            break
+        case Status.ERROR_UNSUPPORTED_REQUEST_METHOD:
+            response.status = 501
+            response.body.append("Method not implemented\n")
+            break
+        case Status.ERROR_EXPECT_FAILED:
+            response.status = 417
+            response.body.append("Expectation Failed\n")
+            break
+        case Status.ERROR_WEB_SOCKET_MISSING_CONNECTION:
+            response.body.append("Upgrade request must include 'Connection: upgrade'\n")
+            break
+        default:
+            response.body.append("Bad request\n")
+            break
+    }
+
+    return this.queueSend(context)
+}
+
+internal func (this: *WorkerThread) sendServerError(
+    session: *SessionContext,
+    status:  Status
+): Status {
+    var httpRequest = HttpRequest{}
+    var requestContext = RequestHandlerContext {
+        .allocator = &session.requestAllocator.allocator,
+        .request   = &httpRequest,
+        .response  = &session.response,
+        .userData  = null,
+        .match     = null
+    }
+    this.serverError(&requestContext, status)
+    return this.queueSend(session)
+}
+
+internal func (this: *WorkerThread) handlePartialHttpRequest(
+    request:   *SessionContext,
+    bytesRead: i32
+): Status {
+
+    var connection = &request.connection
+    var readBuffer = &connection.readBuffer
+
+    readBuffer.length += bytesRead
+
+    var buffer = readBuffer.toString()
+    if(request.requestLineIndex < 1) {
+        request.requestLineIndex = buffer.endIndexOf($"\r\n")
+        if(request.requestLineIndex < 0) {
+            if(readBuffer.remaining() < this.config.maxHttpRequestLineSizeInBytes) {
+                readBuffer.reserve(readBuffer.capacity + this.config.maxHttpRequestLineSizeInBytes as (i32))
+            }
+
+            Debug("RequestLine not fully read, waiting for more data: %d\n", connection.handle())
+            return Status.PARTIAL_REQUEST_DISPATCHING_READ
+        }
+
+        if(request.requestLineIndex > this.config.maxHttpRequestLineSizeInBytes) {
+            return Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT
+        }
+    }
+
+    if(request.headerIndex < 1) {
+        request.headerIndex = buffer.endIndexOf($"\r\n\r\n")
+        if(request.headerIndex < 0) {
+            if(readBuffer.remaining() < this.config.maxHttpHeaderSizeInBytes) {
+                readBuffer.reserve(readBuffer.capacity + this.config.maxHttpHeaderSizeInBytes as (i32))
+            }
+
+            Debug("Headers not fully read, waiting for more data: %d\n", connection.handle())
+            return Status.PARTIAL_REQUEST_DISPATCHING_READ
+        }
+
+        var headerSize = request.headerIndex - request.requestLineIndex
+        if(headerSize > this.config.maxHttpHeaderSizeInBytes) {
+            return Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT
+        }
+
+        request.bodyIndex = request.headerIndex
+    }
+
+    var parser = HttpParser{}
+    parser.init(&request.requestAllocator.allocator)
+
+    var input = String {
+        .buffer = readBuffer.buffer,
+        .length = request.headerIndex
+    }
+
+    var httpRequest = &request.request
+    var ok = parser.parse(input, httpRequest)
+        ?: return ok
+
+    // RFC 7231 §4.1: unrecognised request method → 501 Not Implemented.
+    if(httpRequest.method == HttpMethod.INVALID) {
+        return Status.ERROR_UNSUPPORTED_REQUEST_METHOD
+    }
+
+    // RFC 7230 §3.3.2: duplicate Content-Length with differing values → 400.
+    if((httpRequest.flags & HttpFlags.CONFLICTING_CONTENT_LENGTH) != 0) {
+        return Status.ERROR_CONFLICTING_CONTENT_LENGTH
+    }
+
+    // RFC 7230 §2.6: reject unsupported HTTP versions.
+    if(!httpRequest.version.equals($"HTTP/1.1") && !httpRequest.version.equals($"HTTP/1.0")) {
+        return Status.ERROR_HTTP_VERSION_NOT_SUPPORTED
+    }
+
+    // RFC 7230 §5.4: HTTP/1.1 requests MUST carry a Host header.
+    if(httpRequest.version.equals($"HTTP/1.1")) {
+        var host = httpRequest.getHeaderValue($"Host")
+        if(host.empty()) {
+            return Status.ERROR_MISSING_HOST_HEADER
+        }
+    }
+
+    // RFC 7231 §5.1.1: an unrecognised Expect value MUST be rejected with 417.
+    if((httpRequest.flags & HttpFlags.EXPECT_UNKNOWN) != 0) {
+        return Status.ERROR_EXPECT_FAILED
+    }
+
+    // RFC 7230 §6.7: an Upgrade request MUST also have Connection: upgrade.
+    if((httpRequest.flags & HttpFlags.WEB_SOCKET_PROTOCOL) != 0 &&
+       (httpRequest.flags & HttpFlags.UPGRADE_REQUEST) == 0) {
+        return Status.ERROR_WEB_SOCKET_MISSING_CONNECTION
+    }
+
+    if(httpRequest.flags & HttpFlags.CHUNKED_ENCODING) {
+        // RFC 7230 §3.3.3: receiving both TE and Content-Length is a protocol error.
+        if((httpRequest.flags & HttpFlags.CONTENT_LENGTH_PROVIDED) != 0) {
+            return Status.ERROR_CONFLICTING_BODY_HEADERS
+        }
+        httpRequest.bodyLength = 0
+
+        var status = parser.parseChunk(readBuffer.toString().substring(request.headerIndex), httpRequest)
+        if(status == Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE) {
+            return Status.PARTIAL_REQUEST_DISPATCHING_READ
+        }
+        if(status != Status.OK) {
+            return status
+        }
+    }
+    else if(httpRequest.flags & HttpFlags.CONTENT_LENGTH_PROVIDED) {
+        var bodyLength = httpRequest.bodyLength
+        if(this.config.maxHttpBodySizeInBytes > 0 && bodyLength > this.config.maxHttpBodySizeInBytes) {
+            return Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT
+        }
+
+        if(readBuffer.length - request.headerIndex < bodyLength) {
+            if(readBuffer.remaining() < 1 * MiB) {
+                readBuffer.reserve(readBuffer.capacity + 1 * MiB as (i32))
+            }
+
+            // RFC 7231 §5.1.1: send 100 Continue so the client will send the body.
+            // Guard with SENT_CONTINUE to avoid re-sending on each partial read.
+            if((httpRequest.flags & HttpFlags.EXPECT_CONTINUE) &&
+               !(httpRequest.flags & HttpFlags.SENT_CONTINUE)) {
+
+                httpRequest.flags |= HttpFlags.SENT_CONTINUE
+                return Status.CONTINUE_SEND
+            }
+
+            return Status.PARTIAL_REQUEST_DISPATCHING_READ
+        }
+    }
+    else {
+        var body = readBuffer.toString().substring(request.headerIndex)
+        if(!body.empty()) {
+            return Status.ERROR_UNKNOWN_BODY_LENGTH
+        }
+    }
+
+    return Status.OK
+}
+
+internal func (this: *WorkerThread) handleHttpRequest(
+    request: *SessionContext
+): Status {
+
+    var requestAllocator = &request.requestAllocator.allocator
+    var connection = &request.connection
+
+    var buffer = &connection.readBuffer
+    Debug("Handling HTTP request for socket: %d\n", connection.handle())
+
+    var parser = HttpParser{}
+    parser.init(requestAllocator)
+
+    var input = StringInit(buffer.buffer, buffer.length).substring(request.bodyIndex)
+    var httpRequest = &request.request
+
+    if(httpRequest.flags & HttpFlags.CHUNKED_ENCODING) {
+        input = httpRequest.body.chunkData.toString()
+    }
+
+    var ok = parser.parseBody(input, httpRequest)
+    if(ok != Status.OK) {
+        return ok
+    }
+
+    // RFC 7230 §6.3: HTTP/1.0 is close-by-default; HTTP/1.1 is keep-alive-by-default.
+    var isHttp10 = httpRequest.version.equals($"HTTP/1.0")
+    var keepAliveOptIn = (httpRequest.flags & HttpFlags.KEEP_ALIVE_REQUESTED) != 0
+    connection.disableKeepAlive = (httpRequest.flags & HttpFlags.DISABLE_KEEP_ALIVE) != 0 ||
+                                  (isHttp10 && !keepAliveOptIn)
+
+    if(httpRequest.method == HttpMethod.GET) {
+        if(httpRequest.path.startsWith(this.server.config.publicServerPath)) {
+            return this.handleFileRequest(request, httpRequest)
+        }
+    }
+
+    var requestContext = RequestHandlerContext {
+        .allocator    = requestAllocator,
+        .request      = httpRequest,
+        .response     = &request.response,
+        .userData     = null,
+        .match        = null,
+        .startTime    = request.lastRequestTime,
+        .sessionIndex = request.index
+    }
+
+    // Pre-dispatch filters — each may block the request by returning 0.
+    // The blocking filter is responsible for writing its own response.
+    var blocked = false
+    for(var i = 0; i < this.server.filterHandlers.size(); i += 1) {
+        if(this.server.filterHandlers.get(i).handleFilter(&requestContext) == 0) {
+            blocked = true
+            break
+        }
+    }
+
+    var requestMatch: RouteMatch;
+    if(!blocked) {
+        if(!this.server.router.match(httpRequest.method, httpRequest.path, &requestMatch)) {
+            var allowed = this.server.router.allowedMethods(&httpRequest.path)
+            // RFC 7231 §4.3.7: OPTIONS with no registered handler auto-responds with Allow.
+            // "OPTIONS *" is a server-wide capabilities query — allow on any known path.
+            if(httpRequest.method == HttpMethod.OPTIONS) {
+                this.serverOptions(&requestContext, allowed)
+            } else if(allowed != 0) {
+                this.server405(&requestContext, allowed)
+            } else {
+                this.server404(&requestContext, Status.ERROR_NO_ROUTE_FOUND)
+            }
+        }
+        else {
+            var handler = requestMatch.handler
+            requestContext.userData = handler.userData
+            requestContext.match    = &requestMatch
+
+            switch(handler.type) {
+                case RequestHandlerType.HTTP_REQUEST: {
+                    if(handler.controller.callback(&requestContext) != 1) {
+                        this.serverError(&requestContext, Status.ERROR_CONTROLLER_CALLBACK_ERROR)
+                    }
+                    break
+                }
+                case RequestHandlerType.SSE_STREAM: {
+                    if(httpRequest.method != HttpMethod.GET) {
+                        this.serverError(&requestContext, Status.ERROR_CONTROLLER_CALLBACK_ERROR)
+                        break
+                    }
+                    return this.handleSseSetup(request, httpRequest, &requestContext)
+                }
+                case RequestHandlerType.WEB_SOCKET: {
+                    if(httpRequest.method != HttpMethod.GET) {
+                        this.serverError(&requestContext, Status.ERROR_CONTROLLER_CALLBACK_ERROR)
+                        break
+                    }
+
+                    if(httpRequest.flags & HttpFlags.UPGRADE_REQUEST) {
+                        if(!(httpRequest.flags & HttpFlags.WEB_SOCKET_PROTOCOL)) {
+                            return this.sendBadRequest(request, Status.ERROR_UNSUPPORTED_UPGRADE_PROTOCOL)
+                        }
+
+                        return this.handleWebSocketUpgrade(
+                            request,
+                            httpRequest,
+                            &requestContext
+                        )
+                    }
+
+                    // Non-upgrade GET to a WebSocket-only endpoint
+                    requestContext.response.status = 400
+                    requestContext.response.type   = ResponseType.BODY
+                    requestContext.response.body.append("WebSocket upgrade required\n")
+                    break
+                }
+                default: {
+                    assert(false)
+                }
+            }
+        }
+    }
+
+    // Post-dispatch handlers — always called for HTTP requests (blocked or not).
+    for(var i = 0; i < this.server.postHandlers.size(); i += 1) {
+        this.server.postHandlers.get(i).postHandle(&requestContext)
+    }
+
+    var elapsed = SystemTimeMSec() - request.lastRequestTime
+    var httpReq = &request.request
+    Info("%s %.*s %d %.0fms\n",
+        HttpMethodAsStr(httpReq.method),
+        httpReq.path.length, httpReq.path.buffer,
+        request.response.status,
+        elapsed
+    )
+
+    return this.queueSend(request)
+}
+
+internal func (this: *WorkerThread) handleWebSocketUpgrade(
+    context:        *SessionContext,
+    httpRequest:    *HttpRequest,
+    requestContext: *RequestHandlerContext
+): Status {
+
+    var secKey = httpRequest.getHeaderValue($"Sec-WebSocket-Key")
+    if(secKey.empty()) {
+        return Status.ERROR_WEB_SOCKET_SECURITY_KEY
+    }
+
+    var keyBuffer = [128]char;
+    var keyString = StringBufferInit(keyBuffer, 128)
+    keyString.append("%.*s%s", secKey.length, secKey.buffer, WEB_SOCKET_MAGIC)
+
+    var hashResult:[SHA1_BLOCK_SIZE]u8;
+    var ctx: sha1_ctx;
+
+    sha1_init(&ctx)
+    sha1_update(&ctx, keyString.cStr() as (*u8), keyString.length)
+    sha1_final(&ctx, hashResult)
+
+    var keyAccept = context.requestAllocator.alloc(sizeof(:u8) * 64) as (*u8)
+    var bytesEncoded = base64_encode(hashResult, keyAccept, SHA1_BLOCK_SIZE, 0)
+
+    var response = &context.response
+    response.status = 101
+    response.type   = ResponseType.BODY
+    response.addHeaderStr("Upgrade", "websocket")
+    response.addHeaderStr("Connection", "Upgrade")
+    response.addHeader(
+        StringInit("Sec-WebSocket-Accept"),
+        String{.buffer = keyAccept as (*const char), .length = bytesEncoded as (i32)}
+    )
+
+    context.socketSession.worker   = this
+    context.socketSession.userData = requestContext.userData
+    context.socketSession.allocator = requestContext.allocator
+
+    var requestMatch = requestContext.match
+    assert(requestMatch.handler.type == RequestHandlerType.WEB_SOCKET)
+    context.socketHandler = requestMatch.handler.webSocket
+    context.state         = SessionState.WEB_SOCKET_UPGRADED
+    context.isWebSocket   = true
+
+    var connection = &context.connection
+    var readBuffer = &connection.readBuffer
+    readBuffer.clear()
+
+    var elapsed = SystemTimeMSec() - context.lastRequestTime
+    Info("%s %.*s %d %.0fms\n",
+        HttpMethodAsStr(httpRequest.method),
+        httpRequest.path.length, httpRequest.path.buffer,
+        context.response.status,
+        elapsed
+    )
+
+    return this.queueSend(context)
+}
+
+internal func (this: *WorkerThread) handleSseSetup(
+    context:        *SessionContext,
+    httpRequest:    *HttpRequest,
+    requestContext: *RequestHandlerContext
+): Status {
+
+    var response = &context.response
+    response.status = 200
+    response.type   = ResponseType.SSE
+
+    context.sseSession.worker    = this
+    context.sseSession.context   = context
+    context.sseSession.userData  = requestContext.userData
+    context.sseSession.allocator = requestContext.allocator
+
+    var requestMatch = requestContext.match
+    assert(requestMatch.handler.type == RequestHandlerType.SSE_STREAM)
+    context.sseHandler = requestMatch.handler.sseController
+    context.state      = SessionState.SSE_UPGRADED
+    context.isSse      = true
+
+    var readBuffer = &context.connection.readBuffer
+    readBuffer.clear()
+
+    var elapsed = SystemTimeMSec() - context.lastRequestTime
+    Info("%s %.*s %d %.0fms\n",
+        HttpMethodAsStr(httpRequest.method),
+        httpRequest.path.length, httpRequest.path.buffer,
+        context.response.status,
+        elapsed
+    )
+
+    return this.queueSend(context)
+}
+
+internal func (this: *WorkerThread) handleFileRequest(
+    session:     *SessionContext,
+    httpRequest: *HttpRequest
+): Status {
+
+    var fileResult = OpenFileInfo(
+        this.rootPath,
+        this.config.publicServerPath,
+        httpRequest.path
+    )
+    if(fileResult.status != Status.OK) {
+        return fileResult.status
+    }
+
+    session.file       = fileResult.fd
+    session.fileOffset = 0
+
+    var response = &session.response
+    response.status     = 200
+    response.type       = ResponseType.FILE
+    response.fileHandle = fileResult.fd
+    response.fileSize   = fileResult.fileSize as (usize)
+
+    var mime = this.server.mime.getMimeType(httpRequest.path)
+    if(!mime.empty()) {
+        response.addHeader($"Content-Type", mime)
+    }
+
+    var elapsed = SystemTimeMSec() - session.lastRequestTime
+    Info("%s %.*s %d %.0fms\n",
+        HttpMethodAsStr(httpRequest.method),
+        httpRequest.path.length, httpRequest.path.buffer,
+        response.status,
+        elapsed
+    )
+
+    return this.queueSend(session)
+}
+
+internal func (this: *WorkerThread) handleWebSocketFrame(
+    session:   *SessionContext,
+    bytesRead: i32
+): Status {
+
+    var connection = &session.connection
+    var readBuffer = &connection.readBuffer
+
+    readBuffer.length += bytesRead
+
+    // Loop to process all complete frames that arrived in this read.
+    // Multiple frames can arrive in a single TCP segment; the original
+    // single-shot parse + clear() would silently discard all but the first.
+    while(readBuffer.length >= 2) {
+        var frame = Frame{}
+        var status = frame.parseHeader(readBuffer)
+        if(status != Status.OK) {
+            readBuffer.clear()
+            return Status.ERROR_WEB_SOCKET_FRAME
+        }
+
+        if(this.config.maxHttpBodySizeInBytes > 0 &&
+           frame.payloadLength > this.config.maxHttpBodySizeInBytes
+        ) {
+            readBuffer.clear()
+            return Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT
+        }
+
+        status = frame.parsePayload(readBuffer)
+        if(status != Status.OK) {
+            if(status == Status.ERROR_WEB_SOCKET_FRAME_LENGTH) {
+                if((readBuffer.capacity - frame.offset) < frame.payloadLength) {
+                    var neededSpace = frame.payloadLength - readBuffer.capacity
+                    readBuffer.reserve(readBuffer.capacity + neededSpace as (i32))
+                    Error("TODO: Grow buffer!\n")
+                    exit(1)
+                    return Status.ERROR_OUT_OF_MEMORY
+                }
+                return Status.PARTIAL_WEB_SOCKET_DISPATCHING_READ
+            }
+            readBuffer.clear()
+            return Status.ERROR_WEB_SOCKET_FRAME
+        }
+
+        // How many bytes does this frame occupy in the buffer.
+        var consumed = (frame.offset + frame.payloadLength) as (i32)
+
+        // RFC 6455 §5.5.2: auto-respond to PING with PONG, then continue loop.
+        if(frame.opcode == Opcode.PING) {
+            var pong = Frame{}
+            pong.isFinal       = true
+            pong.masked        = false
+            pong.opcode        = Opcode.PONG
+            pong.payload       = frame.payload
+            pong.payloadLength = frame.payloadLength
+            this.sendWebSocketFrame(session, &pong)
+            var remaining = readBuffer.length - consumed
+            if(remaining > 0) {
+                memmove(readBuffer.buffer, readBuffer.buffer + consumed, remaining as (usize))
+            }
+            readBuffer.length = remaining
+            continue
+        }
+
+        // RFC 6455 §5.4: message fragmentation.
+        if(!frame.isFinal || frame.opcode == Opcode.CONTINUATION) {
+            if(frame.opcode != Opcode.CONTINUATION) {
+                // First fragment — remember opcode, start accumulation buffer.
+                session.wsFragInProgress = true
+                session.wsFragOpcode     = frame.opcode as (i32)
+                session.wsFragBuf.clear()
+                if(!session.wsFragBuf.buffer) {
+                    session.wsFragBuf.init(1024, &session.requestAllocator.allocator)
+                }
+            }
+            if(session.wsFragInProgress && frame.payload != null && frame.payloadLength > 0) {
+                var limit = this.config.maxWsFragmentedMessageSizeInBytes
+                var newTotal = (session.wsFragBuf.length + frame.payloadLength as (i32)) as (usize)
+                if(limit > 0 && newTotal > limit) {
+                    readBuffer.clear()
+                    return Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT
+                }
+                session.wsFragBuf.appendStrn(frame.payload, frame.payloadLength as (i32))
+            }
+            var remaining = readBuffer.length - consumed
+            if(remaining > 0) {
+                memmove(readBuffer.buffer, readBuffer.buffer + consumed, remaining as (usize))
+            }
+            readBuffer.length = remaining
+            if(!frame.isFinal) {
+                continue  // more fragments to come
+            }
+            // FIN=1 + CONTINUATION opcode → final fragment; dispatch assembled message.
+            var assembled = Frame{}
+            assembled.isFinal       = true
+            assembled.masked        = false
+            assembled.opcode        = session.wsFragOpcode as (Opcode)
+            assembled.payload       = session.wsFragBuf.buffer
+            assembled.payloadLength = session.wsFragBuf.length
+            session.wsFragInProgress = false
+            if(session.socketHandler.callback) {
+                if(!session.socketHandler.callback(&session.socketSession, assembled)) {
+                    return Status.ERROR_WEB_SOCKET_HANDLE_FRAME_ERROR
+                }
+            }
+            continue
+        }
+
+        // Non-fragmented data/control frame — call user handler first, then consume.
+        var cbStatus = Status.OK
+        if(session.socketHandler.callback) {
+            if(!session.socketHandler.callback(&session.socketSession, frame)) {
+                cbStatus = Status.ERROR_WEB_SOCKET_HANDLE_FRAME_ERROR
+            }
+        }
+
+        var remaining = readBuffer.length - consumed
+        if(remaining > 0) {
+            memmove(readBuffer.buffer, readBuffer.buffer + consumed, remaining as (usize))
+        }
+        readBuffer.length = remaining
+
+        if(frame.opcode == Opcode.CLOSE) {
+            readBuffer.clear()
+            return Status.WEB_SOCKET_CLOSED
+        }
+
+        if(cbStatus != Status.OK) {
+            readBuffer.clear()
+            return cbStatus
+        }
+    }
+
+    return Status.OK
+}
+
+// ---------------------------------------------------------------
+// Shared HTTP/2 helpers
+// These are protocol-level; the backend provides handleHttp2Data which
+// calls processHttp2Data and then does the backend-specific I/O flush.
+// ---------------------------------------------------------------
+
+// Detect the wire protocol from the first bytes of a new connection.
+// Must be called before readBuffer.length is updated for the current recv.
+//
+// If fewer than 3 bytes have arrived in total the bytes are buffered and
+// false is returned (caller should wait for the next read event).
+// On true the session.protocolVersion and session.state are set.
+internal func (this: *WorkerThread) tryDetectProtocol(
+    session:   *SessionContext,
+    bytesRead: i32
+) : bool {
+    var readBuffer = &session.connection.readBuffer
+    var totalSoFar = readBuffer.length + bytesRead
+    if(totalSoFar < 3) {
+        // Too few bytes — buffer them (recv already wrote them to readBuffer.buffer)
+        readBuffer.length = totalSoFar
+        return false
+    }
+    var b0 = readBuffer.buffer[0] as (u8)
+    var b1 = readBuffer.buffer[1] as (u8)
+    var b2 = readBuffer.buffer[2] as (u8)
+    if(b0 == 'P' && b1 == 'R' && b2 == 'I') {
+        // HTTP/2 prior knowledge (RFC 7540 §3.5).
+        session.protocolVersion = ProtocolVersion.HTTP2
+        session.state = SessionState.HTTP2_OPEN
+        session.http2.init(&session.requestAllocator.allocator)
+        Debug("HTTP/2 connection detected on socket: %d\n", session.connection.handle())
+    } else if(b0 == 'G' || b0 == 'D' || b0 == 'H' || b0 == 'O' || b0 == 'T' || b0 == 'C' ||
+              (b0 == 'P' && b1 != 'R') || b0 == '\r') {
+        // Known HTTP/1.1 method first byte: GET, DELETE, HEAD, OPTIONS, TRACE, CONNECT, POST/PUT/PATCH.
+        // '\r' (CRLF) cannot start HTTP/2 (which begins "PRI "); route to HTTP/1.1 parser for 400.
+        session.protocolVersion = ProtocolVersion.HTTP1
+    } else {
+        // Unknown first byte — sniff the URL to distinguish HTTP/1.1 from an invalid HTTP/2 preface.
+        // HTTP/1.1 request lines are "METHOD SP url SP version CRLF" where url starts with '/'.
+        // Buffer up to SNIFF bytes, then look for the first space followed by '/'.
+        const SNIFF = 20
+        var limit = totalSoFar
+        if(limit > SNIFF) { limit = SNIFF }
+
+        var spaceIdx = -1
+        for(var i = 0; i < limit - 1; i += 1) {
+            if(readBuffer.buffer[i] as (u8) == ' ' as (u8)) {
+                spaceIdx = i
+                break
+            }
+        }
+
+        if(spaceIdx < 0) {
+            // No space found yet; buffer and wait for more bytes (if under SNIFF limit).
+            if(totalSoFar < SNIFF) {
+                readBuffer.length = totalSoFar
+                return false
+            }
+            // Exceeds SNIFF without a space — not HTTP/1.1. Fall through to HTTP/2 path.
+        } else if(readBuffer.buffer[spaceIdx + 1] as (u8) == '/' as (u8)) {
+            // Space + slash matches "METHOD /path" — treat as HTTP/1.1.
+            session.protocolVersion = ProtocolVersion.HTTP1
+            return true
+        }
+        // Space found but URL doesn't start with '/', OR no space within SNIFF bytes —
+        // treat as invalid HTTP/2 connection preface (RFC 7540 §3.5): send GOAWAY.
+        session.protocolVersion = ProtocolVersion.HTTP2
+        session.state = SessionState.HTTP2_OPEN
+        session.http2.init(&session.requestAllocator.allocator)
+        Debug("Non-HTTP/1.1 connection prefix on socket: %d — treating as invalid HTTP/2\n", session.connection.handle())
+    }
+    return true
+}
+
+// Run the HTTP/2 frame state machine on freshly received bytes.
+// Increments readBuffer.length by bytesRead, clears writeBuffer, then calls
+// Http2Connection.process().  The caller (backend-specific handleHttp2Data)
+// is responsible for flushing writeBuffer and closing on error.
+internal func (this: *WorkerThread) processHttp2Data(
+    session:   *SessionContext,
+    bytesRead: i32
+) : Status {
+    var connection = &session.connection
+    connection.readBuffer.length += bytesRead
+    connection.writeBuffer.clear()
+    session.submissions = 0
+
+    var status = session.http2.process(&connection.readBuffer, &connection.writeBuffer)
+    if(status != Status.OK) {
+        return status
+    }
+
+    // Dispatch every stream that became ready during this read.
+    while(!session.http2.readyQueueEmpty()) {
+        var streamIdx = session.http2.dequeueReady()
+        // Skip streams reset by RST_STREAM before we got here.
+        if(session.http2.streams[streamIdx].state == Http2StreamState.IDLE) {
+            continue
+        }
+        status = this.http2DispatchStream(session, streamIdx)
+        if(status != Status.OK) {
+            break
+        }
+    }
+
+    return status
+}
+
+// Dispatch one fully-received HTTP/2 stream as a normal request.
+// Decodes HPACK headers into session.request, runs the router, then
+// serialises the response back as HEADERS + DATA frames into writeBuffer.
+internal func (this: *WorkerThread) http2DispatchStream(
+    session:   *SessionContext,
+    streamIdx: i32
+) : Status {
+    var h2 = &session.http2
+    assert(streamIdx >= 0 && streamIdx < MAX_H2_STREAMS)
+
+    var stream = &h2.streams[streamIdx]
+    var allocator = &session.requestAllocator.allocator
+
+    // ---- Build HttpRequest from the stream --------------------------------
+    session.request.reset()
+    session.request.headers.init(16, allocator)
+    session.request.version = $"HTTP/2.0"
+
+    var hpackPayload = stream.headerBlock.buffer as (*const u8)
+    var hpackLen     = stream.headerBlock.length
+
+    var pseudoError  = false
+    var decodeStatus = h2.hpack.decode(hpackPayload, hpackLen, &session.request, allocator, &pseudoError)
+    if(decodeStatus != Status.OK) {
+        // RFC 7540 §4.3: HPACK decode failure is a connection error (GOAWAY),
+        // not a stream error, because the HPACK state is shared across streams.
+        h2.sendGoaway(&session.connection.writeBuffer, HTTP2_ERR_COMPRESSION_ERROR)
+        return Status.ERROR_IO_ERROR
+    }
+
+    var streamId = stream.streamId
+    var req = &session.request
+
+    // RFC 7540 §8.1.2.1: duplicate pseudo-headers or pseudo after regular header
+    // are stream-level PROTOCOL_ERRORs.
+    if(pseudoError) {
+        http2WriteRstStream(&session.connection.writeBuffer, streamId, HTTP2_ERR_PROTOCOL_ERROR)
+        h2.closeStream(streamIdx)
+        return Status.OK
+    }
+
+    // RFC 7540 §8.1.2.3: :method, :path, :scheme MUST all be present and
+    // non-empty for every request except CONNECT.
+    if(req.method == HttpMethod.INVALID ||
+       (req.method != HttpMethod.CONNECT &&
+        (req.path.length == 0 || req.scheme.length == 0))
+    ) {
+        http2WriteRstStream(&session.connection.writeBuffer, streamId, HTTP2_ERR_PROTOCOL_ERROR)
+        h2.closeStream(streamIdx)
+        return Status.OK
+    }
+
+    // RFC 7540 §8.1.2.6: content-length MUST equal the sum of DATA frame payload lengths.
+    if((req.flags & HttpFlags.CONTENT_LENGTH_PROVIDED) != 0) {
+        if(req.bodyLength != stream.bodyBuf.length) {
+            http2WriteRstStream(&session.connection.writeBuffer, streamId, HTTP2_ERR_PROTOCOL_ERROR)
+            h2.closeStream(streamIdx)
+            return Status.OK
+        }
+    }
+
+    // RFC 7540 §8.1.2.2: connection-specific header fields are forbidden in H2.
+    // connection, keep-alive, proxy-connection, transfer-encoding, upgrade, and
+    // te (unless value is exactly "trailers") MUST be treated as stream errors.
+    for(var hi = 0; hi < req.headers.size(); hi += 1) {
+        var hdr = req.headers.get(hi)
+        var n   = hdr.name
+        if(n.equalsIgnoreCase($"connection")        ||
+           n.equalsIgnoreCase($"keep-alive")        ||
+           n.equalsIgnoreCase($"proxy-connection")  ||
+           n.equalsIgnoreCase($"transfer-encoding") ||
+           n.equalsIgnoreCase($"upgrade")           ||
+           (n.equalsIgnoreCase($"te") && !hdr.values.equalsIgnoreCase($"trailers"))
+        ) {
+            http2WriteRstStream(&session.connection.writeBuffer, streamId, HTTP2_ERR_PROTOCOL_ERROR)
+            h2.closeStream(streamIdx)
+            return Status.OK
+        }
+        // RFC 7540 §8.1.2: header field names MUST be lowercase in HTTP/2.
+        for(var ci = 0; ci < n.length; ci += 1) {
+            var c = n.buffer[ci] as (i32)
+            if(c >= 0x41 && c <= 0x5A) {
+                http2WriteRstStream(&session.connection.writeBuffer, streamId, HTTP2_ERR_PROTOCOL_ERROR)
+                h2.closeStream(streamIdx)
+                return Status.OK
+            }
+        }
+    }
+
+    // Attach body
+    if(stream.bodyBuf.length > 0) {
+        session.request.buffer = stream.bodyBuf.buffer as (*const char)
+        session.request.length = stream.bodyBuf.length
+    }
+
+    // ---- Reset response for this request ----------------------------------
+    session.response.reset()
+
+    // ---- Router dispatch (mirrors handleHttpRequest sans HTTP/1.1 parsing) -
+    var httpRequest    = &session.request
+    var requestContext = RequestHandlerContext {
+        .allocator    = allocator,
+        .request      = httpRequest,
+        .response     = &session.response,
+        .userData     = null,
+        .match        = null,
+        .startTime    = session.lastRequestTime,
+        .sessionIndex = session.index
+    }
+
+    // File request shortcut
+    if(httpRequest.method == HttpMethod.GET &&
+       httpRequest.path.startsWith(this.server.config.publicServerPath)
+    ) {
+        this.handleFileRequest(session, httpRequest)
+    } else {
+        var blocked = false
+        for(var i = 0; i < this.server.filterHandlers.size(); i += 1) {
+            if(this.server.filterHandlers.get(i).handleFilter(&requestContext) == 0) {
+                blocked = true
+                break
+            }
+        }
+
+        var requestMatch: RouteMatch;
+        if(!blocked) {
+            if(!this.server.router.match(httpRequest.method, httpRequest.path, &requestMatch)) {
+                var allowed = this.server.router.allowedMethods(&httpRequest.path)
+                if(httpRequest.method == HttpMethod.OPTIONS) {
+                    this.serverOptions(&requestContext, allowed)
+                } else if(allowed != 0) {
+                    this.server405(&requestContext, allowed)
+                } else {
+                    this.server404(&requestContext, Status.ERROR_NO_ROUTE_FOUND)
+                }
+            } else {
+                var handler = requestMatch.handler
+                requestContext.userData = handler.userData
+                requestContext.match    = &requestMatch
+
+                if(handler.type == RequestHandlerType.HTTP_REQUEST) {
+                    if(handler.controller.callback(&requestContext) != 1) {
+                        this.serverError(&requestContext, Status.ERROR_CONTROLLER_CALLBACK_ERROR)
+                    }
+                } else {
+                    // SSE/WebSocket over H2 not yet implemented
+                    session.response.status = 501
+                    session.response.type   = ResponseType.BODY
+                    session.response.body.append("Not implemented over HTTP/2\n")
+                }
+            }
+        }
+
+        for(var i = 0; i < this.server.postHandlers.size(); i += 1) {
+            this.server.postHandlers.get(i).postHandle(&requestContext)
+        }
+    }
+
+    var elapsed = SystemTimeMSec() - session.lastRequestTime
+    Info("%s %.*s %d %.0fms (h2 stream %u)\n",
+        HttpMethodAsStr(httpRequest.method),
+        httpRequest.path.length, httpRequest.path.buffer,
+        session.response.status,
+        elapsed,
+        streamId
+    )
+
+    // ---- Serialise response as H2 frames ----------------------------------
+    this.http2SerializeResponse(session, streamIdx)
+
+    // Close the stream only if the full response was sent immediately.
+    // If blocked by flow control, the stream stays SEND_BLOCKED and will be
+    // closed by flushBlockedStreams once WINDOW_UPDATE arrives.
+    if(stream.state != Http2StreamState.SEND_BLOCKED) {
+        h2.closeStream(streamIdx)
+    }
+
+    return Status.OK
+}
+
+// Serialise session.response into HEADERS + DATA frame(s) for stream at streamIdx.
+// Enforces both connection-level and stream-level send windows (RFC 7540 §6.9).
+// If the body exceeds the available window, the remainder is buffered in
+// stream.pendingResponse and stream.state is set to SEND_BLOCKED.
+internal func (this: *WorkerThread) http2SerializeResponse(
+    session:   *SessionContext,
+    streamIdx: i32
+) {
+    var h2        = &session.http2
+    var stream    = &h2.streams[streamIdx]
+    var streamId  = stream.streamId
+    var allocator = &session.requestAllocator.allocator
+    var writeBuf  = &session.connection.writeBuffer
+    var response  = &session.response
+
+    // Normalise FILE responses to BODY (no async read path yet)
+    if(response.type == ResponseType.FILE) {
+        response.status = 501
+        response.type   = ResponseType.BODY
+        response.body.clear()
+        response.body.append("File responses not yet supported over HTTP/2\n")
+        response.numberOfHeaders = 0
+    }
+
+    // Encode HPACK response headers
+    var hpackBuf = StringBuilderInit(256, allocator)
+    h2.hpack.encodeResponse(response, &hpackBuf)
+
+    var noBody   = HttpStatusForbidsBody(session.request.method, response.status)
+    var bodyData = response.body.buffer
+    var bodyLen  = response.body.length
+
+    if(response.type == ResponseType.BODY || response.type == ResponseType.NONE) {
+        var hasBody = !noBody && bodyLen > 0
+
+        if(!hasBody) {
+            http2WriteHeadersFrame(writeBuf, streamId, hpackBuf.buffer, hpackBuf.length,
+                HTTP2_FLAG_END_HEADERS | HTTP2_FLAG_END_STREAM)
+            return;
+        }
+
+        // Compute how many body bytes we can send right now
+        var canSend = h2.sendWindow
+        if(stream.sendWindow < canSend) { canSend = stream.sendWindow }
+        if(canSend < 0) { canSend = 0 }
+        if(canSend > bodyLen) { canSend = bodyLen }
+
+        var fullyNow = canSend >= bodyLen
+
+        http2WriteHeadersFrame(writeBuf, streamId, hpackBuf.buffer, hpackBuf.length,
+            HTTP2_FLAG_END_HEADERS)
+
+        if(canSend > 0) {
+            http2WriteDataChunked(writeBuf, streamId, bodyData, canSend,
+                h2.remoteMaxFrameSize, fullyNow)
+            h2.sendWindow    -= canSend
+            stream.sendWindow -= canSend
+        }
+
+        if(!fullyNow) {
+            // Buffer the unsent remainder on the stream
+            var remaining = bodyLen - canSend
+            stream.pendingResponse.appendStrn(bodyData + canSend, remaining)
+            stream.state = Http2StreamState.SEND_BLOCKED
+            Debug("HTTP/2: stream %u flow-controlled: sent %d/%d bytes\n",
+                streamId, canSend, bodyLen)
+        }
+
+    } else {
+        // STREAM / SSE — not supported yet
+        http2WriteHeadersFrame(writeBuf, streamId, hpackBuf.buffer, hpackBuf.length,
+            HTTP2_FLAG_END_HEADERS | HTTP2_FLAG_END_STREAM)
+    }
+}
+
+internal func (this: *WorkerThread) checkTimeouts() {
+    var timeout = this.config.keepAliveTimeoutInSec
+    const currentTime = SystemTimeMSec()
+
+    for(var i = 0; i < this.sessions.pool.length; i+=1) {
+        var context = this.sessions.get(i)
+        if(context.inUse && context.connection.isConnected()) {
+            var sessionTimeout = timeout
+            if(context.isWebSocket || context.isSse) {
+                sessionTimeout = 90
+            }
+
+            if(context.lastRequestTime + sessionTimeout < currentTime) {
+                Debug("Timeout for socket: %d (index: %d)\n",
+                    context.connection.handle(), context.index)
+                this.closeSession(context)
+            }
+        }
+    }
+
+    this.rearmTimeout()
+}

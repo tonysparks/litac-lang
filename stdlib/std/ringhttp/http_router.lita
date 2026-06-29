@@ -1,0 +1,208 @@
+import "std/array"
+import "std/string"
+import "std/assert"
+import "std/libc"
+import "std/mem"
+import "std/log"
+
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_websocket"
+import "std/ringhttp/http_server"
+
+public struct RequestHandlerContext {
+    allocator: *const Allocator
+    request: *HttpRequest
+    response: *HttpResponse
+    userData: *void
+
+    // Slot for filter middleware to pass data to the downstream route handler.
+    filterData: *void
+
+    match: *RouteMatch
+
+    // wall-clock time (ms) when this request started — set by the worker
+    startTime: f64
+
+    // internal structure
+    sessionIndex: i32
+}
+
+public struct RouteMatch {
+    template: *HttpPathTemplate
+    values: HttpPathValues
+    handler: RequestHandler
+}
+
+public enum RequestHandlerType {
+    HTTP_REQUEST,
+    WEB_SOCKET,
+    SSE_STREAM,
+}
+
+public struct RequestHandler {
+    type: RequestHandlerType
+    userData: *void
+
+    union {
+        controller: HttpController
+        webSocket: WebSocketController
+        sseController: SseController
+    }
+}
+
+public const MAX_METHODS = 10
+
+public struct Router {
+    methods: [MAX_METHODS]Array<Route>
+}
+
+struct Route {
+    template: HttpPathTemplate
+    handler: RequestHandler
+}
+
+public func (this: *Router) init(allocator: *const Allocator) {
+    assert(allocator != null)
+    for(var i = 0; i < MAX_METHODS; i+=1) {
+        this.methods[i].init(128, allocator)
+    }
+}
+
+public func (this: *Router) free() {
+    for(var i = 0; i < MAX_METHODS; i+=1) {
+        this.methods[i].free()
+    }
+}
+
+public func (this: *Router) register(
+    method: HttpMethod,
+    route: *const char,
+    handler: RequestHandler) : bool {
+
+    var template: HttpPathTemplate;
+    if(ParsePathTemplateStr(route, &template) != Status.OK) {
+        return false
+    }
+
+
+    this.methods[method].add(Route {
+        .template = template,
+        .handler = handler
+    })
+
+    return true
+}
+
+// Returns a bitmask of HttpMethod values that have a route matching this path.
+// Used to distinguish 404 (path unknown) from 405 (path known, wrong method).
+public func (this: *Router) allowedMethods(path: *String) : i32 {
+    var allowed = 0
+    for(var m = 1; m < MAX_METHODS; m += 1) {
+        var routes = &this.methods[m]
+        for(var i = 0; i < routes.size(); i += 1) {
+            var route = routes.getPtr(i)
+            if(CheckMatch(&route.template, path)) {
+                allowed |= (1 << m)
+                break
+            }
+        }
+    }
+    return allowed
+}
+
+public func (this: *Router) match(
+    method: HttpMethod,
+    path: *String,
+    result: *RouteMatch
+) : bool {
+    var routes = &this.methods[method]
+
+    // TODO: Do something much smarter here...
+    //  Trie? Radix?
+
+    for(var i = 0; i < routes.size(); i+=1) {
+        var route = routes.getPtr(i)
+
+        if(CheckMatch(&route.template, path)) {
+            result.template = &route.template
+            result.handler = route.handler
+
+            return ParsePathValues(&route.template, path, &result.values) == Status.OK
+        }
+    }
+
+    // RFC 7231 §4.3.2: HEAD is identical to GET — fall back to GET routes.
+    if(method == HttpMethod.HEAD) {
+        routes = &this.methods[HttpMethod.GET]
+        for(var i = 0; i < routes.size(); i+=1) {
+            var route = routes.getPtr(i)
+            if(CheckMatch(&route.template, path)) {
+                result.template = &route.template
+                result.handler = route.handler
+                return ParsePathValues(&route.template, path, &result.values) == Status.OK
+            }
+        }
+    }
+
+    return false
+}
+
+public func CheckMatch(route: *HttpPathTemplate, path: *String) : bool {
+    var numberOfEntries = 0
+    var index = 0
+    var i = 0
+
+    while(index < route.template.length) {
+        if(i >= path.length) {
+            return false
+        }
+
+        var a = route.template.buffer[index]
+        if(a == '{') {
+
+            // eat the value
+            while(i < path.length) {
+                var b = path.buffer[i]
+                if(b == '/') {
+                    break
+                }
+
+                i+=1
+            }
+
+            // skip ahead to next path element
+            while(index < route.template.length) {
+                a = route.template.buffer[index]
+                if(a == '/') {
+                    break
+                }
+
+                index+=1
+            }
+
+            numberOfEntries += 1
+        }
+        else {
+            var b = path.buffer[i]
+            if(a != b) {
+                return false
+            }
+        }
+
+        index += 1
+        i += 1
+    }
+
+    // if there is still more path elements, this shouldn't be
+    // a match...
+    if(i < path.length) {
+        return false
+    }
+
+    return numberOfEntries == route.numberOfEntries
+}
+
+

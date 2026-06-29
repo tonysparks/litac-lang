@@ -1,0 +1,64 @@
+import "std/libc"
+import "std/string/builder"
+import "std/string"
+import "std/mem"
+
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_worker"
+
+@doc("An SSE event to push to a connected client")
+public struct SseEvent {
+    id:    String   // optional: "id: <value>"
+    event: String   // optional: "event: <name>"
+    data:  String   // payload: "data: <text>"
+    retry: i32      // optional reconnect hint in ms; 0 = omit
+}
+
+@doc("A handle to an active SSE connection, used to push events or close the stream")
+public struct SseSession {
+    worker:    *WorkerThread
+    context:   *SessionContext
+    allocator: *const Allocator
+    userData:  *void
+}
+
+@doc("Push an SSE event to the client. Must be called from the same worker thread.")
+public func (this: *SseSession) send(event: *SseEvent) : i32 {
+    return this.worker.sendSseEvent(this.context, event)
+}
+
+@doc("Close the SSE connection from the server side")
+public func (this: *SseSession) close() {
+    this.context.isSse = false
+    this.worker.closeSession(this.context)
+}
+
+internal func (event: *SseEvent) serialize(output: *StringBuilder) {
+    if(event.retry > 0) {
+        output.append("retry: %d\n", event.retry)
+    }
+    if(!event.id.empty()) {
+        output.append("id: %.*s\n", event.id.length, event.id.buffer)
+    }
+    if(!event.event.empty()) {
+        output.append("event: %.*s\n", event.event.length, event.event.buffer)
+    }
+
+    // Emit one "data:" line per newline in the payload so multi-line
+    // messages are formatted correctly per the SSE spec.
+    var remaining = event.data
+    while(true) {
+        var nl = remaining.indexOf($"\n")
+        if(nl < 0) {
+            output.append("data: %.*s\n", remaining.length, remaining.buffer)
+            break
+        }
+        var line = remaining.substring(0, nl)
+        output.append("data: %.*s\n", line.length, line.buffer)
+        remaining = remaining.substring(nl + 1)
+    }
+
+    // Blank line signals end of event to the client
+    output.append("\n")
+}

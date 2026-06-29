@@ -1,0 +1,132 @@
+import "std/mem"
+import "std/assert"
+import "std/string"
+
+import "std/ringhttp/mime"
+
+@test("getMimeType returns correct type for common extensions")
+func testMimeKnownExtensions() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+
+    assert(db.getMimeType($"file.json").equals($"application/json"))
+    assert(db.getMimeType($"style.css").equals($"text/css"))
+    assert(db.getMimeType($"image.png").equals($"image/png"))
+    assert(db.getMimeType($"video.mp4").equals($"video/mp4"))
+    assert(db.getMimeType($"app.wasm").equals($"application/wasm"))
+    assert(db.getMimeType($"archive.zip").equals($"application/zip"))
+    assert(db.getMimeType($"script.js").equals($"application/javascript"))
+}
+
+// Path segments must not affect the lookup — only the last component matters.
+@test("getMimeType works on full paths")
+func testMimeFullPaths() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+
+    assert(db.getMimeType($"/path/to/style.css").equals($"text/css"))
+    assert(db.getMimeType($"a/b/c/image.png").equals($"image/png"))
+}
+
+// Extensions registered under multiple aliases must all resolve correctly.
+@test("getMimeType resolves aliased extensions")
+func testMimeAliases() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+
+    assert(db.getMimeType($"photo.jpg").equals($"image/jpeg"))
+    assert(db.getMimeType($"photo.jpeg").equals($"image/jpeg"))
+
+    assert(db.getMimeType($"readme.md").equals($"text/markdown"))
+    assert(db.getMimeType($"readme.markdown").equals($"text/markdown"))
+
+    assert(db.getMimeType($"music.mid").equals($"audio/midi"))
+    assert(db.getMimeType($"music.midi").equals($"audio/midi"))
+}
+
+// For filenames with multiple dots, getMimeType must use the last extension.
+@test("getMimeType uses the last extension for multi-dot filenames")
+func testMimeMultipleDots() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+
+    // "archive.tar.gz" — last extension is ".gz" → application/gzip
+    assert(db.getMimeType($"archive.tar.gz").equals($"application/gzip"))
+    // "photo.thumb.png" — last extension is ".png" → image/png
+    assert(db.getMimeType($"photo.thumb.png").equals($"image/png"))
+}
+
+// Files without an extension, or with an extension not in the DB, return empty.
+@test("getMimeType returns empty for unknown or missing extensions")
+func testMimeUnknown() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+
+    // No extension at all
+    assert(db.getMimeType($"Makefile").empty())
+    assert(db.getMimeType($"filename").empty())
+
+    // Extension not registered in the DB
+    assert(db.getMimeType($"file.xyz").empty())
+    assert(db.getMimeType($"file.unknown").empty())
+
+    // Empty path — no dot → empty
+    assert(db.getMimeType($"").empty())
+}
+
+// The extension lookup is case-sensitive: ".PNG" is not the same as ".png".
+@test("getMimeType is case-sensitive for file extensions")
+func testMimeCaseSensitive() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+
+    // Lowercase must succeed
+    assert(db.getMimeType($"image.png").equals($"image/png"))
+    // Upper-case is not registered → empty
+    assert(db.getMimeType($"image.PNG").empty())
+    assert(db.getMimeType($"data.JSON").empty())
+}
+
+// A dot-leading filename (Unix hidden file) exposes its content as the
+// "extension" — which is not a registered MIME type.
+@test("getMimeType dot-leading filename returns empty")
+func testMimeDotLeadingFile() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+    // ".gitignore" → extension extracted is "gitignore" → not in DB → empty
+    assert(db.getMimeType($".gitignore").empty())
+    assert(db.getMimeType($".env").empty())
+    assert(db.getMimeType($".bashrc").empty())
+}
+
+// A filename whose last character is a dot has an empty extension string;
+// the DB lookup for "" must return empty rather than crashing.
+@test("getMimeType trailing-dot filename returns empty")
+func testMimeTrailingDotFile() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+    assert(db.getMimeType($"file.").empty())
+    assert(db.getMimeType($"archive.tar.").empty())
+}
+
+// A path component that contains dots in directory segments must not
+// confuse getMimeType — only the extension of the final filename matters.
+@test("getMimeType dots in directory segments ignored")
+func testMimeDotsInDirectorySegments() {
+    var db = MimeDB{}
+    db.init(defaultAllocator)
+
+    // Directory "v1.2.3" but file has no extension → empty
+    assert(db.getMimeType($"/api/v1.2.3/resource").empty())
+
+    // Directory ".hidden" but file has known extension → correct type
+    assert(db.getMimeType($"/path/.config/style.css").equals($"text/css"))
+}

@@ -1,0 +1,1273 @@
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/mem"
+import "std/libc"
+import "std/thread"
+import "std/atomic"
+import "std/assert"
+import "std/log"
+import "std/system"
+
+import "std/net"
+import "std/net/posix_socket"
+
+import "std/ringhttp/http_connection"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_file"
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_websocket"
+import "std/ringhttp/http_worker"
+import "std/ringhttp/http2_connection"
+import "std/ringhttp/http2_frame"
+import "std/ringhttp/http2_stream"
+import "std/ringhttp/http_sse"
+import "std/ringhttp/mime"
+
+import "std/crypto/sha1"
+import "std/encoding/base64"
+
+import "std/ssl/openssl"
+import "std/os/linux/pipe"
+import "std/os/linux/io_uring"
+import "std/os/posix/fcntl"
+import "std/os/posix/errno"
+import "std/thread/barrier"
+
+// Cancel all in-flight operations on a given fd (IORING_ASYNC_CANCEL_ALL = 1).
+const IORING_ASYNC_CANCEL_ALL: i32 = 1
+
+@asStr
+internal enum RingOpcode {
+    TIMEOUT,
+    MSG_RING,
+    ACCEPT,
+    SPLICE,
+    SENDMSG,
+    READ,
+    CANCEL,
+    CLOSE,
+}
+
+// Layout (little-endian u64):
+//   bits  0- 7 : RingOpcode (8 bits, values 0-7)
+//   bits  8-31 : generation  (24 bits, wraps after ~16 M reuses)
+//   bits 32-63 : contextIndex (i32 — pool slot index or client socket fd)
+//
+// Using a packed head word keeps contextIndex at its full 32-bit range so
+// large socket file descriptors (MSG_RING path) are never truncated.
+internal union RingOperation {
+    struct {
+        head: u32      // low 8 = opcode, high 24 = generation
+        contextIndex: i32
+    }
+    data: u64
+}
+
+// Build a tagged u64 for io_uring_sqe_set_data64.
+internal func makeOp(opcode: RingOpcode, contextIndex: i32, generation: u32 = 0) : u64 {
+    return RingOperation {
+        .head = (opcode as (u32)) | (generation << 8),
+        .contextIndex = contextIndex,
+    }.data
+}
+
+// Extract the opcode from a decoded RingOperation.
+internal func (op: *RingOperation) opcode() : RingOpcode {
+    return (op.head & 0xFF) as (RingOpcode)
+}
+
+// Extract the generation from a decoded RingOperation.
+internal func (op: *RingOperation) opGeneration() : u32 {
+    return op.head >> 8
+}
+
+internal struct WorkerThread {
+    ring: io_uring
+    thread: Thread
+    index: i32
+
+    server: *HttpServer
+    config: *HttpConfig
+    sessions: ContextPool
+
+    rootPath: String
+
+    // Engine state — passed in from engine to avoid circular imports
+    barrier:    *Barrier
+    isRunning:  *Atomic<bool>
+    mainRingFd: i32
+}
+
+
+// queueSend: serialize the HTTP/1.1 response, optionally encrypt via TLS, and submit via io_uring.
+internal func (this: *WorkerThread) queueSend(session: *SessionContext) : Status {
+    var ring = &this.ring
+
+    session.state = SessionState.WRITTEN_HTTP_RESPONSE
+
+    var connection = &session.connection
+    var request = &session.request
+    var response = &session.response
+
+    connection.bufferContents(request, response, this.config)
+
+    Debug("Writing Http Response (socket: %d, length: %d):\n%.*s\n",
+        connection.handle(),
+        connection.writeBuffer.length,
+        connection.writeBuffer.length, connection.writeBuffer.buffer
+    )
+
+    // SSE headers must be flushed immediately (no MSG_MORE) so the browser sees
+    // the event-stream content-type right away.  FILE and STREAM still use MSG_MORE
+    // to hint the kernel to batch headers with the first data write.
+    // RFC 7231 §4.3.2: HEAD must not include a body — treat like a plain response.
+    var isHeadFile = (response.type == ResponseType.FILE && session.request.method == HttpMethod.HEAD)
+    var useMoreFlag = !session.ssl && !isHeadFile &&
+                      (response.type == ResponseType.FILE || response.type == ResponseType.STREAM)
+
+    var sqeFlags = 0_u8
+    if(response.type == ResponseType.FILE && !isHeadFile) {
+        sqeFlags |= IOSQE_IO_LINK
+    }
+
+    // Encrypt TLS BODY responses in-place; FILE/STREAM/SSE use streaming paths.
+    var useTls = session.ssl != null && response.type == ResponseType.BODY
+    var status = this.queueWriteBufferSend(ring, session, useTls, useMoreFlag, sqeFlags)
+        ?: return status
+
+    if(isHeadFile) {
+        // No body for HEAD: async-close the file handle, then wait for both
+        // the SENDMSG and CLOSE CQEs before resetting (submissions tracks both).
+        if(response.fileHandle > 0) {
+            var sqe = io_uring_get_sqe(ring)
+            if(sqe) {
+                io_uring_prep_close(
+                    sqe,
+                    response.fileHandle
+                )
+                io_uring_sqe_set_data64(
+                    sqe,
+                    makeOp(RingOpcode.CLOSE, session.index, session.generation)
+                )
+                session.submissions += 1
+            } else {
+                // for sync close if no sqe
+                close(response.fileHandle)
+            }
+            response.fileHandle = 0
+            session.file        = 0
+        }
+        session.state = SessionState.WRITTEN_HTTP_RESPONSE_MORE
+    }
+    else if(response.type == ResponseType.FILE) {
+        session.state = SessionState.WRITTEN_HTTP_RESPONSE_MORE
+        return this.queueWriteHttpFileResponse(ring, session)
+    }
+    else if(response.type == ResponseType.SSE) {
+        // Headers sent; the WRITTEN_HTTP_RESPONSE_MORE CQE handler will invoke
+        // the SSE callback once the send completes.
+        session.state = SessionState.WRITTEN_HTTP_RESPONSE_MORE
+    }
+    else if(response.type == ResponseType.STREAM) {
+        session.state = SessionState.WRITING_STREAM
+    }
+
+    return Status.OK
+}
+
+// closeSession: cancel pending operations and close the connection.
+internal func (this: *WorkerThread) closeSession(session: *SessionContext) {
+    if (this.queueCancelAndClose(&this.ring, session) == Status.OK) {
+        session.submissions -= 1
+        io_uring_submit(&this.ring)
+    }
+}
+
+// rearmTimeout: re-queue the periodic timeout SQE.
+internal func (this: *WorkerThread) rearmTimeout() {
+    this.queueTimeoutCheck(&this.ring)
+}
+
+// ---------------------------------------------------------------
+// Raw io_uring IO primitives
+// ---------------------------------------------------------------
+
+
+func (this: *WorkerThread) queueReadBufferRecv(
+    ring: *io_uring,
+    session: *SessionContext,
+    clearBuffer: bool = false
+): Status {
+    var connection = &session.connection
+
+    var sqe = io_uring_get_sqe(ring)
+    if(!sqe) {
+        Error("Error creating SQE for socket: %d\n", connection.handle())
+        goto error;
+    }
+
+    var readBuffer = &connection.readBuffer
+    if(clearBuffer) {
+        readBuffer.clear()
+    }
+
+    io_uring_prep_read(
+        sqe,
+        connection.handle(),
+        &readBuffer.buffer[readBuffer.length],
+        readBuffer.remaining(),
+        0
+    )
+
+    io_uring_sqe_set_data64(
+        sqe,
+        makeOp(RingOpcode.READ, session.index, session.generation)
+    )
+
+    return Status.OK
+
+error:
+    return Status.ERROR_IOURING_ERROR;
+}
+
+// Single write path: optionally encrypt via TLS, then submit a SENDMSG SQE.
+// useTls=true  — plaintext is in writeBuffer; SSL_write encrypts it before sending.
+// useTls=false — writeBuffer is already ready (plain) or BIO has handshake output to drain.
+func (this: *WorkerThread) queueWriteBufferSend(
+    ring: *io_uring,
+    session: *SessionContext,
+    useTls: bool = false,
+    moreContents: bool = false,
+    sqeFlags: u8 = 0
+): Status {
+    var connection  = &session.connection
+    var writeBuffer = &connection.writeBuffer
+
+    if(session.ssl) {
+        if(useTls && writeBuffer.length > 0) {
+            var written = SSL_write(session.ssl, writeBuffer.buffer as (*const void), writeBuffer.length)
+            if(written <= 0) {
+                Error("TLS: SSL_write failed on socket %d\n", connection.handle())
+                var status = this.queueCancelAndClose(ring, session)
+                    ?: return status
+                return Status.ERROR_SSL_ERROR
+            }
+        }
+
+        // Drain write BIO into writeBuffer (covers both app-data encryption and handshake output).
+        writeBuffer.clear()
+        var pending = BIO_ctrl(SSL_get_wbio(session.ssl), BIO_CTRL_PENDING, 0, null) as (i32)
+        if(pending > 0) {
+            if(!writeBuffer.reserve(pending)) {
+                Error("TLS: OOM on socket %d\n", connection.handle())
+                this.queueCancelAndClose(ring, session)
+                return Status.ERROR_OUT_OF_MEMORY
+            }
+            var n = BIO_read(SSL_get_wbio(session.ssl), writeBuffer.buffer as (*void), pending)
+            if(n <= 0) {
+                Error("TLS: BIO_read failed on socket %d\n", connection.handle())
+                this.queueCancelAndClose(ring, session)
+                return Status.ERROR_SSL_ERROR
+            }
+            writeBuffer.length = n
+        }
+
+        if(writeBuffer.length == 0) {
+            return Status.OK
+        }
+    }
+
+    var sqe = io_uring_get_sqe(ring)
+    if(!sqe) {
+        Error("Error creating SQE for socket: %d for ring: %d\n", connection.handle(), ring.ring_fd)
+        goto error;
+    }
+
+    io_uring_prep_send(
+        sqe,
+        connection.handle(),
+        writeBuffer.buffer,
+        writeBuffer.length,
+        moreContents ? SocketFlags.MSG_MORE : 0
+    )
+    io_uring_sqe_set_data64(sqe, makeOp(RingOpcode.SENDMSG, session.index, session.generation))
+    sqe.flags |= sqeFlags
+
+    session.submissions += 1
+    return Status.OK
+
+error:
+    return Status.ERROR_IOURING_ERROR
+}
+
+
+func (this: *WorkerThread) queueCancelAndClose(
+    ring: *io_uring,
+    request: *SessionContext
+): Status {
+
+    if(request.state == SessionState.CLOSED || !request.connection.isConnected()) {
+        return Status.OK;
+    }
+
+    request.state = SessionState.CLOSED
+
+    var connection = &request.connection
+
+    Debug("Setting connection to closed: %d\n", connection.handle())
+    {
+        var sqe = io_uring_get_sqe(ring)
+        if(!sqe) {
+            Error("Error creating SQE for socket: %d\n", connection.handle())
+            goto error;
+        }
+
+        // Cancel ALL in-flight operations on the socket fd so no stale CQEs
+        // arrive after the session is freed.  prep_cancel_fd matches by fd,
+        // which is correct because all our SQEs operate on this socket.
+        io_uring_prep_cancel_fd(
+            sqe,
+            connection.handle(),
+            IORING_ASYNC_CANCEL_ALL
+        )
+
+        io_uring_sqe_set_data64(
+            sqe,
+            makeOp(RingOpcode.CANCEL, request.index, request.generation)
+        )
+    }
+
+    request.submissions += 1
+    return Status.OK
+
+error:
+    return Status.ERROR_IOURING_ERROR;
+}
+
+func (this: *WorkerThread) queueReadHttpRequest(
+    ring: *io_uring,
+    session: *SessionContext
+): Status {
+
+    session.state = SessionState.READ_REQUEST_LINE
+
+    var connection = &session.connection
+
+    Debug("Reading HTTP request for socket: %d state: %s\n", connection.handle(), SessionStateAsStr(session.state))
+    return this.queueReadBufferRecv(ring, session, session.ssl != null)
+}
+
+
+func (this: *WorkerThread) queueAdvanceChunkedWrite(
+    ring: *io_uring,
+    session: *SessionContext
+): Status {
+
+    var connection = &session.connection
+    var response = &session.response
+    if(!response.stream.__this) {
+        Error("No stream attached to connection: %d\n", connection.handle())
+        return Status.ERROR_NO_STREAM_HANDLER_FOUND
+    }
+
+    var writeBuffer = &connection.writeBuffer
+    writeBuffer.clear()
+
+    var numberOfBytesRead = response.stream.read(response.body.buffer, response.body.capacity)
+    var moreContents = numberOfBytesRead > 0
+
+    if(!moreContents) {
+        session.state = SessionState.WRITTEN_HTTP_RESPONSE
+        writeBuffer.append("0\r\n\r\n")
+    }
+    else {
+        if(!writeBuffer.reserve(numberOfBytesRead + 16)) {
+            Error(
+                "Unable to handle stream of %d bytes due to out of memory for connection: %d\n",
+                numberOfBytesRead,
+                connection.handle()
+            )
+            return Status.ERROR_OUT_OF_MEMORY
+        }
+
+        writeBuffer.append("%08X\r\n", numberOfBytesRead)
+        response.body.length = numberOfBytesRead
+        response.body.copyTo(writeBuffer.buffer + writeBuffer.length, numberOfBytesRead, false)
+
+        writeBuffer.length += numberOfBytesRead
+        writeBuffer.appendStrn("\r\n", 2)
+    }
+
+    return this.queueWriteBufferSend(ring, session, moreContents)
+}
+
+func (this: *WorkerThread) queueWriteHttpFileResponse(
+    ring: *io_uring,
+    request: *SessionContext
+): Status {
+
+    request.state = SessionState.WRITTEN_FILE
+
+    var response = &request.response
+    var connection = &request.connection
+
+    var fileFd = response.fileHandle
+    var fileSize = response.fileSize
+    var socketFd = connection.handle()
+
+    if(pipe2(request.pipes, O_CLOEXEC | O_NONBLOCK) < 0) {
+        Error("Error creating pipes for connection: %d\n", connection.handle())
+        return Status.ERROR_PIPE_ERROR
+    }
+
+    var bufferSize = this.config.fileSpliceSizeInBytes
+    var remainingBytes = fileSize
+    while(remainingBytes > 0) {
+        var spliceSize = (remainingBytes > bufferSize)
+            ? bufferSize : remainingBytes;
+        defer remainingBytes -= spliceSize;
+
+        {
+            var sqe = io_uring_get_sqe(ring)
+            if(!sqe) {
+                Error("Error creating SQE for socket: %d\n", socketFd)
+                goto error;
+            }
+
+            io_uring_prep_splice(
+                sqe,
+                response.fileHandle,
+                (fileSize - remainingBytes) as (i64),
+                request.pipes[1],
+                -1_i64,
+                spliceSize as (u32),
+                SPLICE_F_MORE
+            )
+            sqe.flags |= IOSQE_IO_LINK
+
+            io_uring_sqe_set_data64(
+                sqe,
+                makeOp(RingOpcode.SPLICE, request.index, request.generation)
+            )
+        }
+
+        {
+            var sqe = io_uring_get_sqe(ring)
+            if(!sqe) {
+                Error("Error creating SQE for socket: %d\n", socketFd)
+                goto error;
+            }
+
+            io_uring_prep_splice(
+                sqe,
+                request.pipes[0],
+                -1_i64,
+                connection.handle(),
+                -1_i64,
+                spliceSize as (u32),
+                SPLICE_F_MORE
+            )
+            sqe.flags |= IOSQE_IO_LINK
+
+            io_uring_sqe_set_data64(
+                sqe,
+                makeOp(RingOpcode.SPLICE, request.index, request.generation)
+            )
+        }
+
+        request.submissions += 2
+    }
+
+    {
+        var sqe = io_uring_get_sqe(ring)
+        if(!sqe) {
+            Error("Error creating SQE for socket: %d\n", socketFd)
+            goto error;
+        }
+
+        io_uring_prep_close(sqe, response.fileHandle)
+
+        io_uring_sqe_set_data64(
+            sqe,
+            makeOp(RingOpcode.CLOSE, request.index, request.generation)
+        )
+        request.submissions += 1
+    }
+
+    return Status.OK
+
+error:
+    return Status.ERROR_IOURING_ERROR;
+}
+
+public func (this: *WorkerThread) sendWebSocketFrame(
+    session: *SessionContext,
+    frame: *Frame
+) : Status {
+    return this.queueWebSocketSend(&this.ring, session, frame)
+}
+
+func (this: *WorkerThread) queueWebSocketSend(
+    ring: *io_uring,
+    session: *SessionContext,
+    frame: *Frame
+): Status {
+
+    session.state = SessionState.WEB_SOCKET_OPERATION
+
+    var connection = &session.connection
+    Debug("Started Queued writing of web socket: %d\n", connection.handle())
+
+    var writeBuffer = &connection.writeBuffer
+    writeBuffer.clear()
+
+    var status = frame.serialize(writeBuffer)
+    if(status != Status.OK) {
+        return status
+    }
+
+    status = this.queueWriteBufferSend(ring, session)
+
+    // we need to dispatch the submit as this is in the
+    // user space
+    if (status == Status.OK) {
+        session.submissions -= 1
+        io_uring_submit(&this.ring)
+    }
+
+    return status
+}
+
+internal func (this: *WorkerThread) sendSseEvent(
+    session: *SessionContext,
+    event:   *SseEvent
+) : Status {
+    return this.queueWriteSseEvent(&this.ring, session, event)
+}
+
+func (this: *WorkerThread) queueWriteSseEvent(
+    ring:    *io_uring,
+    session: *SessionContext,
+    event:   *SseEvent
+): Status {
+
+    session.state = SessionState.SSE_OPERATION
+
+    var connection = &session.connection
+    Debug("Writing SSE event for socket: %d\n", connection.handle())
+
+    var writeBuffer = &connection.writeBuffer
+    writeBuffer.clear()
+
+    event.serialize(writeBuffer)
+
+    var status = this.queueWriteBufferSend(ring, session)
+    if (status == Status.OK) {
+        session.submissions -= 1
+        io_uring_submit(&this.ring)
+    }
+
+    return status
+}
+
+func (this: *WorkerThread) queueReadWebSocket(
+    ring: *io_uring,
+    session: *SessionContext
+): Status {
+    session.state = SessionState.WEB_SOCKET_OPERATION
+    return this.queueReadBufferRecv(ring, session)
+}
+
+func (this: *WorkerThread) queueTimeoutCheck(ring: *io_uring): Status {
+    var sqe = io_uring_get_sqe(ring)
+    if(!sqe) {
+        Error("Error creating SQE for timeout check\n")
+        goto error;
+    }
+
+    var ts: __kernel_timespec;
+    ts.tv_sec = this.config.timeoutCheckMSec / 1_000;
+    ts.tv_nsec = (this.config.timeoutCheckMSec % 1_000) * 1_000_000;
+
+    io_uring_prep_timeout(
+        sqe,
+        &ts,
+        0,
+        0
+    )
+
+    io_uring_sqe_set_data64(
+        sqe,
+        makeOp(RingOpcode.TIMEOUT, -1)
+    )
+
+    return Status.OK;
+
+error:
+    return Status.ERROR_IOURING_ERROR;
+}
+
+// ---------------------------------------------------------------
+// TLS helpers (memory BIO path)
+// ---------------------------------------------------------------
+
+
+// Queue the next READ SQE: TLS staging buffer when TLS, H2-plain read when H2, else HTTP/1 read.
+func (this: *WorkerThread) queueNextRead(
+    ring:    *io_uring,
+    session: *SessionContext
+) : Status {
+    if(session.state == SessionState.HTTP2_OPEN) {
+        return this.queueReadBufferRecv(ring, session)
+    }
+
+    return this.queueReadHttpRequest(ring, session)
+}
+
+
+// Create SSL with memory BIOs and begin the TLS handshake.
+func (this: *WorkerThread) queueTlsBeginHandshake(
+    ring:    *io_uring,
+    session: *SessionContext,
+    sslCtx:  *SSL_CTX
+) : Status {
+    var ssl = SSL_new(sslCtx)
+    if(!ssl) {
+        Error("TLS: SSL_new failed for socket %d\n", session.connection.handle())
+        var status = this.queueCancelAndClose(ring, session)
+            ?: return status
+        return Status.ERROR_SSL_ERROR
+    }
+
+    var rbio = BIO_new(BIO_s_mem())
+    var wbio = BIO_new(BIO_s_mem())
+    if(rbio == null || wbio == null) {
+        if(rbio) { BIO_free(rbio) }
+        if(wbio) { BIO_free(wbio) }
+        SSL_free(ssl)
+
+        var status = this.queueCancelAndClose(ring, session)
+            ?: return status
+        return Status.ERROR_OUT_OF_MEMORY
+    }
+
+    SSL_set_bio(ssl, rbio, wbio)
+    session.ssl   = ssl
+    session.state = SessionState.TLS_HANDSHAKING
+    return this.queueReadBufferRecv(ring, session, .clearBuffer = true)
+}
+
+// Advance the TLS handshake using raw bytes that io_uring just delivered.
+// Transitions session state to HTTP2_OPEN or READ_REQUEST_LINE on success.
+func (this: *WorkerThread) queueTlsContinueHandshake(
+    ring:       *io_uring,
+    session:    *SessionContext,
+    bytesRead:  i32
+) : Status {
+    // Feed raw TLS bytes into OpenSSL's read BIO
+    var readBuffer = &session.connection.readBuffer
+    BIO_write(SSL_get_rbio(session.ssl), readBuffer.buffer as (*const void), bytesRead)
+    readBuffer.clear()
+
+    var ret = SSL_accept(session.ssl)
+
+    if(ret == 1) {
+        // Handshake complete — check negotiated ALPN protocol.
+        var proto: *const u8 = null
+        var protoLen: u32 = 0
+        SSL_get0_alpn_selected(session.ssl, &proto, &protoLen)
+
+        if(protoLen == 2 && proto[0] == 'h' as (u8) && proto[1] == '2' as (u8)) {
+            session.protocolVersion = ProtocolVersion.HTTP2
+            session.state = SessionState.HTTP2_OPEN
+            session.http2.init(&session.requestAllocator.allocator)
+        } else {
+            session.protocolVersion = ProtocolVersion.HTTP1
+            session.state = SessionState.READ_REQUEST_LINE
+        }
+    }
+
+    // Flush any handshake output (ServerHello, Finished, etc.) via SENDMSG.
+    // useTls=false: BIO already has the handshake records from SSL_accept; no SSL_write needed.
+    // The SENDMSG CQE will queue the next READ when submissions reaches 0.
+    var flushStatus = this.queueWriteBufferSend(ring, session)
+        ?: return flushStatus
+
+    if(session.submissions > 0) {
+        // SENDMSG CQE handler will re-arm the read.
+        return Status.OK
+    }
+
+    // No output to send — queue the next read now.
+    if(ret == 1) {
+        return this.queueReadBufferRecv(ring, session, .clearBuffer = true)
+    }
+
+    var err = SSL_get_error(session.ssl, ret)
+    if(err == SSL_ERROR_WANT_READ) {
+        return this.queueReadBufferRecv(ring, session, .clearBuffer = true)
+    }
+
+    Debug("TLS: handshake failed on socket %d (err=%d)\n", session.connection.handle(), err)
+    return this.queueCancelAndClose(ring, session)
+}
+
+
+// Decrypt raw TLS ciphertext already in readBuffer back into readBuffer (in-place).
+// Returns number of decrypted bytes, 0 if more wire bytes are needed (WANT_READ),
+// or -1 on fatal error (session already closed).
+func (this: *WorkerThread) tlsDecryptToReadBuffer(
+    ring:          *io_uring,
+    session:       *SessionContext,
+    rawBytesRead:  i32
+) : i32 {
+    var readBuffer = &session.connection.readBuffer
+    BIO_write(SSL_get_rbio(session.ssl), readBuffer.buffer as (*const void), rawBytesRead)
+    readBuffer.clear()
+
+    var total = 0
+
+    while(readBuffer.capacity - total > 0) {
+        var n = SSL_read(session.ssl, (readBuffer.buffer + total) as (*void), readBuffer.capacity - total)
+        if(n <= 0) {
+            break
+        }
+        total += n
+    }
+
+    if(total == 0) {
+        var lastN: i32 = 0
+        var err = SSL_get_error(session.ssl, lastN)
+        if(err == SSL_ERROR_WANT_READ) {
+            this.queueReadBufferRecv(ring, session, .clearBuffer = true)
+                ?: return -1
+
+            return 0
+        }
+        this.queueCancelAndClose(ring, session)
+        return -1
+    }
+    return total
+}
+
+// ---------------------------------------------------------------
+// HTTP/2 helpers
+// ---------------------------------------------------------------
+
+
+// Run the H2 frame machine on `bytesRead` plaintext bytes sitting in readBuffer
+// (not yet committed — processHttp2Data will advance readBuffer.length).
+// Caller must ensure decryption has already been done for TLS sessions.
+func (this: *WorkerThread) queueDispatchH2DataSend(
+    ring:      *io_uring,
+    session:   *SessionContext,
+    bytesRead: i32
+): Status {
+    var connection = &session.connection
+    var status = this.processHttp2Data(session, bytesRead)
+    if(status == Status.PARTIAL_REQUEST_DISPATCHING_READ) {
+        return this.queueReadBufferRecv(ring, session)
+    }
+
+    if(status != Status.OK) {
+        // processHttp2Data may have written a GOAWAY — flush before closing.
+        if(connection.writeBuffer.length > 0) {
+            this.queueWriteBufferSend(ring, session, session.ssl != null)
+        }
+        this.queueCancelAndClose(ring, session)
+        return status;
+    }
+    if(connection.writeBuffer.length > 0) {
+        // SENDMSG CQE will re-arm the read.
+        return this.queueWriteBufferSend(ring, session, session.ssl != null)
+    }
+
+    return this.queueReadBufferRecv(ring, session)
+}
+
+// io_uring-specific HTTP/2 data handler (called from handleCompletionRing READ path).
+// rawBytesRead is cqe.res: raw TLS bytes for TLS sessions, plaintext for non-TLS.
+func (this: *WorkerThread) handleHttp2Data(session: *SessionContext, rawBytesRead: i32) {
+    var ring      = &this.ring
+    var bytesRead = rawBytesRead
+
+    if(session.ssl) {
+        bytesRead = this.tlsDecryptToReadBuffer(ring, session, rawBytesRead)
+        if(bytesRead <= 0) {
+            return;  // 0 = WANT_READ (already re-armed); -1 = error (already closed)
+        }
+    }
+
+    var status = this.queueDispatchH2DataSend(ring, session, bytesRead)
+    // TODO: Handle status, return something from this callback..
+}
+
+// ---------------------------------------------------------------
+// io_uring event loop
+// ---------------------------------------------------------------
+
+internal func (this: *WorkerThread) init(
+    server:     *HttpServer,
+    index:      i32,
+    barrier:    *Barrier,
+    isRunning:  *Atomic<bool>,
+    mainRingFd: i32
+): Status {
+
+    this.server     = server
+    this.config     = server.config
+    this.index      = index
+    this.ring       = io_uring{}
+    this.barrier    = barrier
+    this.isRunning  = isRunning
+    this.mainRingFd = mainRingFd
+
+    this.rootPath = this.server.config.fileServerPath.empty()
+        ? CurrentWorkingPath().toString() : this.server.config.fileServerPath
+
+    if(this.rootPath.endsWith($"/")) {
+        this.rootPath.length -= 1
+    }
+
+    var status = this.sessions.init(this.server)
+    if(status != Status.OK) {
+        return status
+    }
+
+    this.thread = Thread{}
+    if(this.thread.create(WorkerFunction, this, this.server.config.allocator) != ThreadStatus.SUCCESS) {
+        Error("Error creating worker thread\n")
+        return Status.ERROR_CREATING_THREAD
+    }
+
+    return Status.OK
+}
+
+internal func WorkerFunction(arg: *void) : i32 {
+    var workerThread = arg as (*WorkerThread)
+
+    var ring = &workerThread.ring
+
+    var params = io_uring_params {}
+    params.flags |= IORING_SETUP_SINGLE_ISSUER
+    params.flags |= IORING_SETUP_COOP_TASKRUN
+    params.flags |= IORING_SETUP_DEFER_TASKRUN
+    params.flags |= IORING_SETUP_ATTACH_WQ
+    params.wq_fd = workerThread.mainRingFd
+
+    var ioStatus = io_uring_queue_init_params(workerThread.config.ioQueueDepth, ring, &params)
+    if(ioStatus != 0) {
+        Error("Error initializing the io_uring queue: %d\n", ioStatus)
+        workerThread.barrier.wait()
+        return -1
+    }
+
+    Info("Started worker thread: %d ringfd: %d\n", ThreadCurrent().id(), workerThread.ring.ring_fd)
+
+    workerThread.barrier.wait()
+
+    workerThread.queueTimeoutCheck(ring)
+    io_uring_submit(ring)
+
+    var cqe: *io_uring_cqe = null;
+    while(workerThread.isRunning.get()) {
+        var result = io_uring_wait_cqe(ring, &cqe);
+        defer if(cqe)  {
+            io_uring_cqe_seen(ring, cqe)
+            cqe = null
+        }
+
+        var status = workerThread.handleCompletionRing(ring, cqe, result)
+        if(status != Status.OK) {
+            continue
+        }
+
+        io_uring_submit(ring)
+    }
+
+    if(ring.ring_fd >= 0) {
+        io_uring_queue_exit(ring)
+    }
+
+    return 0
+}
+
+func (this: *WorkerThread) handleCompletionRing(
+    ring: *io_uring,
+    cqe: *io_uring_cqe,
+    result: i32
+): Status {
+
+    if(!cqe) {
+        Error("Error reading completion queue: %d\n", result)
+        return Status.ERROR_IO_ERROR;
+    }
+
+    var operation = RingOperation {
+        .data = io_uring_cqe_get_data64(cqe)
+    }
+
+    if(cqe.res < 0) {
+        if(operation.opcode() == RingOpcode.TIMEOUT) {
+            this.checkTimeouts()
+            return Status.OK
+        }
+
+        var session = this.sessions.get(operation.contextIndex)
+        assert(session != null)
+
+        // Discard stale CQEs that arrived after the slot was reused.
+        if(operation.opGeneration() != session.generation) {
+            return Status.OK
+        }
+
+        switch(cqe.res) {
+            case -ENOENT:
+            case -EINVAL:
+            case -EALREADY: {
+                if (!session.connection.isConnected()) {
+                    break
+                }
+                Debug("Unable to cancel operations for socket: %d due to already in progress or not found\n",
+                    session.connection.handle()
+                )
+                session.finish(.forceClose = true)
+                break
+            }
+            case -ECANCELED: {
+                Debug("Canceled request queue entries for socket: %d\n",
+                    session.connection.handle()
+                )
+                if (!session.connection.isConnected()) {
+                    break
+                }
+                // All ops on the socket were cancelled; close cleanly.
+                session.finish(.forceClose = true)
+                break
+            }
+            default: {
+                Error("Error with socket (%d) completion result: %d (%s)\n",
+                    session.connection.handle(),
+                    cqe.res,
+                    strerror(-cqe.res)
+                )
+                Error("Force closing connection: %d due to error\n", session.connection.handle())
+                if (!session.connection.isConnected()) {
+                    break
+                }
+                session.finish(.forceClose = true)
+                break
+            }
+        }
+
+        return Status.OK
+    }
+
+    var session: *SessionContext = null
+
+    if(operation.opcode() == RingOpcode.MSG_RING) {
+        session = this.handleAccept(operation.contextIndex)
+        if(session == null) {
+            // Pool exhausted — drop the connection rather than crashing.
+            close(operation.contextIndex)
+            return Status.OK
+        }
+    }
+    else {
+        session = this.sessions.get(operation.contextIndex)
+    }
+
+    assert(session != null)
+
+    // Discard stale CQEs that arrived after the slot was reused.
+    if(operation.opcode() != RingOpcode.MSG_RING &&
+       operation.opGeneration() != session.generation) {
+        return Status.OK
+    }
+
+    session.lastRequestTime = SystemTimeMSec()
+    var connection = &session.connection
+
+    if(!connection.isConnected()) {
+        return Status.OK
+    }
+
+    switch(session.state) {
+        case SessionState.CONNECTED: {
+            var sslCtx = this.server.engine.sslCtx
+            if(sslCtx) {
+                return this.queueTlsBeginHandshake(ring, session, sslCtx)
+            }
+            Debug("Reading HTTP request for socket: %d\n", connection.handle())
+            return this.queueReadHttpRequest(ring, session)
+        }
+        case SessionState.TLS_HANDSHAKING: {
+            switch(operation.opcode()) {
+                case RingOpcode.READ: {
+                    var bytesRead = cqe.res
+                    if(bytesRead == 0) {
+                        return this.queueCancelAndClose(ring, session)
+                    }
+                    return this.queueTlsContinueHandshake(ring, session, bytesRead)
+                }
+                case RingOpcode.SENDMSG: {
+                    session.submissions -= 1
+                    if(session.submissions == 0) {
+                        // Handshake output sent — re-arm read.
+                        // State was already updated in queueTlsContinueHandshake if done.
+                        return this.queueReadHttpRequest(ring, session)
+                    }
+                    break
+                }
+                default: break
+            }
+            break
+        }
+        case SessionState.HTTP2_OPEN: {
+            switch(operation.opcode()) {
+                case RingOpcode.READ: {
+                    var bytesRead = cqe.res
+                    if(bytesRead == 0) {
+                        return this.queueCancelAndClose(ring, session)
+                    }
+                    this.handleHttp2Data(session, bytesRead)
+                    break
+                }
+                case RingOpcode.SENDMSG: {
+                    session.submissions -= 1
+                    if(session.submissions == 0) {
+                        return this.queueReadBufferRecv(ring, session)
+                    }
+                    break
+                }
+                default: break
+            }
+            break
+        }
+        case SessionState.READ_REQUEST_LINE: {
+            // A SENDMSG CQE can arrive here when the TLS handshake sends its
+            // final flight (server Finished / session ticket) AFTER state
+            // transitions from TLS_HANDSHAKING to READ_REQUEST_LINE.
+            if(operation.opcode() == RingOpcode.SENDMSG) {
+                session.submissions -= 1
+                if(session.submissions == 0) {
+                    //this.queueNextRead(ring, session)
+                    return this.queueReadHttpRequest(ring, session)
+                }
+                break
+            }
+
+            var bytesRead = cqe.res
+            Debug("READ_REQUEST_LINE: %d for socket: %d subs: %d\n", bytesRead, connection.handle(), session.submissions)
+
+            if(bytesRead == 0) {
+                Debug("Client Closed socket: %d\n", connection.handle())
+                return this.queueCancelAndClose(ring, session)
+            }
+
+            if(session.ssl) {
+                bytesRead = this.tlsDecryptToReadBuffer(ring, session, bytesRead)
+                if(bytesRead <= 0) {
+                    break  // WANT_READ already re-armed, or error already closed
+                }
+            }
+
+            // Detect H2 prior-knowledge (PRI prefix) on plain connections.
+            if(session.protocolVersion == ProtocolVersion.UNKNOWN) {
+                if(!this.tryDetectProtocol(session, bytesRead)) {
+                    return this.queueNextRead(ring, session)
+                }
+            }
+
+            if(session.state == SessionState.HTTP2_OPEN) {
+                // Bytes already decrypted (or plaintext) — skip the TLS layer in dispatchH2Data.
+                var s = this.queueDispatchH2DataSend(ring, session, bytesRead)
+                    ?: return s
+                break
+            }
+
+            var status = this.handlePartialHttpRequest(session, bytesRead)
+            if(status != Status.OK) {
+                switch(status) {
+                    case Status.PARTIAL_REQUEST_DISPATCHING_READ: {
+                        return this.queueNextRead(ring, session)
+                    }
+                    case Status.CONTINUE_SEND: {
+                        return this.send100Continue(session)
+                    }
+                    case Status.ERROR_UNKNOWN_BODY_LENGTH:
+                    case Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT:
+                    case Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT:
+                    case Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT:
+                    case Status.ERROR_PARSING_HTTP_REQUEST:
+                    case Status.ERROR_MISSING_HOST_HEADER:
+                    case Status.ERROR_DUPLICATE_HOST_HEADER:
+                    case Status.ERROR_HTTP_VERSION_NOT_SUPPORTED:
+                    case Status.ERROR_EXPECT_FAILED:
+                    case Status.ERROR_CONFLICTING_BODY_HEADERS:
+                    case Status.ERROR_CONFLICTING_CONTENT_LENGTH:
+                    case Status.ERROR_INVALID_CONTENT_LENGTH:
+                    case Status.ERROR_UNSUPPORTED_REQUEST_METHOD:
+                    case Status.ERROR_WEB_SOCKET_MISSING_CONNECTION:
+                    case Status.ERROR_HTTP_PARSING_INVALID_REQUEST_LINE:
+                    case Status.ERROR_HTTP_PARSING_INVALID_HEADER_PARAM:
+                    case Status.ERROR_HTTP_PARSING_INVALID_CHUNK:
+                    case Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE: {
+                        return this.sendBadRequest(session, status)
+                    }
+                    default: {
+                        return this.sendServerError(session, status)
+                    }
+                }
+                return status
+            }
+
+            status = this.handleHttpRequest(session)
+
+            if(status != Status.OK) {
+                Error("HTTP Request Bad Status %s with index: %d\n", StatusAsStr(status), session.index)
+                if(status == Status.ERROR_PARSING_HTTP_REQUEST ||
+                   status == Status.ERROR_WEB_SOCKET_SECURITY_KEY) {
+                    return this.sendBadRequest(session, status)
+                }
+                return this.sendServerError(session, status)
+            }
+            break
+        }
+        case SessionState.WEB_SOCKET_OPERATION: {
+            switch(operation.opcode()) {
+                case RingOpcode.SENDMSG: {
+                    Debug("WebSocket write completed for socket: %d\n", connection.handle())
+                    session.submissions -= 1
+
+                    if(!session.isWebSocket) {
+                        return this.queueCancelAndClose(ring, session)
+                    }
+                    break
+                }
+                case RingOpcode.READ: {
+                    var bytesRead = cqe.res
+                    Debug("WebSocket read completed for socket: %d bytes read: %d\n",
+                        connection.handle(), bytesRead
+                    )
+
+                    if(bytesRead == 0) {
+                        Debug("Client Closed socket: %d\n", connection.handle())
+                        return this.queueCancelAndClose(ring, session)
+                    }
+
+                    var status = this.handleWebSocketFrame(session, bytesRead)
+                    if(status == Status.WEB_SOCKET_CLOSED) {
+                        Info("Client Closed socket: %d\n", connection.handle())
+                        return this.queueCancelAndClose(ring, session)
+                    }
+                    else if(status == Status.PARTIAL_WEB_SOCKET_DISPATCHING_READ) {
+                        return this.queueReadWebSocket(ring, session)
+                    }
+                    else if(status != Status.OK) {
+                        Error("Error handling websocket frame for socket: %d: %s\n",
+                            connection.handle(), StatusAsStr(status)
+                        )
+                        return this.queueCancelAndClose(ring, session)
+                    }
+
+                    return this.queueReadWebSocket(ring, session)
+                }
+                default: {
+                    Error("Unsupported web socket operation: %s\n", RingOpcodeAsStr(operation.opcode()))
+                    break
+                }
+            }
+            break
+        }
+        case SessionState.SSE_OPERATION: {
+            switch(operation.opcode()) {
+                case RingOpcode.SENDMSG: {
+                    Debug("SSE write completed for socket: %d\n", connection.handle())
+                    session.submissions -= 1
+
+                    if(!session.isSse) {
+                        return this.queueCancelAndClose(ring, session)
+                    }
+                    break
+                }
+                default: {
+                    Error("Unsupported SSE operation: %s\n", RingOpcodeAsStr(operation.opcode()))
+                    break
+                }
+            }
+            break
+        }
+        case SessionState.WRITING_STREAM: {
+            session.submissions -= 1
+            return this.queueAdvanceChunkedWrite(ring, session)
+        }
+        case SessionState.WRITTEN_HTTP_RESPONSE:
+        case SessionState.WRITTEN_HTTP_RESPONSE_MORE:
+        case SessionState.WRITTEN_FILE: {
+            session.submissions -= 1
+            Debug("%s for socket: %d subs: %d index: %d\n",
+                SessionStateAsStr(session.state),
+                connection.handle(),
+                session.submissions,
+                session.index
+            )
+
+            if(session.submissions <= 0) {
+                if(session.isWebSocket) {
+                    session.state = SessionState.WEB_SOCKET_OPERATION
+                    return this.queueReadWebSocket(ring, session)
+                }
+                if(session.isSse) {
+                    session.state = SessionState.SSE_OPERATION
+                    session.sseHandler.callback(&session.sseSession)
+                    return Status.OK
+                }
+                // RFC 7231 §5.1.1: after a 100 Continue the session must NOT be
+                // reset — the read buffer still holds the request headers and the
+                // next read will append the body so handlePartialHttpRequest can
+                // complete the request without re-parsing from scratch.
+                if(session.response.status == 100) {
+                    return this.queueNextRead(ring, session)
+                }
+                // RFC 7230 §6.6: close when Connection: close or HTTP/1.0 without keep-alive.
+                if(connection.disableKeepAlive) {
+                    this.closeSession(session)
+                    return Status.OK
+                }
+                Debug("Preparing connection for another HTTP request for socket: %d\n", connection.handle())
+                var savedSsl = session.ssl
+                session.begin(connection.handle())
+                // Preserve TLS state across HTTP/1.1 keep-alive; begin() nulls ssl.
+                session.ssl = savedSsl
+                return this.queueNextRead(ring, session)
+            }
+            break
+        }
+        case SessionState.CLOSED: {
+            Debug("Request is forcing closed for connection: %d\n", connection.handle())
+            if (!connection.isConnected()) {
+                break
+            }
+            session.finish(.forceClose = true)
+            break
+        }
+        case SessionState.UNKNOWN: {
+            Debug("Request caught in unknown state for connection: %d\n", connection.handle())
+            break
+        }
+        default: {
+            Panic("Unknown state: %d\n", session.state)
+            assert(false)
+            break;
+        }
+    }
+
+    return Status.OK
+}

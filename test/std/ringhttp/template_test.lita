@@ -1,0 +1,147 @@
+import "std/assert"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/mem"
+
+import "std/ringhttp/template"
+import "std/ringhttp/http_common"
+
+@test
+func testReadStringEmptyInput() {
+    var empty = ReadString(StringInit(""))
+    assert(empty.length == 0)
+
+    var whitespace = ReadString(StringInit("   "))
+    assert(whitespace.length == 0)
+
+    var result = ReadString(StringInit("\"hello\""))
+    assert(result.equals($"hello"))
+
+    var noQuote = ReadString(StringInit("hello"))
+    assert(noQuote.length == 0)
+}
+
+@test
+func testSanitizeName() {
+    assert(SanitizeName($"test.html.lt").equals($"test_html_lt"))
+    assert(SanitizeName($"my-template.lt").equals($"my_template_lt"))
+    assert(SanitizeName($"simple").equals($"simple"))
+}
+
+@test
+func testGenerateBodyVoid() {
+    // Without @type: input is *void, user casts manually in template body
+    var entry = TemplateEntry{
+        .name    = StringBuilderInit(64,   defaultAllocator),
+        .content = StringBuilderInit(1024, defaultAllocator)
+    }
+
+    var status = GenerateFromTemplate(
+        defaultAllocator,
+        $"page.html.lt",
+        """<html>
+<body>
+    <% var data = input as *PageData %>
+    <h1><%= data.title %></h1>
+</body>
+</html>
+""".toString(),
+        &entry
+    )
+
+    assert(status == Status.OK)
+    assert(entry.name.length > 0)
+    assert(entry.typeName.length == 0)
+
+    var content = entry.content.toString()
+    // untyped function takes *void
+    assert(content.contains($"input: *void"))
+    assert(content.contains($"page_html_lt_WriteTemplate"))
+    assert(content.contains($"HtmlEscape(out, data.title)"))
+}
+
+@test
+func testGenerateBodyTyped() {
+    // With @type: input is *User, no manual cast needed, named helper gets typed signature
+    var entry = TemplateEntry{
+        .name    = StringBuilderInit(64,   defaultAllocator),
+        .content = StringBuilderInit(1024, defaultAllocator)
+    }
+
+    var status = GenerateFromTemplate(
+        defaultAllocator,
+        $"greeting.html.lt",
+        """<% @type "models/user" :: User %>
+<html>
+<body>Hello, <%= input.name %></body>
+</html>
+""".toString(),
+        &entry
+    )
+
+    assert(status == Status.OK)
+    assert(entry.name.toString().equals($"greeting_html_lt"))
+    assert(entry.typeName.toString().equals($"User"))
+    assert(entry.typeModule.toString().equals($"models/user"))
+
+    var content = entry.content.toString()
+    // typed function takes *User
+    assert(content.contains($"input: *User"))
+    // type module auto-imported
+    assert(content.contains($"import \"models/user\""))
+    // expression shorthand expanded
+    assert(content.contains($"HtmlEscape(out, input.name)"))
+}
+
+@test
+func testGenerateBodyPartial() {
+    var entry = TemplateEntry{
+        .name    = StringBuilderInit(64,   defaultAllocator),
+        .content = StringBuilderInit(1024, defaultAllocator)
+    }
+
+    var status = GenerateFromTemplate(
+        defaultAllocator,
+        $"page.html.lt",
+        """<html>
+<% @load "templates/header.html.lt" %>
+<body>
+<% @load "templates/card.html.lt" input.card %>
+</body>
+</html>
+""".toString(),
+        &entry
+    )
+
+    assert(status == Status.OK)
+    var content = entry.content.toString()
+
+    // partial without field — passes input unchanged
+    assert(content.contains($"header_html_lt_WriteTemplate(resp, input)"))
+    // partial with field — passes sub-field
+    assert(content.contains($"card_html_lt_WriteTemplate(resp, input.card)"))
+}
+
+@test
+func testGenerateBodyRawOutput() {
+    var entry = TemplateEntry{
+        .name    = StringBuilderInit(64,   defaultAllocator),
+        .content = StringBuilderInit(1024, defaultAllocator)
+    }
+
+    var status = GenerateFromTemplate(
+        defaultAllocator,
+        $"page.html.lt",
+        """<p><%== rawHtml %></p>
+""".toString(),
+        &entry
+    )
+
+    assert(status == Status.OK)
+    var content = entry.content.toString()
+    // <%== %> bypasses escaping
+    assert(content.contains($"out.appendString(rawHtml)"))
+    // make sure it is NOT wrapped in HtmlEscape
+    assert(!content.contains($"HtmlEscape(out, rawHtml)"))
+}

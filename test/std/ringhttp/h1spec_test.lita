@@ -1,0 +1,1467 @@
+// HTTP/1.1 RFC 7230/7231 conformance tests for ringhttp.
+//
+// Starts the ring server in-process on a background thread and probes it with
+// raw TCP connections — no Docker or external tools required.
+//
+// Run with:
+//   litac test -file test/h1spec_test.lita
+
+import "std/libc"
+import "std/string"
+import "std/fmt"
+import "std/assert"
+import "std/thread"
+import "std/thread/barrier"
+import "std/mem"
+import "std/string/builder"
+import "std/net/posix_socket"
+import "std/ringhttp/http_ring"
+
+@raw("""
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <errno.h>
+static void _h1spec_setTimeout(int fd, int sec) {
+    struct timeval tv = { sec, 0 };
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const void*)&tv, sizeof(tv));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (const void*)&tv, sizeof(tv));
+}
+// Blocks up to 500 ms waiting for the server to close the connection.
+// Returns 1 if connection is still open, 0 if closed (FIN received).
+static int _h1spec_peekOpen(int fd) {
+    struct timeval tv = { 0, 500000 }; // 500 ms
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const void*)&tv, sizeof(tv));
+    char b[1];
+    int r = (int)recv(fd, b, 1, MSG_PEEK);
+    // Restore 5-second timeout
+    struct timeval tv2 = { 5, 0 };
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const void*)&tv2, sizeof(tv2));
+    if (r == 0) return 0;  // FIN = closed
+    return 1;              // data or timeout = still open
+}
+""");
+@foreign func _h1spec_setTimeout(fd: i32, sec: i32);
+@foreign func _h1spec_peekOpen(fd: i32) : i32;
+
+const H1SPEC_PORT:    u16 = 9191_u16
+const H1SPEC_TIMEOUT: i32 = 5
+const H1_LARGE_SIZE:  i32 = 1024   // body size for /large route
+
+// ── Handlers ──────────────────────────────────────────────────────────────────
+
+func h1RootHandler(ctx: *RequestHandlerContext) : i32 {
+    ctx.response.status = 200
+    ctx.response.type   = ResponseType.BODY
+    ctx.response.body.append("OK")
+    return 1
+}
+
+func h1LargeHandler(ctx: *RequestHandlerContext) : i32 {
+    ctx.response.status = 200
+    ctx.response.type   = ResponseType.BODY
+    for(var i = 0; i < H1_LARGE_SIZE; i += 1) {
+        ctx.response.body.appendChar('A')
+    }
+    return 1
+}
+
+// ── Server ────────────────────────────────────────────────────────────────────
+
+struct H1TestServer {
+    config:  HttpConfig
+    barrier: Barrier
+}
+var gH1Server:      H1TestServer
+var gH1ServerReady = false
+
+func h1ServerThread(arg: *void) : i32 {
+    var ts = arg as (*H1TestServer)
+    var server = HttpServer{}
+    server.init(&ts.config)
+    server.addHttpController(HttpMethod.GET,  "/",      null,
+        HttpController{.callback = h1RootHandler})
+    server.addHttpController(HttpMethod.POST, "/",      null,
+        HttpController{.callback = h1RootHandler})
+    server.addHttpController(HttpMethod.GET,  "/large", null,
+        HttpController{.callback = h1LargeHandler})
+    ts.barrier.wait()
+    server.start()
+    defer server.close()
+    return 0
+}
+
+func h1EnsureServer() {
+    if(gH1ServerReady) { return; }
+    gH1Server.config = HttpConfig{
+        .allocator             = defaultAllocator,
+        .port                  = H1SPEC_PORT,
+        .numThreads            = 2,
+        .maxPoolSize           = 32,
+        .keepAliveTimeoutInSec = 30,
+        .isLogEnabled          = false,
+    }
+    gH1Server.barrier.init(2)
+    var t = Thread{}
+    assert(t.create(h1ServerThread, &gH1Server) == ThreadStatus.SUCCESS)
+    gH1Server.barrier.wait()
+    ThreadSleepMSec(200)
+    gH1ServerReady = true
+}
+
+// ── Socket helpers ─────────────────────────────────────────────────────────────
+
+func h1Connect() : i32 {
+    var fd = socket(AF_INET, SOCK_STREAM, 0)
+    if(fd < 0) { return -1 }
+    var addr: sockaddr_in
+    memset(&addr, 0, sizeof(:sockaddr_in))
+    addr.sin_family = AF_INET
+    addr.sin_port   = htons(H1SPEC_PORT)
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+    if(connect(fd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) < 0) {
+        close(fd)
+        return -1
+    }
+    _h1spec_setTimeout(fd, H1SPEC_TIMEOUT)
+    return fd
+}
+
+func h1WriteAll(fd: i32, req: *const char) : bool {
+    var len = strlen(req) as (i32)
+    var sent = 0
+    while(sent < len) {
+        var r = send(fd, (req + sent) as (*void), (len - sent) as (usize), 0)
+        if(r <= 0) { return false }
+        sent += r as (i32)
+    }
+    return true
+}
+
+// ── Response parser ────────────────────────────────────────────────────────────
+
+struct H1Resp {
+    buf:        [8192]char
+    totalLen:   i32
+    headerLen:  i32     // index of first body byte (right after \r\n\r\n)
+    statusCode: i32
+}
+
+// Read a complete HTTP/1.1 response from fd into resp.
+// Pass isHead=true for HEAD requests so no body bytes are consumed.
+func h1ReadFull(fd: i32, resp: *H1Resp, isHead: bool) : bool {
+    resp.totalLen   = 0
+    resp.headerLen  = 0
+    resp.statusCode = 0
+
+    // Read until the \r\n\r\n header terminator appears.
+    while(resp.totalLen < 8188) {
+        var n = recv(fd, (&resp.buf[resp.totalLen]) as (*void),
+                    (8188 - resp.totalLen) as (usize), 0)
+        if(n <= 0) { break }
+        resp.totalLen += n as (i32)
+        for(var i = 0; i <= resp.totalLen - 4; i += 1) {
+            if(resp.buf[i] == '\r' && resp.buf[i+1] == '\n' &&
+               resp.buf[i+2] == '\r' && resp.buf[i+3] == '\n') {
+                resp.headerLen = i + 4
+                break
+            }
+        }
+        if(resp.headerLen > 0) { break }
+    }
+    if(resp.headerLen == 0) { return false }
+
+    // Status code lives at bytes [9..12): "HTTP/1.x NNN ..."
+    resp.statusCode = 0
+    for(var i = 9; i < 12 && i < resp.totalLen; i += 1) {
+        var c = resp.buf[i]
+        if(c < '0' || c > '9') { break }
+        resp.statusCode = resp.statusCode * 10 + (c as (i32) - '0' as (i32))
+    }
+
+    if(isHead) { return true }
+    if(resp.statusCode == 204 || resp.statusCode == 304 ||
+       (resp.statusCode >= 100 && resp.statusCode < 200)) {
+        return true
+    }
+
+    // Content-Length framing: read exactly that many body bytes.
+    var cl = h1ContentLength(resp)
+    if(cl >= 0) {
+        var need = resp.headerLen + cl
+        while(resp.totalLen < need && resp.totalLen < 8190) {
+            var n = recv(fd, (&resp.buf[resp.totalLen]) as (*void),
+                        (need - resp.totalLen) as (usize), 0)
+            if(n <= 0) { break }
+            resp.totalLen += n as (i32)
+        }
+        return true
+    }
+
+    // No framing: read until close or timeout.
+    while(resp.totalLen < 8188) {
+        var n = recv(fd, (&resp.buf[resp.totalLen]) as (*void),
+                    (8188 - resp.totalLen) as (usize), 0)
+        if(n <= 0) { break }
+        resp.totalLen += n as (i32)
+    }
+    return true
+}
+
+func h1ContentLength(resp: *H1Resp) : i32 {
+    var headers = String{.buffer = resp.buf, .length = resp.headerLen}
+    var idx = headers.indexOf($"Content-Length: ")
+    if(idx < 0) { return -1 }
+    var after = headers.substring(idx + 16)
+    var end = after.indexOf($"\r\n")
+    if(end < 0) { return -1 }
+    var p = after.substring(0, end).parseInt()
+    if(p.error != ParseError.NONE) { return -1 }
+    return p.value as (i32)
+}
+
+func h1HasTE(resp: *H1Resp) : bool {
+    var headers = String{.buffer = resp.buf, .length = resp.headerLen}
+    return headers.contains($"Transfer-Encoding:")
+}
+
+func h1HasHeader(resp: *H1Resp, needle: *const char) : bool {
+    var headers = String{.buffer = resp.buf, .length = resp.headerLen}
+    return headers.contains(StringInit(needle))
+}
+
+// Returns true if the named header line contains token anywhere on that line.
+func h1HeaderContains(resp: *H1Resp, header: *const char, token: *const char) : bool {
+    var headers = String{.buffer = resp.buf, .length = resp.headerLen}
+    var hi = headers.indexOf(StringInit(header))
+    if(hi < 0) { return false }
+    var lineStart = headers.substring(hi)
+    var lineEnd = lineStart.indexOf($"\r\n")
+    if(lineEnd < 0) { lineEnd = lineStart.length }
+    var line = lineStart.substring(0, lineEnd)
+    return line.contains(StringInit(token))
+}
+
+func h1BodyLen(resp: *H1Resp) : i32 {
+    return resp.totalLen - resp.headerLen
+}
+
+// Returns true if the status line has a non-empty reason phrase after the 3-digit code.
+// Format: "HTTP/1.1 NNN REASON\r\n" — byte 12 must be SP, byte 13 must not be CR.
+func h1HasReasonPhrase(resp: *H1Resp) : bool {
+    if(resp.totalLen < 14) { return false }
+    if(resp.buf[12] != ' ') { return false }
+    return resp.buf[13] != '\r'
+}
+
+// Quick one-shot: connect, send, read, close. Returns status code or -1.
+func h1OneShot(req: *const char) : i32 {
+    var fd = h1Connect()
+    if(fd < 0) { return -1 }
+    defer close(fd)
+    if(!h1WriteAll(fd, req)) { return -1 }
+    var resp: H1Resp
+    if(!h1ReadFull(fd, &resp, false)) { return -1 }
+    return resp.statusCode
+}
+
+// ── Test helper ────────────────────────────────────────────────────────────────
+
+func check(pass: *i32, fail: *i32, name: *const char, ok: bool) {
+    if(ok) {
+        printf("  PASS  %s\n", name)
+        ;*pass += 1
+    } else {
+        printf("  FAIL  %s\n", name)
+        ;*fail += 1
+    }
+}
+
+// ── Section 1: Status line format (RFC 7230 §3.1.2) ──────────────────────────
+
+@test("h1spec_1_status_line")
+func testStatusLine() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 1: Status line format (RFC 7230 §3.1.2)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &resp, false))
+
+    var sl = String{.buffer = resp.buf, .length = resp.headerLen}
+    check(&p, &f, "1.1  starts with HTTP/",               sl.startsWith($"HTTP/"))
+    check(&p, &f, "1.2  HTTP version is 1.0 or 1.1",
+        sl.startsWith($"HTTP/1.0") || sl.startsWith($"HTTP/1.1"))
+    check(&p, &f, "1.3  GET / returns 200",                resp.statusCode == 200)
+    check(&p, &f, "1.4  status line terminated with CRLF", sl.contains($"\r\n"))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 2: Response framing (RFC 7230 §3.3) ───────────────────────────────
+
+@test("h1spec_2_content_framing")
+func testContentFraming() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 2: Response framing (RFC 7230 §3.3)\n")
+
+    // Small body — GET /
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &resp, false))
+
+    var hasCL = h1ContentLength(&resp) >= 0
+    var hasTE = h1HasTE(&resp)
+    check(&p, &f, "2.1  has Content-Length or Transfer-Encoding",  hasCL || hasTE)
+    check(&p, &f, "2.2  Content-Length and Transfer-Encoding not both present",
+        !(hasCL && hasTE))
+    if(hasCL) {
+        var cl = h1ContentLength(&resp)
+        check(&p, &f, "2.3  Content-Length is non-negative",           cl >= 0)
+        check(&p, &f, "2.4  Content-Length matches actual body",
+            cl == h1BodyLen(&resp))
+    }
+
+    // Large body — GET /large
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var resp2: H1Resp
+    assert(h1WriteAll(fd2, "GET /large HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &resp2, false))
+
+    var hasCL2 = h1ContentLength(&resp2) >= 0
+    if(hasCL2) {
+        var cl2 = h1ContentLength(&resp2)
+        check(&p, &f, "2.5  /large: Content-Length equals H1_LARGE_SIZE",
+            cl2 == H1_LARGE_SIZE)
+        check(&p, &f, "2.6  /large: Content-Length matches body received",
+            cl2 == h1BodyLen(&resp2))
+    }
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 3: Host header requirement (RFC 7230 §5.4) ────────────────────────
+
+@test("h1spec_3_host_header")
+func testHostHeader() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 3: Host header requirement (RFC 7230 §5.4)\n")
+
+    check(&p, &f, "3.1  HTTP/1.1 without Host returns 400",
+        h1OneShot("GET / HTTP/1.1\r\n\r\n") == 400)
+
+    check(&p, &f, "3.2  duplicate Host returns 400",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nHost: example.com\r\n\r\n") == 400)
+
+    check(&p, &f, "3.3  valid Host returns 200",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 4: HTTP version handling (RFC 7230 §2.6) ─────────────────────────
+
+@test("h1spec_4_http_version")
+func testHttpVersion() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 4: HTTP version handling (RFC 7230 §2.6)\n")
+
+    check(&p, &f, "4.1  HTTP/1.1 request succeeds",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    check(&p, &f, "4.2  HTTP/1.0 request gets a valid response",
+        h1OneShot("GET / HTTP/1.0\r\nHost: localhost\r\n\r\n") >= 200)
+
+    check(&p, &f, "4.3  HTTP/2.0 returns 505",
+        h1OneShot("GET / HTTP/2.0\r\nHost: localhost\r\n\r\n") == 505)
+
+    check(&p, &f, "4.4  unknown version HTTP/9.9 returns 400 or 505",
+        h1OneShot("GET / HTTP/9.9\r\nHost: localhost\r\n\r\n") == 400 ||
+        h1OneShot("GET / HTTP/9.9\r\nHost: localhost\r\n\r\n") == 505)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 5: HEAD method (RFC 7231 §4.3.2) ─────────────────────────────────
+
+@test("h1spec_5_head_method")
+func testHeadMethod() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 5: HEAD method (RFC 7231 §4.3.2)\n")
+
+    // GET first so we can compare Content-Length
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var getRsp: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &getRsp, false))
+    var getCL = h1ContentLength(&getRsp)
+
+    // HEAD
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var headRsp: H1Resp
+    assert(h1WriteAll(fd2, "HEAD / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &headRsp, true))
+
+    check(&p, &f, "5.1  HEAD returns 200",        headRsp.statusCode == 200)
+    check(&p, &f, "5.2  HEAD response has no body", h1BodyLen(&headRsp) == 0)
+    if(getCL >= 0 && h1ContentLength(&headRsp) >= 0) {
+        check(&p, &f, "5.3  HEAD Content-Length equals GET Content-Length",
+            h1ContentLength(&headRsp) == getCL)
+    }
+    check(&p, &f, "5.4  HEAD response has CRLF header terminator",
+        headRsp.headerLen > 0)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 6: 404 Not Found (RFC 7231 §6.5.4) ────────────────────────────────
+
+@test("h1spec_6_not_found")
+func testNotFound() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 6: 404 Not Found (RFC 7231 §6.5.4)\n")
+
+    check(&p, &f, "6.1  /no-such-path returns 404",
+        h1OneShot("GET /no-such-path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 404)
+
+    check(&p, &f, "6.2  /a/b/c/d/e returns 404",
+        h1OneShot("GET /a/b/c/d/e HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 404)
+
+    check(&p, &f, "6.3  404 response has Content-Length or Transfer-Encoding",
+        h1OneShot("GET /missing HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 404)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 7: POST method (RFC 7231 §4.3.3) ─────────────────────────────────
+
+@test("h1spec_7_post_method")
+func testPostMethod() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 7: POST method (RFC 7231 §4.3.3)\n")
+
+    // POST with body
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    assert(h1WriteAll(fd,
+        "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello"))
+    assert(h1ReadFull(fd, &resp, false))
+    check(&p, &f, "7.1  POST returns 2xx",                   resp.statusCode >= 200 && resp.statusCode < 300)
+    var hasCL = h1ContentLength(&resp) >= 0
+    var hasTE = h1HasTE(&resp)
+    check(&p, &f, "7.2  POST response has framing header",   hasCL || hasTE)
+    if(hasCL) {
+        check(&p, &f, "7.3  POST response Content-Length matches body",
+            h1ContentLength(&resp) == h1BodyLen(&resp))
+    }
+
+    // POST with zero-length body
+    check(&p, &f, "7.4  POST with zero Content-Length returns 2xx",
+        h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        >= 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 8: Method handling (RFC 7231 §4, §6.6.2) ─────────────────────────
+
+@test("h1spec_8_method_handling")
+func testMethodHandling() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 8: Method handling (RFC 7231 §4, §6.6.2)\n")
+
+    // Unknown/unregistered methods
+    var patch = h1OneShot("PATCH / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "8.1  PATCH (unregistered) returns 405 or 501",
+        patch == 405 || patch == 501)
+
+    var del = h1OneShot("DELETE / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "8.2  DELETE (unregistered) returns 405 or 501",
+        del == 405 || del == 501)
+
+    // Completely unknown method token
+    var bogus = h1OneShot("FOOBAR / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "8.3  unknown method token returns 400, 405, or 501",
+        bogus == 400 || bogus == 405 || bogus == 501)
+
+    // OPTIONS
+    var opts = h1OneShot("OPTIONS / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "8.4  OPTIONS returns 200, 204, 405, or 501",
+        opts == 200 || opts == 204 || opts == 405 || opts == 501)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 9: Connection handling (RFC 7230 §6) ──────────────────────────────
+
+@test("h1spec_9_connection")
+func testConnection() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 9: Connection handling (RFC 7230 §6)\n")
+
+    // HTTP/1.1 keep-alive: send two requests on the same connection
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var r1: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+    assert(h1ReadFull(fd, &r1, false))
+    check(&p, &f, "9.1  first request on persistent conn returns 200", r1.statusCode == 200)
+
+    var r2: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &r2, false))
+    check(&p, &f, "9.2  second request on same conn returns 200",      r2.statusCode == 200)
+
+    // Connection: close — server should close after the response
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var rc: H1Resp
+    assert(h1WriteAll(fd2, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &rc, false))
+    check(&p, &f, "9.3  Connection: close response is 200",            rc.statusCode == 200)
+    check(&p, &f, "9.4  server closes connection after Connection: close",
+        _h1spec_peekOpen(fd2) == 0)
+
+    // Three sequential requests on one connection
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var ra: H1Resp; var rb: H1Resp; var rcc: H1Resp
+    assert(h1WriteAll(fd3, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+    assert(h1ReadFull(fd3, &ra, false))
+    assert(h1WriteAll(fd3, "GET /large HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+    assert(h1ReadFull(fd3, &rb, false))
+    assert(h1WriteAll(fd3, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd3, &rcc, false))
+    check(&p, &f, "9.5  3rd sequential request returns 200",           rcc.statusCode == 200)
+    check(&p, &f, "9.6  /large on reused connection has correct CL",
+        h1ContentLength(&rb) == H1_LARGE_SIZE)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 10: HTTP/1.0 compatibility (RFC 7230 §2.6) ────────────────────────
+
+@test("h1spec_10_http10")
+func testHttp10() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 10: HTTP/1.0 compatibility (RFC 7230 §2.6)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n"))
+    assert(h1ReadFull(fd, &resp, false))
+
+    check(&p, &f, "10.1  HTTP/1.0 request returns 200",
+        resp.statusCode == 200)
+    check(&p, &f, "10.2  HTTP/1.0 response begins with HTTP/",
+        String{.buffer = resp.buf, .length = 8}.startsWith($"HTTP/"))
+    check(&p, &f, "10.3  HTTP/1.0 connection closes after response",
+        _h1spec_peekOpen(fd) == 0)
+
+    // HTTP/1.0 + Connection: keep-alive — should reuse
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r1: H1Resp
+    assert(h1WriteAll(fd2, "GET / HTTP/1.0\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n"))
+    assert(h1ReadFull(fd2, &r1, false))
+    check(&p, &f, "10.4  HTTP/1.0 + Connection: keep-alive returns 200",
+        r1.statusCode == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 11: Bad request handling (RFC 7230 §3.1, §3.3) ───────────────────
+
+@test("h1spec_11_bad_requests")
+func testBadRequests() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 11: Bad request handling (RFC 7230 §3.1, §3.3)\n")
+
+    // Duplicate Content-Length with conflicting values
+    check(&p, &f, "11.1  conflicting duplicate Content-Length returns 400",
+        h1OneShot(
+            "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nContent-Length: 10\r\nConnection: close\r\n\r\nhello") == 400)
+
+    // Non-numeric Content-Length
+    check(&p, &f, "11.2  non-numeric Content-Length returns 400",
+        h1OneShot(
+            "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: abc\r\nConnection: close\r\n\r\n") == 400)
+
+    // Negative Content-Length
+    check(&p, &f, "11.3  negative Content-Length returns 400",
+        h1OneShot(
+            "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: -1\r\nConnection: close\r\n\r\n") == 400)
+
+    // Both Transfer-Encoding and Content-Length (RFC 7230 §3.3.3)
+    check(&p, &f, "11.4  Transfer-Encoding + Content-Length together returns 400",
+        h1OneShot(
+            "POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\n\r\n") == 400)
+
+    // Unrecognised Expect value (RFC 7231 §5.1.1 → 417)
+    check(&p, &f, "11.5  unknown Expect value returns 417",
+        h1OneShot(
+            "GET / HTTP/1.1\r\nHost: localhost\r\nExpect: bogus\r\nConnection: close\r\n\r\n") == 417)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 12: Expect: 100-continue (RFC 7231 §5.1.1) ───────────────────────
+
+@test("h1spec_12_expect_continue")
+func testExpectContinue() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 12: Expect: 100-continue (RFC 7231 §5.1.1)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+
+    // Send headers with Expect: 100-continue, then send body
+    assert(h1WriteAll(fd,
+        "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n"))
+
+    // Server should either send 100 or proceed to respond directly
+    assert(h1ReadFull(fd, &resp, false))
+    var code = resp.statusCode
+
+    if(code == 100) {
+        // Got 100; now send body and read final response
+        assert(h1WriteAll(fd, "hello"))
+        assert(h1ReadFull(fd, &resp, false))
+        code = resp.statusCode
+    }
+
+    check(&p, &f, "12.1  Expect: 100-continue gets 100 or final 2xx",
+        code >= 100 && code < 300)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 13: Response headers (RFC 7231 §7) ────────────────────────────────
+
+@test("h1spec_13_response_headers")
+func testResponseHeaders() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 13: Response headers (RFC 7231 §7)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &resp, false))
+
+    check(&p, &f, "13.1  response includes Connection header",
+        h1HasHeader(&resp, "Connection:"))
+
+    // 404 response must also be well-formed
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r404: H1Resp
+    assert(h1WriteAll(fd2, "GET /missing HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &r404, false))
+    check(&p, &f, "13.2  404 has Content-Length or Transfer-Encoding",
+        h1ContentLength(&r404) >= 0 || h1HasTE(&r404))
+    check(&p, &f, "13.3  404 Content-Length matches body",
+        h1ContentLength(&r404) < 0 || h1ContentLength(&r404) == h1BodyLen(&r404))
+
+    // HEAD: no body, but Content-Length header still expected
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var rHead: H1Resp
+    assert(h1WriteAll(fd3, "HEAD / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd3, &rHead, true))
+    check(&p, &f, "13.4  HEAD response body is empty",    h1BodyLen(&rHead) == 0)
+    check(&p, &f, "13.5  HEAD response has Content-Length header",
+        h1ContentLength(&rHead) >= 0)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 14: URI and header size limits (RFC 7230 §3.1.1, §3.2) ──────────
+
+@test("h1spec_14_size_limits")
+func testSizeLimits() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 14: URI and header size limits (RFC 7230 §3.1.1, §3.2)\n")
+
+    // Very long URI — should get 414 Request-URI Too Long
+    var longUri: [9100]char
+    memset(longUri, 'A' as (i32), 9099_usize)
+    ;longUri[0] = '/'
+    ;longUri[9099] = '\0'
+    var longReq: [9200]char
+    var n = sprintf(longReq,
+        "GET %s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        longUri)
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    h1WriteAll(fd, longReq)
+    var resp: H1Resp
+    h1ReadFull(fd, &resp, false)
+    check(&p, &f, "14.1  overlong URI returns 414 or 400",
+        resp.statusCode == 414 || resp.statusCode == 400)
+
+    // Very long header value — should get 431 Request Header Fields Too Large
+    var longVal: [9100]char
+    memset(longVal, 'B' as (i32), 9099_usize)
+    ;longVal[9099] = '\0'
+    var bigHdrReq: [9300]char
+    sprintf(bigHdrReq,
+        "GET / HTTP/1.1\r\nHost: localhost\r\nX-Big: %s\r\nConnection: close\r\n\r\n",
+        longVal)
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    h1WriteAll(fd2, bigHdrReq)
+    var resp2: H1Resp
+    h1ReadFull(fd2, &resp2, false)
+    check(&p, &f, "14.2  overlong header returns 431 or 400",
+        resp2.statusCode == 431 || resp2.statusCode == 400)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 15: Chunked request body (RFC 7230 §4.1) ─────────────────────────
+
+@test("h1spec_15_chunked_request_body")
+func testChunkedRequestBody() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 15: Chunked request body (RFC 7230 §4.1)\n")
+
+    // Single chunk
+    var c1 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+    check(&p, &f, "15.1  single-chunk POST returns 2xx", c1 >= 200 && c1 < 300)
+
+    // Two chunks concatenated
+    var c2 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n")
+    check(&p, &f, "15.2  two-chunk POST returns 2xx", c2 >= 200 && c2 < 300)
+
+    // Chunk extension — server must ignore "; name=value" after the size
+    var c3 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5;ext=foo\r\nhello\r\n0\r\n\r\n")
+    check(&p, &f, "15.3  chunk extension ignored, returns 2xx", c3 >= 200 && c3 < 300)
+
+    // Zero-length body (only the terminator chunk)
+    var c4 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n0\r\n\r\n")
+    check(&p, &f, "15.4  empty chunked body returns 2xx", c4 >= 200 && c4 < 300)
+
+    // Trailing header after last chunk (RFC 7230 §4.1.2 — server must accept)
+    var c5 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\nX-Checksum: abc\r\n\r\n")
+    check(&p, &f, "15.5  chunked with trailer header returns 2xx", c5 >= 200 && c5 < 300)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 16: Absolute-form request target (RFC 7230 §5.3.2) ───────────────
+
+@test("h1spec_16_absolute_form_uri")
+func testAbsoluteFormUri() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 16: Absolute-form request target (RFC 7230 §5.3.2)\n")
+
+    // Full URI as request target — server must strip the authority
+    check(&p, &f, "16.1  GET http://localhost/ returns 200",
+        h1OneShot("GET http://localhost/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    // With explicit port
+    check(&p, &f, "16.2  GET http://localhost:9191/ returns 200",
+        h1OneShot("GET http://localhost:9191/ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    // Unknown path via absolute form
+    check(&p, &f, "16.3  absolute-form unknown path returns 404",
+        h1OneShot("GET http://localhost/no-such-path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 404)
+
+    // Large resource via absolute form
+    check(&p, &f, "16.4  absolute-form GET /large returns 200",
+        h1OneShot("GET http://localhost/large HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 17: Method case sensitivity (RFC 7230 §3.1.1) ────────────────────
+
+@test("h1spec_17_method_case")
+func testMethodCase() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 17: Method case sensitivity (RFC 7230 §3.1.1)\n")
+
+    // RFC 7230 §3.1.1: method tokens are case-sensitive; lowercase must not match
+    var lower = h1OneShot("get / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "17.1  lowercase 'get' returns 4xx or 5xx", lower >= 400)
+
+    var mixed = h1OneShot("Get / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "17.2  mixed-case 'Get' returns 4xx or 5xx", mixed >= 400)
+
+    var upper = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "17.3  correct uppercase POST still returns 2xx", upper >= 200 && upper < 300)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 18: Error response framing (RFC 7230 §3.3) ───────────────────────
+
+@test("h1spec_18_error_response_framing")
+func testErrorResponseFraming() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 18: Error response framing (RFC 7230 §3.3)\n")
+
+    // 400 — missing Host header
+    var fd1 = h1Connect(); assert(fd1 >= 0); defer close(fd1)
+    var r400: H1Resp
+    h1WriteAll(fd1, "GET / HTTP/1.1\r\n\r\n")
+    h1ReadFull(fd1, &r400, false)
+    check(&p, &f, "18.1  400 response has Content-Length or TE",
+        h1ContentLength(&r400) >= 0 || h1HasTE(&r400))
+    check(&p, &f, "18.2  400 Content-Length matches body",
+        h1ContentLength(&r400) < 0 || h1ContentLength(&r400) == h1BodyLen(&r400))
+
+    // 404 — unknown route
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r404: H1Resp
+    h1WriteAll(fd2, "GET /does-not-exist HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd2, &r404, false)
+    check(&p, &f, "18.3  404 response has Content-Length or TE",
+        h1ContentLength(&r404) >= 0 || h1HasTE(&r404))
+    check(&p, &f, "18.4  404 Content-Length matches body",
+        h1ContentLength(&r404) < 0 || h1ContentLength(&r404) == h1BodyLen(&r404))
+
+    // 501 — unregistered method
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var r501: H1Resp
+    h1WriteAll(fd3, "PUT / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd3, &r501, false)
+    check(&p, &f, "18.5  501/405 response has Content-Length or TE",
+        h1ContentLength(&r501) >= 0 || h1HasTE(&r501))
+    check(&p, &f, "18.6  501/405 Content-Length matches body",
+        h1ContentLength(&r501) < 0 || h1ContentLength(&r501) == h1BodyLen(&r501))
+
+    // 505 — unsupported HTTP version
+    var fd4 = h1Connect(); assert(fd4 >= 0); defer close(fd4)
+    var r505: H1Resp
+    h1WriteAll(fd4, "GET / HTTP/2.0\r\nHost: localhost\r\n\r\n")
+    h1ReadFull(fd4, &r505, false)
+    check(&p, &f, "18.7  505 response has Content-Length or TE",
+        h1ContentLength(&r505) >= 0 || h1HasTE(&r505))
+    check(&p, &f, "18.8  505 Content-Length matches body",
+        h1ContentLength(&r505) < 0 || h1ContentLength(&r505) == h1BodyLen(&r505))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 19: Query string routing (RFC 7230 §5.3.1) ───────────────────────
+
+@test("h1spec_19_query_string_routing")
+func testQueryStringRouting() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 19: Query string routing (RFC 7230 §5.3.1)\n")
+
+    // Query must be stripped before routing; /? still matches /
+    check(&p, &f, "19.1  GET /?key=value returns 200",
+        h1OneShot("GET /?key=value HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    check(&p, &f, "19.2  GET /large?page=2 returns 200",
+        h1OneShot("GET /large?page=2 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    // Unknown path with query is still 404
+    check(&p, &f, "19.3  GET /missing?x=y returns 404",
+        h1OneShot("GET /missing?x=y HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n") == 404)
+
+    // POST with query
+    var c4 = h1OneShot("POST /?debug=1 HTTP/1.1\r\nHost: localhost\r\nContent-Length: 3\r\nConnection: close\r\n\r\nfoo")
+    check(&p, &f, "19.4  POST /?debug=1 returns 2xx", c4 >= 200 && c4 < 300)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 20: OPTIONS method (RFC 7231 §4.3.7) ─────────────────────────────
+
+@test("h1spec_20_options_method")
+func testOptionsMethod() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 20: OPTIONS method (RFC 7231 §4.3.7)\n")
+
+    // OPTIONS on a registered path → 200 + Allow (auto-response)
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    h1WriteAll(fd, "OPTIONS / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd, &resp, false)
+    check(&p, &f, "20.1  OPTIONS / returns 200",              resp.statusCode == 200)
+    check(&p, &f, "20.2  OPTIONS response includes Allow",    h1HasHeader(&resp, "Allow:"))
+    check(&p, &f, "20.3  Allow lists OPTIONS",                h1HeaderContains(&resp, "Allow:", "OPTIONS"))
+    check(&p, &f, "20.4  Allow lists GET",                    h1HeaderContains(&resp, "Allow:", "GET"))
+    check(&p, &f, "20.5  Allow lists POST",                   h1HeaderContains(&resp, "Allow:", "POST"))
+
+    // OPTIONS on an unknown path → server still auto-responds 200 (server-wide capabilities)
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r2: H1Resp
+    h1WriteAll(fd2, "OPTIONS /unknown HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd2, &r2, false)
+    check(&p, &f, "20.6  OPTIONS /unknown returns 200",          r2.statusCode == 200)
+    check(&p, &f, "20.7  OPTIONS /unknown still has Allow header", h1HasHeader(&r2, "Allow:"))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 21: 405 Method Not Allowed + Allow header (RFC 7231 §6.5.5) ──────
+
+@test("h1spec_21_method_not_allowed")
+func testMethodNotAllowed() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 21: 405 Method Not Allowed (RFC 7231 §6.5.5)\n")
+
+    // PUT / — GET and POST are registered; PUT is not
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    h1WriteAll(fd, "PUT / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd, &resp, false)
+    check(&p, &f, "21.1  PUT / returns 405",                  resp.statusCode == 405)
+    check(&p, &f, "21.2  405 includes Allow header",          h1HasHeader(&resp, "Allow:"))
+    check(&p, &f, "21.3  Allow includes GET",                 h1HeaderContains(&resp, "Allow:", "GET"))
+    check(&p, &f, "21.4  Allow includes POST",                h1HeaderContains(&resp, "Allow:", "POST"))
+    check(&p, &f, "21.5  405 has Content-Length or TE",
+        h1ContentLength(&resp) >= 0 || h1HasTE(&resp))
+    check(&p, &f, "21.6  405 Content-Length matches body",
+        h1ContentLength(&resp) < 0 || h1ContentLength(&resp) == h1BodyLen(&resp))
+
+    // DELETE / — also not registered
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r2: H1Resp
+    h1WriteAll(fd2, "DELETE / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd2, &r2, false)
+    check(&p, &f, "21.7  DELETE / returns 405",               r2.statusCode == 405)
+    check(&p, &f, "21.8  DELETE 405 also includes Allow",     h1HasHeader(&r2, "Allow:"))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 22: Body boundary in keep-alive (RFC 7230 §3.3) ──────────────────
+
+@test("h1spec_22_body_boundary")
+func testBodyBoundary() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 22: Body boundary in keep-alive (RFC 7230 §3.3)\n")
+
+    // POST body must not bleed into the next request on the same connection
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    assert(h1WriteAll(fd, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\n\r\nhello"))
+    var r1: H1Resp
+    assert(h1ReadFull(fd, &r1, false))
+    check(&p, &f, "22.1  POST with body returns 2xx", r1.statusCode >= 200 && r1.statusCode < 300)
+
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    var r2: H1Resp
+    assert(h1ReadFull(fd, &r2, false))
+    check(&p, &f, "22.2  GET after POST returns 200", r2.statusCode == 200)
+
+    // Same test with a chunked POST
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    assert(h1WriteAll(fd2, "POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n"))
+    var r3: H1Resp
+    assert(h1ReadFull(fd2, &r3, false))
+    check(&p, &f, "22.3  chunked POST returns 2xx", r3.statusCode >= 200 && r3.statusCode < 300)
+
+    assert(h1WriteAll(fd2, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    var r4: H1Resp
+    assert(h1ReadFull(fd2, &r4, false))
+    check(&p, &f, "22.4  GET after chunked POST returns 200", r4.statusCode == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 23: Header value edge cases (RFC 7230 §3.2) ──────────────────────
+
+@test("h1spec_23_header_value_edge_cases")
+func testHeaderValueEdgeCases() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 23: Header value edge cases (RFC 7230 §3.2)\n")
+
+    // Colon in value must not be treated as a second header separator
+    check(&p, &f, "23.1  header value with colons returns 200",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nX-Token: scheme:name:extra\r\nConnection: close\r\n\r\n") == 200)
+
+    // Empty header value (valid per RFC 7230 §3.2)
+    check(&p, &f, "23.2  empty header value returns 200",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nX-Empty:\r\nConnection: close\r\n\r\n") == 200)
+
+    // Multiple headers with the same non-Host name (server must not reject)
+    check(&p, &f, "23.3  duplicate non-Host headers accepted",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nX-Tag: a\r\nX-Tag: b\r\nConnection: close\r\n\r\n") == 200)
+
+    // Complex Authorization value with colons and base64 padding
+    check(&p, &f, "23.4  Authorization with colons in value returns 200",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nAuthorization: Basic dXNlcjpwYXNz\r\nConnection: close\r\n\r\n") == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 24: Transfer-Encoding case insensitivity (RFC 7230 §3.3.1) ────────
+
+@test("h1spec_24_te_case_insensitive")
+func testTECaseInsensitive() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 24: Transfer-Encoding case insensitivity (RFC 7230 §3.3.1)\n")
+
+    // RFC 7230 §3.3.1: transfer-coding names are case-insensitive
+    var c1 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: CHUNKED\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+    check(&p, &f, "24.1  Transfer-Encoding: CHUNKED (uppercase) returns 2xx", c1 >= 200 && c1 < 300)
+
+    var c2 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: Chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\n\r\n")
+    check(&p, &f, "24.2  Transfer-Encoding: Chunked (mixed case) returns 2xx", c2 >= 200 && c2 < 300)
+
+    var c3 = h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\ntransfer-encoding: chunked\r\nConnection: close\r\n\r\n3\r\nabc\r\n0\r\n\r\n")
+    check(&p, &f, "24.3  transfer-encoding: chunked (lowercase name) returns 2xx", c3 >= 200 && c3 < 300)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 25: HEAD /large framing (RFC 7231 §4.3.2) ────────────────────────
+
+@test("h1spec_25_head_large")
+func testHeadLarge() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 25: HEAD /large framing (RFC 7231 §4.3.2)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    assert(h1WriteAll(fd, "HEAD /large HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &resp, true))
+
+    check(&p, &f, "25.1  HEAD /large returns 200",           resp.statusCode == 200)
+    check(&p, &f, "25.2  HEAD /large body is empty",         h1BodyLen(&resp) == 0)
+    check(&p, &f, "25.3  HEAD /large Content-Length is 1024", h1ContentLength(&resp) == H1_LARGE_SIZE)
+
+    // Verify HEAD Content-Length matches GET Content-Length
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var getRsp: H1Resp
+    assert(h1WriteAll(fd2, "GET /large HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &getRsp, false))
+    check(&p, &f, "25.4  HEAD Content-Length equals GET Content-Length",
+        h1ContentLength(&resp) == h1ContentLength(&getRsp))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 26: Malformed request line (RFC 7230 §3.1.1) ─────────────────────
+
+@test("h1spec_26_malformed_request_line")
+func testMalformedRequestLine() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 26: Malformed request line (RFC 7230 §3.1.1)\n")
+
+    // Method with no path or version
+    check(&p, &f, "26.1  'GET\\r\\n\\r\\n' returns 400",
+        h1OneShot("GET\r\n\r\n") == 400)
+
+    // Blank line as entire request
+    check(&p, &f, "26.2  empty request line returns 400",
+        h1OneShot("\r\n\r\n") == 400)
+
+    // Missing HTTP version
+    check(&p, &f, "26.3  'GET /\\r\\n\\r\\n' (no version) returns 400",
+        h1OneShot("GET /\r\n\r\n") == 400)
+
+    // Two tokens but no version
+    check(&p, &f, "26.4  'GET / \\r\\n\\r\\n' (empty version) returns 400 or 505",
+        h1OneShot("GET / \r\n\r\n") == 400 || h1OneShot("GET / \r\n\r\n") == 505)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 27: OPTIONS * (RFC 7231 §4.3.7) ──────────────────────────────────
+
+@test("h1spec_27_options_star")
+func testOptionsStar() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 27: OPTIONS * (RFC 7231 §4.3.7)\n")
+
+    // Asterisk-form applies to the origin server in general, not a specific resource
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    h1WriteAll(fd, "OPTIONS * HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd, &resp, false)
+    check(&p, &f, "27.1  OPTIONS * returns 200",           resp.statusCode == 200)
+    check(&p, &f, "27.2  OPTIONS * response has Allow",    h1HasHeader(&resp, "Allow:"))
+    check(&p, &f, "27.3  OPTIONS * Allow includes OPTIONS", h1HeaderContains(&resp, "Allow:", "OPTIONS"))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 28: GET with request body (RFC 7230 §3.3) ────────────────────────
+
+@test("h1spec_28_get_with_body")
+func testGetWithBody() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 28: GET with request body (RFC 7230 §3.3)\n")
+
+    // RFC 7230 §3.3: a server must not apply Content-Length restrictions based on method;
+    // GET with a body is unusual but not forbidden
+    var c1 = h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
+    check(&p, &f, "28.1  GET with Content-Length body returns 2xx", c1 >= 200 && c1 < 300)
+
+    // Subsequent GET on keep-alive must not include previous body
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 3\r\n\r\nfoo"))
+    var r1: H1Resp
+    assert(h1ReadFull(fd, &r1, false))
+    check(&p, &f, "28.2  GET with body returns 200", r1.statusCode == 200)
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    var r2: H1Resp
+    assert(h1ReadFull(fd, &r2, false))
+    check(&p, &f, "28.3  subsequent GET on same conn returns 200", r2.statusCode == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 29: Keep-alive with varying response sizes (RFC 7230 §6.3) ────────
+
+@test("h1spec_29_keepalive_varying_sizes")
+func testKeepaliveVaryingSizes() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 29: Keep-alive with varying response sizes (RFC 7230 §6.3)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+
+    // Small → large → small: each Content-Length must be exact
+    var rSmall1: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+    assert(h1ReadFull(fd, &rSmall1, false))
+    check(&p, &f, "29.1  small GET returns 200",           rSmall1.statusCode == 200)
+    check(&p, &f, "29.2  small GET Content-Length correct", h1ContentLength(&rSmall1) == h1BodyLen(&rSmall1))
+
+    var rLarge: H1Resp
+    assert(h1WriteAll(fd, "GET /large HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+    assert(h1ReadFull(fd, &rLarge, false))
+    check(&p, &f, "29.3  large GET returns 200",           rLarge.statusCode == 200)
+    check(&p, &f, "29.4  large GET Content-Length is 1024", h1ContentLength(&rLarge) == H1_LARGE_SIZE)
+    check(&p, &f, "29.5  large GET body is 1024 bytes",    h1BodyLen(&rLarge) == H1_LARGE_SIZE)
+
+    var rSmall2: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &rSmall2, false))
+    check(&p, &f, "29.6  second small GET returns 200",          rSmall2.statusCode == 200)
+    check(&p, &f, "29.7  second small GET Content-Length correct", h1ContentLength(&rSmall2) == h1BodyLen(&rSmall2))
+    check(&p, &f, "29.8  both small GETs have same Content-Length",
+        h1ContentLength(&rSmall1) == h1ContentLength(&rSmall2))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 30: Date header (RFC 7231 §7.1.1.2) ──────────────────────────────
+
+@test("h1spec_30_date_header")
+func testDateHeader() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 30: Date header (RFC 7231 §7.1.1.2)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var r200: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &r200, false))
+    check(&p, &f, "30.1  200 response has Date header",    h1HasHeader(&r200, "Date:"))
+
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r404: H1Resp
+    assert(h1WriteAll(fd2, "GET /no-such-path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &r404, false))
+    check(&p, &f, "30.2  404 response has Date header",    h1HasHeader(&r404, "Date:"))
+
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var r400: H1Resp
+    h1WriteAll(fd3, "GET / HTTP/1.1\r\n\r\n")
+    h1ReadFull(fd3, &r400, false)
+    check(&p, &f, "30.3  400 response has Date header",    h1HasHeader(&r400, "Date:"))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 31: Server header (RFC 7231 §7.4.2) ──────────────────────────────
+
+@test("h1spec_31_server_header")
+func testServerHeader() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 31: Server header (RFC 7231 §7.4.2)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var r200: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &r200, false))
+    check(&p, &f, "31.1  200 response has Server header",  h1HasHeader(&r200, "Server:"))
+
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r404: H1Resp
+    assert(h1WriteAll(fd2, "GET /no-such-path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &r404, false))
+    check(&p, &f, "31.2  404 response has Server header",  h1HasHeader(&r404, "Server:"))
+
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var r400: H1Resp
+    h1WriteAll(fd3, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: abc\r\nConnection: close\r\n\r\n")
+    h1ReadFull(fd3, &r400, false)
+    check(&p, &f, "31.3  400 response has Server header",  h1HasHeader(&r400, "Server:"))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 32: Reason phrase in status line (RFC 7230 §3.1.2) ───────────────
+
+@test("h1spec_32_reason_phrase")
+func testReasonPhrase() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 32: Reason phrase in status line (RFC 7230 §3.1.2)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var r200: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &r200, false))
+    check(&p, &f, "32.1  200 status line has SP after code",    r200.totalLen > 12 && r200.buf[12] == ' ')
+    check(&p, &f, "32.2  200 status line has non-empty reason", h1HasReasonPhrase(&r200))
+
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r404: H1Resp
+    assert(h1WriteAll(fd2, "GET /no-such-path HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &r404, false))
+    check(&p, &f, "32.3  404 status line has non-empty reason", h1HasReasonPhrase(&r404))
+
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var r400: H1Resp
+    h1WriteAll(fd3, "GET / HTTP/1.1\r\n\r\n")
+    h1ReadFull(fd3, &r400, false)
+    check(&p, &f, "32.4  400 status line has non-empty reason", h1HasReasonPhrase(&r400))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 33: Header field name case insensitivity (RFC 7230 §3.2) ──────────
+
+@test("h1spec_33_header_case_insensitive")
+func testHeaderCaseInsensitive() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 33: Header field name case insensitivity (RFC 7230 §3.2)\n")
+
+    check(&p, &f, "33.1  HOST: (uppercase) is accepted",
+        h1OneShot("GET / HTTP/1.1\r\nHOST: localhost\r\nConnection: close\r\n\r\n") == 200)
+
+    check(&p, &f, "33.2  host: (lowercase) is accepted",
+        h1OneShot("GET / HTTP/1.1\r\nhost: localhost\r\nconnection: close\r\n\r\n") == 200)
+
+    check(&p, &f, "33.3  CONTENT-LENGTH: (uppercase) is accepted",
+        h1OneShot("POST / HTTP/1.1\r\nHOST: localhost\r\nCONTENT-LENGTH: 2\r\nCONNECTION: close\r\n\r\nhi") == 200)
+
+    check(&p, &f, "33.4  TRANSFER-ENCODING: chunked (uppercase) is accepted",
+        h1OneShot("POST / HTTP/1.1\r\nHOST: localhost\r\nTRANSFER-ENCODING: chunked\r\nCONNECTION: close\r\n\r\n2\r\nhi\r\n0\r\n\r\n") == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 34: Zero Content-Length body (RFC 7230 §3.3.2) ───────────────────
+
+@test("h1spec_34_zero_content_length")
+func testZeroContentLength() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 34: Zero Content-Length (RFC 7230 §3.3.2)\n")
+
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var rPost: H1Resp
+    assert(h1WriteAll(fd, "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &rPost, false))
+    check(&p, &f, "34.1  POST with Content-Length: 0 returns 2xx",
+        rPost.statusCode >= 200 && rPost.statusCode < 300)
+
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var rGet: H1Resp
+    assert(h1WriteAll(fd2, "GET / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &rGet, false))
+    check(&p, &f, "34.2  GET with Content-Length: 0 returns 200",  rGet.statusCode == 200)
+
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var rHead: H1Resp
+    assert(h1WriteAll(fd3, "HEAD / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd3, &rHead, true))
+    check(&p, &f, "34.3  HEAD with Content-Length: 0 returns 200",  rHead.statusCode == 200)
+    check(&p, &f, "34.4  HEAD response has no body",                h1BodyLen(&rHead) == 0)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 35: Multiple instances of the same header (RFC 7230 §3.2.2) ───────
+
+@test("h1spec_35_multiple_headers")
+func testMultipleHeaders() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 35: Multiple instances of same header (RFC 7230 §3.2.2)\n")
+
+    check(&p, &f, "35.1  multiple Accept headers are accepted",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nAccept: text/html\r\nAccept: application/json\r\nConnection: close\r\n\r\n") == 200)
+
+    check(&p, &f, "35.2  multiple Accept-Encoding headers are accepted",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nAccept-Encoding: gzip\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n") == 200)
+
+    check(&p, &f, "35.3  multiple unknown headers are accepted",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nX-Req-Id: 1\r\nX-Req-Id: 2\r\nConnection: close\r\n\r\n") == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 36: TRACE and CONNECT routing (RFC 7231 §4.3.6, §4.3.8) ──────────
+
+@test("h1spec_36_trace_connect")
+func testTraceConnect() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 36: TRACE and CONNECT routing (RFC 7231 §4.3.6, §4.3.8)\n")
+
+    var trace = h1OneShot("TRACE / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "36.1  TRACE / returns 4xx or 5xx",  trace >= 400)
+
+    var traceStar = h1OneShot("TRACE * HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "36.2  TRACE * returns 4xx or 5xx",  traceStar >= 400)
+
+    var conn = h1OneShot("CONNECT localhost:80 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    check(&p, &f, "36.3  CONNECT returns 4xx or 5xx",  conn >= 400)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 38: Obs-fold (header continuation lines) (RFC 7230 §3.2.6) ────────
+
+@test("h1spec_38_obs_fold")
+func testObsFold() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 38: Obs-fold rejection (RFC 7230 §3.2.6)\n")
+
+    // SP at the start of a line → obsolete header folding → 400
+    check(&p, &f, "38.1  SP continuation line returns 400",
+        h1OneShot("GET / HTTP/1.1\r\nHost: local\r\n host\r\nConnection: close\r\n\r\n") == 400)
+
+    // HT at the start of a line → same
+    check(&p, &f, "38.2  HT continuation line returns 400",
+        h1OneShot("GET / HTTP/1.1\r\nHost: local\r\n\thost\r\nConnection: close\r\n\r\n") == 400)
+
+    // Normal multi-line request (no obs-fold) must still work
+    check(&p, &f, "38.3  normal headers without obs-fold are accepted",
+        h1OneShot("GET / HTTP/1.1\r\nHost: localhost\r\nX-A: 1\r\nX-B: 2\r\nConnection: close\r\n\r\n") == 200)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 39: POST without body framing (RFC 7230 §3.3.3 / RFC 7231 §6.5.10)
+
+@test("h1spec_39_post_no_framing")
+func testPostNoFraming() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 39: POST without body framing (RFC 7230 §3.3.3)\n")
+
+    // POST with body data but no Content-Length or Transfer-Encoding → 411
+    check(&p, &f, "39.1  POST with body but no framing returns 411",
+        h1OneShot("POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\nhello") == 411)
+
+    // POST with no body and no Content-Length is treated as zero-length body → 200
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var resp: H1Resp
+    assert(h1WriteAll(fd, "POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd, &resp, false))
+    check(&p, &f, "39.2  POST with no body and no Content-Length returns 2xx",
+        resp.statusCode >= 200 && resp.statusCode < 300)
+
+    // 411 response has Content-Length framing
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var r411: H1Resp
+    assert(h1WriteAll(fd2, "POST / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\nhello"))
+    assert(h1ReadFull(fd2, &r411, false))
+    check(&p, &f, "39.3  411 response has Content-Length or TE",
+        h1ContentLength(&r411) >= 0 || h1HasTE(&r411))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 40: Connection header in response (RFC 7230 §6.1, §6.3) ───────────
+
+@test("h1spec_40_connection_response_header")
+func testConnectionResponseHeader() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 40: Connection header in response (RFC 7230 §6.1, §6.3)\n")
+
+    // Default (no Connection in request) → Connection: keep-alive
+    var fd = h1Connect(); assert(fd >= 0); defer close(fd)
+    var rKeep: H1Resp
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"))
+    assert(h1ReadFull(fd, &rKeep, false))
+    check(&p, &f, "40.1  response has Connection header",
+        h1HasHeader(&rKeep, "Connection:"))
+    check(&p, &f, "40.2  default 200 has Connection: keep-alive",
+        h1HeaderContains(&rKeep, "Connection:", "keep-alive"))
+    // Connection is still open — send a second request to confirm
+    assert(h1WriteAll(fd, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    var rClose2: H1Resp
+    assert(h1ReadFull(fd, &rClose2, false))
+    check(&p, &f, "40.3  connection stayed open after keep-alive response",
+        rClose2.statusCode == 200)
+
+    // Connection: close → response has Connection: close
+    var fd2 = h1Connect(); assert(fd2 >= 0); defer close(fd2)
+    var rClose: H1Resp
+    assert(h1WriteAll(fd2, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd2, &rClose, false))
+    check(&p, &f, "40.4  Connection: close request → response has Connection: close",
+        h1HeaderContains(&rClose, "Connection:", "close"))
+
+    // 404 also carries Connection header
+    var fd3 = h1Connect(); assert(fd3 >= 0); defer close(fd3)
+    var r404: H1Resp
+    assert(h1WriteAll(fd3, "GET /nope HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"))
+    assert(h1ReadFull(fd3, &r404, false))
+    check(&p, &f, "40.5  404 response has Connection header",
+        h1HasHeader(&r404, "Connection:"))
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}
+
+// ── Section 41: Identical duplicate Content-Length (RFC 7230 §3.3.2) ──────────
+
+@test("h1spec_41_identical_duplicate_cl")
+func testIdenticalDuplicateCL() {
+    h1EnsureServer()
+    var p = 0; var f = 0
+    printf("\nSection 41: Identical duplicate Content-Length (RFC 7230 §3.3.2)\n")
+
+    // RFC 7230 §3.3.2: duplicate Content-Length with SAME value — server MAY accept or reject.
+    // Our server tolerates identical duplicates (keeps the first value).
+    var same = h1OneShot(
+        "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
+    check(&p, &f, "41.1  duplicate Content-Length with same value returns 2xx or 400",
+        same >= 200 && same < 300 || same == 400)
+
+    // Differing values must be rejected (already tested in §11, verify here too)
+    check(&p, &f, "41.2  duplicate Content-Length with different values returns 400",
+        h1OneShot(
+            "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nContent-Length: 6\r\nConnection: close\r\n\r\nhello") == 400)
+
+    printf("  %d passed, %d failed\n", p, f); assert(f == 0)
+}

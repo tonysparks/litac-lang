@@ -1,0 +1,294 @@
+import "std/assert"
+import "std/array"
+import "std/mem"
+
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_common"
+
+import "filter_handler_helpers"
+
+// ---------------------------------------------------------------
+// Simulate the pre/post dispatch loop from http_worker.lita.
+// routeHandlerCalled is set to true if no filter blocked the request.
+// ---------------------------------------------------------------
+
+func simulateDispatch(
+    filters:            *Array<HttpFilterHandler>,
+    postHandlers:       *Array<PostHttpHandler>,
+    ctx:                *RequestHandlerContext,
+    routeHandlerCalled: *bool
+) {
+    var blocked = false
+    for(var i = 0; i < filters.size(); i += 1) {
+        if(filters.get(i).handleFilter(ctx) == 0) {
+            blocked = true
+            break
+        }
+    }
+
+    if(!blocked) {
+        *routeHandlerCalled = true
+        ctx.response.status = 200
+        ctx.response.type   = ResponseType.BODY
+    }
+
+    for(var i = 0; i < postHandlers.size(); i += 1) {
+        postHandlers.get(i).postHandle(ctx)
+    }
+}
+
+// ---------------------------------------------------------------
+// HttpFilterHandler tests
+// ---------------------------------------------------------------
+
+@test("allow filter returns 1 and is called once")
+func testAllowFilterReturnValue() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filter = AllowFilter{}
+    var result = filter.handleFilter(&ctx)
+
+    assert(result == 1)
+    assert(filter.callCount == 1)
+}
+
+@test("block filter returns 0 and sets 403 response")
+func testBlockFilterReturnValue() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filter = BlockFilter{}
+    var result = filter.handleFilter(&ctx)
+
+    assert(result == 0)
+    assert(filter.callCount == 1)
+    assert(ctx.response.status == 403)
+}
+
+@test("allow filter lets route handler run")
+func testAllowFilterPassesThrough() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var filter = AllowFilter{}
+    filters.add(&filter)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(routeCalled)
+    assert(filter.callCount == 1)
+    assert(ctx.response.status == 200)
+}
+
+@test("block filter prevents route handler from running")
+func testBlockFilterPreventsDispatch() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var filter = BlockFilter{}
+    filters.add(&filter)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(!routeCalled)
+    assert(filter.callCount == 1)
+    assert(ctx.response.status == 403)
+}
+
+@test("filters are evaluated in order and stop at first block")
+func testFilterChainStopsAtFirstBlock() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var allow = AllowFilter{}
+    var block = BlockFilter{}
+    var after = AllowFilter{}  // must never be reached
+    filters.add(&allow)
+    filters.add(&block)
+    filters.add(&after)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(!routeCalled)
+    assert(allow.callCount == 1)  // ran before the block
+    assert(block.callCount == 1)  // ran and blocked
+    assert(after.callCount == 0)  // never reached
+    assert(ctx.response.status == 403)
+}
+
+@test("multiple allow filters all run and request proceeds")
+func testMultipleAllowFilters() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.POST)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var f1 = AllowFilter{}
+    var f2 = AllowFilter{}
+    var f3 = AllowFilter{}
+    filters.add(&f1)
+    filters.add(&f2)
+    filters.add(&f3)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(routeCalled)
+    assert(f1.callCount == 1)
+    assert(f2.callCount == 1)
+    assert(f3.callCount == 1)
+}
+
+// ---------------------------------------------------------------
+// PostHttpHandler tests
+// ---------------------------------------------------------------
+
+@test("post-handler is called after successful route dispatch")
+func testPostHandlerCalledOnSuccess() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var recorder = RecordingPostHandler{}
+    postHandlers.add(&recorder)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(routeCalled)
+    assert(recorder.callCount == 1)
+    assert(recorder.lastStatus == 200)
+    assert(recorder.lastMethod == HttpMethod.GET)
+}
+
+@test("post-handler is called even when a filter blocks")
+func testPostHandlerCalledOnBlock() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var block    = BlockFilter{}
+    var recorder = RecordingPostHandler{}
+    filters.add(&block)
+    postHandlers.add(&recorder)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(!routeCalled)
+    assert(recorder.callCount == 1)     // still called
+    assert(recorder.lastStatus == 403)  // sees the filter's response
+}
+
+@test("post-handler sees correct method")
+func testPostHandlerSeesMethod() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.DELETE)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var recorder = RecordingPostHandler{}
+    postHandlers.add(&recorder)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(recorder.lastMethod == HttpMethod.DELETE)
+}
+
+@test("multiple post-handlers all run in order")
+func testMultiplePostHandlers() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.GET)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var r1 = RecordingPostHandler{}
+    var r2 = RecordingPostHandler{}
+    postHandlers.add(&r1)
+    postHandlers.add(&r2)
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(r1.callCount == 1)
+    assert(r2.callCount == 1)
+}
+
+@test("no filters and no post-handlers: route runs normally")
+func testEmptyFilterAndPostLists() {
+    var req: HttpRequest;
+    var res: HttpResponse;
+    var ctx = makeContext(&req, &res, HttpMethod.PUT)
+    defer res.free()
+
+    var filters      = ArrayInit<HttpFilterHandler>(4, defaultAllocator)
+    var postHandlers = ArrayInit<PostHttpHandler>(4, defaultAllocator)
+    defer filters.free()
+    defer postHandlers.free()
+
+    var routeCalled = false
+    simulateDispatch(&filters, &postHandlers, &ctx, &routeCalled)
+
+    assert(routeCalled)
+    assert(ctx.response.status == 200)
+}

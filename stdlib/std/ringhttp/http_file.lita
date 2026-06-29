@@ -1,0 +1,78 @@
+import "std/mem"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/io"
+import "std/system"
+import "std/libc"
+import "std/net"
+
+import "std/array"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_connection"
+
+public func OpenFile(
+    rootPath: String,
+    publicServerPath: String,
+    path: String,
+    file: *File
+) : Status {
+
+    // result is rootPath + "/" + path. If rootPath is non-empty the combined
+    // string can exceed MAX_PATH and overflow the stack buffer. Check the
+    // full combined length (+ 1 for the '/' separator).
+    if(path.contains($"..") || (rootPath.length + 1 + path.length) >= MAX_PATH) {
+        return Status.ERROR_REQUEST_PATH_NOT_ALLOWED
+    }
+
+    if (publicServerPath.length > 0 && path.length >= publicServerPath.length) {
+        path = path.substring(publicServerPath.length)
+    }
+
+    var buffer: PathBuf;
+    var filepath = buffer.toStringBuffer()
+
+    filepath.format("%.*s/%.*s",
+        rootPath.length, rootPath.buffer,
+        path.length, path.buffer
+    )
+
+    var fileStatus = file.open(filepath.cStr(), FileOpenOp.READ_ONLY_BINARY)
+    if(fileStatus != FileStatus.Ok) {
+        if(fileStatus == FileStatus.IOError) {
+            return Status.ERROR_IO_ERROR
+        }
+        if(fileStatus == FileStatus.FileNotFoundError) {
+            return Status.ERROR_FILE_NOT_FOUND
+        }
+        return Status.ERROR_INVALID_REQUEST_PATH
+    }
+
+    return Status.OK
+}
+
+// FileOpenResult holds the results of OpenFileInfo without exposing File.
+public struct FileOpenResult {
+    fd:       i32
+    fileSize: i64
+    status:   Status
+}
+
+// OpenFileInfo opens a file and returns the handle and size without
+// exposing the File type to callers that don't import std/io.
+public func OpenFileInfo(
+    rootPath: String,
+    publicServerPath: String,
+    path: String
+) : FileOpenResult {
+    var result = FileOpenResult{}
+    var file: File;
+    result.status = OpenFile(rootPath, publicServerPath, path, &file)
+    if(result.status != Status.OK) {
+        return result
+    }
+    result.fd       = file.handle()
+    result.fileSize = file.length()
+    return result
+}

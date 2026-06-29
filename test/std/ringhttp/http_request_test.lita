@@ -1,0 +1,546 @@
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/array"
+import "std/libc"
+import "std/assert"
+import "std/mem"
+
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_common"
+
+func testQueryParsingUrl(query: *const char, expected: *const char) {
+    var request = HttpRequest {}
+    request.query = query.toString()
+
+    var result = HttpQueryInit(defaultAllocator)
+    assert(request.parseQuery(&result) == Status.OK)
+
+    var sb = StringBuilderInit()
+    for(var i = 0; i < result.params.size(); i+=1) {
+        var param = result.params.getPtr(i)
+
+        sb.append("'%.*s'->'%.*s'\n",
+            param.name.length,
+            param.name.buffer,
+            param.value.length,
+            param.value.buffer)
+    }
+
+    var expectedView = StringInit(expected)
+    assert(expectedView.equals(sb.toString()))
+}
+
+@test
+func testQueryParsing() {
+    testQueryParsingUrl("", "")
+    testQueryParsingUrl("query=this&name=value&yes=1", "'query'->'this'\n'name'->'value'\n'yes'->'1'\n")
+    testQueryParsingUrl("query&name=value&yes=1", "'query'->''\n'name'->'value'\n'yes'->'1'\n")
+    testQueryParsingUrl("query=this&name&yes=1", "'query'->'this'\n'name'->''\n'yes'->'1'\n")
+    testQueryParsingUrl("query=this&name=value&yes", "'query'->'this'\n'name'->'value'\n'yes'->''\n")
+    testQueryParsingUrl("query=this&name&yes", "'query'->'this'\n'name'->''\n'yes'->''\n")
+    testQueryParsingUrl("query&name=value&yes", "'query'->''\n'name'->'value'\n'yes'->''\n")
+    testQueryParsingUrl("query&name&yes=1", "'query'->''\n'name'->''\n'yes'->'1'\n")
+    testQueryParsingUrl("query&name&yes", "'query'->''\n'name'->''\n'yes'->''\n")
+}
+
+
+@test
+func testQueryParams() {
+    var queryParam = HttpQueryInit(defaultAllocator)
+    var queryRequest = HttpRequest{}
+
+    // Test empty
+    {
+        queryParam.params.clear()
+        queryRequest.query = StringInit("")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.empty())
+    }
+
+    // Test 1
+    {
+        queryParam.params.clear()
+        queryRequest.query = StringInit("name=value")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 1)
+
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString("name"))
+            assert(n.value.equalsString("value"))
+        }
+    }
+
+    // Test 2
+    {
+        queryParam.params.clear()
+        queryRequest.query = StringInit("name=value&thing1=thing2")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 2)
+
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString("name"))
+            assert(n.value.equalsString("value"))
+        }
+
+        {
+            var n = queryParam.params.get(1)
+            assert(n.name.equalsString("thing1"))
+            assert(n.value.equalsString("thing2"))
+        }
+    }
+
+    // Missing '='
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("name")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 1)
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString("name"))
+            assert(n.value.equalsString(""))
+        }
+    }
+
+    // Missing '=' with '&'
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("name&value")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 2)
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString("name"))
+            assert(n.value.equalsString(""))
+        }
+        {
+            var n = queryParam.params.get(1)
+            assert(n.name.equalsString("value"))
+            assert(n.value.equalsString(""))
+        }
+    }
+
+    // Double '='
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("name=x=y")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 1)
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString("name"))
+            assert(n.value.equalsString("x=y"))
+        }
+    }
+
+    // Double '=' with '&'
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("name=x=y&thing1=thing2")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 2)
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString("name"))
+            assert(n.value.equalsString("x=y"))
+        }
+
+        {
+            var n = queryParam.params.get(1)
+            assert(n.name.equalsString("thing1"))
+            assert(n.value.equalsString("thing2"))
+        }
+    }
+
+    // Trailing '&'
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("name=x&")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 1)
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString("name"))
+            assert(n.value.equalsString("x"))
+        }
+    }
+
+    // Only '&'
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("&")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.empty())
+    }
+
+    // String of '&&&&'
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("&&&&&")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.empty())
+    }
+
+    // String of '======'
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("====")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 1)
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString(""))
+            assert(n.value.equalsString("==="))
+        }
+    }
+
+    // String of '=&=&=&'
+    {
+
+        queryParam.params.clear()
+        queryRequest.query = StringInit("=&=&=&")
+        queryRequest.parseQuery(&queryParam)
+        assert(queryParam.params.size() == 3)
+        {
+            var n = queryParam.params.get(0)
+            assert(n.name.equalsString(""))
+            assert(n.value.equalsString(""))
+        }
+        {
+            var n = queryParam.params.get(1)
+            assert(n.name.equalsString(""))
+            assert(n.value.equalsString(""))
+        }
+        {
+            var n = queryParam.params.get(2)
+            assert(n.name.equalsString(""))
+            assert(n.value.equalsString(""))
+        }
+    }
+}
+
+@test
+func testQueryRawValues() {
+    // parseQuery stores raw (still percent-encoded) values — no allocation, no decoding
+    var query = HttpQueryInit(defaultAllocator)
+    var request = HttpRequest{}
+    request.query = StringInit("code=4%2F0AXBk-abc&state=deadbeef")
+    request.parseQuery(&query)
+    assert(query.params.size() == 2)
+    // Raw values are stored as-is
+    assert(query.params.get(0).name.equalsString("code"))
+    assert(query.params.get(0).value.equalsString("4%2F0AXBk-abc"))
+    assert(query.params.get(1).name.equalsString("state"))
+    assert(query.params.get(1).value.equalsString("deadbeef"))
+    // get() also returns the raw value
+    assert(query.get($"code").equalsString("4%2F0AXBk-abc"))
+    assert(query.get($"state").equalsString("deadbeef"))
+    // Missing key returns empty String
+    assert(query.get($"nope").length == 0)
+}
+
+@test
+func testQueryDecodedValue() {
+    // getDecodedValue decodes on demand into a caller-supplied StringBuilder
+    {
+        var query = HttpQueryInit(defaultAllocator)
+        var request = HttpRequest{}
+        request.query = StringInit("code=4%2F0AXBk-abc&state=deadbeef")
+        request.parseQuery(&query)
+
+        var codeSb = StringBuilderInit(256)
+        defer codeSb.free()
+        var codeParam = query.getParam($"code")
+        assert(codeParam != null)
+        codeParam.getDecodedValue(&codeSb)
+        assert(codeSb.toString().equalsString("4/0AXBk-abc"))
+
+        // Plain value (no encoding) is returned unchanged
+        var stateSb = StringBuilderInit(64)
+        defer stateSb.free()
+        var stateParam = query.getParam($"state")
+        assert(stateParam != null)
+        stateParam.getDecodedValue(&stateSb)
+        assert(stateSb.toString().equalsString("deadbeef"))
+    }
+
+    // Spaces (%20) and slash (%2F) decoded
+    {
+        var query = HttpQueryInit(defaultAllocator)
+        var request = HttpRequest{}
+        request.query = StringInit("q=hello%20world&redirect%5Furi=http%3A%2F%2Flocalhost")
+        request.parseQuery(&query)
+
+        var qSb = StringBuilderInit(64)
+        defer qSb.free()
+        query.getParam($"q").getDecodedValue(&qSb)
+        assert(qSb.toString().equalsString("hello world"))
+
+        // Encoded name: raw is "redirect%5Furi", decoded name is "redirect_uri"
+        var rawName = query.params.get(1).name
+        assert(rawName.equalsString("redirect%5Furi"))
+
+        var nameSb = StringBuilderInit(64)
+        defer nameSb.free()
+        query.params.getPtr(1).getDecodedName(&nameSb)
+        assert(nameSb.toString().equalsString("redirect_uri"))
+    }
+
+    // getParam returns null for missing key
+    {
+        var query = HttpQueryInit(defaultAllocator)
+        var request = HttpRequest{}
+        request.query = StringInit("a=1")
+        request.parseQuery(&query)
+        assert(query.getParam($"missing") == null)
+    }
+}
+
+@test
+func testCookieParsing() {
+    // Basic single cookie
+    {
+        var request = HttpRequest{}
+        request.headers.init(4, defaultAllocator)
+        var header = HttpHeader { .name = $"Cookie", .values = $"session=abc123" }
+        request.headers.add(header)
+
+        var cookies = HttpCookiesInit(defaultAllocator)
+        assert(request.parseCookies(&cookies) == Status.OK)
+        assert(cookies.entries.size() == 1)
+        assert(cookies.entries.get(0).name.equalsString("session"))
+        assert(cookies.entries.get(0).value.equalsString("abc123"))
+    }
+
+    // Multiple cookies
+    {
+        var request = HttpRequest{}
+        request.headers.init(4, defaultAllocator)
+        var header = HttpHeader { .name = $"Cookie", .values = $"a=1; b=2; c=3" }
+        request.headers.add(header)
+
+        var cookies = HttpCookiesInit(defaultAllocator)
+        assert(request.parseCookies(&cookies) == Status.OK)
+        assert(cookies.entries.size() == 3)
+        assert(cookies.entries.get(0).name.equalsString("a"))
+        assert(cookies.entries.get(0).value.equalsString("1"))
+        assert(cookies.entries.get(1).name.equalsString("b"))
+        assert(cookies.entries.get(1).value.equalsString("2"))
+        assert(cookies.entries.get(2).name.equalsString("c"))
+        assert(cookies.entries.get(2).value.equalsString("3"))
+    }
+
+    // No Cookie header — empty result, no error
+    {
+        var request = HttpRequest{}
+        request.headers.init(4, defaultAllocator)
+
+        var cookies = HttpCookiesInit(defaultAllocator)
+        assert(request.parseCookies(&cookies) == Status.OK)
+        assert(cookies.entries.empty())
+    }
+
+    // Cookie with no value (name only)
+    {
+        var request = HttpRequest{}
+        request.headers.init(4, defaultAllocator)
+        var header = HttpHeader { .name = $"Cookie", .values = $"token; other=x" }
+        request.headers.add(header)
+
+        var cookies = HttpCookiesInit(defaultAllocator)
+        request.parseCookies(&cookies)
+        // "token" has no '=' so it's skipped; "other=x" is kept
+        assert(cookies.entries.size() == 1)
+        assert(cookies.entries.get(0).name.equalsString("other"))
+        assert(cookies.entries.get(0).value.equalsString("x"))
+    }
+}
+
+@test
+func testCookieGet() {
+    var request = HttpRequest{}
+    request.headers.init(4, defaultAllocator)
+    var header = HttpHeader { .name = $"Cookie", .values = $"session=xyz; theme=dark; lang=en" }
+    request.headers.add(header)
+
+    var cookies = HttpCookiesInit(defaultAllocator)
+    request.parseCookies(&cookies)
+
+    assert(cookies.get($"session").equalsString("xyz"))
+    assert(cookies.get($"theme").equalsString("dark"))
+    assert(cookies.get($"lang").equalsString("en"))
+
+    // Missing cookie returns empty String
+    var missing = cookies.get($"nope")
+    assert(missing.length == 0)
+}
+
+func assertPathParsing(
+    turl: *const char,
+    url: *const char,
+    expected: *const char,
+    templateStatus: Status = Status.OK,
+    valueStatus: Status = Status.OK
+) {
+    var template = HttpPathTemplate{}
+
+    var pathTemplate = StringInit(turl)
+    var status = ParsePathTemplate(&pathTemplate, &template)
+    assert(status == templateStatus)
+
+    if(templateStatus != Status.OK) {
+        return;
+    }
+
+    var path = StringInit(url)
+    var values = HttpPathValues{}
+    status = ParsePathValues(&template, &path, &values)
+    assert(status == valueStatus)
+
+    if(valueStatus != Status.OK) {
+        return;
+    }
+
+    assert(values.numberOfEntries == template.numberOfEntries)
+
+    var sb = StringBuilderInit()
+    for(var i = 0; i < template.numberOfEntries; i+=1) {
+        var entry = &template.entries[i]
+        var value = &values.entries[i]
+
+        sb.append("'%.*s'@%d='%.*s';",
+            entry.name.length, entry.name.buffer,
+            entry.index,
+            value.length, value.buffer
+        )
+    }
+    //printf("%s\n", sb.cStr())
+
+    assert(StringEqual(sb.cStr(), expected))
+}
+
+@test
+func testPathParsing() {
+    assertPathParsing(
+        "/{userId}/resources/{resourceId}",
+        "/1234/resources/ABC",
+        "'userId'@1='1234';'resourceId'@11='ABC';"
+    )
+    assertPathParsing(
+        "/",
+        "/1234/resources/ABC",
+        ""
+    )
+
+    assertPathParsing(
+        "/{userId}/resources/{resourceId}/",
+        "/1234/resources/ABCD",
+        "'userId'@1='1234';'resourceId'@11='ABCD';"
+    )
+
+    assertPathParsing(
+        "/{userId}/resources/{resourceId}/x",
+        "/1234/resources/ABC",
+        "'userId'@1='1234';'resourceId'@11='ABC';"
+    )
+
+    assertPathParsing(
+        "/{}/resources/{resourceId}",
+        "/1234/resources/ABC",
+        "''@1='1234';'resourceId'@11='ABC';"
+    )
+
+    assertPathParsing(
+        "/{userId}",
+        "/1234/resources/ABC",
+        "'userId'@1='1234';"
+    )
+
+    assertPathParsing(
+        "",
+        "/1234/resources/ABC",
+        ""
+    )
+
+    assertPathParsing(
+        "{userId}",
+        "/1234/resources/ABC",
+        "'userId'@0='';"
+    )
+
+    assertPathParsing(
+        "/{userId}/resources/{resourceId}",
+        "/",
+        "",
+        Status.OK,
+        Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_START
+    )
+
+    assertPathParsing(
+        "/{userId/resources/{resourceId}",
+        "/1234/resources/ABC",
+        "",
+        Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_START,
+        Status.OK
+    )
+
+    assertPathParsing(
+        "/userId}/resources/{resourceId}",
+        "/1234/resources/ABC",
+        "",
+        Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_END,
+        Status.OK
+    )
+
+    assertPathParsing(
+        "/{userId}",
+        "/1234?jorb",
+        "'userId'@1='1234';"
+    )
+}
+
+// Bug 8: ParsePathTemplate had no bounds check before writing into the
+// fixed-size entries array (size MAX_TEMPATE_ENTRIES = 32).  A template
+// with more than 32 parameters would overflow onto adjacent stack memory.
+// After the fix it returns ERROR_INVALID_TEMPLATE_NAME_START.
+@test
+func testPathTemplateOverflow() {
+    // Build a path template with 33 parameters — one more than MAX_TEMPATE_ENTRIES.
+    var sb = StringBuilderInit(512)
+    defer sb.free()
+    for(var i = 0; i < 33; i+=1) {
+        sb.append("/{p%d}", i)
+    }
+
+    var template = HttpPathTemplate{}
+    var pathTemplate = sb.toString()
+    var status = ParsePathTemplate(&pathTemplate, &template)
+
+    // Must not overflow the array — the 33rd entry must be rejected.
+    assert(status == Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_START)
+
+    // Exactly 32 parameters must still be accepted.
+    var sb2 = StringBuilderInit(512)
+    defer sb2.free()
+    for(var i = 0; i < 32; i+=1) {
+        sb2.append("/{p%d}", i)
+    }
+
+    var template2 = HttpPathTemplate{}
+    var pathTemplate2 = sb2.toString()
+    var status2 = ParsePathTemplate(&pathTemplate2, &template2)
+    assert(status2 == Status.OK)
+    assert(template2.numberOfEntries == 32)
+}

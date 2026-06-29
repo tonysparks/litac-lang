@@ -1,0 +1,59 @@
+import "std/string"
+import "std/array"
+import "std/libc"
+import "std/mem"
+
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_common"
+
+public const MULTIPART_HEADER : String = $"multipart/form-data"
+public const CONTENT_TYPE_HEADER : String = $"content-type"
+
+
+const MULTIPART_HEADER_LENGTH = 19 // len("multipart/form-data")
+const BOUNDARY_LENGTH = 9          // len("boundary=")
+
+public struct HttpMultipart {
+    boundary: String
+    parts: Array<MultipartPart>
+}
+
+public struct MultipartPart {
+    headers: Array<HttpHeader>
+    body: String
+}
+
+public func ParseMultipart(
+    allocator: *const Allocator,
+    request: *HttpRequest,
+    result: *HttpMultipart
+) : Status {
+
+    for(var i = 0; i < request.headers.size(); i+=1) {
+        var header = request.headers.getPtr(i)
+
+        // TODO: make content-type a first class element??
+        if(!header.name.equalsIgnoreCase(CONTENT_TYPE_HEADER)) {
+            continue
+        }
+
+        if(header.values.startsWith(MULTIPART_HEADER)) {
+            var value = header.values
+            var index = value.indexOfAt($"boundary=", MULTIPART_HEADER_LENGTH)
+            if(index > -1) {
+                var boundaryStart = index + BOUNDARY_LENGTH
+                if(boundaryStart >= value.length) {
+                    return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_SECTION
+                }
+                result.boundary.buffer = &value.buffer[boundaryStart]
+                result.boundary.length = value.length - boundaryStart
+                // TODO use HttpParser (parseHeaders to parse each part's header)
+                return Status.OK
+            }
+        }
+    }
+
+    return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_SECTION
+}
+

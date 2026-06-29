@@ -1,0 +1,566 @@
+import "std/libc"
+import "std/array"
+import "std/string/builder"
+import "std/string"
+import "std/mem"
+import "std/mem/thread_safe_allocator"
+import "std/json"
+import "std/io"
+import "std/assert"
+
+import "std/thread"
+import "std/thread/barrier"
+
+// posix specific
+import "std/net/posix_socket"
+
+import "std/ringhttp/http_ring"
+
+public struct FileStream {
+    file: File
+}
+
+public func (this: *FileStream) read(buffer: *char, size: i32) : i32 {
+    var startPosition = this.file.position()
+    var status = this.file.readBytes(buffer, size as (usize))
+
+    if(status == FileStatus.Ok) {
+        return (this.file.position() - startPosition) as (i32)
+    }
+    return -1
+}
+
+public struct ServerHandler {
+}
+
+public func (this: *ServerHandler) handle(
+    context: *RequestHandlerContext,
+    status: Status
+) : i32 {
+
+    var body = ""
+    if (status == Status.ERROR_NO_ROUTE_FOUND) {
+        body = """
+            <html>
+                <body>
+                    <div>
+                        Unknown route for <b>%.*s</b>
+                    </div>
+                </body>
+            </html>
+        """
+    }
+    else {
+        body = """
+            <html>
+                <body>
+                    <div>
+                        Sorry, an internal server error ocurred.
+                    </div>
+                </body>
+            </html>
+        """
+    }
+    var response = context.response
+    response.type = ResponseType.BODY
+    response.addHeaderStr("Content-Type", "text/html")
+
+    // TODO add mime type info..
+    response.body.append(
+        body,
+        context.request.path.length,
+        context.request.path.buffer
+    )
+    return 1
+}
+
+func SseSingleEventController(session: *SseSession) : i32 {
+    var event = SseEvent {
+        .data = $"hello from sse"
+    }
+    session.send(&event)
+    session.close()
+    return 1
+}
+
+func SseMultiEventController(session: *SseSession) : i32 {
+    var ev1 = SseEvent { .data = $"event one" }
+    var ev2 = SseEvent { .data = $"event two" }
+    var ev3 = SseEvent { .data = $"event three" }
+    session.send(&ev1)
+    session.send(&ev2)
+    session.send(&ev3)
+    session.close()
+    return 1
+}
+
+func SseWithFieldsController(session: *SseSession) : i32 {
+    var event = SseEvent {
+        .id    = $"42",
+        .event = $"update",
+        .data  = $"payload data",
+        .retry = 3000
+    }
+    session.send(&event)
+    session.close()
+    return 1
+}
+
+func SseMultilineController(session: *SseSession) : i32 {
+    var event = SseEvent {
+        .data = $"line one\nline two\nline three"
+    }
+    session.send(&event)
+    session.close()
+    return 1
+}
+
+func TestWebSocketController(session: *WebSocketSession, frame: *Frame) : i32 {
+    var text = StringInit(.buffer = frame.payload, .length = frame.payloadLength as (i32))
+
+    if (text.equalsIgnoreCase($"exit")) {
+        session.close()
+        return 1
+    }
+
+    var writeBuffer = StringBuilderInit(256, session.allocator)
+    writeBuffer.clear()
+
+    writeBuffer.append("Server says: '%.*s'\n", text.length, text.buffer)
+
+    var out = Frame{}
+    out.isFinal = true
+    out.masked = false
+    out.payload = writeBuffer.buffer
+    out.payloadLength = writeBuffer.length
+    out.opcode = Opcode.TEXT
+
+    return session.send(
+        &out
+    )
+}
+
+
+func EchoRequestHandler(context: *RequestHandlerContext) : i32 {
+    var req = context.request
+    var res = context.response
+
+    var query = HttpQueryInit(context.allocator)
+    req.parseQuery(&query)
+
+    res.status = 200
+    res.type = ResponseType.BODY
+    res.addHeaderStr("Content-Type", "application/json")
+
+    res.body.append("{ \"query\": {")
+
+    for(var i = 0; i < query.params.size(); i+=1) {
+        var param = query.params.getPtr(i)
+        if(i > 0) res.body.append(",")
+
+        res.body.append("\"%.*s\": \"%.*s\"",
+            param.name.length, param.name.buffer,
+            param.value.length, param.value.buffer
+        )
+    }
+    res.body.append("}}")
+
+//    var json = query.toJson(res.body)
+    //res.bod
+    return 1
+}
+
+func DownloadRequestHandler(context: *RequestHandlerContext) : i32 {
+    var req = context.request
+    var res = context.response
+
+    res.status = 200
+    res.type = ResponseType.STREAM
+    res.addHeaderStr("Content-Type", "application/octet-stream")
+    res.addHeaderStr("Content-Disposition", "attachment; filename=\"big_file.txt\"")
+
+    var fileStream = new<FileStream>(context.allocator)
+    fileStream.file.open("../test/download_sample.txt", FileOpenOp.READ_ONLY)
+    // TODO: Error handling..
+
+    res.asStream(fileStream)
+
+    return 1
+}
+
+func GzipRequestHandler(context: *RequestHandlerContext) : i32 {
+    var req = context.request
+    var res = context.response
+
+    res.status = 200
+    res.type = ResponseType.BODY
+    res.addHeaderStr("Content-Type", "text/plain")
+
+    const size = 2 * KiB;
+    for(var i = 0; i < size; i += 1) {
+        var b = (i % (127 - 32)) + 32
+        res.body.appendChar(b as (char))
+    }
+
+    return 1
+}
+
+
+func SubmitRequestHandler(context: *RequestHandlerContext) : i32 {
+    var req = context.request
+    var res = context.response
+
+    res.status = 200
+    res.type = ResponseType.BODY
+    res.addHeaderStr("Content-Type", "application/json")
+
+    res.body.append("{ ")
+
+    res.body.append(" \"headers\": ")
+    PrintHeaders(&req.headers, res, context.allocator)
+
+    res.body.append(", ")
+
+    res.body.append("\"body\": ")
+    PrintBody(&req.body, res, context.allocator)
+
+    res.body.append("} ")
+    return 1
+}
+
+func PrintHeaders(headers: *Array<HttpHeader>, res: *HttpResponse, allocator: *const Allocator) {
+    res.body.append("[")
+
+    var sb = StringBuilderInit(1024, allocator)
+    for(var i = 0; i < headers.size(); i+=1) {
+        if(i > 0) res.body.append(",")
+
+        var header = headers.getPtr(i)
+        res.body.append("{ ")
+        res.body.append("\"name\": \"%.*s\", ", header.name.length, header.name.buffer)
+
+        JsonEscapeString(sb, header.values.buffer, header.values.length)
+        res.body.append("\"value\": \"%.*s\"", sb.length, sb.buffer)
+        res.body.append("} ")
+
+        sb.clear()
+    }
+    res.body.append("]")
+}
+
+func PrintBody(body: *Body, res: *HttpResponse, allocator: *const Allocator) {
+    switch(body.bodyType) {
+        case BodyType.FORM_URLENCODED: {
+            res.body.append("{ \"post_params\": {")
+            for(var i = 0; i < body.formParams.size(); i+=1) {
+                var param = body.formParams.getPtr(i)
+                if(i > 0) res.body.append(",")
+
+                res.body.append("\"%.*s\": \"%.*s\"",
+                    param.name.length, param.name.buffer,
+                    param.value.length, param.value.buffer
+                )
+            }
+            res.body.append("}}")
+            break
+        }
+        case BodyType.JSON: {
+            if (body.json) {
+                body.json.print(res.body)
+            }
+            break
+        }
+        case BodyType.MULTIPART_FORMDATA: {
+            var multipart = body.multipart
+            res.body.append("{ \"multi_part\": { ")
+            res.body.append(" \"boundary\": \"%.*s\", ", multipart.boundary.length, multipart.boundary.buffer)
+
+            res.body.append(" \"parts\": [")
+            for(var i = 0; i < multipart.parts.size(); i+=1) {
+                var part = multipart.parts.getPtr(i)
+                if(i > 0) res.body.append(",")
+
+                PrintBody(&part.body, res, allocator)
+            }
+            res.body.append("]}}")
+            break
+        }
+        case BodyType.FORMDATA: {
+            var sb = StringBuilderInit(body.formData.value.length + 32, allocator)
+            JsonEscapeString(sb, body.formData.value.buffer, body.formData.value.length)
+
+            res.body.append("{")
+            res.body.append(" \"form_data\": {")
+            res.body.append(" \"name\": \"%.*s\",", body.formData.name.length, body.formData.name.buffer)
+            res.body.append(" \"filename\": \"%.*s\",", body.formData.filename.length, body.formData.filename.buffer)
+            res.body.append(" \"value\": \"%.*s\"", sb.length, sb.buffer)
+            res.body.append("  }")
+            res.body.append("}")
+            break
+        }
+        default: {
+            var sb = StringBuilderInit(body.length + 32, allocator)
+            JsonEscapeString(sb, body.buffer, body.length)
+
+            res.body.append("{ \"body\": ")
+            res.body.append("\"%.*s\"", sb.length, sb.buffer)
+            res.body.append("}")
+            break
+        }
+    }
+}
+
+func PutRequestHandler(context: *RequestHandlerContext) : i32 {
+    var req = context.request
+    var res = context.response
+
+    res.status = 200
+    res.type = ResponseType.BODY
+    res.addHeaderStr("Content-Type", "application/json")
+
+    res.body.append("{ \"method\": \"PUT\", ")
+    res.body.append("\"body\": ")
+    PrintBody(&req.body, res, context.allocator)
+    res.body.append("}")
+    return 1
+}
+
+func PatchRequestHandler(context: *RequestHandlerContext) : i32 {
+    var req = context.request
+    var res = context.response
+
+    res.status = 200
+    res.type = ResponseType.BODY
+    res.addHeaderStr("Content-Type", "application/json")
+
+    res.body.append("{ \"method\": \"PATCH\", ")
+    res.body.append("\"body\": ")
+    PrintBody(&req.body, res, context.allocator)
+    res.body.append("}")
+    return 1
+}
+
+func DeleteRequestHandler(context: *RequestHandlerContext) : i32 {
+    var res = context.response
+
+    res.status = 200
+    res.type = ResponseType.BODY
+    res.addHeaderStr("Content-Type", "application/json")
+    res.body.append("{ \"method\": \"DELETE\" }")
+    return 1
+}
+
+func PathRequestHandler(context: *RequestHandlerContext) : i32 {
+    var req = context.request
+    var res = context.response
+    var match = context.match
+
+    var values = match.values
+
+    res.status = 200
+    res.type = ResponseType.BODY
+    res.body.append("{ \"path_values\": {")
+    for(var i = 0; i < values.numberOfEntries; i+=1) {
+        var entry = match.template.entries[i]
+        var value = &values.entries[i]
+
+        if(i > 0) res.body.append(",")
+
+        res.body.append("\"%.*s\": \"%.*s\"",
+            entry.name.length, entry.name.buffer,
+            value.length, value.buffer
+        )
+    }
+    res.body.append("}}")
+    return 1;
+}
+
+func WebServerFunction(arg: *void) : i32 {
+    var testServer = arg as (*TestServer)
+    return runServer(testServer)
+}
+
+@doc("Runs the test server on the current thread")
+public func runServer(testServer: *TestServer) : i32 {
+    var server = HttpServer{};
+    server.init(testServer.config)
+
+    var handler = ServerHandler{}
+    server.setErrorHandler(&handler)
+    server.setNotFoundHandler(&handler)
+
+    server.addHttpController(
+        HttpMethod.GET,
+        "/echo",
+        &handler,
+        HttpController {
+            .callback = EchoRequestHandler
+        }
+    )
+
+    server.addHttpController(
+        HttpMethod.POST,
+        "/submit",
+        &handler,
+        HttpController {
+            .callback = SubmitRequestHandler
+        }
+    )
+
+    server.addHttpController(
+        HttpMethod.GET,
+        "/download",
+        &handler,
+        HttpController {
+            .callback = DownloadRequestHandler
+        }
+    )
+
+    server.addHttpController(
+        HttpMethod.GET,
+        "/gzip",
+        &handler,
+        HttpController {
+            .callback = GzipRequestHandler
+        }
+    )
+
+    server.addHttpController(
+        HttpMethod.GET,
+        "/path/{id}",
+        &handler,
+        HttpController {
+            .callback = PathRequestHandler
+        }
+    )
+
+    server.addHttpController(
+        HttpMethod.PUT,
+        "/put",
+        &handler,
+        HttpController {
+            .callback = PutRequestHandler
+        }
+    )
+
+    server.addHttpController(
+        HttpMethod.PATCH,
+        "/patch",
+        &handler,
+        HttpController {
+            .callback = PatchRequestHandler
+        }
+    )
+
+    server.addHttpController(
+        HttpMethod.DELETE,
+        "/delete",
+        &handler,
+        HttpController {
+            .callback = DeleteRequestHandler
+        }
+    )
+
+    server.addSseController("/sse/single", &handler, SseController {
+        .callback = SseSingleEventController
+    })
+
+    server.addSseController("/sse/multi", &handler, SseController {
+        .callback = SseMultiEventController
+    })
+
+    server.addSseController("/sse/fields", &handler, SseController {
+        .callback = SseWithFieldsController
+    })
+
+    server.addSseController("/sse/multiline", &handler, SseController {
+        .callback = SseMultilineController
+    })
+
+    server.addWebSocketController(
+        "/websocket",
+        &handler,
+        WebSocketController {
+            .callback = TestWebSocketController
+        }
+    )
+
+    // signal we are ready
+    testServer.barrier.wait()
+
+    var status = server.start()
+    defer server.close()
+
+    if(status != Status.OK) {
+        printf("Test server on port %d failed to start: %s\n",
+            testServer.config.port as (i32), StatusAsStr(status))
+    }
+    return 0
+}
+
+public struct TestServer {
+    config: *HttpConfig
+    barrier: Barrier
+}
+
+var defaultConfig = HttpConfig {
+    .allocator = null,
+    .port = 9091_u16,
+    .numThreads = 4,
+    .ioQueueDepth = 16,
+    .maxPoolSize = 32,
+    .keepAliveTimeoutInSec = 5,
+    .isLogEnabled = true,
+    .logFilePath = $"",
+    .fileServerPath = $"static",
+}
+
+@doc("Launch the test web server on a new thread")
+public func launch(testServer: *TestServer) {
+    if(!testServer.config) {
+        testServer.config = &defaultConfig
+    }
+
+    if(!testServer.config.allocator) {
+        testServer.config.allocator = defaultAllocator
+    }
+
+    testServer.barrier.init(2)
+    // Do NOT defer barrier.destroy() here.  The barrier lives in the global
+    // TestServer struct (valid for the entire process lifetime), and on macOS
+    // the pthreads barrier implementation has an internal race between
+    // pthread_barrier_destroy() and a thread returning from
+    // pthread_barrier_wait() — destroying it here, immediately after the
+    // main thread's wait() returns, races with the server thread's cleanup
+    // inside wait() and causes a use-after-free detected by ASan.
+
+    var thread = Thread{}
+    if(thread.create(WebServerFunction, testServer) != ThreadStatus.SUCCESS) {
+        assert(false)
+    }
+
+    testServer.barrier.wait()
+}
+
+
+@test("Example Server")
+func testExample() {
+    var config = HttpConfig {
+        .allocator = defaultAllocator,
+        .port = 9091_u16,
+        .numThreads = 8,
+        .ioQueueDepth = 32,
+        .isLogEnabled = true,
+        .logFilePath = $"",
+        .maxPoolSize = 512,
+        .keepAliveTimeoutInSec = 5,
+        .fileServerPath = $"./static/",
+    }
+
+    var testServer = TestServer{
+        .config = &config
+    }
+    //runServer(&testServer)
+    launch(&testServer)
+    ThreadSleepMSec(2500000)
+}

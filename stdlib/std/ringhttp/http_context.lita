@@ -1,0 +1,326 @@
+import "std/libc"
+import "std/mem"
+import "std/mem/linear_allocator"
+import "std/string/builder"
+import "std/array"
+import "std/assert"
+import "std/system"
+import "std/log"
+import "std/ssl/openssl"
+
+// posix specific
+import "std/net/posix_socket"
+
+import "std/ringhttp/http_connection"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_websocket"
+import "std/ringhttp/http_sse"
+import "std/ringhttp/http_server"
+import "std/ringhttp/http2_connection"
+
+@asStr
+internal enum SessionState {
+    UNKNOWN,
+    CONNECTED,
+    READ_REQUEST_LINE,
+    WRITTEN_HTTP_RESPONSE,
+    WRITTEN_HTTP_RESPONSE_MORE,
+    WRITTEN_FILE,
+    WRITING_STREAM,
+
+    WEB_SOCKET_UPGRADED,
+    WEB_SOCKET_OPERATION,
+
+    SSE_UPGRADED,
+    SSE_OPERATION,
+
+    HTTP2_OPEN,         // HTTP/2 connection: framing layer active
+
+    TLS_HANDSHAKING,    // TLS handshake in progress (non-blocking SSL_accept)
+
+    PREP_CLOSE,
+    CLOSED,
+}
+
+internal struct SessionContext {
+    index: i32
+    sessions: *ContextPool
+
+    // if this is currently in use by a request
+    inUse: bool
+    isWebSocket: bool
+
+    clientAddr: sockaddr_in;
+    clientAddrLen: socklen_t;
+
+    connection: HttpConnection
+    request: HttpRequest
+    response: HttpResponse
+    state: SessionState
+
+    socketHandler: WebSocketController
+    socketSession: WebSocketSession
+
+    sseHandler: SseController
+    sseSession: SseSession
+    isSse: bool
+
+    requestLineIndex: i32
+    headerIndex: i32
+    bodyIndex: i32
+    workerIndex: i32
+
+    // Protocol version detected on this connection
+    protocolVersion: ProtocolVersion
+
+    // HTTP/2 connection state — valid only when protocolVersion == HTTP2
+    http2: Http2Connection
+
+    // TLS session — non-null when the connection is TLS-wrapped
+    ssl: *SSL
+
+    // Allocator for each request on this thread
+    requestAllocator: LinearAllocator
+
+    // for file transmission
+    pipes: [2]i32
+    // sendfile progress on macOS
+    fileOffset: i64
+
+    // file handle if opened
+    file: i32
+
+    // SQE requests submissions
+    submissions: u32
+
+    // Incremented each time this slot is reused so stale CQEs can be discarded.
+    generation: u32
+
+    // the last time we received a request from the client
+    lastRequestTime: f64
+
+    // WebSocket message fragmentation state (RFC 6455 §5.4).
+    // Active when wsFragInProgress is true; wsFragOpcode holds the first
+    // fragment's opcode; wsFragBuf accumulates the reassembled payload.
+    wsFragInProgress: bool
+    wsFragOpcode:     i32
+    wsFragBuf:        StringBuilder
+}
+
+// begining of a HTTP request cycle
+internal func (this: *SessionContext) begin(
+    clientSocket: i32
+) {
+    assert(clientSocket > 0)
+    // Advance the generation so any CQEs still in-flight from the previous
+    // occupant of this pool slot are discarded when they arrive.
+    this.generation += 1
+    this.requestAllocator.clear()
+
+    var allocator = &this.requestAllocator.allocator
+    this.connection.init(allocator)
+    this.response.init(allocator)
+    this.request.reset()
+
+    this.connection.socket.socket = clientSocket
+    this.socketSession.context = this
+    this.sseSession.context = this
+
+    this.isWebSocket = false
+    this.isSse = false
+
+    this.wsFragInProgress = false
+    this.wsFragOpcode     = 0
+    this.wsFragBuf.clear()
+
+    this.submissions = 0
+
+    this.requestLineIndex = 0
+    this.headerIndex = 0
+    this.bodyIndex = 0
+
+    this.protocolVersion = ProtocolVersion.UNKNOWN
+    memset(&this.http2, 0, sizeof(:Http2Connection))
+    this.ssl = null
+
+    this.state = SessionState.CONNECTED
+
+#if (OS == "LINUX")
+    if(this.pipes[0] > 0) {
+        close(this.pipes[0])
+    }
+
+    if(this.pipes[1] > 0) {
+        close(this.pipes[1])
+    }
+
+    this.pipes[0] = 0
+    this.pipes[1] = 0
+#else
+    this.fileOffset = 0
+#end
+
+    if(this.file > 0) {
+        // close(this.file)
+    }
+    this.file = 0
+
+    this.clientAddrLen = sizeof(this.clientAddr) as (socklen_t);
+}
+
+// ending of an HTTP request cycle, with optional force connection close
+internal func (this: *SessionContext) finish(forceClose: bool = false) {
+    Debug("Finishing Request for socket: %d\n", this.connection.handle())
+
+    this.isWebSocket = false
+    this.isSse = false
+    this.wsFragInProgress = false
+    this.wsFragOpcode     = 0
+    this.wsFragBuf.clear()
+    this.submissions = 0
+
+    this.requestLineIndex = 0
+    this.headerIndex = 0
+    this.bodyIndex = 0
+    this.workerIndex = -1
+
+#if (OS == "LINUX")
+    if(this.pipes[0] > 0) {
+        close(this.pipes[0])
+    }
+
+    if(this.pipes[1] > 0) {
+        close(this.pipes[1])
+    }
+#else
+    this.fileOffset = 0
+#end
+
+    if(this.file > 0) {
+        // The io_uring CLOSE SQE closes this fd in the success path.  Here we
+        // close it synchronously as a safety net for error paths where the
+        // CLOSE SQE was cancelled before it ran.
+        close(this.file)
+    }
+    this.file = 0
+
+    this.state = SessionState.UNKNOWN
+
+    if(this.ssl) {
+        SSL_free(this.ssl)  // also frees rbio/wbio BIOs (SSL_free owns them)
+        this.ssl = null
+    }
+
+    this.connection.reset()
+    this.response.reset()
+    this.request.reset()
+
+    if(!this.isKeepAlive() || forceClose) {
+        this.connection.close()
+        this.sessions.dealloc(this.index)
+    }
+}
+
+internal func (this: *SessionContext) free() {
+    this.finish(.forceClose = true)
+
+    this.connection.free()
+    this.response.free()
+}
+
+internal func (this: *SessionContext) isKeepAlive(): bool {
+    return !this.connection.disableKeepAlive
+}
+
+
+public struct ContextPool {
+    pool: Array<SessionContext>
+    freeList: Array<i32>
+}
+
+public func (this: *ContextPool) init(
+    server: *HttpServer
+): Status {
+    var maxSize = server.config.maxPoolSize
+    this.pool.init(maxSize, server.config.allocator)
+    this.freeList.init(maxSize, server.config.allocator)
+    return this.grow(server, 0, maxSize)
+}
+
+public func (this: *ContextPool) free() {
+    this.pool.free()
+    this.freeList.free()
+}
+
+func (this: *ContextPool) grow(
+    server: *HttpServer,
+    oldSize: i32, newSize: i32
+): Status {
+    var maxMemInBytes = server.config.maxRequestSizeInBytes
+
+    for(var i = oldSize; i < newSize; i+=1) {
+        var item: SessionContext;
+        this.pool.add(item)
+
+        var itemPtr = this.pool.lastPtr()
+        memset(itemPtr, 0, sizeof(:SessionContext))
+
+        // setup the session context
+        {
+            var mem = server.engine.safeAllocator.alloc(maxMemInBytes * sizeof(:char))
+            if(!mem) {
+                // TODO: Handle out of memory more gracefully
+                Error("out of memory - unable to allocate session context pool entries\n")
+                return Status.ERROR_OUT_OF_MEMORY
+            }
+
+            itemPtr.requestAllocator.init(
+                mem,
+                maxMemInBytes
+            )
+        }
+
+        itemPtr.index = i
+        itemPtr.sessions = this
+
+        this.freeList.add(i)
+    }
+
+    return Status.OK
+}
+
+public func (this: *ContextPool) alloc() : i32 {
+    if(this.freeList.empty()) {
+        return -1
+    }
+
+    assert(!this.freeList.empty())
+    var index = this.freeList.pop()
+
+    var context = this.pool.getPtr(index)
+    context.inUse = true
+
+    return index
+}
+
+public func (this: *ContextPool) get(index: i32) : *SessionContext {
+    if(index < 0 || index >= this.freeList.capacity) {
+        return null;
+    }
+
+    return this.pool.getPtr(index)
+}
+
+public func (this: *ContextPool) dealloc(index: i32) {
+    if(index < 0 || index >= this.freeList.capacity) {
+        return;
+    }
+
+    var context = this.get(index)
+    if(context.inUse) {
+        this.freeList.push(index)
+        context.inUse = false
+    }
+}
