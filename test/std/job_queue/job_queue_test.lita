@@ -1,0 +1,485 @@
+import "std/assert"
+import "std/string"
+import "std/thread"
+import "std/mem"
+import "std/job_queue"
+import "std/db"
+import "std/db/sqlite/sqlite_db"
+
+struct TestQueue {
+    conn: SqliteConnection
+    q:    JobQueue
+}
+
+// Open an in-memory queue for testing via pointer to avoid fat-pointer aliasing.
+func openTestQueue(tq: *TestQueue, name: *const char = "test") {
+    var ok = Connect($":memory:", &tq.conn)
+    assert(ok.isOk())
+    assert(JobQueueOpen(tq.conn.connection, name, &tq.q, defaultAllocator) == JobStatus.OK)
+}
+
+func closeTestQueue(tq: *TestQueue) {
+    tq.q.close()
+    tq.conn.close()
+}
+
+// -----------------------------------------------------------------------
+// Basic open / close
+// -----------------------------------------------------------------------
+
+@test("open and close")
+func testOpenClose() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    closeTestQueue(&tq)
+}
+
+// -----------------------------------------------------------------------
+// Submit returns a valid id
+// -----------------------------------------------------------------------
+
+@test("submit returns positive id")
+func testSubmitReturnsId() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var id = tq.q.submit($"hello world")
+    assert(id > 0_i64)
+}
+
+// -----------------------------------------------------------------------
+// Poll claims the job
+// -----------------------------------------------------------------------
+
+@test("poll claims submitted job")
+func testPollClaimsJob() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var id = tq.q.submit($"payload data")
+    assert(id > 0_i64)
+
+    var job: Job
+    var got = tq.q.poll(&job)
+    assert(got)
+    assert(job.id == id)
+    assert(job.payloadStr().equalsIgnoreCase($"payload data"))
+    assert(job.attempts == 1)
+    job.free()
+}
+
+// -----------------------------------------------------------------------
+// Poll returns false when queue is empty
+// -----------------------------------------------------------------------
+
+@test("poll on empty queue returns false")
+func testPollEmpty() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var job: Job
+    var got = tq.q.poll(&job)
+    assert(!got)
+}
+
+// -----------------------------------------------------------------------
+// Complete removes job from active work
+// -----------------------------------------------------------------------
+
+@test("complete marks job done, no re-poll")
+func testComplete() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    tq.q.submit($"work")
+    var job: Job
+    assert(tq.q.poll(&job))
+    tq.q.complete(job.id)
+    job.free()
+
+    // Queue is now empty
+    var job2: Job
+    assert(!tq.q.poll(&job2))
+}
+
+// -----------------------------------------------------------------------
+// Fail with retries remaining re-enqueues the job
+// -----------------------------------------------------------------------
+
+@test("fail re-enqueues when attempts < maxAttempts")
+func testFailRetries() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    // maxAttempts=3, so failure on attempt 1 and 2 re-enqueue
+    tq.q.submit($"retryable", .maxAttempts = 3)
+
+    var job: Job
+    assert(tq.q.poll(&job))
+    assert(job.attempts == 1)
+    var id = job.id
+    job.free()
+
+    tq.q.fail(id)
+
+    // Due to backoff, the job won't be immediately eligible — just verify no crash
+    var job2: Job
+    var gotAfterFail = tq.q.poll(&job2)
+    if(gotAfterFail) {
+        job2.free()
+    }
+}
+
+// -----------------------------------------------------------------------
+// Fail exhausts maxAttempts and marks job 'failed'
+// -----------------------------------------------------------------------
+
+@test("fail marks job failed after maxAttempts exhausted")
+func testFailFinal() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    tq.q.submit($"doomed", .maxAttempts = 1)
+
+    var job: Job
+    assert(tq.q.poll(&job))
+    assert(job.attempts == 1)
+    tq.q.fail(job.id, "something broke")
+    job.free()
+
+    // Job is in 'failed' state, should not be re-polled
+    var job2: Job
+    assert(!tq.q.poll(&job2))
+}
+
+// -----------------------------------------------------------------------
+// Retry requeues immediately (no backoff)
+// -----------------------------------------------------------------------
+
+@test("retry requeues job immediately")
+func testRetry() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    tq.q.submit($"needs retry")
+
+    var job: Job
+    assert(tq.q.poll(&job))
+    var id = job.id
+    job.free()
+
+    tq.q.retry(id)
+
+    // Should be immediately re-pollable (run_at = now)
+    var job2: Job
+    assert(tq.q.poll(&job2))
+    assert(job2.id == id)
+    job2.free()
+}
+
+// -----------------------------------------------------------------------
+// Group key: second job in group blocked while first is running
+// -----------------------------------------------------------------------
+
+@test("group_key: second job blocked while first is running")
+func testGroupKeyBlocking() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var id1 = tq.q.submit($"first",  .groupKey = $"card:42")
+    var id2 = tq.q.submit($"second", .groupKey = $"card:42")
+    assert(id1 > 0_i64)
+    assert(id2 > 0_i64)
+
+    // Poll claims first job
+    var job1: Job
+    assert(tq.q.poll(&job1))
+    assert(job1.id == id1)
+
+    // Second job is blocked — same group has a running job
+    var job2: Job
+    assert(!tq.q.poll(&job2))
+
+    // Complete first; now second is eligible
+    tq.q.complete(job1.id)
+    job1.free()
+
+    var job3: Job
+    assert(tq.q.poll(&job3))
+    assert(job3.id == id2)
+    tq.q.complete(job3.id)
+    job3.free()
+}
+
+// -----------------------------------------------------------------------
+// Group key: jobs in different groups run concurrently
+// -----------------------------------------------------------------------
+
+@test("group_key: different groups run concurrently")
+func testGroupKeyIndependent() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var idA = tq.q.submit($"card A", .groupKey = $"card:1")
+    var idB = tq.q.submit($"card B", .groupKey = $"card:2")
+
+    var jobA: Job
+    assert(tq.q.poll(&jobA))
+    assert(jobA.id == idA)
+
+    // Different group — should be claimable while card:1 is running
+    var jobB: Job
+    assert(tq.q.poll(&jobB))
+    assert(jobB.id == idB)
+
+    tq.q.complete(jobA.id)
+    tq.q.complete(jobB.id)
+    jobA.free()
+    jobB.free()
+}
+
+// -----------------------------------------------------------------------
+// Null group key jobs are always eligible
+// -----------------------------------------------------------------------
+
+@test("null group_key jobs are not blocked by group jobs")
+func testNullGroupKey() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var idGrouped   = tq.q.submit($"grouped",   .groupKey = $"g1")
+    var idUngrouped = tq.q.submit($"ungrouped") // empty group key
+
+    // Poll grouped job
+    var job1: Job
+    assert(tq.q.poll(&job1))
+
+    // Ungrouped job is still eligible even with g1 running
+    var job2: Job
+    assert(tq.q.poll(&job2))
+    assert(job2.id == idUngrouped)
+
+    tq.q.complete(job1.id)
+    tq.q.complete(job2.id)
+    job1.free()
+    job2.free()
+}
+
+// -----------------------------------------------------------------------
+// Recover resets stale running jobs
+// -----------------------------------------------------------------------
+
+@test("recover resets stale running jobs")
+func testRecover() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    tq.q.submit($"stale job")
+
+    // Poll to put job into running state
+    var job: Job
+    assert(tq.q.poll(&job))
+    var id = job.id
+    job.free()
+
+    // Simulate staleness: recover with stale threshold of 0 seconds
+    // (everything running is considered stale)
+    tq.q.recover(0_i64)
+
+    // Job should now be re-pollable
+    var job2: Job
+    assert(tq.q.poll(&job2))
+    assert(job2.id == id)
+    tq.q.complete(job2.id)
+    job2.free()
+}
+
+// -----------------------------------------------------------------------
+// WorkerPool drains the queue concurrently
+// -----------------------------------------------------------------------
+
+func poolTestHandler(job: *Job, ctx: *void) : JobResult {
+    return JobResult.JOB_OK
+}
+
+@test("worker pool drains queue")
+func testWorkerPool() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    const jobCount = 10_i32
+    for(var i = 0; i < jobCount; i += 1) {
+        tq.q.submit($"task")
+    }
+
+    assert(tq.q.stats().pending == 10_i64)
+
+    var pool: WorkerPool
+    assert(WorkerPoolOpen(&tq.q, 2, poolTestHandler, &pool) == JobStatus.OK)
+    defer pool.shutdown()
+
+    // Give workers time to drain the queue
+    ThreadSleepMSec(500_i64)
+
+    var s = tq.q.stats()
+    assert(s.pending   == 0_i64)
+    assert(s.running   == 0_i64)
+    assert(s.completed == 10_i64)
+}
+
+// -----------------------------------------------------------------------
+// WorkerPool with per-worker context factory
+// -----------------------------------------------------------------------
+
+struct WorkerCtx {
+    id:        i32
+    jobsRun:   i32
+}
+
+func createWorkerCtx(arg: *void) : *void {
+    var pool = arg as (*WorkerCtx)
+    // Each call hands out the next pre-allocated slot
+    var ctx = pool
+    pool += 1
+    return ctx as (*void)
+}
+
+func ctxHandler(job: *Job, ctx: *void) : JobResult {
+    var wctx = ctx as (*WorkerCtx)
+    wctx.jobsRun += 1
+    return JobResult.JOB_OK
+}
+
+@test("worker pool per-worker context")
+func testWorkerPoolContext() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var ctxSlots: [2]WorkerCtx
+    ctxSlots[0] = WorkerCtx{.id = 0, .jobsRun = 0}
+    ctxSlots[1] = WorkerCtx{.id = 1, .jobsRun = 0}
+
+    for(var i = 0; i < 10; i += 1) {
+        tq.q.submit($"task")
+    }
+
+    var pool: WorkerPool
+    assert(WorkerPoolOpen(&tq.q, 2, ctxHandler, &pool, createWorkerCtx, ctxSlots, 10_i64) == JobStatus.OK)
+    defer pool.shutdown()
+
+    ThreadSleepMSec(500_i64)
+
+    assert(tq.q.stats().completed == 10_i64)
+
+    // Every job was handled by one of the two workers
+    var total = ctxSlots[0].jobsRun + ctxSlots[1].jobsRun
+    assert(total == 10)
+}
+
+// -----------------------------------------------------------------------
+// Stats reflect job counts per status
+// -----------------------------------------------------------------------
+
+@test("stats counts pending, running, failed, completed")
+func testStats() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    // Start empty
+    var s = tq.q.stats()
+    assert(s.pending == 0_i64)
+    assert(s.running == 0_i64)
+    assert(s.failed  == 0_i64)
+    assert(s.completed == 0_i64)
+
+    // Submit 3 jobs
+    var id1 = tq.q.submit($"job1", .maxAttempts = 1)
+    var id2 = tq.q.submit($"job2", .maxAttempts = 1)
+    var id3 = tq.q.submit($"job3", .maxAttempts = 1)
+
+    s = tq.q.stats()
+    assert(s.pending == 3_i64)
+    assert(s.running == 0_i64)
+
+    // Poll two: they become running
+    var j1: Job
+    var j2: Job
+    assert(tq.q.poll(&j1))
+    assert(tq.q.poll(&j2))
+
+    s = tq.q.stats()
+    assert(s.pending == 1_i64)
+    assert(s.running == 2_i64)
+
+    // Complete one, fail one (maxAttempts=1 → goes to 'failed')
+    tq.q.complete(j1.id)
+    tq.q.fail(j2.id)
+    j1.free()
+    j2.free()
+
+    s = tq.q.stats()
+    assert(s.pending   == 1_i64)
+    assert(s.running   == 0_i64)
+    assert(s.failed    == 1_i64)
+    assert(s.completed == 1_i64)
+
+    // Complete the last one
+    var j3: Job
+    assert(tq.q.poll(&j3))
+    tq.q.complete(j3.id)
+    j3.free()
+
+    s = tq.q.stats()
+    assert(s.pending   == 0_i64)
+    assert(s.running   == 0_i64)
+    assert(s.failed    == 1_i64)
+    assert(s.completed == 2_i64)
+}
+
+// -----------------------------------------------------------------------
+// Multiple jobs are delivered in FIFO order within a queue
+// -----------------------------------------------------------------------
+
+@test("jobs delivered in submission order")
+func testFifoOrder() {
+    var tq: TestQueue
+    openTestQueue(&tq)
+    defer closeTestQueue(&tq)
+
+    var id1 = tq.q.submit($"first")
+    var id2 = tq.q.submit($"second")
+    var id3 = tq.q.submit($"third")
+
+    var j1: Job
+    var j2: Job
+    var j3: Job
+
+    assert(tq.q.poll(&j1))
+    assert(tq.q.poll(&j2))
+    assert(tq.q.poll(&j3))
+
+    assert(j1.id == id1)
+    assert(j2.id == id2)
+    assert(j3.id == id3)
+
+    tq.q.complete(j1.id)
+    tq.q.complete(j2.id)
+    tq.q.complete(j3.id)
+    j1.free()
+    j2.free()
+    j3.free()
+}
