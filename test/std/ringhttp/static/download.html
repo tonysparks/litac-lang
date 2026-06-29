@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Downloader</title>
+    <script>
+        async function downloadAndDisplayFile() {
+            try {
+                // Make a GET request to download the file
+                const response = await fetch('http://localhost:8080/download');
+
+                // Check if the response is successful
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status} ${response.statusText}`);
+                }
+
+                // Get the file content as text
+                const fileContent = await response.text();
+
+                // Display the content in the output div
+                document.getElementById('file-content').textContent = fileContent;
+            } catch (error) {
+                // Display error message if the request fails
+                document.getElementById('file-content').textContent = `Failed to download file: ${error.message}`;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>File Downloader</h1>
+    <button onclick="downloadAndDisplayFile()">Download and Display File</button>
+    <div id="file-content" style="white-space: pre-wrap; border: 1px solid #ccc; padding: 10px; margin-top: 10px;">
+        <!-- File content will appear here -->
+    </div>
+</body>
+</html>

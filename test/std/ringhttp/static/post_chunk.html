@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chunked Request Example</title>
+</head>
+<body>
+    <h1>Chunked Transfer Encoding with Fetch</h1>
+    <button id="sendRequest">Send Chunked Request</button>
+
+    <script>
+        document.getElementById("sendRequest").addEventListener("click", async () => {
+            const serverUrl = "http://localhost:8080/submit"; // Replace with your server URL
+
+            const chunks = [
+                "Hello, ",
+                "this is chunked ",
+                "transfer encoding ",
+                "in the fetch API!"
+            ];
+
+            const bodyStream = new ReadableStream({
+                start(controller) {
+                    let chunkIndex = 0;
+
+                    function pushNextChunk() {
+                        if (chunkIndex < chunks.length) {
+                            controller.enqueue(new TextEncoder().encode(chunks[chunkIndex]));
+                            chunkIndex++;
+                            setTimeout(pushNextChunk, 500); // Simulating streaming by adding delay
+                        } else {
+                            controller.close();
+                        }
+                    }
+
+                    pushNextChunk();
+                }
+            });
+
+            try {
+                const response = await fetch(serverUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Transfer-Encoding': 'chunked',
+                        'Content-Type': 'text/plain'
+                    },
+                    body: bodyStream,
+                    duplex: 'half',
+                });
+
+                const responseText = await response.text();
+                console.log('Server Response:', responseText);
+            } catch (error) {
+                console.error('Error sending chunked request:', error);
+            }
+        });
+    </script>
+</body>
+</html>

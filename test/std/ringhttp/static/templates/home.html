@@ -1,0 +1,75 @@
+<main>
+    <section class="features" id="features">
+        <div class="container">
+            <h2>Designed for real work</h2>
+            <p class="section-lead">
+                MyLang focuses on clarity, control, and predictability — the things you
+                actually need when building systems.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>Explicit error handling</h3>
+                    <p>
+                        Errors are values. No exceptions, no hidden control flow — just
+                        straightforward propagation you can see and reason about.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3>Predictable performance</h3>
+                    <p>
+                        No garbage collector, no surprises. Memory layout and execution
+                        cost are explicit and stable.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3>Simple tooling</h3>
+                    <p>
+                        A single compiler, fast builds, and readable diagnostics. The tool
+                        chain stays out of your way.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="example" id="example">
+        <div class="container example-grid">
+            <div>
+                <h2>Readable by default</h2>
+                <p class="section-lead">
+                    Code should look like what it does. MyLang keeps syntax small and
+                    semantics obvious.
+                </p>
+                <ul class="bullets">
+                    <li>No implicit allocations</li>
+                    <li>No magic conversions</li>
+                    <li>Errors handled at the call site</li>
+                </ul>
+            </div>
+            <div class="code-card">
+                <pre><span class="cm">// values and errors are explicit</span>
+<span class="kw">fn</span> <span class="fn">open_file</span>(path) -> FileStatus {
+    <span class="kw">var</span> f = fs.open(path)
+        ?: <span class="kw">return</span> f
+
+    <span class="kw">return</span> f
+}
+</pre>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <div class="container cta-box">
+            <h2>Get started in minutes</h2>
+            <p>
+                Install the compiler, read the guide, and ship something real today.
+            </p>
+            <div class="hero-actions">
+                <a class="btn primary" href="#download">Download</a>
+                <a class="btn" href="#docs">Documentation</a>
+            </div>
+        </div>
+    </section>
+</main>

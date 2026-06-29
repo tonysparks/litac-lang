@@ -180,7 +180,7 @@ func DownloadRequestHandler(context: *RequestHandlerContext) : i32 {
     res.addHeaderStr("Content-Disposition", "attachment; filename=\"big_file.txt\"")
 
     var fileStream = new<FileStream>(context.allocator)
-    fileStream.file.open("../test/download_sample.txt", FileOpenOp.READ_ONLY)
+    fileStream.file.open("./test/std/ringhttp/download_sample.txt", FileOpenOp.READ_ONLY)
     // TODO: Error handling..
 
     res.asStream(fileStream)
@@ -512,7 +512,7 @@ var defaultConfig = HttpConfig {
     .keepAliveTimeoutInSec = 5,
     .isLogEnabled = true,
     .logFilePath = $"",
-    .fileServerPath = $"static",
+    .fileServerPath = $"./test/std/ringhttp/static",
 }
 
 @doc("Launch the test web server on a new thread")
@@ -554,7 +554,7 @@ func testExample() {
         .logFilePath = $"",
         .maxPoolSize = 512,
         .keepAliveTimeoutInSec = 5,
-        .fileServerPath = $"./static/",
+        .fileServerPath = $"./test/std/ringhttp/static",
     }
 
     var testServer = TestServer{

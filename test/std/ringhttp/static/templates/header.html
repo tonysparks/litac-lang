@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LitaC — Yet another systems language</title>
+    <style>
+        :root {
+        --bg: #0b0e14;
+        --fg: #e6e9ef;
+        --muted: #a5adce;
+        --accent: #7aa2f7;
+        --card: #111528;
+        }
+        * { box-sizing: border-box; }
+        body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background: radial-gradient(1200px 600px at 10% -10%, #1b2040 0%, transparent 60%), var(--bg);
+        color: var(--fg);
+        }
+        a { color: inherit; text-decoration: none; }
+
+        header {
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        backdrop-filter: blur(8px);
+        }
+
+        .nav {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        }
+
+        .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        }
+
+        .logo {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent), #9ece6a);
+        display: grid;
+        place-items: center;
+        color: #0b0e14;
+        font-weight: 900;
+        }
+
+        .nav-links {
+        display: flex;
+        gap: 18px;
+        color: var(--muted);
+        }
+        .nav-links a:hover { color: var(--fg); }
+
+        .cta {
+        display: flex;
+        gap: 10px;
+        }
+        .btn {
+        padding: 8px 14px;
+        border-radius: 10px;
+        background: var(--card);
+        border: 1px solid rgba(255,255,255,0.08);
+        color: var(--fg);
+        }
+        .btn.primary {
+        background: linear-gradient(135deg, var(--accent), #9ece6a);
+        color: #0b0e14;
+        border: none;
+        font-weight: 600;
+        }
+
+        .hero {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 72px 20px 88px;
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 36px;
+        align-items: center;
+        }
+
+        .hero h1 {
+        font-size: clamp(2.2rem, 4vw, 3.4rem);
+        line-height: 1.05;
+        margin: 0 0 14px;
+        }
+        .hero p {
+        color: var(--muted);
+        max-width: 52ch;
+        font-size: 1.05rem;
+        margin: 0 0 24px;
+        }
+
+        .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+        .code-card {
+        background: var(--card);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.95rem;
+        color: #c0caf5;
+        }
+        .code-card .kw { color: #7aa2f7; }
+        .code-card .fn { color: #9ece6a; }
+        .code-card .cm { color: #565f89; }
+
+        @media (max-width: 900px) {
+        .hero { grid-template-columns: 1fr; }
+        }
+    </style>
+    </head>
+    <body>
+    <header>
+        <div class="nav">
+        <div class="brand">
+            <div class="logo">λ</div>
+            <span>LitaC</span>
+        </div>
+        <nav class="nav-links">
+            <a href="#docs">Docs</a>
+            <a href="#playground">Playground</a>
+            <a href="#download">Download</a>
+            <a href="#blog">Blog</a>
+            <a href="#community">Community</a>
+        </nav>
+        <div class="cta">
+            <a class="btn" href="#github">GitHub</a>
+            <a class="btn primary" href="#get-started">Get Started</a>
+        </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div>
+        <h1>A practical language for systems work — without the ceremony.</h1>
+        <p>
+            LitaC is a fast, explicit programming language designed for real-world
+            systems programming. Simple error handling, predictable performance,
+            and tooling that stays out of your way.
+        </p>
+        <div class="hero-actions">
+            <a class="btn primary" href="#get-started">Get Started</a>
+            <a class="btn" href="#docs">Read the Docs</a>
+        </div>
+        </div>
+        <div class="code-card">
+            <pre>
+                <span class="cm">// explicit, boring, reliable</span>
+                <span class="kw">func</span> <span class="fn">build</span>(cmd: *const char, opts: Options): Status {
+                <span class="kw">var</span> status = run(cmd, opts)
+                    ?: <span class="kw">return</span> status
+                <span class="kw">return</span> Status.OK
+                }
+            </pre>
+        </div>
+    </section>
+    </body>
+</html>

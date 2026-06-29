@@ -40,7 +40,7 @@ var wsConfig = HttpConfig {
     .keepAliveTimeoutInSec = 5,
     .isLogEnabled = false,
     .logFilePath = $"",
-    .fileServerPath = $"./static",
+    .fileServerPath = $"./test/std/ringhttp/static",
 }
 
 var wsLimitTestServer = TestServer{}
@@ -53,7 +53,7 @@ var wsLimitConfig = HttpConfig {
     .keepAliveTimeoutInSec = 5,
     .isLogEnabled = false,
     .logFilePath = $"",
-    .fileServerPath = $"./static",
+    .fileServerPath = $"./test/std/ringhttp/static",
     .maxWsFragmentedMessageSizeInBytes = 8,
 }
 

@@ -25,7 +25,7 @@ var sseConfig = HttpConfig {
     .keepAliveTimeoutInSec = 5,
     .isLogEnabled = false,
     .logFilePath = $"",
-    .fileServerPath = $"./static",
+    .fileServerPath = $"./test/std/ringhttp/static",
 }
 
 @module_init
