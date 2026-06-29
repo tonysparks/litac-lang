@@ -515,9 +515,9 @@ func WriteGeneratedHeader(output: *StringBuilder) {
 
 func BaseImports(output: *StringBuilder) {
     // Base imports always required
-    output.appendStr("import \"http_response\"\n")
-    output.appendStr("import \"http_request\"\n")
-    output.appendStr("import \"http_common\"\n")
+    output.appendStr("import \"std/ringhttp/http_response\"\n")
+    output.appendStr("import \"std/ringhttp/http_request\"\n")
+    output.appendStr("import \"std/ringhttp/http_common\"\n")
     output.appendStr("import \"std/html\"\n")
     output.appendStr("import \"std/string\"\n")
     output.appendStr("import \"std/string/builder\"\n")
