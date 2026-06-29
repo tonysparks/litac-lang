@@ -370,6 +370,10 @@ public func SystemInit() : bool {
     return _SystemInit()
 }
 
+public func ProcessId() : i32 {
+    return _ProcessId()
+}
+
 public func GetOS() : OS {
     return os;
 }

@@ -30,6 +30,14 @@ import "std/system"
 func rmdir(filename: *const char) : i32;
 
 @foreign
+func getpid() : i32;
+
+@inline
+public func _ProcessId() : i32 {
+    return getpid()
+}
+
+@foreign
 func setenv(key: *const char, value: *const char, overwrite: i32) : i32;
 
 @foreign("PATH_MAX")

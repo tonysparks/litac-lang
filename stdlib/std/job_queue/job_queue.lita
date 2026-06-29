@@ -1,0 +1,833 @@
+import "std/mem"
+import "std/string"
+import "std/string/buffer"
+import "std/libc"
+import "std/log"
+import "std/thread"
+import "std/time"
+import "std/db"
+import "std/system"
+import "std/atomic"
+
+// -----------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------
+
+const QUEUE_NAME_MAX    = 128_i32
+const GROUP_KEY_MAX     = 128_i32
+const LOCKED_BY_MAX     = 64_i32
+const DEFAULT_POLL_MS   = 100_i64
+const DEFAULT_MAX_TRIES = 3_i32
+const DEFAULT_STALE_SEC = 60_i64
+
+// -----------------------------------------------------------------------
+// Public types
+// -----------------------------------------------------------------------
+
+public enum JobResult {
+    JOB_OK,
+    JOB_FAIL,
+    JOB_RETRY,
+}
+
+// A job claimed from the queue. Caller must call job.free() when done.
+public struct Job {
+    id:          i64
+    payload:     String   // heap-allocated via allocator
+    groupKey:    [GROUP_KEY_MAX]char
+    groupKeyLen: i32
+    attempts:    i32
+    maxAttempts: i32
+    createdAt:   EpochTime
+    runAt:       EpochTime
+    allocator:   *const Allocator
+}
+
+public func (this: *Job) payloadStr() : String {
+    return this.payload
+}
+
+public func (this: *Job) groupKeyStr() : String {
+    return StringInit(this.groupKey, this.groupKeyLen)
+}
+
+public func (this: *Job) free() {
+    if(this.payload.buffer != null && this.payload.length > 0) {
+        this.allocator.free(this.payload.buffer as (*void))
+    }
+    this.payload = $""
+}
+
+// Handler function: return JOB_OK on success, JOB_FAIL to trigger retry
+// backoff (or final failure when maxAttempts is exhausted), or JOB_RETRY
+// to requeue immediately regardless of attempt count.
+public typedef func(job: *Job, ctx: *void) : JobResult as JobHandlerFn
+
+public struct JobStats {
+    pending:   i64
+    running:   i64
+    failed:    i64
+    completed: i64
+}
+
+public enum JobStatus {
+    JOB_STATUS_NOT_FOUND,
+    JOB_STATUS_PENDING,
+    JOB_STATUS_RUNNING,
+    JOB_STATUS_DONE,
+    JOB_STATUS_FAILED,
+}
+
+// -----------------------------------------------------------------------
+// JobQueue
+// -----------------------------------------------------------------------
+
+public struct JobQueue {
+    db:          SqlConnection
+    mtx:         Mutex              // serializes db access across threads
+    pollCounter: i64               // monotonically incremented per poll; makes locked_by unique
+    queue:       [QUEUE_NAME_MAX]char
+    queueLen:    i32
+    allocator:   *const Allocator
+}
+
+// -----------------------------------------------------------------------
+// Worker
+// -----------------------------------------------------------------------
+
+public struct Worker {
+    queue:          *JobQueue
+    handler:        JobHandlerFn
+    ctx:            *void
+    pollIntervalMs: i64
+    running:        Atomic<bool>
+}
+
+// -----------------------------------------------------------------------
+// Open / Close
+// -----------------------------------------------------------------------
+
+// Open a job queue using an externally-managed database connection.
+// queueName scopes this instance to a named queue within that database.
+// Multiple named queues can coexist in the same database.
+// The caller owns the connection and must close it after closing the queue.
+public func JobQueueOpen(
+    conn:      SqlConnection,
+    queueName: *const char,
+    queue:     *JobQueue,
+    allocator: *const Allocator = defaultAllocator
+) : bool {
+
+    var name = queueName.toString()
+    if(name.length >= QUEUE_NAME_MAX) {
+        Error("job_queue: queue name too long\n")
+        return false
+    }
+    name.copyTo(queue.queue, QUEUE_NAME_MAX)
+    queue.queueLen = name.length
+    queue.db       = conn
+    queue.allocator = allocator
+
+    if(!createSchema(queue)) {
+        return false
+    }
+
+    queue.mtx.init()
+    return true
+}
+
+public func (q: *JobQueue) close() {
+    q.mtx.destroy()
+}
+
+// -----------------------------------------------------------------------
+// Submit
+// -----------------------------------------------------------------------
+
+// Submit a job. Returns the job id on success, or -1 on error.
+// groupKey: jobs sharing a group_key are serialized — the next job in the
+// group will not be picked up until the running one completes.
+// runAt: unix seconds for delayed execution; 0 means run immediately.
+public func (q: *JobQueue) submit(
+    payload:     String,
+    groupKey:    String = $"",
+    runAt:       i64 = 0,
+    maxAttempts: i32 = DEFAULT_MAX_TRIES
+) : i64 {
+
+    var now = Now() as (i64)
+    if(runAt == 0) {
+        runAt = now
+    }
+
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    q.db.clearError()
+
+    var stmt: SqlStatement
+    var r = q.db.prepare(&stmt,
+        $"""
+            INSERT INTO jobs
+                (queue, payload, group_key, status, attempts, max_attempts, created_at, updated_at, run_at)
+            VALUES (?, ?, ?, 'pending', 0, ?, ?, ?, ?)
+        """
+    )
+    if(r.isError()) {
+        Error("job_queue: submit prepare failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return -1_i64
+    }
+    defer q.db.release(stmt)
+
+    stmt.bindText(1, q.queue, q.queueLen)
+
+    if(payload.length > 0) {
+        stmt.bindBlob(2, payload.buffer as (*const void), payload.length)
+    } else {
+        stmt.bindNull(2)
+    }
+
+    if(groupKey.length > 0) {
+        stmt.bindText(3, groupKey.buffer, groupKey.length)
+    } else {
+        stmt.bindNull(3)
+    }
+
+    stmt.bindInt32(4, maxAttempts)
+    stmt.bindInt64(5, now)
+    stmt.bindInt64(6, now)
+    stmt.bindInt64(7, runAt)
+
+    r = stmt.step()
+    if(r.isError()) {
+        Error(
+            "job_queue: submit step failed: %.*s\n",
+            r.description.length, r.description.buffer
+        )
+        return -1_i64
+    }
+
+    return q.db.lastInsertId()
+}
+
+// -----------------------------------------------------------------------
+// Poll
+// -----------------------------------------------------------------------
+
+// Attempt to claim the next eligible job into job. Returns true if a job
+// was found; the caller must call job.free() after processing.
+// Group ordering is respected: if a group has a running job, all
+// other jobs in that group remain pending until it completes.
+public func (q: *JobQueue) poll(job: *Job) : bool {
+    var now = Now() as (i64)
+
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    // Unique per-poll lock owner: "pid:tid:counter"
+    // Counter is incremented under the mutex so each poll call gets a distinct id,
+    // even when the same thread holds multiple claimed jobs simultaneously.
+    q.pollCounter += 1
+    var lockedByBuf: [LOCKED_BY_MAX]char
+    var lb = StringBufferInit(lockedByBuf, LOCKED_BY_MAX, 0)
+    lb.format("%d:%lld:%lld", ProcessId(), ThreadCurrent().id(), q.pollCounter)
+
+    q.db.clearError()
+
+    // Atomically claim the next eligible job.
+    // Jobs whose group has a running member are skipped entirely.
+    var stmt: SqlStatement
+    var r = q.db.prepare(&stmt,
+        $"""
+            UPDATE jobs SET
+                status     = 'running',
+                locked_at  = ?,
+                locked_by  = ?,
+                attempts   = attempts + 1,
+                updated_at = ?
+            WHERE id = (
+                SELECT id FROM jobs
+                WHERE queue = ? AND status = 'pending' AND run_at <= ?
+                AND (group_key IS NULL OR group_key NOT IN (
+                    SELECT group_key FROM jobs
+                    WHERE status = 'running' AND group_key IS NOT NULL
+                ))
+                ORDER BY run_at ASC, id ASC LIMIT 1
+            )
+        """
+    )
+    if(r.isError()) {
+        Error(
+            "job_queue: poll prepare failed: %.*s\n",
+            r.description.length, r.description.buffer
+        )
+        return false
+    }
+
+    stmt.bindInt64(1, now)
+    stmt.bindText(2, lockedByBuf, lb.length)
+    stmt.bindInt64(3, now)
+    stmt.bindText(4, q.queue, q.queueLen)
+    stmt.bindInt64(5, now)
+
+    var rs: SqlResultSet
+    stmt.execute(&rs)
+    rs.hasNext()
+    var changed = rs.rowsAffected()
+    rs.closeAndReleaseAll()
+
+    if(changed == 0) {
+        return false
+    }
+
+    return q.fetchClaimed(lockedByBuf, lb.length, job)
+}
+
+func (q: *JobQueue) fetchClaimed(lockedBy: *char, lockedByLen: i32, job: *Job) : bool {
+    var stmt: SqlStatement
+    var r = q.db.prepare(&stmt,
+        $"""
+            SELECT id, payload, group_key, attempts, max_attempts, created_at, run_at
+            FROM jobs
+            WHERE locked_by = ? AND status = 'running' AND queue = ?
+            ORDER BY locked_at DESC LIMIT 1
+        """
+    )
+    if(r.isError()) {
+        Error("job_queue: fetchClaimed prepare failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return false
+    }
+
+    stmt.bindText(1, lockedBy, lockedByLen)
+    stmt.bindText(2, q.queue, q.queueLen)
+
+    var rs: SqlResultSet
+    stmt.execute(&rs)
+
+    if(!rs.hasNext()) {
+        rs.closeAndReleaseAll()
+        return false
+    }
+
+    rs.next()
+    job.id        = rs.columnInt64(0)
+    job.payload   = rs.columnBlobCopy(1, q.allocator)
+    job.allocator = q.allocator
+
+    var gkView = rs.columnStringView(2)
+    job.groupKeyLen = 0
+    job.groupKey[0] = '\0'
+    if(gkView.buffer != null && gkView.length > 0) {
+        job.groupKeyLen = gkView.copyTo(job.groupKey, GROUP_KEY_MAX)
+    }
+
+    job.attempts    = rs.columnInt32(3)
+    job.maxAttempts = rs.columnInt32(4)
+    job.createdAt   = rs.columnInt64(5) as (EpochTime)
+    job.runAt       = rs.columnInt64(6) as (EpochTime)
+
+    rs.closeAndReleaseAll()
+    return true
+}
+
+// -----------------------------------------------------------------------
+// Complete / Fail / Retry
+// -----------------------------------------------------------------------
+
+// Mark a running job as successfully completed. Returns false on error.
+public func (q: *JobQueue) complete(id: i64) : bool {
+    var now = Now() as (i64)
+
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    q.db.clearError()
+
+    var stmt: SqlStatement
+    var r = q.db.prepare(
+        &stmt,
+        $"UPDATE jobs SET status='done', updated_at=? WHERE id=? AND status='running'"
+    )
+    if(r.isError()) {
+        Error(
+            "job_queue: complete prepare failed: %.*s\n",
+            r.description.length, r.description.buffer
+        )
+        return false
+    }
+    defer q.db.release(stmt)
+
+    stmt.bindInt64(1, now)
+    stmt.bindInt64(2, id)
+    r = stmt.step()
+    if(r.isError()) {
+        Error(
+            "job_queue: complete step failed: %.*s\n",
+            r.description.length, r.description.buffer
+        )
+        return false
+    }
+    return true
+}
+
+// Report a job failure. If attempts < maxAttempts it is requeued with
+// exponential backoff; otherwise it is marked 'failed' for inspection.
+// Returns false on error.
+public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
+    var now = Now() as (i64)
+
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    q.db.clearError()
+
+    // Read attempt counts to decide retry vs. final failure
+    var selStmt: SqlStatement
+    var r = q.db.prepare(
+        &selStmt,
+        $"SELECT attempts, max_attempts FROM jobs WHERE id=?"
+    )
+    if(r.isError()) {
+        Error("job_queue: fail select prepare failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return false
+    }
+    selStmt.bindInt64(1, id)
+
+    var rs: SqlResultSet
+    selStmt.execute(&rs)
+
+    if(!rs.hasNext()) {
+        rs.closeAndReleaseAll()
+        return false
+    }
+
+    rs.next()
+    var attempts    = rs.columnInt32(0)
+    var maxAttempts = rs.columnInt32(1)
+    rs.closeAndReleaseAll()
+
+    if(attempts < maxAttempts) {
+        var runAt = now + retryBackoffSec(attempts)
+
+        var updStmt: SqlStatement
+        r = q.db.prepare(&updStmt, $"""
+            UPDATE jobs SET status='pending', run_at=?, updated_at=?, error_msg=?
+            WHERE id=?
+        """)
+        if(r.isError()) {
+            Error("job_queue: fail retry prepare failed: %.*s\n",
+                r.description.length, r.description.buffer)
+            return false
+        }
+        defer q.db.release(updStmt)
+
+        updStmt.bindInt64(1, runAt)
+        updStmt.bindInt64(2, now)
+        if(errorMsg != null) {
+            var em = errorMsg.toString()
+            updStmt.bindText(3, em.buffer, em.length)
+        } else {
+            updStmt.bindNull(3)
+        }
+        updStmt.bindInt64(4, id)
+        r = updStmt.step()
+        if(r.isError()) {
+            Error("job_queue: fail retry step failed: %.*s\n",
+                r.description.length, r.description.buffer)
+            return false
+        }
+
+    } else {
+        var updStmt: SqlStatement
+        r = q.db.prepare(&updStmt, $"UPDATE jobs SET status='failed', updated_at=?, error_msg=? WHERE id=?")
+        if(r.isError()) {
+            Error("job_queue: fail final prepare failed: %.*s\n",
+                r.description.length, r.description.buffer)
+            return false
+        }
+        defer q.db.release(updStmt)
+
+        updStmt.bindInt64(1, now)
+        if(errorMsg != null) {
+            var em = errorMsg.toString()
+            updStmt.bindText(2, em.buffer, em.length)
+        } else {
+            updStmt.bindNull(2)
+        }
+        updStmt.bindInt64(3, id)
+        r = updStmt.step()
+        if(r.isError()) {
+            Error("job_queue: fail final step failed: %.*s\n",
+                r.description.length, r.description.buffer)
+            return false
+        }
+    }
+
+    return true
+}
+
+// Immediately requeue a running job, ignoring its attempt count.
+// Use when the handler encounters a transient error it knows will resolve.
+// Returns false on error.
+public func (q: *JobQueue) retry(id: i64) : bool {
+    var now = Now() as (i64)
+
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    q.db.clearError()
+
+    var stmt: SqlStatement
+    var r = q.db.prepare(&stmt, $"UPDATE jobs SET status='pending', run_at=?, updated_at=? WHERE id=?")
+    if(r.isError()) {
+        Error("job_queue: retry prepare failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return false
+    }
+    defer q.db.release(stmt)
+
+    stmt.bindInt64(1, now)
+    stmt.bindInt64(2, now)
+    stmt.bindInt64(3, id)
+    r = stmt.step()
+    if(r.isError()) {
+        Error("job_queue: retry step failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return false
+    }
+    return true
+}
+
+// -----------------------------------------------------------------------
+// Recover
+// -----------------------------------------------------------------------
+
+// Reset any running jobs whose locked_at is older than staleSec seconds.
+// Call this on startup before starting workers to reclaim jobs left behind
+// by a previous crashed process or thread. Returns false on error.
+public func (q: *JobQueue) recover(staleSec: i64 = DEFAULT_STALE_SEC) : bool {
+    var now    = Now() as (i64)
+    var cutoff = now - staleSec
+
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    q.db.clearError()
+
+    var stmt: SqlStatement
+    var r = q.db.prepare(&stmt, $"""
+        UPDATE jobs
+        SET status='pending', locked_at=NULL, locked_by=NULL, updated_at=?
+        WHERE queue=? AND status='running' AND locked_at IS NOT NULL AND locked_at <= ?
+    """)
+    if(r.isError()) {
+        Error("job_queue: recover prepare failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return false
+    }
+
+    stmt.bindInt64(1, now)
+    stmt.bindText(2, q.queue, q.queueLen)
+    stmt.bindInt64(3, cutoff)
+
+    var rs: SqlResultSet
+    stmt.execute(&rs)
+    rs.hasNext()
+    var count = rs.rowsAffected()
+    rs.closeAndReleaseAll()
+
+    if(count > 0) {
+        Info("job_queue: recovered %lld stale job(s)\n", count)
+    }
+    return true
+}
+
+// -----------------------------------------------------------------------
+// Stats
+// -----------------------------------------------------------------------
+
+// Returns a snapshot of job counts per status for this queue.
+public func (q: *JobQueue) stats() : JobStats {
+    var result: JobStats
+
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    q.db.clearError()
+
+    var stmt: SqlStatement
+    var r = q.db.prepare(&stmt, $"""
+        SELECT
+            COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status = 'failed'  THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status = 'done'    THEN 1 ELSE 0 END), 0)
+        FROM jobs
+        WHERE queue = ?
+    """)
+    if(r.isError()) {
+        Error("job_queue: stats prepare failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return result
+    }
+
+    stmt.bindText(1, q.queue, q.queueLen)
+
+    var rs: SqlResultSet
+    stmt.execute(&rs)
+
+    if(rs.hasNext()) {
+        rs.next()
+        result.pending   = rs.columnInt64(0)
+        result.running   = rs.columnInt64(1)
+        result.failed    = rs.columnInt64(2)
+        result.completed = rs.columnInt64(3)
+    }
+
+    rs.closeAndReleaseAll()
+    return result
+}
+
+// Returns the status of a specific job by ID, or JOB_STATUS_NOT_FOUND if
+// the id does not exist in this queue.
+public func (q: *JobQueue) getStatus(id: i64) : JobStatus {
+    q.mtx.lock()
+    defer q.mtx.unlock()
+
+    q.db.clearError()
+
+    var stmt: SqlStatement
+    var r = q.db.prepare(&stmt, $"SELECT status FROM jobs WHERE id=? AND queue=?")
+    if(r.isError()) {
+        Error("job_queue: getStatus prepare failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return JobStatus.JOB_STATUS_NOT_FOUND
+    }
+
+    stmt.bindInt64(1, id)
+    stmt.bindText(2, q.queue, q.queueLen)
+
+    var rs: SqlResultSet
+    stmt.execute(&rs)
+
+    if(!rs.hasNext()) {
+        rs.closeAndReleaseAll()
+        return JobStatus.JOB_STATUS_NOT_FOUND
+    }
+
+    rs.next()
+    var statusView = rs.columnStringView(0)
+    var result     = JobStatus.JOB_STATUS_NOT_FOUND
+
+    if(statusView.equalsIgnoreCase($"pending")) {
+        result = JobStatus.JOB_STATUS_PENDING
+    } else if(statusView.equalsIgnoreCase($"running")) {
+        result = JobStatus.JOB_STATUS_RUNNING
+    } else if(statusView.equalsIgnoreCase($"done")) {
+        result = JobStatus.JOB_STATUS_DONE
+    } else if(statusView.equalsIgnoreCase($"failed")) {
+        result = JobStatus.JOB_STATUS_FAILED
+    }
+
+    rs.closeAndReleaseAll()
+    return result
+}
+
+// -----------------------------------------------------------------------
+// Worker
+// -----------------------------------------------------------------------
+
+public func WorkerInit(
+    queue:          *JobQueue,
+    handler:        JobHandlerFn,
+    ctx:            *void = null,
+    pollIntervalMs: i64 = DEFAULT_POLL_MS
+) : Worker {
+    var w = Worker {
+        .queue          = queue,
+        .handler        = handler,
+        .ctx            = ctx,
+        .pollIntervalMs = pollIntervalMs,
+    }
+    w.running.init(false)
+    return w
+}
+
+// Blocking run loop. Call this in a dedicated thread.
+// Polls the queue, dispatches to the handler, then marks the job
+// done/failed/retried based on the handler's return value.
+public func (w: *Worker) run() {
+    w.running.set(true)
+    while(w.running.get()) {
+        var job: Job
+        if(w.queue.poll(&job)) {
+            var result = w.handler(&job, w.ctx)
+            switch(result) {
+                case JobResult.JOB_OK: {
+                    w.queue.complete(job.id)
+                    break
+                }
+                case JobResult.JOB_FAIL: {
+                    w.queue.fail(job.id)
+                    break
+                }
+                case JobResult.JOB_RETRY: {
+                    w.queue.retry(job.id)
+                    break
+                }
+                default: {
+                    break
+                }
+            }
+            job.free()
+        } else {
+            ThreadSleepMSec(w.pollIntervalMs)
+        }
+    }
+}
+
+// Signal the worker to stop after its current job completes.
+public func (w: *Worker) stop() {
+    w.running.set(false)
+}
+
+// -----------------------------------------------------------------------
+// WorkerPool
+// -----------------------------------------------------------------------
+
+// Called once per worker thread at startup to produce that worker's context.
+// arg is the value passed as createCtxArg to WorkerPoolOpen.
+public typedef func(arg: *void) : *void as CreateWorkerContextFn
+
+public struct WorkerPool {
+    workers:   *Worker
+    threads:   *Thread
+    count:     i32
+    allocator: *const Allocator
+}
+
+func workerThreadFn(arg: *void) : i32 {
+    (arg as (*Worker)).run()
+    return 0
+}
+
+// Allocate and start `count` worker threads against queue.
+// If createCtx is non-null it is called once per worker to produce that
+// worker's ctx — useful for giving each worker its own resources (e.g. a
+// dedicated business-logic DB connection). If null, all workers share null ctx.
+// Returns false if allocation or thread creation fails; partial state is cleaned up.
+public func WorkerPoolOpen(
+    queue:          *JobQueue,
+    count:          i32,
+    handler:        JobHandlerFn,
+    pool:           *WorkerPool,
+    createCtx:      CreateWorkerContextFn = null,
+    createCtxArg:   *void = null,
+    pollIntervalMs: i64 = DEFAULT_POLL_MS,
+    allocator:      *const Allocator = defaultAllocator
+) : bool {
+    if(count <= 0) {
+        return false
+    }
+
+    pool.count     = count
+    pool.allocator = allocator
+    pool.workers   = allocator.alloc(sizeof(:Worker) * (count as (usize))) as (*Worker)
+    pool.threads   = allocator.alloc(sizeof(:Thread) * (count as (usize))) as (*Thread)
+
+    if(!pool.workers || !pool.threads) {
+        if(pool.workers) { allocator.free(pool.workers) }
+        if(pool.threads) { allocator.free(pool.threads) }
+        pool.workers = null
+        pool.threads = null
+        pool.count   = 0
+        return false
+    }
+
+    for(var i = 0; i < count; i += 1) {
+        // Initialize Worker in-place so Atomic<bool> lives in its final location
+        var w = &pool.workers[i]
+        w.queue          = queue
+        w.handler        = handler
+        w.ctx            = createCtx != null ? createCtx(createCtxArg) : null
+        w.pollIntervalMs = pollIntervalMs
+        w.running.init(false)
+
+        var status = pool.threads[i].create(workerThreadFn, w, allocator)
+        if(status != ThreadStatus.SUCCESS) {
+            Error("job_queue: failed to create worker thread %d\n", i)
+            for(var j = 0; j < i; j += 1) {
+                pool.workers[j].stop()
+            }
+            for(var j = 0; j < i; j += 1) {
+                pool.threads[j].join()
+            }
+            allocator.free(pool.workers)
+            allocator.free(pool.threads)
+            pool.workers = null
+            pool.threads = null
+            pool.count   = 0
+            return false
+        }
+    }
+    return true
+}
+
+// Signal all workers to stop and wait for their threads to finish.
+public func (p: *WorkerPool) shutdown() {
+    for(var i = 0; i < p.count; i += 1) {
+        p.workers[i].stop()
+    }
+    for(var i = 0; i < p.count; i += 1) {
+        p.threads[i].join()
+    }
+    p.allocator.free(p.workers)
+    p.allocator.free(p.threads)
+    p.workers = null
+    p.threads = null
+    p.count   = 0
+}
+
+// -----------------------------------------------------------------------
+// Schema (internal)
+// -----------------------------------------------------------------------
+
+func createSchema(q: *JobQueue) : bool {
+    var sqlBuf: [2048]char
+    var sql = StringBufferInit(sqlBuf, 2048, 0)
+    sql.appendStr("CREATE TABLE IF NOT EXISTS jobs (")
+    sql.appendStr("    id           INTEGER PRIMARY KEY AUTOINCREMENT,")
+    sql.appendStr("    queue        TEXT    NOT NULL,")
+    sql.appendStr("    payload      BLOB,")
+    sql.appendStr("    status       TEXT    NOT NULL DEFAULT 'pending',")
+    sql.appendStr("    attempts     INTEGER NOT NULL DEFAULT 0,")
+    sql.appendStr("    max_attempts INTEGER NOT NULL DEFAULT 3,")
+    sql.appendStr("    error_msg    TEXT,")
+    sql.appendStr("    group_key    TEXT,")
+    sql.appendStr("    created_at   INTEGER NOT NULL,")
+    sql.appendStr("    updated_at   INTEGER NOT NULL,")
+    sql.appendStr("    run_at       INTEGER NOT NULL DEFAULT 0,")
+    sql.appendStr("    locked_at    INTEGER,")
+    sql.appendStr("    locked_by    TEXT")
+    sql.appendStr(");")
+    sql.appendStr("CREATE INDEX IF NOT EXISTS idx_jobs_poll  ON jobs(queue, status, run_at, id);")
+    sql.appendStr("CREATE INDEX IF NOT EXISTS idx_jobs_group ON jobs(group_key, status);")
+
+    var r = q.db.execute(sql.cStr())
+    if(r.isError()) {
+        Error("job_queue: createSchema failed: %.*s\n",
+            r.description.length, r.description.buffer)
+        return false
+    }
+    return true
+}
+
+// Retry backoff in seconds: 1s for attempt 1, 5s for attempt 2, 30s for 3+
+func retryBackoffSec(attempts: i32) : i64 {
+    if(attempts <= 1) { return 1_i64 }
+    if(attempts == 2) { return 5_i64 }
+    return 30_i64
+}

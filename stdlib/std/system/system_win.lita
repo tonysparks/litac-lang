@@ -77,6 +77,14 @@ func QueryPerformanceCounter(time: *LARGE_INTEGER);
 @foreign
 func _putenv_s(key: *const char, value: *const char) : i32;
 
+@foreign
+func GetCurrentProcessId() : u32;
+
+@inline
+public func _ProcessId() : i32 {
+    return GetCurrentProcessId() as (i32)
+}
+
 var systemFreq: f64;
 var systemStart: u64 = 0;
 
