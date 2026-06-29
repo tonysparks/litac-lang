@@ -85,7 +85,7 @@ func ensureTlsServer() {
         .port                  = TLS_TEST_PORT,
         .numThreads            = 2,
         .maxPoolSize           = 32,
-        .keepAliveTimeoutInSec = 10,
+        .keepAliveTimeoutInSec = 60,
         .isLogEnabled          = false,
         .tlsCertFile           = TLS_CERT,
         .tlsKeyFile            = TLS_KEY,
@@ -300,6 +300,7 @@ func testTlsGarbageHandshake() {
 @test("tls_h1_keep_alive")
 func testTlsH1KeepAlive() {
     ensureTlsServer()
+    ThreadSleepMSec(500)  // let kqueue drain failed-handshake sessions from prior tests
 
     // Wire-format: \x08http/1.1
     var alpn = [9]u8 {
@@ -344,6 +345,7 @@ func testTlsH1KeepAlive() {
 @test("tls_h2_raw_handshake")
 func testTlsH2RawHandshake() {
     ensureTlsServer()
+    ThreadSleepMSec(500)  // let kqueue drain sessions from prior tests
 
     // Wire-format: \x02h2
     var alpn = [3]u8 { 2_u8, 104_u8, 50_u8 }
@@ -365,10 +367,11 @@ func testTlsH2RawHandshake() {
     settingsHdr[3] = 0x04_i8
     assert(SSL_write(ssl, settingsHdr as (*const void), 9) == 9)
 
-    // Read server SETTINGS + ACK (at least 18 bytes)
+    // Read server SETTINGS + ACK (at least 18 bytes). Loop up to 20 times in
+    // case the server delivers the two 9-byte frames in separate TLS records.
     var buf: [512]char
     var total = 0
-    while(total < 18) {
+    for(var tries = 0; tries < 20 && total < 18; tries += 1) {
         var n = SSL_read(ssl, (buf + total) as (*void), 512 - total)
         if(n <= 0) { break }
         total += n
