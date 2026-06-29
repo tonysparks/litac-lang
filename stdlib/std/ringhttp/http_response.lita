@@ -1,0 +1,177 @@
+import "std/mem"
+import "std/string"
+import "std/string/builder"
+import "std/io"
+import "std/system"
+import "std/libc"
+import "std/array"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_common"
+
+@foreign
+func close(fd: i32) : i32;
+
+public const MAX_STATUS_CODES = 512
+public const STATUS_CODES = [MAX_STATUS_CODES]*const char {
+    // 1xx Informational
+    [100] = "Continue",
+    [101] = "Switching Protocols",
+    [102] = "Processing",
+    [103] = "Early Hints",
+
+    // 2xx Success
+    [200] = "OK",
+    [201] = "Created",
+    [202] = "Accepted",
+    [203] = "Non-Authoritative Information",
+    [204] = "No Content",
+    [205] = "Reset Content",
+    [206] = "Partial Content",
+    [207] = "Multi-Status",
+    [208] = "Already Reported",
+    [226] = "IM Used",
+
+    // 3xx Redirection
+    [300] = "Multiple Choices",
+    [301] = "Moved Permanently",
+    [302] = "Found (or Moved Temporarily)",
+    [303] = "See Other",
+    [304] = "Not Modified",
+    [305] = "Use Proxy (deprecated)",
+    [307] = "Temporary Redirect",
+    [308] = "Permanent Redirect",
+
+    // 4xx Client Errors
+    [400] = "Bad Request",
+    [401] = "Unauthorized",
+    [402] = "Payment Required",
+    [403] = "Forbidden",
+    [404] = "Not Found",
+    [405] = "Method Not Allowed",
+    [406] = "Not Acceptable",
+    [407] = "Proxy Authentication Required",
+    [408] = "Request Timeout",
+    [409] = "Conflict",
+    [410] = "Gone",
+    [411] = "Length Required",
+    [412] = "Precondition Failed",
+    [413] = "Payload Too Large",
+    [414] = "URI Too Long",
+    [415] = "Unsupported Media Type",
+    [416] = "Range Not Satisfiable",
+    [417] = "Expectation Failed",
+    [418] = "I'm a teapot",
+    [421] = "Misdirected Request",
+    [422] = "Unprocessable Entity",
+    [423] = "Locked",
+    [424] = "Failed Dependency",
+    [426] = "Upgrade Required",
+    [428] = "Precondition Required",
+    [429] = "Too Many Requests",
+    [431] = "Request Header Fields Too Large",
+    [451] = "Unavailable For Legal Reasons",
+
+    // 5xx Server Errors
+    [500] = "Internal Server Error",
+    [501] = "Not Implemented",
+    [502] = "Bad Gateway",
+    [503] = "Service Unavailable",
+    [504] = "Gateway Timeout",
+    [505] = "HTTP Version Not Supported",
+    [506] = "Variant Also Negotiates",
+    [507] = "Insufficient Storage",
+    [508] = "Loop Detected",
+    [510] = "Not Extended",
+    [511] = "Network Authentication Required",
+}
+
+public const MAX_HEADERS = 64
+
+public enum ResponseType {
+    NONE,
+    BODY,
+    FILE,
+    STREAM,
+    SSE,
+}
+
+public trait Stream {
+    read: func(*char, i32) : i32;
+}
+
+public struct HttpResponse {
+    status: i32
+    headers: [MAX_HEADERS]HttpHeader
+    numberOfHeaders: u32
+
+    type: ResponseType
+    body: StringBuilder
+
+    union {
+        // File
+        struct {
+            fileHandle: i32
+            fileSize: usize
+            fileBytesSent: i64
+        }
+
+        // Stream
+        stream: Stream
+    }
+}
+
+public func (this: *HttpResponse) init(allocator: *const Allocator) {
+    this.body.init(1024, allocator)
+    this.reset()
+}
+
+public func (this: *HttpResponse) addHeader(name: String, value: String) {
+    if(this.numberOfHeaders >= MAX_HEADERS) {
+        return;
+    }
+
+    var header = &this.headers[this.numberOfHeaders]
+    header.name = name
+    header.values = value
+
+    this.numberOfHeaders += 1
+}
+
+public func (this: *HttpResponse) addHeaderStr(name: *const char, value: *const char) {
+    this.addHeader(StringInit(name), StringInit(value))
+}
+
+public func (this: *HttpResponse) redirectTo(path: *const char) {
+    this.status = 302
+    this.type = ResponseType.BODY
+    this.addHeaderStr("Location", path)
+}
+
+public func (this: *HttpResponse) asStream(stream: Stream) {
+    this.stream = stream
+    this.type = ResponseType.STREAM
+}
+
+public func (this: *HttpResponse) asTemplate(template: String) {
+}
+
+public func (this: *HttpResponse) free() {
+    this.body.free()
+
+    if(this.fileHandle > 0) {
+        close(this.fileHandle)
+    }
+}
+
+
+public func (this: *HttpResponse) reset() {
+    this.body.clear()
+    this.type = ResponseType.NONE
+    this.numberOfHeaders = 0
+    this.fileBytesSent = 0
+    this.status = 200
+    // if(this.fileHandle > 0) {
+    //     close(this.fileHandle)
+    // }
+}
+

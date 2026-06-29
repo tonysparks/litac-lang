@@ -1,0 +1,79 @@
+#if OS != "WINDOWS"
+import "std/mem"
+import "std/string/builder"
+import "std/system"
+
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_common"
+
+// ---------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------
+
+public func makeContext(
+    req:    *HttpRequest,
+    res:    *HttpResponse,
+    method: HttpMethod
+) : RequestHandlerContext {
+    req.method = method
+    res.init(defaultAllocator)
+    res.status = 200
+    res.type   = ResponseType.NONE
+
+    return RequestHandlerContext {
+        .allocator    = defaultAllocator,
+        .request      = req,
+        .response     = res,
+        .userData     = null,
+        .match        = null,
+        .startTime    = SystemTimeMSec(),
+        .sessionIndex = 0,
+    }
+}
+
+// ---------------------------------------------------------------
+// Test filter implementations
+// ---------------------------------------------------------------
+
+public struct AllowFilter {
+    callCount: i32
+}
+
+public func (this: *AllowFilter) handleFilter(ctx: *RequestHandlerContext) : i32 {
+    this.callCount += 1
+    return 1
+}
+
+public struct BlockFilter {
+    callCount: i32
+}
+
+public func (this: *BlockFilter) handleFilter(ctx: *RequestHandlerContext) : i32 {
+    this.callCount += 1
+    ctx.response.status = 403
+    ctx.response.type   = ResponseType.BODY
+    ctx.response.body.appendStr("Forbidden")
+    return 0
+}
+
+// ---------------------------------------------------------------
+// Test post-handler implementations
+// ---------------------------------------------------------------
+
+public struct RecordingPostHandler {
+    callCount:     i32
+    lastStatus:    i32
+    lastMethod:    HttpMethod
+    hadRouteMatch: bool
+}
+
+public func (this: *RecordingPostHandler) postHandle(ctx: *RequestHandlerContext) {
+    this.callCount    += 1
+    this.lastStatus    = ctx.response.status
+    this.lastMethod    = ctx.request.method
+    this.hadRouteMatch = ctx.match != null
+}
+#end

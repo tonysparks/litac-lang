@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POST JSON Example</title>
+    <script>
+        async function submitForm(event) {
+            event.preventDefault(); // Prevent form submission from reloading the page
+
+            // Gather form data
+            const name = document.getElementById('name').value;
+            const address = document.getElementById('address').value;
+            const phone = document.getElementById('phone').value;
+
+            // Prepare JSON payload
+            const data = {
+                name: name,
+                address: address,
+                phone: phone
+            };
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Submitting...'; // Display loading message
+
+            try {
+                // Send POST request
+                const response = await fetch('http://localhost:8080/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    resultDiv.textContent = 'Success: ' + JSON.stringify(result, null, 2);
+                } else {
+                    resultDiv.textContent = 'Error: ' + response.statusText;
+                }
+            } catch (error) {
+                resultDiv.textContent = 'Request failed: ' + error.message;
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Submit JSON Data</h1>
+    <form onsubmit="submitForm(event)">
+        <label for="name">Name:</label><br>
+        <input type="text" id="name" name="name" required><br><br>
+
+        <label for="address">Address:</label><br>
+        <input type="text" id="address" name="address" required><br><br>
+
+        <label for="phone">Phone:</label><br>
+        <input type="text" id="phone" name="phone" required><br><br>
+
+        <button type="submit">Submit</button>
+    </form>
+
+    <h2>Result</h2>
+    <pre id="result" style="background-color: #f4f4f4; padding: 10px; border: 1px solid #ddd;"></pre>
+</body>
+</html>

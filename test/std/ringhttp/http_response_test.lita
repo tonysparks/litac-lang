@@ -1,0 +1,43 @@
+#if OS != "WINDOWS"
+import "std/assert"
+import "std/mem"
+import "std/string/builder"
+
+import "std/ringhttp"
+
+// addHeader must silently drop headers once the fixed-size slot array is full.
+@test
+func testResponseAddHeaderOverflow() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    for(var i = 0; i < MAX_HEADERS; i += 1) {
+        resp.addHeaderStr("X-Test", "value")
+    }
+    assert(resp.numberOfHeaders == MAX_HEADERS as (u32))
+
+    resp.addHeaderStr("X-Overflow", "dropped")
+    assert(resp.numberOfHeaders == MAX_HEADERS as (u32))
+}
+
+// reset() must clear body, restore status to 200, zero header count and type.
+@test
+func testResponseReset() {
+    var resp = HttpResponse{}
+    resp.init(defaultAllocator)
+    defer resp.free()
+
+    resp.status = 404
+    resp.body.append("some body")
+    resp.addHeaderStr("X-Custom", "val")
+    resp.type = ResponseType.BODY
+
+    resp.reset()
+
+    assert(resp.status == 200)
+    assert(resp.body.length == 0)
+    assert(resp.numberOfHeaders == 0)
+    assert(resp.type == ResponseType.NONE)
+}
+#end

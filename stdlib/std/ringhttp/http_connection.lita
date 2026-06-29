@@ -1,0 +1,217 @@
+import "std/net"
+import "std/array"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/thread"
+import "std/mem"
+import "std/io"
+import "std/libc"
+import "std/zip"
+import "std/log"
+import "std/time"
+
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_file"
+import "std/ringhttp/http_server"
+
+
+public const READ_BUFFER_SIZE = 32 * KiB as (i32)
+public const WRITE_BUFFER_SIZE = 8 * KiB as (i32)
+public const COMPRESSION_SIZE = 1 * KiB as (i32)
+
+public struct HttpConnection {
+    id: u32
+    socket: Socket
+    writeBuffer: StringBuilder
+    readBuffer: StringBuilder
+
+    disableKeepAlive: bool
+}
+
+public func (this: *HttpConnection) init(allocator: *const Allocator) {
+    this.writeBuffer.init(WRITE_BUFFER_SIZE, allocator)
+    this.readBuffer.init(READ_BUFFER_SIZE, allocator)
+
+    this.reset()
+}
+
+
+public func (this: *HttpConnection) free() {
+    this.writeBuffer.free()
+    this.readBuffer.free()
+    this.socket.close()
+}
+
+public func (this: *HttpConnection) reset() {
+    this.writeBuffer.clear()
+    this.readBuffer.clear()
+}
+
+public func (this: *HttpConnection) close() {
+    this.socket.close()
+    this.socket.socket = 0
+}
+
+
+public func (this: *HttpConnection) handle() : i32 {
+    return this.socket.socket
+}
+
+public func (this: *HttpConnection) isConnected() : bool {
+    return this.socket.socket > 0
+}
+
+
+public func (this: *HttpConnection) bufferContents(
+    request: *HttpRequest,
+    response: *HttpResponse,
+    config: *HttpConfig
+) {
+    this.writeBuffer.clear()
+
+    if(response.status < 0 || response.status >= MAX_STATUS_CODES) {
+        response.status = 500
+    }
+
+    // Status Line
+    this.writeBuffer.append("HTTP/1.1 %d %s\r\n",
+        response.status, STATUS_CODES[response.status]
+    )
+
+    // Headers
+    var hasConnectionHeader = false
+    for(var i = 0; i < response.numberOfHeaders; i += 1) {
+        var header = response.headers[i]
+        this.writeBuffer.append("%.*s: %.*s\r\n",
+            header.name.length, header.name.buffer,
+            header.values.length, header.values.buffer
+        )
+        if(header.name.equalsIgnoreCase($"Connection")) {
+            hasConnectionHeader = true
+        }
+    }
+
+    // Default headers (RFC 7231 §7.1.1.2, RFC 7230 §6.3)
+    #if (OS == "MAC")
+        this.writeBuffer.append("Server: Ring/0.0.1 (Darwin)\r\n")
+    #elseif (OS == "LINUX")
+        this.writeBuffer.append("Server: Ring/0.0.1 (Linux)\r\n")
+    #else
+        this.writeBuffer.append("Server: Ring/0.0.1\r\n")
+    #end
+
+    // // Date header — RFC 7231 §7.1.1.2: servers SHOULD include Date in all responses.
+    this.writeBuffer.append("Date: ")
+    var now = DateTimeNow()
+    now.format($"%a, %d %b %Y %H:%M:%S GMT", this.writeBuffer)
+    this.writeBuffer.append("\r\n")
+
+    // Connection header — RFC 7230 §6.3: signal keep-alive or close unless
+    // the handler already set a Connection header (e.g. WebSocket 101 Upgrade).
+    if(!hasConnectionHeader) {
+        if(this.disableKeepAlive) {
+            this.writeBuffer.append("Connection: close\r\n")
+        } else {
+            this.writeBuffer.append("Connection: keep-alive\r\n")
+        }
+    }
+
+    // RFC 7230 §3.3: a response MUST NOT include a message body when the request
+    // method is HEAD, or the status code is 1xx, 204, or 304.  A single predicate
+    // covers all cases so every ResponseType branch uses the same rule.
+    var noBody = HttpStatusForbidsBody(request.method, response.status)
+
+    // Body
+    switch(response.type) {
+        case ResponseType.NONE: break;
+        case ResponseType.BODY: {
+            if(!noBody && (request.flags & HttpFlags.ACCEPT_DEFLATE_ENCODING) != 0) {
+                if(response.body.length > config.compressionEnabledOnBodySizeInBytes) {
+                    var position = this.writeBuffer.length
+
+                    this.writeBuffer.append("Content-Encoding: deflate\r\n")
+                    this.writeBuffer.append("\r\n")   // end-of-headers blank line
+
+                    var bodyStartPosition = this.writeBuffer.length
+                    var zipStatus = ZipCompress(
+                        this.writeBuffer,
+                        response.body.toString(),
+                        config.compressionLevel as (ZipCompressionLevel)
+                    )
+                    var bodyEndPosition = this.writeBuffer.length
+                    if(zipStatus == ZipStatus.OK) {
+                        // Insert Content-Length before Content-Encoding.
+                        // bodyStartPosition already accounts for the blank line,
+                        // so the length calculation gives the compressed body size only.
+                        this.writeBuffer.insert(
+                            position,
+                            "Content-Length: %zu\r\n",
+                            bodyEndPosition - bodyStartPosition
+                        )
+                        Debug("Compressed info: Full length: %d, Body length: %d\n",
+                            this.writeBuffer.length,
+                            bodyEndPosition - bodyStartPosition
+                        )
+                        return;
+                    }
+
+                    // Compression failed or not beneficial — rewind and fall through.
+                    this.writeBuffer.length = position
+                }
+            }
+
+            // RFC 7230 §3.3.1: MUST NOT send Content-Length for 1xx or 204 responses.
+            // HEAD responses SHOULD still include Content-Length (RFC 7231 §4.3.2):
+            // it tells the client the size the body would have been.
+            var noContentLength = (response.status >= 100 && response.status < 200) ||
+                                   response.status == 204
+            if(!noContentLength) {
+                this.writeBuffer.append("Content-Length: %zu\r\n", response.body.length)
+            }
+            this.writeBuffer.append("\r\n")
+            if(!noBody) {
+                this.writeBuffer.append("%.*s",
+                    response.body.length, response.body.buffer
+                )
+            }
+            break;
+        }
+        case ResponseType.FILE: {
+            this.writeBuffer.append("Content-Length: %zu\r\n", response.fileSize)
+            this.writeBuffer.append("\r\n")
+            break;
+        }
+        case ResponseType.STREAM: {
+            this.writeBuffer.append("Transfer-Encoding: chunked\r\n")
+            this.writeBuffer.append("\r\n")
+            break;
+        }
+        case ResponseType.SSE: {
+            this.writeBuffer.append("Content-Type: text/event-stream\r\n")
+            this.writeBuffer.append("Cache-Control: no-cache\r\n")
+            this.writeBuffer.append("X-Accel-Buffering: no\r\n")
+            this.writeBuffer.append("\r\n")
+            break;
+        }
+        default: break;
+    }
+}
+
+// RFC 7230 §3.3: body MUST be suppressed for HEAD requests and for status
+// codes that prohibit a message body (1xx informational, 204 No Content,
+// 304 Not Modified).
+public func HttpStatusForbidsBody(method: HttpMethod, status: i32) : bool {
+    if(method == HttpMethod.HEAD) {
+        return true
+    }
+    if(status >= 100 && status < 200) {
+        return true   // 1xx informational
+    }
+    if(status == 204 || status == 304) {
+        return true
+    }
+    return false
+}

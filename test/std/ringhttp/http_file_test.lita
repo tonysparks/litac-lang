@@ -1,0 +1,94 @@
+#if OS != "WINDOWS"
+import "std/string"
+import "std/mem"
+import "std/libc"
+import "std/assert"
+import "std/io"
+import "std/system"  // MAX_PATH is defined here
+
+import "std/ringhttp/http_file"
+import "std/ringhttp/http_common"
+
+// Bug 9: OpenFile only checked path.length < MAX_PATH, not the combined
+// rootPath + "/" + path length.  A long rootPath could push the formatted
+// string past MAX_PATH and overflow the stack buffer.
+// After the fix, ERROR_REQUEST_PATH_NOT_ALLOWED is returned whenever
+// rootPath.length + 1 + path.length >= MAX_PATH.
+@test
+func testOpenFileCombinedPathTooLong() {
+    // Construct a rootPath that by itself is just under MAX_PATH, then add
+    // any non-empty path — the combined string must exceed MAX_PATH.
+    var longRoot = [MAX_PATH]char{}
+    for(var i = 0; i < MAX_PATH - 1; i+=1) {
+        longRoot[i] = 'a'
+    }
+    var root = String { .buffer = longRoot, .length = MAX_PATH - 1 }
+    var path = StringInit("index.html")
+
+    var file: File;
+    var status = OpenFile(root, StringInit(""), path, &file)
+    // Combined length is (MAX_PATH - 1) + 1 + 10 >= MAX_PATH → rejected.
+    assert(status == Status.ERROR_REQUEST_PATH_NOT_ALLOWED)
+}
+
+// Sanity-check: a short rootPath + short path must not be blocked by the
+// combined-length guard.
+@test
+func testOpenFileShortCombinedPathNotBlocked() {
+    var root = StringInit("/var/www")
+    var path = StringInit("index.html")
+
+    var file: File;
+    var status = OpenFile(root, StringInit(""), path, &file)
+    // The file won't exist, but the error must NOT be path-not-allowed.
+    assert(status != Status.ERROR_REQUEST_PATH_NOT_ALLOWED)
+}
+
+// Any path containing ".." must be rejected as a traversal attack,
+// regardless of where the ".." appears.
+@test
+func testOpenFilePathTraversalBlocked() {
+    var root = StringInit("/var/www")
+    var file: File;
+
+    // Classic traversal: ../etc/passwd
+    var s1 = OpenFile(root, StringInit(""), StringInit("../etc/passwd"), &file)
+    assert(s1 == Status.ERROR_REQUEST_PATH_NOT_ALLOWED)
+
+    // Embedded traversal: sub/../../../etc
+    var s2 = OpenFile(root, StringInit(""), StringInit("sub/../../etc/shadow"), &file)
+    assert(s2 == Status.ERROR_REQUEST_PATH_NOT_ALLOWED)
+
+    // Suffix only: "file..ext" does NOT contain ".." as a path segment,
+    // but "contains(..)" matches the two consecutive dots — also blocked.
+    var s3 = OpenFile(root, StringInit(""), StringInit("file..ext"), &file)
+    assert(s3 == Status.ERROR_REQUEST_PATH_NOT_ALLOWED)
+}
+
+// When publicServerPath is non-empty and the request path starts with it,
+// OpenFile must strip the prefix before constructing the filesystem path.
+// We verify indirectly: a path starting with the public prefix that resolves
+// to a non-existent file must reach the filesystem lookup (no path-not-allowed),
+// returning ERROR_FILE_NOT_FOUND rather than ERROR_REQUEST_PATH_NOT_ALLOWED.
+@test
+func testOpenFilePublicServerPathStripping() {
+    var root    = StringInit("/tmp")
+    var public_ = StringInit("/static/")
+    var path    = StringInit("/static/nonexistent_file_xyz.html")
+    var file: File;
+
+    var status = OpenFile(root, public_, path, &file)
+    // Must not be path-not-allowed — the prefix was stripped and the file lookup ran.
+    assert(status != Status.ERROR_REQUEST_PATH_NOT_ALLOWED)
+    // The stripped path "nonexistent_file_xyz.html" under "/tmp" should not exist.
+    assert(status == Status.ERROR_FILE_NOT_FOUND)
+}
+
+// OpenFileInfo must propagate the status and leave fd at 0 when the file
+// does not exist.
+@test
+func testOpenFileInfoNotFound() {
+    var result = OpenFileInfo(StringInit("/tmp"), StringInit(""), StringInit("no_such_file_abc123.html"))
+    assert(result.status == Status.ERROR_FILE_NOT_FOUND)
+}
+#end

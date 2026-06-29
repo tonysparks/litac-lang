@@ -1,0 +1,541 @@
+import "std/libc"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/system"
+import "std/fs"
+import "std/io"
+import "std/array"
+import "std/mem"
+import "std/assert"
+import "std/ascii"
+import "std/time"
+
+import "std/ringhttp/http_common"
+
+// Scans inputDir for .lt templates, generates .lita source files into outputDir.
+// Writes one tmpl_<name>.lita per template and a templates.lita dispatch file.
+public func GenerateTemplates(
+    inputDir: String,
+    outputDir: *const char,
+    allocator: *const Allocator
+) : Status {
+    var t: Template
+    t.init(allocator)
+
+    var status = t.build(inputDir)
+        ?: return status
+
+    if(t.entries.empty()) {
+        return Status.OK
+    }
+
+    Mkdir(outputDir)
+
+    for(var i = 0; i < t.entries.size(); i += 1) {
+        var entry = t.entries.getPtr(i)
+        var name    = entry.name.toString()
+        var content = entry.content.toString()
+
+        var temp: PathBuf;
+        var filePath = temp.toStringBuffer()
+        filePath.append("%s/tmpl_%.*s.lita", outputDir, name.length, name.buffer)
+
+        var fs = WriteFile(filePath.cStr(), content.buffer, content.length as (usize))
+        if(fs != FileStatus.Ok) {
+            return Status.ERROR_IO_ERROR
+        }
+    }
+
+    var dispatch = StringBuilderInit(4096, allocator)
+    defer dispatch.free()
+    GenerateDispatch(&t, outputDir, &dispatch)
+
+    var temp: PathBuf;
+    var dispatchPath = temp.toStringBuffer()
+    dispatchPath.append("%s/templates.lita", outputDir)
+
+    var ds = WriteFile(dispatchPath.cStr(), dispatch.cStr(), dispatch.length as (usize))
+    if(ds != FileStatus.Ok) {
+        return Status.ERROR_IO_ERROR
+    }
+
+    return Status.OK
+}
+
+func GenerateDispatch(t: *Template, genOutputDir: *const char, output: *StringBuilder) {
+    WriteGeneratedHeader(output)
+    BaseImports(output)
+    output.appendStr("\n")
+
+    var typeImports = ArrayInit<String>(8, t.entries.getPtr(0).name.alloc)
+    defer typeImports.free()
+
+    for(var i = 0; i < t.entries.size(); i += 1) {
+        var entry = t.entries.getPtr(i)
+        var name = entry.name.toString()
+        output.append("import \"gen/tmpl_%.*s\"\n", name.length, name.buffer)
+
+        if(entry.typeModule.length > 0) {
+            var mod = entry.typeModule.toString()
+            var seen = false
+            for(var j = 0; j < typeImports.size(); j += 1) {
+                if(typeImports.get(j).equals(mod)) {
+                    seen = true
+                    break
+                }
+            }
+            if(!seen) {
+                typeImports.add(mod)
+                output.append("import \"%.*s\"\n", mod.length, mod.buffer)
+            }
+        }
+    }
+    output.appendStr("\n")
+
+    // String dispatch — takes *void; typed templates cast input to their concrete type
+    output.appendStr("public func (this: *HttpResponse) template(name: *const char, input: *void) : Status {\n")
+    for(var i = 0; i < t.entries.size(); i += 1) {
+        var entry = t.entries.getPtr(i)
+        var name = entry.name.toString()
+        if(entry.typeName.length > 0) {
+            var typeName = entry.typeName.toString()
+            output.append(
+                "    if(StringInit(name).equals($\"%.*s\")) { return %.*s_WriteTemplate(this, input as (*%.*s)) }\n",
+                name.length, name.buffer,
+                name.length, name.buffer,
+                typeName.length, typeName.buffer
+            )
+        } else {
+            output.append(
+                "    if(StringInit(name).equals($\"%.*s\")) { return %.*s_WriteTemplate(this, input) }\n",
+                name.length, name.buffer,
+                name.length, name.buffer
+            )
+        }
+    }
+    output.appendStr("    return Status.ERROR_TEMPLATE_NOT_FOUND\n}\n\n")
+
+    // Named helpers per template — typed for @type templates, *void otherwise
+    for(var i = 0; i < t.entries.size(); i += 1) {
+        var entry = t.entries.getPtr(i)
+        var name = entry.name.toString()
+        if(entry.typeName.length > 0) {
+            var typeName = entry.typeName.toString()
+            output.append(
+                "public func (this: *HttpResponse) tmpl_%.*s(input: *%.*s) : Status {\n    return %.*s_WriteTemplate(this, input)\n}\n\n",
+                name.length, name.buffer,
+                typeName.length, typeName.buffer,
+                name.length, name.buffer
+            )
+        } else {
+            output.append(
+                "public func (this: *HttpResponse) tmpl_%.*s(input: *void = null) : Status {\n    return %.*s_WriteTemplate(this, input)\n}\n\n",
+                name.length, name.buffer,
+                name.length, name.buffer
+            )
+        }
+    }
+}
+
+// Per-template generation context — tracks imports, @type info, and partial count
+struct GenContext {
+    allocator: *const Allocator
+    imports: Array<String>
+    partialCount: i32
+    typeName: String    // from <% @type "module" :: TypeName %>, empty if absent
+    typeModule: String  // module path for the declared type
+}
+
+func (ctx: *GenContext) init(allocator: *const Allocator) {
+    ctx.allocator = allocator
+    ctx.imports.init(8, allocator)
+    ctx.partialCount = 0
+    ctx.typeName = String{}
+    ctx.typeModule = String{}
+}
+
+func (ctx: *GenContext) free() {
+    ctx.imports.free()
+}
+
+func (ctx: *GenContext) addImport(path: String) {
+    for(var i = 0; i < ctx.imports.size(); i += 1) {
+        if(ctx.imports.get(i).equals(path)) {
+            return;
+        }
+    }
+    ctx.imports.add(path)
+}
+
+// One generated .lita file per .lt template
+public struct TemplateEntry {
+    name: StringBuilder      // sanitized function name prefix, e.g. "greeting_html_lt"
+    content: StringBuilder   // complete generated .lita file content
+    typeName: StringBuilder  // declared type name (e.g. "User"), empty if no @type
+    typeModule: StringBuilder// declared type module (e.g. "models/user"), empty if no @type
+}
+
+public struct Template {
+    allocator: *const Allocator
+    fileBuffer: StringBuilder
+    entries: Array<TemplateEntry>
+}
+
+public func (this: *Template) init(allocator: *const Allocator) {
+    this.allocator = allocator
+    this.fileBuffer.init(1024, allocator)
+    this.entries.init(16, allocator)
+}
+
+public func (this: *Template) build(assetPath: String) : Status {
+    return ScanForTemplates(this, assetPath)
+}
+
+func ScanForTemplates(template: *Template, assetPath: String) : Status {
+    var temp: PathBuf;
+    var path = temp.toStringBuffer()
+    path.append("%.*s", assetPath.length, assetPath.buffer)
+    return ScanDirectory(template, path)
+}
+
+func ScanDirectory(template: *Template, path: *StringBuffer) : Status {
+    if(!FileExists(path.cStr())) {
+        return Status.ERROR_FILE_NOT_FOUND
+    }
+
+    var templateDir = FileHandle{}
+    !templateDir.open(path.toString())
+        ?: return Status.ERROR_FILE_NOT_FOUND
+    defer templateDir.close()
+
+    while(templateDir.next()) {
+        var len = path.length
+        path.append("/%s", templateDir.name())
+        defer path.length = len
+
+        if(templateDir.isDirectory()) {
+            var status = ScanDirectory(template, path)
+                ?: return status
+        }
+
+        if(templateDir.isFile()) {
+            var fileName = templateDir.name().toString()
+            if(!fileName.endsWith($".lt")) {
+                continue
+            }
+
+            template.fileBuffer.clear()
+            var status = ReadFileFully(path.toString(), template.fileBuffer)
+                ?: return Status.ERROR_FILE_NOT_FOUND
+
+            var entry = TemplateEntry{
+                .name      = StringBuilderInit(64,   template.allocator),
+                .content   = StringBuilderInit(1024, template.allocator)
+            }
+
+            var genStatus = GenerateFromTemplate(
+                template.allocator,
+                fileName,
+                template.fileBuffer.toString(),
+                &entry
+            ) ?: return genStatus
+
+            template.entries.add(entry)
+        }
+    }
+    return Status.OK
+}
+
+// Generates a complete .lita source file for one template into entry.
+// GenerateBody runs first (may call SanitizeName for @load), then we
+// sanitize the template name to avoid clobbering the @static buffer.
+public func GenerateFromTemplate(
+    allocator: *const Allocator,
+    name: String,
+    template: String,
+    entry: *TemplateEntry
+) : Status {
+
+    var ctx = GenContext{}
+    ctx.init(allocator)
+    defer ctx.free()
+
+    var body = StringBuilderInit(1024, allocator)
+    defer body.free()
+
+    var status = GenerateBody(allocator, &ctx, template, &body)
+        ?: return status
+
+    // Sanitize after GenerateBody — avoids clobbering the @static buffer mid-body
+    var sname = SanitizeName(name)
+    entry.name.appendString(sname)
+
+    // Copy @type info into entry if declared
+    if(!ctx.typeName.empty()) {
+        entry.typeName.init(ctx.typeName.length + 1, allocator)
+        entry.typeName.appendString(ctx.typeName)
+        entry.typeModule.init(ctx.typeModule.length + 1, allocator)
+        entry.typeModule.appendString(ctx.typeModule)
+    }
+
+    var output = &entry.content
+    WriteGeneratedHeader(output)
+    BaseImports(output)
+
+    // Imports declared in the template via <% @import "..." %>
+    // (the type module from @type is already added via addImport)
+    for(var i = 0; i < ctx.imports.size(); i += 1) {
+        var imp = ctx.imports.get(i)
+        output.append("import \"%.*s\"\n", imp.length, imp.buffer)
+    }
+    output.appendStr("\n")
+
+    // Function signature: *TypeName when @type declared, *void otherwise
+    if(!ctx.typeName.empty()) {
+        output.append(
+            "public func %.*s_WriteTemplate(\n    resp: *HttpResponse,\n    input: *%.*s\n) : Status {\n    var out = &resp.body\n",
+            sname.length, sname.buffer,
+            ctx.typeName.length, ctx.typeName.buffer
+        )
+    } else {
+        output.append(
+            "public func %.*s_WriteTemplate(\n    resp: *HttpResponse,\n    input: *void\n) : Status {\n    var out = &resp.body\n",
+            sname.length, sname.buffer
+        )
+    }
+
+    output.appendString(body.toString())
+    output.appendStr("    return Status.OK\n}\n")
+
+    return Status.OK
+}
+
+public func GenerateBody(
+    allocator: *const Allocator,
+    ctx: *GenContext,
+    template: String,
+    output: *StringBuilder
+) : Status {
+    var iter = template.split($"<%")
+    while(iter.hasNext()) {
+        var s = iter.next()
+
+        if(s.length > 0) {
+            // Strip trailing '"' chars — they produce """" which closes the triple-quote early
+            var trailingQuotes = 0
+            while(trailingQuotes < s.length && s.buffer[s.length - 1 - trailingQuotes] == '"') {
+                trailingQuotes += 1
+            }
+            var mainLen = s.length - trailingQuotes
+            if(mainLen > 0) {
+                output.append("    out.appendStrn(\"\"\"%.*s\"\"\", %d)\n", mainLen, s.buffer, mainLen)
+            }
+            for(var q = 0; q < trailingQuotes; q += 1) {
+                output.appendStr("    out.appendChar('\"')\n")
+            }
+        }
+
+        var extra = iter.remaining()
+        if(!extra.empty()) {
+            // <%== expr %> raw output; <%= expr %> HTML-escaped output
+            var isRaw = extra.startsWith($"==")
+            var isExpression = !isRaw && extra.startsWith($"=")
+            if(isRaw) {
+                extra = extra.substring(2)
+            } else if(isExpression) {
+                extra = extra.substring(1)
+            }
+
+            var endIndex = extra.indexOf($"%>")
+            if(endIndex < 0) {
+                return Status.ERROR_TEMPLATE_NO_END_TAG
+            }
+
+            var startIndex = extra.indexOf($"<%")
+            if(startIndex > -1 && startIndex < endIndex) {
+                return Status.ERROR_TEMPLATE_START_TAG_BEFORE_END_TAG
+            }
+
+            var code = extra.substring(0, endIndex)
+
+            if(isRaw) {
+                var expr = code.trim()
+                output.append("    out.appendString(%.*s)\n", expr.length, expr.buffer)
+            } else if(isExpression) {
+                var expr = code.trim()
+                output.append("    HtmlEscape(out, %.*s)\n", expr.length, expr.buffer)
+            } else {
+                var dirStatus = HandleDirective(allocator, ctx, &code, output)
+                    ?: return dirStatus
+                if(code.length > 0) {
+                    output.append("%.*s\n", code.length, code.buffer)
+                }
+            }
+
+            iter = extra.substring(endIndex + 2).split($"<%")
+        }
+    }
+    return Status.OK
+}
+
+func HandleDirective(
+    allocator: *const Allocator,
+    ctx: *GenContext,
+    code: *String,
+    output: *StringBuilder
+) : Status {
+    var block = (*code).trim()
+
+    // <% @import "module/path" %> — add a LitaC import to this template's file
+    if(block.startsWith($"@import ")) {
+        var index = block.endIndexOf($"@import ")
+        assert(index > -1)
+
+        var modulePath = ReadString(block.substring(index))
+        if(modulePath.empty()) {
+            printf("'@import' must be followed by a quoted module path\n")
+            return Status.ERROR_TEMPLATE_INVALID_COMMAND
+        }
+        ctx.addImport(modulePath)
+        ;*code = $""
+        return Status.OK
+    }
+
+    // <% @type "module/path" :: TypeName %> — declare the input type
+    // Generates a typed function signature and adds the module import.
+    if(block.startsWith($"@type ")) {
+        var index = block.endIndexOf($"@type ")
+        assert(index > -1)
+
+        var modulePath = ReadString(block.substring(index))
+        if(modulePath.empty()) {
+            printf("'@type' must be followed by a quoted module path\n")
+            return Status.ERROR_TEMPLATE_INVALID_COMMAND
+        }
+
+        var afterModule = block.substring(index + modulePath.length + 2).trim()
+        if(!afterModule.startsWith($"::")) {
+            printf("'@type' module path must be followed by ':: TypeName'\n")
+            return Status.ERROR_TEMPLATE_INVALID_COMMAND
+        }
+
+        var typeName = afterModule.substring(2).trim()
+        if(typeName.empty()) {
+            printf("'@type' must include a type name after '::'\n")
+            return Status.ERROR_TEMPLATE_INVALID_COMMAND
+        }
+
+        ctx.typeName = typeName
+        ctx.typeModule = modulePath
+        ctx.addImport(modulePath)
+        ;*code = $""
+        return Status.OK
+    }
+
+    // <% @load "file.lt" [field] %> — emit a direct call to the partial's function
+    if(block.startsWith($"@load ")) {
+        var index = block.endIndexOf($"@load ")
+        assert(index > -1)
+
+        var filename = ReadString(block.substring(index))
+        if(filename.empty()) {
+            printf("'@load' must be followed by a quoted template file path\n")
+            return Status.ERROR_TEMPLATE_INVALID_COMMAND
+        }
+
+        var afterFilename = block.substring(index + filename.length + 2).trim()
+        var funcName = SanitizeName(BaseName(filename))
+        var pcount = ctx.partialCount
+        ctx.partialCount += 1
+
+        if(afterFilename.empty()) {
+            output.append(
+                "    var _p%d = %.*s_WriteTemplate(resp, input)\n    if(_p%d != Status.OK) { return _p%d }\n",
+                pcount, funcName.length, funcName.buffer, pcount, pcount
+            )
+        } else {
+            output.append(
+                "    var _p%d = %.*s_WriteTemplate(resp, %.*s)\n    if(_p%d != Status.OK) { return _p%d }\n",
+                pcount, funcName.length, funcName.buffer,
+                afterFilename.length, afterFilename.buffer,
+                pcount, pcount
+            )
+        }
+
+        ;*code = $""
+        return Status.OK
+    }
+
+    return Status.OK
+}
+
+public func ReadString(str: String) : String {
+    str = str.trim()
+    if(str.length < 1 || str.buffer[0] != '"') {
+        return String{}
+    }
+
+    var length = 0
+    for(var i = 1; i < str.length; i += 1) {
+        var c = str.buffer[i]
+        if(c == '"') { //"
+            break;
+        }
+        length += 1
+    }
+    return String {
+        .buffer = str.buffer + 1,
+        .length = length
+    }
+}
+
+// Returns the filename portion of a path (after the last path separator)
+func BaseName(path: String) : String {
+    var sep = GetSystemPathSeparator()
+    var lastIdx = -1
+    var i = 0
+    while(true) {
+        var found = path.indexOfAt(sep, i)
+        if(found < 0) { break }
+        lastIdx = found
+        i = found + 1
+    }
+    if(lastIdx < 0) { return path }
+    return path.substring(lastIdx + 1)
+}
+
+func WriteGeneratedHeader(output: *StringBuilder) {
+    var now = DateTimeNow()
+    var temp:[64]char;
+    var buf = StringBufferInit(temp, 64, 0)
+    now.isoFormat(&buf)
+    output.append("// Generated: %s\n", buf.cStr())
+}
+
+func BaseImports(output: *StringBuilder) {
+    // Base imports always required
+    output.appendStr("import \"http_response\"\n")
+    output.appendStr("import \"http_request\"\n")
+    output.appendStr("import \"http_common\"\n")
+    output.appendStr("import \"std/html\"\n")
+    output.appendStr("import \"std/string\"\n")
+    output.appendStr("import \"std/string/builder\"\n")
+    output.appendStr("import \"std/string/buffer\"\n")
+}
+
+// Not thread-safe — uses a @static buffer. Use result before calling again.
+public func SanitizeName(name: String) : String {
+    @static
+    var buffer: PathBuf;
+
+    var str = buffer.toStringBuffer()
+    for(var i = 0; i < name.length; i += 1) {
+        var c = name.buffer[i]
+        if(!c.isAlphanumeric()) {
+            c = '_'
+        }
+        str.appendChar(c)
+    }
+    return str.toString()
+}

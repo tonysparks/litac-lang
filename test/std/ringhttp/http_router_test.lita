@@ -1,0 +1,271 @@
+#if OS != "WINDOWS"
+import "std/assert"
+import "std/string"
+import "std/mem"
+
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_common"
+
+func assertCheckMatch(t: *const char, p: *const char, expected: bool) {
+    var template: HttpPathTemplate
+    ParsePathTemplateStr(t, &template)
+
+    var path = StringInit(p)
+    assert(CheckMatch(&template, path) == expected)
+}
+
+@test
+func testCheckMatch() {
+    assertCheckMatch("/{id}/{a}", "/123/b", true)
+    assertCheckMatch("/{id}/{a}", "/123/", false)
+    assertCheckMatch("/{id}/", "/123/b", false)
+    assertCheckMatch("{id}/", "123/", true)
+    assertCheckMatch("{id}", "123", true)
+    assertCheckMatch("/{id}", "/123/b", false)
+    assertCheckMatch("/{id}", "/123", true)
+    assertCheckMatch("", "", true)
+    assertCheckMatch("", "/abc", false)
+}
+
+func makeTestHandler() : RequestHandler {
+    return RequestHandler {
+        .type = RequestHandlerType.HTTP_REQUEST,
+        .userData = null,
+        .controller = HttpController { .callback = null }
+    }
+}
+
+// Router.match() must extract path-parameter values from the URL.
+@test
+func testRouterMatchPathParams() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET, "/users/{id}", makeTestHandler()))
+
+    var path = StringInit("/users/42")
+    var result = RouteMatch{}
+    assert(router.match(HttpMethod.GET, &path, &result))
+    assert(result.values.numberOfEntries == 1)
+    assert(result.values.entries[0].equals($"42"))
+}
+
+// Router.match() must return false for wrong method and wrong path.
+@test
+func testRouterNoMatch() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET, "/users/{id}", makeTestHandler()))
+
+    // Wrong method
+    var path1 = StringInit("/users/42")
+    var result1 = RouteMatch{}
+    assert(!router.match(HttpMethod.POST, &path1, &result1))
+
+    // Wrong path
+    var path2 = StringInit("/other/42")
+    var result2 = RouteMatch{}
+    assert(!router.match(HttpMethod.GET, &path2, &result2))
+}
+
+// RFC 7231 §4.3.2: HEAD is identical to GET — Router must fall back to GET routes.
+@test
+func testRouterHeadFallsBackToGet() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET, "/ping", makeTestHandler()))
+
+    var path = StringInit("/ping")
+    var result = RouteMatch{}
+    assert(router.match(HttpMethod.HEAD, &path, &result))
+
+    // HEAD must NOT match when there is no GET route either.
+    var router2 = Router{}
+    router2.init(defaultAllocator)
+    defer router2.free()
+
+    assert(router2.register(HttpMethod.POST, "/ping", makeTestHandler()))
+    var result2 = RouteMatch{}
+    assert(!router2.match(HttpMethod.HEAD, &path, &result2))
+}
+
+// allowedMethods() returns a bitmask of HttpMethod values for a path;
+// returns 0 for paths that are not registered at all.
+@test
+func testRouterAllowedMethods() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET,  "/foo", makeTestHandler()))
+    assert(router.register(HttpMethod.POST, "/foo", makeTestHandler()))
+
+    var fooPath = StringInit("/foo")
+    var allowed = router.allowedMethods(&fooPath)
+
+    assert((allowed & (1 << 1)) != 0)  // GET = 1
+    assert((allowed & (1 << 4)) != 0)  // POST = 4
+    assert((allowed & (1 << 2)) == 0)  // PUT = 2, not registered
+
+    // Unknown path must return 0 (no allowed methods).
+    var barPath = StringInit("/bar")
+    assert(router.allowedMethods(&barPath) == 0)
+}
+
+// ---------------------------------------------------------------------------
+// Multiple path parameters
+// ---------------------------------------------------------------------------
+
+// Router.match() must extract all path-parameter values in a multi-segment
+// template, not just the first one.
+@test
+func testRouterMultiplePathParams() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET, "/users/{id}/posts/{postId}", makeTestHandler()))
+
+    var path = StringInit("/users/42/posts/7")
+    var result = RouteMatch{}
+    assert(router.match(HttpMethod.GET, &path, &result))
+    assert(result.values.numberOfEntries == 2)
+    assert(result.values.entries[0].equals($"42"))
+    assert(result.values.entries[1].equals($"7"))
+}
+
+// ---------------------------------------------------------------------------
+// Static (no-parameter) path matching
+// ---------------------------------------------------------------------------
+
+// A route with no path parameters must match the exact literal path and must
+// not match any other path.
+@test
+func testRouterStaticPath() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET, "/api/status", makeTestHandler()))
+
+    var good = StringInit("/api/status")
+    var result = RouteMatch{}
+    assert(router.match(HttpMethod.GET, &good, &result))
+
+    var bad = StringInit("/api/other")
+    var result2 = RouteMatch{}
+    assert(!router.match(HttpMethod.GET, &bad, &result2))
+}
+
+// ---------------------------------------------------------------------------
+// Invalid template registration
+// ---------------------------------------------------------------------------
+
+// register() must return false when the template string is malformed
+// (e.g. an unclosed brace).
+@test
+func testRouterInvalidTemplateReturnsFalse() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    // Unclosed '{' → ParsePathTemplateStr returns an error.
+    assert(!router.register(HttpMethod.GET, "/{unclosed", makeTestHandler()))
+
+    // Mismatched '}' without opening '{'.
+    assert(!router.register(HttpMethod.GET, "/users}/posts", makeTestHandler()))
+}
+
+// ---------------------------------------------------------------------------
+// Method isolation: GET and POST on the same path
+// ---------------------------------------------------------------------------
+
+// Registering GET, POST, and (not) PUT on the same path; each method must
+// match only its own registered route.
+@test
+func testRouterMethodIsolation() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET,  "/data", makeTestHandler()))
+    assert(router.register(HttpMethod.POST, "/data", makeTestHandler()))
+
+    var path = StringInit("/data")
+
+    var r1 = RouteMatch{}
+    assert(router.match(HttpMethod.GET, &path, &r1))
+
+    var r2 = RouteMatch{}
+    assert(router.match(HttpMethod.POST, &path, &r2))
+
+    // PUT was not registered — must not match.
+    var r3 = RouteMatch{}
+    assert(!router.match(HttpMethod.PUT, &path, &r3))
+}
+
+// ---------------------------------------------------------------------------
+// First-registered wins when two templates overlap
+// ---------------------------------------------------------------------------
+
+// The router uses a linear scan.  When a static path and a parameterised
+// template both match the same URL, the one registered first wins.
+// Observable: the static route has 0 captured params; the parameterised one has 1.
+@test
+func testRouterFirstRegisteredWins() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    // Static route first (0 path params), then parameterised (1 path param).
+    assert(router.register(HttpMethod.GET, "/users/admin", makeTestHandler()))
+    assert(router.register(HttpMethod.GET, "/users/{id}",  makeTestHandler()))
+
+    // "/users/admin" must hit the static route → 0 captured params.
+    var path = StringInit("/users/admin")
+    var result = RouteMatch{}
+    assert(router.match(HttpMethod.GET, &path, &result))
+    assert(result.values.numberOfEntries == 0)
+
+    // A numeric id falls through to the parameterised route → 1 captured param.
+    var path2 = StringInit("/users/42")
+    var result2 = RouteMatch{}
+    assert(router.match(HttpMethod.GET, &path2, &result2))
+    assert(result2.values.numberOfEntries == 1)
+    assert(result2.values.entries[0].equals($"42"))
+}
+
+// ---------------------------------------------------------------------------
+// allowedMethods does not include HEAD implicitly
+// ---------------------------------------------------------------------------
+
+// Router.match() falls back from HEAD to GET, but allowedMethods() reports
+// only explicitly registered methods.  A caller building a 405 Allow header
+// must be aware that HEAD is implicitly covered by GET.
+@test
+func testRouterAllowedMethodsHeadNotImplicit() {
+    var router = Router{}
+    router.init(defaultAllocator)
+    defer router.free()
+
+    assert(router.register(HttpMethod.GET, "/resource", makeTestHandler()))
+
+    var path = StringInit("/resource")
+
+    // HEAD must match (falls back to GET handler).
+    var result = RouteMatch{}
+    assert(router.match(HttpMethod.HEAD, &path, &result))
+
+    // But allowedMethods must report only GET (bit 1), not HEAD (bit 3).
+    var allowed = router.allowedMethods(&path)
+    assert((allowed & (1 << 1)) != 0)   // GET registered
+    assert((allowed & (1 << 3)) == 0)   // HEAD not explicitly registered
+}
+#end

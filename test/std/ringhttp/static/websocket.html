@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Echo Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #chat {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        #messageInput {
+            width: 80%;
+            padding: 10px;
+        }
+        #sendButton {
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Echo Chat</h1>
+    <div id="chat"></div>
+    <input type="text" id="messageInput" placeholder="Type a message...">
+    <button id="sendButton">Send</button>
+    <button id="closeButton">Close</button>
+
+    <script>
+        const chatDiv = document.getElementById('chat');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const closeButton = document.getElementById('closeButton');
+
+        // Create WebSocket connection
+        const ws = new WebSocket('ws://localhost:8080/websocket'); // Change URL as needed
+
+        // Append messages to the chat div
+        function appendMessage(message, type = 'received') {
+            const messageElem = document.createElement('div');
+            messageElem.textContent = (type === 'sent' ? 'You: ' : 'Server: ') + message;
+            messageElem.style.color = type === 'sent' ? 'blue' : 'green';
+            chatDiv.appendChild(messageElem);
+            chatDiv.scrollTop = chatDiv.scrollHeight; // Auto-scroll to the bottom
+        }
+
+        // Handle WebSocket events
+        ws.addEventListener('open', () => {
+            appendMessage('WebSocket connection established.', 'system');
+        });
+
+        ws.addEventListener('message', (event) => {
+            appendMessage(event.data);
+        });
+
+        ws.addEventListener('close', () => {
+            appendMessage('WebSocket connection closed.', 'system');
+        });
+
+        ws.addEventListener('error', (event, error) => {
+            appendMessage('WebSocket error occurred. ' + error, 'system');
+        });
+
+        // Send message on button click
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value.trim();
+            if (message && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+                appendMessage(message, 'sent');
+                messageInput.value = '';
+            }
+        });
+
+        closeButton.addEventListener('click', () => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                messageInput.value = '';
+            }
+        });
+
+        // Optionally send message on Enter key press
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+    </script>
+</body>
+</html>

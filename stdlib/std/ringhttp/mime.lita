@@ -1,0 +1,208 @@
+import "std/string"
+import "std/map"
+import "std/mem"
+
+@asStr
+public enum MimeType {
+
+    @asStr("application/octet-stream")
+    UNKNOWN = 0,
+
+    @asStr("text/csv") TEXT_CSV,
+    @asStr("text/calendar") TEXT_CALENDAR,
+    @asStr("text/markdown") TEXT_MARKDOWN,
+    @asStr("text/vnd.dvb.subtitle") TEXT_DVB_SUBTITLE,
+    @asStr("text/css") TEXT_CSS,
+    @asStr("application/javascript") APPLICATION_JAVASCRIPT,
+
+    @asStr("application/octet-stream") APPLICATION_OCTET_STREAM,
+    @asStr("application/x-www-form-urlencoded") APPLICATION_X_WWW_FORM_URLENCODED,
+    @asStr("multipart/form-data") MULTIPART_FORM_DATA,
+    @asStr("application/x-shockwave-flash") APPLICATION_X_SHOCKWAVE_FLASH,
+    @asStr("application/json-patch+json") APPLICATION_JSON_PATCH_JSON,
+    @asStr("application/ld+json") APPLICATION_LD_JSON,
+
+    @asStr("image/jpeg") IMAGE_JPEG,
+    @asStr("image/png") IMAGE_PNG,
+    @asStr("image/gif") IMAGE_GIF,
+    @asStr("image/bmp") IMAGE_BMP,
+    @asStr("image/tiff") IMAGE_TIFF,
+    @asStr("image/webp") IMAGE_WEBP,
+    @asStr("image/svg+xml") IMAGE_SVG_XML,
+    @asStr("image/x-icon") IMAGE_X_ICON,
+    @asStr("image/vnd.microsoft.icon") IMAGE_VND_MICROSOFT_ICON,
+    @asStr("image/vnd.wap.wbmp") IMAGE_VND_WAP_WBMP,
+    @asStr("image/jp2") IMAGE_JP2,
+    @asStr("image/x-portable-anymap") IMAGE_X_PORTABLE_ANYMAP,
+    @asStr("image/x-portable-bitmap") IMAGE_X_PORTABLE_BITMAP,
+    @asStr("image/x-portable-graymap") IMAGE_X_PORTABLE_GRAYMAP,
+    @asStr("image/x-portable-pixmap") IMAGE_X_PORTABLE_PIXMAP,
+
+    @asStr("audio/mpeg") AUDIO_MPEG,
+    @asStr("audio/wav") AUDIO_WAV,
+    @asStr("audio/ogg") AUDIO_OGG,
+    @asStr("audio/midi") AUDIO_MIDI,
+    @asStr("audio/x-midi") AUDIO_X_MIDI,
+    @asStr("audio/webm") AUDIO_WEBM,
+    @asStr("audio/amr") AUDIO_AMR,
+    @asStr("audio/aac") AUDIO_AAC,
+    @asStr("audio/flac") AUDIO_FLAC,
+    @asStr("audio/x-ms-wma") AUDIO_X_MS_WMA,
+    @asStr("audio/x-ms-wax") AUDIO_X_MS_WAX,
+    @asStr("audio/vnd.rn-realaudio") AUDIO_VND_RN_REALAUDIO,
+    @asStr("audio/x-pn-realaudio") AUDIO_X_PN_REALAUDIO,
+    @asStr("audio/x-pn-realaudio-plugin") AUDIO_X_PN_REALAUDIO_PLUGIN,
+    @asStr("audio/x-realaudio") AUDIO_X_REALAUDIO,
+
+    @asStr("application/json") APPLICATION_JSON,
+    @asStr("application/xml") APPLICATION_XML,
+    @asStr("application/xhtml+xml") APPLICATION_XHTML_XML,
+    @asStr("application/rss+xml") APPLICATION_RSS_XML,
+    @asStr("application/atom+xml") APPLICATION_ATOM_XML,
+    @asStr("application/pdf") APPLICATION_PDF,
+    @asStr("application/msword") APPLICATION_MSWORD,
+    @asStr("application/vnd.ms-excel") APPLICATION_VND_MS_EXCEL,
+    @asStr("application/vnd.ms-powerpoint") APPLICATION_VND_MS_POWERPOINT,
+    @asStr("application/vnd.openxmlformats-officedocument.wordprocessingml.document") APPLICATION_WORD_DOCX,
+    @asStr("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") APPLICATION_EXCEL_XLSX,
+    @asStr("application/vnd.openxmlformats-officedocument.presentationml.presentation") APPLICATION_POWERPOINT_PPTX,
+    @asStr("application/zip") APPLICATION_ZIP,
+    @asStr("application/gzip") APPLICATION_GZIP,
+    @asStr("application/x-tar") APPLICATION_X_TAR,
+    @asStr("application/x-rar-compressed") APPLICATION_X_RAR_COMPRESSED,
+    @asStr("application/x-dvi") APPLICATION_X_DVI,
+    @asStr("application/java-archive") APPLICATION_JAVA_ARCHIVE,
+    @asStr("application/wasm") APPLICATION_WASM,
+
+    @asStr("application/font-woff") APPLICATION_FONT_WOFF,
+    @asStr("application/font-woff2") APPLICATION_FONT_WOFF2,
+    @asStr("application/vnd.ms-fontobject") APPLICATION_VND_MS_FONTOBJECT,
+    @asStr("application/x-font-ttf") APPLICATION_X_FONT_TTF,
+    @asStr("application/x-font-otf") APPLICATION_X_FONT_OTF,
+    @asStr("font/ttf") FONT_TTF,
+    @asStr("font/woff") FONT_WOFF,
+    @asStr("font/woff2") FONT_WOFF2,
+    @asStr("font/eot") FONT_EOT,
+    @asStr("font/sfnt") FONT_SFNT,
+    @asStr("font/otf") FONT_OTF,
+    @asStr("font/collection") FONT_COLLECTION,
+    @asStr("application/vnd.ms-opentype") APPLICATION_VND_MS_OPENTYPE,
+    @asStr("application/font-sfnt") APPLICATION_FONT_SFNT,
+
+    @asStr("video/mp4") VIDEO_MP4,
+    @asStr("video/webm") VIDEO_WEBM,
+    @asStr("video/ogg") VIDEO_OGG,
+    @asStr("video/quicktime") VIDEO_QUICKTIME,
+    @asStr("video/x-msvideo") VIDEO_X_MSVIDEO,
+    @asStr("video/x-flv") VIDEO_X_FLV,
+    @asStr("video/3gpp") VIDEO_3GPP,
+    @asStr("video/3gpp2") VIDEO_3GPP2,
+    @asStr("video/x-matroska") VIDEO_X_MATROSKA,
+    @asStr("video/vnd.rn-realvideo") VIDEO_VND_RN_REALVIDEO,
+    @asStr("video/x-ms-wmv") VIDEO_X_MS_WMV,
+    @asStr("video/x-ms-wmx") VIDEO_X_MS_WMX,
+    @asStr("video/x-ms-wvx") VIDEO_X_MS_WVX,
+
+    MAX_MIME_TYPES, // Must be at the end
+}
+
+struct FileToMime {
+    fileExtensions: *String
+    mimeType: MimeType
+}
+
+// TODO: Probably just inline the raw mime type here instead of using enum, skips a
+// look up
+public var mimeFileTypes = []*FileToMime{
+    &FileToMime{ .fileExtensions = []String{ $".csv", $"" }, .mimeType = MimeType.TEXT_CSV },
+    &FileToMime{ .fileExtensions = []String{ $".ics", $"" }, .mimeType = MimeType.TEXT_CALENDAR },
+    &FileToMime{ .fileExtensions = []String{ $".md", $".markdown", $"" }, .mimeType = MimeType.TEXT_MARKDOWN },
+    &FileToMime{ .fileExtensions = []String{ $".srt", $".vtt", $"" }, .mimeType = MimeType.TEXT_DVB_SUBTITLE },
+    &FileToMime{ .fileExtensions = []String{ $".css", $"" }, .mimeType = MimeType.TEXT_CSS },
+    &FileToMime{ .fileExtensions = []String{ $".js", $"" }, .mimeType = MimeType.APPLICATION_JAVASCRIPT },
+    &FileToMime{ .fileExtensions = []String{ $".json", $"" }, .mimeType = MimeType.APPLICATION_JSON },
+    &FileToMime{ .fileExtensions = []String{ $".jsonld", $"" }, .mimeType = MimeType.APPLICATION_LD_JSON },
+    &FileToMime{ .fileExtensions = []String{ $".xml", $"" }, .mimeType = MimeType.APPLICATION_XML },
+    &FileToMime{ .fileExtensions = []String{ $".xhtml", $"" }, .mimeType = MimeType.APPLICATION_XHTML_XML },
+    &FileToMime{ .fileExtensions = []String{ $".rss", $"" }, .mimeType = MimeType.APPLICATION_RSS_XML },
+    &FileToMime{ .fileExtensions = []String{ $".atom", $"" }, .mimeType = MimeType.APPLICATION_ATOM_XML },
+    &FileToMime{ .fileExtensions = []String{ $".pdf", $"" }, .mimeType = MimeType.APPLICATION_PDF },
+    &FileToMime{ .fileExtensions = []String{ $".doc", $"" }, .mimeType = MimeType.APPLICATION_MSWORD },
+    &FileToMime{ .fileExtensions = []String{ $".docx", $"" }, .mimeType = MimeType.APPLICATION_WORD_DOCX },
+    &FileToMime{ .fileExtensions = []String{ $".xls", $"" }, .mimeType = MimeType.APPLICATION_VND_MS_EXCEL },
+    &FileToMime{ .fileExtensions = []String{ $".xlsx", $"" }, .mimeType = MimeType.APPLICATION_EXCEL_XLSX },
+    &FileToMime{ .fileExtensions = []String{ $".ppt", $"" }, .mimeType = MimeType.APPLICATION_VND_MS_POWERPOINT },
+    &FileToMime{ .fileExtensions = []String{ $".pptx", $"" }, .mimeType = MimeType.APPLICATION_POWERPOINT_PPTX },
+    &FileToMime{ .fileExtensions = []String{ $".zip", $"" }, .mimeType = MimeType.APPLICATION_ZIP },
+    &FileToMime{ .fileExtensions = []String{ $".gz", $"" }, .mimeType = MimeType.APPLICATION_GZIP },
+    &FileToMime{ .fileExtensions = []String{ $".tar", $"" }, .mimeType = MimeType.APPLICATION_X_TAR },
+    &FileToMime{ .fileExtensions = []String{ $".rar", $"" }, .mimeType = MimeType.APPLICATION_X_RAR_COMPRESSED },
+    &FileToMime{ .fileExtensions = []String{ $".dvi", $"" }, .mimeType = MimeType.APPLICATION_X_DVI },
+    &FileToMime{ .fileExtensions = []String{ $".jar", $"" }, .mimeType = MimeType.APPLICATION_JAVA_ARCHIVE },
+    &FileToMime{ .fileExtensions = []String{ $".wasm", $"" }, .mimeType = MimeType.APPLICATION_WASM },
+
+    &FileToMime{ .fileExtensions = []String{ $".woff", $"" }, .mimeType = MimeType.FONT_WOFF },
+    &FileToMime{ .fileExtensions = []String{ $".woff2", $"" }, .mimeType = MimeType.FONT_WOFF2 },
+    &FileToMime{ .fileExtensions = []String{ $".ttf", $"" }, .mimeType = MimeType.FONT_TTF },
+    &FileToMime{ .fileExtensions = []String{ $".otf", $"" }, .mimeType = MimeType.FONT_OTF },
+    &FileToMime{ .fileExtensions = []String{ $".eot", $"" }, .mimeType = MimeType.FONT_EOT },
+    &FileToMime{ .fileExtensions = []String{ $".sfnt", $"" }, .mimeType = MimeType.FONT_SFNT },
+
+    &FileToMime{ .fileExtensions = []String{ $".jpg", $".jpeg", $"" }, .mimeType = MimeType.IMAGE_JPEG },
+    &FileToMime{ .fileExtensions = []String{ $".png", $"" }, .mimeType = MimeType.IMAGE_PNG },
+    &FileToMime{ .fileExtensions = []String{ $".gif", $"" }, .mimeType = MimeType.IMAGE_GIF },
+    &FileToMime{ .fileExtensions = []String{ $".bmp", $"" }, .mimeType = MimeType.IMAGE_BMP },
+    &FileToMime{ .fileExtensions = []String{ $".tiff", $".tif", $"" }, .mimeType = MimeType.IMAGE_TIFF },
+    &FileToMime{ .fileExtensions = []String{ $".webp", $"" }, .mimeType = MimeType.IMAGE_WEBP },
+    &FileToMime{ .fileExtensions = []String{ $".svg", $"" }, .mimeType = MimeType.IMAGE_SVG_XML },
+    &FileToMime{ .fileExtensions = []String{ $".ico", $"" }, .mimeType = MimeType.IMAGE_X_ICON },
+    &FileToMime{ .fileExtensions = []String{ $".jp2", $"" }, .mimeType = MimeType.IMAGE_JP2 },
+
+    &FileToMime{ .fileExtensions = []String{ $".mp3", $"" }, .mimeType = MimeType.AUDIO_MPEG },
+    &FileToMime{ .fileExtensions = []String{ $".wav", $"" }, .mimeType = MimeType.AUDIO_WAV },
+    &FileToMime{ .fileExtensions = []String{ $".ogg", $"" }, .mimeType = MimeType.AUDIO_OGG },
+    &FileToMime{ .fileExtensions = []String{ $".mid", $".midi", $"" }, .mimeType = MimeType.AUDIO_MIDI },
+    &FileToMime{ .fileExtensions = []String{ $".aac", $"" }, .mimeType = MimeType.AUDIO_AAC },
+    &FileToMime{ .fileExtensions = []String{ $".flac", $"" }, .mimeType = MimeType.AUDIO_FLAC },
+    &FileToMime{ .fileExtensions = []String{ $".amr", $"" }, .mimeType = MimeType.AUDIO_AMR },
+
+    &FileToMime{ .fileExtensions = []String{ $".mp4", $"" }, .mimeType = MimeType.VIDEO_MP4 },
+    &FileToMime{ .fileExtensions = []String{ $".webm", $"" }, .mimeType = MimeType.VIDEO_WEBM },
+    &FileToMime{ .fileExtensions = []String{ $".ogv", $"" }, .mimeType = MimeType.VIDEO_OGG },
+    &FileToMime{ .fileExtensions = []String{ $".mov", $"" }, .mimeType = MimeType.VIDEO_QUICKTIME },
+    &FileToMime{ .fileExtensions = []String{ $".avi", $"" }, .mimeType = MimeType.VIDEO_X_MSVIDEO },
+    &FileToMime{ .fileExtensions = []String{ $".flv", $"" }, .mimeType = MimeType.VIDEO_X_FLV },
+    &FileToMime{ .fileExtensions = []String{ $".mkv", $"" }, .mimeType = MimeType.VIDEO_X_MATROSKA },
+    null
+};
+
+public struct MimeDB {
+    db: Map<String, String>
+}
+
+public func (this: *MimeDB) init(allocator: Allocator) {
+    this.db = StringMap<String>($"", 126, allocator)
+
+
+    for(var i = 0; mimeFileTypes[i] != null; i += 1) {
+        var entry = mimeFileTypes[i]
+
+        for(var j = 0; !entry.fileExtensions[j].empty(); j+=1) {
+            this.db.put(entry.fileExtensions[j], MimeTypeAsStr(entry.mimeType).toString())
+        }
+    }
+}
+
+public func (this: *MimeDB) free() {
+    this.db.free()
+}
+
+public func (this: *MimeDB) getMimeType(filePath: String) : String {
+    var lastIndex = filePath.lastIndexOfAt($".")
+    if (lastIndex < 0) {
+        return $""
+    }
+
+    return this.db.get(filePath.substring(lastIndex))
+}
+

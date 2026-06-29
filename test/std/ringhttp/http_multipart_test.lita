@@ -1,0 +1,40 @@
+#if OS != "WINDOWS"
+import "std/assert"
+import "std/string"
+import "std/mem"
+import "std/libc"
+import "std/array"
+
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_multipart"
+import "std/ringhttp/http_common"
+
+func assertBoundaryParsing(headerValue: *const char, expectedValue: *const char, success: bool = true) {
+    var request = HttpRequest{}
+    request.headers.init(12)
+    request.headers.add(HttpHeader {
+        .name = CONTENT_TYPE_HEADER,
+        .values = StringInit(headerValue)
+    })
+
+    var multipart = HttpMultipart{}
+    var status = ParseMultipart(defaultAllocator, &request, &multipart)
+    if(!success) {
+        assert(status == Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_SECTION)
+        return;
+    }
+
+    assert(status == Status.OK)
+    assert(multipart.boundary.equalsString(expectedValue))
+}
+
+@test
+func testParseMultipartBoundary() {
+    assertBoundaryParsing("multipart/form-data; boundary=xyz", "xyz")
+    assertBoundaryParsing("multipart/form-data; boundary=xyz wxy", "xyz wxy")
+    assertBoundaryParsing("boundary=xyz", "", false)
+    // "boundary=" with no value must error (not return an empty-boundary result)
+    assertBoundaryParsing("multipart/form-data; boundary=", "", false)
+}
+#end

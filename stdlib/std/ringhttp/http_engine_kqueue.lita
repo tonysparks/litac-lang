@@ -1,0 +1,232 @@
+import "std/net"
+import "std/libc"
+import "std/thread"
+import "std/mem"
+import "std/mem/thread_safe_allocator"
+import "std/string"
+import "std/array"
+import "std/io"
+import "std/libc/signal"
+import "std/atomic"
+import "std/assert"
+import "std/system"
+import "std/log"
+
+import "std/net/posix_socket"
+import "std/os/darwin/kqueue"
+import "std/os/posix/fcntl"
+import "std/thread/barrier"
+import "std/ringhttp/http_connection"
+import "std/ringhttp/http_websocket"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_worker"
+
+const MAX_ENGINE_EVENTS : i32 = 64
+
+internal struct HttpRingEngine {
+    config: using *HttpConfig
+    safeAllocator: ThreadSafeAllocator
+    serverSocket: Socket
+
+    kq: i32
+
+    isRunning: Atomic<bool>
+
+    distribution: u64
+    workers: Array<WorkerThread>
+    barrier: Barrier
+
+    clientAddr: sockaddr_in
+    clientAddrLen: socklen_t
+
+    server: *HttpServer
+}
+
+internal func (this: *HttpRingEngine) init(
+    server: *HttpServer
+) {
+    this.server = server
+    this.config = server.config
+
+    this.distribution = 0_u64
+    this.kq = -1
+
+    this.safeAllocator.init(this.config.allocator)
+
+    var maxWorkers = MAX(this.config.numThreads, 1)
+    this.workers.init(
+        maxWorkers,
+        this.safeAllocator
+    )
+
+    if(!this.config.disableSignal) {
+        signal(SIGINT,  kqueue_signal_handler)
+        signal(SIGTERM, kqueue_signal_handler)
+    }
+}
+
+internal func (this: *HttpRingEngine) listen() : Status {
+    this.close()
+
+    this.isRunning.init(true)
+
+    this.kq = kqueue()
+    if(this.kq < 0) {
+        Panic("Error creating kqueue: %d\n", this.kq)
+    }
+
+    // numThreads workers + 1 for the engine thread itself
+    this.barrier.init(this.config.numThreads + 1)
+
+    var maxWorkers = MAX(this.config.numThreads, 1)
+    for(var i = 0; i < maxWorkers; i+=1) {
+        this.workers.add(WorkerThread{})
+
+        var worker = this.workers.getPtr(i)
+        worker.init(this.server, i, &this.barrier, &this.isRunning)
+    }
+
+    // Wait for all workers to finish initialization
+    this.barrier.wait()
+
+    for(var i = 0; i < this.workers.length; i+=1) {
+        var worker = this.workers.getPtr(i)
+        Info("Initialized worker thread: %d\n", worker.thread.id())
+    }
+
+    if(!this.serverSocket.create()) {
+        Error("Failed to create server socket\n")
+        return Status.ERROR_UNABLE_TO_CREATE_SERVER_SOCKET
+    }
+
+    defer this.serverSocket.close()
+
+    var enableReuse = 1
+    this.serverSocket.setSocketOpt(SocketOption.SO_REUSEADDR, &enableReuse, sizeof(:i32))
+
+    // Make server socket non-blocking
+    var flags = fcntl(this.serverSocket.handle(), F_GETFL, 0)
+    fcntl(this.serverSocket.handle(), F_SETFL, flags | O_NONBLOCK)
+
+    if(!FromPort(this.config.port, &this.serverSocket.address)) {
+        Error("Failed to create address for port %d\n", this.config.port)
+        return Status.ERROR_CREATING_ADDRESS
+    }
+
+    if(!this.serverSocket.bind()) {
+        Error("Failed to bind to port %d (address already in use?)\n", this.config.port)
+        return Status.ERROR_SOCKET_BIND
+    }
+
+    if(!this.serverSocket.listen()) {
+        Error("Failed to listen on port %d\n", this.config.port)
+        return Status.ERROR_SOCKET_LISTEN
+    }
+
+    // Register the server socket with kqueue for read events (new connections)
+    var change = kevent {
+        .ident  = this.serverSocket.handle() as (usize),
+        .filter = EVFILT_READ,
+        .flags  = EV_ADD | EV_ENABLE,
+        .fflags = 0_u32,
+        .data   = 0_i64,
+        .udata  = null,
+    }
+
+    if(KEventCall(this.kq, &change, 1, null, 0, null) < 0) {
+        Error("Error registering server socket with kqueue\n")
+        return Status.ERROR_IOURING_ERROR
+    }
+
+    var events: [MAX_ENGINE_EVENTS]kevent;
+
+    while(this.isRunning.get()) {
+        var n = KEventCall(this.kq, null, 0, events, MAX_ENGINE_EVENTS, null)
+        if(n < 0) {
+            // EINTR is harmless (signal interrupted the wait), retry
+            continue
+        }
+
+        for(var i = 0; i < n; i+=1) {
+            var ev = &events[i]
+
+            if(ev.flags & EV_ERROR) {
+                Error("kqueue engine error on fd %lu\n", ev.ident)
+                continue
+            }
+
+            if(ev.ident == this.serverSocket.handle() as (usize)) {
+                this.acceptConnections()
+            }
+        }
+    }
+
+    return Status.OK
+}
+
+func (this: *HttpRingEngine) acceptConnections() {
+    // Accept all pending connections and hand them off to workers
+    while(true) {
+        this.clientAddrLen = sizeof(this.clientAddr) as (socklen_t)
+        var clientFd = accept(
+            this.serverSocket.handle(),
+            (&this.clientAddr) as (*sockaddr),
+            &this.clientAddrLen
+        )
+
+        if(clientFd < 0) {
+            // Non-blocking: EAGAIN means no more connections pending
+            break
+        }
+
+        Debug("CONNECTED: client socket: %d\n", clientFd)
+
+        // Make client socket non-blocking
+        var flags = fcntl(clientFd, F_GETFL, 0)
+        fcntl(clientFd, F_SETFL, flags | O_NONBLOCK)
+
+        // Round-robin to a worker
+        this.distribution = (this.distribution + 1) % (this.workers.length as (u64))
+        var worker = this.workers.getPtr(this.distribution as (i32))
+
+        Debug("Handing off socket %d to worker thread: %d\n", clientFd, worker.thread.id())
+
+        // Write the client fd into the worker's pipe
+        var written = write(worker.pipefd[1], &clientFd, sizeof(:i32))
+        if(written != sizeof(:i32)) {
+            Error("Failed to write client fd to worker pipe for socket: %d\n", clientFd)
+            close(clientFd)
+        }
+    }
+}
+
+
+internal func (this: *HttpRingEngine) close() {
+    this.isRunning.set(false)
+
+    this.serverSocket.close()
+    this.safeAllocator.free()
+
+    if(this.kq >= 0) {
+        close(this.kq)
+        this.kq = -1
+    }
+}
+
+internal func (this: *HttpRingEngine) free() {
+    this.close()
+    this.workers.free()
+}
+
+func kqueue_signal_handler(signo: i32) {
+    // Only async-signal-safe calls here — no mutexes (Info/printf are not safe).
+    const msg = "Shutdown signal received, exiting...\n"
+    write(2, msg as (*const void), 38_usize)
+    exit(0)
+}
+

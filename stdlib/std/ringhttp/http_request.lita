@@ -1,0 +1,406 @@
+import "std/string"
+import "std/string/builder"
+import "std/array"
+import "std/libc"
+import "std/assert"
+import "std/mem"
+import "std/json"
+import "std/url/encoding"
+// import "std/json/from_json"
+// import "std/json/to_json"
+
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_parser"
+
+
+@asStr
+public enum HttpMethod {
+    INVALID,
+    GET,
+    PUT,
+    HEAD,
+    POST,
+    TRACE,
+    PATCH,
+    DELETE,
+    OPTIONS,
+    CONNECT,
+}
+
+@asStr
+public enum BodyType {
+    UNKNOWN,
+    MALFORMED_INPUT,
+    FORM_URLENCODED,
+    JSON,
+    MULTIPART_FORMDATA,
+    FORMDATA,
+}
+
+public enum HttpFlags {
+    DISABLE_KEEP_ALIVE  = (1<<0),
+    CHUNKED_ENCODING    = (1<<1),
+    GZIP_ENCODING       = (1<<2),
+    DEFLATE_ENCODING    = (1<<3),
+    COMPRESSED_ENCODING = (1<<4),
+
+    CONTENT_LENGTH_PROVIDED = (1<<5),
+
+    UPGRADE_REQUEST         = (1<<6),
+    WEB_SOCKET_PROTOCOL     = (1<<7),
+
+    ACCEPT_GZIP_ENCODING    = (1<<8),
+    ACCEPT_DEFLATE_ENCODING = (1<<9),
+
+    SSE                     = (1<<10),
+
+    EXPECT_CONTINUE         = (1<<11),
+    SENT_CONTINUE           = (1<<12),
+    KEEP_ALIVE_REQUESTED         = (1<<13),  // Connection: keep-alive was explicit (HTTP/1.0 opt-in)
+    EXPECT_UNKNOWN               = (1<<14),  // Expect header present with unrecognised value → 417
+    CONFLICTING_CONTENT_LENGTH   = (1<<15),  // duplicate Content-Length with differing values → 400
+    HOST_PROVIDED                = (1<<16),  // Host header seen; set again → 400
+}
+
+/**
+    The parsed out request
+*/
+public struct HttpRequest {
+    method: HttpMethod
+    scheme: String
+    path: String
+    query: String
+    version: String
+
+    flags: i32
+    bodyLength: i32
+
+    payload: using Payload
+}
+
+
+public func (this: *HttpRequest) reset() {
+    this.flags = 0
+    this.bodyLength = 0
+    this.headers.clear()
+    this.method   = HttpMethod.INVALID
+    this.bodyType = BodyType.UNKNOWN
+    this.path     = String{}
+    this.scheme   = String{}
+    this.query    = String{}
+}
+
+public struct Payload {
+    headers: Array<HttpHeader>
+    body: using Body
+}
+
+public struct Body {
+    body: using String
+
+    bodyType: BodyType
+    union {
+        formParams: Array<FormParam>
+        json: *JsonNode
+        multipart: MultiPart
+        formData: FormData
+        chunkData: StringBuilder
+    }
+}
+
+public struct MultiPart {
+    boundary: String
+    parts: Array<Part>
+}
+
+public struct Part {
+    payload: using Payload
+}
+
+public struct FormParam {
+    name: String
+    value: String
+}
+
+public struct FormData {
+    name: String
+    filename: String
+    value: String
+}
+
+public struct WebSocketUpgrade {
+    upgrade: String
+    connection: String
+    secKey: String
+    secVersion: String
+}
+
+public struct HttpHeader {
+    name: String
+    values: String
+}
+
+public func HttpHeaderFrom(name: *const char, values: *const char) : HttpHeader {
+    return HttpHeader {
+        .name = StringInit(name),
+        .values = StringInit(values)
+    }
+}
+
+public struct QueryParam {
+    name: String
+    value: String
+}
+
+public struct HttpQuery {
+    params: Array<QueryParam>
+}
+
+public struct HttpPathValues {
+    entries: [MAX_TEMPATE_ENTRIES]String
+    numberOfEntries: i32
+}
+
+public struct HttpPathEntry {
+    name: String
+    index: i32
+}
+
+public const MAX_TEMPATE_ENTRIES = 32
+
+public struct HttpPathTemplate {
+    template: String
+    entries: [MAX_TEMPATE_ENTRIES]HttpPathEntry
+    numberOfEntries: i32
+}
+
+public func (this: *Payload) getHeaderValue(name: String) : String {
+    for(var i = 0; i < this.headers.size(); i+=1) {
+        var header = this.headers.getPtr(i)
+        if(header.name.equalsIgnoreCase(name)) {
+            return header.values
+        }
+    }
+
+    return String{}
+}
+
+public func ParsePathTemplateStr(
+    pathTemplate: *const char,
+    result: *HttpPathTemplate
+) : Status {
+    var template = StringInit(pathTemplate)
+    return ParsePathTemplate(template, result)
+}
+
+public func ParsePathTemplate(
+    pathTemplate: String,
+    result: *HttpPathTemplate
+) : Status {
+
+    result.template = pathTemplate
+    result.numberOfEntries = 0
+
+    var index = 0
+    var startIndex = -1
+    var diff = 0
+
+    while(index < pathTemplate.length) {
+        var c = pathTemplate.buffer[index]
+        if(c == '{') {
+            if(startIndex >= 0) {
+                return Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_START
+            }
+            startIndex = index
+        }
+        else if(c == '}') {
+            if(startIndex < 0) {
+                return Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_END
+            }
+
+            // Bug fix (8): no bounds check existed before writing into the
+            // fixed-size entries array; a template with > MAX_TEMPATE_ENTRIES
+            // parameters would overflow the array onto adjacent stack memory.
+            if(result.numberOfEntries >= MAX_TEMPATE_ENTRIES) {
+                return Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_START
+            }
+
+            var entry = &result.entries[result.numberOfEntries]
+            entry.name.buffer = &pathTemplate.buffer[startIndex + 1]
+            entry.name.length = index - (startIndex + 1)
+            entry.index = diff
+
+            result.numberOfEntries += 1
+            startIndex = -1
+            diff = -1
+        }
+
+        index += 1
+
+        if(startIndex < 0) {
+            diff += 1
+        }
+    }
+
+    if(startIndex >= 0) {
+        return Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_END
+    }
+
+    return Status.OK
+}
+
+public func ParsePathValues(
+    template: *HttpPathTemplate,
+    path: String,
+    result: *HttpPathValues) : Status {
+
+    var index = 0
+    for(var i = 0; i < template.numberOfEntries; i+=1) {
+        var entry = &template.entries[i]
+
+        if(index + entry.index >= path.length) {
+            return Status.ERROR_HTTP_PARSING_INVALID_TEMPLATE_NAME_START
+        }
+
+        index += entry.index
+        var startIndex = index
+
+        while(index < path.length) {
+            var c = path.buffer[index]
+            if(c == '/' || c == '?') {
+                break;
+            }
+
+            index += 1
+        }
+
+        var value = &result.entries[result.numberOfEntries]
+        value.buffer = &path.buffer[startIndex]
+        value.length = index - startIndex
+        result.numberOfEntries += 1
+    }
+
+    return Status.OK
+}
+
+public func HttpQueryInit(allocator: *const Allocator) : HttpQuery {
+    var query = HttpQuery{}
+    query.params.init(16, allocator)
+    return query
+}
+
+// Returns the raw (still percent-encoded) value of the first param matching name.
+public func (this: *HttpQuery) get(name: String) : String {
+    for(var i = 0; i < this.params.size(); i += 1) {
+        var p = this.params.getPtr(i)
+        if(p.name.equals(name)) {
+            return p.value
+        }
+    }
+    return String{}
+}
+
+// Returns a pointer to the first param matching name, or null if not found.
+// Use the returned QueryParam's getDecodedValue/getDecodedName when the value is percent-encoded.
+public func (this: *HttpQuery) getParam(name: String) : *QueryParam {
+    for(var i = 0; i < this.params.size(); i += 1) {
+        var p = this.params.getPtr(i)
+        if(p.name.equals(name)) {
+            return p
+        }
+    }
+    return null
+}
+
+public func (this: *HttpRequest) parseQuery(result: *HttpQuery) : Status {
+    if(this.query.empty()) {
+        return Status.OK;
+    }
+
+    var params = this.query.split($"&")
+    while(params.hasNext()) {
+        var entry = params.next()
+        if(entry.empty()) {
+            continue
+        }
+
+        var valueIndex = entry.endIndexOf($"=")
+
+        var queryParam = QueryParam{}
+        if(valueIndex < 0) {
+            queryParam.name = entry
+        } else {
+            queryParam.name  = entry.substring(0, valueIndex - 1)
+            queryParam.value = entry.substring(valueIndex)
+        }
+
+        result.params.add(queryParam)
+    }
+
+    return Status.OK
+}
+
+// Decodes the percent-encoded name into out.
+public func (this: *QueryParam) getDecodedName(out: *StringBuilder) {
+    UrlDecode(this.name, out)
+}
+
+// Decodes the percent-encoded value into out.
+public func (this: *QueryParam) getDecodedValue(out: *StringBuilder) {
+    UrlDecode(this.value, out)
+}
+
+public struct HttpCookie {
+    name: String
+    value: String
+}
+
+public struct HttpCookies {
+    entries: Array<HttpCookie>
+}
+
+public func HttpCookiesInit(allocator: *const Allocator) : HttpCookies {
+    var cookies = HttpCookies{}
+    cookies.entries.init(8, allocator)
+    return cookies
+}
+
+// Returns the value of the cookie with the given name, or an empty String.
+public func (this: *HttpCookies) get(name: String) : String {
+    for(var i = 0; i < this.entries.size(); i += 1) {
+        var e = this.entries.getPtr(i)
+        if(e.name.equals(name)) {
+            return e.value
+        }
+    }
+    return String{}
+}
+
+// Parses the Cookie request header into individual name=value pairs.
+public func (this: *HttpRequest) parseCookies(result: *HttpCookies) : Status {
+    var cookieHeader = this.getHeaderValue($"Cookie")
+    if(cookieHeader.empty()) {
+        return Status.OK
+    }
+
+    var parts = cookieHeader.split($";")
+    while(parts.hasNext()) {
+        var part = parts.next().trim()
+        if(part.empty()) {
+            continue
+        }
+
+        var eqIdx = part.endIndexOf($"=")
+        if(eqIdx < 0) {
+            continue
+        }
+
+        var cookie = HttpCookie {
+            .name  = part.substring(0, eqIdx - 1),
+            .value = part.substring(eqIdx)
+        }
+        result.entries.add(cookie)
+    }
+
+    return Status.OK
+}

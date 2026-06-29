@@ -1,0 +1,791 @@
+import "std/string/builder"
+import "std/string/buffer"
+import "std/string"
+import "std/mem"
+import "std/libc"
+import "std/thread"
+import "std/atomic"
+import "std/assert"
+import "std/log"
+import "std/system"
+
+import "std/net/posix_socket"
+
+import "std/ringhttp/http_connection"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_file"
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_websocket"
+import "std/ringhttp/http_sse"
+import "std/ringhttp/http_worker"
+import "std/ringhttp/mime"
+
+import "std/os/darwin/kqueue"
+import "std/os/posix/sendfile"
+import "std/os/posix/fcntl"
+import "std/thread/barrier"
+
+import "std/crypto/sha1"
+import "std/encoding/base64"
+
+internal struct WorkerThread {
+    kq:     i32
+    pipefd: [2]i32  // pipefd[0] = read end, pipefd[1] = write end (engine writes here)
+
+    thread: Thread
+    index:  i32
+
+    server:   *HttpServer
+    config:   *HttpConfig
+    sessions: ContextPool
+
+    rootPath: String
+
+    // Engine state — passed in from engine to avoid circular imports
+    barrier:   *Barrier
+    isRunning: *Atomic<bool>
+}
+
+const MAX_WORKER_EVENTS : i32 = 64
+const TIMER_IDENT       : usize = 1_usize
+
+// ---------------------------------------------------------------
+// Raw kqueue IO primitives
+// ---------------------------------------------------------------
+
+func (this: *WorkerThread) doSend(session: *SessionContext) : i32 {
+    var connection = &session.connection
+    var writeBuffer = &connection.writeBuffer
+
+    var remaining = writeBuffer.length - session.submissions as (i32)
+    if(remaining <= 0) {
+        return 0
+    }
+
+    var src = writeBuffer.buffer + session.submissions as (i32)
+
+    var sent = send(connection.handle(), src as (*void), remaining as (usize), 0) as (i32)
+    if(sent < 0) {
+        return 1  // EAGAIN/EINTR
+    }
+    if(sent == 0) {
+        return -1  // peer closed
+    }
+
+    session.submissions += sent as (u32)
+    if(session.submissions as (i32) >= writeBuffer.length) {
+        session.submissions = 0
+        return 0  // fully sent
+    }
+    return 1  // partial
+}
+
+func (this: *WorkerThread) doRecv(session: *SessionContext, buf: *void, bufLen: i32) : i64 {
+    return recv(session.connection.handle(), buf, bufLen as (usize), 0)
+}
+
+func (this: *WorkerThread) registerWrite(session: *SessionContext) {
+    var change = kevent {
+        .ident  = session.connection.handle() as (usize),
+        .filter = EVFILT_WRITE,
+        .flags  = EV_ADD | EV_ENABLE | EV_ONESHOT,
+        .fflags = 0_u32,
+        .data   = 0_i64,
+        .udata  = session,
+    }
+    KEventCall(this.kq, &change, 1, null, 0, null)
+}
+
+func (this: *WorkerThread) deregisterWrite(session: *SessionContext) {
+    var change = kevent {
+        .ident  = session.connection.handle() as (usize),
+        .filter = EVFILT_WRITE,
+        .flags  = EV_DELETE,
+        .fflags = 0_u32,
+        .data   = 0_i64,
+        .udata  = session,
+    }
+    KEventCall(this.kq, &change, 1, null, 0, null)
+}
+
+func (this: *WorkerThread) deregisterAll(session: *SessionContext) {
+    var fd = session.connection.handle()
+
+    var changes: [2]kevent;
+    changes[0] = kevent {
+        .ident  = fd as (usize),
+        .filter = EVFILT_READ,
+        .flags  = EV_DELETE,
+        .fflags = 0_u32,
+        .data   = 0_i64,
+        .udata  = null,
+    }
+    changes[1] = kevent {
+        .ident  = fd as (usize),
+        .filter = EVFILT_WRITE,
+        .flags  = EV_DELETE,
+        .fflags = 0_u32,
+        .data   = 0_i64,
+        .udata  = null,
+    }
+    KEventCall(this.kq, changes, 2, null, 0, null)
+}
+
+// ---------------------------------------------------------------
+// Backend IO interface (called from shared layer above)
+// ---------------------------------------------------------------
+
+// queueSend: buffer the response and start flushing it.
+internal func (this: *WorkerThread) queueSend(session: *SessionContext) : Status {
+    var connection = &session.connection
+    var request    = &session.request
+    var response   = &session.response
+
+    connection.bufferContents(request, response, this.config)
+
+    Debug("Writing HTTP response (socket: %d, length: %d)\n",
+        connection.handle(), connection.writeBuffer.length
+    )
+
+    session.state       = SessionState.WRITTEN_HTTP_RESPONSE
+    session.submissions = 0
+
+    this.flushResponse(session)
+    return Status.OK
+}
+
+// closeSession: deregister from kqueue, close file handle and socket.
+internal func (this: *WorkerThread) closeSession(session: *SessionContext) {
+    if(!session.connection.isConnected()) {
+        return;
+    }
+
+    this.deregisterAll(session)
+
+    if(session.response.fileHandle > 0) {
+        close(session.response.fileHandle)
+        session.response.fileHandle = 0
+    }
+
+    session.finish(.forceClose = true)
+}
+
+// rearmTimeout: kqueue EVFILT_TIMER is auto-recurring; nothing to do.
+internal func (this: *WorkerThread) rearmTimeout() {
+}
+
+// ---------------------------------------------------------------
+// Response flush state machine
+// ---------------------------------------------------------------
+
+func (this: *WorkerThread) flushResponse(session: *SessionContext) {
+    var response = &session.response
+    var result   = this.doSend(session)
+
+    if(result < 0) {
+        Error("Send error on socket: %d\n", session.connection.handle())
+        this.closeSession(session)
+        return;
+    }
+
+    if(result > 0) {
+        session.state = SessionState.WRITTEN_HTTP_RESPONSE
+        this.registerWrite(session)
+        return;
+    }
+
+    if(response.type == ResponseType.FILE) {
+        // RFC 7231 §4.3.2: HEAD must not include a body — skip file send.
+        if(session.request.method == HttpMethod.HEAD) {
+            if(response.fileHandle > 0) {
+                close(response.fileHandle)
+                response.fileHandle = 0
+                session.file        = 0
+            }
+            this.resetRequest(session)
+        } else {
+            session.state      = SessionState.WRITTEN_FILE
+            session.fileOffset = 0
+            this.flushFileResponse(session)
+        }
+    }
+    else if(response.type == ResponseType.STREAM) {
+        session.state = SessionState.WRITING_STREAM
+        this.advanceChunkedResponse(session)
+    }
+    else if(response.type == ResponseType.SSE) {
+        session.state = SessionState.SSE_OPERATION
+        session.sseHandler.callback(&session.sseSession)
+    }
+    else {
+        this.resetRequest(session)
+    }
+}
+
+func (this: *WorkerThread) flushFileResponse(session: *SessionContext) {
+    var connection = &session.connection
+    var response   = &session.response
+
+    var fileFd   = response.fileHandle
+    var fileSize = response.fileSize
+    var socketFd = connection.handle()
+
+    while(session.fileOffset < fileSize) {
+        var len = (fileSize - session.fileOffset) as (i64)
+
+        var result = sendfile(fileFd, socketFd, session.fileOffset, &len, null, 0)
+        if(len > 0) {
+            session.fileOffset += len
+        }
+
+        if(result < 0) {
+            if(len > 0) {
+                continue
+            }
+            this.registerWrite(session)
+            return;
+        }
+    }
+
+    if(response.fileHandle > 0) {
+        close(response.fileHandle)
+        response.fileHandle = 0
+        session.file        = 0
+    }
+
+    this.resetRequest(session)
+}
+
+// advanceChunkedResponse handles both STREAM and SSE chunked responses.
+func (this: *WorkerThread) advanceChunkedResponse(session: *SessionContext) {
+    while(true) {
+        var connection = &session.connection
+        var response   = &session.response
+        if(!response.stream.__this) {
+            Error("No stream attached to connection: %d\n", connection.handle())
+            this.closeSession(session)
+            return;
+        }
+
+        var writeBuffer = &connection.writeBuffer
+        writeBuffer.clear()
+
+        var numberOfBytesRead = response.stream.read(response.body.buffer, response.body.capacity)
+        var moreContents      = numberOfBytesRead > 0
+
+        if(!moreContents) {
+            session.state = SessionState.WRITTEN_HTTP_RESPONSE
+            writeBuffer.append("0\r\n\r\n")
+        }
+        else {
+            if(!writeBuffer.reserve(numberOfBytesRead + 16)) {
+                Error("Out of memory for chunked response on socket: %d\n", connection.handle())
+                this.closeSession(session)
+                return;
+            }
+
+            writeBuffer.append("%08X\r\n", numberOfBytesRead)
+            response.body.length = numberOfBytesRead
+            response.body.copyTo(writeBuffer.buffer + writeBuffer.length, numberOfBytesRead, false)
+            writeBuffer.length += numberOfBytesRead
+            writeBuffer.appendStrn("\r\n", 2)
+        }
+
+        session.submissions = 0
+        var result = this.doSend(session)
+
+        if(result < 0) {
+            this.closeSession(session)
+            return;
+        }
+
+        if(result > 0) {
+            this.registerWrite(session)
+            return;
+        }
+
+        if(moreContents) {
+            continue  // read and send next chunk without growing the call stack
+        }
+
+        this.resetRequest(session)
+        return;
+    }
+}
+
+func (this: *WorkerThread) flushSseWrite(session: *SessionContext) {
+    var result = this.doSend(session)
+    if(result < 0) {
+        this.closeSession(session)
+        return;
+    }
+    if(result > 0) {
+        this.registerWrite(session)
+        return;
+    }
+    if(!session.isSse) {
+        this.closeSession(session)
+        return;
+    }
+    // fully sent — stay open, waiting for next sendSseEvent call
+}
+
+func (this: *WorkerThread) flushWebSocketWrite(session: *SessionContext) {
+    var result = this.doSend(session)
+    if(result < 0) {
+        this.closeSession(session)
+        return;
+    }
+    if(result > 0) {
+        this.registerWrite(session)
+        return;
+    }
+
+    if(!session.isWebSocket) {
+        this.closeSession(session)
+        return;
+    }
+    // EVFILT_WRITE was EV_ONESHOT so it auto-removed; read events continue
+}
+
+// resetRequest: response sent — recycle the session for the next request.
+func (this: *WorkerThread) resetRequest(session: *SessionContext) {
+    Debug("Response complete for socket: %d\n", session.connection.handle())
+
+    if(session.isWebSocket) {
+        session.submissions = 0
+        session.state = SessionState.WEB_SOCKET_OPERATION
+        return;
+    }
+
+    if(session.isSse) {
+        session.submissions = 0
+        session.state = SessionState.SSE_OPERATION
+        return;
+    }
+
+    session.submissions = 0
+
+    var connection = &session.connection
+
+    // RFC 7230 §6.6: close the TCP connection when Connection: close was requested
+    // or when the client spoke HTTP/1.0 without opting in to keep-alive.
+    if(connection.disableKeepAlive) {
+        this.closeSession(session)
+        return;
+    }
+
+    session.begin(connection.handle())
+
+    var change = kevent {
+        .ident  = connection.handle() as (usize),
+        .filter = EVFILT_READ,
+        .flags  = EV_ADD | EV_ENABLE | EV_CLEAR,
+        .fflags = 0_u32,
+        .data   = 0_i64,
+        .udata  = session,
+    }
+    KEventCall(this.kq, &change, 1, null, 0, null)
+    session.state = SessionState.READ_REQUEST_LINE
+}
+
+// sendWebSocketFrame: public — called by user WebSocket handlers.
+public func (this: *WorkerThread) sendWebSocketFrame(
+    session: *SessionContext,
+    frame:   *Frame
+) : Status {
+    var connection  = &session.connection
+    var writeBuffer = &connection.writeBuffer
+    writeBuffer.clear()
+
+    var status = frame.serialize(writeBuffer)
+    if(status != Status.OK) {
+        return status
+    }
+
+    session.state       = SessionState.WEB_SOCKET_OPERATION
+    session.submissions = 0
+
+    var result = this.doSend(session)
+    if(result < 0) {
+        this.closeSession(session)
+        return Status.ERROR_IO_ERROR
+    }
+    if(result > 0) {
+        this.registerWrite(session)
+    }
+
+    return Status.OK
+}
+
+// sendSseEvent: public — called by user SSE handlers to push an event.
+public func (this: *WorkerThread) sendSseEvent(
+    session: *SessionContext,
+    event:   *SseEvent
+) : Status {
+    var connection  = &session.connection
+    var writeBuffer = &connection.writeBuffer
+    writeBuffer.clear()
+
+    event.serialize(writeBuffer)
+
+    session.state       = SessionState.SSE_OPERATION
+    session.submissions = 0
+
+    var result = this.doSend(session)
+    if(result < 0) {
+        this.closeSession(session)
+        return Status.ERROR_IO_ERROR
+    }
+    if(result > 0) {
+        this.registerWrite(session)
+    }
+
+    return Status.OK
+}
+
+// ---------------------------------------------------------------
+// kqueue event loop
+// ---------------------------------------------------------------
+
+internal func (this: *WorkerThread) init(
+    server:    *HttpServer,
+    index:     i32,
+    barrier:   *Barrier,
+    isRunning: *Atomic<bool>
+): Status {
+
+    this.server    = server
+    this.config    = server.config
+    this.index     = index
+    this.kq        = -1
+    this.barrier   = barrier
+    this.isRunning = isRunning
+
+    this.pipefd[0] = -1
+    this.pipefd[1] = -1
+
+    this.rootPath = this.server.config.fileServerPath.empty()
+        ? CurrentWorkingPath().toString() : this.server.config.fileServerPath
+
+    if(this.rootPath.endsWith($"/")) {
+        this.rootPath.length -= 1
+    }
+
+    var status = this.sessions.init(this.server)
+    if(status != Status.OK) {
+        return status
+    }
+
+    this.thread = Thread{}
+    if(this.thread.create(KqueueWorkerFunction, this, this.server.config.allocator) != ThreadStatus.SUCCESS) {
+        Error("Error creating worker thread\n")
+        return Status.ERROR_CREATING_THREAD
+    }
+
+    return Status.OK
+}
+
+internal func KqueueWorkerFunction(arg: *void) : i32 {
+    var workerThread = arg as (*WorkerThread)
+
+    var pfds: [2]i32;
+    if(pipe(pfds) < 0) {
+        Error("Failed to create worker pipe\n")
+        return -1
+    }
+    workerThread.pipefd[0] = pfds[0]
+    workerThread.pipefd[1] = pfds[1]
+
+    var flags = fcntl(pfds[0], F_GETFL, 0)
+    fcntl(pfds[0], F_SETFL, flags | O_NONBLOCK)
+
+    workerThread.kq = kqueue()
+    if(workerThread.kq < 0) {
+        Error("Failed to create kqueue for worker\n")
+        return -1
+    }
+
+    var pipeChange = kevent {
+        .ident  = pfds[0] as (usize),
+        .filter = EVFILT_READ,
+        .flags  = EV_ADD | EV_ENABLE,
+        .fflags = 0_u32,
+        .data   = 0_i64,
+        .udata  = null,
+    }
+
+    var timerChange = kevent {
+        .ident  = TIMER_IDENT,
+        .filter = EVFILT_TIMER,
+        .flags  = EV_ADD | EV_ENABLE,
+        .fflags = 0_u32,
+        .data   = workerThread.config.timeoutCheckMSec,
+        .udata  = null,
+    }
+
+    var changes: [2]kevent;
+    changes[0] = pipeChange
+    changes[1] = timerChange
+
+    if(KEventCall(workerThread.kq, changes, 2, null, 0, null) < 0) {
+        Error("Failed to register initial kqueue events for worker\n")
+        return -1
+    }
+
+    Info("Started worker thread: %d kq: %d\n", ThreadCurrent().id(), workerThread.kq)
+
+    workerThread.barrier.wait()
+
+    var events: [MAX_WORKER_EVENTS]kevent;
+
+    while(workerThread.isRunning.get()) {
+        var n = KEventCall(workerThread.kq, null, 0, events, MAX_WORKER_EVENTS, null)
+        if(n < 0) {
+            continue
+        }
+
+        for(var i = 0; i < n; i+=1) {
+            var ev = &events[i]
+            workerThread.handleEvent(ev)
+        }
+    }
+
+    close(workerThread.kq)
+    workerThread.kq = -1
+    close(workerThread.pipefd[0])
+    close(workerThread.pipefd[1])
+
+    return 0
+}
+
+func (this: *WorkerThread) handleEvent(ev: *kevent) {
+    if(ev.flags & EV_ERROR) {
+        if(ev.udata != null) {
+            var session = ev.udata as (*SessionContext)
+            Debug("kqueue error on socket: %d, force closing\n", session.connection.handle())
+            this.closeSession(session)
+        }
+        return;
+    }
+
+    if(ev.ident == this.pipefd[0] as (usize)) {
+        this.drainPipe()
+        return;
+    }
+
+    if(ev.filter == EVFILT_TIMER) {
+        this.checkTimeouts()
+        return;
+    }
+
+    var session = ev.udata as (*SessionContext)
+    if(!session || !session.connection.isConnected()) {
+        return;
+    }
+
+    session.lastRequestTime = SystemTimeMSec()
+
+    if(ev.flags & EV_EOF) {
+        Debug("Client closed socket: %d\n", session.connection.handle())
+        this.closeSession(session)
+        return;
+    }
+
+    if(ev.filter == EVFILT_READ) {
+        this.handleReadReady(session)
+    }
+    else if(ev.filter == EVFILT_WRITE) {
+        this.handleWriteReady(session)
+    }
+}
+
+func (this: *WorkerThread) drainPipe() {
+    var clientFd: i32 = 0
+    while(true) {
+        var n = read(this.pipefd[0], &clientFd, sizeof(:i32))
+        if(n != sizeof(:i32) as (i64)) {
+            break
+        }
+
+        Debug("Worker received new connection: %d\n", clientFd)
+
+        var session = this.handleAccept(clientFd)
+        if(!session) {
+            close(clientFd)
+            continue
+        }
+
+        var change = kevent {
+            .ident  = clientFd as (usize),
+            .filter = EVFILT_READ,
+            .flags  = EV_ADD | EV_ENABLE | EV_CLEAR,
+            .fflags = 0_u32,
+            .data   = 0_i64,
+            .udata  = session,
+        }
+        KEventCall(this.kq, &change, 1, null, 0, null)
+        session.state = SessionState.READ_REQUEST_LINE
+    }
+}
+
+func (this: *WorkerThread) handleReadReady(session: *SessionContext) {
+    var connection = &session.connection
+    var readBuffer = &connection.readBuffer
+
+    var bytesRead = this.doRecv(
+        session,
+        &readBuffer.buffer[readBuffer.length],
+        readBuffer.remaining() as (i32)
+    )
+
+    if(bytesRead == 0) {
+        Debug("Client closed socket: %d\n", connection.handle())
+        this.closeSession(session)
+        return;
+    }
+
+    if(bytesRead < 0) {
+        return;
+    }
+
+    switch(session.state) {
+        case SessionState.READ_REQUEST_LINE: {
+            var status = this.handlePartialHttpRequest(session, bytesRead as (i32))
+
+            if(status != Status.OK) {
+                switch(status) {
+                    case Status.PARTIAL_REQUEST_DISPATCHING_READ: {
+                        return;
+                    }
+                    case Status.CONTINUE_SEND: {
+                        // this.send100Continue(session)
+
+                        // RFC 7231 §5.1.1: send 100 Continue without disturbing the session.
+                        // The read buffer still holds the request headers; when the client
+                        // sends the body the EV_CLEAR read event re-fires and the body is
+                        // appended to the same buffer so handlePartialHttpRequest succeeds.
+                        const reply = "HTTP/1.1 100 Continue\r\n\r\n"
+                        send(
+                            session.connection.handle(),
+                            reply as (*void),
+                            strlen(reply) as (usize),
+                            0
+                        )
+                        return;
+                    }
+                    case Status.ERROR_UNKNOWN_BODY_LENGTH:
+                    case Status.ERROR_INVALID_REQUEST_PATH_EXCEEDED_LIMIT:
+                    case Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT:
+                    case Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT:
+                    case Status.ERROR_PARSING_HTTP_REQUEST:
+                    case Status.ERROR_MISSING_HOST_HEADER:
+                    case Status.ERROR_DUPLICATE_HOST_HEADER:
+                    case Status.ERROR_HTTP_VERSION_NOT_SUPPORTED:
+                    case Status.ERROR_EXPECT_FAILED:
+                    case Status.ERROR_CONFLICTING_BODY_HEADERS:
+                    case Status.ERROR_CONFLICTING_CONTENT_LENGTH:
+                    case Status.ERROR_INVALID_CONTENT_LENGTH:
+                    case Status.ERROR_UNSUPPORTED_REQUEST_METHOD:
+                    case Status.ERROR_WEB_SOCKET_MISSING_CONNECTION:
+                    case Status.ERROR_HTTP_PARSING_INVALID_REQUEST_LINE:
+                    case Status.ERROR_HTTP_PARSING_INVALID_HEADER_PARAM:
+                    case Status.ERROR_HTTP_PARSING_INVALID_CHUNK:
+                    case Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE: {
+                        this.sendBadRequest(session, status)
+                        break
+                    }
+                    default: {
+                        this.sendServerError(session, status)
+                        break
+                    }
+                }
+                return;
+            }
+
+            var reqStatus = this.handleHttpRequest(session)
+            if(reqStatus != Status.OK) {
+                Error("HTTP request error %s for socket: %d\n", StatusAsStr(reqStatus), connection.handle())
+                if(reqStatus == Status.ERROR_PARSING_HTTP_REQUEST ||
+                   reqStatus == Status.ERROR_WEB_SOCKET_SECURITY_KEY) {
+                    this.sendBadRequest(session, reqStatus)
+                }
+                else {
+                    this.sendServerError(session, reqStatus)
+                }
+            }
+            break
+        }
+        case SessionState.WEB_SOCKET_OPERATION: {
+            var status = this.handleWebSocketFrame(session, bytesRead as (i32))
+            if(status == Status.WEB_SOCKET_CLOSED) {
+                this.closeSession(session)
+            }
+            else if(status == Status.PARTIAL_WEB_SOCKET_DISPATCHING_READ) {
+                return;
+            }
+            else if(status != Status.OK) {
+                Error("WebSocket frame error for socket: %d: %s\n",
+                    connection.handle(), StatusAsStr(status))
+                this.closeSession(session)
+            }
+            break
+        }
+        case SessionState.SSE_OPERATION: {
+            // SSE is server-push only; unexpected client data closes the connection
+            Debug("Unexpected read on SSE socket: %d, closing\n", connection.handle())
+            this.closeSession(session)
+            break
+        }
+        default: {
+            Warn("Unexpected read in state %s for socket: %d\n",
+                SessionStateAsStr(session.state), connection.handle())
+            break
+        }
+    }
+}
+
+func (this: *WorkerThread) handleWriteReady(session: *SessionContext) {
+    switch(session.state) {
+        case SessionState.WRITTEN_HTTP_RESPONSE:
+        case SessionState.WRITTEN_HTTP_RESPONSE_MORE: {
+            this.flushResponse(session)
+            break
+        }
+        case SessionState.WRITTEN_FILE: {
+            this.flushFileResponse(session)
+            break
+        }
+        case SessionState.WRITING_STREAM: {
+            var result = this.doSend(session)
+            if(result < 0) {
+                this.closeSession(session)
+                break
+            }
+            if(result > 0) {
+                this.registerWrite(session)
+                break
+            }
+            this.advanceChunkedResponse(session)
+            break
+        }
+        case SessionState.WEB_SOCKET_OPERATION: {
+            this.flushWebSocketWrite(session)
+            break
+        }
+        case SessionState.SSE_OPERATION: {
+            this.flushSseWrite(session)
+            break
+        }
+        default: {
+            this.deregisterWrite(session)
+            break
+        }
+    }
+}
+

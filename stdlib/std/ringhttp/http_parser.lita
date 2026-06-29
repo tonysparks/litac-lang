@@ -1,0 +1,606 @@
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/array"
+import "std/mem"
+import "std/libc"
+import "std/json"
+import "std/log"
+import "std/fmt"
+
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_common"
+import "std/url/encoding"
+
+
+
+
+public struct HttpParser {
+    allocator: *const Allocator
+}
+
+public func (this: *HttpParser) init(allocator: *const Allocator) {
+    this.allocator = allocator
+}
+
+public func (this: *HttpParser) parse(input: String, result: *HttpRequest) : Status {
+    var index = input.indexOf($"\r\n")
+    if(index < 0) {
+        return Status.ERROR_HTTP_PARSING_INVALID_REQUEST_LINE
+    }
+
+    // The Request Line (Method Path Http/Version)
+    var requestLine = input.substring(0, index)
+
+    var methodIndex = requestLine.indexOf($" ")
+    if(methodIndex < 0) {
+        return Status.ERROR_HTTP_PARSING_INVALID_REQUEST_LINE
+    }
+
+    var pathIndex = requestLine.indexOfAt($" ", methodIndex + 1)
+    if(pathIndex < 0) {
+        return Status.ERROR_HTTP_PARSING_INVALID_REQUEST_LINE
+    }
+
+    var method = requestLine.substring(0, methodIndex)
+    result.method = ToHttpMethod(&method)
+    result.version = requestLine.substring(pathIndex + 1, index)
+
+    // RFC 7230 §5.3.2: request-target may be in absolute-form (full URI).
+    // Strip the scheme and authority so routing always sees an origin-form path.
+    var rawPath = requestLine.substring(methodIndex + 1, pathIndex)
+    var schemeEnd = rawPath.indexOf($"://")
+    if(schemeEnd >= 0) {
+        result.scheme = rawPath.substring(0, schemeEnd)
+        var afterAuthority = rawPath.substring(schemeEnd + 3)
+        var slash = afterAuthority.indexOf($"/")
+        rawPath = (slash >= 0) ? afterAuthority.substring(slash) : StringInit("/")
+    }
+    result.path = rawPath
+
+    var queryIndex = result.path.indexOf($"?")
+    if(queryIndex >= 0) {
+        result.query = result.path.substring(queryIndex + 1)
+        result.path = result.path.substring(0, queryIndex)
+    }
+
+    var headerInput = input.substring(index + 2)
+    return this.parseHeaders(&headerInput, result)
+}
+
+public func (this: *HttpParser) parseBody(input: String, result: *HttpRequest): Status {
+    var parseResult = this.parseBodyInternal(input, &result.body)
+    if(parseResult != Status.OK) {
+        return parseResult
+    }
+    return Status.OK
+}
+
+
+public func (this: *HttpParser) parseChunk(input: String, result: *HttpRequest) : Status {
+    if(!input.endsWith($"\r\n\r\n")) {
+        return Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE
+    }
+
+    result.chunkData.init(5 * KiB as (i32), this.allocator)
+
+    while(true) {
+        //printf("Chunk processing: %.*s\n",)
+        if(input.empty()) {
+            break
+        }
+
+        var index = input.indexOf($"\r\n")
+        if(index < 0) {
+            return Status.ERROR_HTTP_PARSING_INVALID_CHUNK
+        }
+
+        // Strip any chunk extension (";name=value") before parsing the size.
+        // parseHex() stops at the first non-hex character, so extensions are
+        // ignored automatically and we never read past the slice boundary.
+        var lengthStr = input.substring(0, index)
+        var parsed = lengthStr.parseHex()
+        if(parsed.len == 0 || parsed.value > 0x7FFFFFFF) {
+            return Status.ERROR_HTTP_PARSING_INVALID_CHUNK
+        }
+        var size = parsed.value as (i32)
+
+        // check to see if we are at the end of the stream
+        if(size < 1) {
+            // RFC 7230 §4.1.2: after the zero-size chunk comes an optional trailer
+            // section followed by a blank line (CRLF).  Skip any trailer headers
+            // rather than rejecting them as invalid.
+            input = input.substring(index + 2)
+            var trailerEnd = input.indexOf($"\r\n\r\n")
+            if(trailerEnd < 0 && !input.startsWith($"\r\n")) {
+                return Status.ERROR_HTTP_PARSING_INVALID_CHUNK
+            }
+
+            result.body.body = result.chunkData.toString()
+            return Status.OK
+        }
+
+        // Verify the full chunk payload is present before consuming it.
+        // index + 2 skips the size line's CRLF; the chunk data must be followed
+        // by its own CRLF, so we need at least index+2+size+2 bytes total.
+        if(input.length < index + 2 + size + 2) {
+            return Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE
+        }
+
+        // parse the chunk data
+        var chunk = input.substring(index + 2, index + 2 + size)
+        result.chunkData.appendStrn(chunk.buffer, chunk.length)
+
+        // move to the next chunk
+        var chunkEndIndex = index + 2 + size
+        input = input.substring(chunkEndIndex)
+
+        if(!input.startsWith($"\r\n")) {
+            return Status.ERROR_HTTP_PARSING_INVALID_CHUNK
+        }
+
+        input = input.substring(2)
+    }
+
+    return Status.ERROR_HTTP_PARSING_INVALID_CHUNK
+}
+
+func ToHttpMethod(method: *String) : HttpMethod {
+    switch(method.length) {
+        case 3: {
+            // GET
+            if(method.equalsString("GET", method.length)) {
+                return HttpMethod.GET
+            }
+            // PUT
+            else if(method.equalsString("PUT", method.length)) {
+                return HttpMethod.PUT
+            }
+            break;
+        }
+        case 4: {
+            // HEAD
+            if(method.equalsString("HEAD", method.length)) {
+                return HttpMethod.HEAD
+            }
+            // POST
+            else if(method.equalsString("POST", method.length)) {
+                return HttpMethod.POST
+            }
+            break;
+        }
+        case 5: {
+            // TRACE
+            if(method.equalsString("TRACE", method.length)) {
+                return HttpMethod.TRACE
+            }
+            // PATCH
+            else if(method.equalsString("PATCH", method.length)) {
+                return HttpMethod.PATCH
+            }
+            break;
+        }
+        case 6: {
+            // DELETE
+            if(method.equalsString("DELETE", method.length)) {
+                return HttpMethod.DELETE
+            }
+            break;
+        }
+        case 7: {
+            // OPTIONS
+            if(method.equalsString("OPTIONS", method.length)) {
+                return HttpMethod.OPTIONS
+            }
+            // CONNECT
+            else if(method.equalsString("CONNECT", method.length)) {
+                return HttpMethod.CONNECT
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    return HttpMethod.INVALID
+
+}
+
+func (this: *HttpParser) parseHeaders(input: *String, result: *HttpRequest) : Status {
+    var headerEndIndex = -1
+    defer *input = input.substring(headerEndIndex + 2)
+
+    result.headers.init(16, this.allocator)
+    result.flags &= ~HttpFlags.HOST_PROVIDED
+
+    var headers = input.split($"\r\n")
+    while(headers.hasNext()) {
+        var header = headers.next()
+        if(header.empty()) {
+            headerEndIndex = headers.currentIndex
+            break
+        }
+
+        var currentHeader = HttpHeader{}
+
+        // Split only on the first ':' — header values may contain colons
+        // (e.g. Date, Authorization, WWW-Authenticate).
+        var colonIndex = header.indexOf($":")
+        if(colonIndex < 0) {
+            return Status.ERROR_HTTP_PARSING_INVALID_HEADER_PARAM
+        }
+
+        currentHeader.name   = header.substring(0, colonIndex).trim()
+        currentHeader.values = header.substring(colonIndex + 1).trim()
+
+        var status = this.checkHeader(&currentHeader, result)
+            ?: return status
+        result.headers.add(currentHeader)
+    }
+
+    return Status.OK
+}
+
+
+func (this: *HttpParser) checkHeader(header: *HttpHeader, result: *HttpRequest) : Status {
+    // TODO: Optimize case insensitivity
+    if (header.name.equalsIgnoreCase($"host")) {
+        if((result.flags & HttpFlags.HOST_PROVIDED) != 0) {
+            return Status.ERROR_DUPLICATE_HOST_HEADER
+        }
+        result.flags |= HttpFlags.HOST_PROVIDED
+    }
+    else if (header.name.equalsIgnoreCase($"connection")) {
+        if (header.values.containsIgnoreCase($"close")) {
+            result.flags |= HttpFlags.DISABLE_KEEP_ALIVE
+        }
+        if (header.values.containsIgnoreCase($"upgrade")) {
+            // RFC 7230 §6.7: Connection must list "upgrade" for a valid Upgrade request.
+            result.flags |= HttpFlags.UPGRADE_REQUEST
+        }
+        if (header.values.containsIgnoreCase($"keep-alive")) {
+            // RFC 7230 §6.3: HTTP/1.0 clients must opt in to persistent connections.
+            result.flags |= HttpFlags.KEEP_ALIVE_REQUESTED
+        }
+    }
+    else if (header.name.equalsIgnoreCase($"content-length")) {
+        var parsed = header.values.parseU64()
+        if(parsed.error != ParseError.NONE || parsed.len == 0 || parsed.len != header.values.length) {
+            return Status.ERROR_INVALID_CONTENT_LENGTH
+        }
+        var newLen = MAX(0, parsed.value as (i32))
+        if((result.flags & HttpFlags.CONTENT_LENGTH_PROVIDED) != 0) {
+            // RFC 7230 §3.3.2: duplicate Content-Length with a different value is an error.
+            if(result.bodyLength != newLen) {
+                result.flags |= HttpFlags.CONFLICTING_CONTENT_LENGTH
+            }
+            // identical duplicates are tolerated — keep the existing value
+        } else {
+            result.bodyLength = newLen
+            result.flags |= HttpFlags.CONTENT_LENGTH_PROVIDED
+        }
+    }
+    else if (header.name.equalsIgnoreCase($"transfer-encoding")) {
+        if(header.values.containsIgnoreCase($"chunked")) {
+            result.flags |= HttpFlags.CHUNKED_ENCODING
+        }
+    }
+    else if (header.name.equalsIgnoreCase($"content-encoding")) {
+        if(header.values.containsIgnoreCase($"gzip")) {
+            result.flags |= HttpFlags.GZIP_ENCODING
+        }
+        else if(header.values.containsIgnoreCase($"deflate")) {
+            result.flags |= HttpFlags.DEFLATE_ENCODING
+        }
+        else if(header.values.containsIgnoreCase($"compressed")) {
+            result.flags |= HttpFlags.COMPRESSED_ENCODING
+        }
+    }
+    else if (header.name.equalsIgnoreCase($"accept-encoding")) {
+        if(header.values.containsIgnoreCase($"gzip")) {
+            result.flags |= HttpFlags.ACCEPT_GZIP_ENCODING
+        }
+        if(header.values.containsIgnoreCase($"deflate")) {
+            result.flags |= HttpFlags.ACCEPT_DEFLATE_ENCODING
+        }
+    }
+    else if (header.name.equalsIgnoreCase($"upgrade")) {
+        // RFC 7230 §6.7: WEB_SOCKET_PROTOCOL only set when Upgrade: websocket.
+        // Validity (Connection must also say "upgrade") is checked post-parse.
+        if(header.values.containsIgnoreCase($"websocket")) {
+            result.flags |= HttpFlags.WEB_SOCKET_PROTOCOL
+        }
+    }
+    else if (header.name.equalsIgnoreCase($"accept") && header.values.contains($"text/event-stream")) {
+        result.flags |= HttpFlags.SSE
+    }
+    else if (header.name.equalsIgnoreCase($"expect")) {
+        // RFC 7231 §5.1.1: only "100-continue" is a registered expectation token.
+        // Any other value MUST be rejected with 417.
+        if(header.values.containsIgnoreCase($"100-continue")) {
+            result.flags |= HttpFlags.EXPECT_CONTINUE
+        } else {
+            result.flags |= HttpFlags.EXPECT_UNKNOWN
+        }
+    }
+    else {
+        this.checkHeaderBody(header, result)
+    }
+    return Status.OK
+}
+
+func (this: *HttpParser) checkHeaderBody(header: *HttpHeader, body: *Body) {
+    if (header.name.equalsIgnoreCase($"content-type")) {
+        // RFC 7231 §3.1.1.1: media-type names are case-insensitive and
+        // parameters (e.g. "; charset=utf-8") must be stripped before
+        // comparing the type/subtype token.
+        var mediaType = header.values
+        var semiIdx = mediaType.indexOf($";")
+        if(semiIdx >= 0) {
+            mediaType = mediaType.substring(0, semiIdx).trim()
+        }
+
+        if(mediaType.equalsIgnoreCase($"application/x-www-form-urlencoded")) {
+            body.bodyType = BodyType.FORM_URLENCODED
+        }
+        else if(mediaType.equalsIgnoreCase($"application/json")) {
+            body.bodyType = BodyType.JSON
+        }
+        else if(mediaType.equalsIgnoreCase($"multipart/form-data")) {
+            var boundaryIndex = header.values.endIndexOf($"boundary=")
+            if(boundaryIndex < 0 || boundaryIndex >= header.values.length) {
+                return;
+            }
+
+            body.bodyType = BodyType.MULTIPART_FORMDATA
+            // RFC 2046 §5.1: boundary may be a quoted string — strip surrounding quotes.
+            var boundary = header.values.substring(boundaryIndex)
+            if(boundary.length >= 2 && boundary.buffer[0] == '"' &&
+               boundary.buffer[boundary.length - 1] == '"') {
+                boundary = boundary.substring(1, boundary.length - 1)
+            }
+            body.multipart.boundary = boundary
+        }
+    }
+}
+
+
+func (this: *HttpParser) parseBodyInternal(input: String, body: *Body) : Status {
+    switch(body.bodyType) {
+        case BodyType.FORM_URLENCODED: {
+            // Should we error if not POST, PUT, PATCH, OPTIONS, DELETE?
+
+            body.formParams = ArrayInit<FormParam>(16, this.allocator)
+
+            var params = input.split($"&")
+            while(params.hasNext()) {
+                var param = params.next()
+                if(param.empty()) {
+                    continue
+                }
+
+                var currentParam = FormParam{}
+
+                var pair = param.split($"=")
+                if(!pair.hasNext()) {
+                    return Status.ERROR_HTTP_PARSING_INVALID_FORM_URLENCODED_PARAM
+                }
+
+                currentParam.name = pair.next().trim().decodeFormUrl(this.allocator)
+
+                if(pair.hasNext()) {
+                    currentParam.value = pair.next().trim().decodeFormUrl(this.allocator)
+                }
+                body.formParams.add(currentParam)
+            }
+            break
+        }
+        case BodyType.JSON: {
+            var jsonParser = JsonParserInit(this.allocator)
+
+            // TODO: fix horrible duplicate copy
+            var sb = StringBuilderInit(input.length + 1, this.allocator)
+            input.copyTo(sb.buffer, input.length)
+
+            body.json = jsonParser.parseJson(sb.buffer)
+
+            // TODO: Error handling of bad json
+            if (!body.json && input.length > 0) {
+                body.bodyType = BodyType.MALFORMED_INPUT
+                body.body = input
+            }
+            break
+        }
+        case BodyType.MULTIPART_FORMDATA: {
+            return this.parseMultipart(input, &body.multipart)
+        }
+        default: {
+            // TODO: More body types
+            body.body = input
+        }
+    }
+
+    return Status.OK
+}
+
+func (this: *HttpParser) parseMultipart(input: *String, multipart: *MultiPart) : Status {
+    multipart.parts.init(6, this.allocator)
+
+    var boundary = multipart.boundary
+    var index = -1
+    var status = Status.OK
+
+    while(true) {
+        if(input.empty()) {
+            break
+        }
+
+        // ensure start boundary
+        status = this.parseMultipartBoundary(input, boundary)
+        if(status != Status.OK) return status;
+
+        // exit if --boundary--
+        {
+            if(input.startsWith($"--")) {
+                break
+            }
+        }
+
+        var part = Part{}
+        part.bodyType = BodyType.UNKNOWN
+        part.body.buffer = input.buffer;
+
+        // parse headers
+        {
+            status = this.parseMultipartHeaders(input, &part)
+            if(status != Status.OK) return status
+        }
+
+        // parse body
+        {
+            status = this.parseMultipartBody(input, &part, boundary)
+            if(status != Status.OK) return status
+        }
+
+        multipart.parts.add(part)
+    }
+
+    return Status.OK
+}
+
+func (this: *HttpParser) parseMultipartBoundary(input: *String, boundary: String) : Status {
+    if(!input.startsWith($"--")) {
+        return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_BOUNDARY
+    }
+
+    *input = input.substring(2)
+
+    var index = input.endIndexOf(boundary)
+    if(index < 0) {
+        return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_BOUNDARY
+    }
+
+    *input = input.substring(index)
+
+    if(input.startsWith($"\r\n")) {
+       *input = input.substring(2)
+    }
+
+    return Status.OK
+}
+
+func (this: *HttpParser) parseMultipartHeaders(input: *String, part: *Part) : Status {
+    part.headers.init(4, this.allocator)
+
+    var it = input.split($"\r\n")
+    while(it.hasNext()) {
+        var rawHeader = it.next()
+
+        if(rawHeader.empty()) {
+            *input = it.remaining()
+            break
+        }
+
+        var nameValue = rawHeader.split($":")
+
+        if(!nameValue.hasNext()) {
+            return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_HEADER
+        }
+        var name = nameValue.next()
+
+        if(!nameValue.hasNext()) {
+            return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART_HEADER
+        }
+        var value = nameValue.next()
+
+        var header = HttpHeader{
+            .name = name,
+            .values = value,
+        }
+        this.checkHeaderBody(&header, &part.body)
+
+        part.headers.add(header)
+    }
+
+    return Status.OK
+}
+
+func (this: *HttpParser) parseMultipartBody(input: *String, part: *Part, boundary: String) : Status {
+    var it = input.split(boundary)
+    var formData = &part.formData
+
+    var disposition = part.getHeaderValue($"content-disposition")
+    if(disposition.contains($"form-data")) {
+        part.bodyType = BodyType.FORMDATA
+
+        // name
+        {
+            var index = disposition.endIndexOf($" name=")
+            if(index > -1) {
+                var endIndex = disposition.indexOfAt($";", index)
+                if(endIndex < 0) {
+                    endIndex = disposition.length
+                }
+
+                formData.name = disposition.substring(index, endIndex)
+                if(formData.name.length >= 2 && formData.name.startsWith($"\"") && formData.name.endsWith($"\"")) {
+                    formData.name.buffer += 1
+                    formData.name.length -= 2
+                }
+            }
+        }
+
+        // filename
+        {
+            var index = disposition.endIndexOf($"filename=")
+            if(index > -1) {
+                var endIndex = disposition.indexOfAt($";", index)
+                if(endIndex < 0) {
+                    endIndex = disposition.length
+                }
+
+                formData.filename = disposition.substring(index, endIndex)
+                if(formData.filename.length >= 2 && formData.filename.startsWith($"\"") && formData.filename.endsWith($"\"")) {
+                    formData.filename.buffer += 1
+                    formData.filename.length -= 2
+                }
+            }
+        }
+    }
+
+    // body/value
+    if(it.hasNext()) {
+        var body = it.next()
+        if(body.length < 4) {
+            return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART
+        }
+        // adjust the \r\n--
+        formData.value = body.substring(0, body.length - 4)
+    }
+
+    var offset = it.remaining();
+    var rewindBytes = boundary.length + 2
+    // Use pointer-minus-pointer (always valid within the same allocation) to
+    // compute the distance rather than pointer-minus-integer.  The latter form
+    // offset.buffer - rewindBytes can produce an out-of-bounds pointer before
+    // the comparison fires, which UBSan flags even though we never dereference
+    // the out-of-bounds value.
+    if((offset.buffer - input.buffer) as (i64) < rewindBytes as (i64)) {
+        return Status.ERROR_HTTP_PARSING_INVALID_MULTIPART
+    }
+    *input = String {
+        .buffer = offset.buffer - rewindBytes,
+        .length = offset.length + rewindBytes,
+    }
+
+    return Status.OK
+}
+
+func (this: String) decodeFormUrl(allocator: *const Allocator): String {
+    var sb = StringBuilderInit(this.length + 16, allocator)
+    FormUrlDecode(this, sb)
+
+    return sb.toString()
+}
+

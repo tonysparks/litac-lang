@@ -1,0 +1,1051 @@
+#if OS != "WINDOWS"
+
+import "std/http" as http
+import "std/assert"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/libc"
+import "std/thread"
+import "std/io"
+import "std/mem"
+import "std/json"
+import "std/log"
+
+import "std/array"
+import "std/map"
+import "std/net/posix_socket"
+import "std/fmt"
+import "std/time"
+
+import "std/ringhttp"
+import "std/ringhttp/test_webserver"
+
+
+@raw("""
+#include <sys/socket.h>
+#include <sys/time.h>
+void _main_setRecvTimeout(int fd, int seconds) {
+    struct timeval tv = { seconds, 0 };
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const void*)&tv, sizeof(tv));
+}
+""");
+@foreign func _main_setRecvTimeout(fd: i32, seconds: i32);
+
+/**
+ * Open a raw TCP connection to localhost:port, send `request` verbatim, read
+ * back the response, and return the HTTP status code (e.g. 200, 400, 417).
+ * Returns -1 on any socket error.
+ */
+func rawHttpStatusCode(request: *const char, port: u16 = 9091_u16) : i32 {
+    var fd = socket(AF_INET, SOCK_STREAM, 0)
+    if (fd < 0) {
+        return -1
+    }
+    defer close(fd)
+
+    var addr: sockaddr_in
+    memset(&addr, 0, sizeof(:sockaddr_in))
+    addr.sin_family = AF_INET
+    addr.sin_port = htons(port)
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+
+    if (connect(fd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) < 0) {
+        return -1
+    }
+    _main_setRecvTimeout(fd, 10)
+
+    var reqLen = strlen(request) as (usize)
+    send(fd, request as (*void), reqLen, 0)
+
+    var buf: [4096]char
+    var n = recv(fd, buf as (*void), 4095_usize, 0)
+    if (n <= 0) {
+        return -1
+    }
+    ;buf[n] = '\0' as (char)
+
+    // Parse status code from "HTTP/1.x NNN ..."
+    var response = String { .buffer = buf, .length = n as (i32) }
+    var spaceIdx = response.indexOf($" ")
+    if (spaceIdx < 0) {
+        return -1
+    }
+    var afterVersion = response.substring(spaceIdx + 1)
+    var parsed = afterVersion.parseInt(10)
+    if(parsed.error != ParseError.NONE) {
+        return -1
+    }
+    return parsed.value as (i32)
+}
+
+/**
+ * Like rawHttpStatusCode but also returns a header value by name.
+ * Searches for "HeaderName: value\r\n" in the raw response.
+ * The returned String points into a static buffer — copy before next call.
+ */
+func rawHttpHeader(request: *const char, headerName: *const char, port: u16 = 9091_u16) : String {
+    var fd = socket(AF_INET, SOCK_STREAM, 0)
+    if (fd < 0) {
+        return String{}
+    }
+    defer close(fd)
+
+    var addr: sockaddr_in
+    memset(&addr, 0, sizeof(:sockaddr_in))
+    addr.sin_family = AF_INET
+    addr.sin_port = htons(port)
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+
+    if (connect(fd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) < 0) {
+        return String{}
+    }
+    _main_setRecvTimeout(fd, 10)
+
+    var reqLen = strlen(request) as (usize)
+    send(fd, request as (*void), reqLen, 0)
+
+    @static var buf: [8192]char
+    var n = recv(fd, buf as (*void), 8191_usize, 0)
+    if (n <= 0) {
+        return String{}
+    }
+    ;buf[n] = '\0' as (char)
+
+    var response = String { .buffer = buf, .length = n as (i32) }
+
+    // Search for the header name followed by ": "
+    var nameStr = StringInit(headerName)
+    var idx = response.indexOf(nameStr)
+    if (idx < 0) {
+        return String{}
+    }
+    var afterName = response.substring(idx + nameStr.length)
+    // skip ": "
+    if (afterName.length < 2) {
+        return String{}
+    }
+    afterName = afterName.substring(2)
+    var end = afterName.indexOf($"\r\n")
+    if (end < 0) {
+        return String{}
+    }
+    return afterName.substring(0, end)
+}
+
+var testServer = TestServer{}
+var http = http::Http{}
+
+var defaultConfig = HttpConfig {
+    .port = 9091_u16,
+    .numThreads = 4,
+    .ioQueueDepth = 16,
+    .maxPoolSize = 32,
+    .keepAliveTimeoutInSec = 5,
+    .isLogEnabled = false,
+    .logFilePath = $"",
+    .logLevel = LogLevel.DEBUG,
+    .fileServerPath = $"../../test/std/ringhttp/static",
+    .maxHttpBodySizeInBytes = 1_024,
+}
+
+@module_init
+public func init_tests() {
+    http.init(http::HttpOptions{})
+
+    testServer.config = &defaultConfig
+    launch(&testServer)
+    ThreadSleepMSec(250)
+}
+
+@module_destroy
+public func destroy_tests() {
+    http.free()
+}
+
+@test("test static webpage retrieval")
+func test_static_webpage() {
+    var body = StringBuilderInit(256)
+    defer body.free()
+
+    var resp = http::HttpResponse {
+        .body = body
+    }
+    http.get("http://localhost:9091/static/index.html", &resp)
+
+    var fileContents = StringBuilderInit(256)
+    defer fileContents.free()
+
+    var status = ReadFileFully($"../../test/std/ringhttp/static/index.html", &fileContents)
+    assert(status == FileStatus.Ok)
+    assert(resp.statusCode == 200)
+    assert(fileContents.equals(resp.body))
+}
+
+
+
+struct Param {
+    key: *const char
+    value: *const char
+}
+
+func testPathParameters(url: *const char, params: *Array<Param>) {
+    var body = StringBuilderInit(256)
+    defer body.free()
+
+    var resp = http::HttpResponse {
+        .body = body
+    }
+    http.get(url, &resp)
+    assert(resp.statusCode == 200)
+
+    var parser = JsonParserInit()
+    defer parser.free()
+
+    var json = parser.parseJson(resp.body.cStr())
+    assert(json.isObject())
+    assert(json.contains("query"))
+
+    var query = json.get("query")
+    assert(query.isObject())
+
+    for(var i = 0; i < params.size(); i+=1) {
+        var param = params.getPtr(i)
+
+        assert(query.contains(param.key))
+
+        var value = query.get(param.key)
+        assert(value.isString())
+        assert(value.asString().equals(param.value))
+    }
+
+    params.clear()
+}
+
+@test("test path parameters retrieval")
+func test_path_parameters_retrieval() {
+    var params = ArrayInit<Param>()
+
+    params.add(Param {.key = "hello", .value = "wor🙂ld"})
+    testPathParameters("http://localhost:9091/echo?hello=wor🙂ld", params)
+
+    params.add(Param {.key = "hello", .value = "🙂"})
+    testPathParameters("http://localhost:9091/echo?hello=🙂", params)
+
+    params.add(Param {.key = "🙂", .value = "🙂"})
+    testPathParameters("http://localhost:9091/echo?🙂=🙂", params)
+
+    params.add(Param {.key = "🙂", .value = ""})
+    testPathParameters("http://localhost:9091/echo?🙂=", params)
+
+    params.add(Param {.key = "hello", .value = "world"})
+    testPathParameters("http://localhost:9091/echo?hello=world", params)
+}
+
+@test("test path parameters retrieval hit limit for request line")
+func test_path_parameters_retrieval_hit_limit() {
+    var urlBuilder = StringBuilderInit(MAX_URL_LENGTH_DEFAULT + 1)
+    urlBuilder.append("http://localhost:9091/echo?")
+
+    var i = 0
+    while(urlBuilder.length <= testServer.config.maxHttpRequestLineSizeInBytes) {
+        if(i > 0) {
+            urlBuilder.append("&")
+        }
+        urlBuilder.append("param_%d=%d", i, i)
+        i+=1
+    }
+
+    var body = StringBuilderInit(256)
+    var resp = http::HttpResponse {
+        .body = body
+    }
+    http.get(urlBuilder.cStr(), &resp)
+    var x = resp.body.trim().cStr()
+    //printf("Resp: %d Body: '%s'\n", resp.statusCode, x)
+    assert(resp.statusCode == 414)
+    assert("Request URI exceeds the maximum of 8192 bytes".equals(x))
+}
+
+@test("test path parameters retrieval hit limit for header")
+func test_path_parameters_retrieval_hit_header_limit() {
+
+    const size = testServer.config.maxHttpHeaderSizeInBytes as (i32)
+    var headerBuilder = StringBuilderInit(size + 1)
+
+    var i = 0
+    while(headerBuilder.length <= size) {
+        headerBuilder.append("param_%d", i)
+        i+=1
+    }
+
+    var headers = http::HeadersInit(32)
+    headers.put($"x-key", headerBuilder.toString())
+
+    var body = StringBuilderInit(256)
+    var resp = http::HttpResponse {
+        .body = body
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/echo?hello=world",
+        .type = http::HttpRequestType.GET,
+        .body = http::HttpBody {},
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+
+    var x = resp.body.trim().cStr()
+    //printf("Resp: %d Body: '%s'\n", resp.statusCode, x)
+    assert(resp.statusCode == 400)
+    assert("Request exceeded the max request limit of 8192 bytes for headers".equals(x))
+}
+
+@test("test 404 handler")
+func test_404_handler() {
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    http.get("http://localhost:9091/doesnotexist", &resp)
+
+    assert(resp.statusCode == 404)
+    assert(resp.body.contains($"Unknown route for <b>/doesnotexist</b>"))
+}
+
+@test("test download file handler")
+func test_download_file() {
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256),
+        .headers = http::HeadersInit(32)
+    }
+    http.get("http://localhost:9091/download", &resp)
+
+    assert(resp.statusCode == 200)
+
+    var fileContents = StringBuilderInit(256)
+    defer fileContents.free()
+
+    var status = ReadFileFully($"../../test/std/ringhttp/download_sample.txt", &fileContents)
+    assert(status == FileStatus.Ok)
+    assert(fileContents.equals(resp.body))
+    assert(fileContents.length > 0)
+    assert(resp.body.length > 0)
+
+    var encoding = resp.headers.get($"Transfer-Encoding")
+    assert(encoding.equals($"chunked"))
+
+    var disposition = resp.headers.get($"Content-Disposition")
+    assert(disposition.contains($"attachment; filename"))
+}
+
+
+@test("test gzip response")
+func test_gzip_response() {
+    var headers = http::HeadersInit(32)
+    headers.put($"Accept-Encoding", $"gzip, deflate")
+
+    var body = StringBuilderInit(256)
+    var resp = http::HttpResponse {
+        .body = body,
+        .headers = http::HeadersInit(32)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/gzip",
+        .type = http::HttpRequestType.GET,
+        .body = http::HttpBody {},
+        .headers = headers
+    }
+//http.makeRequest(&req, &resp)
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    //printf("Body: \n%.*s\n", resp.body.length, resp.body.buffer)
+
+    var fileContents = StringBuilderInit(256)
+    defer fileContents.free()
+
+    const size = 2 * KiB;
+    for(var i = 0; i < size; i += 1) {
+        var b = (i % (127 - 32)) + 32
+        fileContents.appendChar(b as (char))
+    }
+//printf("Contents: \n%.*s\n", fileContents.length, fileContents.buffer)
+    assert(fileContents.equals(resp.body))
+    assert(fileContents.length > 0)
+    assert(resp.body.length > 0)
+
+    var encoding = resp.headers.get($"Content-Encoding")
+    //printf("Encoding: '%.*s'\n", encoding.length, encoding.buffer)
+    assert(encoding.equals($"gzip") || encoding.equals($"deflate"))
+}
+
+
+@test("test POST with JSON body")
+func test_post_json() {
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", $"application/json")
+
+    var bodyStr = $"{\"name\":\"ringhttp\"}"
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/submit",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyStr
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    assert(resp.body.contains($"\"body\""))
+}
+
+@test("test POST with form-urlencoded body")
+func test_post_form_urlencoded() {
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", $"application/x-www-form-urlencoded")
+
+    var bodyStr = $"username=admin&password=secret"
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/submit",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyStr
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    assert(resp.body.contains($"\"post_params\""))
+    assert(resp.body.contains($"\"username\""))
+    assert(resp.body.contains($"\"password\""))
+}
+
+@test("test PUT with body")
+func test_put_with_body() {
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", $"text/plain")
+
+    var bodyStr = $"updated value"
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/put",
+        .type = http::HttpRequestType.PUT,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyStr
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    assert(resp.body.contains($"\"method\""))
+    assert(resp.body.contains($"\"PUT\""))
+}
+
+@test("test PATCH with body")
+func test_patch_with_body() {
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", $"text/plain")
+
+    var bodyStr = $"patched value"
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/patch",
+        .type = http::HttpRequestType.PATCH,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyStr
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    assert(resp.body.contains($"\"method\""))
+    assert(resp.body.contains($"\"PATCH\""))
+}
+
+@test("test DELETE")
+func test_delete_request() {
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    assert(http.delete("http://localhost:9091/delete", &resp) == true)
+    assert(resp.statusCode == 200)
+    assert(resp.body.contains($"\"method\""))
+    assert(resp.body.contains($"\"DELETE\""))
+}
+
+@test("test URL path parameter")
+func test_url_path_parameter() {
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    http.get("http://localhost:9091/path/hello123", &resp)
+    assert(resp.statusCode == 200)
+
+    var parser = JsonParserInit()
+    defer parser.free()
+
+    var json = parser.parseJson(resp.body.cStr())
+    assert(json.isObject())
+    assert(json.contains("path_values"))
+
+    var pathValues = json.get("path_values")
+    assert(pathValues.isObject())
+    assert(pathValues.contains("id"))
+
+    var id = pathValues.get("id")
+    assert(id.isString())
+    assert(id.asString().equals("hello123"))
+}
+
+@test("test body too large returns 413")
+func test_body_too_large() {
+    // Build a body larger than maxHttpBodySizeInBytes (1024 bytes)
+    var bodyBuilder = StringBuilderInit(2048)
+    defer bodyBuilder.free()
+
+    var i = 0
+    while(bodyBuilder.length < 1100) {
+        bodyBuilder.append("x")
+        i += 1
+    }
+
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/submit",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyBuilder.toString()
+        }
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 413)
+}
+
+@test("test bare form body param (no =) is treated as name with empty value")
+func test_malformed_form_body() {
+    // A form-urlencoded body with no '=' separator is a valid bare param
+    // (name with empty value), not an error.
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", $"application/x-www-form-urlencoded")
+
+    var bodyStr = $"this-is-not-form-encoded"
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/submit",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyStr
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+}
+
+@test("test bare form body param on PUT (no =) is treated as name with empty value")
+func test_malformed_form_body_put() {
+    // Same bare-param behaviour on PUT.
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", $"application/x-www-form-urlencoded")
+
+    var bodyStr = $"not-form-encoded"
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/put",
+        .type = http::HttpRequestType.PUT,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyStr
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+}
+
+@test("test wrong method on GET-only route returns 405")
+func test_wrong_method_on_get_route() {
+    // /echo is registered for GET only; POST should get 405 with Allow: GET
+    var resp = http::HttpResponse {
+        .body    = StringBuilderInit(256),
+        .headers = http::HeadersInit(16)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/echo?x=1",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = $"x=1"
+        }
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 405)
+    assert(resp.headers.get($"Allow").contains($"GET"))
+}
+
+@test("test wrong method on POST-only route returns 405")
+func test_wrong_method_on_post_route() {
+    // /submit is registered for POST only; GET should get 405 with Allow: POST
+    var resp = http::HttpResponse {
+        .body    = StringBuilderInit(256),
+        .headers = http::HeadersInit(16)
+    }
+    http.get("http://localhost:9091/submit", &resp)
+    assert(resp.statusCode == 405)
+    assert(resp.headers.get($"Allow").contains($"POST"))
+}
+
+@test("test wrong method on PUT-only route returns 405")
+func test_wrong_method_on_put_route() {
+    // /put is registered for PUT only; DELETE should get 405 with Allow: PUT
+    var resp = http::HttpResponse {
+        .body    = StringBuilderInit(256),
+        .headers = http::HeadersInit(16)
+    }
+    assert(http.delete("http://localhost:9091/put", &resp) == true)
+    assert(resp.statusCode == 405)
+    assert(resp.headers.get($"Allow").contains($"PUT"))
+}
+
+@test("test wrong method on DELETE-only route returns 405")
+func test_wrong_method_on_delete_route() {
+    // /delete is registered for DELETE only; POST should get 405 with Allow: DELETE
+    var resp = http::HttpResponse {
+        .body    = StringBuilderInit(256),
+        .headers = http::HeadersInit(16)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/delete",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = $"x=1"
+        }
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 405)
+    assert(resp.headers.get($"Allow").contains($"DELETE"))
+}
+
+@test("test HEAD request returns no body but correct headers")
+func test_head_request() {
+    // HEAD must return the same status and headers as GET but zero body bytes.
+    var resp = http::HttpResponse {
+        .body    = StringBuilderInit(256),
+        .headers = http::HeadersInit(16)
+    }
+    var req = http::HttpRequest {
+        .url  = "http://localhost:9091/echo?hello=world",
+        .type = http::HttpRequestType.HEAD,
+        .body = http::HttpBody {}
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    // RFC 7231 §4.3.2: body MUST be empty for HEAD responses.
+    assert(resp.body.length == 0)
+    // Content-Length must still be present and positive (the GET body is non-empty).
+    var cl = resp.headers.get($"Content-Length")
+    assert(!cl.empty())
+}
+
+@test("test Date header present in response")
+func test_date_header_in_response() {
+    // RFC 7231 §7.1.1.2: servers SHOULD send Date in all responses.
+    var resp = http::HttpResponse {
+        .body    = StringBuilderInit(256),
+        .headers = http::HeadersInit(16)
+    }
+    http.get("http://localhost:9091/echo?x=1", &resp)
+    assert(resp.statusCode == 200)
+    var date = resp.headers.get($"Date")
+    assert(!date.empty())
+
+    var now = DateTimeNow()
+    var sb = StringBuilderInit(256)
+    defer sb.free()
+
+    now.format($"%a, %d %b %Y %H:%M:%S GMT", sb)
+    var headerDate = DateTimeFrom($"%a, %d %b %Y %H:%M:%S GMT", date)
+    assert(headerDate.toEpochTime() <= now.toEpochTime())
+    //printf("M: %s vs %.*s\n", sb.cStr(), date.length, date.buffer)
+}
+
+@test("test Connection header present in response")
+func test_connection_header_in_response() {
+    // RFC 7230 §6.3: server SHOULD send Connection header.
+    var resp = http::HttpResponse {
+        .body    = StringBuilderInit(256),
+        .headers = http::HeadersInit(16)
+    }
+    http.get("http://localhost:9091/echo?x=1", &resp)
+    assert(resp.statusCode == 200)
+    var conn = resp.headers.get($"Connection")
+    assert(!conn.empty())
+    assert(conn.equals($"keep-alive") || conn.equals($"close"))
+}
+
+struct ConcurrentState {
+    successCount: i32
+    mutex: Mutex
+}
+
+func concurrentRequestWorker(arg: *void) : i32 {
+    var state = arg as (*ConcurrentState)
+
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(256)
+    }
+    var localHttp = http::Http{}
+    localHttp.init(http::HttpOptions{})
+
+    var ok = localHttp.get("http://localhost:9091/echo?concurrent=1", &resp)
+    if (ok && resp.statusCode == 200) {
+        state.mutex.lock()
+        state.successCount += 1
+        state.mutex.unlock()
+    }
+
+    localHttp.free()
+    return 0
+}
+
+@test("test concurrent requests")
+func test_concurrent_requests() {
+    const N = 8
+    var state = ConcurrentState{}
+    state.successCount = 0
+    state.mutex.init()
+    defer state.mutex.destroy()
+
+    var threads: [N]Thread
+    for (var i = 0; i < N; i += 1) {
+        assert(threads[i].create(concurrentRequestWorker, &state) == ThreadStatus.SUCCESS)
+    }
+    for (var i = 0; i < N; i += 1) {
+        threads[i].join(null)
+    }
+
+    assert(state.successCount == N)
+}
+
+@test("test POST with multipart form-data text fields")
+func test_post_multipart_text_fields() {
+    const boundary = "TestBoundary1234"
+
+    var bodyBuilder = StringBuilderInit(512)
+    defer bodyBuilder.free()
+
+    bodyBuilder.append("--%s\r\n", boundary)
+    bodyBuilder.append("Content-Disposition: form-data; name=\"username\"\r\n")
+    bodyBuilder.append("\r\n")
+    bodyBuilder.append("alice\r\n")
+
+    bodyBuilder.append("--%s\r\n", boundary)
+    bodyBuilder.append("Content-Disposition: form-data; name=\"email\"\r\n")
+    bodyBuilder.append("\r\n")
+    bodyBuilder.append("alice@example.com\r\n")
+
+    bodyBuilder.append("--%s--", boundary)
+
+    var ctBuilder = StringBuilderInit(64)
+    defer ctBuilder.free()
+    ctBuilder.append("multipart/form-data; boundary=%s", boundary)
+
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", ctBuilder.toString())
+
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(512)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/submit",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyBuilder.toString()
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    assert(resp.body.contains($"multi_part"))
+    assert(resp.body.contains($"username"))
+    assert(resp.body.contains($"alice"))
+    assert(resp.body.contains($"email"))
+    assert(resp.body.contains($"alice@example.com"))
+}
+
+@test("test POST with multipart file upload")
+func test_post_multipart_file_upload() {
+    const boundary = "TestBoundary5678"
+
+    var bodyBuilder = StringBuilderInit(512)
+    defer bodyBuilder.free()
+
+    bodyBuilder.append("--%s\r\n", boundary)
+    bodyBuilder.append("Content-Disposition: form-data; name=\"file\"; filename=\"hello.txt\"\r\n")
+    bodyBuilder.append("Content-Type: text/plain\r\n")
+    bodyBuilder.append("\r\n")
+    bodyBuilder.append("Hello, World!\r\n")
+
+    bodyBuilder.append("--%s--", boundary)
+
+    var ctBuilder = StringBuilderInit(64)
+    defer ctBuilder.free()
+    ctBuilder.append("multipart/form-data; boundary=%s", boundary)
+
+    var headers = http::HeadersInit(32)
+    headers.put($"Content-Type", ctBuilder.toString())
+
+    var resp = http::HttpResponse {
+        .body = StringBuilderInit(512)
+    }
+    var req = http::HttpRequest {
+        .url = "http://localhost:9091/submit",
+        .type = http::HttpRequestType.POST,
+        .body = http::HttpBody {
+            .kind = http::HttpBodyKind.BODY,
+            .data = bodyBuilder.toString()
+        },
+        .headers = headers
+    }
+    assert(http.makeRequest(&req, &resp) == true)
+    assert(resp.statusCode == 200)
+    assert(resp.body.contains($"multi_part"))
+    assert(resp.body.contains($"file"))
+    assert(resp.body.contains($"hello.txt"))
+    assert(resp.body.contains($"Hello, World!"))
+}
+
+// Fix D (worker): OPTIONS with no handler registered must auto-respond 200
+// with an Allow header listing the methods registered for that path.
+// RFC 7231 §4.3.7.
+@test("test OPTIONS auto-responds with Allow header")
+func test_options_auto_response() {
+    // /echo has GET registered; OPTIONS on it must list GET (and OPTIONS itself).
+    var status = rawHttpStatusCode(
+        "OPTIONS /echo HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    )
+    assert(status == 200)
+
+    var allow = rawHttpHeader(
+        "OPTIONS /echo HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        "Allow"
+    )
+    assert(allow.contains($"GET"))
+    assert(allow.contains($"OPTIONS"))
+}
+
+// Fix A/C (worker): an unrecognised Expect value must produce 417 Expectation
+// Failed. RFC 7231 §5.1.1: the server MUST respond with 417 if the Expect
+// header contains a value the server does not understand.
+@test("test unknown Expect header returns 417")
+func test_expect_unknown_returns_417() {
+    var status = rawHttpStatusCode(
+        "POST /submit HTTP/1.1\r\nHost: localhost\r\nContent-Length: 4\r\nExpect: i-can-fly\r\nConnection: close\r\n\r\ntest"
+    )
+    assert(status == 417)
+}
+
+// Fix A (worker): both Transfer-Encoding and Content-Length present must
+// produce 400. RFC 7230 §3.3.3: if both are present the server MUST reject
+// the request.
+@test("test Transfer-Encoding and Content-Length conflict returns 400")
+func test_conflicting_body_headers_returns_400() {
+    var status = rawHttpStatusCode(
+        "POST /submit HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nContent-Length: 10\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\n\r\n"
+    )
+    assert(status == 400)
+}
+
+// Fix B (worker): HTTP/1.0 defaults to Connection: close unless the client
+// explicitly sends "Connection: keep-alive". RFC 7230 §6.3.
+@test("test HTTP/1.0 defaults to Connection: close")
+func test_http10_closes_by_default() {
+    // HTTP/1.0 with no Connection header — server must close after response.
+    var conn = rawHttpHeader(
+        "GET /echo?x=1 HTTP/1.0\r\nHost: localhost\r\n\r\n",
+        "Connection"
+    )
+    assert(conn.equals($"close") || conn.empty())
+
+    // HTTP/1.0 with explicit Connection: keep-alive — server may honour it.
+    // We don't assert keep-alive here (server may still close), but the
+    // request must succeed (2xx or valid response).
+    var status = rawHttpStatusCode(
+        "GET /echo?x=1 HTTP/1.0\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n"
+    )
+    assert(status == 200)
+}
+
+// Fix 1: unrecognised request method must return 501 Not Implemented.
+// RFC 7231 §4.1.
+@test("test unknown HTTP method returns 501")
+func test_unknown_method_returns_501() {
+    var status = rawHttpStatusCode(
+        "FOOBAR /echo HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    )
+    assert(status == 501)
+}
+
+// Fix 2: duplicate Content-Length headers with differing values must return 400.
+// RFC 7230 §3.3.2.
+@test("test duplicate Content-Length with different values returns 400")
+func test_conflicting_content_length_returns_400() {
+    var status = rawHttpStatusCode(
+        "POST /submit HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nContent-Length: 99\r\nConnection: close\r\n\r\nhello"
+    )
+    assert(status == 400)
+}
+
+// Fix 3: chunked requests that include RFC 7230 §4.1.2 trailer headers must
+// be accepted. Previously the server rejected them with 400.
+@test("test chunked request with trailers is accepted")
+func test_chunked_with_trailers_accepted() {
+    var status = rawHttpStatusCode(
+        "POST /submit HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n0\r\nX-Checksum: abc\r\n\r\n"
+    )
+    assert(status == 200)
+}
+
+// Fix 4: a request-target longer than the server limit must return 414 URI Too Long.
+// RFC 7231 §6.5.12.
+@test("test URI too long returns 414")
+func test_uri_too_long_returns_414() {
+    // Build a path longer than maxHttpRequestLineSizeInBytes (8192).
+    var pathBuilder = StringBuilderInit(8300)
+    defer pathBuilder.free()
+    pathBuilder.append("GET /echo?")
+    var i = 0
+    while(pathBuilder.length < 8200) {
+        pathBuilder.append("x%d=y%d&", i, i)
+        i += 1
+    }
+    pathBuilder.append(" HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+
+    var status = rawHttpStatusCode(pathBuilder.cStr())
+    assert(status == 414)
+}
+
+// Bug 1 (kqueue+iouring): Expect: 100-continue — server must send 100 before
+// the client sends the body, then process the body and return 200.
+// RFC 7231 §5.1.1.
+@test("test Expect: 100-continue sends 100 then final response")
+func test_expect_100_continue() {
+    var fd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(fd >= 0)
+    defer close(fd)
+
+    var addr: sockaddr_in
+    memset(&addr, 0, sizeof(:sockaddr_in))
+    addr.sin_family = AF_INET
+    addr.sin_port = htons(9091_u16)
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+    assert(connect(fd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) == 0)
+
+    // Phase 1: send headers only — body withheld so server issues 100 Continue.
+    var headers = "POST /submit HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n"
+    send(fd, headers as (*void), strlen(headers) as (usize), 0)
+
+    var buf: [4096]char
+    var n = recv(fd, buf as (*void), 4095_usize, 0)
+    assert(n > 0)
+    ;buf[n] = '\0' as (char)
+
+    var interim = String { .buffer = buf, .length = n as (i32) }
+    assert(interim.startsWith($"HTTP/1.1 100"))
+
+    // Phase 2: send the body; server must now process and return 200.
+    var body = "hello"
+    send(fd, body as (*void), 5_usize, 0)
+
+    n = recv(fd, buf as (*void), 4095_usize, 0)
+    assert(n > 0)
+    ;buf[n] = '\0' as (char)
+
+    var finalResp = String { .buffer = buf, .length = n as (i32) }
+    var spaceIdx = finalResp.indexOf($" ")
+    assert(spaceIdx >= 0)
+    var parsed = finalResp.substring(spaceIdx + 1).parseInt(10)
+    assert(parsed.error == ParseError.NONE)
+    assert(parsed.value == 200)
+}
+
+// Bug 2 (connection): 100 Continue response MUST NOT include Content-Length.
+// RFC 7230 §3.3.1.
+@test("test 100 Continue response has no Content-Length header")
+func test_100_continue_no_content_length() {
+    var fd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(fd >= 0)
+    defer close(fd)
+
+    var addr: sockaddr_in
+    memset(&addr, 0, sizeof(:sockaddr_in))
+    addr.sin_family = AF_INET
+    addr.sin_port = htons(9091_u16)
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+    assert(connect(fd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) == 0)
+
+    var headers = "POST /submit HTTP/1.1\r\nHost: localhost\r\nContent-Length: 5\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n"
+    send(fd, headers as (*void), strlen(headers) as (usize), 0)
+
+    @static var buf2: [4096]char
+    var n2 = recv(fd, buf2 as (*void), 4095_usize, 0)
+    assert(n2 > 0)
+    ;buf2[n2] = '\0' as (char)
+
+    var interim2 = String { .buffer = buf2, .length = n2 as (i32) }
+    assert(interim2.startsWith($"HTTP/1.1 100"))
+    // The 100 Continue response must NOT include Content-Length.
+    assert(!interim2.contains($"Content-Length"))
+
+    // Complete the exchange so the server can close cleanly.
+    var body2 = "hello"
+    send(fd, body2 as (*void), 5_usize, 0)
+    recv(fd, buf2 as (*void), 4095_usize, 0)
+}
+
+// Bug 3+4 (parser): Content-Type with parameters must be recognised.
+// RFC 7231 §3.1.1.1: media-type names are case-insensitive; parameters optional.
+@test("test Content-Type with parameters is parsed correctly")
+func test_content_type_with_parameters() {
+    // "application/json; charset=utf-8" must be treated as JSON — the
+    // SubmitRequestHandler echoes the body under "body"; for JSON bodies it
+    // prints the parsed object directly (not wrapped in a "body" string key).
+    var resp = rawHttpHeader(
+        "POST /submit HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: 7\r\nConnection: close\r\n\r\n{\"k\":1}",
+        "Content-Type"
+    )
+    // The server responded — status 200 means the request was accepted.
+    var status = rawHttpStatusCode(
+        "POST /submit HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: 7\r\nConnection: close\r\n\r\n{\"k\":1}"
+    )
+    assert(status == 200)
+
+    // Upper-case media type must also be accepted.
+    var status2 = rawHttpStatusCode(
+        "POST /submit HTTP/1.1\r\nHost: localhost\r\nContent-Type: APPLICATION/JSON\r\nContent-Length: 7\r\nConnection: close\r\n\r\n{\"k\":1}"
+    )
+    assert(status2 == 200)
+}
+#end

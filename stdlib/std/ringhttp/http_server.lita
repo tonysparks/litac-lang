@@ -1,0 +1,238 @@
+import "std/net"
+import "std/libc"
+import "std/mem"
+import "std/mem/bucket_allocator"
+import "std/mem/thread_safe_allocator"
+import "std/string/builder"
+import "std/string"
+import "std/array"
+import "std/io"
+import "std/libc/signal"
+import "std/log"
+import "std/assert"
+
+import "std/ringhttp/http_connection"
+import "std/ringhttp/http_parser"
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_file"
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_websocket"
+import "std/ringhttp/http_sse"
+import "std/ringhttp/http_engine"
+import "std/ringhttp/mime"
+
+
+@doc("Catch all http handler for 404, 5xx")
+public trait HttpHandler {
+    handle: func(*RequestHandlerContext, Status) : i32;
+}
+
+@doc("""
+Pre-dispatch middleware — called before the route handler.
+Return 1 to allow the request to proceed, 0 to block it.
+When blocking, the filter is responsible for setting the
+response status, type and body before returning 0.
+""")
+public trait HttpFilterHandler {
+    handleFilter: func(*RequestHandlerContext) : i32;
+}
+
+@doc("""
+Post-dispatch hook — called after the route handler
+(or after a blocked filter). Always invoked for regular HTTP
+requests; not called for WebSocket/SSE streams.
+""")
+public trait PostHttpHandler {
+    postHandle: func(*RequestHandlerContext) : void;
+}
+
+@doc("Controller that can be bound to an http route")
+public struct HttpController {
+    @doc("Handle an http request from the client")
+    callback: func(*RequestHandlerContext) : i32;
+}
+
+@doc("Handler for web socket connection")
+public struct WebSocketController {
+    @doc("Handle receiving web socket frames from the client")
+    callback: func(*WebSocketSession, *Frame) : i32;
+}
+
+@doc("Handler for an SSE stream — called once when the client connects and headers are flushed")
+public struct SseController {
+    @doc("Called once with the live session handle; store it to push events later")
+    callback: func(*SseSession) : i32;
+}
+
+public struct HttpConfig {
+    allocator: *const Allocator //= defaultAllocator
+    port: u16 = 8080_u16
+
+    numThreads: i32 = 16
+
+    maxPoolSize: i32 = 128
+
+    maxHttpRequestLineSizeInBytes: usize = 8 * KiB
+    maxHttpHeaderSizeInBytes: usize = 8 * KiB
+    maxHttpBodySizeInBytes: usize = 2 * MiB // 0 for no limit
+    maxWsFragmentedMessageSizeInBytes: usize = 8 * MiB // 0 for no limit
+
+    // max limit size for handling a request, including user-space
+    maxRequestSizeInBytes: usize = 8 * MiB
+
+    // the bucket size for the bucket memory allocator for request allocator
+    requestBucketSizeInBytes: usize = 2 * MiB
+
+    fileSpliceSizeInBytes: usize = 16 * KiB
+
+    // the zlib compression level to use
+    compressionLevel: i32 = 6
+    // the size of a payload in order to trigger compression response
+    compressionEnabledOnBodySizeInBytes: usize = 1 * KiB
+
+    // static file directory
+    fileServerPath: String = $""            // the FileSystem path to look for static assets
+    templatePath: String = $""             // the FileSystem path to look for .lt template files
+    publicServerPath: String = $"/static/"  // the URI path that denotes we're looking for static assets
+
+    // the server side keep alive time in seconds
+    keepAliveTimeoutInSec: i32 = 5
+    // the frequency in which the server checks timeouts
+    timeoutCheckMSec: i64 = 5_000i64
+
+    // io_uring queue depth
+    ioQueueDepth: i32 = 32
+
+    // logging
+    logFilePath: String = $"./ring.log"
+    isLogEnabled: bool = true
+    logLevel: LogLevel = LogLevel.INFO
+
+    // command line handling
+    disableSignal: bool = false
+
+}
+
+
+public struct HttpServer {
+    engine: HttpRingEngine
+    config: *HttpConfig
+
+    mime: MimeDB
+    router: Router
+
+    errorHandler: HttpHandler
+    notFoundHandler: HttpHandler
+    filterHandlers: Array<HttpFilterHandler>
+    postHandlers:   Array<PostHttpHandler>
+}
+
+public func (this: *HttpServer) setErrorHandler(errorHandler: HttpHandler) {
+    this.errorHandler = errorHandler
+}
+
+public func (this: *HttpServer) setNotFoundHandler(notFoundHandler: HttpHandler) {
+    this.notFoundHandler = notFoundHandler
+}
+
+public func (this: *HttpServer) addFilterHandler(handler: HttpFilterHandler) {
+    this.filterHandlers.add(handler)
+}
+
+public func (this: *HttpServer) addPostHandler(handler: PostHttpHandler) {
+    this.postHandlers.add(handler)
+}
+
+public func (this: *HttpServer) addHttpController(
+    method: HttpMethod,
+    path: *const char,
+    userData: *void,
+    controller: HttpController
+) : Status {
+
+    var handler = RequestHandler {
+        .type = RequestHandlerType.HTTP_REQUEST,
+        .userData = userData,
+        .controller = controller
+    }
+    return this.addRequestHandler(method, path, handler)
+}
+
+public func (this: *HttpServer) addWebSocketController(
+    path: *const char,
+    userData: *void,
+    controller: WebSocketController
+) : Status {
+
+    var handler = RequestHandler {
+        .type = RequestHandlerType.WEB_SOCKET,
+        .userData = userData,
+        .webSocket = controller
+    }
+    return this.addRequestHandler(HttpMethod.GET, path, handler)
+}
+
+public func (this: *HttpServer) addSseController(
+    path:       *const char,
+    userData:   *void,
+    controller: SseController
+) : Status {
+
+    var handler = RequestHandler {
+        .type = RequestHandlerType.SSE_STREAM,
+        .userData = userData,
+        .sseController = controller
+    }
+    return this.addRequestHandler(HttpMethod.GET, path, handler)
+}
+
+public func (this: *HttpServer) addRequestHandler(
+    method: HttpMethod,
+    path: *const char,
+    handler: RequestHandler
+) : Status {
+    if(!this.router.register(method, path, handler)) {
+        return Status.ERROR_UNABLE_TO_REGISTER_HANDLER
+    }
+
+    return Status.OK
+}
+
+public func (this: *HttpServer) init(config: *HttpConfig) : Status {
+    assert(config != null)
+
+    this.config = config
+
+    this.router.init(config.allocator)
+    this.filterHandlers.init(32, config.allocator)
+    this.postHandlers.init(32, config.allocator)
+    this.engine.init(this)
+
+    this.mime.init(config.allocator)
+
+    return Status.OK
+}
+
+public func (this: *HttpServer) start() : Status {
+    if(this.config.isLogEnabled) {
+        LogInit(this.config.logFilePath, this.config.logLevel)
+    }
+
+    Info("listening on port: %d\n", this.config.port)
+    return this.engine.listen()
+}
+
+public func (this: *HttpServer) close() {
+    this.engine.close()
+}
+
+public func (this: *HttpServer) free() {
+    this.engine.close()
+
+    this.filterHandlers.free()
+    this.postHandlers.free()
+    this.router.free()
+    this.mime.free()
+}

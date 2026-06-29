@@ -1,0 +1,156 @@
+import "std/metrics"
+import "std/string/builder"
+import "std/string"
+import "std/system"
+import "std/mem"
+import "std/array"
+
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_router"
+import "std/ringhttp/http_request"
+import "std/ringhttp/http_response"
+import "std/ringhttp/http_common"
+
+// Default histogram buckets for HTTP request duration (milliseconds)
+const NUM_LATENCY_BOUNDS = 14
+const LATENCY_BOUNDS = [NUM_LATENCY_BOUNDS]f64 {
+    0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0,
+    100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0
+}
+
+// ---------------------------------------------------------------
+// HttpMetrics — the actual metric objects, shared across threads
+// ---------------------------------------------------------------
+
+public struct HttpMetrics {
+    requestsTotal:    *Counter    // attrs: method, path
+    responsesTotal:   *Counter    // attrs: status, path
+    responsesBlocked: *Counter    // attrs: path
+    durationMs:       *Histogram  // attrs: path
+
+    registry: *Registry
+}
+
+public func (this: *HttpMetrics) init(registry: *Registry) {
+    this.registry = registry
+
+    this.requestsTotal = registry.counter(
+        "http_requests_total",
+        "Total number of HTTP requests received"
+    )
+    this.responsesTotal = registry.counter(
+        "http_responses_total",
+        "Total number of HTTP responses sent"
+    )
+    this.responsesBlocked = registry.counter(
+        "http_responses_blocked",
+        "Requests blocked by a filter"
+    )
+    this.durationMs = registry.histogram(
+        "http_request_duration_ms",
+        LATENCY_BOUNDS,
+        NUM_LATENCY_BOUNDS,
+        "HTTP request duration in milliseconds"
+    )
+}
+
+// ---------------------------------------------------------------
+// MetricsFilter — implements PostHttpHandler
+//
+// Registered via addMetricsMiddleware; called after every regular
+// HTTP request (blocked or not) to record method, status and latency.
+// ---------------------------------------------------------------
+
+public struct MetricsFilter {
+    metrics: HttpMetrics
+}
+
+public func (this: *MetricsFilter) init(registry: *Registry) {
+    this.metrics.init(registry)
+}
+
+public func (this: *MetricsFilter) postHandle(ctx: *RequestHandlerContext) {
+    var m = &this.metrics
+
+    var method = HttpMethodAsStr(ctx.request.method)
+    var path: *const char = ctx.match != null
+        ? ctx.match.template.template.buffer
+        : ""
+
+    m.requestsTotal.inc(
+        MetricAttr { .name = "method", .value = method },
+        MetricAttr { .name = "path",   .value = path }
+    )
+
+    var status = ctx.response.status
+    var statusStr: *const char = null
+    if(status >= 200 && status < 300) {
+        statusStr = "2xx"
+    } else if(status >= 300 && status < 400) {
+        statusStr = "3xx"
+    } else if(status >= 400 && status < 500) {
+        statusStr = "4xx"
+    } else if(status >= 500) {
+        statusStr = "5xx"
+    }
+
+    if(statusStr != null) {
+        m.responsesTotal.inc(
+            MetricAttr { .name = "status", .value = statusStr },
+            MetricAttr { .name = "path",   .value = path }
+        )
+    }
+
+    // A blocked request has no route match
+    if(ctx.match == null && status != 404) {
+        m.responsesBlocked.inc(
+            MetricAttr { .name = "path", .value = path }
+        )
+    }
+
+    var elapsed = SystemTimeMSec() - ctx.startTime
+    m.durationMs.observe(elapsed,
+        MetricAttr { .name = "path", .value = path }
+    )
+}
+
+// ---------------------------------------------------------------
+// /metrics endpoint handler
+// ---------------------------------------------------------------
+
+// userData must point to a *Registry
+func MetricsEndpointHandler(ctx: *RequestHandlerContext) : i32 {
+    var registry = ctx.userData as (*Registry)
+
+    ctx.response.status = 200
+    ctx.response.type   = ResponseType.BODY
+
+    var accept = ctx.request.getHeaderValue($"accept")
+    if(accept.contains($"application/json")) {
+        ctx.response.addHeaderStr("Content-Type", "application/json; charset=utf-8")
+        registry.scrapeJSON(&ctx.response.body)
+    } else {
+        ctx.response.addHeaderStr("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        registry.scrapePrometheus(&ctx.response.body)
+    }
+    return 1
+}
+
+// ---------------------------------------------------------------
+// Convenience: wire up post-handler + /metrics route in one call
+// ---------------------------------------------------------------
+
+public func (this: *HttpServer) addMetricsMiddleware(
+    filter: *MetricsFilter,
+    path:   *const char = "/metrics"
+) {
+    this.addPostHandler(filter)
+    this.addHttpController(
+        HttpMethod.GET,
+        path,
+        filter.metrics.registry,
+        HttpController {
+            .callback = MetricsEndpointHandler
+        }
+    )
+}

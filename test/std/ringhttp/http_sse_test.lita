@@ -1,0 +1,261 @@
+#if OS != "WINDOWS"
+
+import "std/libc"
+import "std/assert"
+import "std/string"
+import "std/string/builder"
+import "std/mem"
+import "std/thread"
+
+import "std/net"
+import "std/net/posix_socket"
+
+import "std/ringhttp"
+import "std/ringhttp/test_webserver"
+
+
+const SSE_TEST_PORT = 19083_u16
+
+var sseTestServer = TestServer{}
+var sseConfig = HttpConfig {
+    .allocator = null,
+    .port = SSE_TEST_PORT,
+    .numThreads = 4,
+    .ioQueueDepth = 16,
+    .maxPoolSize = 32,
+    .keepAliveTimeoutInSec = 5,
+    .isLogEnabled = false,
+    .logFilePath = $"",
+    .fileServerPath = $"../../test/std/ringhttp/static",
+}
+
+@module_init
+public func init_sse_tests() {
+    sseTestServer.config = &sseConfig
+    launch(&sseTestServer)
+    ThreadSleepMSec(250)
+}
+
+func connectToSseServer() : i32 {
+    var sock = socket(AF_INET, SOCK_STREAM, 0)
+    if (sock < 0) {
+        return -1
+    }
+
+    var addr: sockaddr_in
+    memset(&addr, 0, sizeof(addr))
+    addr.sin_family = AF_INET
+    addr.sin_port = htons(SSE_TEST_PORT)
+    inet_pton(AF_INET, "127.0.0.1", (&addr.sin_addr) as (*void))
+
+    if (connect(sock, (&addr) as (*sockaddr), sizeof(addr) as (socklen_t)) != 0) {
+        close(sock)
+        return -1
+    }
+    return sock
+}
+
+// Parse the HTTP status code from "HTTP/1.1 XYZ ..." at the start of raw.
+func parseSseStatus(raw: *StringBuilder) : i32 {
+    if (raw.length < 12) {
+        return -1
+    }
+    // "HTTP/1.1 " is 9 bytes; next 3 bytes are the status digits.
+    var a = raw.buffer[9]  - '0'
+    var b = raw.buffer[10] - '0'
+    var c = raw.buffer[11] - '0'
+    return a as (i32) * 100 + b as (i32) * 10 + c as (i32)
+}
+
+// Sends a GET request to path and reads the entire response until the server
+// closes the connection. Fills raw with the raw bytes. Returns HTTP status code.
+func fetchSseRaw(path: *const char, raw: *StringBuilder) : i32 {
+    var sock = connectToSseServer()
+    if (sock < 0) {
+        return -1
+    }
+    defer close(sock)
+
+    var req = StringBuilderInit(256)
+    defer req.free()
+    req.append("GET %s HTTP/1.1\r\n", path)
+    req.append("Host: localhost:%d\r\n", SSE_TEST_PORT as (i32))
+    req.append("Accept: text/event-stream\r\n")
+    req.append("\r\n")
+    send(sock, req.buffer, req.length, 0)
+
+    var buf: [4096]char
+    while (true) {
+        var n = recv(sock, buf, 4096, 0)
+        if (n <= 0) {
+            break
+        }
+        raw.appendStrn(buf, n as (i32))
+    }
+
+    return parseSseStatus(raw)
+}
+
+// Copies the body portion (everything after \r\n\r\n) into body.
+func extractBody(raw: *StringBuilder, body: *StringBuilder) {
+    var idx = raw.indexOf($"\r\n\r\n")
+    if (idx < 0) {
+        return;
+    }
+    var start = idx + 4
+    if (start >= raw.length) {
+        return;
+    }
+    body.appendStrn(raw.buffer + start, raw.length - start)
+}
+
+// Sends an arbitrary HTTP method request and returns the status code.
+// Reads until the headers arrive, then stops (does not block for the full body).
+func sendMethodRaw(method: *const char, path: *const char) : i32 {
+    var sock = connectToSseServer()
+    if (sock < 0) {
+        return -1
+    }
+    defer close(sock)
+
+    var req = StringBuilderInit(256)
+    defer req.free()
+    req.append("%s %s HTTP/1.1\r\n", method, path)
+    req.append("Host: localhost:%d\r\n", SSE_TEST_PORT as (i32))
+    req.append("Content-Length: 0\r\n")
+    req.append("\r\n")
+    send(sock, req.buffer, req.length, 0)
+
+    var raw = StringBuilderInit(1024)
+    defer raw.free()
+
+    var buf: [4096]char
+    while (true) {
+        var n = recv(sock, buf, 4096, 0)
+        if (n <= 0) {
+            break
+        }
+        raw.appendStrn(buf, n as (i32))
+        if (raw.contains($"\r\n\r\n")) {
+            break
+        }
+    }
+
+    return parseSseStatus(&raw)
+}
+
+// ---------------------------------------------------------------
+// Happy-path tests
+// ---------------------------------------------------------------
+
+@test("test SSE response has correct headers and no chunked encoding")
+func test_sse_response_headers() {
+    var raw = StringBuilderInit(1024)
+    defer raw.free()
+
+    var status = fetchSseRaw("/sse/single", &raw)
+    assert(status == 200)
+    assert(raw.contains($"Content-Type: text/event-stream"))
+    assert(raw.contains($"Cache-Control: no-cache"))
+    // SSE must NOT use chunked transfer encoding (regression: old code shared the chunked path)
+    assert(!raw.contains($"Transfer-Encoding: chunked"))
+}
+
+@test("test SSE delivers a single event with data line and blank-line terminator")
+func test_sse_single_event() {
+    var raw = StringBuilderInit(1024)
+    defer raw.free()
+
+    var status = fetchSseRaw("/sse/single", &raw)
+    assert(status == 200)
+
+    var body = StringBuilderInit(256)
+    defer body.free()
+    extractBody(&raw, &body)
+
+    assert(body.contains($"data: hello from sse"))
+    // Each event ends with a blank line (\n\n)
+    assert(body.contains($"\n\n"))
+}
+
+@test("test SSE delivers multiple events in order")
+func test_sse_multiple_events() {
+    var raw = StringBuilderInit(1024)
+    defer raw.free()
+
+    var status = fetchSseRaw("/sse/multi", &raw)
+    assert(status == 200)
+
+    var body = StringBuilderInit(256)
+    defer body.free()
+    extractBody(&raw, &body)
+
+    assert(body.contains($"data: event one"))
+    assert(body.contains($"data: event two"))
+    assert(body.contains($"data: event three"))
+}
+
+@test("test SSE event with id, event type, retry, and data fields")
+func test_sse_event_fields() {
+    var raw = StringBuilderInit(1024)
+    defer raw.free()
+
+    var status = fetchSseRaw("/sse/fields", &raw)
+    assert(status == 200)
+
+    var body = StringBuilderInit(256)
+    defer body.free()
+    extractBody(&raw, &body)
+
+    assert(body.contains($"id: 42"))
+    assert(body.contains($"event: update"))
+    assert(body.contains($"retry: 3000"))
+    assert(body.contains($"data: payload data"))
+}
+
+@test("test SSE multiline data payload splits into one data line per newline")
+func test_sse_multiline_data() {
+    var raw = StringBuilderInit(1024)
+    defer raw.free()
+
+    var status = fetchSseRaw("/sse/multiline", &raw)
+    assert(status == 200)
+
+    var body = StringBuilderInit(256)
+    defer body.free()
+    extractBody(&raw, &body)
+
+    // Each line of the original payload must be a separate "data:" line
+    assert(body.contains($"data: line one"))
+    assert(body.contains($"data: line two"))
+    assert(body.contains($"data: line three"))
+}
+
+// ---------------------------------------------------------------
+// Error-path tests
+// ---------------------------------------------------------------
+
+@test("test SSE POST to SSE route returns 405 (route is GET-only)")
+func test_sse_post_returns_404() {
+    var status = sendMethodRaw("POST", "/sse/single")
+    assert(status == 405)
+}
+
+@test("test SSE PUT to SSE route returns 405 (route is GET-only)")
+func test_sse_put_returns_404() {
+    var status = sendMethodRaw("PUT", "/sse/single")
+    assert(status == 405)
+}
+
+@test("test SSE DELETE to SSE route returns 405 (route is GET-only)")
+func test_sse_delete_returns_404() {
+    var status = sendMethodRaw("DELETE", "/sse/single")
+    assert(status == 405)
+}
+
+@test("test SSE GET to unknown path returns 404")
+func test_sse_unknown_path() {
+    var status = sendMethodRaw("GET", "/sse/nonexistent")
+    assert(status == 404)
+}
+#end

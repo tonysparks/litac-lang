@@ -1,0 +1,175 @@
+import "std/libc"
+import "std/string/builder"
+import "std/string"
+import "std/mem"
+
+import "std/ringhttp/http_common"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_engine"
+import "std/ringhttp/http_worker"
+import "std/ringhttp/http_router"
+
+public const WEB_SOCKET_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+@doc("A client <-> server session which allows for sending/closing from the server")
+public struct WebSocketSession {
+    worker: *WorkerThread
+    context: *SessionContext
+
+    // public data
+    allocator: *const Allocator
+    userData: *void
+}
+
+public func (this: *WebSocketSession) send(frame: *Frame) : i32 {
+    this.worker.sendWebSocketFrame(this.context, frame)
+
+    // TODO: Error handling
+    return 1
+}
+
+public func (this: *WebSocketSession) close() {
+    // TODO: Close out the socket connection
+    var out = Frame{}
+    out.isFinal = true
+    out.masked = false
+    out.payload = null
+    out.payloadLength = 0
+    out.opcode = Opcode.CLOSE
+
+    this.send(&out)
+    this.context.isWebSocket = false
+}
+
+
+public enum Opcode {
+    UNKNOWN = -1,
+    CONTINUATION = 0x0,
+    TEXT         = 0x1,
+    BINARY       = 0x2,
+    CLOSE        = 0x8,
+    PING         = 0x9,
+    PONG         = 0xA,
+}
+
+public struct Frame {
+    payloadLength: i64
+    maskKey: [4]i8
+    opcode: Opcode
+    isFinal: bool
+    masked: bool
+
+    offset: i32
+    payload: *char
+}
+
+public func (frame: *Frame) parseHeader(input: *StringBuilder) : Status {
+    if(input.length < 2) {
+        return Status.ERROR_WEB_SOCKET_FRAME
+    }
+
+    var buffer = input.buffer
+
+    var header = buffer[0]
+    frame.isFinal = (header>>7) & 0x1
+    frame.opcode = header & 0xF
+
+    var maskPayload = buffer[1]
+    frame.masked = (maskPayload>>7) & 0x1
+    frame.payloadLength = maskPayload & 0x7F
+
+    frame.offset = 2
+    if(frame.payloadLength == 126) {
+        if(input.length < 4) {
+            return Status.ERROR_WEB_SOCKET_FRAME
+        }
+        var b1 = buffer[2]
+        var b2 = buffer[3]
+
+        frame.payloadLength = (b1 << 8) | b2
+        frame.offset += 2
+    }
+    else if(frame.payloadLength == 127) {
+        if(input.length < 10) {
+            return Status.ERROR_WEB_SOCKET_FRAME
+        }
+
+        frame.payloadLength = 0
+        for(var i = 0; i < 8; i+=1) {
+            frame.payloadLength = (frame.payloadLength << 8) | buffer[2 + i]
+        }
+        frame.offset += 8
+    }
+
+    memset(frame.maskKey, 0, 4)
+    if(frame.masked) {
+        if(input.length < (frame.offset+4)) {
+            return Status.ERROR_WEB_SOCKET_FRAME
+        }
+
+        memcpy(frame.maskKey, buffer + frame.offset, 4)
+        frame.offset += 4
+    }
+
+    return Status.OK
+}
+
+public func (frame: *Frame) parsePayload(input: *StringBuilder) : Status {
+
+    if(frame.payloadLength > (input.length - frame.offset)) {
+        return Status.ERROR_WEB_SOCKET_FRAME_LENGTH
+    }
+
+    var buffer = input.buffer
+    frame.payload = buffer + frame.offset;
+
+    if(frame.masked) {
+        for(var i = 0_i64; i < frame.payloadLength; i+=1) {
+            frame.payload[i] ^= frame.maskKey[i % 4]
+        }
+    }
+    return Status.OK
+}
+
+public func (frame: *Frame) serialize(input: *StringBuilder) : Status {
+    // Bug fix (3): large frames need a 10-byte header (2 base + 8 extended
+    // length), so the required capacity is payloadLength + 10, not + 8.
+    if(input.capacity < frame.payloadLength + 10) {
+        return Status.ERROR_WEB_SOCKET_FRAME_LENGTH
+    }
+
+    var buffer = input.buffer
+
+    frame.offset = 2
+
+    buffer[0] = ((frame.isFinal ? 0x80 : 0x0) | (frame.opcode & 0x0F)) as (i32)
+    if(frame.payloadLength >= 126 && frame.payloadLength < 65536) {
+        // Bug fix (1): 16-bit extended-length header is 4 bytes
+        // (buffer[0..3]), so payload must start at offset 4, not 3.
+        // Was: frame.offset += 1
+        frame.offset += 2
+
+        buffer[1] = 126
+        buffer[2] = ((frame.payloadLength >> 8) & 0xFF) as (i32)
+        buffer[3] = (frame.payloadLength & 0xFF) as (i32)
+    }
+    else if(frame.payloadLength >= 65536) {
+        frame.offset += 8
+
+        buffer[1] = 127
+        for(var i = 0; i < 8; i+=1) {
+            // Bug fix (2): big-endian encoding requires right-shift (>>), not
+            // left-shift (<<). Left-shift produced a near-zero length field.
+            buffer[2 + i] = ((frame.payloadLength >> (56 - i * 8)) & 0xFF) as (i32)
+        }
+    }
+    else {
+        buffer[1] = (frame.payloadLength & 0x7F) as (i32)
+    }
+
+    memcpy(buffer + frame.offset, frame.payload, frame.payloadLength)
+    input.length = (frame.offset + frame.payloadLength) as (i32)
+
+    return Status.OK
+}
+

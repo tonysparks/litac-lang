@@ -1,0 +1,5 @@
+<html>
+<% $load "static/templates/test_header.html.lt" %>
+    <div id="footer">stuff here</div>
+
+</html>
