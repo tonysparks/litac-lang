@@ -2,7 +2,7 @@ import "std/assert"
 import "std/mem"
 import "std/string/builder"
 
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 
 // addHeader must silently drop headers once the fixed-size slot array is full.
 @test

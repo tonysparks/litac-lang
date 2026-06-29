@@ -17,7 +17,7 @@ import "std/net/posix_socket"
 import "std/fmt"
 import "std/time"
 
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 import "test_webserver"
 
 

@@ -17,7 +17,7 @@ import "std/thread"
 import "std/thread/barrier"
 import "std/mem"
 import "std/testcontainers/docker"
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 
 const H2SPEC_PORT: u16 = 9090_u16
 

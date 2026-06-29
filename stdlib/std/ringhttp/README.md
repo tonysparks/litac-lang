@@ -5,15 +5,15 @@ A high-performance HTTP server for LitaC. Uses `io_uring` on Linux and `kqueue` 
 ## Import
 
 ```litac
-import "std/ringhttp/http_ring" as ring
+import "std/ringhttp" as ring
 ```
 
-`http_ring` re-exports every public symbol from the package, so a single import is enough for normal use.
+This re-exports every public symbol from the package, so a single import is enough for normal use.
 
 ## Hello World
 
 ```litac
-import "std/ringhttp/http_ring" as ring
+import "std/ringhttp" as ring
 
 func helloHandler(ctx: *ring::RequestHandlerContext) : i32 {
     ctx.response.status = 200

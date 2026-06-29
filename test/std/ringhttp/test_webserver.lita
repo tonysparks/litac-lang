@@ -14,7 +14,7 @@ import "std/thread/barrier"
 // posix specific
 import "std/net/posix_socket"
 
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 
 public struct FileStream {
     file: File

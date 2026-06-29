@@ -3,7 +3,7 @@
 // Uses HttpOptions{ .priorKnowledge = true } so curl speaks HTTP/2 cleartext
 // (no TLS required), matching ringhttp's cleartext mode.
 //
-// Both "std/http/http" and "std/ringhttp/http_ring" define HttpRequest/HttpResponse, so
+// Both "std/http/http" and "std/ringhttp" define HttpRequest/HttpResponse, so
 // both are imported under aliases and referenced via :: syntax.
 
 import "std/mem"
@@ -17,7 +17,7 @@ import "std/libc"
 
 import "std/http/http" as stdhttp
 
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 
 // ---------------------------------------------------------------------------
 // Server on a dedicated port (separate from the raw-socket e2e tests)

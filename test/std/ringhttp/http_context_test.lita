@@ -3,7 +3,7 @@ import "std/mem"
 import "std/assert"
 import "std/array"
 
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 
 // ---------------------------------------------------------------------------
 // Minimal server setup helper — just enough to initialise a ContextPool

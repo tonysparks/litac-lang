@@ -7,7 +7,7 @@ import "std/string/builder"
 import "std/array"
 import "std/libc"
 
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 import "std/ringhttp/http2_hpack"
 
 // ---------------------------------------------------------------------------

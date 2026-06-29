@@ -2,7 +2,7 @@ import "std/libc"
 import "std/string"
 import "std/string/builder"
 import "std/mem"
-import "std/ringhttp/http_ring"
+import "std/ringhttp"
 
 func RootHandler(ctx: *RequestHandlerContext) : i32 {
     ctx.response.status = 200
