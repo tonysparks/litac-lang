@@ -16,6 +16,7 @@ import "std/atomic"
 const QUEUE_NAME_MAX    = 128_i32
 const GROUP_KEY_MAX     = 128_i32
 const LOCKED_BY_MAX     = 64_i32
+const ERROR_MSG_MAX     = 512_i32
 const DEFAULT_POLL_MS   = 100_i64
 const DEFAULT_MAX_TRIES = 3_i32
 const DEFAULT_STALE_SEC = 60_i64
@@ -36,6 +37,8 @@ public struct Job {
     payload:     String   // heap-allocated via allocator
     groupKey:    [GROUP_KEY_MAX]char
     groupKeyLen: i32
+    errorMsg:    [ERROR_MSG_MAX]char
+    errorMsgLen: i32
     attempts:    i32
     maxAttempts: i32
     createdAt:   EpochTime
@@ -49,6 +52,12 @@ public func (this: *Job) payloadStr() : String {
 
 public func (this: *Job) groupKeyStr() : String {
     return StringInit(this.groupKey, this.groupKeyLen)
+}
+
+// setError records a failure reason that will be stored in error_msg when the
+// worker calls fail(). Call this inside a JOB_FAIL handler before returning.
+public func (this: *Job) setError(msg: String) {
+    this.errorMsgLen = msg.copyTo(this.errorMsg, ERROR_MSG_MAX)
 }
 
 public func (this: *Job) free() {
@@ -331,6 +340,9 @@ func (q: *JobQueue) fetchClaimed(lockedBy: *char, lockedByLen: i32, job: *Job) :
     if(gkView.buffer != null && gkView.length > 0) {
         job.groupKeyLen = gkView.copyTo(job.groupKey, GROUP_KEY_MAX)
     }
+
+    job.errorMsgLen = 0
+    job.errorMsg[0] = '\0'
 
     job.attempts    = rs.columnInt32(3)
     job.maxAttempts = rs.columnInt32(4)
@@ -680,7 +692,11 @@ public func (w: *Worker) run() {
                     break
                 }
                 case JobResult.JOB_FAIL: {
-                    s = w.queue.fail(job.id)
+                    var errMsg: *const char = null
+                    if(job.errorMsgLen > 0) {
+                        errMsg = job.errorMsg
+                    }
+                    s = w.queue.fail(job.id, errMsg)
                     break
                 }
                 case JobResult.JOB_RETRY: {
