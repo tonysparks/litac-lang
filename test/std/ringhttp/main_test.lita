@@ -18,7 +18,7 @@ import "std/fmt"
 import "std/time"
 
 import "std/ringhttp"
-import "test_webserver"
+import "std/ringhttp/test_webserver"
 
 
 @raw("""
@@ -144,7 +144,7 @@ var defaultConfig = HttpConfig {
     .isLogEnabled = false,
     .logFilePath = $"",
     .logLevel = LogLevel.DEBUG,
-    .fileServerPath = $"./test/std/ringhttp/static",
+    .fileServerPath = $"../../test/std/ringhttp/static",
     .maxHttpBodySizeInBytes = 1_024,
 }
 
@@ -175,7 +175,7 @@ func test_static_webpage() {
     var fileContents = StringBuilderInit(256)
     defer fileContents.free()
 
-    var status = ReadFileFully($"./test/std/ringhttp/static/index.html", &fileContents)
+    var status = ReadFileFully($"../../test/std/ringhttp/static/index.html", &fileContents)
     assert(status == FileStatus.Ok)
     assert(resp.statusCode == 200)
     assert(fileContents.equals(resp.body))
@@ -323,7 +323,7 @@ func test_download_file() {
     var fileContents = StringBuilderInit(256)
     defer fileContents.free()
 
-    var status = ReadFileFully($"./test/std/ringhttp/download_sample.txt", &fileContents)
+    var status = ReadFileFully($"../../test/std/ringhttp/download_sample.txt", &fileContents)
     assert(status == FileStatus.Ok)
     assert(fileContents.equals(resp.body))
     assert(fileContents.length > 0)

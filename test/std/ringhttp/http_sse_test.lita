@@ -10,7 +10,7 @@ import "std/net"
 import "std/net/posix_socket"
 
 import "std/ringhttp"
-import "test_webserver"
+import "std/ringhttp/test_webserver"
 
 
 const SSE_TEST_PORT = 19083_u16
@@ -25,7 +25,7 @@ var sseConfig = HttpConfig {
     .keepAliveTimeoutInSec = 5,
     .isLogEnabled = false,
     .logFilePath = $"",
-    .fileServerPath = $"./test/std/ringhttp/static",
+    .fileServerPath = $"../../test/std/ringhttp/static",
 }
 
 @module_init

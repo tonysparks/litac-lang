@@ -14,7 +14,7 @@ import "std/crypto/sha1"
 import "std/encoding/base64"
 
 import "std/ringhttp"
-import "test_webserver"
+import "std/ringhttp/test_webserver"
 
 
 @raw("""
@@ -40,7 +40,7 @@ var wsConfig = HttpConfig {
     .keepAliveTimeoutInSec = 5,
     .isLogEnabled = false,
     .logFilePath = $"",
-    .fileServerPath = $"./test/std/ringhttp/static",
+    .fileServerPath = $"../../test/std/ringhttp/static",
 }
 
 var wsLimitTestServer = TestServer{}
@@ -53,7 +53,7 @@ var wsLimitConfig = HttpConfig {
     .keepAliveTimeoutInSec = 5,
     .isLogEnabled = false,
     .logFilePath = $"",
-    .fileServerPath = $"./test/std/ringhttp/static",
+    .fileServerPath = $"../../test/std/ringhttp/static",
     .maxWsFragmentedMessageSizeInBytes = 8,
 }
 

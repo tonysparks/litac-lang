@@ -8,7 +8,7 @@ import "std/ringhttp/http_request"
 import "std/ringhttp/http_response"
 import "std/ringhttp/http_common"
 
-import "filter_handler_helpers"
+import "std/ringhttp/filter_handler_helpers"
 
 // ---------------------------------------------------------------
 // Simulate the pre/post dispatch loop from http_worker.lita.

@@ -8,7 +8,7 @@ import "std/mem"
 import "std/thread"
 
 import "std/ringhttp"
-import "filter_e2e_server"
+import "std/ringhttp/filter_e2e_server"
 
 const BASE = "http://localhost:8081"
 
