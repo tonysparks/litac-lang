@@ -184,3 +184,12 @@ WorkerPoolOpen(&q, 4, myHandler, &pool)
 ## Database schema
 
 All queues share a single `jobs` table. Each queue is scoped by its name so multiple queues can coexist in the same database without interfering. The schema is created automatically on `JobQueueOpen`.
+
+If you manage migrations yourself, the public constant `JOB_QUEUE_SCHEMA` holds the exact DDL that `JobQueueOpen` would run — copy it directly into your migration script:
+
+```litac
+import "std/job_queue"
+
+// use in a migration:
+db.execute(JOB_QUEUE_SCHEMA.buffer)
+```
