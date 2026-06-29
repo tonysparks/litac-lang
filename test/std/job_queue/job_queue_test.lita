@@ -15,8 +15,7 @@ struct TestQueue {
 func openTestQueue(tq: *TestQueue, name: *const char = "test") {
     var ok = Connect($":memory:", &tq.conn)
     assert(ok.isOk())
-    var opened = JobQueueOpen(tq.conn.connection, name, &tq.q, defaultAllocator)
-    assert(opened)
+    assert(JobQueueOpen(tq.conn.connection, name, &tq.q, defaultAllocator) == JobStatus.OK)
 }
 
 func closeTestQueue(tq: *TestQueue) {
@@ -328,7 +327,7 @@ func testWorkerPool() {
     assert(tq.q.stats().pending == 10_i64)
 
     var pool: WorkerPool
-    assert(WorkerPoolOpen(&tq.q, 2, poolTestHandler, &pool))
+    assert(WorkerPoolOpen(&tq.q, 2, poolTestHandler, &pool) == JobStatus.OK)
     defer pool.shutdown()
 
     // Give workers time to drain the queue
@@ -378,7 +377,7 @@ func testWorkerPoolContext() {
     }
 
     var pool: WorkerPool
-    assert(WorkerPoolOpen(&tq.q, 2, ctxHandler, &pool, createWorkerCtx, ctxSlots, 10_i64))
+    assert(WorkerPoolOpen(&tq.q, 2, ctxHandler, &pool, createWorkerCtx, ctxSlots, 10_i64) == JobStatus.OK)
     defer pool.shutdown()
 
     ThreadSleepMSec(500_i64)

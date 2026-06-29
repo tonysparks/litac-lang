@@ -71,11 +71,20 @@ public struct JobStats {
 }
 
 public enum JobStatus {
-    JOB_STATUS_NOT_FOUND,
-    JOB_STATUS_PENDING,
-    JOB_STATUS_RUNNING,
-    JOB_STATUS_DONE,
-    JOB_STATUS_FAILED,
+    OK = 0,        // operation succeeded; also used as a zero-check with ?:
+
+    // Job state codes returned by getStatus()
+    PENDING,       // job is queued and waiting to run
+    RUNNING,       // job is currently being processed by a worker
+    DONE,          // job completed successfully
+    FAILED,        // job exhausted all retries
+    NOT_FOUND,     // no job with that id exists in this queue
+
+    // Operation error codes returned when a queue method itself fails
+    ERROR_DB,      // a database prepare, step, or execute call failed
+    ERROR_ARGS,    // invalid arguments (e.g. queue name too long, worker count <= 0)
+    ERROR_ALLOC,   // memory allocation failed
+    ERROR_THREAD,  // thread creation failed (WorkerPoolOpen only)
 }
 
 // -----------------------------------------------------------------------
@@ -116,12 +125,12 @@ public func JobQueueOpen(
     queueName: *const char,
     queue:     *JobQueue,
     allocator: *const Allocator = defaultAllocator
-) : bool {
+) : JobStatus {
 
     var name = queueName.toString()
     if(name.length >= QUEUE_NAME_MAX) {
         Error("job_queue: queue name too long\n")
-        return false
+        return JobStatus.ERROR_ARGS
     }
     name.copyTo(queue.queue, QUEUE_NAME_MAX)
     queue.queueLen = name.length
@@ -129,11 +138,11 @@ public func JobQueueOpen(
     queue.allocator = allocator
 
     if(!createSchema(queue)) {
-        return false
+        return JobStatus.ERROR_DB
     }
 
     queue.mtx.init()
-    return true
+    return JobStatus.OK
 }
 
 public func (q: *JobQueue) close() {
@@ -336,8 +345,8 @@ func (q: *JobQueue) fetchClaimed(lockedBy: *char, lockedByLen: i32, job: *Job) :
 // Complete / Fail / Retry
 // -----------------------------------------------------------------------
 
-// Mark a running job as successfully completed. Returns false on error.
-public func (q: *JobQueue) complete(id: i64) : bool {
+// Mark a running job as successfully completed.
+public func (q: *JobQueue) complete(id: i64) : JobStatus {
     var now = Now() as (i64)
 
     q.mtx.lock()
@@ -355,7 +364,7 @@ public func (q: *JobQueue) complete(id: i64) : bool {
             "job_queue: complete prepare failed: %.*s\n",
             r.description.length, r.description.buffer
         )
-        return false
+        return JobStatus.ERROR_DB
     }
     defer q.db.release(stmt)
 
@@ -367,15 +376,14 @@ public func (q: *JobQueue) complete(id: i64) : bool {
             "job_queue: complete step failed: %.*s\n",
             r.description.length, r.description.buffer
         )
-        return false
+        return JobStatus.ERROR_DB
     }
-    return true
+    return JobStatus.OK
 }
 
 // Report a job failure. If attempts < maxAttempts it is requeued with
 // exponential backoff; otherwise it is marked 'failed' for inspection.
-// Returns false on error.
-public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
+public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : JobStatus {
     var now = Now() as (i64)
 
     q.mtx.lock()
@@ -392,7 +400,7 @@ public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
     if(r.isError()) {
         Error("job_queue: fail select prepare failed: %.*s\n",
             r.description.length, r.description.buffer)
-        return false
+        return JobStatus.ERROR_DB
     }
     selStmt.bindInt64(1, id)
 
@@ -401,7 +409,7 @@ public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
 
     if(!rs.hasNext()) {
         rs.closeAndReleaseAll()
-        return false
+        return JobStatus.NOT_FOUND
     }
 
     rs.next()
@@ -420,7 +428,7 @@ public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
         if(r.isError()) {
             Error("job_queue: fail retry prepare failed: %.*s\n",
                 r.description.length, r.description.buffer)
-            return false
+            return JobStatus.ERROR_DB
         }
         defer q.db.release(updStmt)
 
@@ -437,7 +445,7 @@ public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
         if(r.isError()) {
             Error("job_queue: fail retry step failed: %.*s\n",
                 r.description.length, r.description.buffer)
-            return false
+            return JobStatus.ERROR_DB
         }
 
     } else {
@@ -446,7 +454,7 @@ public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
         if(r.isError()) {
             Error("job_queue: fail final prepare failed: %.*s\n",
                 r.description.length, r.description.buffer)
-            return false
+            return JobStatus.ERROR_DB
         }
         defer q.db.release(updStmt)
 
@@ -462,17 +470,16 @@ public func (q: *JobQueue) fail(id: i64, errorMsg: *const char = null) : bool {
         if(r.isError()) {
             Error("job_queue: fail final step failed: %.*s\n",
                 r.description.length, r.description.buffer)
-            return false
+            return JobStatus.ERROR_DB
         }
     }
 
-    return true
+    return JobStatus.OK
 }
 
 // Immediately requeue a running job, ignoring its attempt count.
 // Use when the handler encounters a transient error it knows will resolve.
-// Returns false on error.
-public func (q: *JobQueue) retry(id: i64) : bool {
+public func (q: *JobQueue) retry(id: i64) : JobStatus {
     var now = Now() as (i64)
 
     q.mtx.lock()
@@ -485,7 +492,7 @@ public func (q: *JobQueue) retry(id: i64) : bool {
     if(r.isError()) {
         Error("job_queue: retry prepare failed: %.*s\n",
             r.description.length, r.description.buffer)
-        return false
+        return JobStatus.ERROR_DB
     }
     defer q.db.release(stmt)
 
@@ -496,9 +503,9 @@ public func (q: *JobQueue) retry(id: i64) : bool {
     if(r.isError()) {
         Error("job_queue: retry step failed: %.*s\n",
             r.description.length, r.description.buffer)
-        return false
+        return JobStatus.ERROR_DB
     }
-    return true
+    return JobStatus.OK
 }
 
 // -----------------------------------------------------------------------
@@ -507,8 +514,8 @@ public func (q: *JobQueue) retry(id: i64) : bool {
 
 // Reset any running jobs whose locked_at is older than staleSec seconds.
 // Call this on startup before starting workers to reclaim jobs left behind
-// by a previous crashed process or thread. Returns false on error.
-public func (q: *JobQueue) recover(staleSec: i64 = DEFAULT_STALE_SEC) : bool {
+// by a previous crashed process or thread.
+public func (q: *JobQueue) recover(staleSec: i64 = DEFAULT_STALE_SEC) : JobStatus {
     var now    = Now() as (i64)
     var cutoff = now - staleSec
 
@@ -526,7 +533,7 @@ public func (q: *JobQueue) recover(staleSec: i64 = DEFAULT_STALE_SEC) : bool {
     if(r.isError()) {
         Error("job_queue: recover prepare failed: %.*s\n",
             r.description.length, r.description.buffer)
-        return false
+        return JobStatus.ERROR_DB
     }
 
     stmt.bindInt64(1, now)
@@ -542,7 +549,7 @@ public func (q: *JobQueue) recover(staleSec: i64 = DEFAULT_STALE_SEC) : bool {
     if(count > 0) {
         Info("job_queue: recovered %lld stale job(s)\n", count)
     }
-    return true
+    return JobStatus.OK
 }
 
 // -----------------------------------------------------------------------
@@ -591,8 +598,9 @@ public func (q: *JobQueue) stats() : JobStats {
     return result
 }
 
-// Returns the status of a specific job by ID, or JOB_STATUS_NOT_FOUND if
-// the id does not exist in this queue.
+// Returns the current state of a specific job by ID.
+// Returns NOT_FOUND if the id does not exist in this queue, or ERROR_DB on
+// a database failure.
 public func (q: *JobQueue) getStatus(id: i64) : JobStatus {
     q.mtx.lock()
     defer q.mtx.unlock()
@@ -604,7 +612,7 @@ public func (q: *JobQueue) getStatus(id: i64) : JobStatus {
     if(r.isError()) {
         Error("job_queue: getStatus prepare failed: %.*s\n",
             r.description.length, r.description.buffer)
-        return JobStatus.JOB_STATUS_NOT_FOUND
+        return JobStatus.ERROR_DB
     }
 
     stmt.bindInt64(1, id)
@@ -615,21 +623,21 @@ public func (q: *JobQueue) getStatus(id: i64) : JobStatus {
 
     if(!rs.hasNext()) {
         rs.closeAndReleaseAll()
-        return JobStatus.JOB_STATUS_NOT_FOUND
+        return JobStatus.NOT_FOUND
     }
 
     rs.next()
     var statusView = rs.columnStringView(0)
-    var result     = JobStatus.JOB_STATUS_NOT_FOUND
+    var result     = JobStatus.NOT_FOUND
 
     if(statusView.equalsIgnoreCase($"pending")) {
-        result = JobStatus.JOB_STATUS_PENDING
+        result = JobStatus.PENDING
     } else if(statusView.equalsIgnoreCase($"running")) {
-        result = JobStatus.JOB_STATUS_RUNNING
+        result = JobStatus.RUNNING
     } else if(statusView.equalsIgnoreCase($"done")) {
-        result = JobStatus.JOB_STATUS_DONE
+        result = JobStatus.DONE
     } else if(statusView.equalsIgnoreCase($"failed")) {
-        result = JobStatus.JOB_STATUS_FAILED
+        result = JobStatus.FAILED
     }
 
     rs.closeAndReleaseAll()
@@ -665,22 +673,27 @@ public func (w: *Worker) run() {
         var job: Job
         if(w.queue.poll(&job)) {
             var result = w.handler(&job, w.ctx)
+            var s: JobStatus
             switch(result) {
                 case JobResult.JOB_OK: {
-                    w.queue.complete(job.id)
+                    s = w.queue.complete(job.id)
                     break
                 }
                 case JobResult.JOB_FAIL: {
-                    w.queue.fail(job.id)
+                    s = w.queue.fail(job.id)
                     break
                 }
                 case JobResult.JOB_RETRY: {
-                    w.queue.retry(job.id)
+                    s = w.queue.retry(job.id)
                     break
                 }
                 default: {
+                    s = JobStatus.OK
                     break
                 }
+            }
+            if(s != JobStatus.OK) {
+                Error("job_queue: worker failed to update job %lld: status=%d\n", job.id, s)
             }
             job.free()
         } else {
@@ -718,7 +731,9 @@ func workerThreadFn(arg: *void) : i32 {
 // If createCtx is non-null it is called once per worker to produce that
 // worker's ctx — useful for giving each worker its own resources (e.g. a
 // dedicated business-logic DB connection). If null, all workers share null ctx.
-// Returns false if allocation or thread creation fails; partial state is cleaned up.
+// Returns ERROR_ARGS if count <= 0, ERROR_ALLOC on allocation failure, or
+// ERROR_THREAD if a thread could not be created (already-started threads are
+// cleanly stopped before returning).
 public func WorkerPoolOpen(
     queue:          *JobQueue,
     count:          i32,
@@ -728,9 +743,9 @@ public func WorkerPoolOpen(
     createCtxArg:   *void = null,
     pollIntervalMs: i64 = DEFAULT_POLL_MS,
     allocator:      *const Allocator = defaultAllocator
-) : bool {
+) : JobStatus {
     if(count <= 0) {
-        return false
+        return JobStatus.ERROR_ARGS
     }
 
     pool.count     = count
@@ -744,7 +759,7 @@ public func WorkerPoolOpen(
         pool.workers = null
         pool.threads = null
         pool.count   = 0
-        return false
+        return JobStatus.ERROR_ALLOC
     }
 
     for(var i = 0; i < count; i += 1) {
@@ -770,10 +785,10 @@ public func WorkerPoolOpen(
             pool.workers = null
             pool.threads = null
             pool.count   = 0
-            return false
+            return JobStatus.ERROR_THREAD
         }
     }
-    return true
+    return JobStatus.OK
 }
 
 // Signal all workers to stop and wait for their threads to finish.
