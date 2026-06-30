@@ -391,6 +391,15 @@ func (m: *Migrator) loadApplied(
 }
 
 func (m: *Migrator) recordApplied(mig: *Migration, err: *MigrationError) : bool {
+    for(var i = 0; i < m.tableName.length; i += 1) {
+        var c = m.tableName.buffer[i]
+        if(!isalpha(c) && !isdigit(c) && c != '_') {
+            err.status = MigrationStatus.SQL_ERROR
+            var msg = StringBufferInit(err.message, MSG_MAX, 0)
+            msg.format("Invalid table name: contains illegal characters")
+            return false
+        }
+    }
     var sqlBuf: [512]char
     var sqlSb = StringBufferInit(sqlBuf, 512, 0)
     sqlSb.format(
