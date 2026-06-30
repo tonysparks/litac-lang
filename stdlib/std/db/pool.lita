@@ -296,6 +296,8 @@ public func (this: *ConnectionPool) acquireTimed(timeoutMs: i64, conn: *SqlConne
 // release returns a previously acquired connection to the pool.
 // If the pool has been destroyed, the connection is closed and freed instead.
 public func (this: *ConnectionPool) release(conn: SqlConnection) {
+    conn.clearError()
+
     this.mutex.lock()
     defer this.mutex.unlock()
 

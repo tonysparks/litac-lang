@@ -361,6 +361,49 @@ func testTransactionRollback() {
 }
 
 // -----------------------------------------------------------------------
+// rollback() preserves the original error, not the rollback result
+// -----------------------------------------------------------------------
+
+@test
+func testRollbackPreservesOriginalError() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.begin()
+    // force an error inside the transaction
+    conn.execute("INSERT INTO nonexistent_table (id) VALUES (1);")
+    assert(conn.hasError())
+
+    // rollback must succeed (returns OK) but must NOT clear the original error
+    var rollbackResult = conn.rollback()
+    assert(rollbackResult.isOk())
+    assert(conn.hasError())
+    assert(conn.lastResult().isError())
+}
+
+// rollback() on a clean connection (no prior error) leaves the connection clean
+@test
+func testRollbackOnCleanConnectionKeepsOk() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.begin()
+    var rollbackResult = conn.rollback()
+    assert(rollbackResult.isOk())
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
 // Raw statement API: prepare, bind*, parameterCount/Name/Index,
 //                    clearBindings, step, reset, finalize
 // -----------------------------------------------------------------------

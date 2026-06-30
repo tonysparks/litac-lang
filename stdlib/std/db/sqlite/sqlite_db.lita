@@ -221,10 +221,14 @@ public func (this: *SqliteConnection) commit() : SqlResult  {
 public func (this: *SqliteConnection) rollback() : SqlResult  {
     // Always attempt rollback regardless of current error state,
     // so a failed statement inside a transaction can be properly rolled back.
+    var savedError = this.error
     var error: *char = null
     var errorCode = sqlite3_exec(this.db, "ROLLBACK;", null, null, &error)
-    this.error = CreateError(this, null, errorCode, error)
-    return this.error
+    var rollbackResult = CreateError(this, null, errorCode, error)
+    // preserve the original error so callers see why the rollback happened;
+    // only replace it if rollback itself failed
+    this.error = rollbackResult.isError() ? rollbackResult : savedError
+    return rollbackResult
 }
 
 public func (this: *SqliteConnection) prepare(statement: *SqlStatement, sql: String) : SqlResult  {

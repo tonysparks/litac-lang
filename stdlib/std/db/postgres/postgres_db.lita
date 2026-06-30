@@ -186,10 +186,15 @@ public func (this: *PgConnection) commit() : SqlResult {
 
 // Always attempts ROLLBACK regardless of current error state so a failed
 // statement inside a transaction can be properly undone.
+// Preserves the original error so callers see why the rollback happened;
+// only replaces it if rollback itself fails.
 public func (this: *PgConnection) rollback() : SqlResult {
+    var savedError = this.error
     this.clearError()
     _execRaw(this, "ROLLBACK")
-    return this.error
+    var rollbackResult = this.error
+    this.error = rollbackResult.isError() ? rollbackResult : savedError
+    return rollbackResult
 }
 
 public func (this: *PgConnection) close() : SqlResult {

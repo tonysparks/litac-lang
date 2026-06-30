@@ -24,6 +24,37 @@ func testPoolInit() {
 }
 
 // -----------------------------------------------------------------------
+// release clears error so the next borrower gets a clean connection
+// -----------------------------------------------------------------------
+
+@test
+func testReleaseClearsError() {
+    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var pool: ConnectionPool;
+    ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
+
+    var conn: SqlConnection;
+    pool.acquire(&conn)
+
+    // put the connection into an error state
+    conn.setError(SqlResult {
+        .type        = SqlResultType.ERROR,
+        .description = $"synthetic error"
+    })
+    assert(conn.hasError())
+    pool.release(conn)
+
+    // the same connection comes back from the idle pool — must be clean
+    var conn2: SqlConnection;
+    pool.acquire(&conn2)
+    assert(!conn2.hasError())
+    assert(conn2.lastResult().isOk())
+
+    pool.release(conn2)
+    pool.destroy()
+}
+
+// -----------------------------------------------------------------------
 // acquire / release round-trip
 // -----------------------------------------------------------------------
 
