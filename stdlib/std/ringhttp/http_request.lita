@@ -350,9 +350,33 @@ public func (this: *QueryParam) getDecodedValue(out: *StringBuilder) {
     UrlDecode(this.value, out)
 }
 
+public enum SameSite {
+    DEFAULT,
+    NONE,
+    LAX,
+    STRICT,
+}
+
 public struct HttpCookie {
-    name: String
-    value: String
+    name:     String
+    value:    String
+    path:     String
+    domain:   String
+    maxAge:   i64    // -1 = not set; 0 = delete; >0 = lifetime in seconds
+    expires:  i64    // -1 = not set; >=0 = unix timestamp (UTC)
+    httpOnly: bool
+    secure:   bool
+    sameSite: SameSite
+}
+
+// Creates a response cookie with maxAge and expires unset (-1).
+public func HttpCookieInit(name: String, value: String) : HttpCookie {
+    return HttpCookie {
+        .name    = name,
+        .value   = value,
+        .maxAge  = -1_i64,
+        .expires = -1_i64,
+    }
 }
 
 public struct HttpCookies {

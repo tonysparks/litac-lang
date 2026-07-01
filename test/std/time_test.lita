@@ -153,6 +153,19 @@ func testDateTimeFormat() {
 }
 
 @test
+func testHttpDateFormat() {
+    // 2024-01-01 00:00:00 UTC = epoch 1704067200, a Monday
+    var dt = (1704067200_i64).toDateTime()
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    var status = dt.format(HTTP_DATE_FORMAT, sb)
+    assert(status == DateTimeStatus.OK)
+    assert(sb.toString().equals($"Mon, 01 Jan 2024 00:00:00 GMT"))
+}
+
+@test
 func testAddSeconds() {
     var dt = DateTime {
         .date = Date { .year = 2024, .month = 1_u8, .day = 1_u8 },

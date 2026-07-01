@@ -2,7 +2,8 @@ import "std/string"
 import "std/string/builder"
 import "std/string/buffer"
 
-public const ISO_8601_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+public const ISO_8601_DATE_FORMAT = $"%Y-%m-%dT%H:%M:%S"
+public const HTTP_DATE_FORMAT = $"%a, %d %b %Y %H:%M:%S GMT"
 
 // Unix timestamp - timezone is UTC
 public typedef i64 as EpochTime
@@ -120,7 +121,7 @@ public func (this: *DateTime) compare(other: *DateTime) : i32 {
 public func (this: *DateTime) isoFormat(output: *StringBuffer) : DateTimeStatus {
     return DateTimeFormat(
         this,
-        ISO_8601_DATE_FORMAT.toString(),
+        ISO_8601_DATE_FORMAT,
         output
     )
 }
@@ -142,7 +143,7 @@ public func DateTimeFrom(format: String, value: String) : DateTime {
 
 public func DateTimeFromIso(value: String) : DateTime {
     return _DateTimeFrom(
-        ISO_8601_DATE_FORMAT.toString(),
+        ISO_8601_DATE_FORMAT,
         value
     )
 }
@@ -318,11 +319,12 @@ internal func DateTimeFormat(
     var formatStr  = [32]char{}
     format.copyTo(formatStr, 31)
 
-    var tm = tm {}
+    var epoch = ToEpochTime(dateTime)
+    var fullTm = gmtime((&epoch) as (*time_t))
     var len = strftime(
         resultStr, sizeof(resultStr),
         formatStr,
-        ToTM(dateTime, &tm)
+        fullTm
     )
 
     if(len == 0) {

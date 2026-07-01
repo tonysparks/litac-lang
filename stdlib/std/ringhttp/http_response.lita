@@ -1,6 +1,8 @@
 import "std/mem"
 import "std/string"
 import "std/string/builder"
+import "std/string/buffer"
+import "std/time"
 import "std/io"
 import "std/system"
 import "std/libc"
@@ -153,6 +155,54 @@ public func (this: *HttpResponse) asStream(stream: Stream) {
 }
 
 public func (this: *HttpResponse) asTemplate(template: String) {
+}
+
+public func (this: *HttpResponse) addCookie(cookie: HttpCookie) {
+    var buf = this.body.alloc.alloc(512) as (*char)
+    if(buf == null) {
+        return;
+    }
+    var sb = StringBufferInit(buf, 512, 0)
+
+    sb.append("%.*s=%.*s",
+        cookie.name.length, cookie.name.buffer,
+        cookie.value.length, cookie.value.buffer)
+
+    if(!cookie.path.empty()) {
+        sb.append("; Path=%.*s", cookie.path.length, cookie.path.buffer)
+    }
+
+    if(!cookie.domain.empty()) {
+        sb.append("; Domain=%.*s", cookie.domain.length, cookie.domain.buffer)
+    }
+
+    if(cookie.maxAge >= 0_i64) {
+        sb.append("; Max-Age=%lld", cookie.maxAge)
+    }
+
+    if(cookie.expires >= 0_i64) {
+        sb.append("; Expires=")
+        var dt = cookie.expires.toDateTime()
+        dt.format(HTTP_DATE_FORMAT, &sb)
+    }
+
+    if(cookie.httpOnly) {
+        sb.append("; HttpOnly")
+    }
+
+    if(cookie.secure) {
+        sb.append("; Secure")
+    }
+
+    switch(cookie.sameSite) {
+        case SameSite.NONE:   sb.append("; SameSite=None")
+        case SameSite.LAX:    sb.append("; SameSite=Lax")
+        case SameSite.STRICT: sb.append("; SameSite=Strict")
+        default: {}
+    }
+
+    var value = String { .buffer = buf, .length = sb.length }
+    this.addHeader($"Set-Cookie", value)
 }
 
 public func (this: *HttpResponse) free() {
