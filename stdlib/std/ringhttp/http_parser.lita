@@ -367,6 +367,7 @@ func (this: *HttpParser) checkHeaderBody(header: *HttpHeader, body: *Body) {
 
 
 func (this: *HttpParser) parseBodyInternal(input: String, body: *Body) : Status {
+    body.body = input
     switch(body.bodyType) {
         case BodyType.FORM_URLENCODED: {
             // Should we error if not POST, PUT, PATCH, OPTIONS, DELETE?
@@ -412,8 +413,6 @@ func (this: *HttpParser) parseBodyInternal(input: String, body: *Body) : Status 
             return this.parseMultipart(input, &body.multipart)
         }
         default: {
-            // TODO: More body types
-            body.body = input
         }
     }
 
