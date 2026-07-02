@@ -399,11 +399,7 @@ func (this: *HttpParser) parseBodyInternal(input: String, body: *Body) : Status 
         case BodyType.JSON: {
             var jsonParser = JsonParserInit(this.allocator)
 
-            // TODO: fix horrible duplicate copy
-            var sb = StringBuilderInit(input.length + 1, this.allocator)
-            input.copyTo(sb.buffer, input.length)
-
-            body.json = jsonParser.parseJson(sb.buffer)
+            body.json = jsonParser.parseJson(input)
 
             // TODO: Error handling of bad json
             if (!body.json && input.length > 0) {

@@ -97,7 +97,7 @@
                 var parser = JsonParser{}
                 parser.init(&arena.allocator)
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     {
                         "x" : true,
                         "y" : false,
@@ -172,7 +172,7 @@
                 var parser = JsonParser{}
                 parser.init()
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     {
                         "x" : true,
                         "y" : false,

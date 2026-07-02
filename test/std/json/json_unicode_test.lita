@@ -8,7 +8,7 @@ import "std/assert"
 // Asserts that parsing succeeded and the key exists.
 func parseStr(json: *const char) : *const char {
     var parser = JsonParserInit()
-    var node = parser.parseJson(json)
+    var node = parser.parseJson(StringInit(json))
     assert(!parser.hasError())
     assert(node != null)
     var val = node.getStr("k")
@@ -19,7 +19,7 @@ func parseStr(json: *const char) : *const char {
 // Parse and assert the parser fails (hasError, returns null).
 func assertParseError(json: *const char) {
     var parser = JsonParserInit()
-    var node = parser.parseJson(json)
+    var node = parser.parseJson(StringInit(json))
     assert(parser.hasError())
 }
 
@@ -36,7 +36,7 @@ func testUnicodeEscapeAsciiRange() {
 
     //  is '\0' — decoded byte is 0; result string starts with null byte
     var node0 = JsonParserInit()
-    var parsed0 = node0.parseJson("{\"k\":\"\\u0000\"}")
+    var parsed0 = node0.parseJson($"{\"k\":\"\\u0000\"}")
     assert(!node0.hasError())
     assert(parsed0 != null)
     assert(parsed0.getStr("k")[0] == '\0')
@@ -104,7 +104,7 @@ func testUnicodeEscapeRealWorldGooglePicture() {
     }
     """
     var parser = JsonParserInit()
-    var node = parser.parseJson(userinfo)
+    var node = parser.parseJson(StringInit(userinfo))
     assert(!parser.hasError())
     assert(node != null)
     assert(strcmp(node.getStr("email"), "test@example.com") == 0)

@@ -34,7 +34,7 @@
             }
         `,
         "code": `
-            var json = """
+            var json = $"""
             {
                 "a": [1,2]
             }
@@ -83,7 +83,7 @@
             }
         `,
         "code": `
-            var json = """
+            var json = $"""
             [
                 {
                     "a": 3
@@ -132,7 +132,7 @@
 
         `,
         "code": `
-            var json = """
+            var json = $"""
             ["1","2","3","4"]
             """
 
@@ -180,7 +180,7 @@
 
         `,
         "code": `
-            var json = """
+            var json = $"""
             ["1","2","3","4"]
             """
 
@@ -228,7 +228,7 @@
 
         `,
         "code": `
-            var json = """
+            var json = $"""
             ["1","2","3","4"]
             """
 
@@ -275,7 +275,7 @@
             import "std/array";
         `,
         "code": `
-            var json = """
+            var json = $"""
             ["1","2","3","4"]
             """
 
@@ -324,7 +324,7 @@
 
         `,
         "code": `
-            var json = """
+            var json = $"""
             [1,2,3,4]
             """
 
@@ -378,7 +378,7 @@
             }
         `,
         "code": `
-            var json = """
+            var json = $"""
             {
 
                 "aMap": {
@@ -425,7 +425,7 @@
 
         `,
         "code": `
-            var json = """
+            var json = $"""
             {
 
                 "aInt": 4,
@@ -492,7 +492,7 @@
             }
         `,
         "code": `
-            var json = """
+            var json = $"""
             {
 
                 "aString": "4",
@@ -542,7 +542,7 @@
 
         `,
         "code": `
-            var json = """
+            var json = $"""
             {
 
                 "aString": "4",
@@ -591,7 +591,7 @@
             import "std/string";
         `,
         "code": `
-            var json = """
+            var json = $"""
             {
 
                 "aString": "4",
@@ -641,7 +641,7 @@
 
         `,
         "code": `
-            var json = """
+            var json = $"""
             {
 
                 "aString": "4",
@@ -712,7 +712,7 @@
       "code": `
                 var test = Test {}
 
-                var json = """
+                var json = $"""
                 {
                     "aStr": "Hello World",
                     "aInt": 4,

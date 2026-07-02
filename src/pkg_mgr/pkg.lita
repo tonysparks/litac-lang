@@ -124,7 +124,7 @@ public func ParsePackageFile(
         return PkgStatus.ERROR_READING_PKG_FILE
     }
 
-    var node = parser.parseJson(data)
+    var node = parser.parseJson(StringInit(data, length as (i32)))
     // We actually keep a reference of the json node on the PackageDef,
     // for easy data retrieval
     // defer if(node) node.free();
@@ -298,7 +298,7 @@ func testParsePackage() {
 
     //"
 
-    var node = parser.parseJson(data)
+    var node = parser.parseJson(StringInit(data))
     defer if(node) node.free()
 
     if(parser.hasError()) {

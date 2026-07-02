@@ -247,13 +247,11 @@ func ProcessTestOutput(
                 continue
             }
 
-            // TODO: fix me, memory copy
-            var json = line.toCStr(pm.allocator)
             sb.delete(0, index + 1)
             bufferStr = sb.toString()
             index = bufferStr.indexOf($"\n")
 
-            var node = parser.parseJson(json)
+            var node = parser.parseJson(line)
             defer node.free()
 
             if(node == null || !node.isObject()) {

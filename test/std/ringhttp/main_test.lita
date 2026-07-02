@@ -202,7 +202,7 @@ func testPathParameters(url: *const char, params: *Array<Param>) {
     var parser = JsonParserInit()
     defer parser.free()
 
-    var json = parser.parseJson(resp.body.cStr())
+    var json = parser.parseJson(resp.body.toString())
     assert(json.isObject())
     assert(json.contains("query"))
 
@@ -496,7 +496,7 @@ func test_url_path_parameter() {
     var parser = JsonParserInit()
     defer parser.free()
 
-    var json = parser.parseJson(resp.body.cStr())
+    var json = parser.parseJson(resp.body.toString())
     assert(json.isObject())
     assert(json.contains("path_values"))
 

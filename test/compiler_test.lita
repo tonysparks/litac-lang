@@ -200,7 +200,7 @@ func BuildTestSuite(
     var parser = JsonParser{}
     parser.init(suite.allocator)
 
-    var node = parser.parseJson(data)
+    var node = parser.parseJson(StringInit(data))
     if(!node) {
         if(parser.hasError()) {
             printf("Test Json Syntax error: '%s' in file '%s'\n", parser.errorMsg, suite.filename)

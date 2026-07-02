@@ -1,0 +1,352 @@
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+// Tests for escape sequence handling in all four string literal forms:
+//
+//   "..."       *const char, single-line  -- standard C escape semantics
+//   """..."""   *const char, multiline    -- verbatim: \n stays \n, not newline
+//   $"..."      String,      single-line  -- same escapes as "...", adds .length
+//   $"""..."""  String,      multiline    -- same semantics as """...""", adds .length
+//
+// Key difference: in MULTILINE strings (\"\"\"), escape sequences like \n and \t
+// are preserved LITERALLY (backslash + letter).  Only \\ is special (becomes \).
+// To embed a newline in a multiline string, use a literal newline in the source.
+
+// ============================================================
+// $"..." native String (single-line) escape sequence tests
+// ============================================================
+
+@test
+func testNativeStrNoEscapes() {
+    var s = $"hello"
+    assert(s.length == 5)
+    assert(s.buffer[0] == 'h')
+    assert(s.buffer[4] == 'o')
+}
+
+@test
+func testNativeStrEscapedQuote() {
+    var s = $"\""
+    assert(s.length == 1)
+    assert(s.buffer[0] == '"')
+}
+
+@test
+func testNativeStrEscapedBackslash() {
+    // \\ in source = one backslash byte in output; .length must be 1
+    var s = $"\\"
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\\')
+}
+
+@test
+func testNativeStrNewlineEscape() {
+    // \n in a single-line $"..." is a real newline byte
+    var s = $"\n"
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\n')
+}
+
+@test
+func testNativeStrTabEscape() {
+    // \t in a single-line $"..." is a real tab byte
+    var s = $"\t"
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\t')
+}
+
+@test
+func testNativeStrCarriageReturn() {
+    var s = $"\r"
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\r')
+}
+
+@test
+func testNativeStrNullByte() {
+    // \0 = one null byte; .length must be 1 (cannot use strlen here)
+    var s = $"\0"
+    assert(s.length == 1)
+    assert(s.buffer[0] == '\0')
+}
+
+@test
+func testNativeStrTwoBackslashes() {
+    // \\\\ in source = two backslash bytes; .length must be 2
+    var s = $"\\\\"
+    assert(s.length == 2)
+    assert(s.buffer[0] == '\\')
+    assert(s.buffer[1] == '\\')
+}
+
+@test
+func testNativeStrBackslashBeforeN() {
+    // \\n in source = backslash then 'n' (NOT a newline); .length must be 2
+    var s = $"\\n"
+    assert(s.length == 2)
+    assert(s.buffer[0] == '\\')
+    assert(s.buffer[1] == 'n')
+}
+
+@test
+func testNativeStrBackslashBeforeT() {
+    // \\t in source = backslash then 't' (NOT a tab); .length must be 2
+    var s = $"\\t"
+    assert(s.length == 2)
+    assert(s.buffer[0] == '\\')
+    assert(s.buffer[1] == 't')
+}
+
+@test
+func testNativeStrMixedEscapes() {
+    // a\\b\nc = a, \, b, newline, c = 5 bytes
+    var s = $"a\\b\nc"
+    assert(s.length == 5)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == 'b')
+    assert(s.buffer[3] == '\n')
+    assert(s.buffer[4] == 'c')
+}
+
+@test
+func testNativeStrBackslashSurroundedByText() {
+    // "prefix\\suffix" = prefix + \ + suffix = 13 chars
+    var s = $"prefix\\suffix"
+    assert(s.length == 13)
+    assert(s.buffer[6] == '\\')
+    assert(s.buffer[7] == 's')
+}
+
+@test
+func testNativeStrMultipleBackslashSequences() {
+    // \\x\\y = \x\y = 4 bytes
+    var s = $"\\x\\y"
+    assert(s.length == 4)
+    assert(s.buffer[0] == '\\')
+    assert(s.buffer[1] == 'x')
+    assert(s.buffer[2] == '\\')
+    assert(s.buffer[3] == 'y')
+}
+
+@test
+func testNativeStrBackslashUSequence() {
+    // \\u0000 in LitaC source becomes \\u0000 in the C string literal,
+    // which C processes as a literal backslash + u0000 (6 chars, not a UCN).
+    // The full string {"k":"..."} is 14 chars.
+    // This was the original cgen bug: both bytes of \\ were skipped,
+    // giving .length = 13 instead of 14.
+    var s = $"{\"k\":\"\\u0000\"}"
+    assert(s.length == 14)
+}
+
+@test
+func testNativeStrAgreesWithCStr() {
+    // $"..." and "..." must produce identical bytes for the same content
+    var cstr = "hello \\ world"
+    var nstr = $"hello \\ world"
+    assert(nstr.length == strlen(cstr) as (i32))
+    assert(strcmp(cstr, nstr.buffer) == 0)
+}
+
+// ============================================================
+// $"""...""" multiline native String escape tests
+//
+// Multiline strings are VERBATIM: escape sequences like \n, \t
+// are NOT interpreted as control characters; they are kept as
+// literal backslash+letter sequences in the output.  Only \\
+// is special -- it produces a single backslash.
+//
+// To get an actual newline in a multiline string, write a real
+// newline in the source (the cgen will escape it into \n in C).
+// ============================================================
+
+@test
+func testMultiStrNativeNoEscapes() {
+    var s = $"""hello"""
+    assert(s.length == 5)
+    assert(s.buffer[0] == 'h')
+    assert(s.buffer[4] == 'o')
+}
+
+@test
+func testMultiStrNativeBackslash() {
+    // \\ in multistring source = one backslash byte in output
+    var s = $"""a\\b"""
+    assert(s.length == 3)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == 'b')
+}
+
+@test
+func testMultiStrNativeBackslashNIsLiteral() {
+    // \n in a MULTILINE string is NOT a newline; it is a literal \ + n (2 bytes).
+    // Use a real newline in source (testMultiStrNativeLiteralNewline) to get '\n'.
+    var s = $"""a\nb"""
+    assert(s.length == 4)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == 'n')
+    assert(s.buffer[3] == 'b')
+}
+
+@test
+func testMultiStrNativeBackslashTIsLiteral() {
+    // \t in a MULTILINE string is NOT a tab; it is a literal \ + t (2 bytes).
+    var s = $"""a\tb"""
+    assert(s.length == 4)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == 't')
+    assert(s.buffer[3] == 'b')
+}
+
+@test
+func testMultiStrNativeTwoBackslashes() {
+    // \\\\ = two backslash bytes; .length must be 4 (a + \ + \ + b)
+    var s = $"""a\\\\b"""
+    assert(s.length == 4)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == '\\')
+    assert(s.buffer[3] == 'b')
+}
+
+@test
+func testMultiStrNativeBackslashBeforeN() {
+    // \\n = backslash then 'n' (same as plain \n in a multistring)
+    var s = $"""\\n"""
+    assert(s.length == 2)
+    assert(s.buffer[0] == '\\')
+    assert(s.buffer[1] == 'n')
+}
+
+@test
+func testMultiStrNativeMixed() {
+    // a\\b\nc = a + \ + b + \ + n + c = 6 bytes
+    // Note: \n here is a literal \+n, NOT a newline
+    var s = $"""a\\b\nc"""
+    assert(s.length == 6)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == 'b')
+    assert(s.buffer[3] == '\\')
+    assert(s.buffer[4] == 'n')
+    assert(s.buffer[5] == 'c')
+}
+
+@test
+func testMultiStrNativeLiteralNewline() {
+    // A real newline in the source becomes a real newline byte in the output.
+    var s = $"""a
+b"""
+    assert(s.length == 3)
+    assert(s.buffer[0] == 'a')
+    assert(s.buffer[1] == '\n')
+    assert(s.buffer[2] == 'b')
+}
+
+@test
+func testMultiStrNativeAgreesWithSingleLine() {
+    // $"""...""" and $"..." must produce the same bytes when only \\ is used
+    var ml = $"""hello \\ world"""
+    var sl = $"hello \\ world"
+    assert(ml.length == sl.length)
+    assert(strncmp(ml.buffer, sl.buffer, ml.length as (usize)) == 0)
+}
+
+// ============================================================
+// """...""" *const char multiline string escape tests
+//
+// Same verbatim semantics as $"""...""" -- \n is literal, \\ is backslash.
+// Correctness verified via strlen (safe: no embedded nulls here).
+// ============================================================
+
+@test
+func testCStrMultiNoEscapes() {
+    var s = """hello"""
+    assert(strlen(s) == 5)
+}
+
+@test
+func testCStrMultiBackslash() {
+    // \\ = single backslash byte; strlen must reflect 3 bytes (a\b)
+    var s = """a\\b"""
+    assert(strlen(s) == 3)
+    assert(s[0] == 'a')
+    assert(s[1] == '\\')
+    assert(s[2] == 'b')
+}
+
+@test
+func testCStrMultiBackslashNIsLiteral() {
+    // \n in a MULTILINE *const char is NOT a newline; it is \ + n (strlen = 4)
+    var s = """a\nb"""
+    assert(strlen(s) == 4)
+    assert(s[0] == 'a')
+    assert(s[1] == '\\')
+    assert(s[2] == 'n')
+    assert(s[3] == 'b')
+}
+
+@test
+func testCStrMultiBackslashTIsLiteral() {
+    // \t in a MULTILINE *const char is NOT a tab; it is \ + t (strlen = 4)
+    var s = """a\tb"""
+    assert(strlen(s) == 4)
+    assert(s[0] == 'a')
+    assert(s[1] == '\\')
+    assert(s[2] == 't')
+    assert(s[3] == 'b')
+}
+
+@test
+func testCStrMultiTwoBackslashes() {
+    // \\\\ = two backslash bytes; strlen must be 4
+    var s = """a\\\\b"""
+    assert(strlen(s) == 4)
+    assert(s[0] == 'a')
+    assert(s[1] == '\\')
+    assert(s[2] == '\\')
+    assert(s[3] == 'b')
+}
+
+@test
+func testCStrMultiBackslashBeforeN() {
+    // \\n = backslash then 'n'; strlen must be 2
+    var s = """\\n"""
+    assert(strlen(s) == 2)
+    assert(s[0] == '\\')
+    assert(s[1] == 'n')
+}
+
+@test
+func testCStrMultiLiteralNewline() {
+    // A real newline in source produces a real newline byte
+    var s = """a
+b"""
+    assert(strlen(s) == 3)
+    assert(s[0] == 'a')
+    assert(s[1] == '\n')
+    assert(s[2] == 'b')
+}
+
+@test
+func testCStrMultiAgreesWithNativeStr() {
+    // *const char multistring and $"""...""" must produce the same bytes
+    var cstr = """hello \\ world"""
+    var nstr = $"""hello \\ world"""
+    assert(nstr.length == strlen(cstr) as (i32))
+    assert(strcmp(cstr, nstr.buffer) == 0)
+}
+
+@test
+func testCStrSingleAgreesWithNativeStr() {
+    // Single-quoted *const char and $"..." must produce the same bytes
+    var cstr = "hello \\ world"
+    var nstr = $"hello \\ world"
+    assert(nstr.length == strlen(cstr) as (i32))
+    assert(strcmp(cstr, nstr.buffer) == 0)
+}

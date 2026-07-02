@@ -106,7 +106,7 @@ public func BuildFileFromFile(
         return false
     }
 
-    var node = parser.parseJson(data)
+    var node = parser.parseJson(StringInit(data, length as (i32)))
     defer if(node) node.free()
 
     if(parser.hasError()) {
@@ -188,7 +188,7 @@ func testBuildFileFromJson() {
     parser.init()
     defer parser.free()
 
-    var node = parser.parseJson(data)
+    var node = parser.parseJson(StringInit(data))
     defer if(node) node.free()
 
     assert(!parser.hasError());

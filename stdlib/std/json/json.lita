@@ -880,6 +880,7 @@ public struct JsonParser {
     token: Token
     buffer: StringBuilder
     stream: *const char
+    streamEnd: *const char  // null = null-terminated mode; non-null = length-bounded mode
     lineStart: *const char
 }
 
@@ -895,6 +896,7 @@ public func (p: *JsonParser) init(alloc: *const mem::Allocator = mem::defaultAll
     memset(p.errorMsg, 0, MAX_MESSAGE_SIZE)
 
     p.stream = null
+    p.streamEnd = null
     p.lineStart = null
     p.token.pos.name = "<string>";
     p.token.pos.line = 1
@@ -907,8 +909,9 @@ public func (p: *JsonParser) free() {
     p.lineStart = null
 }
 
-public func (p: *JsonParser) parseJson(buffer: *const char) : *JsonNode {
-    p.stream = buffer
+public func (p: *JsonParser) parseJson(str: String) : *JsonNode {
+    p.stream = str.buffer
+    p.streamEnd = str.buffer + str.length
     p.lineStart = p.stream
     p.status = JsonParserStatus.OK
 
@@ -924,6 +927,10 @@ public func (p: *JsonParser) parseJson(buffer: *const char) : *JsonNode {
     }
 
     return node
+}
+
+func (p: *JsonParser) atEnd() : bool {
+    return !p.stream || p.stream >= p.streamEnd
 }
 
 public func (p: *JsonParser) hasError() : bool {
@@ -1256,7 +1263,7 @@ func (p: using *JsonParser) scanStr() {
     stream+=1;
     buffer.clear()
 
-    while (*stream && *stream != '"' ) { //"
+    while (!p.atEnd() && *stream != '"' ) { //"
         var c = (*stream) as (u8)
 
         // unicode code point
@@ -1285,7 +1292,10 @@ func (p: using *JsonParser) scanStr() {
                     stream += 1;
                     // Validate all 4 hex digits are present before reading.
                     for(var hi = 0; hi < 4; hi += 1) {
-                        if(stream[hi] == '\0' || !isHexChar(stream[hi])) {
+                        if((streamEnd != null && stream + hi >= streamEnd) ||
+                           stream[hi] == '\0' ||
+                           !isHexChar(stream[hi])
+                        ) {
                             p.error("Invalid \\uXXXX escape: expected 4 hex digits")
                             break
                         }
@@ -1316,7 +1326,7 @@ func (p: using *JsonParser) scanStr() {
             buffer.append("%c", val)
         }
     }
-    if (*stream) {
+    if (!p.atEnd()) {
         stream += 1;
     } else {
         p.error("Unexpected end of file within string literal");
@@ -1335,7 +1345,7 @@ func (p: using *JsonParser) scanMultiStr() {
     stream+=1;
     buffer.clear()
 
-    while (*stream && *stream != '`' ) {
+    while (!p.atEnd() && *stream != '`' ) {
         var c = (*stream) as (u8)
 
         // unicode code point
@@ -1381,7 +1391,7 @@ func (p: using *JsonParser) scanMultiStr() {
             buffer.append("%c", val)
         }
     }
-    if (*stream) {
+    if (!p.atEnd()) {
         stream += 1;
     } else {
         p.error("Unexpected end of file within string literal");
@@ -1405,7 +1415,7 @@ func (l: *JsonParser) skipComments() {
                     break;
                 }
             }
-            while(l.stream)
+            while(!l.atEnd() && *l.stream != '\0')
         }
         else if(l.stream[1] == '*') {
             l.stream += 1 // eat /
@@ -1416,7 +1426,7 @@ func (l: *JsonParser) skipComments() {
                     break;
                 }
             }
-            while(l.stream)
+            while(!l.atEnd() && *l.stream != '\0')
         }
     }
 }
@@ -1426,6 +1436,11 @@ func (p: using *JsonParser) nextToken() {
 
 repeat:
     if(p.hasError()) {
+        return;
+    }
+
+    if(p.atEnd()) {
+        token.kind = TokenKind.EOF
         return;
     }
 
@@ -1439,7 +1454,7 @@ repeat:
         case '\r':
         case '\t': {
       //  case '\v':
-            while (isspace(*stream)) {
+            while (!p.atEnd() && isspace(*stream)) {
                 if (*stream == '\n') {
                     lineStart = stream;
                     token.pos.line += 1;
@@ -1607,7 +1622,7 @@ public func testParser() {
     parser.init()
     defer parser.free()
 
-    var node = parser.parseJson(data)
+    var node = parser.parseJson(StringInit(data, length as (i32)))
     defer if(node) node.free()
 
     if(!node) {
@@ -1636,7 +1651,7 @@ public func testPrettyPrinter() {
     { "x": 7, "y":[1,234,{"x":[null, true, false, 34.5, [false]] }],"z":"hi"}
     """
     var parser = JsonParserInit()
-    var node = parser.parseJson(json)
+    var node = parser.parseJson(StringInit(json))
     if (parser.hasError()) {
         printf("Parsing error: %s\n", parser.errorMsg)
     }

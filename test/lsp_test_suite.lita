@@ -192,9 +192,8 @@ func RunTest(sb: *StringBuilder, test: *TestCase) {
             }
         }
 
-        var response = sb.cStr()
         var parser = JsonParserInit(testHarness.allocator)
-        var responseJson = parser.parseJson(response)
+        var responseJson = parser.parseJson(sb.toString())
 
         if(!responseJson) {
             printf("Failed parsing response json: %s\n", parser.errorMsg)
@@ -207,7 +206,7 @@ func RunTest(sb: *StringBuilder, test: *TestCase) {
             continue
         }
 
-        var expectedJson = parser.parseJson(req.response)
+        var expectedJson = parser.parseJson(StringInit(req.response))
         if(!expectedJson) {
             printf("Failed parsing expected json: %s from '%s'\n", parser.errorMsg, req.response)
             return;

@@ -179,7 +179,7 @@ public func (this: *LspServer) readMessage() {
     var parser = JsonParserInit(this.requestAlloc())
     defer parser.free()
 
-    var json = parser.parseJson(this.message.cStr())
+    var json = parser.parseJson(this.message.toString())
     if(parser.hasError()) {
         this.log("json parsing error: %s\n", parser.errorMsg)
         return;
@@ -310,7 +310,7 @@ public func (this: *LspServer) handleInitializeMessage(msg: *JsonNode, params: *
 
     this.workspace.setup(path, rootUri)
 
-    var capabilities = """
+    var capabilities = $"""
     {
         "capabilities": {
             "textDocumentSync": {

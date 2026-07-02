@@ -2863,10 +2863,18 @@ public func (this: using *CGen) emitStmt(s: *Stmt) {
             if(expr.string.mod & Mod.NATIVE_STRING) {
                 while(start < end) {
                     var c = this.buf.buffer[start]
-                    if(c != '\\') {
+                    if(c == '\\') {
+                        if(start + 1 < end && this.buf.buffer[start + 1] == '\\') {
+                            // \\ → one backslash in output
+                            length += 1
+                            start += 2
+                        } else {
+                            start += 1
+                        }
+                    } else {
                         length += 1
+                        start += 1
                     }
-                    start+=1
                 }
                 this.buf.append(", .length = %d }", length)
             }

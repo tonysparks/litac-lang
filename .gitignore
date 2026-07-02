@@ -55,3 +55,6 @@ bootstrap/output/**
 bin/file_test
 bin/profile.data.txt
 test_output/lita_test.lita
+test_output/cgen/litac.c
+test_output/json_debug_test.lita
+test_output/json_debug.lita

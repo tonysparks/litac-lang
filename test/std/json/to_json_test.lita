@@ -26,7 +26,7 @@ func assertToJson(s: String, expected: *const char) {
 func decodeJsonToString(jsonObj: *const char) : String {
     var ctx = JsonContextInit()
     var parser = JsonParserInit()
-    var node = parser.parseJson(jsonObj)
+    var node = parser.parseJson(StringInit(jsonObj))
     assert(!parser.hasError())
     assert(node != null)
     var s = String{}
@@ -38,7 +38,7 @@ func decodeJsonToString(jsonObj: *const char) : String {
 func decodeJsonToStringBuffer(jsonObj: *const char, buf: *char, cap: i32) : StringBuffer {
     var ctx = JsonContextInit()
     var parser = JsonParserInit()
-    var node = parser.parseJson(jsonObj)
+    var node = parser.parseJson(StringInit(jsonObj))
     assert(!parser.hasError())
     assert(node != null)
     var sb = StringBufferInit(buf, cap)
@@ -50,7 +50,7 @@ func decodeJsonToStringBuffer(jsonObj: *const char, buf: *char, cap: i32) : Stri
 func decodeJsonToStringBuilder(jsonObj: *const char, sb: *StringBuilder) {
     var ctx = JsonContextInit()
     var parser = JsonParserInit()
-    var node = parser.parseJson(jsonObj)
+    var node = parser.parseJson(StringInit(jsonObj))
     assert(!parser.hasError())
     assert(node != null)
     sb.fromJson(&ctx, node.get("k"))
@@ -525,7 +525,7 @@ func assertCStrRoundTrip(s: *const char) {
     wrapped.append("{\"k\":%.*s}", encoded.length, encoded.buffer)
 
     var parser = JsonParserInit()
-    var node = parser.parseJson(wrapped.cStr())
+    var node = parser.parseJson(wrapped.toString())
     assert(!parser.hasError())
     assert(node != null)
     assert(strcmp(node.getStr("k"), s) == 0)

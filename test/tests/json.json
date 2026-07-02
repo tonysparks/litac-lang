@@ -45,7 +45,7 @@
                 //printf("%s\n", buf.cStr())
 
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     [
                          true, 4, false, "hi", 34343, null, [5],
                          {
@@ -123,7 +123,7 @@
                 parser.init()
                 defer parser.free()
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     [
                          true, 4, false, "hi", 34343, null, [5],
 
@@ -156,7 +156,7 @@
                 parser.init()
                 defer parser.free()
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     fase
                 """)
                 //printf("error: '%s'\n", parser.errorMsg)
@@ -183,7 +183,7 @@
                 parser.init()
                 defer parser.free()
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     [
                          tru, 4, false, "hi", 34343, null, [5],
                          {
@@ -217,7 +217,7 @@
                 parser.init()
                 defer parser.free()
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     [
                          true 4, false, "hi", 34343, null, [5],
                          {
@@ -249,7 +249,7 @@
                 parser.init()
                 defer parser.free()
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     {
                         "amount": -4.22,
                         "credit": -100.5,
@@ -285,7 +285,7 @@
                 parser.init()
                 defer parser.free()
 
-                var node = parser.parseJson("""
+                var node = parser.parseJson($"""
                     [-4.22, -100.5, 9.99, -7, 0.0]
                 """)
 
