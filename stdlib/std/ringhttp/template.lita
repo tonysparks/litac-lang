@@ -507,10 +507,9 @@ func BaseName(path: String) : String {
 
 func WriteGeneratedHeader(output: *StringBuilder) {
     var now = DateTimeNow()
-    var temp:[64]char;
-    var buf = StringBufferInit(temp, 64, 0)
-    now.isoFormat(&buf)
-    output.append("// Generated: %s\n", buf.cStr())
+    var buf: IsoDateBuf;
+    var nowStr = buf.isoFormat(&now)
+    output.append("// Generated: %s\n", nowStr)
 }
 
 func BaseImports(output: *StringBuilder) {

@@ -416,8 +416,8 @@ func (m: *Migrator) recordApplied(mig: *Migration, err: *MigrationError) : bool 
         return false
     }
 
-    var nowBuf: [TIMESTAMP_MAX]char
-    var nowSb = StringBufferInit(nowBuf, TIMESTAMP_MAX, 0)
+    var nowBuf: IsoDateBuf;
+    var nowSb = nowBuf.toStringBuffer()
     var now = DateTimeNow()
     now.isoFormat(&nowSb)
 
@@ -425,7 +425,7 @@ func (m: *Migrator) recordApplied(mig: *Migration, err: *MigrationError) : bool 
     stmt.bindText (2, mig.filename,    mig.filenameLen)
     stmt.bindText (3, mig.description, mig.descLen)
     stmt.bindText (4, mig.checksum,    CHECKSUM_LEN)
-    stmt.bindText (5, nowBuf,          nowSb.length)
+    stmt.bindText (5, nowBuf.buffer,   nowSb.length)
 
     r = stmt.step()
     stmt.close()

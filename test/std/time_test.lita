@@ -121,6 +121,17 @@ func testIsoFormatRoundTrip() {
 }
 
 @test
+func testIsoDateBuf() {
+    var dt = DateTimeFromIso("1967-02-20T13:23:22".toString())
+
+    var buf: IsoDateBuf;
+    var str = buf.isoFormat(&dt)
+
+    var parsed = DateTimeFromIso(StringInit(str))
+    assert(parsed.compare(dt) == 0)
+}
+
+@test
 func testDateTimeFromIsoKnown() {
     var dt = DateTimeFromIso("1967-02-20T13:23:22".toString())
     assert(dt.year == 1967)

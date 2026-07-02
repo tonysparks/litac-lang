@@ -54,13 +54,11 @@ public func Logv(level: LogLevel, format: *const char, args: va_list) {
     if(logLevel > level) return;
 
     mtx.lock()
-        var buffer:[64]char;
-        var sb = StringBufferInit(buffer, 64, 0)
-
+        var buffer: IsoDateBuf;
         var now = DateTimeNow()
-        now.isoFormat(sb)
+        var nowStr = buffer.isoFormat(&now)
 
-        fprintf(outputFile, "[%s] [%s] ", LogLevelAsStr(level), sb.cStr())
+        fprintf(outputFile, "[%s] [%s] ", LogLevelAsStr(level), nowStr)
         vfprintf(outputFile, format, args);
         fflush(outputFile)
     mtx.unlock()

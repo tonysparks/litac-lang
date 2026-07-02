@@ -395,8 +395,8 @@ public func (this: *SqliteStatement) bindDateTime(index: i32, dateTime: DateTime
         return this.bindNull(index)
     }
 
-    var buffer:[64]char;
-    var dateString = StringBufferInit(buffer, 64, 0)
+    var buffer: IsoDateBuf;
+    var dateString = buffer.toStringBuffer()
     dateTime.isoFormat(&dateString)
 
     var errorCode = sqlite3_bind_text(this.stmt, index, dateString.buffer, dateString.length, SQLITE_TRANSIENT)

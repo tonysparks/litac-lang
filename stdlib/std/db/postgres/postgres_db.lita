@@ -354,8 +354,8 @@ public func (this: *PgStatement) bindDateTime(index: i32, dateTime: DateTime) : 
     if(dateTime.year == 0 && dateTime.month == 0 && dateTime.day == 0) {
         return this.bindNull(index)
     }
-    var buf: [64]char
-    var sb = StringBufferInit(buf, 64, 0)
+    var buf: IsoDateBuf;
+    var sb = buf.toStringBuffer()
     dateTime.isoFormat(&sb)
     return this.bindText(index, sb.buffer, sb.length)
 }

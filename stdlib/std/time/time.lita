@@ -5,6 +5,9 @@ import "std/string/buffer"
 public const ISO_8601_DATE_FORMAT = $"%Y-%m-%dT%H:%M:%S"
 public const HTTP_DATE_FORMAT = $"%a, %d %b %Y %H:%M:%S GMT"
 
+// "YYYY-MM-DDTHH:MM:SS" (19 chars) + null, with headroom
+public const ISO_DATE_BUF_SIZE = 32_i32
+
 // Unix timestamp - timezone is UTC
 public typedef i64 as EpochTime
 
@@ -124,6 +127,22 @@ public func (this: *DateTime) isoFormat(output: *StringBuffer) : DateTimeStatus 
         ISO_8601_DATE_FORMAT,
         output
     )
+}
+
+// Stack-allocated buffer sized for ISO_8601_DATE_FORMAT output, avoiding the manual [N]char + StringBufferInit dance.
+public struct IsoDateBuf {
+    buffer: [ISO_DATE_BUF_SIZE]char
+}
+
+public func (this: *IsoDateBuf) toStringBuffer() : StringBuffer {
+    return StringBufferInit(this.buffer, ISO_DATE_BUF_SIZE, 0)
+}
+
+// One-shot: formats `dateTime` as ISO 8601 and returns the resulting C string.
+public func (this: *IsoDateBuf) isoFormat(dateTime: *DateTime) : *const char {
+    var sb = this.toStringBuffer()
+    dateTime.isoFormat(&sb)
+    return sb.cStrConst()
 }
 
 public func Now() : EpochTime {
