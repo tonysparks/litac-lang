@@ -911,7 +911,7 @@ public func (p: *JsonParser) free() {
 
 public func (p: *JsonParser) parseJson(str: String) : *JsonNode {
     p.stream = str.buffer
-    p.streamEnd = str.buffer + str.length
+    p.streamEnd = str.buffer ? str.buffer + str.length : null
     p.lineStart = p.stream
     p.status = JsonParserStatus.OK
 

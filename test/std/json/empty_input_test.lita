@@ -1,0 +1,34 @@
+import "std/json"
+import "std/string"
+import "std/libc"
+import "std/assert"
+
+// Regression test: JsonParser.parseJson() must not perform pointer
+// arithmetic on a null String.buffer. A zero-valued String{} (buffer =
+// null, length = 0) shows up whenever callers pass an empty/uninitialized
+// body (e.g. FromJson() on an empty HTTP request body). Previously this
+// computed `null + 0` for streamEnd, which is undefined behavior and was
+// flagged by UBSan ("applying zero offset to null pointer").
+
+@test
+func testParseJsonWithNullBufferString() {
+    var empty = String{}
+    assert(empty.buffer == null)
+    assert(empty.length == 0)
+
+    var parser = JsonParserInit()
+    var node = parser.parseJson(empty)
+
+    // Empty input yields no node (parser hits EOF immediately) but,
+    // critically, must not crash/trap computing streamEnd from a null buffer.
+    assert(node == null)
+}
+
+@test
+func testParseJsonWithEmptyCString() {
+    // A non-null buffer with zero length should behave the same way.
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit(""))
+
+    assert(node == null)
+}
