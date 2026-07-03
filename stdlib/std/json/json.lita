@@ -1285,6 +1285,10 @@ func (p: using *JsonParser) scanStr() {
                 break;
             } else if (val == '\\') {
                 stream += 1;
+                if (p.atEnd()) {
+                    p.error("Unexpected end of input in string escape");
+                    break;
+                }
                 if (*stream == 'x') {
                     //  TODO
                     // val = scan_hex_escape();
@@ -1296,22 +1300,25 @@ func (p: using *JsonParser) scanStr() {
                            stream[hi] == '\0' ||
                            !isHexChar(stream[hi])
                         ) {
-                            p.error("Invalid \\uXXXX escape: expected 4 hex digits")
-                            break
+                            p.error("Invalid \\uXXXX escape: expected 4 hex digits");
+                            break;
                         }
                     }
-                    var codepoint = Utf8HexDecode(stream, 4)
-                    stream += 4
-                    if(!Utf8CodepointValid(codepoint)) {
-                        p.error("Invalid Unicode codepoint U+%04X in \\u escape", codepoint as (u32))
-                        break
+                    if(!p.hasError()) {
+                        var codepoint = Utf8HexDecode(stream, 4)
+                        stream += 4
+                        if(!Utf8CodepointValid(codepoint)) {
+                            p.error("Invalid Unicode codepoint U+%04X in \\u escape", codepoint as (u32));
+                            break;
+                        }
+                        var encoded: [4]u8
+                        var encLen = Utf8Encode(codepoint, encoded)
+                        if(encLen > 0) {
+                            buffer.appendStrn(encoded as (*const char), encLen)
+                        }
+                        continue;
                     }
-                    var encoded: [4]u8
-                    var encLen = Utf8Encode(codepoint, encoded)
-                    if(encLen > 0) {
-                        buffer.appendStrn(encoded as (*const char), encLen)
-                    }
-                    continue
+                    break;
                 } else {
                     val = escapeToChar[(*stream) as (i32)];
                     if (val == 0 && *stream != '0') {
@@ -1407,6 +1414,9 @@ func (p: using *JsonParser) scanMultiStr() {
 
 func (l: *JsonParser) skipComments() {
     if(*l.stream == '/') {
+        if(l.stream + 1 >= l.streamEnd) {
+            return;
+        }
         if(l.stream[1] == '/') {
             l.stream += 1
             do {
@@ -1421,7 +1431,10 @@ func (l: *JsonParser) skipComments() {
             l.stream += 1 // eat /
             do {
                 l.stream += 1
-                if((l.stream[0] == '*' && l.stream[1] == '/')) {
+                if(!l.atEnd() &&
+                   l.stream + 1 < l.streamEnd &&
+                   (l.stream[0] == '*' && l.stream[1] == '/')
+                ) {
                     l.stream += 2
                     break;
                 }
@@ -1472,18 +1485,21 @@ repeat:
             break;
         }
         case '.':
-            if (isdigit(stream[1])) {
+            if ((stream + 1 < streamEnd) && isdigit(stream[1])) {
                 p.scanFloat();
+            } else {
+                p.error("'.' must be followed by a digit");
+                stream += 1;
             }
             break;
         case '-':
-            if (isdigit(stream[1])) {
+            if ((stream + 1 < streamEnd) && isdigit(stream[1])) {
                 stream += 1
                 // peek ahead to detect negative float (mirrors positive number case)
-                while (isdigit(*stream)) {
+                while (!p.atEnd() && isdigit(*stream)) {
                     stream += 1;
                 }
-                var c: char = *stream;
+                var c: char = p.atEnd() ? '0' : *stream;
                 stream = token.start + 1;  // reset to first digit (past the '-')
                 if (c == '.' || tolower(c) == 'e') {
                     p.scanFloat()
@@ -1492,6 +1508,9 @@ repeat:
                     p.scanInt()
                     token.intNumValue *= -1
                 }
+            } else {
+                p.error("'-' must be followed by a digit");
+                stream += 1;
             }
             break;
         case '0':
@@ -1517,7 +1536,7 @@ repeat:
             break;
         }
         case 'n': {
-            if(stream[1] == 'u' && stream[2] == 'l' && stream[3] == 'l') {
+            if((stream + 4 <= streamEnd) && stream[1] == 'u' && stream[2] == 'l' && stream[3] == 'l') {
                 stream += 4;
                 token.kind = TokenKind.NULL
                 break;
@@ -1526,7 +1545,7 @@ repeat:
             break;
         }
         case 't': {
-            if(stream[1] == 'r' && stream[2] == 'u' && stream[3] == 'e') {
+            if((stream + 4 <= streamEnd) && stream[1] == 'r' && stream[2] == 'u' && stream[3] == 'e') {
                 stream += 4;
                 token.kind = TokenKind.TRUE
                 break;
@@ -1535,7 +1554,7 @@ repeat:
             break;
         }
         case 'f': {
-            if(stream[1] == 'a' && stream[2] == 'l' && stream[3] == 's' && stream[4] == 'e') {
+            if((stream + 5 <= streamEnd) && stream[1] == 'a' && stream[2] == 'l' && stream[3] == 's' && stream[4] == 'e') {
                 stream += 5;
                 token.kind = TokenKind.FALSE
                 break;

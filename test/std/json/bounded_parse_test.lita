@@ -1,0 +1,115 @@
+import "std/json"
+import "std/string"
+import "std/libc"
+import "std/assert"
+
+// assertParseErr parses a length-bounded String and asserts the parser
+// reported an error and returned null. Extra bytes beyond `len` (e.g. '!')
+// in the literal are intentional: with AddressSanitizer they distinguish a
+// real OOB read from a harmless out-of-bounds that happens to read '\0'.
+func assertParseErr(s: String) {
+    var parser = JsonParserInit()
+    var node = parser.parseJson(s)
+    assert(parser.hasError())
+    assert(node == null)
+}
+
+// ── Fix: scanStr backslash eat without bounds check ─────────────────────────
+
+@test
+func testStringTrailingBackslash() {
+    // JSON bytes: {"k":"\ — 7 bytes, streamEnd after the backslash.
+    // Before fix: stream advances past '\', then *stream reads the '!' byte
+    // at streamEnd — an OOB read.
+    var s = "{\"k\":\"\\!!!"
+    assertParseErr(StringInit(s, 7))
+}
+
+// ── Fix: \u escape falls through to Utf8HexDecode after for-loop break ──────
+
+@test
+func testTruncatedUnicodeEscapeBoundary() {
+    // JSON bytes: {"k":"\u00  — streamEnd cuts off after the two hex digits.
+    // Before fix: Utf8HexDecode(stream, 4) reads 4 bytes starting at 'u'
+    // position even though only 2 remain — OOB heap read.
+    var s = "{\"k\":\"\\u00!!!"
+    assertParseErr(StringInit(s, 10))
+}
+
+// ── Fix: skipComments reads stream[1] without streamEnd guard ───────────────
+
+@test
+func testSingleSlashAtEnd() {
+    // A lone '/' as the only byte: stream + 1 == streamEnd.
+    // Before fix: l.stream[1] reads the '!' beyond streamEnd.
+    var s = "/!!!"
+    assertParseErr(StringInit(s, 1))
+}
+
+@test
+func testBlockCommentTerminatorAtEnd() {
+    // "/* *" — the '*' is the last byte; stream[1] to check '/' is OOB.
+    var s = "/* *!!!"
+    assertParseErr(StringInit(s, 4))
+}
+
+// ── Fix: keyword lookahead (null/true/false) without streamEnd guard ─────────
+
+@test
+func testTruncatedNullKeyword() {
+    // "nul" — 3 bytes. Parser sees 'n', then reads stream[1..3]; stream[3]
+    // lands on '!' beyond streamEnd before the fix.
+    var s = "nul!!!"
+    assertParseErr(StringInit(s, 3))
+}
+
+@test
+func testTruncatedTrueKeyword() {
+    // "tru" — 3 bytes. Same OOB pattern for stream[3].
+    var s = "tru!!!"
+    assertParseErr(StringInit(s, 3))
+}
+
+@test
+func testTruncatedFalseKeyword() {
+    // "fals" — 4 bytes. "false" needs stream[4] which is '!' beyond streamEnd.
+    var s = "fals!!!"
+    assertParseErr(StringInit(s, 4))
+}
+
+// ── Fix: '.' and '-' number lookahead without streamEnd guard ────────────────
+
+@test
+func testDotAtEnd() {
+    // A lone '.' — stream[1] is OOB before the fix (checks isdigit(stream[1])).
+    var s = ".!!!"
+    assertParseErr(StringInit(s, 1))
+}
+
+@test
+func testNegativeSignAtEnd() {
+    // A lone '-' — stream[1] OOB before fix.
+    var s = "-!!!"
+    assertParseErr(StringInit(s, 1))
+}
+
+@test
+func testNegativeIntegerFillingBuffer() {
+    // "-5" exactly filling the buffer. After advancing past '-' and '5', the
+    // peek-ahead while-loop would call isdigit(*stream) at streamEnd before fix.
+    // With fix: loop guards with !p.atEnd() and final read uses p.atEnd() ? '0' : *stream.
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("-5", 2))
+    assert(!parser.hasError())
+    assert(node != null)
+    assert(node.asLong() == -5_i64)
+}
+
+@test
+func testNegativeFloatFillingBuffer() {
+    // "-3.14" exactly filling the buffer.
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("-3.14", 5))
+    assert(!parser.hasError())
+    assert(node != null)
+}
