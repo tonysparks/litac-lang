@@ -802,7 +802,7 @@ func ComputeChecksum(
     sha1_final(&ctx, hash as (*u8))
 
     for(var i = 0; i < SHA1_BLOCK_SIZE; i += 1) {
-        sprintf(&out[i * 2], "%02x", hash[i] as (u32))
+        snprintf(&out[i * 2], 3, "%02x", hash[i] as (u32))
     }
     out[CHECKSUM_LEN] = '\0'
 
