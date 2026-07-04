@@ -9,8 +9,8 @@ import "std/libc"
 //   $"..."      String,      single-line  -- same escapes as "...", adds .length
 //   $"""..."""  String,      multiline    -- same semantics as """...""", adds .length
 //
-// Key difference: in MULTILINE strings (\"\"\"), escape sequences like \n and \t
-// are preserved LITERALLY (backslash + letter).  Only \\ is special (becomes \).
+// Key difference: in MULTILINE strings (\"\"\"), ALL escape sequences including
+// \n, \t, and \\ are preserved LITERALLY (backslash + letter, or two backslashes).
 // To embed a newline in a multiline string, use a literal newline in the source.
 
 // ============================================================
@@ -172,12 +172,13 @@ func testMultiStrNativeNoEscapes() {
 
 @test
 func testMultiStrNativeBackslash() {
-    // \\ in multistring source = one backslash byte in output
+    // \\ in multistring source = two backslash bytes in output (verbatim, no collapsing)
     var s = $"""a\\b"""
-    assert(s.length == 3)
+    assert(s.length == 4)
     assert(s.buffer[0] == 'a')
     assert(s.buffer[1] == '\\')
-    assert(s.buffer[2] == 'b')
+    assert(s.buffer[2] == '\\')
+    assert(s.buffer[3] == 'b')
 }
 
 @test
@@ -205,36 +206,39 @@ func testMultiStrNativeBackslashTIsLiteral() {
 
 @test
 func testMultiStrNativeTwoBackslashes() {
-    // \\\\ = two backslash bytes; .length must be 4 (a + \ + \ + b)
+    // \\\\ = four backslash bytes in output (each \\ stays as \\); .length must be 6
     var s = $"""a\\\\b"""
-    assert(s.length == 4)
+    assert(s.length == 6)
     assert(s.buffer[0] == 'a')
     assert(s.buffer[1] == '\\')
     assert(s.buffer[2] == '\\')
-    assert(s.buffer[3] == 'b')
+    assert(s.buffer[3] == '\\')
+    assert(s.buffer[4] == '\\')
+    assert(s.buffer[5] == 'b')
 }
 
 @test
 func testMultiStrNativeBackslashBeforeN() {
-    // \\n = backslash then 'n' (same as plain \n in a multistring)
+    // \\n = two backslashes then 'n' (\\ is no longer special; stays as \\)
     var s = $"""\\n"""
-    assert(s.length == 2)
+    assert(s.length == 3)
     assert(s.buffer[0] == '\\')
-    assert(s.buffer[1] == 'n')
+    assert(s.buffer[1] == '\\')
+    assert(s.buffer[2] == 'n')
 }
 
 @test
 func testMultiStrNativeMixed() {
-    // a\\b\nc = a + \ + b + \ + n + c = 6 bytes
-    // Note: \n here is a literal \+n, NOT a newline
+    // a\\b\nc: \\ stays as \\ (2 bytes), \n stays as \n (2 bytes) = a + \\ + b + \n + c = 7 bytes
     var s = $"""a\\b\nc"""
-    assert(s.length == 6)
+    assert(s.length == 7)
     assert(s.buffer[0] == 'a')
     assert(s.buffer[1] == '\\')
-    assert(s.buffer[2] == 'b')
-    assert(s.buffer[3] == '\\')
-    assert(s.buffer[4] == 'n')
-    assert(s.buffer[5] == 'c')
+    assert(s.buffer[2] == '\\')
+    assert(s.buffer[3] == 'b')
+    assert(s.buffer[4] == '\\')
+    assert(s.buffer[5] == 'n')
+    assert(s.buffer[6] == 'c')
 }
 
 @test
@@ -249,18 +253,19 @@ b"""
 }
 
 @test
-func testMultiStrNativeAgreesWithSingleLine() {
-    // $"""...""" and $"..." must produce the same bytes when only \\ is used
+func testMultiStrNativeDifferentFromSingleLine() {
+    // $"""...""" is verbatim: \\ stays as \\ (2 bytes).
+    // $"..." processes escapes: \\ → \ (1 byte).
+    // They intentionally produce DIFFERENT results for \\.
     var ml = $"""hello \\ world"""
     var sl = $"hello \\ world"
-    assert(ml.length == sl.length)
-    assert(strncmp(ml.buffer, sl.buffer, ml.length as (usize)) == 0)
+    assert(ml.length == sl.length + 1)  // ml has one extra backslash byte
 }
 
 // ============================================================
 // """...""" *const char multiline string escape tests
 //
-// Same verbatim semantics as $"""...""" -- \n is literal, \\ is backslash.
+// Same verbatim semantics as $"""...""" -- \n is literal, \\ stays as \\.
 // Correctness verified via strlen (safe: no embedded nulls here).
 // ============================================================
 
@@ -272,12 +277,13 @@ func testCStrMultiNoEscapes() {
 
 @test
 func testCStrMultiBackslash() {
-    // \\ = single backslash byte; strlen must reflect 3 bytes (a\b)
+    // \\ = two backslash bytes (verbatim, no collapsing); strlen must reflect 4 bytes
     var s = """a\\b"""
-    assert(strlen(s) == 3)
+    assert(strlen(s) == 4)
     assert(s[0] == 'a')
     assert(s[1] == '\\')
-    assert(s[2] == 'b')
+    assert(s[2] == '\\')
+    assert(s[3] == 'b')
 }
 
 @test
@@ -304,22 +310,25 @@ func testCStrMultiBackslashTIsLiteral() {
 
 @test
 func testCStrMultiTwoBackslashes() {
-    // \\\\ = two backslash bytes; strlen must be 4
+    // \\\\ = four backslash bytes (each \\ stays as \\); strlen must be 6
     var s = """a\\\\b"""
-    assert(strlen(s) == 4)
+    assert(strlen(s) == 6)
     assert(s[0] == 'a')
     assert(s[1] == '\\')
     assert(s[2] == '\\')
-    assert(s[3] == 'b')
+    assert(s[3] == '\\')
+    assert(s[4] == '\\')
+    assert(s[5] == 'b')
 }
 
 @test
 func testCStrMultiBackslashBeforeN() {
-    // \\n = backslash then 'n'; strlen must be 2
+    // \\n = two backslashes then 'n' (\\ stays as \\); strlen must be 3
     var s = """\\n"""
-    assert(strlen(s) == 2)
+    assert(strlen(s) == 3)
     assert(s[0] == '\\')
-    assert(s[1] == 'n')
+    assert(s[1] == '\\')
+    assert(s[2] == 'n')
 }
 
 @test

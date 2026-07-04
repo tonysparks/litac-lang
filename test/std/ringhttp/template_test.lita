@@ -146,4 +146,30 @@ func testGenerateBodyRawOutput() {
     // make sure it is NOT wrapped in HtmlEscape
     assert(!content.contains($"HtmlEscape(out, rawHtml)"))
 }
+
+@test
+func testGenerateBodyBackslashContent() {
+    // Template segments with \\ must pass the raw byte count to appendStrn.
+    // Because the cgen now treats \\ as truly verbatim (no collapsing), the raw
+    // source byte count equals the binary byte count, so no adjustment is needed.
+    //
+    // $"<p>a\\\\b</p>\n" gives 12 bytes (two raw backslashes between a and b).
+    // The generated MULTISTR keeps both backslashes → binary length is also 12.
+    var entry = TemplateEntry{
+        .name    = StringBuilderInit(64,   defaultAllocator),
+        .content = StringBuilderInit(1024, defaultAllocator)
+    }
+
+    var status = GenerateFromTemplate(
+        defaultAllocator,
+        $"page.html.lt",
+        $"<p>a\\\\b</p>\n",
+        &entry
+    )
+
+    assert(status == Status.OK)
+    var content = entry.content.toString()
+    // raw source = 12 bytes; \\ stays as \\ → binary len = 12 as well
+    assert(content.contains($"out.appendStrn(\"\"\"<p>a\\\\b</p>\n\"\"\", 12)"))
+}
 #end

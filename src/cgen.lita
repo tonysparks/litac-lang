@@ -82,8 +82,11 @@ const escapeChars = [256]*const char {
     ['n'] = "\\\\n",
     ['r'] = "\\\\r",
     ['t'] = "\\\\t",
-    ['\\'] = "\\\\",
-    ['\''] = "\\'",
+    // \\ and \' must emit 2 binary bytes to match their 2 source bytes, so that
+    // str.length (raw source count) equals the binary byte count in the C string.
+    // "\\\\\\\\" emits \\\\ to C → binary \\ (2 bytes); "\\\\'" emits \\' → \' (2 bytes).
+    ['\\'] = "\\\\\\\\",
+    ['\''] = "\\\\'",
     ['"'] = "\\\\\"",
     ['\0'] = "\\0",
 }
