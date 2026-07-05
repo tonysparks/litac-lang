@@ -32,7 +32,7 @@ public func LogInit(
     if(!outputFileName.empty()) {
         var buf: [MAX_PATH]char
         outputFileName.copyTo(buf, MAX_PATH - 1)
-        outputFile = fopen(buf, "w")
+        outputFile = fopen(buf, "a")
     }
 
     if(!outputFile) {
