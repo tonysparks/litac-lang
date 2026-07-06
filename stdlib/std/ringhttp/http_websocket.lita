@@ -83,10 +83,13 @@ public func (frame: *Frame) parseHeader(input: *StringBuilder) : Status {
         if(input.length < 4) {
             return Status.ERROR_WEB_SOCKET_FRAME
         }
-        var b1 = buffer[2]
-        var b2 = buffer[3]
+        // Mask each length byte to u8 before shifting: `buffer` is *char,
+        // which is signed on the target platforms, so a byte >= 0x80 would
+        // otherwise sign-extend and corrupt the decoded payload length.
+        var b1 = (buffer[2] as (u8)) as (i64)
+        var b2 = (buffer[3] as (u8)) as (i64)
 
-        frame.payloadLength = (b1 << 8) | b2
+        frame.payloadLength = (b1 << 8_i64) | b2
         frame.offset += 2
     }
     else if(frame.payloadLength == 127) {
@@ -96,9 +99,15 @@ public func (frame: *Frame) parseHeader(input: *StringBuilder) : Status {
 
         frame.payloadLength = 0
         for(var i = 0; i < 8; i+=1) {
-            frame.payloadLength = (frame.payloadLength << 8) | buffer[2 + i]
+            frame.payloadLength = (frame.payloadLength << 8_i64) | ((buffer[2 + i] as (u8)) as (i64))
         }
         frame.offset += 8
+    }
+
+    // RFC 6455 §5.2: the most-significant bit of a 64-bit length is always 0.
+    // Reject a negative decoded length so downstream size math stays sound.
+    if(frame.payloadLength < 0) {
+        return Status.ERROR_WEB_SOCKET_FRAME_LENGTH
     }
 
     memset(frame.maskKey, 0, 4)

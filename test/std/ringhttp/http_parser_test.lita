@@ -1128,8 +1128,7 @@ func testNonNumericContentLength() {
     assert(parser.parse(input, &result) == Status.ERROR_INVALID_CONTENT_LENGTH)
 }
 
-// A very large Content-Length that overflows i32 must be clamped to 0 by
-// the MAX(0, ...) guard and must not crash.
+// A Content-Length so large it overflows u64 must be rejected outright.
 @test
 func testOverflowContentLength() {
     var parser = HttpParser{}
@@ -1138,5 +1137,56 @@ func testOverflowContentLength() {
     var result: HttpRequest
     var input = StringInit("GET / HTTP/1.1\r\nContent-Length: 99999999999999999999\r\n\r\n")
     assert(parser.parse(input, &result) == Status.ERROR_INVALID_CONTENT_LENGTH)
+}
+
+// A Content-Length that fits in u64 but exceeds i32 (2^32) must be rejected
+// rather than truncated: truncation would wrap it to a small body length,
+// desyncing the message boundary (request smuggling) and slipping past the
+// maxHttpBodySizeInBytes limit.
+@test
+func testContentLengthExceedsInt32() {
+    var parser = HttpParser{}
+    parser.init(defaultAllocator)
+
+    var result: HttpRequest
+    var input = StringInit("GET / HTTP/1.1\r\nContent-Length: 4294967296\r\n\r\n")
+    assert(parser.parse(input, &result) == Status.ERROR_INVALID_CONTENT_LENGTH)
+}
+
+// The largest value that still fits i32 must be accepted (boundary check).
+@test
+func testContentLengthMaxInt32Accepted() {
+    var parser = HttpParser{}
+    parser.init(defaultAllocator)
+
+    var result: HttpRequest
+    var input = StringInit("GET / HTTP/1.1\r\nHost: x\r\nContent-Length: 2147483647\r\n\r\n")
+    assert(parser.parse(input, &result) == Status.OK)
+    assert(result.bodyLength == 2147483647)
+}
+
+// A chunked body larger than the supplied limit must be rejected with the
+// body-size-exceeded status, mirroring the Content-Length body cap.
+@test
+func testChunkBodyExceedsLimit() {
+    var parser = HttpParser{}
+    parser.init(defaultAllocator)
+
+    var result: HttpRequest
+    // Two 10-byte chunks = 20 bytes of body; limit is 15.
+    var input = StringInit("A\r\n0123456789\r\nA\r\n0123456789\r\n0\r\n\r\n")
+    assert(parser.parseChunk(input, &result, 15) == Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT)
+}
+
+// A chunked body within the supplied limit is still accepted.
+@test
+func testChunkBodyWithinLimit() {
+    var parser = HttpParser{}
+    parser.init(defaultAllocator)
+
+    var result: HttpRequest
+    var input = StringInit("A\r\n0123456789\r\n0\r\n\r\n")
+    assert(parser.parseChunk(input, &result, 15) == Status.OK)
+    assert(result.body.body.equalsString("0123456789"))
 }
 #end

@@ -34,6 +34,12 @@ public func (b: String) hash() : u32 {
 public func (b: String) substring(start: i32, end: i32 = -1) : String {
     var endIndex = end < 0 ? b.length : end
 
+    // Clamp the end to the string bounds so an over-large `end` can never
+    // produce a String that points past the underlying allocation.
+    if(endIndex > b.length) {
+        endIndex = b.length
+    }
+
     if(endIndex <= start || start < 0 || start >= b.length) {
         return String {
             .buffer = null,
@@ -788,4 +794,26 @@ func testTrim() {
 
     str = StringInit("x")
     assert(str.trim().equalsString("x"))
+}
+
+@test("substring")
+func testSubstring() {
+    var str = StringInit("Hello")
+
+    // Normal in-bounds slice.
+    assert(str.substring(0, 5).equalsString("Hello"))
+    assert(str.substring(1, 4).equalsString("ell"))
+
+    // Open-ended slice runs to the end.
+    assert(str.substring(2).equalsString("llo"))
+
+    // Regression: an `end` past the length must clamp to the length rather
+    // than producing a String that points past the underlying allocation.
+    assert(str.substring(0, 100).equalsString("Hello"))
+    assert(str.substring(3, 100).equalsString("lo"))
+    assert(str.substring(3, 100).length == 2)
+
+    // Degenerate ranges still return empty.
+    assert(str.substring(4, 2).length == 0)
+    assert(str.substring(10, 20).length == 0)
 }

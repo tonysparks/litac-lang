@@ -77,7 +77,7 @@ public func (this: *HttpParser) parseBody(input: String, result: *HttpRequest): 
 }
 
 
-public func (this: *HttpParser) parseChunk(input: String, result: *HttpRequest) : Status {
+public func (this: *HttpParser) parseChunk(input: String, result: *HttpRequest, maxBodySize: i32 = 0) : Status {
     if(!input.endsWith($"\r\n\r\n")) {
         return Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE
     }
@@ -120,16 +120,25 @@ public func (this: *HttpParser) parseChunk(input: String, result: *HttpRequest) 
             return Status.OK
         }
 
-        // Verify the full chunk payload is present before consuming it.
-        // index + 2 skips the size line's CRLF; the chunk data must be followed
-        // by its own CRLF, so we need at least index+2+size+2 bytes total.
-        if(input.length < index + 2 + size + 2) {
+        // Verify the full chunk payload plus its trailing CRLF is present.
+        // `size` is only bounded to 0x7FFFFFFF, so computing index+2+size+2
+        // could overflow i32; check with subtraction against the known-small
+        // buffer length instead (available and size are both non-negative).
+        var available = input.length - (index + 2)   // bytes after the size line's CRLF
+        if(available < 2 || (available - 2) < size) {
             return Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE
         }
 
         // parse the chunk data
         var chunk = input.substring(index + 2, index + 2 + size)
         result.chunkData.appendStrn(chunk.buffer, chunk.length)
+
+        // RFC 7230 §4.1: bound the reassembled chunked body the same way the
+        // Content-Length path is bounded, so a stream of chunks cannot grow
+        // the request unbounded.
+        if(maxBodySize > 0 && result.chunkData.length > maxBodySize) {
+            return Status.ERROR_INVALID_BODY_EXCEEDED_LIMIT
+        }
 
         // move to the next chunk
         var chunkEndIndex = index + 2 + size
@@ -269,7 +278,14 @@ func (this: *HttpParser) checkHeader(header: *HttpHeader, result: *HttpRequest) 
         if(parsed.error != ParseError.NONE || parsed.len == 0 || parsed.len != header.values.length) {
             return Status.ERROR_INVALID_CONTENT_LENGTH
         }
-        var newLen = MAX(0, parsed.value as (i32))
+        // Reject any length that does not fit a signed 32-bit int rather than
+        // truncating it: a value like 2^32 would otherwise wrap to a small
+        // number, desyncing the body boundary (request smuggling) and slipping
+        // past the maxHttpBodySizeInBytes limit.
+        if(parsed.value > 0x7FFFFFFF_u64) {
+            return Status.ERROR_INVALID_CONTENT_LENGTH
+        }
+        var newLen = parsed.value as (i32)
         if((result.flags & HttpFlags.CONTENT_LENGTH_PROVIDED) != 0) {
             // RFC 7230 §3.3.2: duplicate Content-Length with a different value is an error.
             if(result.bodyLength != newLen) {

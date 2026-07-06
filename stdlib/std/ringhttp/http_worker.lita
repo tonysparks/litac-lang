@@ -98,19 +98,26 @@ func (this: *WorkerThread) writeAllowHeader(
     allowedMethods: i32
 ) {
     var response = requestContext.response
-    var allowBuf = requestContext.allocator.alloc(128) as (*char)
+    const ALLOW_BUF_SIZE = 128
+    var allowBuf = requestContext.allocator.alloc(ALLOW_BUF_SIZE) as (*char)
     var allowLen = 0
     // OPTIONS is always allowed if we are here.
     var allMethods = allowedMethods | (1 << HttpMethod.OPTIONS as (i32))
     for(var m = 1; m < MAX_METHODS; m += 1) {
         if(allMethods & (1 << m)) {
+            var methodName = HttpMethodAsStr(m as (HttpMethod))
+            var methodLen  = methodName.length() as (i32)
+            // Bound every write to the fixed buffer; skip any method that
+            // would not fit rather than overflowing onto adjacent memory.
+            var needed = (allowLen > 0 ? 2 : 0) + methodLen
+            if(allowLen + needed > ALLOW_BUF_SIZE) {
+                break
+            }
             if(allowLen > 0) {
                 allowBuf[allowLen] = ','
                 allowBuf[allowLen + 1] = ' '
                 allowLen += 2
             }
-            var methodName = HttpMethodAsStr(m as (HttpMethod))
-            var methodLen = methodName.length()
             memcpy(allowBuf + allowLen, methodName, methodLen as (usize))
             allowLen += methodLen
         }
@@ -375,7 +382,11 @@ internal func (this: *WorkerThread) handlePartialHttpRequest(
         }
         httpRequest.bodyLength = 0
 
-        var status = parser.parseChunk(readBuffer.toString().substring(request.headerIndex), httpRequest)
+        var status = parser.parseChunk(
+            readBuffer.toString().substring(request.headerIndex),
+            httpRequest,
+            this.config.maxHttpBodySizeInBytes as (i32)
+        )
         if(status == Status.ERROR_HTTP_PARSING_CHUNK_INCOMPLETE) {
             return Status.PARTIAL_REQUEST_DISPATCHING_READ
         }
@@ -709,6 +720,12 @@ internal func (this: *WorkerThread) handleWebSocketFrame(
             return Status.ERROR_WEB_SOCKET_FRAME
         }
 
+        // RFC 6455 §5.1: every client-to-server frame MUST be masked.
+        if(!frame.masked) {
+            readBuffer.clear()
+            return Status.ERROR_WEB_SOCKET_FRAME
+        }
+
         if(this.config.maxHttpBodySizeInBytes > 0 &&
            frame.payloadLength > this.config.maxHttpBodySizeInBytes
         ) {
@@ -719,12 +736,19 @@ internal func (this: *WorkerThread) handleWebSocketFrame(
         status = frame.parsePayload(readBuffer)
         if(status != Status.OK) {
             if(status == Status.ERROR_WEB_SOCKET_FRAME_LENGTH) {
-                if((readBuffer.capacity - frame.offset) < frame.payloadLength) {
-                    var neededSpace = frame.payloadLength - readBuffer.capacity
-                    readBuffer.reserve(readBuffer.capacity + neededSpace as (i32))
-                    Error("TODO: Grow buffer!\n")
-                    exit(1)
-                    return Status.ERROR_OUT_OF_MEMORY
+                // The full payload has not arrived yet.  Ensure the read buffer
+                // can hold the complete frame, then wait for more data.  The
+                // payload length was already bounded by maxHttpBodySizeInBytes
+                // above, so this growth is bounded and cannot be used to exhaust
+                // memory or crash the process (previously this path exit(1)'d,
+                // letting any client kill the whole server with one large frame).
+                var neededTotal = (frame.offset as (i64)) + frame.payloadLength
+                var additional  = neededTotal - (readBuffer.length as (i64))
+                if(additional > 0) {
+                    if(!readBuffer.reserve(additional as (i32))) {
+                        readBuffer.clear()
+                        return Status.ERROR_OUT_OF_MEMORY
+                    }
                 }
                 return Status.PARTIAL_WEB_SOCKET_DISPATCHING_READ
             }

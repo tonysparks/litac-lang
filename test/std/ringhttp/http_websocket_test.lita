@@ -601,6 +601,53 @@ func testWebSocketFrameCapacityGuardLargeFrame() {
     assert(status == Status.ERROR_WEB_SOCKET_FRAME_LENGTH)
 }
 
+// Regression: 16-bit extended-length bytes must be read as unsigned.  A value
+// with the high bit set (>= 0x8000) previously sign-extended through the
+// signed *char and corrupted payloadLength (decoding it as negative).
+@test
+func testWebSocketFrameParseHighBitLength16() {
+    var raw: [4]char
+    raw[0] = 0x82 as (char)   // FIN + BINARY
+    raw[1] = 126 as (char)    // 16-bit extended length, MASK bit clear
+    raw[2] = 0x9C as (char)   // 0x9C40 = 40000, high bit set
+    raw[3] = 0x40 as (char)
+
+    var sb = StringBuilderInit(16)
+    defer sb.free()
+    sb.appendStrn(raw, 4)
+
+    var frame = Frame{}
+    assert(frame.parseHeader(sb) == Status.OK)
+    assert(frame.payloadLength == 40000)
+    assert(frame.offset == 4)
+}
+
+// Regression: 64-bit extended-length bytes must also be read as unsigned.
+@test
+func testWebSocketFrameParseHighBitLength64() {
+    var raw: [10]char
+    raw[0] = 0x82 as (char)   // FIN + BINARY
+    raw[1] = 127 as (char)    // 64-bit extended length, MASK bit clear
+    // 0x0000_0000_00FF_0001 = 16711681, with a high-bit byte in the middle
+    raw[2] = 0x00 as (char)
+    raw[3] = 0x00 as (char)
+    raw[4] = 0x00 as (char)
+    raw[5] = 0x00 as (char)
+    raw[6] = 0x00 as (char)
+    raw[7] = 0xFF as (char)
+    raw[8] = 0x00 as (char)
+    raw[9] = 0x01 as (char)
+
+    var sb = StringBuilderInit(16)
+    defer sb.free()
+    sb.appendStrn(raw, 10)
+
+    var frame = Frame{}
+    assert(frame.parseHeader(sb) == Status.OK)
+    assert(frame.payloadLength == 16711681)
+    assert(frame.offset == 10)
+}
+
 // ---------------------------------------------------------------------------
 // Helpers for new tests
 // ---------------------------------------------------------------------------
@@ -850,6 +897,86 @@ func test_websocket_frag_limit_exceeded() {
     send(sock, frameBuf, n, 0)
 
     // Server closes the connection; recv returns 0 (EOF) or -1 (reset).
+    var buf: [16]char
+    var r = recv(sock, buf, 16, 0)
+    assert(r <= 0)
+}
+
+// ---------------------------------------------------------------------------
+// Oversized frame must not crash the server (regression for the exit(1) DoS)
+// ---------------------------------------------------------------------------
+
+// A frame declaring a payload larger than the 32 KiB read buffer (but within
+// maxHttpBodySizeInBytes) previously reached an exit(1) call, letting any
+// client kill the whole server process with a single frame.  Send such a frame
+// header, then prove the server is still alive by completing a normal echo on a
+// fresh connection.
+@test("test WebSocket oversized frame does not crash the server")
+func test_websocket_large_frame_no_crash() {
+    if(!wsServerReady) { return; }
+
+    var sock = wsConnect()
+    assert(sock >= 0)
+
+    // Masked BINARY frame, 16-bit extended length = 40000 (> 32 KiB buffer).
+    // Only the header + one payload byte is sent; the server must grow its
+    // buffer and wait for the rest rather than crashing.
+    var hdr: [16]char
+    hdr[0] = 0x82 as (char)          // FIN + BINARY
+    hdr[1] = (0x80 | 126) as (char)  // MASK + 16-bit length
+    hdr[2] = 0x9C as (char)          // 40000 >> 8
+    hdr[3] = 0x40 as (char)          // 40000 & 0xFF
+    hdr[4] = 0x01 as (char)          // mask key
+    hdr[5] = 0x02 as (char)
+    hdr[6] = 0x03 as (char)
+    hdr[7] = 0x04 as (char)
+    hdr[8] = 0x00 as (char)          // one payload byte, far short of 40000
+    send(sock, hdr, 9, 0)
+    close(sock)
+
+    // The server survived: a brand-new connection still handshakes and echoes.
+    var sock2 = wsConnect()
+    assert(sock2 >= 0)
+    defer close(sock2)
+
+    var mask = [4]u8 {0xDE_u8, 0xAD_u8, 0xBE_u8, 0xEF_u8}
+    var frameBuf: [32]char
+    var frameLen = buildWsFrame(0x1, true, "alive", 5, frameBuf, mask)
+    assert(send(sock2, frameBuf, frameLen, 0) == frameLen)
+
+    var echo = StringBuilderInit(64)
+    defer echo.free()
+    var opcode = 0
+    var echoLen = readWebSocketFrame(sock2, &echo, &opcode)
+    assert(echoLen > 0)
+    assert(echo.contains($"alive"))
+}
+
+// ---------------------------------------------------------------------------
+// Unmasked client frame must be rejected (RFC 6455 §5.1)
+// ---------------------------------------------------------------------------
+
+@test("test WebSocket unmasked client frame is rejected")
+func test_websocket_unmasked_frame_rejected() {
+    if(!wsServerReady) { return; }
+
+    var sock = wsConnect()
+    assert(sock >= 0)
+    defer close(sock)
+    _ws_setRecvTimeout(sock, 3)
+
+    // FIN + TEXT, MASK bit clear, 5-byte payload sent in the clear.
+    var frameBuf: [16]char
+    frameBuf[0] = 0x81 as (char)   // FIN + TEXT
+    frameBuf[1] = 5 as (char)      // no MASK bit, length 5
+    frameBuf[2] = 'h'
+    frameBuf[3] = 'e'
+    frameBuf[4] = 'l'
+    frameBuf[5] = 'l'
+    frameBuf[6] = 'o'
+    send(sock, frameBuf, 7, 0)
+
+    // Server rejects the unmasked frame and closes: recv returns 0 (EOF) or -1.
     var buf: [16]char
     var r = recv(sock, buf, 16, 0)
     assert(r <= 0)
