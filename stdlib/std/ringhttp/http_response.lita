@@ -127,9 +127,18 @@ public func (this: *HttpResponse) init(allocator: *const Allocator) {
     this.reset()
 }
 
-public func (this: *HttpResponse) addHeader(name: String, value: String) {
+public func (this: *HttpResponse) addHeader(name: String, value: String) : Status {
     if(this.numberOfHeaders >= MAX_HEADERS) {
-        return;
+        return Status.ERROR_INVALID_HEADER_EXCEEDED_LIMIT
+    }
+
+    // Reject values containing CR/LF: no legitimate header value carries a bare CR/LF,
+    // and allowing them enables response splitting / header injection.
+    for(var i = 0; i < value.length; i += 1) {
+        var c = value.buffer[i]
+        if(c == '\r' || c == '\n') {
+            return Status.ERROR_INVALID_HEADER_VALUE
+        }
     }
 
     var header = &this.headers[this.numberOfHeaders]
@@ -137,10 +146,11 @@ public func (this: *HttpResponse) addHeader(name: String, value: String) {
     header.values = value
 
     this.numberOfHeaders += 1
+    return Status.OK
 }
 
-public func (this: *HttpResponse) addHeaderStr(name: *const char, value: *const char) {
-    this.addHeader(StringInit(name), StringInit(value))
+public func (this: *HttpResponse) addHeaderStr(name: *const char, value: *const char) : Status {
+    return this.addHeader(StringInit(name), StringInit(value))
 }
 
 public func (this: *HttpResponse) redirectTo(path: *const char) {

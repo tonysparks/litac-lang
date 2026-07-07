@@ -142,6 +142,7 @@ var testFiles = []*const char {
     "../../test/tests/generics_inference.json",
     "../../test/tests/generics_constraints.json",
     "../../test/tests/post_else.json",
+    // "../../test/tests/example.json", not a valid test suite file (missing top-level "tests" array)
     null
 }
 
