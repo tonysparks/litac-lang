@@ -229,95 +229,95 @@ func ProcessTestOutput(
         if(len < 1) {
             doneReading = true
         }
-
-        sb.append("%.*s", len, buffer)
+        else {
+            sb.append("%.*s", len, buffer)
+        }
 
         // drain ALL complete lines from sb before reading more data
         var bufferStr = sb.toString()
         var index = bufferStr.indexOf($"\n")
         while(index >= 0) {
+            // `line` (and any JSON node parsed from it) is a view into sb's
+            // buffer — sb.delete() memmoves that memory, so the line must be
+            // fully processed before it is deleted from sb.
             var line = bufferStr.substring(0, index).trim()
 
             // only attempt to parse out json objects
             if(!line.startsWith($"{")) {
                 printf("%.*s\n", line.length, line.buffer)
-                sb.delete(0, index + 1)
-                bufferStr = sb.toString()
-                index = bufferStr.indexOf($"\n")
-                continue
             }
+            else {
+                var node = parser.parseJson(line)
+                defer node.free()
 
-            sb.delete(0, index + 1)
-            bufferStr = sb.toString()
-            index = bufferStr.indexOf($"\n")
+                if(node != null && node.isObject()) {
+                    var type = node.getStr("type")
+                    if(type.equals("TEST_RESULT")) {
+                        var name = node.getStr("name")
+                        var status = node.getStr("status")
+                        var time = node.getFloat("durationMSec")
+                        var errors = node.getArray("errors")
 
-            var node = parser.parseJson(line)
-            defer node.free()
+                        var isDisabled = status.equals("DISABLED")
+                        var isSuccess = status.equals("SUCCESS")
+                        var isFailure = status.equals("FAILED")
 
-            if(node == null || !node.isObject()) {
-                continue
-            }
+                        var result = "⏸️"
+                        if(isSuccess) {
+                            result = "✅"
+                            output.numberOfPassed += 1
+                        }
+                        if(isFailure) {
+                            output.numberOfFailed += 1
+                            result = "❌"
+                        }
 
-            var type = node.getStr("type")
-            if(type.equals("TEST_RESULT")) {
-                var name = node.getStr("name")
-                var status = node.getStr("status")
-                var time = node.getFloat("durationMSec")
-                var errors = node.getArray("errors")
+                        var dots = $"..............................................................."
+                        var nDots = MAX(0, dots.length - name.length())
+                        printf("%s", name)
+                        printf(
+                            "%.*s",
+                            nDots,
+                            dots.buffer
+                        )
+                        printf("(%.4f) %s\n", time, result)
 
-                var isDisabled = status.equals("DISABLED")
-                var isSuccess = status.equals("SUCCESS")
-                var isFailure = status.equals("FAILED")
+                        if(errors != null && !errors.empty()) {
+                            for(var i = 0; i < errors.size(); i+=1) {
+                                var error = errors.at(i)
+                                printf("%s\n", error.asString())
+                            }
+                        }
+                    }
+                    else if(type.equals("COMPILATION_MESSAGE")) {
+                        var errors = node.getArray("errors")
+                        for(var i = 0; i < errors.size(); i += 1) {
+                            var error = errors.at(i)
+                            var pos = error.getObject("pos")
 
-                var result = "⏸️"
-                if(isSuccess) {
-                    result = "✅"
-                    output.numberOfPassed += 1
-                }
-                if(isFailure) {
-                    output.numberOfFailed += 1
-                    result = "❌"
-                }
-
-                var dots = $"..............................................................."
-                var nDots = MAX(0, dots.length - name.length())
-                printf("%s", name)
-                printf(
-                    "%.*s",
-                    nDots,
-                    dots.buffer
-                )
-                printf("(%.4f) %s\n", time, result)
-
-                if(errors != null && !errors.empty()) {
-                    for(var i = 0; i < errors.size(); i+=1) {
-                        var error = errors.at(i)
-                        printf("%s\n", error.asString())
+                            var filename = pos != null ? pos.getStr("filename") : "<unknown>";
+                            var lineNumber = pos != null ? pos.getInt("lineNumber") : 0;
+                            printf(
+                                "%s:%d: %serror%s %s\n",
+                                filename,
+                                lineNumber,
+                                ConsoleColorsAsStr(ConsoleColors.RED),
+                                ConsoleColorsAsStr(ConsoleColors.CLEAR),
+                                error.getStr("message")
+                            )
+                        }
+                    }
+                    else if(type.equals("MESSAGE")) {
+                        var message = node.getStr("message").toString().trim()
+                        printf("%.*s\n", message.length, message.buffer)
                     }
                 }
             }
-            else if(type.equals("COMPILATION_MESSAGE")) {
-                var errors = node.getArray("errors")
-                for(var i = 0; i < errors.size(); i += 1) {
-                    var error = errors.at(i)
-                    var pos = error.getObject("pos")
 
-                    var filename = pos != null ? pos.getStr("filename") : "<unknown>";
-                    var lineNumber = pos != null ? pos.getInt("lineNumber") : 0;
-                    printf(
-                        "%s:%d: %serror%s %s\n",
-                        filename,
-                        lineNumber,
-                        ConsoleColorsAsStr(ConsoleColors.RED),
-                        ConsoleColorsAsStr(ConsoleColors.CLEAR),
-                        error.getStr("message")
-                    )
-                }
-            }
-            else if(type.equals("MESSAGE")) {
-                var message = node.getStr("message").toString().trim()
-                printf("%.*s\n", message.length, message.buffer)
-            }
+            // line fully processed — now it is safe to drop it from sb
+            sb.delete(0, index + 1)
+            bufferStr = sb.toString()
+            index = bufferStr.indexOf($"\n")
         }
     }
 

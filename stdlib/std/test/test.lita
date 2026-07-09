@@ -292,7 +292,7 @@ public func AssertFloat<F>(
 ) {
     const r = ABS(expected - actual)
     Assert(
-        r <= tolence,
+        r <= tolerance,
         filename,
         lineNumber
     )
