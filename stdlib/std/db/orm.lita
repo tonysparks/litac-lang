@@ -37,7 +37,10 @@ public func (this: *SqlConnection) queryMany<T>(
         &stmt,
         sb.toString()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     if(this.hasError()) {
         return 0
@@ -131,7 +134,10 @@ public func (this: *SqlConnection) queryOneById<T, ID>(
         &stmt,
         result.getSqlSelectOneById()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     result.bindId(&stmt, id, 0)
 
@@ -167,7 +173,10 @@ public func (this: *SqlConnection) insertMany<T>(
         &stmt,
         resultType.getSqlInsert()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     var inserts = 0
     for(var i = 0; i < items.size(); i +=1) {
@@ -194,7 +203,10 @@ public func (this: *SqlConnection) insertOne<T>(
         &stmt,
         item.getSqlInsert()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     item.bindValues(&stmt)
 
@@ -223,7 +235,10 @@ public func (this: *SqlConnection) deleteOne<T>(
         &stmt,
         entity.getSqlDeleteOneById()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     entity.bindId(&stmt, entity.id, 0)
 
@@ -247,7 +262,10 @@ public func (this: *SqlConnection) deleteById<T, ID>(
         &stmt,
         resultType.getSqlDeleteOneById()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     resultType.bindId(&stmt, id, 0)
 
@@ -271,7 +289,10 @@ public func (this: *SqlConnection) deleteMany<T>(
         &stmt,
         resultType.getSqlDeleteOneById()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     var deletes = 0
     for(var i = 0; i < entities.size(); i+=1) {
@@ -303,7 +324,10 @@ public func (this: *SqlConnection) updateOne<T>(
         &stmt,
         entity.getSqlUpdateOneById()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     var index = entity.bindValues(&stmt)
     entity.bindIdValue(&stmt, index)
@@ -328,7 +352,10 @@ public func (this: *SqlConnection) updateMany<T>(
         &stmt,
         entity.getSqlUpdateOneById()
     )
-    defer stmt.close()
+    // release (not just close): frees the statement wrapper allocated by
+    // prepare (release() itself no-ops on the zero-value stmt prepare leaves
+    // behind on its out-of-memory/already-erroring bailout path)
+    defer this.release(stmt)
 
     var updates = 0
     for(var i = 0; i < entities.size(); i+=1) {

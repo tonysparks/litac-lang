@@ -150,6 +150,10 @@ public func (this: *PgConnection) getAllocator() : *const Allocator {
     return this.allocator
 }
 
+public func (this: *PgConnection) setAllocator(allocator: *const Allocator) : void {
+    this.allocator = allocator
+}
+
 public func (this: *PgConnection) lastError() : String {
     return this.error.description
 }
@@ -268,6 +272,13 @@ public func (this: *PgConnection) prepare(statement: *SqlStatement, sql: String)
 }
 
 public func (this: *PgConnection) release(stmt: SqlStatement) : SqlResult {
+    // See SqliteConnection.release() for why this guard lives here: callers
+    // defer this.release(stmt) unconditionally, including on the zero-value
+    // SqlStatement prepare() can return when it bails out early.
+    if (!stmt.__this) {
+        return this.error
+    }
+
     stmt.close()
     var mem = stmt.__this
     this.allocator.free(mem)

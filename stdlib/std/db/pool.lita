@@ -187,7 +187,15 @@ public func ConnectionPoolInit(
 
 // acquire checks out a connection from the pool.
 // Blocks until one is available if the pool is exhausted.
-public func (this: *ConnectionPool) acquire(conn: *SqlConnection) : SqlResult {
+//
+// allocator, if non-null, is stamped onto the connection and backs every
+// statement wrapper prepare()'d during this checkout — pass a request-scoped
+// allocator (e.g. ctx.allocator) so per-query allocations are reclaimed in
+// bulk when the request ends instead of round-tripping through a shared
+// general-purpose allocator. When null, falls back to the pool's own
+// configured allocator (PoolConfig.allocator, or defaultAllocator if that
+// wasn't set) — the same allocator used for the pool's own bookkeeping.
+public func (this: *ConnectionPool) acquire(conn: *SqlConnection, allocator: *const Allocator = null) : SqlResult {
     this.mutex.lock()
     defer this.mutex.unlock()
 
@@ -219,12 +227,16 @@ public func (this: *ConnectionPool) acquire(conn: *SqlConnection) : SqlResult {
         }
     }
 
+    if (result.isOk()) {
+        conn.setAllocator(allocator ? allocator : this.allocator)
+    }
+
     return result
 }
 
 // tryAcquire checks out a connection without blocking.
 // Returns an error immediately if no connection is available.
-public func (this: *ConnectionPool) tryAcquire(conn: *SqlConnection) : SqlResult {
+public func (this: *ConnectionPool) tryAcquire(conn: *SqlConnection, allocator: *const Allocator = null) : SqlResult {
     this.mutex.lock()
     defer this.mutex.unlock()
 
@@ -238,11 +250,13 @@ public func (this: *ConnectionPool) tryAcquire(conn: *SqlConnection) : SqlResult
     if (this.idle.length > 0) {
         var tmp = this.idle.pop();
         *conn = tmp
+        conn.setAllocator(allocator ? allocator : this.allocator)
         return SqlResult { .type = SqlResultType.OK }
     } else if (this.totalSize < this.config.maxSize) {
         var result = CreateConnection(this, conn)
         if (result.isOk()) {
             this.totalSize += 1
+            conn.setAllocator(allocator ? allocator : this.allocator)
         }
         return result
     }
@@ -255,7 +269,7 @@ public func (this: *ConnectionPool) tryAcquire(conn: *SqlConnection) : SqlResult
 
 // acquireTimed checks out a connection, blocking at most timeoutMs milliseconds.
 // Returns an error if the timeout expires before a connection becomes available.
-public func (this: *ConnectionPool) acquireTimed(timeoutMs: i64, conn: *SqlConnection) : SqlResult {
+public func (this: *ConnectionPool) acquireTimed(timeoutMs: i64, conn: *SqlConnection, allocator: *const Allocator = null) : SqlResult {
     this.mutex.lock()
     defer this.mutex.unlock()
 
@@ -282,6 +296,7 @@ public func (this: *ConnectionPool) acquireTimed(timeoutMs: i64, conn: *SqlConne
     if (this.idle.length > 0) {
         var tmp = this.idle.pop();
         *conn = tmp
+        conn.setAllocator(allocator ? allocator : this.allocator)
         return SqlResult { .type = SqlResultType.OK }
     }
 
@@ -289,6 +304,7 @@ public func (this: *ConnectionPool) acquireTimed(timeoutMs: i64, conn: *SqlConne
     var result = CreateConnection(this, conn)
     if (result.isOk()) {
         this.totalSize += 1
+        conn.setAllocator(allocator ? allocator : this.allocator)
     }
     return result
 }
@@ -306,6 +322,13 @@ public func (this: *ConnectionPool) release(conn: SqlConnection) {
         this.allocator.free(conn.__this)
         return;
     }
+
+    // Reset to the pool's own configured allocator before the connection
+    // goes idle. Whatever allocator the last checkout passed to acquire()
+    // (e.g. a request's bump allocator) may be destroyed the moment that
+    // request ends; leaving it stamped on an idle connection would hand the
+    // next acquirer a dangling pointer if it doesn't pass one of its own.
+    conn.setAllocator(this.allocator)
 
     this.idle.add(conn)
     this.available.signal()

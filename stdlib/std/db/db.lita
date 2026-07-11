@@ -55,6 +55,7 @@ public struct SqlResult {
 
 public trait SqlConnection {
     getAllocator: func(): *const Allocator
+    setAllocator: func(allocator: *const Allocator): void
 
     lastError: func(): String;
     lastResult: func(): SqlResult;

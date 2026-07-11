@@ -93,6 +93,17 @@ public func (this: *SqliteConnection) getAllocator() : *const Allocator {
     return this.allocator
 }
 
+// setAllocator re-stamps which allocator prepare() uses for the next
+// SqliteStatement wrapper it allocates. The connection pool calls this on
+// every acquire()/release() cycle: the caller holding a checked-out
+// connection is guaranteed single-threaded access to it, so this is safe
+// without extra locking, and lets a per-request scratch allocator (e.g. a
+// request's own bump allocator) back statement wrappers for the duration of
+// that checkout instead of a general-purpose heap allocator.
+public func (this: *SqliteConnection) setAllocator(allocator: *const Allocator) : void {
+    this.allocator = allocator
+}
+
 public func (this: *SqliteConnection) close(): SqlResult {
     var errorCode = sqlite3_close(this.db)
     this.error = CreateError(this, null, errorCode)
@@ -258,6 +269,14 @@ public func (this: *SqliteConnection) prepare(statement: *SqlStatement, sql: Str
 }
 
 public func (this: *SqliteConnection) release(stmt: SqlStatement): SqlResult {
+    // prepare() can hand back a zero-value SqlStatement (e.g. it bailed out
+    // early because the connection already had an error) — callers defer
+    // this.release(stmt) unconditionally, so guard against that here rather
+    // than pushing the check onto every call site.
+    if (!stmt.__this) {
+        return this.error
+    }
+
     stmt.close()
     var mem = stmt.__this
     this.allocator.free(mem)
