@@ -70,6 +70,59 @@ func testToJsonStringPlain() {
     assertToJson($"hello", "\"hello\"")
 }
 
+@test
+func testToJsonStringUtf8MultiByte() {
+    // "café" — the 'é' is a 2-byte UTF-8 sequence (0xC3 0xA9), whose lead byte is >= 0x80.
+    // Regression: JsonEscapeString indexed its 256-entry escape table with a sign-extended
+    // char, turning bytes >= 0x80 into a huge index and crashing (OOB read) instead of
+    // passing the raw UTF-8 bytes through unescaped, as JSON allows.
+    var raw: [5]char
+    raw[0] = 'c'
+    raw[1] = 'a'
+    raw[2] = 'f'
+    raw[3] = 0xC3 as (char)
+    raw[4] = 0xA9 as (char)
+
+    var expected: [7]char
+    expected[0] = '"'
+    expected[1] = 'c'
+    expected[2] = 'a'
+    expected[3] = 'f'
+    expected[4] = 0xC3 as (char)
+    expected[5] = 0xA9 as (char)
+    expected[6] = '"'
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    StringInit(raw, 5).toJson(&sb)
+    assert(sb.length == 7)
+    assert(memcmp(sb.buffer as (*const void), (&expected[0]) as (*const void), 7) == 0)
+}
+
+@test
+func testToJsonStringUtf8Emoji() {
+    // 4-byte UTF-8 sequence (U+1F600 GRINNING FACE), also exercises bytes >= 0x80.
+    var raw: [4]char
+    raw[0] = 0xF0 as (char)
+    raw[1] = 0x9F as (char)
+    raw[2] = 0x98 as (char)
+    raw[3] = 0x80 as (char)
+
+    var expected: [6]char
+    expected[0] = '"'
+    expected[1] = 0xF0 as (char)
+    expected[2] = 0x9F as (char)
+    expected[3] = 0x98 as (char)
+    expected[4] = 0x80 as (char)
+    expected[5] = '"'
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    StringInit(raw, 4).toJson(&sb)
+    assert(sb.length == 6)
+    assert(memcmp(sb.buffer as (*const void), (&expected[0]) as (*const void), 6) == 0)
+}
+
 // -------------------------------------------------------------------------
 // to_json — each escape sequence
 // -------------------------------------------------------------------------

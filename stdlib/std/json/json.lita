@@ -259,7 +259,16 @@ const escapeChars = [256]*const char {
 public func JsonEscapeString(buf: *StringBuilder, string: *const char, length: i32) {
     for(var i = 0; i < length; i += 1) {
         var c:char = string[i]
-        var escaped = escapeStrings[c as (u32)]
+        // string bytes must be zero-extended (not sign-extended) before use as a table
+        // index — otherwise bytes >= 0x80 (e.g. UTF-8 continuation bytes) produce a huge
+        // index when char is signed and wrapping to u32 sign-extends first.
+        //
+        // Bytes >= 0x80 that aren't in the escape table are appended as-is rather than
+        // replaced with a placeholder: JSON strings are UTF-8 text, and multi-byte UTF-8
+        // sequences (accented letters, emoji, etc.) are valid unescaped in a JSON string.
+        // appendChar preserves the exact byte pattern regardless of char's signedness
+        // (two's-complement bits are unchanged), so this round-trips correctly.
+        var escaped = escapeStrings[(c as (u8)) as (u32)]
         if(escaped) {
             buf.appendStr(escaped)
             continue
