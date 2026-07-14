@@ -561,6 +561,13 @@ internal func KqueueWorkerFunction(arg: *void) : i32 {
     close(workerThread.pipefd[0])
     close(workerThread.pipefd[1])
 
+    // Each session slot carries its own maxRequestSizeInBytes buffer (8MiB by
+    // default) x maxPoolSize slots — a per-worker allocation nothing else
+    // frees. Harmless in production (the process is killed, not shut down
+    // cleanly), but a real leak for anything that actually calls close() and
+    // exits, like tests — see the matching comment in http_worker_iouring.lita.
+    workerThread.sessions.free(workerThread.server)
+
     return 0
 }
 

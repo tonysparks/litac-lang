@@ -656,6 +656,14 @@ internal func WorkerFunction(arg: *void) : i32 {
         io_uring_queue_exit(ring)
     }
 
+    // Each session slot carries its own maxRequestSizeInBytes buffer (8MiB by
+    // default) x maxPoolSize slots — a per-worker allocation nothing else
+    // frees. Harmless in production (the process is killed, not shut down
+    // cleanly), but a real leak for anything that actually calls close() and
+    // exits, like tests: found via LeakSanitizer reporting ~2GB leaked for a
+    // maxPoolSize=32, numThreads=8 test server (32 * 8 * 8MiB).
+    workerThread.sessions.free(workerThread.server)
+
     return 0
 }
 

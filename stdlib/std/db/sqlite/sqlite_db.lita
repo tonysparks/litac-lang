@@ -105,7 +105,15 @@ public func (this: *SqliteConnection) setAllocator(allocator: *const Allocator) 
 }
 
 public func (this: *SqliteConnection) close(): SqlResult {
-    var errorCode = sqlite3_close(this.db)
+    // close_v2, not close(): plain sqlite3_close() refuses (SQLITE_BUSY) and
+    // leaves the connection's memory (schema, page cache, etc.) allocated if
+    // any prepared statement on it isn't finalized yet — and the caller here
+    // doesn't check this return value before freeing the wrapper struct, so
+    // that failure was silent. close_v2 instead defers the actual teardown
+    // until anything outstanding finalizes on its own, which is what surfaced
+    // as sqlite3MemMalloc-attributed LeakSanitizer reports under the stress
+    // test's heavy concurrent load.
+    var errorCode = sqlite3_close_v2(this.db)
     this.error = CreateError(this, null, errorCode)
     return this.error
 }
@@ -466,22 +474,35 @@ public func (this: *SqliteStatement) reset() : SqlResult {
 }
 
 public func (this: *SqliteStatement) finalize() : SqlResult {
-    if (this.conn.hasError()) return this.conn.error
+    // Must run even if the connection already has an error — that's exactly
+    // the case (a failed step/bind, e.g. SQLITE_LOCKED) where this statement
+    // most needs finalizing. Skipping sqlite3_finalize() here previously left
+    // it dangling: never released, and keeping the whole connection "busy"
+    // from SQLite's point of view so its schema/page-cache memory could never
+    // be freed either — found via LeakSanitizer on the concurrency stress
+    // test, which deliberately drives lock contention.
+    var priorError = this.conn.error
+    var hadError = this.conn.hasError()
 
     var errorCode = sqlite3_finalize(this.stmt)
-    this.conn.error = CreateError(this.conn, null, errorCode)
+
+    // Preserve the original error for the caller instead of letting a
+    // successful finalize() silently erase it.
+    this.conn.error = hadError ? priorError : CreateError(this.conn, null, errorCode)
     return this.conn.error
 }
 
 public func (this: *SqliteStatement) close() : SqlResult {
-    if (this.conn.hasError()) return this.conn.error
-
     this.results.status = 0
     this.results.checkError = false
 
+    // See the comment in finalize() — must always run, error or not.
+    var priorError = this.conn.error
+    var hadError = this.conn.hasError()
+
     var errorCode = sqlite3_finalize(this.stmt)
     // pass null: stmt is already finalized and its handle is invalid
-    this.conn.error = CreateError(this.conn, null, errorCode)
+    this.conn.error = hadError ? priorError : CreateError(this.conn, null, errorCode)
     return this.conn.error
 }
 

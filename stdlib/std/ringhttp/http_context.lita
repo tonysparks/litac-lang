@@ -224,7 +224,18 @@ public func (this: *ContextPool) init(
     return this.grow(server, 0, maxSize)
 }
 
-public func (this: *ContextPool) free() {
+public func (this: *ContextPool) free(server: *HttpServer) {
+    // Each slot's requestAllocator wraps a buffer grow() allocated directly
+    // from server.engine.safeAllocator (maxRequestSizeInBytes each) — that
+    // buffer isn't owned by this.pool itself (Array<SessionContext> stores
+    // SessionContext by value), so it has to be freed explicitly here or it
+    // outlives the pool.
+    for(var i = 0; i < this.pool.length; i += 1) {
+        var itemPtr = this.pool.getPtr(i)
+        if(itemPtr.requestAllocator.mem) {
+            server.engine.safeAllocator.free(itemPtr.requestAllocator.mem)
+        }
+    }
     this.pool.free()
     this.freeList.free()
 }

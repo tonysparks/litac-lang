@@ -33,7 +33,7 @@ func testContextPoolExhaustion() {
 
     var pool: ContextPool
     pool.init(&server)
-    defer pool.free()
+    defer pool.free(&server)
 
     // Exhaust all three slots.
     var a = pool.alloc()
@@ -66,7 +66,7 @@ func testContextPoolDoubleDeallocSafe() {
 
     var pool: ContextPool
     pool.init(&server)
-    defer pool.free()
+    defer pool.free(&server)
 
     var idx = pool.alloc()
     assert(idx >= 0)
@@ -98,7 +98,7 @@ func testContextPoolBoundaryIndices() {
 
     var pool: ContextPool
     pool.init(&server)
-    defer pool.free()
+    defer pool.free(&server)
 
     // Dealloc of -1 and an index past the pool must be no-ops (no crash).
     pool.dealloc(-1)
