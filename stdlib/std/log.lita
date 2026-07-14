@@ -60,7 +60,21 @@ public func Logv(level: LogLevel, format: *const char, args: va_list) {
 
         fprintf(outputFile, "[%s] [%s] ", LogLevelAsStr(level), nowStr)
         vfprintf(outputFile, format, args);
-        fflush(outputFile)
+        // Flushing every call turns a log write into a blocking syscall taken
+        // while holding the one mutex every thread in the process logs
+        // through. Under high-frequency INFO/DEBUG logging with a slow
+        // consumer on the other end of stdout (e.g. a CI log pipe), whichever
+        // thread is mid-flush blocks holding the lock and every other thread
+        // that wants to log — including unrelated ones — piles up behind it,
+        // which can look like the whole process hanging. WARN/ERROR/FATAL
+        // stay flushed immediately since those are rare and you want them
+        // visible right away; INFO/DEBUG/TRACE ride the C stream's normal
+        // buffering and get flushed in bulk by exit()'s standard atexit
+        // stream cleanup (or explicitly via Error/Panic paths, or a crash
+        // that unwinds through exit() rather than a raw kill).
+        if(level >= LogLevel.WARN) {
+            fflush(outputFile)
+        }
     mtx.unlock()
 
     if(level == LogLevel.FATAL) {
