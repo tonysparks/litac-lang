@@ -145,8 +145,20 @@ internal func (this: *HttpRingEngine) listen() : Status {
 
     var events: [MAX_ENGINE_EVENTS]kevent;
 
+    // Bounded wait, not an untimed KEventCall(): this loop had no self-wakeup
+    // and relied entirely on close() closing this.kq from another thread to
+    // interrupt an indefinite blocking wait. BSD kqueue does reliably wake a
+    // blocked kevent() when its fd is closed elsewhere, which is why this
+    // hadn't shown up as a bug here — but io_uring's equivalent trick turned
+    // out NOT to be reliable on Linux (see the matching comment in
+    // http_engine_iouring.lita, found by reproducing an actual hang). Giving
+    // this loop its own heartbeat too removes the dependency on that
+    // cross-thread-close behavior entirely instead of leaving it correct by
+    // platform coincidence.
+    var pollInterval = timespec { .tv_sec = 0, .tv_nsec = 200_000_000 } // 200ms
+
     while(this.isRunning.get()) {
-        var n = KEventCall(this.kq, null, 0, events, MAX_ENGINE_EVENTS, null)
+        var n = KEventCall(this.kq, null, 0, events, MAX_ENGINE_EVENTS, &pollInterval)
         if(n < 0) {
             // EINTR is harmless (signal interrupted the wait), retry
             continue

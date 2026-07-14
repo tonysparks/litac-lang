@@ -150,10 +150,31 @@ internal func (this: *HttpRingEngine) listen() : Status {
         return Status.ERROR_IOURING_ERROR
     }
 
+    // Bounded wait, not io_uring_wait_cqe(): unlike the workers (which have
+    // their own periodic timeoutCheckMSec SQE giving them a heartbeat), this
+    // engine loop had no self-wakeup at all and relied entirely on close()
+    // tearing down `this.ring` from another thread to interrupt an unbounded
+    // blocking wait. That does NOT reliably wake a thread already parked in
+    // io_uring_wait_cqe() on Linux — confirmed by reproducing it directly:
+    // the engine thread stayed stuck in the kernel's io_cqring_wait forever
+    // after close() ran, even though every worker thread (which don't depend
+    // on that trick) exited cleanly. A short timeout gives this loop its own
+    // heartbeat so isRunning is rechecked promptly regardless of whether the
+    // ring teardown actually interrupts anything.
+    var pollInterval = __kernel_timespec { .tv_sec = 0, .tv_nsec = 200_000_000 } // 200ms
+
     var cqe: *io_uring_cqe = null;
     while(this.isRunning.get()) {
-        var result = io_uring_wait_cqe(ring, &cqe);
+        cqe = null
+        var result = io_uring_wait_cqe_timeout(ring, &cqe, &pollInterval);
         defer if(cqe) io_uring_cqe_seen(ring, cqe)
+
+        if(!cqe) {
+            // Timed out (ETIME) with nothing to process, or a transient error
+            // with no completion produced — either way, loop back and
+            // recheck isRunning rather than treating it as a hard failure.
+            continue
+        }
 
         var status = this.handleCompletionRing(ring, cqe, result)
         if(status != Status.OK) {
