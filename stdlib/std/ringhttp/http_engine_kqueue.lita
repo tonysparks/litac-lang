@@ -210,6 +210,18 @@ internal func (this: *HttpRingEngine) close() {
     this.isRunning.set(false)
 
     this.serverSocket.close()
+
+    // Each worker runs its own kqueue and only notices isRunning go false the
+    // next time its kevent() wakes up — at the latest one timeoutCheckMSec
+    // heartbeat away (see the TIMER_IDENT kevent in http_worker_kqueue.lita).
+    // Joining here makes close() a complete, deterministic shutdown instead
+    // of leaving a worker thread alive and blocked in kevent() on its own kq
+    // after this struct's buffers/allocator are freed below.
+    for(var i = 0; i < this.workers.length; i += 1) {
+        var worker = this.workers.getPtr(i)
+        worker.thread.join()
+    }
+
     this.safeAllocator.free()
 
     if(this.kq >= 0) {

@@ -171,6 +171,21 @@ internal func (this: *HttpRingEngine) close() {
     this.isRunning.set(false)
 
     this.serverSocket.close()
+
+    // Each worker runs its OWN io_uring instance and only notices isRunning
+    // go false the next time its io_uring_wait_cqe() wakes up — at the latest
+    // one timeoutCheckMSec heartbeat away (see queueTimeoutCheck/rearmTimeout
+    // in http_worker_iouring.lita). Joining here makes close() a complete,
+    // deterministic shutdown: without it, a caller (and this struct's own
+    // buffers/allocator, freed below) could be torn down while a worker
+    // thread is still alive and blocked inside a syscall on its own ring —
+    // observed as "Interrupted system call" spam, or the process failing to
+    // exit at all, when that race loses against process teardown.
+    for(var i = 0; i < this.workers.length; i += 1) {
+        var worker = this.workers.getPtr(i)
+        worker.thread.join()
+    }
+
     this.safeAllocator.free()
 
     if(this.ring.ring_fd >= 0) {
