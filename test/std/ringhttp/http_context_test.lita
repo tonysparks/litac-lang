@@ -16,7 +16,6 @@ func makeMinimalServer(config: *HttpConfig, server: *HttpServer) {
     // maxRequestSizeInBytes must be > 0 for pool slot allocation.
     config.maxRequestSizeInBytes = 64 * KiB
     config.disableSignal = true
-    config.isLogEnabled  = false
 
     server.init(config)
 }

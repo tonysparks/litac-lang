@@ -142,9 +142,6 @@ var defaultConfig = HttpConfig {
     .ioQueueDepth = 16,
     .maxPoolSize = 32,
     .keepAliveTimeoutInSec = 5,
-    .isLogEnabled = false,
-    .logFilePath = $"",
-    .logLevel = LogLevel.DEBUG,
     .fileServerPath = $"../../test/std/ringhttp/static",
     .maxHttpBodySizeInBytes = 1_024,
 }

@@ -511,8 +511,6 @@ var defaultConfig = HttpConfig {
     .ioQueueDepth = 16,
     .maxPoolSize = 32,
     .keepAliveTimeoutInSec = 5,
-    .isLogEnabled = true,
-    .logFilePath = $"",
     .fileServerPath = $"../../test/std/ringhttp/static",
 }
 
@@ -551,8 +549,6 @@ func testExample() {
         .port = 9091_u16,
         .numThreads = 8,
         .ioQueueDepth = 32,
-        .isLogEnabled = true,
-        .logFilePath = $"",
         .maxPoolSize = 512,
         .keepAliveTimeoutInSec = 5,
         .fileServerPath = $"../../test/std/ringhttp/static",

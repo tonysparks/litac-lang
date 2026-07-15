@@ -167,11 +167,6 @@ var config = ring::HttpConfig {
     // Templates
     .templatePath = $"./templates",
 
-    // Logging
-    .isLogEnabled = true,
-    .logFilePath  = $"./ring.log",
-    .logLevel     = ring::LogLevel.INFO,
-
     // TLS (omit both fields for plain HTTP)
     .tlsCertFile = $"./certs/cert.pem",
     .tlsKeyFile  = $"./certs/key.pem",

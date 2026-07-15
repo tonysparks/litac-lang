@@ -219,6 +219,8 @@ fn DeserializeSymbol(sym) {
 
 var symbols = getSymbolsByNote("json")
 
+var generated = {}
+
 for(sym in symbols) {
    // print("Sym: ", sym.name, "\n")
 
@@ -233,5 +235,46 @@ for(sym in symbols) {
       addDeclaration(sym.moduleFilename, emitStr())
    }
    // print("Deser: ", emitStr())
+
+   generated[sym.fullName] = true
+}
+
+// A @json struct may reference an enum-typed field whose enum declaration
+// isn't itself annotated @json (e.g. a shared stdlib enum used purely as a
+// config value, such as LogLevel). Auto-generate the same string-based
+// toJson/fromJson for those enums too, so any enum can be used as a @json
+// struct field without separately annotating the enum declaration.
+for(sym in symbols) {
+   if(sym.kind != "STRUCT_DECL") {
+      continue
+   }
+
+   for(field in sym.structDecl.fields) {
+      var typeInfo = field.typeInfo
+      if(typeInfo == null || !typeInfo.isEnum) {
+         continue
+      }
+
+      var enumSym = typeInfo.symbol
+      if(enumSym == null || generated[enumSym.fullName]) {
+         continue
+      }
+      generated[enumSym.fullName] = true
+
+      // Emit into the *referencing* struct's module rather than the enum's
+      // own declaring module — the enum's module (e.g. a core stdlib module
+      // like std/log) has no reason to import JsonContext/JsonNode/
+      // StringBuilder itself, whereas any module with an @json struct
+      // already has those in scope.
+      emitClear()
+      if(SerializeSymbol(enumSym)) {
+         addDeclaration(sym.moduleFilename, emitStr())
+      }
+
+      emitClear()
+      if(DeserializeSymbol(enumSym)) {
+         addDeclaration(sym.moduleFilename, emitStr())
+      }
+   }
 }
 

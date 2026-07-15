@@ -99,7 +99,6 @@ func h1EnsureServer() {
         .numThreads            = 2,
         .maxPoolSize           = 32,
         .keepAliveTimeoutInSec = 30,
-        .isLogEnabled          = false,
     }
     gH1Server.barrier.init(2)
     var t = Thread{}

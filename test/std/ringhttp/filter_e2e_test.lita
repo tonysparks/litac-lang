@@ -21,8 +21,6 @@ var filterServerConfig = HttpConfig {
     .ioQueueDepth            = 16,
     .maxPoolSize             = 32,
     .keepAliveTimeoutInSec   = 5,
-    .isLogEnabled            = false,
-    .logFilePath = $"",
 }
 
 var filterServer = FilterTestServer{}

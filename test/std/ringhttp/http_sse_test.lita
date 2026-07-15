@@ -24,8 +24,6 @@ var sseConfig = HttpConfig {
     .ioQueueDepth = 16,
     .maxPoolSize = 32,
     .keepAliveTimeoutInSec = 5,
-    .isLogEnabled = false,
-    .logFilePath = $"",
     .fileServerPath = $"../../test/std/ringhttp/static",
 }
 
