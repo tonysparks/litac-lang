@@ -219,7 +219,16 @@ fn DeserializeSymbol(sym) {
 
 var symbols = getSymbolsByNote("json")
 
-var generated = {}
+var generatedNames = []
+
+fn hasGenerated(name) {
+   for(n in generatedNames) {
+      if(n == name) {
+         return true
+      }
+   }
+   return false
+}
 
 for(sym in symbols) {
    // print("Sym: ", sym.name, "\n")
@@ -236,7 +245,7 @@ for(sym in symbols) {
    }
    // print("Deser: ", emitStr())
 
-   generated[sym.fullName] = true
+   append(generatedNames, sym.fullName)
 }
 
 // A @json struct may reference an enum-typed field whose enum declaration
@@ -256,10 +265,10 @@ for(sym in symbols) {
       }
 
       var enumSym = typeInfo.symbol
-      if(enumSym == null || generated[enumSym.fullName]) {
+      if(enumSym == null || hasGenerated(enumSym.fullName)) {
          continue
       }
-      generated[enumSym.fullName] = true
+      append(generatedNames, enumSym.fullName)
 
       // Emit into the *referencing* struct's module rather than the enum's
       // own declaring module — the enum's module (e.g. a core stdlib module
