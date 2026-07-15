@@ -183,6 +183,7 @@ public func LogInit(options: *const LogOptions = null) {
         }
 
         ringBuffer.capacity = capacity
+        //@ai pass the allocator in on the LogOption
         ringBuffer.slots = defaultAllocator.alloc(sizeof(:LogSlot) * (capacity as (usize))) as (*LogSlot)
         for(var i = 0; i < capacity; i += 1) {
             // -1 can never equal a slot's first legitimate claim (that
@@ -207,18 +208,25 @@ public func LogInit(options: *const LogOptions = null) {
 public func LogShutdown() {
     logInitialized.set(false)
 
-    if(logMode != LogMode.ASYNC_RING) {
-        return;
+    if(logMode == LogMode.ASYNC_RING) {
+        logThreadRunning.set(false)
+        logCond.signal()
+        logThread.join()
+
+        if(ringBuffer.slots) {
+            defaultAllocator.free(ringBuffer.slots as (*void))
+            ringBuffer.slots = null
+        }
     }
 
-    logThreadRunning.set(false)
-    logCond.signal()
-    logThread.join()
-
-    if(ringBuffer.slots) {
-        defaultAllocator.free(ringBuffer.slots as (*void))
-        ringBuffer.slots = null
+    // Close the file we opened (never touch stdout — we don't own it).
+    // Left unclosed, a still-open write handle can race a fresh read of
+    // the same path from a subsequent LogInit/LogShutdown cycle within the
+    // same process (as every test in log_test.lita does).
+    if(outputFile && outputFile != stdout) {
+        fclose(outputFile)
     }
+    outputFile = null
 }
 
 public func Log(level: LogLevel, format: *const char, ...) {

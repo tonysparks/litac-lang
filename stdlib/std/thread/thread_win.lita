@@ -410,6 +410,17 @@ var _tinycthread_tss_head: *TinyCThreadTSSData;
 @foreign
 func CreateThread(n: *void, i: i32, fn: func(LPVOID): DWORD, t: LPVOID, z:i32, v: *void) : HANDLE;
 
+// A thread started via raw CreateThread() must not call CRT functions (per
+// Microsoft's own docs) — the CRT's per-thread state isn't initialized for
+// it. Our thread start routine calls fwrite/fflush (the async logger's
+// drain loop), so threads must go through the CRT's own _beginthreadex /
+// _endthreadex instead, which do that initialization/teardown for us.
+@foreign
+func _beginthreadex(security: *void, stackSize: u32, fn: func(LPVOID): DWORD, argList: LPVOID, initFlag: u32, threadId: *u32) : HANDLE;
+
+@foreign
+func _endthreadex(retVal: u32);
+
 @foreign
 func ResumeThread(handle: HANDLE) : DWORD;
 
@@ -824,9 +835,9 @@ public func (thr: *Thread) create(
     ti.parentCase = testSuite.currentCase
     #end
 
-    var state = 0; // suspend ? CREATE_SUSPENDED : 0
+    var state: u32 = 0; // suspend ? CREATE_SUSPENDED : 0
 
-    thr.hnd = CreateThread(null, 0, _thrd_wrapper_function, ti as (LPVOID), state, null);
+    thr.hnd = _beginthreadex(null, 0, _thrd_wrapper_function, ti as (LPVOID), state, null);
 
     /* Did we fail to create the thread? */
     if(!thr.hnd) {
@@ -900,7 +911,7 @@ public func ThreadExit(res: i32) {
         _tinycthread_tss_cleanup();
     }
 
-    ExitThread(res as (DWORD));
+    _endthreadex(res as (u32));
 }
 
 public func ThreadSleepMSec(msec: i64) : i32 {
