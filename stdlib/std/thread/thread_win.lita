@@ -415,8 +415,12 @@ func CreateThread(n: *void, i: i32, fn: func(LPVOID): DWORD, t: LPVOID, z:i32, v
 // it. Our thread start routine calls fwrite/fflush (the async logger's
 // drain loop), so threads must go through the CRT's own _beginthreadex /
 // _endthreadex instead, which do that initialization/teardown for us.
+// Signature must match process.h's _beginthreadex_proc_type exactly
+// (return `unsigned`/u32, not DWORD) or clang 16+ rejects the function
+// pointer as an incompatible type. Real return type is uintptr_t; cast to
+// HANDLE at the call site, same as tinycthread's own C source does.
 @foreign
-func _beginthreadex(security: *void, stackSize: u32, fn: func(LPVOID): DWORD, argList: LPVOID, initFlag: u32, threadId: *u32) : HANDLE;
+func _beginthreadex(security: *void, stackSize: u32, fn: func(LPVOID): u32, argList: LPVOID, initFlag: u32, threadId: *u32) : usize;
 
 @foreign
 func _endthreadex(retVal: u32);
@@ -770,7 +774,7 @@ public struct ThreadStartInfo {
 
 #if TESTING
 @raw("WINAPI ")
-func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
+func _thrd_wrapper_function(aArg: LPVOID) : u32 {
     var ti: *ThreadStartInfo = aArg as (*ThreadStartInfo);
     var fun = ti.mFunction;
     var arg = ti.mArg;
@@ -792,11 +796,11 @@ func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
         _tinycthread_tss_cleanup();
     }
 
-    return res as (DWORD)
+    return res as (u32)
 }
 #else
 @raw("WINAPI ")
-func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
+func _thrd_wrapper_function(aArg: LPVOID) : u32 {
 
     /* Get thread startup information */
     var ti: *ThreadStartInfo = aArg as (*ThreadStartInfo);
@@ -813,7 +817,7 @@ func _thrd_wrapper_function(aArg: LPVOID) : DWORD {
         _tinycthread_tss_cleanup();
     }
 
-    return res as (DWORD);
+    return res as (u32);
 }
 #end
 
@@ -837,7 +841,7 @@ public func (thr: *Thread) create(
 
     var state: u32 = 0; // suspend ? CREATE_SUSPENDED : 0
 
-    thr.hnd = _beginthreadex(null, 0, _thrd_wrapper_function, ti as (LPVOID), state, null);
+    thr.hnd = _beginthreadex(null, 0, _thrd_wrapper_function, ti as (LPVOID), state, null) as (HANDLE);
 
     /* Did we fail to create the thread? */
     if(!thr.hnd) {
