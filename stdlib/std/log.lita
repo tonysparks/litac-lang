@@ -229,6 +229,12 @@ public func LogShutdown() {
     outputFile = null
 }
 
+// Diagnostic accessor: how many lines the ASYNC_RING backpressure check has
+// dropped since the last LogInit. 0 in SYNC mode or before ASYNC_RING init.
+public func LogDroppedLines() : i64 {
+    return ringBuffer.droppedLines.get()
+}
+
 public func Log(level: LogLevel, format: *const char, ...) {
     var args: va_list;
     va_start(args, format);

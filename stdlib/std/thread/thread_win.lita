@@ -916,6 +916,12 @@ public func ThreadExit(res: i32) {
     }
 
     _endthreadex(res as (u32));
+
+    // _endthreadex terminates the calling thread and never actually
+    // returns, but unlike ExitThread it isn't declared noreturn in
+    // process.h, so clang can't verify that for our TTHREAD_NORETURN
+    // annotation above. This is unreachable in practice.
+    while(true) {}
 }
 
 public func ThreadSleepMSec(msec: i64) : i32 {
