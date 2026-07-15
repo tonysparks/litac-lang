@@ -105,11 +105,6 @@ public struct HttpConfig {
     // io_uring queue depth
     ioQueueDepth: i32 = 32
 
-    // logging
-    logFilePath: String = $"./ring.log"
-    isLogEnabled: bool = true
-    logLevel: LogLevel = LogLevel.INFO
-
     // command line handling
     disableSignal: bool = false
 
@@ -216,10 +211,6 @@ public func (this: *HttpServer) init(config: *HttpConfig) : Status {
 }
 
 public func (this: *HttpServer) start() : Status {
-    if(this.config.isLogEnabled) {
-        LogInit(this.config.logFilePath, this.config.logLevel)
-    }
-
     Info("listening on port: %d\n", this.config.port)
     return this.engine.listen()
 }

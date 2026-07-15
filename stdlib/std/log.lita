@@ -1,6 +1,7 @@
 import "std/libc"
 import "std/mem"
 import "std/thread"
+import "std/atomic"
 import "std/time"
 import "std/string"
 import "std/string/buffer"
@@ -16,30 +17,208 @@ public enum LogLevel {
     FATAL
 }
 
-// TODO
-// public struct LogOptions {
-//     outputFile: *const char
-// }
+@asStr
+public enum LogMode {
+    // Simple/legacy behavior: every call fwrite's and fflush's on the
+    // calling thread, under a single mutex. No background thread. Blocks
+    // the caller if outputFile's consumer is slow, but has zero moving
+    // parts — useful for short-lived tools/tests where that's a fine trade.
+    SYNC,
+
+    // A single background thread is the sole writer of outputFile. Producer
+    // threads never touch outputFile directly — they claim a slot in a
+    // fixed-size ring buffer via an atomic counter (LMAX Disruptor-style:
+    // same shape as log4j2's AsyncLogger / zerolog's diode) and copy their
+    // formatted line into it. If the ring is full (background thread can't
+    // keep up), the line is dropped rather than blocking the caller.
+    ASYNC_RING
+}
+public struct LogOptions {
+    outputFileName: String = $""
+    logLevel: LogLevel = LogLevel.TRACE
+    mode: LogMode = LogMode.SYNC
+
+    // Only used by ASYNC_RING: how many in-flight lines can be buffered
+    // before new ones are dropped. Higher = more burst tolerance, at the
+    // cost of ringSlots * MAX_LOG_LINE bytes of heap memory.
+    ringSlots: i32 = 4096
+
+    // Whether a FATAL-level log call exits the process (after fully
+    // draining any pending lines). Defaults to true to match historical
+    // Panic() behavior; set false if the caller wants to handle fatal
+    // errors itself without dying.
+    exitOnFatal: bool = true
+}
 
 var outputFile: *FILE = null
 var mtx: Mutex;
 var logLevel: LogLevel = LogLevel.TRACE
+var logMode: LogMode = LogMode.SYNC
+var logExitOnFatal: bool = true
 
-public func LogInit(
-    outputFileName: String,
-    level: LogLevel = LogLevel.TRACE
-) {
-    if(!outputFileName.empty()) {
+const MAX_LOG_LINE = 2048
+
+// One fixed-size slot in the ring. `seq` holds the claim number whose data
+// currently lives here — not just a ready/not-ready flag — which is what
+// lets the consumer tell a freshly published slot apart from a stale one
+// left over from `capacity` claims ago after wraparound.
+struct LogSlot {
+    text: [MAX_LOG_LINE]char
+    len: i32
+    seq: Atomic<i64>
+}
+
+struct LogRingBuffer {
+    slots: *LogSlot
+    capacity: i32
+    nextSeq: Atomic<i64>     // producers claim a slot via getAdd(1) on this
+    readSeq: Atomic<i64>     // consumer's position; producers read it for backpressure
+    droppedLines: Atomic<i64>
+}
+
+// Lock-free: the only contended op is the atomic claim below. Once a
+// producer holds a unique `claimed` value, the slot at claimed % capacity
+// is exclusively its to write until the ring wraps all the way around
+// again — which the backpressure check prevents from happening under it.
+func (rb: *LogRingBuffer) push(bytes: *const char, len: i32) {
+    var claimed = rb.nextSeq.getAdd(1_i64)
+
+    if(claimed - rb.readSeq.get() >= rb.capacity as (i64)) {
+        // Consumer can't keep up — drop rather than block the caller or
+        // overwrite a slot it hasn't read yet.
+        rb.droppedLines.getAdd(1_i64)
+        return;
+    }
+
+    var idx = (claimed % (rb.capacity as (i64))) as (i32)
+    var slot = &rb.slots[idx]
+
+    var n = len
+    if(n > MAX_LOG_LINE) {
+        n = MAX_LOG_LINE
+    }
+    memcpy(slot.text as (*void), bytes as (*const void), n as (usize))
+    slot.len = n
+    slot.seq.set(claimed) // publish: consumer waits for exactly this value
+}
+
+var ringBuffer: LogRingBuffer
+var logCond: Cond
+var logThread: Thread
+var logThreadRunning: Atomic<bool>
+
+// The sole writer of outputFile in ASYNC_RING mode. Reads slots strictly in
+// claim order; a slot whose `seq` doesn't match what we're expecting yet
+// just hasn't been published, so we short-wait and recheck rather than
+// skipping ahead.
+func logDrainLoop(arg: *void) : i32 {
+    var next: i64 = 0
+
+    while(true) {
+        var idx = (next % (ringBuffer.capacity as (i64))) as (i32)
+        var slot = &ringBuffer.slots[idx]
+
+        if(slot.seq.get() != next) {
+            if(!logThreadRunning.get()) {
+                break
+            }
+            // Not durable synchronization (no mutex on the producer side to
+            // pair with this wait), so this is a bounded-latency poll, not
+            // a guaranteed wakeup: worst case we notice new data after this
+            // timeout instead of immediately.
+            mtx.lock()
+                logCond.timedWait(&mtx, 20)
+            mtx.unlock()
+            continue
+        }
+
+        if(outputFile) {
+            fwrite(slot.text, 1, slot.len as (usize), outputFile)
+            fflush(outputFile)
+        }
+
+        next += 1
+        ringBuffer.readSeq.set(next)
+    }
+    return 0
+}
+var logInitialized: Atomic<bool>
+
+public func LogInit(options: *const LogOptions = null) {
+    // Some callers (e.g. ring::HttpServer.start()) call this a second time
+    // as a matter of course, expecting a harmless redundant re-open. That
+    // was true under the old synchronous logger; under ASYNC_RING it would
+    // spawn a second background drain thread racing the first one over the
+    // same ring buffer, which duplicates every line. First call wins.
+    if(logInitialized.get()) {
+        return;
+    }
+    logInitialized.set(true)
+
+    var opts = LogOptions{}
+    if(options) {
+        opts = *options
+    }
+
+    if(!opts.outputFileName.empty()) {
         var buf: [MAX_PATH]char
-        outputFileName.copyTo(buf, MAX_PATH - 1)
+        opts.outputFileName.copyTo(buf, MAX_PATH - 1)
         outputFile = fopen(buf, "a")
     }
 
     if(!outputFile) {
         outputFile = stdout
     }
-    logLevel = level
+    logLevel = opts.logLevel
+    logMode = opts.mode
+    logExitOnFatal = opts.exitOnFatal
     mtx.init()
+
+    if(logMode == LogMode.ASYNC_RING) {
+        logCond.init()
+
+        var capacity = opts.ringSlots
+        if(capacity <= 0) {
+            capacity = 1
+        }
+
+        ringBuffer.capacity = capacity
+        ringBuffer.slots = defaultAllocator.alloc(sizeof(:LogSlot) * (capacity as (usize))) as (*LogSlot)
+        for(var i = 0; i < capacity; i += 1) {
+            // -1 can never equal a slot's first legitimate claim (that
+            // slot's own index, the earliest value `claimed % capacity`
+            // can produce it), so it's a safe "nothing published yet" mark.
+            ringBuffer.slots[i].seq.init(-1_i64)
+            ringBuffer.slots[i].len = 0
+        }
+        ringBuffer.nextSeq.init(0_i64)
+        ringBuffer.readSeq.init(0_i64)
+        ringBuffer.droppedLines.init(0_i64)
+
+        logThreadRunning.init(true)
+        logThread.create(logDrainLoop, null)
+    }
+}
+
+// Stops the background drain thread, flushing anything left in the ring
+// buffer first. Call once during shutdown — buffered lines live in our own
+// ring buffer, not libc's stdio buffer, so they don't ride an atexit flush.
+// No-op in SYNC mode (there's no background thread to stop).
+public func LogShutdown() {
+    logInitialized.set(false)
+
+    if(logMode != LogMode.ASYNC_RING) {
+        return;
+    }
+
+    logThreadRunning.set(false)
+    logCond.signal()
+    logThread.join()
+
+    if(ringBuffer.slots) {
+        defaultAllocator.free(ringBuffer.slots as (*void))
+        ringBuffer.slots = null
+    }
 }
 
 public func Log(level: LogLevel, format: *const char, ...) {
@@ -50,34 +229,39 @@ public func Log(level: LogLevel, format: *const char, ...) {
 }
 
 public func Logv(level: LogLevel, format: *const char, args: va_list) {
-    if(!outputFile) return;
+    if(!logInitialized.get()) return;
     if(logLevel > level) return;
 
-    mtx.lock()
-        var buffer: IsoDateBuf;
-        var now = DateTimeNow()
-        var nowStr = buffer.isoFormat(&now)
+    var buffer: IsoDateBuf;
+    var now = DateTimeNow()
+    var nowStr = buffer.isoFormat(&now)
 
-        fprintf(outputFile, "[%s] [%s] ", LogLevelAsStr(level), nowStr)
-        vfprintf(outputFile, format, args);
-        // Flushing every call turns a log write into a blocking syscall taken
-        // while holding the one mutex every thread in the process logs
-        // through. Under high-frequency INFO/DEBUG logging with a slow
-        // consumer on the other end of stdout (e.g. a CI log pipe), whichever
-        // thread is mid-flush blocks holding the lock and every other thread
-        // that wants to log — including unrelated ones — piles up behind it,
-        // which can look like the whole process hanging. WARN/ERROR/FATAL
-        // stay flushed immediately since those are rare and you want them
-        // visible right away; INFO/DEBUG/TRACE ride the C stream's normal
-        // buffering and get flushed in bulk by exit()'s standard atexit
-        // stream cleanup (or explicitly via Error/Panic paths, or a crash
-        // that unwinds through exit() rather than a raw kill).
-        if(level >= LogLevel.WARN) {
+    var line: [MAX_LOG_LINE]char
+    var sb = StringBufferInit(line, MAX_LOG_LINE, 0)
+    sb.append("[%s] [%s] ", LogLevelAsStr(level), nowStr)
+    sb.appendv(format, args)
+
+    if(logMode == LogMode.SYNC) {
+        mtx.lock()
+            fwrite(sb.buffer, 1, sb.length as (usize), outputFile)
             fflush(outputFile)
-        }
-    mtx.unlock()
+        mtx.unlock()
+    }
+    else {
+        // Lock-free: push() only contends on one atomic claim, and signal()
+        // needs no mutex, so no level needs a synchronous fallback anymore
+        // — the old WARN+ bypass existed only to dodge a blocking risk that
+        // this design doesn't have.
+        ringBuffer.push(sb.buffer, sb.length)
+        logCond.signal()
+    }
 
-    if(level == LogLevel.FATAL) {
+    if(level == LogLevel.FATAL && logExitOnFatal) {
+        // Guarantee this message (and anything else pending) actually
+        // reaches outputFile before the process dies — LogShutdown() fully
+        // drains the ring synchronously. Without this, ASYNC_RING mode
+        // could exit before the background thread ever gets to it.
+        LogShutdown()
         exit(2);
     }
 }

@@ -1,0 +1,343 @@
+import "std/log"
+import "std/assert"
+import "std/io"
+import "std/string"
+import "std/string/builder"
+import "std/thread"
+import "std/system"
+import "std/libc"
+import "std/mem"
+
+// -----------------------------------------------------------------------
+// Test helpers
+// -----------------------------------------------------------------------
+
+const PATH_BUF_SIZE = 256
+
+// Writes {cwd}/test_output/log/{name} into the caller-owned `buf` (creating
+// the directory as a side effect) and returns a String view into it. No
+// heap allocation — the caller's stack buffer owns the memory.
+func logTestPath(buf: *char, name: *const char) : String {
+    var dirBuf: [PATH_BUF_SIZE]char
+    snprintf(dirBuf, PATH_BUF_SIZE, "%s/test_output/log", CurrentWorkingPath())
+    Mkdirs(dirBuf)
+
+    var len = snprintf(buf, PATH_BUF_SIZE, "%s/test_output/log/%s", CurrentWorkingPath(), name)
+    return StringInit(buf, len)
+}
+
+// Reads the given file fully into the caller-owned StringBuilder (caller
+// must `.free()` it). Fails the test if the file can't be read.
+func readTestFile(path: String, out: *StringBuilder) {
+    out.init(1024, defaultAllocator)
+    var status = ReadFileFully(path, out)
+    assert(status == FileStatus.Ok)
+}
+
+// Formats into the caller-owned `buf` and returns a String view into it —
+// used for building search markers without heap allocation.
+func formatMarker(buf: *char, bufLen: i32, format: *const char, ...) : String {
+    var args: va_list;
+    va_start(args, format);
+    var len = vsnprintf(buf, bufLen as (u64), format, args)
+    va_end(args);
+    return StringInit(buf, len)
+}
+
+// Counts non-overlapping occurrences of `marker` within `content`.
+func countOccurrences(content: *StringBuilder, marker: String) : i32 {
+    var count = 0
+    var fromIndex = 0
+    while(true) {
+        var idx = content.indexOfAt(marker, fromIndex)
+        if(idx < 0) {
+            break
+        }
+        count += 1
+        fromIndex = idx + 1
+    }
+    return count
+}
+
+// -----------------------------------------------------------------------
+// LogOptions defaults
+// -----------------------------------------------------------------------
+
+@test("LogOptions defaults to SYNC mode, TRACE level, exitOnFatal true")
+func testLogOptionsDefaults() {
+    var opts = LogOptions{}
+    assert(opts.mode == LogMode.SYNC)
+    assert(opts.logLevel == LogLevel.TRACE)
+    assert(opts.exitOnFatal == true)
+    assert(opts.ringSlots == 4096)
+    assert(opts.outputFileName.empty())
+}
+
+// -----------------------------------------------------------------------
+// SYNC mode: writes synchronously and respects the level filter
+// -----------------------------------------------------------------------
+
+@test("SYNC mode writes immediately and filters below configured level")
+func testSyncModeWritesAndFilters() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "sync_basic.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .logLevel = LogLevel.WARN,
+        .mode = LogMode.SYNC
+    }
+    LogInit(&opts)
+    defer LogShutdown()
+
+    Debug("debug-should-not-appear\n")
+    Info("info-should-not-appear\n")
+    Warn("warn-should-appear\n")
+    Error("error-should-appear\n")
+
+    // SYNC mode fflushes on every call — no shutdown/drain needed to observe it.
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    assert(!content.contains($"debug-should-not-appear"))
+    assert(!content.contains($"info-should-not-appear"))
+    assert(content.contains($"[WARN]"))
+    assert(content.contains($"warn-should-appear"))
+    assert(content.contains($"[ERROR]"))
+    assert(content.contains($"error-should-appear"))
+}
+
+// -----------------------------------------------------------------------
+// ASYNC_RING mode: LogShutdown fully drains before returning
+// -----------------------------------------------------------------------
+
+@test("ASYNC_RING: LogShutdown drains all pending lines before returning")
+func testAsyncRingShutdownDrainsFully() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "async_basic.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .logLevel = LogLevel.TRACE,
+        .mode = LogMode.ASYNC_RING,
+        .ringSlots = 64
+    }
+    LogInit(&opts)
+
+    const N = 20
+    for(var i = 0; i < N; i += 1) {
+        Info("async-line-%d\n", i)
+    }
+    LogShutdown() // must fully flush before this returns
+
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    for(var i = 0; i < N; i += 1) {
+        var markerBuf: [32]char
+        var marker = formatMarker(markerBuf, 32, "async-line-%d\n", i)
+        assert(countOccurrences(&content, marker) == 1)
+    }
+}
+
+// -----------------------------------------------------------------------
+// LogInit is idempotent: second call (different options) is a no-op
+// -----------------------------------------------------------------------
+
+@test("LogInit second call is a no-op until LogShutdown resets it")
+func testLogInitIsIdempotent() {
+    var pathBufA: [PATH_BUF_SIZE]char
+    var pathBufB: [PATH_BUF_SIZE]char
+    var pathA = logTestPath(pathBufA, "idempotent_a.log")
+    var pathB = logTestPath(pathBufB, "idempotent_b.log")
+    remove(pathA.buffer)
+    remove(pathB.buffer)
+
+    var optsA = LogOptions{ .outputFileName = pathA, .mode = LogMode.SYNC }
+    LogInit(&optsA)
+
+    Info("first-init-message\n")
+
+    // Second call should be ignored entirely — pathB is never even opened.
+    var optsB = LogOptions{ .outputFileName = pathB, .mode = LogMode.SYNC }
+    LogInit(&optsB)
+
+    Info("second-message-still-goes-to-a\n")
+    LogShutdown()
+
+    var contentA: StringBuilder
+    readTestFile(pathA, &contentA)
+    defer contentA.free()
+
+    assert(contentA.contains($"first-init-message"))
+    assert(contentA.contains($"second-message-still-goes-to-a"))
+
+    var lenB = FileLength(pathB.buffer)
+    assert(lenB < 0) // pathB was never created
+}
+
+// -----------------------------------------------------------------------
+// LogShutdown resets initialization state so LogInit can run again
+// -----------------------------------------------------------------------
+
+@test("LogShutdown allows a clean re-initialization with new options")
+func testReinitializationAfterShutdown() {
+    var pathBufA: [PATH_BUF_SIZE]char
+    var pathBufB: [PATH_BUF_SIZE]char
+    var pathA = logTestPath(pathBufA, "reinit_a.log")
+    var pathB = logTestPath(pathBufB, "reinit_b.log")
+    remove(pathA.buffer)
+    remove(pathB.buffer)
+
+    var optsA = LogOptions{ .outputFileName = pathA, .mode = LogMode.SYNC }
+    LogInit(&optsA)
+    Info("session-a-message\n")
+    LogShutdown()
+
+    var optsB = LogOptions{ .outputFileName = pathB, .mode = LogMode.ASYNC_RING, .ringSlots = 32 }
+    LogInit(&optsB)
+    Info("session-b-message\n")
+    LogShutdown()
+
+    var contentA: StringBuilder
+    readTestFile(pathA, &contentA)
+    defer contentA.free()
+    assert(contentA.contains($"session-a-message"))
+    assert(!contentA.contains($"session-b-message"))
+
+    var contentB: StringBuilder
+    readTestFile(pathB, &contentB)
+    defer contentB.free()
+    assert(contentB.contains($"session-b-message"))
+    assert(!contentB.contains($"session-a-message"))
+}
+
+// -----------------------------------------------------------------------
+// exitOnFatal = false: Panic() logs but does not terminate the process
+// -----------------------------------------------------------------------
+
+@test("exitOnFatal=false lets Panic() log without exiting")
+func testExitOnFatalFalse() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "no_exit_on_fatal.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .mode = LogMode.SYNC,
+        .exitOnFatal = false
+    }
+    LogInit(&opts)
+    defer LogShutdown()
+
+    Panic("fatal-but-should-not-exit\n")
+
+    // If exitOnFatal weren't honored, the process would already be dead —
+    // reaching this line at all is part of what's being verified.
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    assert(content.contains($"[FATAL]"))
+    assert(content.contains($"fatal-but-should-not-exit"))
+}
+
+// -----------------------------------------------------------------------
+// ASYNC_RING: many concurrent producers, ring sized generously (no drops
+// expected) — every message should survive exactly once, uncorrupted.
+// -----------------------------------------------------------------------
+
+const CONCURRENCY_THREAD_COUNT = 8
+const CONCURRENCY_MSGS_PER_THREAD = 50
+
+struct ConcurrencyCtx {
+    threadIdx: i32
+}
+
+func concurrencyWorker(arg: *void) : i32 {
+    var ctx = arg as (*ConcurrencyCtx)
+    for(var i = 0; i < CONCURRENCY_MSGS_PER_THREAD; i += 1) {
+        Info("T%d-M%d\n", ctx.threadIdx, i)
+    }
+    return 0
+}
+
+@test("ASYNC_RING: concurrent producers, generously-sized ring loses nothing")
+func testAsyncRingConcurrentProducersNoLoss() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "async_concurrent.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .mode = LogMode.ASYNC_RING,
+        .ringSlots = 4096 // comfortably larger than the 400 total messages
+    }
+    LogInit(&opts)
+
+    var ctxs: [CONCURRENCY_THREAD_COUNT]ConcurrencyCtx
+    var threads: [CONCURRENCY_THREAD_COUNT]Thread
+    for(var t = 0; t < CONCURRENCY_THREAD_COUNT; t += 1) {
+        ctxs[t] = ConcurrencyCtx{ .threadIdx = t }
+        assert(threads[t].create(concurrencyWorker, &ctxs[t]) == ThreadStatus.SUCCESS)
+    }
+    for(var t = 0; t < CONCURRENCY_THREAD_COUNT; t += 1) {
+        threads[t].join()
+    }
+
+    LogShutdown() // drains everything the threads already pushed
+
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    for(var t = 0; t < CONCURRENCY_THREAD_COUNT; t += 1) {
+        for(var i = 0; i < CONCURRENCY_MSGS_PER_THREAD; i += 1) {
+            var markerBuf: [32]char
+            var marker = formatMarker(markerBuf, 32, "T%d-M%d\n", t, i)
+            assert(countOccurrences(&content, marker) == 1)
+        }
+    }
+}
+
+// -----------------------------------------------------------------------
+// ASYNC_RING: backpressure under a tiny ring — some drops are expected,
+// but whatever survives must be uncorrupted and never duplicated.
+// -----------------------------------------------------------------------
+
+const BACKPRESSURE_MSG_COUNT = 300
+
+@test("ASYNC_RING: tiny ring under backpressure drops but never corrupts or duplicates")
+func testAsyncRingBackpressureDropsCleanly() {
+    var pathBuf: [PATH_BUF_SIZE]char
+    var path = logTestPath(pathBuf, "async_backpressure.log")
+    remove(path.buffer)
+
+    var opts = LogOptions{
+        .outputFileName = path,
+        .mode = LogMode.ASYNC_RING,
+        .ringSlots = 2 // tiny — the producer will vastly outpace the drain thread
+    }
+    LogInit(&opts)
+
+    for(var i = 0; i < BACKPRESSURE_MSG_COUNT; i += 1) {
+        Info("B-M%d\n", i)
+    }
+    LogShutdown() // must not hang even though most lines were dropped
+
+    var content: StringBuilder
+    readTestFile(path, &content)
+    defer content.free()
+
+    for(var i = 0; i < BACKPRESSURE_MSG_COUNT; i += 1) {
+        var markerBuf: [32]char
+        var marker = formatMarker(markerBuf, 32, "B-M%d\n", i)
+        var count = countOccurrences(&content, marker)
+        // Never duplicated or corrupted into appearing more than once — may be 0 (dropped).
+        assert(count == 0 || count == 1)
+    }
+}
