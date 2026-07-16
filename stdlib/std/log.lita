@@ -163,7 +163,7 @@ public func LogInit(options: *const LogOptions = null) {
     if(!opts.outputFileName.empty()) {
         var buf: [MAX_PATH]char
         opts.outputFileName.copyTo(buf, MAX_PATH - 1)
-        outputFile = fopen(buf, "a")
+        outputFile = fopen(buf, "ab")
     }
 
     if(!outputFile) {

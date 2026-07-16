@@ -131,35 +131,17 @@ func testAsyncRingShutdownDrainsFully() {
     for(var i = 0; i < N; i += 1) {
         Info("async-line-%d\n", i)
     }
-    var dropped = LogDroppedLines()
     LogShutdown() // must fully flush before this returns
 
     var content: StringBuilder
     readTestFile(path, &content)
     defer content.free()
 
-    printf("[diag] testAsyncRingShutdownDrainsFully: dropped=%lld contentLen=%d\n",
-        dropped, content.length)
-    fflush(stdout)
-
-    var failures = 0
     for(var i = 0; i < N; i += 1) {
         var markerBuf: [32]char
         var marker = formatMarker(markerBuf, 32, "async-line-%d\n", i)
-        var count = countOccurrences(&content, marker)
-        if(count != 1) {
-            failures += 1
-            printf("[diag] marker '%.*s' (minus newline) occurred %d times\n",
-                marker.length - 1, marker.buffer, count)
-            fflush(stdout)
-        }
+        assert(countOccurrences(&content, marker) == 1)
     }
-    if(failures > 0) {
-        printf("[diag] full content (%d bytes):\n---\n%.*s\n---\n",
-            content.length, content.length, content.cStrConst())
-        fflush(stdout)
-    }
-    assert(failures == 0)
 }
 
 // -----------------------------------------------------------------------
@@ -307,37 +289,19 @@ func testAsyncRingConcurrentProducersNoLoss() {
         threads[t].join()
     }
 
-    var dropped = LogDroppedLines()
     LogShutdown() // drains everything the threads already pushed
 
     var content: StringBuilder
     readTestFile(path, &content)
     defer content.free()
 
-    printf("[diag] testAsyncRingConcurrentProducersNoLoss: dropped=%lld contentLen=%d\n",
-        dropped, content.length)
-    fflush(stdout)
-
-    var failures = 0
     for(var t = 0; t < CONCURRENCY_THREAD_COUNT; t += 1) {
         for(var i = 0; i < CONCURRENCY_MSGS_PER_THREAD; i += 1) {
             var markerBuf: [32]char
             var marker = formatMarker(markerBuf, 32, "T%d-M%d\n", t, i)
-            var count = countOccurrences(&content, marker)
-            if(count != 1) {
-                failures += 1
-                printf("[diag] marker '%.*s' (minus newline) occurred %d times\n",
-                    marker.length - 1, marker.buffer, count)
-                fflush(stdout)
-            }
+            assert(countOccurrences(&content, marker) == 1)
         }
     }
-    if(failures > 0) {
-        printf("[diag] %d marker(s) failed; full content (%d bytes):\n---\n%.*s\n---\n",
-            failures, content.length, content.length, content.cStrConst())
-        fflush(stdout)
-    }
-    assert(failures == 0)
 }
 
 // -----------------------------------------------------------------------
