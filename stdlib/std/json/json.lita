@@ -40,24 +40,35 @@ public struct JsonContext {
     allocator: *const mem::Allocator
     maker: MakeFn
     makerPtr: MakePtrFn
+
+    // Whether string/char-pointer fields are cloned (via `allocator`) out of
+    // the JsonNode tree during fromJson, or just aliased directly into it.
+    // Cloning (the default) is what makes it safe to free the JsonNode tree
+    // right after deserializing — the entity holds its own copies. Set false
+    // only if the JsonNode tree is guaranteed to outlive the deserialized
+    // entity and the extra allocation/copy isn't wanted.
+    copyStrings: bool
 }
 
 public func JsonContextInit(
     maker: MakeFn = DefaultMakeFn,
     makerPtr: MakePtrFn = DefaultMakePtrFn,
-    allocator: *const mem::Allocator = mem::defaultAllocator) : JsonContext {
+    allocator: *const mem::Allocator = mem::defaultAllocator,
+    copyStrings: bool = true) : JsonContext {
 
     var context = JsonContext{}
-    context.init(maker, makerPtr, allocator)
+    context.init(maker, makerPtr, allocator, copyStrings)
     return context;
 }
 public func (this: *JsonContext) init(
     maker: MakeFn,
     makerPtr: MakePtrFn,
-    allocator: *const mem::Allocator = mem::defaultAllocator) {
+    allocator: *const mem::Allocator = mem::defaultAllocator,
+    copyStrings: bool = true) {
     this.allocator = allocator
     this.maker = maker
     this.makerPtr = makerPtr
+    this.copyStrings = copyStrings
 }
 
 

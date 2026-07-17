@@ -7,6 +7,7 @@ import "std/array";
 import "std/json"
 import "std/libc";
 import "std/time";
+import "std/mem";
 
 #precheck
     fn json_get_generic_symbol(name, arg) {
@@ -144,14 +145,63 @@ public func (this: **const char) fromJson(context: *JsonContext, json: *JsonNode
     if(!json) {
         return;
     }
-    *this = json.asString()
+    if(!context.copyStrings) {
+        *this = json.asString()
+        return;
+    }
+
+    // Clone rather than alias json's own buffer: callers keep this pointer
+    // long after the JsonNode tree that produced it is freed. Not using
+    // StringClone here: it returns null for a strlen-zero input, which
+    // would turn a non-null (e.g. embedded '\0') json string into a null
+    // pointer instead of an allocated one.
+    var raw = json.asString()
+    var copied: *char = null
+    if(raw) {
+        var n = raw.length()
+        copied = context.allocator.alloc((n + 1) as (usize)) as (*char)
+        if(n > 0) {
+            memcpy(copied as (*void), raw as (*const void), n as (usize))
+        }
+        copied[n] = '\0'
+    }
+    *this = copied as (*const char)
 }
 
 public func (this: *String) fromJson(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;
     }
-    *this = StringInit(json.asString())
+    if(!context.copyStrings) {
+        *this = StringInit(json.asString())
+        return;
+    }
+
+    // Same reasoning as **const char's fromJson above (and matching the
+    // Array<String>/Map<K,String> paths below, which always clone) — the
+    // String we produce here is expected to outlive the JsonNode tree it
+    // was parsed from.
+    var raw = json.asString()
+    var copied: *char = null
+    var n = 0
+    if(raw) {
+        n = raw.length()
+        // StringClone returns null for a zero-length input, which would
+        // collapse a non-null (e.g. embedded '\0') json string into a null
+        // buffer — so only defer to it once n is known to be > 0.
+        if(n > 0) {
+            copied = StringClone(raw, n, context.allocator)
+        }
+        else {
+            // Can't just point at a "" literal: it lives in static/read-only
+            // memory, not on context.allocator's heap, and callers are free
+            // to eventually pass this buffer back to that same allocator's
+            // free() — which would crash on a non-heap pointer.
+            copied = context.allocator.alloc(1) as (*char)
+            copied[0] = '\0'
+        }
+    }
+    *this = StringInit(copied, n)
 }
 
 public func (this: *StringBuffer) fromJson(context: *JsonContext, json: *JsonNode) {

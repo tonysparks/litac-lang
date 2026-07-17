@@ -48,6 +48,10 @@ public struct LogOptions {
     // Panic() behavior; set false if the caller wants to handle fatal
     // errors itself without dying.
     exitOnFatal: bool = true
+
+    // Allocator used for the ASYNC_RING ring buffer's slots. Left null,
+    // LogInit defaults it to defaultAllocator.
+    allocator: *const Allocator = null
 }
 
 var outputFile: *FILE = null
@@ -55,6 +59,7 @@ var mtx: Mutex;
 var logLevel: LogLevel = LogLevel.TRACE
 var logMode: LogMode = LogMode.SYNC
 var logExitOnFatal: bool = true
+var logAllocator: *const Allocator = null
 
 const MAX_LOG_LINE = 2048
 
@@ -172,6 +177,10 @@ public func LogInit(options: *const LogOptions = null) {
     logLevel = opts.logLevel
     logMode = opts.mode
     logExitOnFatal = opts.exitOnFatal
+    logAllocator = opts.allocator
+    if(!logAllocator) {
+        logAllocator = defaultAllocator
+    }
     mtx.init()
 
     if(logMode == LogMode.ASYNC_RING) {
@@ -183,8 +192,7 @@ public func LogInit(options: *const LogOptions = null) {
         }
 
         ringBuffer.capacity = capacity
-        //@ai pass the allocator in on the LogOption
-        ringBuffer.slots = defaultAllocator.alloc(sizeof(:LogSlot) * (capacity as (usize))) as (*LogSlot)
+        ringBuffer.slots = logAllocator.alloc(sizeof(:LogSlot) * (capacity as (usize))) as (*LogSlot)
         for(var i = 0; i < capacity; i += 1) {
             // -1 can never equal a slot's first legitimate claim (that
             // slot's own index, the earliest value `claimed % capacity`
@@ -214,7 +222,7 @@ public func LogShutdown() {
         logThread.join()
 
         if(ringBuffer.slots) {
-            defaultAllocator.free(ringBuffer.slots as (*void))
+            logAllocator.free(ringBuffer.slots as (*void))
             ringBuffer.slots = null
         }
     }

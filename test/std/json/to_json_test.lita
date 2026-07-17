@@ -6,6 +6,7 @@ import "std/string/builder"
 import "std/string/buffer"
 import "std/libc"
 import "std/assert"
+import "std/mem"
 
 // -------------------------------------------------------------------------
 // Helpers
@@ -295,11 +296,14 @@ func testFromJsonStringBackslash() {
 
 @test
 func testFromJsonStringNullByte() {
-    // \0 is a non-standard extension; the parser decodes it but String.fromJson
-    // wraps the result via StringInit(*const char) which calls strlen — strlen
-    // stops at the first null byte so length comes back as 0.  We verify the
-    // decoded byte is correct by inspecting buffer[0] directly.
+    // \0 is a non-standard extension; the parser decodes it, but computing the
+    // clone length via strlen (as String.fromJson's copyStrings path does)
+    // stops at the first null byte, so the reported .length comes back as 0.
+    // Regression check: a strlen-zero source must still clone into a non-null
+    // one-byte buffer, not collapse to a null buffer (which previously
+    // segfaulted on the buffer[0] read below).
     var s = decodeJsonToString("{\"k\":\"\\0\"}")
+    assert(s.buffer != null)
     assert(s.buffer[0] == '\0')
 }
 
@@ -612,4 +616,80 @@ func testRoundTripCStrBackslash() {
 @test
 func testRoundTripCStrMixed() {
     assertCStrRoundTrip("a\tb\nc\\d\"e")
+}
+
+// -------------------------------------------------------------------------
+// JsonContext.copyStrings
+// -------------------------------------------------------------------------
+
+@test
+func testFromJsonStringCopyStringsClonesAndSurvivesNodeFree() {
+    // copyStrings defaults to true.
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"k\":\"hello\"}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var jsonStr = node.get("k")
+    var s = String{}
+    s.fromJson(&ctx, jsonStr)
+
+    assert(s.buffer != jsonStr.asString()) // cloned, not aliased
+
+    node.free() // must not invalidate s: it owns its own copy
+    assert(s.equals($"hello"))
+}
+
+@test
+func testFromJsonStringNoCopyAliasesJsonBuffer() {
+    var ctx = JsonContextInit(DefaultMakeFn, DefaultMakePtrFn, defaultAllocator, false)
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"k\":\"hello\"}"))
+    assert(!parser.hasError())
+    assert(node != null)
+    defer node.free()
+
+    var jsonStr = node.get("k")
+    var s = String{}
+    s.fromJson(&ctx, jsonStr)
+
+    assert(s.buffer == jsonStr.asString()) // aliased, not cloned
+    assert(s.equals($"hello"))
+}
+
+@test
+func testFromJsonCStrCopyStringsClonesAndSurvivesNodeFree() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"k\":\"hello\"}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var jsonStr = node.get("k")
+    var raw: *const char = null
+    var rawPtr = &raw
+    rawPtr.fromJson(&ctx, jsonStr)
+
+    assert(raw != jsonStr.asString()) // cloned, not aliased
+
+    node.free() // must not invalidate raw: it owns its own copy
+    assert(strcmp(raw, "hello") == 0)
+}
+
+@test
+func testFromJsonCStrNoCopyAliasesJsonBuffer() {
+    var ctx = JsonContextInit(DefaultMakeFn, DefaultMakePtrFn, defaultAllocator, false)
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"k\":\"hello\"}"))
+    assert(!parser.hasError())
+    assert(node != null)
+    defer node.free()
+
+    var jsonStr = node.get("k")
+    var raw: *const char = null
+    var rawPtr = &raw
+    rawPtr.fromJson(&ctx, jsonStr)
+
+    assert(raw == jsonStr.asString()) // aliased, not cloned
 }
