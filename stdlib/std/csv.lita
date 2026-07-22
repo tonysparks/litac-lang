@@ -1,0 +1,168 @@
+import "std/mem" as mem
+import "std/array"
+import "std/string"
+import "std/string/buffer"
+import "std/string/builder"
+
+// Minimal RFC 4180 CSV parser — comma-delimited only, no dialect sniffing.
+// Pure string-in/struct-out: no knowledge of any particular row/record type
+// lives here, just headers + string cells.
+public struct ParsedCsv {
+    headers: Array<String>
+    rows:    Array<Array<String>>
+}
+
+public struct CsvRowError {
+    row_number: i32  // 1-based; the header row counts as row 1
+    reason:     String
+}
+
+public struct CsvParseResult {
+    csv:       ParsedCsv
+    rowErrors: Array<CsvRowError>
+}
+
+func commitRow(
+    result:    *CsvParseResult,
+    row:       *Array<String>,
+    rowNumber: i32,
+    allocator: *const mem::Allocator
+) {
+    if(result.csv.headers.size() == 0) {
+        result.csv.headers = *row
+        return;
+    }
+
+    if(row.size() != result.csv.headers.size()) {
+        var reason = StringBuilderInit(64, allocator)
+        reason.append("expected %d columns, got %d", result.csv.headers.size(), row.size())
+        result.rowErrors.add(CsvRowError {
+            .row_number = rowNumber,
+            .reason     = reason.toString().copy(allocator),
+        })
+        row.free()
+        return;
+    }
+
+    result.csv.rows.add(*row)
+}
+
+// Parses `input` into headers + rows. Returns false only for unrecoverable
+// input (empty file). Malformed individual rows are reported via
+// result.rowErrors and skipped, not treated as a fatal error.
+public func ParseCsv(
+    input:     String,
+    allocator: *const mem::Allocator,
+    result:    *CsvParseResult
+) : bool {
+    result.csv.headers = ArrayInit<String>(8, allocator)
+    result.csv.rows    = ArrayInit<Array<String>>(64, allocator)
+    result.rowErrors   = ArrayInit<CsvRowError>(4, allocator)
+
+    if(input.length == 0) {
+        return false
+    }
+
+    var field = StringBuilderInit(64, allocator)
+    defer field.free()
+
+    var row = ArrayInit<String>(8, allocator)
+    var inQuotes      = false
+    var fieldStarted  = false  // a field (possibly empty-but-quoted) is in progress
+    var fieldWasQuoted = false // this field was opened with a '"' — its content is not trimmed
+    var lineHasContent = false // true once anything (a field, or a prior column) exists on this line
+    var rowNumber = 1
+
+    var i = 0
+    while(i < input.length) {
+        var c = input.buffer[i]
+
+        if(inQuotes) {
+            if(c == '"') {
+                if(i + 1 < input.length && input.buffer[i+1] == '"') {
+                    field.appendChar('"')
+                    i += 2
+                    continue
+                }
+                inQuotes = false
+                i += 1
+                continue
+            }
+            field.appendChar(c)
+            i += 1
+            continue
+        }
+
+        if(c == '"' && !fieldStarted) {
+            inQuotes       = true
+            fieldStarted   = true
+            fieldWasQuoted = true
+            lineHasContent = true
+            i += 1
+            continue
+        }
+
+        if(c == ',') {
+            if(fieldWasQuoted) {
+                row.add(field.toString().copy(allocator))
+            } else {
+                row.add(field.trim().toString().copy(allocator))
+            }
+            field.clear()
+            fieldStarted   = false
+            fieldWasQuoted = false
+            lineHasContent = true
+            i += 1
+            continue
+        }
+
+        if(c == '\r' || c == '\n') {
+            var recordHasContent = lineHasContent || fieldStarted || field.size() > 0
+
+            if(fieldWasQuoted) {
+                row.add(field.toString().copy(allocator))
+            } else {
+                row.add(field.trim().toString().copy(allocator))
+            }
+            field.clear()
+            fieldStarted   = false
+            fieldWasQuoted = false
+
+            if(c == '\r' && i + 1 < input.length && input.buffer[i+1] == '\n') {
+                i += 2
+            } else {
+                i += 1
+            }
+
+            if(recordHasContent) {
+                commitRow(result, &row, rowNumber, allocator)
+                rowNumber += 1
+            } else {
+                // wholly blank line — drop the single phantom empty-string field
+                row.free()
+            }
+            row = ArrayInit<String>(8, allocator)
+            lineHasContent = false
+            continue
+        }
+
+        field.appendChar(c)
+        fieldStarted   = true
+        lineHasContent = true
+        i += 1
+    }
+
+    // Flush a final record that wasn't newline-terminated.
+    if(lineHasContent || fieldStarted || field.size() > 0) {
+        if(fieldWasQuoted) {
+            row.add(field.toString().copy(allocator))
+        } else {
+            row.add(field.trim().toString().copy(allocator))
+        }
+        commitRow(result, &row, rowNumber, allocator)
+    } else {
+        row.free()
+    }
+
+    return true
+}

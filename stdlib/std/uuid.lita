@@ -37,6 +37,21 @@ public func (this: *UUID) version() : i32 {
 }
 
 
+// Stack-allocated buffer sized to hold a formatted UUID (36 chars), avoiding
+// the manual [37]char + StringBufferInit dance at every call site.
+public struct UuidBuf {
+    buffer: [37]char
+}
+
+public func (this: *UuidBuf) toStringBuffer() : StringBuffer {
+    return StringBufferInit(this.buffer, 37, 0)
+}
+
+// One-shot: formats `uuid` and returns the resulting String view into this buffer.
+public func (this: *UuidBuf) format(uuid: *UUID) : String {
+    return uuid.toString(this.toStringBuffer())
+}
+
 public func (this: *UUID) toString(sb: StringBuffer) : String {
     if(sb.remaining() < 37) {
         return String{}

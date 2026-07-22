@@ -1,0 +1,125 @@
+import "std/csv"
+import "std/array"
+import "std/string"
+import "std/assert"
+import "std/mem" as mem
+
+@test("csv::wellFormed_basic")
+func testWellFormed_basic() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Description,Amount\n01/02/2024,Coffee Shop,4.50\n01/03/2024,Paycheck,-100.00\n"), mem::defaultAllocator, &result))
+
+    assert(result.csv.headers.size() == 3)
+    assert(result.csv.headers.get(0).equals(StringInit("Date")))
+    assert(result.csv.headers.get(1).equals(StringInit("Description")))
+    assert(result.csv.headers.get(2).equals(StringInit("Amount")))
+
+    assert(result.csv.rows.size() == 2)
+    var row0: Array<String> = result.csv.rows.get(0)
+    var row1: Array<String> = result.csv.rows.get(1)
+    assert(row0.get(0).equals(StringInit("01/02/2024")))
+    assert(row0.get(1).equals(StringInit("Coffee Shop")))
+    assert(row0.get(2).equals(StringInit("4.50")))
+    assert(row1.get(1).equals(StringInit("Paycheck")))
+    assert(result.rowErrors.size() == 0)
+}
+
+@test("csv::quotedCommaInField")
+func testQuotedCommaInField() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Description,Amount\n01/02/2024,\"Smith, John\",100.00\n"), mem::defaultAllocator, &result))
+
+    assert(result.csv.rows.size() == 1)
+    var row0: Array<String> = result.csv.rows.get(0)
+    assert(row0.size() == 3)
+    assert(row0.get(1).equals(StringInit("Smith, John")))
+    assert(result.rowErrors.size() == 0)
+}
+
+@test("csv::quotedEmbeddedNewline")
+func testQuotedEmbeddedNewline() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Description,Amount\n01/02/2024,\"Line one\nLine two\",5.00\n"), mem::defaultAllocator, &result))
+
+    assert(result.csv.rows.size() == 1)
+    var row0: Array<String> = result.csv.rows.get(0)
+    assert(row0.get(1).equals(StringInit("Line one\nLine two")))
+}
+
+@test("csv::doubledQuoteEscape")
+func testDoubledQuoteEscape() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Description,Amount\n01/02/2024,\"Say \"\"hi\"\"\",5.00\n"), mem::defaultAllocator, &result))
+
+    assert(result.csv.rows.size() == 1)
+    var row0: Array<String> = result.csv.rows.get(0)
+    assert(row0.get(1).equals(StringInit("Say \"hi\"")))
+}
+
+@test("csv::crlfAndLfBothWork")
+func testCrlfAndLfBothWork() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Amount\r\n01/02/2024,4.50\r\n01/03/2024,5.00\n"), mem::defaultAllocator, &result))
+
+    assert(result.csv.headers.size() == 2)
+    assert(result.csv.rows.size() == 2)
+    var row0: Array<String> = result.csv.rows.get(0)
+    var row1: Array<String> = result.csv.rows.get(1)
+    assert(row0.get(1).equals(StringInit("4.50")))
+    assert(row1.get(1).equals(StringInit("5.00")))
+}
+
+@test("csv::trailingBlankLineIgnored")
+func testTrailingBlankLineIgnored() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Amount\n01/02/2024,4.50\n\n"), mem::defaultAllocator, &result))
+
+    assert(result.csv.rows.size() == 1)
+}
+
+@test("csv::raggedRowReportedNotFatal")
+func testRaggedRowReportedNotFatal() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Description,Amount\n01/02/2024,Coffee,4.50\n01/03/2024,OnlyTwoCols\n01/04/2024,Paycheck,-100.00\n"), mem::defaultAllocator, &result))
+
+    // the ragged row is skipped, the two well-formed rows still come through
+    assert(result.csv.rows.size() == 2)
+    assert(result.rowErrors.size() == 1)
+    var err0: CsvRowError = result.rowErrors.get(0)
+    assert(err0.row_number == 3)
+}
+
+@test("csv::emptyInputReturnsFalse")
+func testEmptyInputReturnsFalse() {
+    var result = CsvParseResult{}
+    assert(!ParseCsv(StringInit(""), mem::defaultAllocator, &result))
+}
+
+@test("csv::headerOnlyInput")
+func testHeaderOnlyInput() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Description,Amount\n"), mem::defaultAllocator, &result))
+    assert(result.csv.headers.size() == 3)
+    assert(result.csv.rows.size() == 0)
+    assert(result.rowErrors.size() == 0)
+}
+
+@test("csv::unquotedWhitespaceTrimmed")
+func testUnquotedWhitespaceTrimmed() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date, Description ,Amount\n01/02/2024,  Coffee Shop  ,4.50\n"), mem::defaultAllocator, &result))
+
+    assert(result.csv.headers.get(1).equals(StringInit("Description")))
+    var row0: Array<String> = result.csv.rows.get(0)
+    assert(row0.get(1).equals(StringInit("Coffee Shop")))
+}
+
+@test("csv::finalRecordWithoutTrailingNewline")
+func testFinalRecordWithoutTrailingNewline() {
+    var result = CsvParseResult{}
+    assert(ParseCsv(StringInit("Date,Amount\n01/02/2024,4.50"), mem::defaultAllocator, &result))
+
+    assert(result.csv.rows.size() == 1)
+    var row0: Array<String> = result.csv.rows.get(0)
+    assert(row0.get(1).equals(StringInit("4.50")))
+}
