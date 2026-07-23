@@ -179,6 +179,40 @@ func test_static_webpage() {
     assert(fileContents.equals(resp.body))
 }
 
+// Regression test for a splice-based static file response (ResponseType.FILE,
+// the io_uring queueWriteHttpFileResponse path — distinct from the /download
+// route above, which uses ResponseType.STREAM and never exercised this code).
+//
+// large_file.txt is 300,000 bytes: at the default fileSpliceSizeInBytes
+// (16KiB), that needs ceil(300000/16384) = 19 chunks. The old implementation
+// queued every chunk's splice pair (2 SQEs) plus a final close SQE — 39 SQEs —
+// in one unsubmitted burst before ever calling io_uring_submit. Against this
+// suite's .ioQueueDepth = 16, that's more than double the ring's capacity, so
+// the old code would fail ERROR_IOURING_ERROR deterministically on every
+// request for this file, not just under load. The fix streams one chunk at a
+// time, re-queuing the next chunk only after the previous one's completion,
+// so the required SQE count no longer scales with file size.
+@test("test large static file spanning more splice chunks than ioQueueDepth")
+func test_large_static_file_exceeds_io_queue_depth() {
+    var body = StringBuilderInit(300_000)
+    defer body.free()
+
+    var resp = http::HttpResponse {
+        .body = body
+    }
+    http.get("http://localhost:9091/static/large_file.txt", &resp)
+
+    var fileContents = StringBuilderInit(300_000)
+    defer fileContents.free()
+
+    var status = ReadFileFully($"../../test/std/ringhttp/static/large_file.txt", &fileContents)
+    assert(status == FileStatus.Ok)
+    assert(fileContents.length == 300_000)
+    assert(resp.statusCode == 200)
+    assert(resp.body.length == 300_000)
+    assert(fileContents.equals(resp.body))
+}
+
 
 
 struct Param {

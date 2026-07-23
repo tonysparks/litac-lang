@@ -176,10 +176,7 @@ internal func (this: *HttpRingEngine) listen() : Status {
             continue
         }
 
-        var status = this.handleCompletionRing(ring, cqe, result)
-        if(status != Status.OK) {
-            continue
-        }
+        this.handleCompletionRing(ring, cqe, result)
 
         io_uring_submit(ring)
     }

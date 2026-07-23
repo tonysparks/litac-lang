@@ -962,7 +962,15 @@ func (this: *WorkerThread) handleCompletionRing(
         }
         case SessionState.WRITING_STREAM: {
             session.submissions -= 1
-            return this.queueAdvanceChunkedWrite(ring, session)
+            // Unlike the initial dispatch (handleHttpRequest), a failure here has
+            // no caller left to fall back to sendServerError — this is already
+            // mid-response, driven by a completion, not a fresh request. Without
+            // an explicit close the connection would just stall: no further SQE
+            // gets queued for it, so no more CQEs ever arrive for this session.
+            if(this.queueAdvanceChunkedWrite(ring, session) != Status.OK) {
+                this.closeSession(session)
+            }
+            return Status.OK
         }
         case SessionState.WRITTEN_HTTP_RESPONSE:
         case SessionState.WRITTEN_HTTP_RESPONSE_MORE: {
@@ -993,7 +1001,15 @@ func (this: *WorkerThread) handleCompletionRing(
                 // (or the terminal close once the whole file has been spliced)
                 // instead of treating the response as finished.
                 if(operation.opcode() != RingOpcode.CLOSE) {
-                    return this.queueWriteHttpFileResponse(ring, session)
+                    // Same reasoning as WRITING_STREAM above: this is a completion-
+                    // driven continuation with no caller to fall back to
+                    // sendServerError, so a failure here must close the session
+                    // itself or the connection stalls forever with no SQE ever
+                    // queued for it again.
+                    if(this.queueWriteHttpFileResponse(ring, session) != Status.OK) {
+                        this.closeSession(session)
+                    }
+                    return Status.OK
                 }
                 return this.finishWrittenResponse(ring, session)
             }
