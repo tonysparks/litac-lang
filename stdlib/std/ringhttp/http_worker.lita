@@ -271,10 +271,9 @@ internal func (this: *WorkerThread) sendServerError(
     session: *SessionContext,
     status:  Status
 ): Status {
-    var httpRequest = HttpRequest{}
     var requestContext = RequestHandlerContext {
         .allocator = &session.requestAllocator.allocator,
-        .request   = &httpRequest,
+        .request   = &session.request,
         .response  = &session.response,
         .userData  = null,
         .match     = null

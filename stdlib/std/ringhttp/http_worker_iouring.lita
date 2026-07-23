@@ -644,11 +644,13 @@ internal func WorkerFunction(arg: *void) : i32 {
             cqe = null
         }
 
-        var status = workerThread.handleCompletionRing(ring, cqe, result)
-        if(status != Status.OK) {
-            continue
-        }
+        workerThread.handleCompletionRing(ring, cqe, result)
 
+        // Always submit, even on a non-OK status: handleCompletionRing may have
+        // already queued SQEs (e.g. partway through a multi-chunk file splice)
+        // before hitting an error. Skipping submit here stranded those entries
+        // in the ring's local SQ array forever, permanently shrinking the
+        // effective queue depth until the process restarted.
         io_uring_submit(ring)
     }
 
