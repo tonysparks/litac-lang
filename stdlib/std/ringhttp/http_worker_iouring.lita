@@ -363,6 +363,17 @@ func (this: *WorkerThread) queueAdvanceChunkedWrite(
     return this.queueWriteBufferSend(ring, session, moreContents)
 }
 
+// queueWriteHttpFileResponse: splice one chunk (fileSpliceSizeInBytes) of the
+// response file to the socket per call, tracking progress in request.fileOffset,
+// and returns Status.OK having queued only that chunk's 2 SQEs (or the terminal
+// close's 1 SQE once the whole file has been spliced).
+//
+// This is re-entered from handleCompletionRing every time a chunk's splice pair
+// completes (see the SessionState.WRITTEN_FILE case), rather than queuing every
+// chunk for the entire file up front: queuing the whole file in one unsubmitted
+// burst made the required SQE count scale with file size, so any file needing
+// more SQEs than the ring's configured depth would fail ERROR_IOURING_ERROR on
+// every single request, deterministically — not just under concurrent load.
 func (this: *WorkerThread) queueWriteHttpFileResponse(
     ring: *io_uring,
     request: *SessionContext
@@ -373,71 +384,46 @@ func (this: *WorkerThread) queueWriteHttpFileResponse(
     var response = &request.response
     var connection = &request.connection
 
-    var fileFd = response.fileHandle
-    var fileSize = response.fileSize
+    var fileSize = response.fileSize as (i64)
     var socketFd = connection.handle()
 
-    if(pipe2(request.pipes, O_CLOEXEC | O_NONBLOCK) < 0) {
-        Error("Error creating pipes for connection: %d\n", connection.handle())
-        return Status.ERROR_PIPE_ERROR
+    if(request.fileOffset >= fileSize) {
+        return this.queueCloseFileHandle(ring, request)
     }
 
-    var bufferSize = this.config.fileSpliceSizeInBytes
-    var remainingBytes = fileSize
-    while(remainingBytes > 0) {
-        var spliceSize = (remainingBytes > bufferSize)
-            ? bufferSize : remainingBytes;
-        defer remainingBytes -= spliceSize;
+    if(request.fileOffset == 0) {
+        if(pipe2(request.pipes, O_CLOEXEC | O_NONBLOCK) < 0) {
+            Error("Error creating pipes for connection: %d\n", connection.handle())
+            return Status.ERROR_PIPE_ERROR
+        }
+    }
 
-        {
-            var sqe = io_uring_get_sqe(ring)
-            if(!sqe) {
-                Error("Error creating SQE for socket: %d\n", socketFd)
-                goto error;
-            }
+    var bufferSize = this.config.fileSpliceSizeInBytes as (i64)
+    var remainingBytes = fileSize - request.fileOffset
+    var spliceSize = (remainingBytes > bufferSize) ? bufferSize : remainingBytes;
 
-            io_uring_prep_splice(
-                sqe,
-                response.fileHandle,
-                (fileSize - remainingBytes) as (i64),
-                request.pipes[1],
-                -1_i64,
-                spliceSize as (u32),
-                SPLICE_F_MORE
-            )
-            sqe.flags |= IOSQE_IO_LINK
-
-            io_uring_sqe_set_data64(
-                sqe,
-                makeOp(RingOpcode.SPLICE, request.index, request.generation)
-            )
+    {
+        var sqe = io_uring_get_sqe(ring)
+        if(!sqe) {
+            Error("Error creating SQE for socket: %d\n", socketFd)
+            goto error;
         }
 
-        {
-            var sqe = io_uring_get_sqe(ring)
-            if(!sqe) {
-                Error("Error creating SQE for socket: %d\n", socketFd)
-                goto error;
-            }
+        io_uring_prep_splice(
+            sqe,
+            response.fileHandle,
+            request.fileOffset,
+            request.pipes[1],
+            -1_i64,
+            spliceSize as (u32),
+            SPLICE_F_MORE
+        )
+        sqe.flags |= IOSQE_IO_LINK
 
-            io_uring_prep_splice(
-                sqe,
-                request.pipes[0],
-                -1_i64,
-                connection.handle(),
-                -1_i64,
-                spliceSize as (u32),
-                SPLICE_F_MORE
-            )
-            sqe.flags |= IOSQE_IO_LINK
-
-            io_uring_sqe_set_data64(
-                sqe,
-                makeOp(RingOpcode.SPLICE, request.index, request.generation)
-            )
-        }
-
-        request.submissions += 2
+        io_uring_sqe_set_data64(
+            sqe,
+            makeOp(RingOpcode.SPLICE, request.index, request.generation)
+        )
     }
 
     {
@@ -447,19 +433,54 @@ func (this: *WorkerThread) queueWriteHttpFileResponse(
             goto error;
         }
 
-        io_uring_prep_close(sqe, response.fileHandle)
+        io_uring_prep_splice(
+            sqe,
+            request.pipes[0],
+            -1_i64,
+            connection.handle(),
+            -1_i64,
+            spliceSize as (u32),
+            SPLICE_F_MORE
+        )
 
         io_uring_sqe_set_data64(
             sqe,
-            makeOp(RingOpcode.CLOSE, request.index, request.generation)
+            makeOp(RingOpcode.SPLICE, request.index, request.generation)
         )
-        request.submissions += 1
     }
+
+    request.fileOffset   += spliceSize
+    request.submissions  += 2
 
     return Status.OK
 
 error:
     return Status.ERROR_IOURING_ERROR;
+}
+
+// queueCloseFileHandle: queue the terminal close SQE once the whole file has
+// been spliced to the socket. Split out of queueWriteHttpFileResponse since
+// it's now also reached directly for a zero-length file (fileOffset starts
+// at 0, which already equals fileSize).
+func (this: *WorkerThread) queueCloseFileHandle(
+    ring: *io_uring,
+    request: *SessionContext
+): Status {
+    var sqe = io_uring_get_sqe(ring)
+    if(!sqe) {
+        Error("Error creating SQE for socket: %d\n", request.connection.handle())
+        return Status.ERROR_IOURING_ERROR;
+    }
+
+    io_uring_prep_close(sqe, request.response.fileHandle)
+
+    io_uring_sqe_set_data64(
+        sqe,
+        makeOp(RingOpcode.CLOSE, request.index, request.generation)
+    )
+    request.submissions += 1
+
+    return Status.OK
 }
 
 public func (this: *WorkerThread) sendWebSocketFrame(
@@ -667,6 +688,42 @@ internal func WorkerFunction(arg: *void) : i32 {
     workerThread.sessions.free(workerThread.server)
 
     return 0
+}
+
+// finishWrittenResponse: shared tail for whatever comes after a fully-written
+// response — a plain body/chunked write, or the terminal close of a streamed
+// file — deciding whether to flip into websocket/SSE mode, keep the request
+// alive for the next one on this connection, or close it.
+func (this: *WorkerThread) finishWrittenResponse(
+    ring: *io_uring,
+    session: *SessionContext
+): Status {
+    var connection = &session.connection
+
+    if(session.isWebSocket) {
+        session.state = SessionState.WEB_SOCKET_OPERATION
+        return this.queueReadWebSocket(ring, session)
+    }
+    if(session.isSse) {
+        session.state = SessionState.SSE_OPERATION
+        session.sseHandler.callback(&session.sseSession)
+        return Status.OK
+    }
+    // RFC 7231 §5.1.1: after a 100 Continue the session must NOT be
+    // reset — the read buffer still holds the request headers and the
+    // next read will append the body so handlePartialHttpRequest can
+    // complete the request without re-parsing from scratch.
+    if(session.response.status == 100) {
+        return this.queueReadHttpRequest(ring, session)
+    }
+    // RFC 7230 §6.6: close when Connection: close or HTTP/1.0 without keep-alive.
+    if(connection.disableKeepAlive) {
+        this.closeSession(session)
+        return Status.OK
+    }
+    Debug("Preparing connection for another HTTP request for socket: %d\n", connection.handle())
+    session.begin(connection.handle())
+    return this.queueReadHttpRequest(ring, session)
 }
 
 func (this: *WorkerThread) handleCompletionRing(
@@ -908,7 +965,20 @@ func (this: *WorkerThread) handleCompletionRing(
             return this.queueAdvanceChunkedWrite(ring, session)
         }
         case SessionState.WRITTEN_HTTP_RESPONSE:
-        case SessionState.WRITTEN_HTTP_RESPONSE_MORE:
+        case SessionState.WRITTEN_HTTP_RESPONSE_MORE: {
+            session.submissions -= 1
+            Debug("%s for socket: %d subs: %d index: %d\n",
+                SessionStateAsStr(session.state),
+                connection.handle(),
+                session.submissions,
+                session.index
+            )
+
+            if(session.submissions <= 0) {
+                return this.finishWrittenResponse(ring, session)
+            }
+            break
+        }
         case SessionState.WRITTEN_FILE: {
             session.submissions -= 1
             Debug("%s for socket: %d subs: %d index: %d\n",
@@ -919,30 +989,13 @@ func (this: *WorkerThread) handleCompletionRing(
             )
 
             if(session.submissions <= 0) {
-                if(session.isWebSocket) {
-                    session.state = SessionState.WEB_SOCKET_OPERATION
-                    return this.queueReadWebSocket(ring, session)
+                // A chunk's splice pair just completed; queue the next chunk
+                // (or the terminal close once the whole file has been spliced)
+                // instead of treating the response as finished.
+                if(operation.opcode() != RingOpcode.CLOSE) {
+                    return this.queueWriteHttpFileResponse(ring, session)
                 }
-                if(session.isSse) {
-                    session.state = SessionState.SSE_OPERATION
-                    session.sseHandler.callback(&session.sseSession)
-                    return Status.OK
-                }
-                // RFC 7231 §5.1.1: after a 100 Continue the session must NOT be
-                // reset — the read buffer still holds the request headers and the
-                // next read will append the body so handlePartialHttpRequest can
-                // complete the request without re-parsing from scratch.
-                if(session.response.status == 100) {
-                    return this.queueReadHttpRequest(ring, session)
-                }
-                // RFC 7230 §6.6: close when Connection: close or HTTP/1.0 without keep-alive.
-                if(connection.disableKeepAlive) {
-                    this.closeSession(session)
-                    return Status.OK
-                }
-                Debug("Preparing connection for another HTTP request for socket: %d\n", connection.handle())
-                session.begin(connection.handle())
-                return this.queueReadHttpRequest(ring, session)
+                return this.finishWrittenResponse(ring, session)
             }
             break
         }

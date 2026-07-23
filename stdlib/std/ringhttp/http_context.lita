@@ -138,9 +138,12 @@ internal func (this: *SessionContext) begin(
 
     this.pipes[0] = 0
     this.pipes[1] = 0
-#else
-    this.fileOffset = 0
 #end
+    // Tracks splice/sendfile progress through the current response file on
+    // both backends now (io_uring chunks the splice loop across completions,
+    // driven by this offset) — must be reset for every new request regardless
+    // of OS, or a reused session slot would resume mid-file on its next file response.
+    this.fileOffset = 0
 
     if(this.file > 0) {
         // close(this.file)
@@ -174,9 +177,8 @@ internal func (this: *SessionContext) finish(forceClose: bool = false) {
     if(this.pipes[1] > 0) {
         close(this.pipes[1])
     }
-#else
-    this.fileOffset = 0
 #end
+    this.fileOffset = 0
 
     if(this.file > 0) {
         // The io_uring CLOSE SQE closes this fd in the success path.  Here we
