@@ -19,6 +19,7 @@ jobs:
   build-linux:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -90,6 +91,7 @@ jobs:
   build-windows:
     # The type of runner that the job will run on
     runs-on: windows-latest
+    timeout-minutes: 10
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -152,6 +154,7 @@ jobs:
   build-macos:
     # The type of runner that the job will run on
     runs-on: macos-15-intel
+    timeout-minutes: 10
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
