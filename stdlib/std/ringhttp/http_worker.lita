@@ -282,6 +282,21 @@ internal func (this: *WorkerThread) sendServerError(
     return this.queueSend(session)
 }
 
+internal func (this: *WorkerThread) sendNotFound(
+    session: *SessionContext,
+    status:  Status
+): Status {
+    var requestContext = RequestHandlerContext {
+        .allocator = &session.requestAllocator.allocator,
+        .request   = &session.request,
+        .response  = &session.response,
+        .userData  = null,
+        .match     = null
+    }
+    this.server404(&requestContext, status)
+    return this.queueSend(session)
+}
+
 internal func (this: *WorkerThread) handlePartialHttpRequest(
     request:   *SessionContext,
     bytesRead: i32

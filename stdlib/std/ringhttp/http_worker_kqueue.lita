@@ -717,13 +717,18 @@ func (this: *WorkerThread) handleReadReady(session: *SessionContext) {
 
             var reqStatus = this.handleHttpRequest(session)
             if(reqStatus != Status.OK) {
-                Error("HTTP request error %s for socket: %d\n", StatusAsStr(reqStatus), connection.handle())
-                if(reqStatus == Status.ERROR_PARSING_HTTP_REQUEST ||
-                   reqStatus == Status.ERROR_WEB_SOCKET_SECURITY_KEY) {
-                    this.sendBadRequest(session, reqStatus)
+                if(reqStatus == Status.ERROR_FILE_NOT_FOUND) {
+                    this.sendNotFound(session, reqStatus)
                 }
                 else {
-                    this.sendServerError(session, reqStatus)
+                    Error("HTTP request error %s for socket: %d\n", StatusAsStr(reqStatus), connection.handle())
+                    if(reqStatus == Status.ERROR_PARSING_HTTP_REQUEST ||
+                       reqStatus == Status.ERROR_WEB_SOCKET_SECURITY_KEY) {
+                        this.sendBadRequest(session, reqStatus)
+                    }
+                    else {
+                        this.sendServerError(session, reqStatus)
+                    }
                 }
             }
             break

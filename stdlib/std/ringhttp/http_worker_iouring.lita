@@ -887,6 +887,9 @@ func (this: *WorkerThread) handleCompletionRing(
             status = this.handleHttpRequest(session)
 
             if(status != Status.OK) {
+                if(status == Status.ERROR_FILE_NOT_FOUND) {
+                    return this.sendNotFound(session, status)
+                }
                 Error("HTTP Request Bad Status %s with index: %d\n", StatusAsStr(status), session.index)
                 if(status == Status.ERROR_PARSING_HTTP_REQUEST ||
                    status == Status.ERROR_WEB_SOCKET_SECURITY_KEY) {
