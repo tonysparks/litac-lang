@@ -149,6 +149,15 @@ func logDrainLoop(arg: *void) : i32 {
 }
 var logInitialized: Atomic<bool>
 
+// Reports whether LogInit() has run and not yet been undone by
+// LogShutdown(). Exists for callers/tests that need to verify a given code
+// path performs its own lazy LogInit() without depending on log output
+// landing somewhere observable (level filtering or destination could
+// otherwise mask that from a black-box check).
+public func IsLogInitialized() : bool {
+    return logInitialized.get()
+}
+
 public func LogInit(options: *const LogOptions = null) {
     // Some callers (e.g. ring::HttpServer.start()) call this a second time
     // as a matter of course, expecting a harmless redundant re-open. That

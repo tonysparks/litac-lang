@@ -3,6 +3,7 @@ import "std/libc"
 import "std/mem"
 import "std/assert"
 import "std/array"
+import "std/net/posix_socket"
 
 import "std/ringhttp"
 
@@ -106,5 +107,182 @@ func testContextPoolBoundaryIndices() {
     // get() on out-of-range must return null.
     assert(pool.get(-1) == null)
     assert(pool.get(9999) == null)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: WebSocketSession/SseSession are documented as "store this handle
+// to push events/messages later" (a broadcast-list use case), but held no
+// liveness check at all — once a connection closed and its pool slot was
+// recycled for a completely unrelated client, a stale handle's send()/
+// close() would silently operate on that unrelated connection. Fixed via a
+// generation number captured at handoff (SessionContext.begin()) and
+// checked by isLive() before every send()/close(). Also verifies the new
+// onClose callback fires exactly once so apps have a real signal to drop a
+// handle from any broadcast list, instead of the framework never telling
+// them (SSE previously had no disconnect notification at all).
+// ---------------------------------------------------------------------------
+
+var wsOnCloseCallCount: i32 = 0
+var lastWsOnCloseUserData: *void = null
+
+func testWsOnClose(session: *WebSocketSession) {
+    wsOnCloseCallCount += 1
+    lastWsOnCloseUserData = session.userData
+}
+
+@test
+func testWebSocketSessionGenerationGuard() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalServer(&config, &server)
+
+    var pool: ContextPool
+    pool.init(&server)
+    defer pool.free(&server)
+
+    var firstFd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(firstFd > 0)
+    defer close(firstFd)
+
+    var idx = pool.alloc()
+    assert(idx >= 0)
+    var session = pool.get(idx)
+    session.begin(firstFd)
+
+    // Simulate the websocket upgrade having happened for connection #1.
+    session.isWebSocket = true
+    session.socketHandler = WebSocketController { .callback = null, .onClose = testWsOnClose }
+    session.socketSession.userData = 1 as (*void)
+
+    // Correct usage per WebSocketSession's doc comment: an app that wants to
+    // keep pushing to this session later stores a *copy* of the dereferenced
+    // value, not the pointer the callback receives (session.socketSession is
+    // embedded in the pool slot itself, so a stored pointer would silently
+    // track whatever connection reuses this slot next).
+    var staleHandle = session.socketSession
+    assert(staleHandle.isLive())
+
+    wsOnCloseCallCount = 0
+    lastWsOnCloseUserData = null
+
+    // Connection #1 disconnects.
+    session.finish(.forceClose = true)
+
+    // onClose must fire exactly once, identifying the right session.
+    assert(wsOnCloseCallCount == 1)
+    assert(lastWsOnCloseUserData == (1 as (*void)))
+
+    // The freed slot is immediately reused (LIFO free-list) by a brand new,
+    // unrelated connection #2 — also a websocket, so isLive()'s isWebSocket
+    // check alone can't be what distinguishes them; only the generation can.
+    var secondFd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(secondFd > 0)
+    defer close(secondFd)
+
+    var newIdx = pool.alloc()
+    assert(newIdx == idx) // must be the same slot for this test to mean anything
+    var newSession = pool.get(newIdx)
+    newSession.begin(secondFd)
+    newSession.isWebSocket = true
+    newSession.socketHandler = WebSocketController { .callback = null, .onClose = testWsOnClose }
+    newSession.socketSession.userData = 2 as (*void)
+
+    wsOnCloseCallCount = 0
+
+    // The handle captured before connection #1 finished must now be dead...
+    assert(!staleHandle.isLive())
+
+    // ...and touching it must be a complete no-op: it must not send on
+    // connection #2's socket, close it, or fire its onClose.
+    var frame = Frame{}
+    var sendResult = staleHandle.send(&frame)
+    assert(sendResult == 0)
+    assert(newSession.isWebSocket == true)
+
+    staleHandle.close()
+    assert(newSession.isWebSocket == true)
+    assert(wsOnCloseCallCount == 0)
+
+    // Connection #2's own (still-live) handle must be unaffected.
+    assert(newSession.socketSession.isLive())
+}
+
+var sseOnCloseCallCount: i32 = 0
+var lastSseOnCloseUserData: *void = null
+
+func testSseOnClose(session: *SseSession) {
+    sseOnCloseCallCount += 1
+    lastSseOnCloseUserData = session.userData
+}
+
+@test
+func testSseSessionGenerationGuard() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalServer(&config, &server)
+
+    var pool: ContextPool
+    pool.init(&server)
+    defer pool.free(&server)
+
+    var firstFd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(firstFd > 0)
+    defer close(firstFd)
+
+    var idx = pool.alloc()
+    assert(idx >= 0)
+    var session = pool.get(idx)
+    session.begin(firstFd)
+
+    // Simulate the SSE stream having been set up for connection #1.
+    session.isSse = true
+    session.sseHandler = SseController { .callback = null, .onClose = testSseOnClose }
+    session.sseSession.userData = 1 as (*void)
+
+    // Correct usage per SseSession's doc comment: an app that wants to keep
+    // pushing to this session later stores a *copy* of the dereferenced
+    // value, not the pointer the callback receives (session.sseSession is
+    // embedded in the pool slot itself, so a stored pointer would silently
+    // track whatever connection reuses this slot next).
+    var staleHandle = session.sseSession
+    assert(staleHandle.isLive())
+
+    sseOnCloseCallCount = 0
+    lastSseOnCloseUserData = null
+
+    // Connection #1 disconnects (e.g. timeout, network error — SSE has no
+    // client-initiated close frame the way websocket does).
+    session.finish(.forceClose = true)
+
+    assert(sseOnCloseCallCount == 1)
+    assert(lastSseOnCloseUserData == (1 as (*void)))
+
+    // Slot reused by an unrelated connection #2, also SSE.
+    var secondFd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(secondFd > 0)
+    defer close(secondFd)
+
+    var newIdx = pool.alloc()
+    assert(newIdx == idx)
+    var newSession = pool.get(newIdx)
+    newSession.begin(secondFd)
+    newSession.isSse = true
+    newSession.sseHandler = SseController { .callback = null, .onClose = testSseOnClose }
+    newSession.sseSession.userData = 2 as (*void)
+
+    sseOnCloseCallCount = 0
+
+    assert(!staleHandle.isLive())
+
+    var event = SseEvent { .data = $"stale-event-should-not-be-sent" }
+    var sendResult = staleHandle.send(&event)
+    assert(sendResult == 0)
+    assert(newSession.isSse == true)
+
+    staleHandle.close()
+    assert(newSession.isSse == true)
+    assert(sseOnCloseCallCount == 0)
+
+    assert(newSession.sseSession.isLive())
 }
 #end

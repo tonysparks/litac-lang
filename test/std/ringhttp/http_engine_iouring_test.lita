@@ -1,0 +1,283 @@
+#if OS == "LINUX"
+import "std/libc"
+import "std/mem"
+import "std/assert"
+import "std/array"
+import "std/atomic"
+import "std/thread"
+import "std/thread/barrier"
+
+import "std/ringhttp/http_engine_iouring"
+import "std/ringhttp/http_worker_iouring"
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_common"
+import "std/os/linux/io_uring"
+import "std/net"
+import "std/net/posix_socket"
+
+// ---------------------------------------------------------------------------
+// Minimal server/engine setup helper — enough to drive HttpRingEngine
+// directly (queueAcceptRequest/handleCompletionRing/listen) without going
+// through the full HttpServer request-handling machinery.
+// ---------------------------------------------------------------------------
+func makeMinimalEngineServer(config: *HttpConfig, server: *HttpServer, port: u16, numThreads: i32 = 1) {
+    config.allocator = defaultAllocator
+    config.port = port
+    config.numThreads = numThreads
+    config.ioQueueDepth = 16
+    config.maxPoolSize = 8
+    // maxRequestSizeInBytes must be > 0 for pool slot allocation (bare `var
+    // config: HttpConfig` does not apply the struct's declared per-field
+    // defaults — see http_context_test.lita's makeMinimalServer).
+    config.maxRequestSizeInBytes = 64 * KiB
+    config.disableSignal = true
+    // Keep shutdown fast in tests — close() joins each worker thread, which
+    // only notices isRunning==false at its next timeoutCheckMSec heartbeat.
+    config.timeoutCheckMSec = 200
+    server.init(config)
+}
+
+// Retries a real TCP connect to 127.0.0.1:port for a bounded time — the only
+// reliable way to know engine.listen() has fully finished starting up
+// (workers created, isRunning.init(true) called, socket bound+listening).
+// An internal flag check is not safe here: this file's own
+// makeMinimalEngineServer/listen() sequence showed that closing before
+// listen() reaches isRunning.init(true) lets that later call silently
+// resurrect isRunning to true, hanging shutdown forever.
+func waitUntilAcceptingConnections(port: u16) : bool {
+    for(var i = 0; i < 100; i += 1) {
+        var fd = socket(AF_INET, SOCK_STREAM, 0)
+        if(fd >= 0) {
+            var addr: sockaddr_in
+            memset(&addr, 0, sizeof(:sockaddr_in))
+            addr.sin_family = AF_INET
+            addr.sin_port = htons(port)
+            inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+
+            var connected = connect(fd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) == 0
+            close(fd)
+            if(connected) {
+                return true
+            }
+        }
+        ThreadSleepMSec(20)
+    }
+    return false
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: the kernel clears F_MORE on the terminal CQE of a multishot
+// accept (on error — EMFILE/ENFILE/ENOMEM under load are all realistic — or
+// cancellation). Nothing previously re-armed the accept afterward, so the
+// server would silently stop accepting any new connection for the rest of
+// the process's life. handleCompletionRing now re-queues the accept
+// whenever F_MORE is absent.
+// ---------------------------------------------------------------------------
+@test
+func testAcceptRearmsAfterTermination() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalEngineServer(&config, &server, 28201_u16)
+
+    var engine = &server.engine
+
+    var params = io_uring_params{}
+    var ringStatus = io_uring_queue_init_params(16, &engine.ring, &params)
+    assert(ringStatus == 0)
+    defer io_uring_queue_exit(&engine.ring)
+
+    assert(engine.serverSocket.create())
+    var enableReuse = 1
+    engine.serverSocket.setSocketOpt(SocketOption.SO_REUSEADDR, &enableReuse, sizeof(:i32))
+    assert(FromPort(config.port, &engine.serverSocket.address) != null)
+    assert(engine.serverSocket.bind())
+    assert(engine.serverSocket.listen())
+    defer engine.serverSocket.close()
+
+    // Arm the initial multishot accept.
+    assert(engine.queueAcceptRequest(&engine.ring) == Status.OK)
+
+    // Simulate the kernel terminating the multishot accept, as if EMFILE had
+    // occurred: a CQE with a negative res and no F_MORE flag.
+    var fakeCqe = io_uring_cqe {
+        .user_data = makeOp(RingOpcode.ACCEPT, 0),
+        .res = -24, // -EMFILE
+        .flags = 0  // F_MORE absent => the kernel considers this terminated
+    }
+    engine.handleCompletionRing(&engine.ring, &fakeCqe, 0)
+
+    // Prove the accept was actually re-armed: connect a real client and
+    // confirm the ring produces a genuine ACCEPT completion for it.
+    var clientFd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(clientFd > 0)
+    defer close(clientFd)
+
+    var addr: sockaddr_in
+    memset(&addr, 0, sizeof(:sockaddr_in))
+    addr.sin_family = AF_INET
+    addr.sin_port = htons(config.port)
+    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+    assert(connect(clientFd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) == 0)
+
+    var cqe: *io_uring_cqe = null
+    var ts = __kernel_timespec { .tv_sec = 3, .tv_nsec = 0 }
+    io_uring_wait_cqe_timeout(&engine.ring, &cqe, &ts)
+    assert(cqe != null)
+
+    var op = RingOperation { .data = io_uring_cqe_get_data64(cqe) }
+    assert(op.opcode() == RingOpcode.ACCEPT)
+    assert(cqe.res >= 0) // a real accepted client fd
+    io_uring_cqe_seen(&engine.ring, cqe)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: an ACCEPT completion with cqe.res==0 (fd 0 — a legitimate fd, e.g.
+// if stdin was ever closed) used to be silently dropped (`if(cqe.res==0)
+// break`) instead of dispatched, leaking that connection forever. It must
+// now be handed off via MSG_RING exactly like any other accepted fd.
+// ---------------------------------------------------------------------------
+@test
+func testAcceptDispatchesFdZero() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalEngineServer(&config, &server, 28203_u16, 1)
+
+    var engine = &server.engine
+
+    var params = io_uring_params{}
+    var ringStatus = io_uring_queue_init_params(16, &engine.ring, &params)
+    assert(ringStatus == 0)
+    defer io_uring_queue_exit(&engine.ring)
+
+    // A second, standalone ring stands in for a worker's ring — the point
+    // of this test is only to observe whether queueHandleConnection's
+    // MSG_RING handoff happens at all, not to exercise a full WorkerThread.
+    var workerRing: io_uring
+    var workerRingStatus = io_uring_queue_init(16, &workerRing, 0)
+    assert(workerRingStatus == 0)
+    defer io_uring_queue_exit(&workerRing)
+
+    engine.workers.add(WorkerThread{})
+    var worker = engine.workers.getPtr(0)
+    worker.ring = workerRing
+
+    var fakeCqe = io_uring_cqe {
+        .user_data = makeOp(RingOpcode.ACCEPT, 0),
+        .res = 0,
+        .flags = IORING_CQE_F_MORE // not exercising the rearm path here
+    }
+    engine.handleCompletionRing(&engine.ring, &fakeCqe, 0)
+    io_uring_submit(&engine.ring) // queueHandleConnection only queues the MSG_RING SQE
+
+    var cqe: *io_uring_cqe = null
+    var ts = __kernel_timespec { .tv_sec = 3, .tv_nsec = 0 }
+    io_uring_wait_cqe_timeout(&workerRing, &cqe, &ts)
+    assert(cqe != null) // fd 0 WAS dispatched — proof it wasn't silently dropped
+
+    var op = RingOperation { .data = io_uring_cqe_get_data64(cqe) }
+    assert(op.opcode() == RingOpcode.MSG_RING)
+    assert(op.contextIndex == 0) // the "client fd" (0) survived the handoff
+    io_uring_cqe_seen(&workerRing, cqe)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: a worker whose io_uring_queue_init_params fails left ring_fd at
+// whatever WorkerThread's zero-initialized default was (0 — a real, if
+// unlikely, fd), so nothing distinguished "this worker's ring never came
+// up" from "fd 0". WorkerFunction now explicitly sets ring_fd to the -1
+// sentinel before attempting init, restoring it only on success — which is
+// what HttpRingEngine.listen() checks after the startup barrier to refuse
+// to serve traffic through a dead worker.
+// ---------------------------------------------------------------------------
+@test
+func testWorkerInitFailureSetsRingFdSentinel() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalEngineServer(&config, &server, 28204_u16, 1)
+
+    var barrier: Barrier
+    barrier.init(2)
+
+    var isRunning: Atomic<bool>
+    isRunning.init(true)
+
+    var worker: WorkerThread
+    // An invalid wq_fd makes IORING_SETUP_ATTACH_WQ fail inside
+    // io_uring_queue_init_params — a deterministic, portable way to force
+    // the failure path without needing real resource exhaustion (EMFILE).
+    var initStatus = worker.init(&server, 0, &barrier, &isRunning, 999999)
+    assert(initStatus == Status.OK) // thread creation itself still succeeds
+
+    barrier.wait() // WorkerFunction always reaches the barrier, success or failure
+
+    assert(worker.ring.ring_fd < 0)
+
+    isRunning.set(false)
+    worker.thread.join()
+    worker.sessions.free(&server)
+}
+
+func EngineListenThreadFn(arg: *void) : i32 {
+    var engine = arg as (*HttpRingEngine)
+    engine.listen()
+    return 0
+}
+
+func trivialThreadFn(arg: *void) : i32 {
+    return 0
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: close() joins every worker thread from a previous listen() call
+// but never trims this.workers itself — a second listen() on the same
+// engine (e.g. a restart) used to append a fresh batch of WorkerThread
+// entries after the old, now-dead ones instead of replacing them, and
+// queueHandleConnection's round-robin would intermittently route new
+// connections to a dead worker's already-closed ring. listen() now clears
+// this.workers before repopulating it.
+//
+// This simulates "a previous listen() cycle already populated workers" by
+// injecting entries directly, rather than running two full real listen()/
+// close() cycles back to back on one engine: that fuller scenario turned up
+// its own separate, deeper pre-existing issues (a data race confirmed with
+// ThreadSanitizer around reading engine state without a real happens-before
+// edge, plus close()'s worker-thread-join and barrier lifecycle not being
+// safe to run twice) that are a bigger fix than this one line. Each
+// injected entry gets a real thread that actually runs and exits, so
+// listen()'s own internal self-close (which joins whatever is already in
+// this.workers) joins a normal, already-finished thread exactly once — a
+// well-defined join, unlike joining a never-started or already-joined one.
+// ---------------------------------------------------------------------------
+@test
+func testWorkersClearedOnRelisten() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalEngineServer(&config, &server, 28205_u16, 2)
+
+    var engine = &server.engine
+
+    for(var i = 0; i < 2; i += 1) {
+        engine.workers.add(WorkerThread{})
+        var stale = engine.workers.getPtr(i)
+        assert(stale.thread.create(trivialThreadFn, null) == ThreadStatus.SUCCESS)
+    }
+    // Let the trivial threads actually finish before listen()'s self-close
+    // joins them, so that join lands on an already-exited thread.
+    ThreadSleepMSec(50)
+
+    var t = Thread{}
+    assert(t.create(EngineListenThreadFn, engine) == ThreadStatus.SUCCESS)
+    assert(waitUntilAcceptingConnections(config.port))
+
+    engine.close()
+    t.join()
+
+    // Not 4 (2 stale + 2 real) — the stale entries must have been cleared
+    // before listen() added its own. thread.join() above is a real
+    // synchronization point, so this read has a proper happens-before edge
+    // over the listen() thread's writes to engine.workers.
+    assert(engine.workers.length == config.numThreads)
+}
+
+#end

@@ -103,6 +103,24 @@ internal struct WorkerThread {
 
 // queueSend: serialize the HTTP/1.1 response, optionally encrypt via TLS, and submit via io_uring.
 internal func (this: *WorkerThread) queueSend(session: *SessionContext) : Status {
+    // A response that partially failed to queue (e.g. the header SENDMSG
+    // succeeded but a later splice SQE alloc then failed mid-file-response)
+    // leaves session.submissions > 0 with an SQE still referencing
+    // connection.writeBuffer. The error path for that failure (sendServerError/
+    // sendBadRequest/sendNotFound) calls back into queueSend to write a
+    // *different* response — without this guard that clear()s and
+    // re-serializes the very buffer the still-in-flight SQE is reading from,
+    // corrupting whatever the client actually receives. Nothing can be
+    // un-queued at this point, so give up on writing anything further and
+    // let the in-flight SQEs finish into a closing connection instead.
+    if(session.submissions > 0) {
+        Error("Refusing to queue a second response for socket: %d while %d submission(s) are still in flight\n",
+            session.connection.handle(), session.submissions
+        )
+        this.closeSession(session)
+        return Status.ERROR_IOURING_ERROR
+    }
+
     var ring = &this.ring
 
     session.state = SessionState.WRITTEN_HTTP_RESPONSE
@@ -636,6 +654,16 @@ internal func WorkerFunction(arg: *void) : i32 {
 
     var ring = &workerThread.ring
 
+    // Default to an explicit invalid sentinel (distinct from a real fd or a
+    // zero-initialized-but-never-touched ring) before attempting init, so
+    // the engine can reliably tell "this worker's ring never came up" apart
+    // from "fd 0" if io_uring_queue_init_params fails without touching
+    // ring_fd. HttpRingEngine.listen() checks this after the barrier below
+    // and refuses to serve traffic if any worker failed, rather than
+    // silently round-robining a share of all connections to a dead worker
+    // (whose ring_fd would otherwise read as 0 — a real, if unlikely, fd).
+    ring.ring_fd = -1
+
     var params = io_uring_params {}
     params.flags |= IORING_SETUP_SINGLE_ISSUER
     params.flags |= IORING_SETUP_COOP_TASKRUN
@@ -646,6 +674,7 @@ internal func WorkerFunction(arg: *void) : i32 {
     var ioStatus = io_uring_queue_init_params(workerThread.config.ioQueueDepth, ring, &params)
     if(ioStatus != 0) {
         Error("Error initializing the io_uring queue: %d\n", ioStatus)
+        ring.ring_fd = -1
         workerThread.barrier.wait()
         return -1
     }
@@ -726,7 +755,7 @@ func (this: *WorkerThread) finishWrittenResponse(
     return this.queueReadHttpRequest(ring, session)
 }
 
-func (this: *WorkerThread) handleCompletionRing(
+internal func (this: *WorkerThread) handleCompletionRing(
     ring: *io_uring,
     cqe: *io_uring_cqe,
     result: i32
@@ -748,7 +777,17 @@ func (this: *WorkerThread) handleCompletionRing(
         }
 
         var session = this.sessions.get(operation.contextIndex)
-        assert(session != null)
+        if(session == null) {
+            // Should not happen in normal operation (contextIndex always
+            // carries a valid pool slot for non-MSG_RING ops), but this is a
+            // single stray/malformed completion, not a reason to bring down
+            // every other connection on this worker — log and drop it
+            // rather than aborting the whole process.
+            Error("Received completion for unknown session index: %d (opcode: %s)\n",
+                operation.contextIndex, RingOpcodeAsStr(operation.opcode())
+            )
+            return Status.OK
+        }
 
         // Discard stale CQEs that arrived after the slot was reused.
         if(operation.opGeneration() != session.generation) {
@@ -797,6 +836,18 @@ func (this: *WorkerThread) handleCompletionRing(
         return Status.OK
     }
 
+    // TIMEOUT's contextIndex is the -1 sentinel (see queueTimeoutCheck), never
+    // a real pool index. In practice a timeout CQE always carries a negative
+    // res (-ETIME on expiry, -ECANCELED if cancelled) so this is handled
+    // above — but that's a kernel/liburing behavior this code relies on
+    // without owning it. Guard it here too so a -1 index can never reach
+    // sessions.get() regardless of which branch a future/unexpected kernel
+    // behavior takes.
+    if(operation.opcode() == RingOpcode.TIMEOUT) {
+        this.checkTimeouts()
+        return Status.OK
+    }
+
     var session: *SessionContext = null
 
     if(operation.opcode() == RingOpcode.MSG_RING) {
@@ -811,7 +862,15 @@ func (this: *WorkerThread) handleCompletionRing(
         session = this.sessions.get(operation.contextIndex)
     }
 
-    assert(session != null)
+    if(session == null) {
+        // Same reasoning as the cqe.res < 0 branch above: drop this one
+        // stray completion rather than aborting every other connection on
+        // this worker over it.
+        Error("Received completion for unknown session index: %d (opcode: %s)\n",
+            operation.contextIndex, RingOpcodeAsStr(operation.opcode())
+        )
+        return Status.OK
+    }
 
     // Discard stale CQEs that arrived after the slot was reused.
     if(operation.opcode() != RingOpcode.MSG_RING &&

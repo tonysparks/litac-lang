@@ -2,6 +2,9 @@ import "std/libc"
 import "std/mem"
 import "std/assert"
 import "std/array"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
 
 // ---------------------------------------------------------------------------
 // Tests: RingOperation packing and stale-generation detection
@@ -9,6 +12,25 @@ import "std/array"
 
 #if OS == "LINUX"
 import "std/ringhttp/http_worker_iouring"
+import "std/ringhttp/http_server"
+import "std/ringhttp/http_context"
+import "std/ringhttp/http_common"
+import "std/os/linux/io_uring"
+import "std/net/posix_socket"
+
+// ---------------------------------------------------------------------------
+// Minimal server/worker setup helper — just enough to drive
+// WorkerThread.handleCompletionRing/queueSend directly against a real (but
+// otherwise idle) io_uring, without spinning up the real WorkerFunction
+// thread or a listening socket.
+// ---------------------------------------------------------------------------
+func makeMinimalWorkerServer(config: *HttpConfig, server: *HttpServer) {
+    config.allocator = defaultAllocator
+    config.maxPoolSize = 3
+    config.maxRequestSizeInBytes = 64 * KiB
+    config.disableSignal = true
+    server.init(config)
+}
 
 // Bug fix: RingOperation packing — opcode, generation, and contextIndex must
 // survive a round-trip through the u64 encoding used in io_uring user_data.
@@ -86,6 +108,158 @@ func testStaleGenerationDetection() {
     // once the slot has been recycled.
     var gen0Op = RingOperation { .data = makeOp(RingOpcode.READ, 0, 0) }
     assert(gen0Op.opGeneration() != sessionGeneration)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: an out-of-range/stale session index used to hit
+// assert(session != null) in handleCompletionRing — not compiled out in
+// release builds (no -DNDEBUG), so it aborts the *entire* process over a
+// single bad completion instead of just dropping that one connection. Now
+// logged and dropped (Status.OK), in both the cqe.res<0 and cqe.res>=0
+// branches.
+// ---------------------------------------------------------------------------
+
+@test
+func testUnknownSessionIndexNegativeResDoesNotAbort() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalWorkerServer(&config, &server)
+
+    var worker: WorkerThread
+    worker.server = &server
+    worker.config = &config
+    worker.sessions.init(&server)
+    defer worker.sessions.free(&server)
+
+    var ringStatus = io_uring_queue_init(8, &worker.ring, 0)
+    assert(ringStatus == 0)
+    defer io_uring_queue_exit(&worker.ring)
+
+    // contextIndex 9999 is far outside maxPoolSize=3. Reaching the assert
+    // below at all is part of what's being verified — the old
+    // assert(session != null) would have aborted the process before this.
+    var cqe = io_uring_cqe {
+        .user_data = makeOp(RingOpcode.READ, 9999, 0),
+        .res = -1,
+        .flags = 0
+    }
+    var result = worker.handleCompletionRing(&worker.ring, &cqe, 0)
+    assert(result == Status.OK)
+}
+
+@test
+func testUnknownSessionIndexNonNegativeResDoesNotAbort() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalWorkerServer(&config, &server)
+
+    var worker: WorkerThread
+    worker.server = &server
+    worker.config = &config
+    worker.sessions.init(&server)
+    defer worker.sessions.free(&server)
+
+    var ringStatus = io_uring_queue_init(8, &worker.ring, 0)
+    assert(ringStatus == 0)
+    defer io_uring_queue_exit(&worker.ring)
+
+    var cqe = io_uring_cqe {
+        .user_data = makeOp(RingOpcode.READ, 9999, 0),
+        .res = 5,
+        .flags = 0
+    }
+    var result = worker.handleCompletionRing(&worker.ring, &cqe, 0)
+    assert(result == Status.OK)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: TIMEOUT's contextIndex (-1 sentinel) was only guarded against
+// reaching sessions.get() in the cqe.res<0 branch — relying on the
+// (currently true, but unenforced) assumption that a real timeout
+// completion always carries a negative res. Now guarded in the cqe.res>=0
+// branch too, and checkTimeouts() still runs either way.
+// ---------------------------------------------------------------------------
+
+@test
+func testTimeoutGuardedInNonNegativeBranch() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalWorkerServer(&config, &server)
+
+    var worker: WorkerThread
+    worker.server = &server
+    worker.config = &config
+    worker.sessions.init(&server)
+    defer worker.sessions.free(&server)
+
+    var ringStatus = io_uring_queue_init(8, &worker.ring, 0)
+    assert(ringStatus == 0)
+    defer io_uring_queue_exit(&worker.ring)
+
+    var cqe = io_uring_cqe {
+        .user_data = makeOp(RingOpcode.TIMEOUT, -1),
+        .res = 0, // non-negative — real timeouts never do this, but nothing enforced that
+        .flags = 0
+    }
+    var result = worker.handleCompletionRing(&worker.ring, &cqe, 0)
+    assert(result == Status.OK)
+
+    // Confirm checkTimeouts() actually ran (not just "didn't crash"): it
+    // ends by calling rearmTimeout(), which queues (but doesn't submit) one
+    // new SQE. If handleCompletionRing had instead fallen into the generic
+    // unknown-session drop path, nothing would have been queued here.
+    var submitted = io_uring_submit(&worker.ring)
+    assert(submitted == 1)
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: if a response partially failed to queue (e.g. the header SENDMSG
+// succeeded but a later splice SQE alloc then failed mid-file-response),
+// the error-recovery path (sendServerError/sendBadRequest/sendNotFound)
+// used to call back into queueSend to write a *different* response — which
+// clear()s and re-serializes the very writeBuffer a still-in-flight SQE is
+// reading from, corrupting whatever the client actually receives. queueSend
+// now refuses to re-enter while session.submissions > 0.
+// ---------------------------------------------------------------------------
+
+@test
+func testQueueSendRefusesReentryWithPendingSubmissions() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalWorkerServer(&config, &server)
+
+    var worker: WorkerThread
+    worker.server = &server
+    worker.config = &config
+    worker.sessions.init(&server)
+    defer worker.sessions.free(&server)
+
+    var ringStatus = io_uring_queue_init(8, &worker.ring, 0)
+    assert(ringStatus == 0)
+    defer io_uring_queue_exit(&worker.ring)
+
+    var fd = socket(AF_INET, SOCK_STREAM, 0)
+    assert(fd > 0)
+    defer close(fd)
+
+    var idx = worker.sessions.alloc()
+    assert(idx >= 0)
+    var session = worker.sessions.get(idx)
+    session.begin(fd)
+
+    // Simulate a response that's already partially in flight: the header
+    // SENDMSG succeeded (submissions == 1) before a later SQE alloc failed.
+    session.submissions = 1
+
+    session.connection.writeBuffer.clear()
+    session.connection.writeBuffer.append("SENTINEL-UNTOUCHED")
+
+    var result = worker.queueSend(session)
+    assert(result == Status.ERROR_IOURING_ERROR)
+
+    // The buffer a still-in-flight SQE points at must not have been
+    // clobbered by a second, different response.
+    assert(session.connection.writeBuffer.toString().equals($"SENTINEL-UNTOUCHED"))
 }
 
 #end

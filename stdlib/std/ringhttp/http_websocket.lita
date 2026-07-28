@@ -11,17 +11,52 @@ import "std/ringhttp/http_router"
 
 public const WEB_SOCKET_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-@doc("A client <-> server session which allows for sending/closing from the server")
+@doc("""
+A client <-> server session which allows for sending/closing from the server.
+
+This struct is embedded directly in its connection's pool slot — the
+callback that hands you a `*WebSocketSession` is giving you a pointer into
+that slot's own memory. If you want to keep this session around past the
+callback (e.g. in a broadcast list) you MUST store a copy of the *value*
+(`var mine = *session`), not the pointer you were given: once the
+connection closes, the slot is recycled for a completely unrelated client,
+and SessionContext.begin() overwrites this struct's `generation` field (and
+everything else) in place for the new occupant. A stored pointer would
+silently start reading/writing that unrelated connection's data instead of
+detecting staleness — only a copy, taken before that happens, freezes the
+generation this handle actually belongs to.
+""")
 public struct WebSocketSession {
     worker: *WorkerThread
     context: *SessionContext
+
+    // The context's generation at the moment this handle was handed to the
+    // application (set in SessionContext.begin()). Only meaningful if you
+    // hold a *copy* of this struct (see the doc comment above) — comparing
+    // against a stale generation is what stops that copy from writing to,
+    // or closing, whatever connection now owns the pool slot.
+    generation: u32
 
     // public data
     allocator: *const Allocator
     userData: *void
 }
 
+// isLive: false once the connection this handle was issued for has closed
+// and its pool slot been reused (or freed) — send()/close() are no-ops
+// after that point instead of touching whatever connection now owns the slot.
+public func (this: *WebSocketSession) isLive() : bool {
+    return this.context != null &&
+           this.context.generation == this.generation &&
+           this.context.isWebSocket &&
+           this.context.isConnected()
+}
+
 public func (this: *WebSocketSession) send(frame: *Frame) : i32 {
+    if(!this.isLive()) {
+        return 0
+    }
+
     this.worker.sendWebSocketFrame(this.context, frame)
 
     // TODO: Error handling
@@ -29,6 +64,10 @@ public func (this: *WebSocketSession) send(frame: *Frame) : i32 {
 }
 
 public func (this: *WebSocketSession) close() {
+    if(!this.isLive()) {
+        return;
+    }
+
     // TODO: Close out the socket connection
     var out = Frame{}
     out.isFinal = true

@@ -15,21 +15,59 @@ public struct SseEvent {
     retry: i32      // optional reconnect hint in ms; 0 = omit
 }
 
-@doc("A handle to an active SSE connection, used to push events or close the stream")
+@doc("""
+A handle to an active SSE connection, used to push events or close the stream.
+
+This struct is embedded directly in its connection's pool slot — the
+SseController callback that hands you a `*SseSession` is giving you a
+pointer into that slot's own memory. If you want to keep this session
+around past the callback (e.g. in a broadcast list) you MUST store a copy
+of the *value* (`var mine = *session`), not the pointer you were given:
+once the connection closes, the slot is recycled for a completely
+unrelated client, and SessionContext.begin() overwrites this struct's
+`generation` field (and everything else) in place for the new occupant. A
+stored pointer would silently start writing to that unrelated connection's
+socket instead of detecting staleness — only a copy, taken before that
+happens, freezes the generation this handle actually belongs to.
+""")
 public struct SseSession {
     worker:    *WorkerThread
     context:   *SessionContext
+
+    // The context's generation at the moment this handle was handed to the
+    // application (set in SessionContext.begin()). Only meaningful if you
+    // hold a *copy* of this struct (see the doc comment above) — comparing
+    // against a stale generation is what stops that copy from writing to,
+    // or closing, whatever connection now owns the pool slot.
+    generation: u32
+
     allocator: *const Allocator
     userData:  *void
 }
 
+// isLive: false once the connection this handle was issued for has closed
+// and its pool slot been reused (or freed) — send()/close() are no-ops
+// after that point instead of touching whatever connection now owns the slot.
+public func (this: *SseSession) isLive() : bool {
+    return this.context != null &&
+           this.context.generation == this.generation &&
+           this.context.isSse &&
+           this.context.isConnected()
+}
+
 @doc("Push an SSE event to the client. Must be called from the same worker thread.")
 public func (this: *SseSession) send(event: *SseEvent) : i32 {
+    if(!this.isLive()) {
+        return 0
+    }
     return this.worker.sendSseEvent(this.context, event)
 }
 
 @doc("Close the SSE connection from the server side")
 public func (this: *SseSession) close() {
+    if(!this.isLive()) {
+        return;
+    }
     this.context.isSse = false
     this.worker.closeSession(this.context)
 }

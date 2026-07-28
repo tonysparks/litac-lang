@@ -56,14 +56,42 @@ public struct HttpController {
 
 @doc("Handler for web socket connection")
 public struct WebSocketController {
-    @doc("Handle receiving web socket frames from the client")
+    @doc("""
+    Handle receiving web socket frames from the client. To push messages
+    outside of this callback (e.g. a broadcast list), store a *copy* of the
+    dereferenced session (`var mine = *session`), not the pointer you're
+    given — see WebSocketSession's doc comment for why.
+    """)
     callback: func(*WebSocketSession, *Frame) : i32;
+
+    @doc("""
+    Optional: called exactly once when the connection is torn down, for any
+    reason (client CLOSE frame, timeout, network error, server shutdown) —
+    not just a client-initiated close. Use this to remove the session from
+    any broadcast list/registry the app keeps; the handle is no longer live
+    once this fires (send()/close() on it become no-ops).
+    """)
+    onClose: func(*WebSocketSession) : void;
 }
 
 @doc("Handler for an SSE stream — called once when the client connects and headers are flushed")
 public struct SseController {
-    @doc("Called once with the live session handle; store it to push events later")
+    @doc("""
+    Called once with the live session handle. To push events later, store a
+    *copy* of the dereferenced session (`var mine = *session`), not the
+    pointer you're given — see SseSession's doc comment for why.
+    """)
     callback: func(*SseSession) : i32;
+
+    @doc("""
+    Optional: called exactly once when the connection is torn down, for any
+    reason (timeout, network error, client disconnect, server shutdown).
+    Without this there is no way for the app to know a stored session handle
+    has gone stale — use it to remove the session from any broadcast
+    list/registry; the handle is no longer live once this fires (send()/
+    close() on it become no-ops).
+    """)
+    onClose: func(*SseSession) : void;
 }
 
 public struct HttpConfig {
@@ -211,6 +239,16 @@ public func (this: *HttpServer) init(config: *HttpConfig) : Status {
 }
 
 public func (this: *HttpServer) start() : Status {
+    // LogInit() is idempotent (first call wins) — this is a no-op if the
+    // caller already initialized logging with its own LogOptions. Without
+    // this, every Info/Error/Panic call is a silent no-op (Logv() returns
+    // immediately when logging was never initialized) — including the
+    // fatal-error exit(2) that Panic() depends on, so an unrecoverable
+    // engine error (e.g. io_uring queue init failure) would fall straight
+    // through into undefined behavior instead of exiting with a log line
+    // explaining why.
+    LogInit()
+
     Info("listening on port: %d\n", this.config.port)
     return this.engine.listen()
 }

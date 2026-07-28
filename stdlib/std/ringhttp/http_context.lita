@@ -110,7 +110,9 @@ internal func (this: *SessionContext) begin(
 
     this.connection.socket.socket = clientSocket
     this.socketSession.context = this
+    this.socketSession.generation = this.generation
     this.sseSession.context = this
+    this.sseSession.generation = this.generation
 
     this.isWebSocket = false
     this.isSse = false
@@ -157,8 +159,27 @@ internal func (this: *SessionContext) begin(
 internal func (this: *SessionContext) finish(forceClose: bool = false) {
     Debug("Finishing Request for socket: %d\n", this.connection.handle())
 
+    var wasWebSocket = this.isWebSocket
+    var wasSse       = this.isSse
+
     this.isWebSocket = false
     this.isSse = false
+
+    // Notify the app the connection is going away, whatever the reason
+    // (client close, timeout, network error, forced close) — this is the
+    // app's one chance to remove this handle from any broadcast list/
+    // registry it keeps. Even if it doesn't, the generation check inside
+    // WebSocketSession/SseSession.send()/close() (isLive()) already stops a
+    // stale handle from touching whatever connection later reuses this pool
+    // slot; this callback exists so the app finds out instead of silently
+    // holding a dead handle.
+    if(wasWebSocket && this.socketHandler.onClose) {
+        this.socketHandler.onClose(&this.socketSession)
+    }
+    if(wasSse && this.sseHandler.onClose) {
+        this.sseHandler.onClose(&this.sseSession)
+    }
+
     this.wsFragInProgress = false
     this.wsFragOpcode     = 0
     this.wsFragBuf.clear()
@@ -209,6 +230,13 @@ internal func (this: *SessionContext) free() {
 
 internal func (this: *SessionContext) isKeepAlive(): bool {
     return !this.connection.disableKeepAlive
+}
+
+// Passthrough so callers that don't (and shouldn't, to avoid a circular
+// import back through http_server) import http_connection directly — e.g.
+// WebSocketSession/SseSession.isLive() — can still check liveness.
+public func (this: *SessionContext) isConnected(): bool {
+    return this.connection.isConnected()
 }
 
 

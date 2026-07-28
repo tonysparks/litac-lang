@@ -84,6 +84,14 @@ internal func (this: *HttpRingEngine) init(
 internal func (this: *HttpRingEngine) listen() : Status {
     this.close()
 
+    // close() joins every worker thread started by a previous listen() call
+    // but never trims this.workers itself — without this, a second listen()
+    // on the same engine (e.g. a restart) would append a fresh batch of
+    // WorkerThread entries after the old, now-dead ones instead of replacing
+    // them, and queueHandleConnection's round-robin would intermittently
+    // route new connections to a dead worker's already-closed ring.
+    this.workers.clear()
+
     this.isRunning.init(true)
 
     // The engine ring must NOT use SINGLE_ISSUER or DEFER_TASKRUN: worker threads
@@ -112,9 +120,27 @@ internal func (this: *HttpRingEngine) listen() : Status {
 
     this.barrier.wait()
 
+    // A worker whose io_uring_queue_init_params failed already logged why
+    // and exited its thread (see WorkerFunction), but nothing previously
+    // checked for that here: the dead worker stayed in this.workers and
+    // kept getting its round-robin share of every new connection via
+    // queueHandleConnection's MSG_RING handoff, which would then silently
+    // fail on every request routed to it for the rest of the process's
+    // life. Fail startup outright instead — same as the socket create/bind/
+    // listen failures just below.
+    var anyWorkerFailed = false
     for(var i = 0; i < this.workers.length; i+=1) {
         var worker = this.workers.getPtr(i)
+        if(worker.ring.ring_fd < 0) {
+            Error("Worker thread %d failed to initialize its io_uring queue\n", worker.thread.id())
+            anyWorkerFailed = true
+            continue
+        }
         Info("Initialized worker thread: %d with ringfd: %d\n", worker.thread.id(), worker.ring.ring_fd)
+    }
+
+    if(anyWorkerFailed) {
+        return Status.ERROR_IOURING_ERROR
     }
 
     if(!this.serverSocket.create()) {
@@ -195,7 +221,7 @@ internal func (this: *HttpRingEngine) close() {
     // one timeoutCheckMSec heartbeat away (see queueTimeoutCheck/rearmTimeout
     // in http_worker_iouring.lita). Joining here makes close() a complete,
     // deterministic shutdown: without it, a caller (and this struct's own
-    // buffers/allocator, freed below) could be torn down while a worker
+    // io_uring ring, torn down below) could be torn down while a worker
     // thread is still alive and blocked inside a syscall on its own ring —
     // observed as "Interrupted system call" spam, or the process failing to
     // exit at all, when that race loses against process teardown.
@@ -203,8 +229,6 @@ internal func (this: *HttpRingEngine) close() {
         var worker = this.workers.getPtr(i)
         worker.thread.join()
     }
-
-    this.safeAllocator.free()
 
     if(this.ring.ring_fd >= 0) {
         io_uring_queue_exit(&this.ring)
@@ -214,11 +238,23 @@ internal func (this: *HttpRingEngine) close() {
 
 internal func (this: *HttpRingEngine) free() {
     this.close()
+
+    // safeAllocator is NOT torn down in close(): close() is called every
+    // time listen() starts (as its own self-close, for idempotent re-entry)
+    // in addition to whenever a caller wants to stop serving — including
+    // twice per restart cycle (once by the caller, again by the next
+    // listen() call). Destroying an already-destroyed mutex is undefined
+    // behavior, and that double-destroy is exactly what freeing it here
+    // used to cause on a second listen() cycle, corrupting allocator state
+    // in a way that only surfaced later as a segfault inside a worker's
+    // session-pool allocation. free() is the actual one-time final
+    // teardown, so it's the only place this belongs.
+    this.safeAllocator.free()
     this.workers.free()
 }
 
 
-func (this: *HttpRingEngine) queueAcceptRequest(ring: *io_uring): Status {
+internal func (this: *HttpRingEngine) queueAcceptRequest(ring: *io_uring): Status {
     var sqe = io_uring_get_sqe(ring)
     if(!sqe) {
         var space = io_uring_sq_space_left(ring)
@@ -248,7 +284,7 @@ error:
 }
 
 
-func (this: *HttpRingEngine) queueHandleConnection(
+internal func (this: *HttpRingEngine) queueHandleConnection(
     ring: *io_uring,
     clientSocket: i32
 ) : Status {
@@ -281,15 +317,14 @@ error:
     return Status.ERROR_IOURING_ERROR;
 }
 
-func (this: *HttpRingEngine) handleCompletionRing(
+internal func (this: *HttpRingEngine) handleCompletionRing(
     ring: *io_uring,
     cqe: *io_uring_cqe,
     result: i32
 ): Status {
 
-    if(!cqe || cqe.res < 0) {
-        Error("Error reading completion queue: %d (%s)\n", result, strerror(-result))
-        //assert(false)
+    if(!cqe) {
+        Error("Error reading completion queue: %d\n", result)
         return Status.OK
     }
 
@@ -299,13 +334,41 @@ func (this: *HttpRingEngine) handleCompletionRing(
 
     switch(operation.opcode()) {
         case RingOpcode.ACCEPT: {
-            Debug("CONNECTED: client socket: %d\n", cqe.res)
-            if(cqe.res == 0) {
-                break
+            if(cqe.res < 0) {
+                Error("Error on multishot accept completion: %d (%s)\n", cqe.res, strerror(-cqe.res))
+            }
+            else {
+                // cqe.res is the accepted client fd. 0 is a legitimate fd
+                // (e.g. if stdin was ever closed) — it must be dispatched
+                // like any other fd, not silently dropped/leaked.
+                Debug("CONNECTED: client socket: %d\n", cqe.res)
+                this.queueHandleConnection(ring, cqe.res)
             }
 
-            // queue up delegation of handling the connection
-            return this.queueHandleConnection(ring, cqe.res)
+            // The kernel clears F_MORE on the terminal CQE of a multishot
+            // accept (on error — EMFILE/ENFILE/ENOMEM under load are all
+            // realistic — or cancellation). Nothing else re-arms the accept,
+            // so missing this means the server silently stops accepting any
+            // new connection for the rest of the process's life, with no
+            // further indication anything is wrong.
+            if((cqe.flags & IORING_CQE_F_MORE) == 0) {
+                Error("Multishot accept terminated (res: %d) — re-arming\n", cqe.res)
+                if(this.queueAcceptRequest(ring) != Status.OK) {
+                    Panic("Unable to re-arm server socket accept after multishot termination\n")
+                }
+            }
+            break
+        }
+        case RingOpcode.MSG_RING: {
+            // Only surfaces here on failure to hand a connection off to a
+            // worker — success is suppressed via IOSQE_CQE_SKIP_SUCCESS.
+            // The accepted client fd (packed as contextIndex) was never
+            // consumed by a worker in that case, so close it here or it leaks.
+            Error("Error handing off connection (fd: %d) to worker: %d (%s)\n",
+                operation.contextIndex, cqe.res, strerror(-cqe.res)
+            )
+            close(operation.contextIndex)
+            break
         }
         default: {
             Panic("Unhandled accept ring opcode: %d\n", RingOpcodeAsStr(operation.opcode()))

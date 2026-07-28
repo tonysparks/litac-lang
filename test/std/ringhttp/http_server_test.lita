@@ -1,0 +1,123 @@
+#if OS != "WINDOWS"
+import "std/libc"
+import "std/mem"
+import "std/assert"
+import "std/log"
+import "std/thread"
+import "std/thread/barrier"
+import "std/net/posix_socket"
+
+import "std/ringhttp"
+
+// Retries a real TCP connect to 127.0.0.1:port for a bounded time. Used
+// instead of any internal readiness flag: IsLogInitialized() (this file's
+// own regression signal) flips true right at the top of start(), long
+// before engine.listen() finishes standing up workers/isRunning/the actual
+// listening socket — calling close() that early races listen()'s own
+// isRunning.init(true) and can silently undo the shutdown request, hanging
+// the test forever. A successful connect is proof listen() fully completed.
+func waitUntilAcceptingConnections(port: u16) : bool {
+    for(var i = 0; i < 100; i += 1) {
+        var fd = socket(AF_INET, SOCK_STREAM, 0)
+        if(fd >= 0) {
+            var addr: sockaddr_in
+            memset(&addr, 0, sizeof(:sockaddr_in))
+            addr.sin_family = AF_INET
+            addr.sin_port = htons(port)
+            inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+
+            var connected = connect(fd, (&addr) as (*sockaddr), sizeof(:sockaddr_in) as (socklen_t)) == 0
+            close(fd)
+            if(connected) {
+                return true
+            }
+        }
+        ThreadSleepMSec(20)
+    }
+    return false
+}
+
+// ---------------------------------------------------------------------------
+// Bug fix: HttpServer.start() used to call LogInit() (visible in an old
+// LSP-session capture kept in this directory's download_sample.txt test
+// fixture), but that call was silently dropped when LogInit's signature
+// moved from a bare file path to *const LogOptions — nobody updated the one
+// call site. Since every log call (including the exit(2) that Panic()
+// depends on for fatal errors, e.g. an io_uring queue init failure) is a
+// total no-op until LogInit() has run at least once, this meant a fatal
+// engine error would log nothing and fall straight through into whatever
+// undefined behavior came next instead of exiting cleanly. Fixed by
+// restoring a `LogInit()` call at the top of start() (idempotent — a no-op
+// if the app already initialized logging itself with custom LogOptions).
+// ---------------------------------------------------------------------------
+
+struct ServerStartArgs {
+    server:  *HttpServer
+    config:  *HttpConfig
+    barrier: *Barrier
+}
+
+func ServerStartThreadFn(arg: *void) : i32 {
+    var args = arg as (*ServerStartArgs)
+    args.server.init(args.config)
+    // Signal readiness right before the blocking call, same convention as
+    // test_webserver.lita's runServer/launch.
+    args.barrier.wait()
+    args.server.start()
+    return 0
+}
+
+@test("HttpServer.start() lazily initializes logging even if the app never calls LogInit() itself")
+func test_start_initializes_logging() {
+    // Force a clean slate regardless of what earlier tests in this process
+    // already initialized — LogInit() is "first call wins" until
+    // LogShutdown() resets it.
+    LogShutdown()
+    assert(!IsLogInitialized())
+
+    var config = HttpConfig {
+        .allocator      = defaultAllocator,
+        .port           = 28099_u16,
+        .numThreads     = 1,
+        .ioQueueDepth   = 8,
+        .maxPoolSize    = 4,
+        .disableSignal  = true,
+    }
+
+    var server: HttpServer
+    var barrier: Barrier
+    barrier.init(2)
+
+    var args = ServerStartArgs {
+        .server  = &server,
+        .config  = &config,
+        .barrier = &barrier,
+    }
+
+    var thread = Thread{}
+    assert(thread.create(ServerStartThreadFn, &args) == ThreadStatus.SUCCESS)
+
+    barrier.wait()
+
+    // start() calls LogInit() before entering engine.listen()'s blocking
+    // loop, but barrier.wait() returning here only proves init() completed
+    // — poll briefly rather than assume the background thread has already
+    // reached the LogInit() line the instant control returns to us.
+    var becameInitialized = false
+    for(var i = 0; i < 100; i += 1) {
+        if(IsLogInitialized()) {
+            becameInitialized = true
+            break
+        }
+        ThreadSleepMSec(20)
+    }
+    assert(becameInitialized)
+
+    // Let listen() fully finish starting up before requesting shutdown —
+    // see waitUntilAcceptingConnections' comment for why this matters.
+    assert(waitUntilAcceptingConnections(config.port))
+
+    server.close()
+    thread.join()
+}
+#end
