@@ -80,13 +80,11 @@ fn getColumnTypeDriverName(field) {
         return "DateTime"
       }
 
-//    if(typeInfo.name == "std::builtin::String") {
-//        return "String"
-//    }
+      if(typeInfo.name == "Date") {
+        return "Date"
+      }
 
-//    if(typeInfo.name == "std::time::Date" ||
-//       typeInfo.name == "std::time::Time"
-//    ) {
+//    if(typeInfo.name == "std::builtin::String") {
 //        return "String"
 //    }
 

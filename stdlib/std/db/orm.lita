@@ -93,6 +93,11 @@ public func (this: *SqlConnection) queryMany<T>(
                 stmt.bindDateTime(index, datetime)
                 break
             }
+            case typeof(:Date): {
+                var date = va_arg<Date>(list)
+                stmt.bindDate(index, date)
+                break
+            }
             default: {
                 var msg = StringBuilderInit(256, allocator)
                 msg.append("Unsupported parameter type: %lu", typeid)

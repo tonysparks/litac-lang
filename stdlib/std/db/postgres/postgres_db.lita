@@ -227,7 +227,7 @@ public func (this: *PgConnection) ddlType(bindType: String) : String {
     if(bindType.equals($"Int32")) { return $"INTEGER" }
     if(bindType.equals($"Int64")) { return $"BIGINT" }
     if(bindType.equals($"Double") || bindType.equals($"Float64")) { return $"DOUBLE PRECISION" }
-    if(bindType.equals($"DateTime") || bindType.equals($"Text")) { return $"TEXT" }
+    if(bindType.equals($"DateTime") || bindType.equals($"Date") || bindType.equals($"Text")) { return $"TEXT" }
     return $"TEXT"
 }
 
@@ -368,6 +368,16 @@ public func (this: *PgStatement) bindDateTime(index: i32, dateTime: DateTime) : 
     var buf: IsoDateBuf;
     var sb = buf.toStringBuffer()
     dateTime.isoFormat(&sb)
+    return this.bindText(index, sb.buffer, sb.length)
+}
+
+public func (this: *PgStatement) bindDate(index: i32, date: Date) : SqlResult {
+    if(date.year == 0 && date.month == 0 && date.day == 0) {
+        return this.bindNull(index)
+    }
+    var buf: IsoDateBuf;
+    var sb = buf.toStringBuffer()
+    date.isoFormat(&sb)
     return this.bindText(index, sb.buffer, sb.length)
 }
 
@@ -571,6 +581,14 @@ public func (this: *PgResultSet) columnDateTime(column: i32) : DateTime {
     var value = ptr.toString()
     if(value.empty()) { return DateTime{}; }
     return DateTimeFromIso(value)
+}
+
+public func (this: *PgResultSet) columnDate(column: i32) : Date {
+    var ptr = this.columnTextView(column)
+    if(ptr == null) { return Date{}; }
+    var value = ptr.toString()
+    if(value.empty()) { return Date{}; }
+    return DateFromIso(value)
 }
 
 public func (this: *PgResultSet) columnType(column: i32) : SqlColumnType {

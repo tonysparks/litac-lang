@@ -807,6 +807,86 @@ func testBindAndColumnDateTime() {
 }
 
 // -----------------------------------------------------------------------
+// bindDate / columnDate
+// -----------------------------------------------------------------------
+
+@test
+func testBindAndColumnDate() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute("CREATE TABLE d_test (d TEXT);")
+    assert(!conn.hasError())
+
+    var date = Date { .year = 2026, .month = 3_u8, .day = 14_u8 }
+
+    var stmt: SqlStatement
+    conn.prepare(&stmt, $"INSERT INTO d_test (d) VALUES (?)")
+    stmt.bindDate(1, date)
+    stmt.step()
+    stmt.close()
+    assert(!conn.hasError())
+
+    // Read back via columnDate
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT d FROM d_test")
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    // Stored as plain "YYYY-MM-DD" text, not a full timestamp
+    assert(rs.columnType(0) == SqlColumnType.TEXT)
+    assert(rs.columnStringView(0).equals($"2026-03-14"))
+
+    var found = rs.columnDate(0)
+    assert(found.year == 2026)
+    assert(found.month == 3)
+    assert(found.day == 14)
+
+    qstmt.close()
+    assert(!conn.hasError())
+}
+
+@test
+func testBindDateZeroValueBindsNull() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    conn.execute("CREATE TABLE d_null_test (d TEXT);")
+    assert(!conn.hasError())
+
+    var stmt: SqlStatement
+    conn.prepare(&stmt, $"INSERT INTO d_null_test (d) VALUES (?)")
+    stmt.bindDate(1, Date{})
+    stmt.step()
+    stmt.close()
+    assert(!conn.hasError())
+
+    var qstmt: SqlStatement
+    conn.prepare(&qstmt, $"SELECT d FROM d_null_test")
+    var rs: SqlResultSet
+    qstmt.execute(&rs)
+    assert(rs.hasNext())
+    rs.next()
+
+    assert(rs.columnType(0) == SqlColumnType.NULL)
+
+    qstmt.close()
+    assert(!conn.hasError())
+}
+
+// -----------------------------------------------------------------------
 // statement.connection() returns the owning connection
 // -----------------------------------------------------------------------
 

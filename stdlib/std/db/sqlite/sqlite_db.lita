@@ -225,7 +225,7 @@ public func (this: *SqliteConnection) ddlType(bindType: String) : String {
     }
     if(bindType.equals($"Int32") || bindType.equals($"Int64")) { return $"INTEGER" }
     if(bindType.equals($"Double") || bindType.equals($"Float64")) { return $"REAL" }
-    if(bindType.equals($"DateTime") || bindType.equals($"Text")) { return $"TEXT" }
+    if(bindType.equals($"DateTime") || bindType.equals($"Date") || bindType.equals($"Text")) { return $"TEXT" }
     return $"TEXT"
 }
 
@@ -434,6 +434,26 @@ public func (this: *SqliteStatement) bindDateTime(index: i32, dateTime: DateTime
     return this.conn.error
 }
 
+public func (this: *SqliteStatement) bindDate(index: i32, date: Date) : SqlResult {
+    if (this.conn.hasError()) return this.conn.error
+
+    // A zero-initialized Date has no valid date — bind NULL, same as bindDateTime.
+    if (date.year == 0 && date.month == 0 && date.day == 0) {
+        return this.bindNull(index)
+    }
+
+    var buffer: IsoDateBuf;
+    var dateString = buffer.toStringBuffer()
+    date.isoFormat(&dateString)
+
+    var errorCode = sqlite3_bind_text(this.stmt, index, dateString.buffer, dateString.length, SQLITE_TRANSIENT)
+    if (errorCode != SQLITE_OK) {
+        this.conn.error = CreateError(this.conn, this.stmt, errorCode)
+    }
+
+    return this.conn.error
+}
+
 public func (this: *SqliteStatement) parameterCount() : i32 {
     return sqlite3_bind_parameter_count(this.stmt)
 }
@@ -628,6 +648,20 @@ public func (this: *SqliteResultSet) columnDateTime(column: i32) : DateTime {
     }
 
     return DateTimeFromIso(value)
+}
+
+public func (this: *SqliteResultSet) columnDate(column: i32) : Date {
+    var ptr = this.columnTextView(column)
+    if(ptr == null) {
+        return Date{}
+    }
+
+    var value = ptr.toString()
+    if(value.empty()) {
+        return Date{}
+    }
+
+    return DateFromIso(value)
 }
 
 public func (this: *SqliteResultSet) columnType(column: i32) : SqlColumnType {

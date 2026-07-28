@@ -30,6 +30,9 @@ public struct NullableRecord {
 
     @column
     ts: DateTime
+
+    @column
+    bday: Date
 }
 
 // A table entity where one field is annotated @db_ignore — it must be excluded
@@ -61,7 +64,8 @@ func createNullableTable(conn: *SqliteConnection) {
             id    INTEGER PRIMARY KEY AUTOINCREMENT,
             label TEXT,
             note  TEXT,
-            ts    TEXT
+            ts    TEXT,
+            bday  TEXT
         );
         """
     )
@@ -219,6 +223,127 @@ func testOrmNonNullTextAndDateTimeRoundTrip() {
     assert(rec.ts.year == 2025)
     assert(rec.ts.month == 6)
     assert(rec.ts.day == 15)
+}
+
+// -----------------------------------------------------------------------
+// NULL Date column via raw resultSet — columnDate must return Date{} without
+// crash (mirrors testColumnDateTimeNull for the new Date bind/column pair).
+// -----------------------------------------------------------------------
+
+@test
+func testColumnDateNull() {
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, .enableWAL = false)
+
+    conn.execute("CREATE TABLE d_null_test (bday TEXT);")
+    assert(!conn.hasError())
+
+    conn.execute("INSERT INTO d_null_test (bday) VALUES (NULL);")
+    assert(!conn.hasError())
+
+    var rs: SqlResultSet
+    conn.connection.query(&rs, $"SELECT bday FROM d_null_test")
+    assert(rs.hasNext())
+    rs.next()
+
+    assert(rs.columnType(0) == SqlColumnType.NULL)
+
+    var d = rs.columnDate(0)
+    assert(d.year == 0)
+    assert(d.month == 0)
+    assert(d.day == 0)
+}
+
+// -----------------------------------------------------------------------
+// NULL Date column via ORM fromResultSet — must not crash
+// (exercises the pre_serialization.ape codegen change: fromResultSet must
+//  call resultSet.columnDate for a Date-typed field, not fall through to the
+//  String path).
+// -----------------------------------------------------------------------
+
+@test
+func testOrmNullDateColumn() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createNullableTable(&conn)
+
+    conn.execute("INSERT INTO nullable_record (label, note, ts, bday) VALUES ('hello', 'world', NULL, NULL);")
+    assert(!conn.hasError())
+
+    var records = ArrayInit<NullableRecord>(4, &allocator.allocator)
+    var count = conn.connection.queryMany(
+        &allocator.allocator,
+        &records,
+        .alias = $"r",
+        .sql   = $"order by r.id"
+    )
+
+    assert(count == 1)
+    assert(!conn.hasError())
+
+    var rec = records.get(0)
+    assert(rec.label.equals($"hello"))
+    assert(rec.bday.year == 0)
+    assert(rec.bday.month == 0)
+    assert(rec.bday.day == 0)
+}
+
+// -----------------------------------------------------------------------
+// Non-NULL Date round-trip through the full ORM write+read path — inserts
+// via bindValues/insertOne (exercising the generated stmt.bindDate call) and
+// reads back via queryMany/fromResultSet (exercising resultSet.columnDate).
+// -----------------------------------------------------------------------
+
+@test
+func testOrmNonNullDateRoundTrip() {
+    var allocator = BucketAllocator{}
+    allocator.init(defaultAllocator, 32)
+    defer allocator.free()
+
+    var conn = SqliteConnection{}
+    defer conn.close()
+    Connect($":memory:", &conn, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, false, &allocator.allocator)
+
+    createNullableTable(&conn)
+
+    var item = NullableRecord {
+        .label = $"foo",
+        .note  = $"bar",
+        .ts    = DateTimeFromIso($"2025-06-15T12:00:00"),
+        .bday  = Date { .year = 1990, .month = 11_u8, .day = 2_u8 },
+    }
+    var inserted = conn.connection.insertOne(&item)
+    assert(inserted == 1)
+    assert(!conn.hasError())
+
+    // Stored as plain "YYYY-MM-DD" text, not a full timestamp
+    var raw: SqlResultSet
+    conn.connection.query(&raw, $"SELECT bday FROM nullable_record")
+    assert(raw.hasNext())
+    raw.next()
+    assert(raw.columnStringView(0).equals($"1990-11-02"))
+
+    var records = ArrayInit<NullableRecord>(4, &allocator.allocator)
+    var count = conn.connection.queryMany(
+        &allocator.allocator,
+        &records,
+        .alias = $"r",
+        .sql   = $"order by r.id"
+    )
+    assert(count == 1)
+    assert(!conn.hasError())
+
+    var rec = records.get(0)
+    assert(rec.bday.year == 1990)
+    assert(rec.bday.month == 11)
+    assert(rec.bday.day == 2)
 }
 
 // -----------------------------------------------------------------------

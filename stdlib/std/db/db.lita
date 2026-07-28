@@ -93,6 +93,7 @@ public trait SqlStatement {
     bindText64: func(index: i32, data: *const char, len: u64, enc: u8): SqlResult
     bindString: func(index: i32, str: String): SqlResult
     bindDateTime: func(index: i32, dateTime: DateTime): SqlResult
+    bindDate: func(index: i32, date: Date): SqlResult
 
     parameterCount: func() : i32
     parameterName: func(index: i32) : *const char
@@ -141,6 +142,7 @@ public trait SqlResultSet {
     columnStringView: func(column: i32) : String
     columnStringCopy: func(column: i32, allocator: *const Allocator) : String
     columnDateTime: func(column: i32) : DateTime
+    columnDate: func(column: i32) : Date
     columnType: func(column: i32) : SqlColumnType
 
     statement: func(): SqlStatement
@@ -209,6 +211,11 @@ func _bindParams(
             case typeof(:DateTime): {
                 var datetime = va_arg<DateTime>(*list)
                 stmt.bindDateTime(index, datetime)
+                break
+            }
+            case typeof(:Date): {
+                var date = va_arg<Date>(*list)
+                stmt.bindDate(index, date)
                 break
             }
             default: {
