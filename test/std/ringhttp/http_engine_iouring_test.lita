@@ -218,6 +218,73 @@ func testWorkerInitFailureSetsRingFdSentinel() {
     worker.sessions.free(&server)
 }
 
+// ---------------------------------------------------------------------------
+// Bug fix: listen()'s early-return paths (worker init failure here; also
+// the socket create/bind/listen/accept-queue failures below them) never
+// called close() — any sibling worker that had already started
+// successfully before the failing one was orphaned: never signaled to
+// stop via isRunning, never joined. Reproduced directly under a tight
+// restart-loop stress test (small timeoutCheckMSec so workers exit fast):
+// a leaked worker thread's deferred ContextPool.free() call crashed
+// several iterations later, inside memory that had since become a
+// different iteration's HttpServer. listen() now defers a close() call
+// that fires exactly when it returns before reaching normal operation,
+// so every worker — successful or not — always gets joined.
+//
+// This mirrors that scenario directly: two workers whose io_uring init
+// succeeds (a real, valid mainRingFd) alongside one that's forced to fail
+// (an invalid mainRingFd), then closes the batch the same way listen()'s
+// deferred cleanup does. If the successful workers were left running,
+// close() joining them would hang or crash instead of returning promptly.
+// ---------------------------------------------------------------------------
+@test
+func testFailedWorkerInitDoesNotOrphanSiblingWorkers() {
+    var config: HttpConfig
+    var server: HttpServer
+    makeMinimalEngineServer(&config, &server, 28207_u16, 1)
+
+    var engine = &server.engine
+    var params = io_uring_params{}
+    var ringStatus = io_uring_queue_init_params(16, &engine.ring, &params)
+    assert(ringStatus == 0)
+    defer io_uring_queue_exit(&engine.ring)
+
+    var barrier: Barrier
+    barrier.init(4) // 3 workers + this thread
+
+    // engine.isRunning (not a separate local Atomic) — close() below signals
+    // shutdown via this.isRunning.set(false), so workers must be watching
+    // the engine's own field for that signal to actually reach them.
+    engine.isRunning.init(true)
+
+    engine.workers.add(WorkerThread{})
+    engine.workers.add(WorkerThread{})
+    engine.workers.add(WorkerThread{})
+
+    // Workers 0 and 1 attach to the real engine ring created above and
+    // succeed; worker 2 gets a deliberately invalid mainRingFd so its
+    // IORING_SETUP_ATTACH_WQ fails — the same "some workers up, a later
+    // one in the batch fails" shape real resource pressure (EMFILE/ENOMEM)
+    // can produce, forced deterministically instead.
+    assert(engine.workers.getPtr(0).init(&server, 0, &barrier, &engine.isRunning, engine.ring.enter_ring_fd) == Status.OK)
+    assert(engine.workers.getPtr(1).init(&server, 1, &barrier, &engine.isRunning, engine.ring.enter_ring_fd) == Status.OK)
+    assert(engine.workers.getPtr(2).init(&server, 2, &barrier, &engine.isRunning, 999999) == Status.OK)
+
+    barrier.wait() // every WorkerFunction reaches its own barrier.wait(), success or failure
+
+    assert(engine.workers.getPtr(0).ring.ring_fd >= 0)
+    assert(engine.workers.getPtr(1).ring.ring_fd >= 0)
+    assert(engine.workers.getPtr(2).ring.ring_fd < 0)
+
+    // What listen()'s deferred cleanup does on this failure path. If workers
+    // 0/1 were orphaned instead of properly joined here, this would hang
+    // (joining threads still blocked in their own io_uring_wait_cqe()) or
+    // let them keep running past this function returning.
+    engine.close()
+
+    assert(engine.workers.length == 3)
+}
+
 func EngineListenThreadFn(arg: *void) : i32 {
     var engine = arg as (*HttpRingEngine)
     engine.listen()

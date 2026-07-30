@@ -107,6 +107,21 @@ internal func (this: *HttpRingEngine) listen() : Status {
         Panic("Error initializing the io_uring queue: %d\n", ioStatus)
     }
 
+    // Tears down the engine's own ring from whatever thread is running
+    // listen() — the only thread that ever uses it — instead of from
+    // close(), which can be (and normally is) called by a different
+    // thread wanting to stop an already-running server. close() calling
+    // io_uring_queue_exit() here raced this function's own use of the same
+    // ring (io_uring_wait_cqe_timeout/io_uring_submit in the loop below):
+    // nothing stopped that external close() from tearing down and
+    // unmapping the ring's memory while this thread was still inside a
+    // live syscall on it. Symmetric with the safeAllocator fix in free()
+    // below — same class of bug, same reasoning.
+    defer if(this.ring.ring_fd >= 0) {
+        io_uring_queue_exit(&this.ring)
+        this.ring.ring_fd = -1
+    }
+
     this.barrier.init(this.config.numThreads + 1)
     defer this.barrier.destroy()
 
@@ -119,6 +134,27 @@ internal func (this: *HttpRingEngine) listen() : Status {
     }
 
     this.barrier.wait()
+
+    // Every early-return between here and the main loop below used to skip
+    // cleanup entirely: this.close() was only ever called by an external
+    // caller wanting to stop an already-running server, never by listen()
+    // itself on its own startup-failure paths. Any worker that had already
+    // started successfully (e.g. workers 0-1 up, worker 2 fails to init)
+    // was orphaned — never signaled via isRunning, never joined — and kept
+    // running against this call's now-returned (and, in a caller that
+    // retries listen(), soon reused/freed) stack frame. Reproduced directly
+    // under a tight restart-loop stress test: a leaked worker thread's
+    // deferred ContextPool.free() call crashed several iterations later
+    // inside memory that had since become a different iteration's HttpServer.
+    // startedSuccessfully stays false across every early return below, so
+    // the deferred close() runs exactly on those paths; it's a no-op on the
+    // normal path (once we reach the main loop, some external caller is
+    // responsible for close() as usual, and calling it twice would try to
+    // join each worker thread a second time — undefined behavior).
+    var startedSuccessfully = false
+    defer if(!startedSuccessfully) {
+        this.close()
+    }
 
     // A worker whose io_uring_queue_init_params failed already logged why
     // and exited its thread (see WorkerFunction), but nothing previously
@@ -176,6 +212,11 @@ internal func (this: *HttpRingEngine) listen() : Status {
         return Status.ERROR_IOURING_ERROR
     }
 
+    // Past this point we're in normal operation — the deferred close()
+    // above is now a no-op; an external caller owns calling close() to stop
+    // the loop below, exactly as before.
+    startedSuccessfully = true
+
     // Bounded wait, not io_uring_wait_cqe(): unlike the workers (which have
     // their own periodic timeoutCheckMSec SQE giving them a heartbeat), this
     // engine loop had no self-wakeup at all and relied entirely on close()
@@ -220,19 +261,19 @@ internal func (this: *HttpRingEngine) close() {
     // go false the next time its io_uring_wait_cqe() wakes up — at the latest
     // one timeoutCheckMSec heartbeat away (see queueTimeoutCheck/rearmTimeout
     // in http_worker_iouring.lita). Joining here makes close() a complete,
-    // deterministic shutdown: without it, a caller (and this struct's own
-    // io_uring ring, torn down below) could be torn down while a worker
-    // thread is still alive and blocked inside a syscall on its own ring —
-    // observed as "Interrupted system call" spam, or the process failing to
-    // exit at all, when that race loses against process teardown.
+    // deterministic shutdown: without it, a caller could return while a
+    // worker thread is still alive and blocked inside a syscall on its own
+    // ring — observed as "Interrupted system call" spam, or the process
+    // failing to exit at all, when that race loses against process teardown.
+    //
+    // This engine's OWN ring is deliberately NOT torn down here — see the
+    // matching comment in listen(), which owns that instead: close() can
+    // be (and normally is) called by a thread other than the one running
+    // listen(), and that thread has no way to know whether listen() is
+    // still using this.ring at the moment close() runs.
     for(var i = 0; i < this.workers.length; i += 1) {
         var worker = this.workers.getPtr(i)
         worker.thread.join()
-    }
-
-    if(this.ring.ring_fd >= 0) {
-        io_uring_queue_exit(&this.ring)
-        this.ring.ring_fd = -1
     }
 }
 
