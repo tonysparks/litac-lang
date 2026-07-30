@@ -122,6 +122,14 @@ public func (this: *DateTime) compare(other: *DateTime) : i32 {
     return (this.toEpochTime() - other.toEpochTime()) as (i32)
 }
 
+// Delegates to DateTime.compare (both wrapped at midnight) rather than
+// hand-rolling a year/month/day tuple comparison.
+public func (this: *Date) compare(other: *Date) : i32 {
+    var a = DateTime { .date = *this }
+    var b = DateTime { .date = *other }
+    return a.compare(&b)
+}
+
 public func (this: *DateTime) isoFormat(output: *StringBuffer) : DateTimeStatus {
     return DateTimeFormat(
         this,

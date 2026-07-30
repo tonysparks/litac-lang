@@ -7,6 +7,7 @@ import "std/string/buffer"
 import "std/libc"
 import "std/assert"
 import "std/mem"
+import "std/time"
 
 // -------------------------------------------------------------------------
 // Helpers
@@ -692,4 +693,70 @@ func testFromJsonCStrNoCopyAliasesJsonBuffer() {
     rawPtr.fromJson(&ctx, jsonStr)
 
     assert(raw == jsonStr.asString()) // aliased, not cloned
+}
+
+// -------------------------------------------------------------------------
+// Date
+// -------------------------------------------------------------------------
+
+@test
+func testToJsonDateKnownValue() {
+    var d = Date { .year = 2026, .month = 3_u8, .day = 14_u8 }
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    d.toJson(&sb)
+    assert(strcmp(sb.cStr(), "\"2026-03-14\"") == 0)
+}
+
+@test
+func testFromJsonDateKnownValue() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"k\":\"2026-03-14\"}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var d = Date{}
+    d.fromJson(&ctx, node.get("k"))
+    assert(d.year == 2026)
+    assert(d.month == 3)
+    assert(d.day == 14)
+}
+
+@test
+func testDateJsonRoundTrip() {
+    var original = Date { .year = 1999, .month = 12_u8, .day = 31_u8 }
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    original.toJson(&sb)
+
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var wrapped = StringBuilderInit(48)
+    defer wrapped.free()
+    wrapped.append("{\"k\":%s}", sb.cStr())
+    var node = parser.parseJson(wrapped.toString())
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var roundTripped = Date{}
+    roundTripped.fromJson(&ctx, node.get("k"))
+    assert(roundTripped.year == original.year)
+    assert(roundTripped.month == original.month)
+    assert(roundTripped.day == original.day)
+}
+
+@test
+func testFromJsonDateInvalidStringYieldsZeroDate() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"k\":\"not-a-date\"}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var d = Date { .year = 1, .month = 1_u8, .day = 1_u8 }  // pre-set, to prove it gets overwritten
+    d.fromJson(&ctx, node.get("k"))
+    assert(d.year == 0)
+    assert(d.month == 0)
+    assert(d.day == 0)
 }

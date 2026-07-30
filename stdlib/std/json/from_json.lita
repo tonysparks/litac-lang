@@ -225,6 +225,13 @@ public func (this: *DateTime) fromJson(context: *JsonContext, json: *JsonNode) {
     *this = DateTimeFromIso(json.asString().toString())
 }
 
+public func (this: *Date) fromJson(context: *JsonContext, json: *JsonNode) {
+    if(!json) {
+        return;
+    }
+    *this = DateFromIso(json.asString().toString())
+}
+
 public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;

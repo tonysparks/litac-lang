@@ -276,6 +276,27 @@ func testCompareGreater() {
 }
 
 @test
+func testDateCompareEqual() {
+    var d1 = DateFromIso("2024-06-15".toString())
+    var d2 = DateFromIso("2024-06-15".toString())
+    assert(d1.compare(&d2) == 0)
+}
+
+@test
+func testDateCompareLess() {
+    var earlier = DateFromIso("2024-01-01".toString())
+    var later   = DateFromIso("2024-12-31".toString())
+    assert(earlier.compare(&later) < 0)
+}
+
+@test
+func testDateCompareGreater() {
+    var earlier = DateFromIso("2024-01-01".toString())
+    var later   = DateFromIso("2024-12-31".toString())
+    assert(later.compare(&earlier) > 0)
+}
+
+@test
 func testAddMilliseconds() {
     var dt = DateTime {
         .date = Date { .year = 2024, .month = 1_u8, .day = 1_u8 },
