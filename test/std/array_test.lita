@@ -226,6 +226,42 @@ func testSetAll() {
 }
 
 @test
+func testSetAllRejectsIndexAtCapacity() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+
+    var other = ArrayInit<i32>(2)
+    defer other.free()
+    other.add(99)
+    other.add(98)
+
+    var n = a.setAll(8, other)
+    assert(n == -1)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+}
+
+@test
+func testSetAllRejectsIndexPastCapacity() {
+    var a = ArrayInit<i32>(8)
+    defer a.free()
+    a.add(1)
+    a.add(2)
+
+    var other = ArrayInit<i32>(2)
+    defer other.free()
+    other.add(99)
+    other.add(98)
+
+    var n = a.setAll(1000, other)
+    assert(n == -1)
+    assert(a.get(0) == 1)
+    assert(a.get(1) == 2)
+}
+
+@test
 func testReserve() {
     var a = ArrayInit<i32>(4)
     defer a.free()
@@ -364,4 +400,43 @@ func testGetPtr() {
     assert(p[0] == 20)
     p[0] = 21
     assert(a.get(1) == 21)
+}
+
+@test
+func testInsertAllInteractsWithSetAll() {
+    var list = ArrayInit<i32>(10)
+    defer list.free()
+    for(var i = 0; i < list.capacity; i+=1) {
+        list.add(i + 1)
+    }
+
+    var other = ArrayInit<i32>(3)
+    defer other.free()
+    other.add(33)
+    other.add(44)
+    other.add(55)
+    list.insertAllAt(7, other)
+
+    assert(list.get(6) == 7)
+    assert(list.get(7) == 33)
+    assert(list.get(8) == 44)
+    assert(list.get(9) == 55)
+    assert(list.get(10) == 8)
+    assert(list.size() == 13)
+
+    list.insertAllAt(12, other)
+    assert(list.size() == 16)
+    assert(list.get(11) == 9)
+    assert(list.get(12) == 33)
+    assert(list.get(13) == 44)
+    assert(list.get(14) == 55)
+    assert(list.get(15) == 10)
+
+    list.setAll(15, other)
+    assert(list.size() == 16)
+    assert(list.get(11) == 9)
+    assert(list.get(12) == 33)
+    assert(list.get(13) == 44)
+    assert(list.get(14) == 55)
+    assert(list.get(15) == 33)
 }

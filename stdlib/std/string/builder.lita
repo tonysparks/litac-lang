@@ -5,6 +5,7 @@ import "std/string";
 import "std/string/buffer"
 import "std/libc";
 import "std/ascii";
+import "std/limits";
 
 const MAX_BUFFER_SIZE = 32;
 
@@ -66,7 +67,7 @@ public func (b: *StringBuilder) appendStrn(str: *const char, len: i32) : i32 {
         return 0;
     }
 
-    if(b.length + len > b.capacity) {
+    if(len > b.capacity - b.length) {
         if(!BufferGrow(b, len)) {
             return -1
         }
@@ -426,7 +427,11 @@ public func (b: *StringBuilder) reserve(length: i32) : bool {
 }
 
 func BufferGrow(b: *StringBuilder, increment: i32) : bool {
-    var doubleCurrent = b.capacity * 2
+    if(increment < 0 || increment > MAX_I32 - b.capacity) {
+        return false
+    }
+
+    var doubleCurrent = (b.capacity > MAX_I32 / 2) ? MAX_I32 : b.capacity * 2
     var minReq = b.capacity + increment
     var n = minReq
 
@@ -445,22 +450,3 @@ func BufferGrow(b: *StringBuilder, increment: i32) : bool {
     return true
 }
 
-
-@test("trim")
-func testTrim() {
-    var str = StringBuilderInit(256)
-    str.append("  xy z  ")
-    assert(str.trim().cStr().equals("xy z"))
-
-    str = StringBuilderInit(256)
-    str.append("\n\txy z\n\t")
-    assert(str.trim().cStr().equals("xy z"))
-
-    str = StringBuilderInit(256)
-    str.append("")
-    assert(str.trim().cStr().equals(""))
-
-    str = StringBuilderInit(256)
-    str.append("x")
-    assert(str.trim().cStr().equals("x"))
-}

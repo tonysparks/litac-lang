@@ -11,8 +11,6 @@ import "std/unicode/utf8"
 import "std/limits"
 import "std/fmt"
 
-import "std/io"
-
 public @note json {
     format: *const char// = null
     name: *const char// = null
@@ -381,7 +379,7 @@ public func (node: *JsonNode) put(key: *const char, n: *JsonNode) {
         n = JSON_NULL
     }
 
-    var copy = StringClone(key, key.length(), node.alloc)
+    var copy = StringClone(key, key ? key.length() : 0, node.alloc)
     var entry = JsonEntry {
         .key = copy,
         .value = n
@@ -1739,56 +1737,4 @@ func (p: *JsonParser) expect(kind: TokenKind) : bool {
 
     p.nextToken()
     return true
-}
-
-
-@test
-public func testParser() {
-    var data:*char;
-    var length: usize;
-    if(ReadFile("/home/tony/projects/litac-lang/test/tests/example.json", &data, &length) != FileStatus.Ok) {
-        printf("Failed to read file\n")
-        goto err;
-    }
-
-    var parser = JsonParser{}
-    parser.init()
-    defer parser.free()
-
-    var node = parser.parseJson(StringInit(data, length as (i32)))
-    defer if(node) node.free()
-
-    if(!node) {
-        if(parser.hasError()) {
-            printf("Test Json Syntax error: \"%s\"\n", parser.errorMsg)
-        }
-    }
-    else {
-        var def = node.getStr("definitions")
-        printf("%s\n", def)
-        var x = node.getInt("x")
-        assert(x == -1)
-    }
-
-    return;
-
-
-err:
-    assert(false)
-}
-
-@test
-public func testPrettyPrinter() {
-    // { "x": 7, "y":[1,234,{"x":[], null, true, false, 34.5, [false]}],"z":"hi"}
-    var json = """
-    { "x": 7, "y":[1,234,{"x":[null, true, false, 34.5, [false]] }],"z":"hi"}
-    """
-    var parser = JsonParserInit()
-    var node = parser.parseJson(StringInit(json))
-    if (parser.hasError()) {
-        printf("Parsing error: %s\n", parser.errorMsg)
-    }
-    var sb = StringBuilderInit(1024)
-    PrettyPrintJson(node, sb)
-    printf("%.*s\n", sb.length, sb.buffer)
 }

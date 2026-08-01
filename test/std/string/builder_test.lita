@@ -2,6 +2,7 @@ import "std/string"
 import "std/string/builder"
 import "std/assert"
 import "std/libc"
+import "std/limits"
 
 @test
 func testStringBuilderInitEmpty() {
@@ -28,6 +29,24 @@ func testStringBuilderAppendStrn() {
     defer sb.free()
     var n = sb.appendStrn("hello world", 5)
     assert(n == 5)
+    assert(sb.cStr().equals("hello"))
+}
+
+// Fix: `b.length + len > b.capacity` overflowed i32 for a large len,
+// wrapping negative and making the check see "no growth needed" --
+// skipping BufferGrow entirely and going straight into memcpy with the
+// original huge len against the still-small buffer. With the fix, the
+// comparison can no longer be fooled, so this correctly routes through
+// BufferGrow (which then fails cleanly for an unsatisfiable allocation
+// request, rather than corrupting memory).
+@test
+func testStringBuilderAppendStrnHugeLenDoesNotOverflow() {
+    var sb = StringBuilderInit(32)
+    defer sb.free()
+    sb.appendStrn("hello", 5)
+
+    var n = sb.appendStrn("more text", MAX_I32)
+    assert(n == -1)
     assert(sb.cStr().equals("hello"))
 }
 
@@ -217,4 +236,19 @@ func testStringBuilderTrim() {
     sb.appendStr("  xy z  ")
     sb.trim()
     assert(sb.cStr().equals("xy z"))
+}
+
+func trimVariant(input: *const char, expected: *const char) {
+    var str = StringBuilderInit(256)
+    defer str.free()
+    str.append("%s", input)
+    assert(str.trim().cStr().equals(expected))
+}
+
+@test
+func testStringBuilderTrimVariants() {
+    trimVariant("  xy z  ", "xy z")
+    trimVariant("\n\txy z\n\t", "xy z")
+    trimVariant("", "")
+    trimVariant("x", "x")
 }

@@ -1,7 +1,5 @@
 import "std/mem" as mem;
-import "std/io";
 import "std/assert";
-import "std/libc";
 import "std/string";
 
 
@@ -372,90 +370,3 @@ func (this: i32) equals(b: i32) : bool {
     return this == b;
 }
 
-func Print(m: *Map<i32,i32>) {
-    printf("\n")
-    for(var i = 0; i < m.capacity; i+=1) {
-        var k = &m.entries[i]
-
-        var key = k.key
-        var value = k.value
-        var hash = k.hash
-
-        printf("Key: %d/%d Value: %d @ %d\n", key, hash, value, i)
-    }
-}
-
-//@test
-func testRemove() {
-    var map = Map<i32, i32>{}
-    map.init(
-        .emptyValue = 0,
-        .initialSize = 4,
-        .allocator = mem::defaultAllocator
-        //.emptyKey = 0
-    )
-    defer map.free()
-
-    map.put(1, 2)
-    map.put(2, 4)
-    map.put(3, 8)
-
-    map.put(1, 4)
-    map.put(2, 8)
-    map.put(3, 16)
-    Print(&map)
-    printf("X: %d\n", map.get(2))
-    assert(map.get(1) == 4)
-    assert(map.get(2) == 8)
-    assert(map.get(3) == 16)
-
-
-    map.remove(2)
-    Print(&map)
-    assert(map.get(1) == 4)
-    assert(map.get(2) == 0)
-    assert(map.get(3) == 16)
-
-    //map.put(2, 8)
-    //Print(&map)
-}
-
-
-import "std/system"
-//import "std/libc"
-import "std/hash" as hash
-
-@test
-func performanceTest() {
-    {
-        var start = SystemTimeMSec()
-        var map = Map<i64, i32>{}
-        map.init(
-            .emptyValue = 0,
-            .initialSize = 4,
-            .allocator = mem::defaultAllocator
-            //.emptyKey = 0
-        )
-        defer map.free()
-
-        const COUNT = 1_000_000_0
-
-        for(var i = 0; i < COUNT; i+=1) {
-            map.put(i as (i64), i)
-        }
-
-/*
-        for(var i = 0; i < COUNT; i+=1) {
-            var x = map.get(i as (i64))
-            assert(x == i)
-        }
-        for(var i = 0; i < COUNT; i+=1) {
-            var x = map.remove(i as (i64))
-            //assert(x == i)
-        }
-*/
-        var end = SystemTimeMSec()
-
-        printf("Time: %.4f\n", end-start)
-    }
-}

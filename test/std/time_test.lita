@@ -4,6 +4,7 @@ import "std/string/builder"
 import "std/string/buffer"
 import "std/string"
 import "std/libc"
+import "std/limits"
 
 @test
 func testDateTime() {
@@ -358,4 +359,48 @@ func testDateTimeFromIsoInvalidFormat() {
     assert(dt.year == 0)
     assert(dt.month == 0_u8)
     assert(dt.day == 0_u8)
+}
+
+// Fix: gmtime() returns null for an epoch value it can't represent (e.g. an
+// absurdly large i64 -- easily reached via i64.fromJson deserializing a
+// malformed timestamp field). ToDateTime()/FromTM() dereferenced that
+// result unconditionally -- a guaranteed crash. Must now degrade to a zero
+// DateTime instead.
+@test
+func testToDateTimeExtremeEpochDoesNotCrash() {
+    var dt = (MAX_I64).toDateTime()
+    assert(dt.year == 0)
+    assert(dt.month == 0_u8)
+    assert(dt.day == 0_u8)
+}
+
+@test
+func testToDateTimeExtremeNegativeEpochDoesNotCrash() {
+    var dt = (MIN_I64).toDateTime()
+    assert(dt.year == 0)
+    assert(dt.month == 0_u8)
+    assert(dt.day == 0_u8)
+}
+
+// Fix: DateTimeFormat() (backing isoFormat()/format()) had the same
+// unguarded gmtime() dereference, this time feeding a null tm straight into
+// strftime() -- also a guaranteed crash, reachable from an out-of-range
+// year set directly on a DateTime (e.g. deserialized from an untrusted
+// integer field rather than parsed from a date string). Note: this platform's
+// gmtime_r() tolerates a far wider year range than Date.year (i32) can even
+// express, so this can't force the null-tm path here -- the assertion is
+// just that formatting an extreme year returns normally (OK or
+// INVALID_INPUT_FORMAT) instead of crashing.
+@test
+func testFormatExtremeYearDoesNotCrash() {
+    var dt = DateTime {
+        .date = Date { .year = 999999999, .month = 1_u8, .day = 1_u8 },
+        .time = Time { .hour = 0_u8, .min = 0_u8, .sec = 0_u8 },
+    }
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+
+    var status = dt.isoFormat(sb)
+    assert(status == DateTimeStatus.OK || status == DateTimeStatus.INVALID_INPUT_FORMAT)
 }

@@ -323,6 +323,28 @@ func blockedAcquireForDestroyRace(arg: *void) : i32 {
     return 0
 }
 
+// Polls pool.activeWaiters (guarded by pool.mutex, so this is a safe read,
+// not a data race) until the spawned thread has provably entered acquire()'s
+// cond.wait() — bounded so a real regression fails fast instead of hanging.
+//
+// A fixed-duration sleep here is not a substitute: thread start-up latency
+// (particularly _beginthreadex's CRT init on Windows) can exceed a couple
+// milliseconds, so a sleep-and-hope racer can call destroy() — which frees
+// pool.mutex/pool.available — before the spawned thread has even called
+// acquire() once. That thread then calls EnterCriticalSection on an already-
+// destroyed CRITICAL_SECTION: undefined behavior, not a benign timing race.
+func waitUntilWaiting(pool: *ConnectionPool) {
+    for (var i = 0; i < 5000; i += 1) {
+        pool.mutex.lock()
+        var waiting = pool.activeWaiters > 0
+        pool.mutex.unlock()
+        if (waiting) return;
+        ThreadSleepMSec(1)
+    }
+    // timed out waiting for the thread to block in acquire()
+    assert(false)
+}
+
 @test
 func testDestroyWhileWaiterBlocked() {
     for (var iter = 0; iter < 100; iter += 1) {
@@ -338,11 +360,11 @@ func testDestroyWhileWaiterBlocked() {
         var thread: Thread;
         thread.create(blockedAcquireForDestroyRace, &state)
 
-        // Give the thread a brief, but not generous, moment to actually
-        // enter cond.wait() before destroying the pool out from under it —
-        // deliberately not the safe close()-then-join() pattern used by
-        // testCloseInterruptsWaiter above.
-        ThreadSleepMSec(1)
+        // Wait until the thread has actually entered cond.wait() before
+        // destroying the pool out from under it — deliberately not the safe
+        // close()-then-join() pattern used by testCloseInterruptsWaiter
+        // above.
+        waitUntilWaiting(&pool)
 
         pool.destroy()
 

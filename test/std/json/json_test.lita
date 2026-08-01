@@ -1,0 +1,46 @@
+import "std/json"
+import "std/string"
+import "std/string/builder"
+import "std/assert"
+
+@test
+func testParser() {
+    var json = $"""
+    {
+        "name": "Body If MultiLine",
+        "definitions": "some definition text",
+        "x": -1
+    }
+    """
+
+    var parser = JsonParser{}
+    parser.init()
+    defer parser.free()
+
+    var node = parser.parseJson(json)
+    defer if(node) node.free()
+
+    assert(node != null)
+    assert(!parser.hasError())
+
+    assert(node.getStr("definitions").equals("some definition text"))
+
+    var x = node.getInt("x")
+    assert(x == -1)
+}
+
+@test
+func testPrettyPrinter() {
+    var json = """
+    { "x": 7, "y":[1,234,{"x":[null, true, false, 34.5, [false]] }],"z":"hi"}
+    """
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit(json))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var sb = StringBuilderInit(1024)
+    defer sb.free()
+    PrettyPrintJson(node, sb)
+    assert(sb.length > 0)
+}

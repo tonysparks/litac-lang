@@ -239,6 +239,13 @@ typedef void as time_t;
 @foreign
 func gmtime(time: *time_t) : *tm;
 
+// gmtime() returns a pointer into a static/thread-shared buffer -- not
+// guaranteed thread-safe across platforms, and this is used from a
+// multi-threaded HTTP server. gmtime_r() takes a caller-owned result buffer
+// instead.
+@foreign
+func gmtime_r(time: *time_t, result: *tm) : *tm;
+
 @foreign
 func time(sec: *time_t) : time_t;
 
@@ -254,9 +261,13 @@ func strptime(s: *const char, format: *const char, tm: *const tm) : *char;
 
 
 internal func ToDateTime(epoch: EpochTime) : DateTime {
-    var tm = gmtime((&epoch) as (*time_t))
+    var tmResult: tm
+    var tmPtr = gmtime_r((&epoch) as (*time_t), &tmResult)
+    if(!tmPtr) {
+        return DateTime{}
+    }
 
-    return FromTM(tm)
+    return FromTM(tmPtr)
 }
 
 @inline
@@ -368,7 +379,13 @@ internal func DateTimeFormat(
     format.copyTo(formatStr, 31)
 
     var epoch = ToEpochTime(dateTime)
-    var fullTm = gmtime((&epoch) as (*time_t))
+
+    var fullTmResult: tm
+    var fullTm = gmtime_r((&epoch) as (*time_t), &fullTmResult)
+    if(!fullTm) {
+        return DateTimeStatus.INVALID_INPUT_FORMAT
+    }
+
     var len = strftime(
         resultStr, sizeof(resultStr),
         formatStr,

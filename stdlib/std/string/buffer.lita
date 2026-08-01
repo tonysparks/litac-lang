@@ -153,8 +153,12 @@ public func (b: *StringBuffer) appendStrn(str: *const char, len: i32) {
         return;
     }
 
-    if(b.length + len > b.capacity) {
-        len = b.capacity - b.length
+    var available = b.capacity - b.length
+    if(len > available) {
+        len = available
+    }
+    if(len < 1) {
+        return;
     }
 
     memcpy((&b.buffer[b.length]) as (*void),
@@ -268,14 +272,14 @@ public func (s: StringBuffer) remaining() : i32 {
 }
 
 public func (s: StringBuffer) cStr() : *char {
-    if(s.length < s.capacity && s.length > 0) {
+    if(s.length < s.capacity) {
         s.buffer[s.length] = '\0'
     }
     return s.buffer
 }
 
 public func (s: StringBuffer) cStrConst() : *const char {
-    if(s.length < s.capacity && s.length > 0) {
+    if(s.length < s.capacity) {
         s.buffer[s.length] = '\0'
     }
     return s.buffer as (*const char)

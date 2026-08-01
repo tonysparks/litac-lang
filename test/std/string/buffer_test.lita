@@ -3,6 +3,7 @@ import "std/string/buffer"
 import "std/assert"
 import "std/libc"
 import "std/mem"
+import "std/limits"
 
 @test
 func testCString() {
@@ -61,6 +62,29 @@ func testStringBufferAppendStrn() {
     sb.appendStrn("hello world", 5)
     assert(sb.size() == 5)
     assert(sb.cStr().equals("hello"))
+}
+
+// Fix: `b.length + len > b.capacity` overflowed i32 for a large len,
+// wrapping negative and bypassing the truncation entirely -- the original
+// huge len then went straight into memcpy as the copy size against the
+// still-too-small destination. The source buffer here is sized to safely
+// cover whatever the (correctly clamped) len can actually reach, so this
+// only exercises the destination-side bug, not an unrelated source over-read.
+@test
+func testStringBufferAppendStrnHugeLenDoesNotOverflow() {
+    var storage = [64]char{0}
+    var sb = StringBufferInit(storage, 64)
+    sb.appendStrn("hello world", 5)
+
+    var bigSource = [256]char{0}
+    for(var i = 0; i < 256; i += 1) {
+        bigSource[i] = 'x'
+    }
+    sb.appendStrn(bigSource, MAX_I32)
+    // clamped to exactly fill the 64-byte capacity, not overflowed past it
+    assert(sb.size() == 64)
+    // "hello" (already appended above) must still be intact at the front
+    assert(strncmp(sb.buffer, "hello", 5) == 0)
 }
 
 @test
@@ -204,4 +228,26 @@ func testStringBufferSlice() {
     sb2.format("bye world")
     assert(sb2.toString().equals($"bye world"))
     assert(sb.toString().equals($"Hello World"))
+}
+
+// Fix: cStr()/cStrConst() only null-terminated when `length > 0`, so a
+// zero-length buffer over caller-supplied (not pre-zeroed) storage was
+// returned without ensuring buffer[0]=='\0' -- callers treating the result
+// as a C string would read whatever garbage happened to be there.
+@test
+func testStringBufferCStrEmptyIsTerminated() {
+    var storage = [8]char
+    storage[0] = 'X' as (char)  // simulates un-zeroed backing storage
+    var sb = StringBufferInit(storage, 8, 0)
+    assert(sb.length == 0)
+    assert(sb.cStr()[0] == '\0')
+}
+
+@test
+func testStringBufferCStrConstEmptyIsTerminated() {
+    var storage = [8]char
+    storage[0] = 'X' as (char)
+    var sb = StringBufferInit(storage, 8, 0)
+    assert(sb.length == 0)
+    assert(sb.cStrConst()[0] == '\0')
 }

@@ -2,6 +2,8 @@ import "std/map"
 import "std/assert"
 import "std/hash"
 import "std/string"
+import "std/system"
+import "std/libc"
 
 @test
 func testMapInitAndEmpty() {
@@ -225,6 +227,21 @@ func testStringMapContainsAndRemove() {
 }
 
 @test
+func testStrMapNullKeyDoesNotCrash() {
+    var m = StrMap<i32>(0, 16)
+    defer m.free()
+
+    var nullKey: *const char = null
+    m.put(nullKey, 42)
+    assert(m.contains(nullKey))
+    assert(m.get(nullKey) == 42)
+
+    var removed = m.remove(nullKey)
+    assert(removed == 42)
+    assert(!m.contains(nullKey))
+}
+
+@test
 func testMapI64Keys() {
     var m = Map<i64, i32>{}
     m.init(.emptyValue = 0, .initialSize = 16)
@@ -236,4 +253,22 @@ func testMapI64Keys() {
     assert(m.get(100 as (i64)) == 1)
     assert(m.get(200 as (i64)) == 2)
     assert(m.get(300 as (i64)) == 3)
+}
+
+@test
+func performanceTest() {
+    var start = SystemTimeMSec()
+    var map = Map<i64, i32>{}
+    map.init(.emptyValue = 0, .initialSize = 4)
+    defer map.free()
+
+    const COUNT = 1_000_000_0
+
+    for(var i = 0; i < COUNT; i+=1) {
+        map.put(i as (i64), i)
+    }
+
+    var end = SystemTimeMSec()
+
+    printf("Time: %.4f\n", end-start)
 }
