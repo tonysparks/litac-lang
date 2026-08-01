@@ -144,7 +144,7 @@ public func (b: *StringBuilder) appendArgs(format: *const char, args: va_list) :
 
     var len = _vscprintf(format, copyArgs)
     if(b.length + len >= b.capacity) {
-        if(!BufferGrow(b, (len + 1) - b.capacity)) {
+        if(!BufferGrow(b, (b.length + len + 1) - b.capacity)) {
             return -1
         }
     }

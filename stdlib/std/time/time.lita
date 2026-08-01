@@ -243,8 +243,24 @@ func gmtime(time: *time_t) : *tm;
 // guaranteed thread-safe across platforms, and this is used from a
 // multi-threaded HTTP server. gmtime_r() takes a caller-owned result buffer
 // instead.
-@foreign
-func gmtime_r(time: *time_t, result: *tm) : *tm;
+//
+// MSVC's UCRT has no gmtime_r -- only gmtime_s, which reverses the argument
+// order and returns errno_t (0 on success) instead of a *tm. Wrap it so
+// call sites can use gmtime_r's signature on every platform.
+#if (OS == "WINDOWS")
+    @foreign
+    func gmtime_s(result: *tm, time: *time_t) : i32;
+
+    func gmtime_r(time: *time_t, result: *tm) : *tm {
+        if (gmtime_s(result, time) != 0) {
+            return null;
+        }
+        return result;
+    }
+#else
+    @foreign
+    func gmtime_r(time: *time_t, result: *tm) : *tm;
+#end
 
 @foreign
 func time(sec: *time_t) : time_t;
