@@ -295,3 +295,58 @@ func testRegisterDriver() {
     // the noop driver always returns error, so init should fail
     assert(result.isError())
 }
+
+// -----------------------------------------------------------------------
+// Bug fix: destroy() called close() (which broadcasts to wake any thread
+// blocked in acquire()/acquireTimed()'s cond.wait()) and then immediately
+// freed this.idle and destroyed the mutex/cond, with nothing to guarantee
+// the woken thread had actually finished re-reading pool state and
+// returned first. Confirmed as a real, not just theoretical, data race
+// with ThreadSanitizer: the waiter's post-wakeup re-check of this.idle/
+// this.closed raced destroy()'s Array_free(this.idle) and
+// mutex/cond destruction. destroy() now drains a per-pool "how many
+// threads are still inside acquire()'s wait" counter to zero before
+// freeing anything. Run many iterations since this is a genuine race,
+// not deterministic — this reliably crashed/hit ThreadSanitizer before
+// the fix and is clean after it.
+// -----------------------------------------------------------------------
+
+struct DestroyRaceState {
+    pool:   *ConnectionPool
+    result: SqlResult
+}
+
+func blockedAcquireForDestroyRace(arg: *void) : i32 {
+    var state = arg as (*DestroyRaceState)
+    var conn: SqlConnection;
+    state.result = state.pool.acquire(&conn)
+    return 0
+}
+
+@test
+func testDestroyWhileWaiterBlocked() {
+    for (var iter = 0; iter < 100; iter += 1) {
+        var config = PoolConfig { .maxSize = 1, .minSize = 1 }
+        var pool: ConnectionPool;
+        ConnectionPoolInit($"ldbc://sqlite/:memory:", &pool, config)
+
+        // drain the only connection so the next acquire will block
+        var conn: SqlConnection;
+        pool.acquire(&conn)
+
+        var state = DestroyRaceState { .pool = &pool }
+        var thread: Thread;
+        thread.create(blockedAcquireForDestroyRace, &state)
+
+        // Give the thread a brief, but not generous, moment to actually
+        // enter cond.wait() before destroying the pool out from under it —
+        // deliberately not the safe close()-then-join() pattern used by
+        // testCloseInterruptsWaiter above.
+        ThreadSleepMSec(1)
+
+        pool.destroy()
+
+        thread.join()
+        assert(state.result.isError())
+    }
+}

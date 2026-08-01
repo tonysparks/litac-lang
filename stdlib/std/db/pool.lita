@@ -123,6 +123,14 @@ public struct ConnectionPool {
     idle:      Array<SqlConnection>
     totalSize: i32    // total connections created (idle + currently acquired)
     closed:    bool
+
+    // Number of threads currently blocked inside acquire()/acquireTimed()'s
+    // cond.wait()/timedWait(). destroy() must drain this to 0 before freeing
+    // this.idle or destroying mutex/available — close()'s broadcast only
+    // wakes those threads, it doesn't wait for them to actually resume and
+    // return, and a woken thread re-reads this.idle/this.closed and
+    // re-acquires this.mutex as part of returning from cond.wait().
+    activeWaiters: i32
 }
 
 // =========================================================================
@@ -199,12 +207,27 @@ public func (this: *ConnectionPool) acquire(conn: *SqlConnection, allocator: *co
     this.mutex.lock()
     defer this.mutex.unlock()
 
-    while(
+    if (
         this.idle.length == 0 &&
         this.totalSize >= this.config.maxSize &&
         !this.closed
     ) {
-        this.available.wait(&this.mutex)
+        // Visible to destroy()'s drain loop for as long as this call might
+        // still be blocked inside cond.wait() (i.e. still reading/touching
+        // pool state destroy() would otherwise be free to tear down).
+        this.activeWaiters += 1
+        defer {
+            this.activeWaiters -= 1
+            this.available.signal()
+        }
+
+        while(
+            this.idle.length == 0 &&
+            this.totalSize >= this.config.maxSize &&
+            !this.closed
+        ) {
+            this.available.wait(&this.mutex)
+        }
     }
 
     if (this.closed) {
@@ -273,15 +296,30 @@ public func (this: *ConnectionPool) acquireTimed(timeoutMs: i64, conn: *SqlConne
     this.mutex.lock()
     defer this.mutex.unlock()
 
-    while(
+    if (
         this.idle.length == 0 &&
         this.totalSize >= this.config.maxSize &&
         !this.closed
     ) {
-        if (this.available.timedWait(&this.mutex, timeoutMs) == ThreadStatus.TIMEDOUT) {
-            return SqlResult {
-                .type = SqlResultType.ERROR,
-                .description = $"timed out waiting for connection"
+        // See acquire()'s matching comment — makes this call visible to
+        // destroy()'s drain loop for as long as it might still be blocked
+        // inside timedWait().
+        this.activeWaiters += 1
+        defer {
+            this.activeWaiters -= 1
+            this.available.signal()
+        }
+
+        while(
+            this.idle.length == 0 &&
+            this.totalSize >= this.config.maxSize &&
+            !this.closed
+        ) {
+            if (this.available.timedWait(&this.mutex, timeoutMs) == ThreadStatus.TIMEDOUT) {
+                return SqlResult {
+                    .type = SqlResultType.ERROR,
+                    .description = $"timed out waiting for connection"
+                }
             }
         }
     }
@@ -352,6 +390,19 @@ public func (this: *ConnectionPool) destroy() {
     this.close()
 
     this.mutex.lock()
+
+    // close()'s broadcast only wakes threads blocked in acquire()/
+    // acquireTimed() — it doesn't wait for them to actually resume and
+    // return. A woken thread re-reads this.idle/this.closed and
+    // re-acquires this.mutex as part of returning from cond.wait()/
+    // timedWait(); freeing this.idle or destroying mutex/available while
+    // that's still in flight is a real, confirmed data race (caught
+    // directly with ThreadSanitizer), not just a theoretical one. Wait for
+    // every such call to finish before touching anything further.
+    while (this.activeWaiters > 0) {
+        this.available.wait(&this.mutex)
+    }
+
     for (var i = 0; i < this.idle.length; i += 1) {
         var c = this.idle.get(i)
         c.close()

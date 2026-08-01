@@ -32,6 +32,20 @@ public func Utf8Decode(str: *const u8, len: i32, codepoint: *rune) : i32 {
 
 }
 
+@doc("""
+    Number of bytes utf8codepoint() (invoked by Utf8Decode) will read for a
+    sequence starting with this leading byte. Utf8Decode's `len` parameter is
+    unused/ignored by utf8codepoint — it performs no bounds checking of its
+    own and will happily read s[1]..s[3] regardless of what's actually there,
+    so callers must verify these bytes exist before calling it.
+""")
+public func Utf8SeqLen(c: u8) : i32 {
+    if((c & 0xf8) == 0xf0) return 4
+    if((c & 0xf0) == 0xe0) return 3
+    if((c & 0xe0) == 0xc0) return 2
+    return 1
+}
+
 public func Utf8HexDecode(str: *const char, len: i32) : rune {
     const buffer = [9]char{}
     len = len == 4 ? 4 : 8

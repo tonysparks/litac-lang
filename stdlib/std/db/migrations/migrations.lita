@@ -415,6 +415,12 @@ func (m: *Migrator) recordApplied(mig: *Migration, err: *MigrationError) : bool 
         )
         return false
     }
+    // release (not just close): close() finalizes the underlying prepared
+    // statement, but the SqlStatement wrapper itself was heap-allocated by
+    // prepare() and is only freed by release() — see SqliteConnection/
+    // PgConnection.release(). Calling close() alone here leaked that
+    // wrapper on every single migration applied.
+    defer m.conn.release(stmt)
 
     var nowBuf: IsoDateBuf;
     var nowSb = nowBuf.toStringBuffer()
@@ -428,7 +434,6 @@ func (m: *Migrator) recordApplied(mig: *Migration, err: *MigrationError) : bool 
     stmt.bindText (5, nowBuf.buffer,   nowSb.length)
 
     r = stmt.step()
-    stmt.close()
 
     if(r.isError()) {
         err.status = MigrationStatus.SQL_ERROR

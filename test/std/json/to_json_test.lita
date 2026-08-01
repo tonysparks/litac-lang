@@ -760,3 +760,105 @@ func testFromJsonDateInvalidStringYieldsZeroDate() {
     assert(d.month == 0)
     assert(d.day == 0)
 }
+
+// -------------------------------------------------------------------------
+// Type confusion safety: fromJson must not crash when a field's JSON value
+// doesn't match the field's expected type (a routine client mistake, or an
+// explicit JSON `null` for an optional field). Before the fix, asString()
+// reinterpreted the JsonNode union's non-string bits as a *const char and
+// handed them to strlen/memcpy — a wild-pointer crash for a mismatched type,
+// or a guaranteed strlen(null) crash for an explicit `null` (JSON_NULL isn't
+// a C null pointer, so the `if(!json) return;` guards don't catch it).
+// -------------------------------------------------------------------------
+
+@json
+enum FixtureStatus {
+    ACTIVE,
+    INACTIVE,
+}
+
+@json
+struct FixtureRecord {
+    name: String
+    status: FixtureStatus
+    createdAt: DateTime
+}
+
+@test
+func testFromJsonStringFieldGivenNumberDoesNotCrash() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"name\":12345}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var rec = FixtureRecord{}
+    rec.fromJson(&ctx, node)
+    assert(rec.name.length == 0)
+}
+
+@test
+func testFromJsonStringFieldGivenNullDoesNotCrash() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"name\":null}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var rec = FixtureRecord{}
+    rec.fromJson(&ctx, node)
+    assert(rec.name.length == 0)
+}
+
+@test
+func testFromJsonEnumFieldGivenNullDoesNotCrash() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"status\":null}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    // pre-set, to prove a null/mismatched JSON value leaves it untouched
+    // rather than crashing
+    var rec = FixtureRecord{.status = FixtureStatus.ACTIVE}
+    rec.fromJson(&ctx, node)
+    assert(rec.status == FixtureStatus.ACTIVE)
+}
+
+@test
+func testFromJsonEnumFieldGivenNumberDoesNotCrash() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"status\":42}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var rec = FixtureRecord{.status = FixtureStatus.ACTIVE}
+    rec.fromJson(&ctx, node)
+    assert(rec.status == FixtureStatus.ACTIVE)
+}
+
+@test
+func testFromJsonDateTimeFieldGivenNullDoesNotCrash() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"createdAt\":null}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    // Not crashing is the assertion here.
+    var rec = FixtureRecord{}
+    rec.fromJson(&ctx, node)
+}
+
+@test
+func testFromJsonDateTimeFieldGivenArrayDoesNotCrash() {
+    var ctx = JsonContextInit()
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("{\"createdAt\":[1,2,3]}"))
+    assert(!parser.hasError())
+    assert(node != null)
+
+    var rec = FixtureRecord{}
+    rec.fromJson(&ctx, node)
+}

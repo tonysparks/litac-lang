@@ -9,6 +9,7 @@ import "std/array";
 import "std/libc";
 import "std/unicode/utf8"
 import "std/limits"
+import "std/fmt"
 
 import "std/io"
 
@@ -151,8 +152,17 @@ public func (node: *JsonNode) isObject() : bool {
     return node.type == JsonType.OBJECT
 }
 
+// Returns null if node isn't actually a STRING — the underlying JsonValue is
+// a union, so reading .strValue on e.g. a NUMBER/ARRAY/OBJECT node would
+// reinterpret those bits as a pointer and hand back garbage. Callers
+// (including the fromJson generated code) dereference this via strlen/
+// memcpy, so an unguarded read here is a real, remotely-triggerable crash
+// whenever a client sends the "wrong" JSON type for a string-typed field.
 @inline
 public func (node: *JsonNode) asString() : *const char {
+    if(node.type != JsonType.STRING) {
+        return null
+    }
     return node.value.strValue
 }
 
@@ -184,13 +194,21 @@ public func (node: *JsonNode) asLong() : i64 {
     return node.value.intValue as (i64)
 }
 
+// See asString() — same type-confusion hazard for a union read.
 @inline
 public func (node: *JsonNode) asArray() : *JsonArray {
+    if(node.type != JsonType.ARRAY) {
+        return null
+    }
     return node.value.arrayValue
 }
 
+// See asString() — same type-confusion hazard for a union read.
 @inline
 public func (node: *JsonNode) asObject() : *JsonObject {
+    if(node.type != JsonType.OBJECT) {
+        return null
+    }
     return node.value.objValue
 }
 
@@ -892,6 +910,15 @@ public enum JsonParserStatus {
 
 const MAX_MESSAGE_SIZE = 256
 
+// parseJsonArray/parseJsonObject recurse into parseJsonNode for every nested
+// level. Without a cap, a malicious/malformed payload of deeply nested
+// arrays or objects (e.g. thousands of consecutive '[' characters — trivial
+// for a remote client to send as an HTTP request body) recurses until it
+// blows the native call stack and crashes the process. 1000 levels is far
+// beyond any legitimate document while leaving a large safety margin below
+// a typical thread stack size.
+const MAX_JSON_DEPTH = 1000
+
 public struct JsonParser {
     alloc: *const mem::Allocator
     status: JsonParserStatus
@@ -902,6 +929,7 @@ public struct JsonParser {
     stream: *const char
     streamEnd: *const char  // null = null-terminated mode; non-null = length-bounded mode
     lineStart: *const char
+    depth: i32
 }
 
 public func JsonParserInit(alloc: *const mem::Allocator = mem::defaultAllocator) : JsonParser {
@@ -934,6 +962,7 @@ public func (p: *JsonParser) parseJson(str: String) : *JsonNode {
     p.streamEnd = str.buffer ? str.buffer + str.length : null
     p.lineStart = p.stream
     p.status = JsonParserStatus.OK
+    p.depth = 0
 
     p.buffer.clear()
     p.nextToken()
@@ -1131,6 +1160,13 @@ func (p: using *JsonParser) parseJsonStr() : *JsonNode {
 func (p: using *JsonParser) parseJsonArray() : *JsonNode {
     var node = CreateJsonArray(p.alloc)
 
+    p.depth += 1
+    defer p.depth -= 1
+    if(p.depth > MAX_JSON_DEPTH) {
+        p.error("JSON exceeds maximum nesting depth of %d", MAX_JSON_DEPTH)
+        return node
+    }
+
     do {
         if(p.check(TokenKind.RIGHT_BRACKET)) {
             break;
@@ -1145,6 +1181,13 @@ func (p: using *JsonParser) parseJsonArray() : *JsonNode {
 }
 func (p: using *JsonParser) parseJsonObject() : *JsonNode {
     var node = CreateJsonObject(p.alloc)
+
+    p.depth += 1
+    defer p.depth -= 1
+    if(p.depth > MAX_JSON_DEPTH) {
+        p.error("JSON exceeds maximum nesting depth of %d", MAX_JSON_DEPTH)
+        return node
+    }
 
     do {
         if(p.check(TokenKind.RIGHT_BRACE)) {
@@ -1191,26 +1234,33 @@ func (p: using *JsonParser) scanInt() {
     var start_digits = stream;
     if (*stream == '0') {
         stream += 1;
-        if (tolower(*stream) == 'x') {
+        if (!p.atEnd() && tolower(*stream) == 'x') {
             stream += 1;
             base = 16;
             start_digits = stream;
-        } else if (tolower(*stream) == 'b') {
+        } else if (!p.atEnd() && tolower(*stream) == 'b') {
             stream += 1;
             base = 2;
             start_digits = stream;
-        } else if (isdigit(*stream)) {
+        } else if (!p.atEnd() && isdigit(*stream)) {
             base = 8;
             start_digits = stream;
         }
     }
     var val: i64 = 0;
     for (;;) {
+        // A number filling the rest of a length-bounded (non-null-
+        // terminated) buffer would otherwise read *stream past streamEnd.
+        if (p.atEnd()) {
+            break;
+        }
         if (*stream == '_') {
             stream += 1;
             continue;
         }
-        var digit = charToDigit[(*stream) as (i32)];
+        // string bytes must be zero-extended (not sign-extended) before use
+        // as a table index — see the identical note in JsonEscapeString.
+        var digit = charToDigit[((*stream) as (u8)) as (i32)];
         if (digit == 0 && *stream != '0') {
             break;
         }
@@ -1220,7 +1270,7 @@ func (p: using *JsonParser) scanInt() {
         }
         if (val > (MAX_I64 - digit)/base) {
             p.error("Integer literal overflow");
-            while (isdigit(*stream)) {
+            while (!p.atEnd() && isdigit(*stream)) {
                 stream += 1;
             }
             val = 0;
@@ -1230,7 +1280,7 @@ func (p: using *JsonParser) scanInt() {
         stream += 1;
     }
     if (stream == start_digits) {
-        p.error("Expected base %d digit, got '%c'", base, *stream);
+        p.error("Expected base %d digit, got '%c'", base, p.atEnd() ? '\0' : *stream);
     }
 
     if(p.hasError()) {
@@ -1244,29 +1294,39 @@ func (p: using *JsonParser) scanInt() {
 func (p: using *JsonParser) scanFloat() {
     var start = p.stream;
 
-    while (isdigit(*stream)) {
+    // A float filling the rest of a length-bounded (non-null-terminated)
+    // buffer would otherwise read *stream past streamEnd at each step below.
+    while (!p.atEnd() && isdigit(*stream)) {
         stream+=1;
     }
-    if (*stream == '.') {
+    if (!p.atEnd() && *stream == '.') {
         stream+=1;
     }
-    while (isdigit(*stream)) {
+    while (!p.atEnd() && isdigit(*stream)) {
         stream+=1;
     }
-    if (tolower(*stream) == 'e') {
+    if (!p.atEnd() && tolower(*stream) == 'e') {
         stream+=1;
-        if (*stream == '+' || *stream == '-') {
+        if (!p.atEnd() && (*stream == '+' || *stream == '-')) {
             stream+=1;
         }
-        if (!isdigit(*stream)) {
-            p.error("Expected digit after float literal exponent, found '%c'.", *stream);
+        if (p.atEnd() || !isdigit(*stream)) {
+            p.error("Expected digit after float literal exponent, found '%c'.", p.atEnd() ? '\0' : *stream);
         }
-        while (isdigit(*stream)) {
+        while (!p.atEnd() && isdigit(*stream)) {
             stream+=1;
         }
     }
-    var val = strtod(start, null);
-    if (val == HUGE_VAL) {
+
+    // strtod() has no notion of streamEnd — it reads until it hits a
+    // non-numeric byte, which would run past the buffer if it isn't
+    // null-terminated (the length-bounded parsing mode this parser
+    // otherwise supports). parseF64() already handles this exact problem
+    // (bounded by String.length, copies to a null-terminated scratch buffer
+    // internally before delegating to strtod).
+    var parsed = StringInit(start, (stream - start) as (i32)).parseF64()
+    var val = parsed.value
+    if (parsed.error == ParseError.ERROR_RESULT_OUT_OF_RANGE) {
         p.error("Float literal overflow");
     }
 
@@ -1288,6 +1348,15 @@ func (p: using *JsonParser) scanStr() {
 
         // unicode code point
         if(c >= 0x80) {
+            // A truncated multi-byte sequence at the end of a length-bounded
+            // (non-null-terminated) buffer would otherwise make Utf8Decode
+            // read past streamEnd.
+            var needed = Utf8SeqLen(c)
+            if(streamEnd != null && stream + needed > streamEnd) {
+                p.error("Truncated UTF-8 sequence in string literal");
+                break;
+            }
+
             var result: rune = 0
             var len = Utf8Decode(stream as (*const u8), -1, &result)
             if(len < 0) {
@@ -1340,7 +1409,8 @@ func (p: using *JsonParser) scanStr() {
                     }
                     break;
                 } else {
-                    val = escapeToChar[(*stream) as (i32)];
+                    // zero-extend, not sign-extend — see the note in JsonEscapeString
+                    val = escapeToChar[((*stream) as (u8)) as (i32)];
                     if (val == 0 && *stream != '0') {
                         p.error("Invalid string literal escape '\\%c'", *stream);
                     }
@@ -1377,6 +1447,15 @@ func (p: using *JsonParser) scanMultiStr() {
 
         // unicode code point
         if(c >= 0x80) {
+            // See the identical guard in scanStr — a truncated multi-byte
+            // sequence at the end of a length-bounded buffer would otherwise
+            // make Utf8Decode read past streamEnd.
+            var needed = Utf8SeqLen(c)
+            if(streamEnd != null && stream + needed > streamEnd) {
+                p.error("Truncated UTF-8 sequence in string literal");
+                break;
+            }
+
             var result: rune = 0
             var len = Utf8Decode(stream as (*const u8), -1, &result)
             if(len < 0) {
@@ -1392,6 +1471,12 @@ func (p: using *JsonParser) scanMultiStr() {
             var val: char = *stream;
             if (val == '\\') {
                 stream += 1;
+                // A trailing backslash at EOF would otherwise dereference
+                // *stream past streamEnd — see the matching check in scanStr.
+                if (p.atEnd()) {
+                    p.error("Unexpected end of input in string escape");
+                    break;
+                }
                 if(*stream == '`') {
                     val = '`'
                     stream += 1
@@ -1441,6 +1526,12 @@ func (l: *JsonParser) skipComments() {
             l.stream += 1
             do {
                 l.stream += 1
+                // A '//' comment reaching EOF with no trailing '\n' would
+                // otherwise dereference *l.stream one byte past streamEnd
+                // before the loop condition below gets a chance to check.
+                if(l.atEnd()) {
+                    break;
+                }
                 if(*l.stream == '\n') {
                     break;
                 }
@@ -1543,10 +1634,13 @@ repeat:
         case '7':
         case '8':
         case '9': {
-            while (isdigit(*stream)) {
+            // mirrors the '-' case's bounds-checked lookahead above — a bare
+            // number filling the rest of a length-bounded (non-null-
+            // terminated) buffer would otherwise read *stream past streamEnd.
+            while (!p.atEnd() && isdigit(*stream)) {
                 stream += 1;
             }
-            var c: char = *stream;
+            var c: char = p.atEnd() ? '0' : *stream;
             stream = token.start;
             if (c == '.' || tolower(c) == 'e') {
                 p.scanFloat();

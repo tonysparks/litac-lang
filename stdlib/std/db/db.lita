@@ -243,6 +243,16 @@ public func (this: *SqlConnection) query(
     var stmt: SqlStatement;
     this.prepare(&stmt, sql)
     if(this.hasError()) {
+        // prepare() may have allocated the statement wrapper even though
+        // the underlying sqlite3_prepare_v2/PQprepare call itself failed
+        // (e.g. a SQL syntax error) — release() is safe to call
+        // unconditionally (no-ops on the zero-value case too), so release
+        // it here rather than leaking it. Not done via `defer` covering the
+        // whole function: on success this function hands `resultSet` back
+        // live for the caller to iterate and release themselves via
+        // closeAndReleaseAll() — releasing it here on that path would free
+        // it out from under them.
+        this.release(stmt)
         return this.lastResult()
     }
 
@@ -252,6 +262,7 @@ public func (this: *SqlConnection) query(
 
     var vargs = va_arg<NativeVararg>(list)
     if(!_bindParams(this, stmt, &list, vargs)) {
+        this.release(stmt)
         return this.lastResult()
     }
 
@@ -267,6 +278,11 @@ public func (this: *SqlConnection) update(
     var stmt: SqlStatement;
     this.prepare(&stmt, sql)
     if(this.hasError()) {
+        // See the matching comment in query() — release() is safe to call
+        // unconditionally; this function (unlike query()) always fully
+        // consumes the statement itself, so there's no "hand it back live
+        // to the caller" path to worry about clobbering here.
+        this.release(stmt)
         return 0_i64
     }
 
@@ -276,6 +292,7 @@ public func (this: *SqlConnection) update(
 
     var vargs = va_arg<NativeVararg>(list)
     if(!_bindParams(this, stmt, &list, vargs)) {
+        this.release(stmt)
         return 0_i64
     }
 

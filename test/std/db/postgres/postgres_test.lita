@@ -8,6 +8,8 @@ import "std/testcontainers"
 import "std/testcontainers/presets"
 import "std/db"
 import "std/db/postgres/postgres_db"
+import "std/db/pool"
+import "std/db/postgres/pg_pool_driver"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -182,5 +184,43 @@ func testRollback() {
     assert(rs.hasNext())
     assert(rs.next().isOk())
     assert(rs.columnInt32(0) == 10)
+}
+
+// -----------------------------------------------------------------------
+// Bug fix: PgDriverConnect's error path freed only the PgConnection
+// wrapper struct, never calling close() — which is what actually calls
+// PQfinish() to release the underlying libpq connection/socket. Wrong
+// credentials against an otherwise-live server hits exactly that path:
+// PQconnectdb succeeds at the socket/protocol level, authentication then
+// fails, so PQstatus() != CONNECTION_OK — a routine failure mode for any
+// pool that retries a flaky/misconfigured DB, not a rare edge case.
+// Fixing it also required copying the error message out first: it can be
+// a view into the connection's own internal buffer (PQerrorMessage()),
+// which close() then invalidates — returning it unchanged would hand the
+// caller a dangling pointer instead.
+// -----------------------------------------------------------------------
+
+@test
+func testPoolConnectFailureReturnsUsableErrorAndDoesNotLeak() {
+    var c: Container
+    var conn = connectContainer(&c)
+    defer c.stop()
+    conn.close()
+
+    RegisterPostgresDriver()
+
+    var dsnUri = StringBuilderInit(128)
+    defer dsnUri.free()
+    dsnUri.append("ldbc://postgres/testdb?host=127.0.0.1&port=%d&user=postgres&password=totally-wrong-password&sslmode=disable",
+                   c.getPort(5432))
+
+    var pool: ConnectionPool
+    var config = PoolConfig { .maxSize = 2, .minSize = 1 }
+    var result = ConnectionPoolInit(dsnUri.toString(), &pool, config)
+
+    assert(result.isError())
+    // Real, readable error text — not a dangling pointer into an
+    // already-PQfinish()'d connection's internal buffer.
+    assert(!result.description.empty())
 }
 #end

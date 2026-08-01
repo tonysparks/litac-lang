@@ -148,6 +148,12 @@ public func (this: *SqliteConnection) execute(sql: *const char) : SqlResult {
     var error: *char = null
 
     var errorCode = sqlite3_exec(this.db, sql, null, null, &error)
+    // sqlite3_exec's own docs: the caller must sqlite3_free() this message.
+    // CreateError() copies its contents into its own StringBuilder, so
+    // freeing it here (sqlite3_free(NULL) is a documented no-op when
+    // errorCode == SQLITE_OK and error was never set) doesn't touch
+    // anything CreateError's result still needs.
+    defer sqlite3_free(error as (*void))
     if (errorCode != SQLITE_OK) {
         this.error = CreateError(this, null, errorCode, error)
     }
@@ -243,6 +249,9 @@ public func (this: *SqliteConnection) rollback() : SqlResult  {
     var savedError = this.error
     var error: *char = null
     var errorCode = sqlite3_exec(this.db, "ROLLBACK;", null, null, &error)
+    // See the matching comment in execute() — sqlite3_exec's docs require
+    // freeing this, and CreateError() below has already copied it out.
+    defer sqlite3_free(error as (*void))
     var rollbackResult = CreateError(this, null, errorCode, error)
     // preserve the original error so callers see why the rollback happened;
     // only replace it if rollback itself failed

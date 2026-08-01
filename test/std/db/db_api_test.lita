@@ -507,6 +507,59 @@ func testSqlitePrepareAndStep() {
     doPrepareAndStep(db)
 }
 
+// -----------------------------------------------------------------------
+// Bug fix: query()/update() prepared a statement (a real sqlite3_stmt),
+// then returned without releasing it on either early-failure path — a
+// syntactically bad SQL string (prepare() itself errors) or an
+// unsupported vararg parameter type (_bindParams() rejects it). Confirmed
+// against orm.lita's insert/update/delete helpers, which already release
+// via `defer this.release(stmt)` right after prepare() specifically to
+// avoid this. Neither path should crash; both should now also release the
+// statement instead of leaking it (release() is documented as safe to
+// call unconditionally, including on the zero-value case).
+// -----------------------------------------------------------------------
+
+@test
+func testSqliteQueryReleasesStatementOnPrepareFailure() {
+    var conn = SqliteConnection{}
+    defer conn.close()
+    var db = openSqliteDb(&conn)
+
+    var rs: SqlResultSet
+    var result = db.query(&rs, $"SELECT * FROM this_table_does_not_exist_at_all")
+    assert(result.isError())
+    // The connection must still be usable afterward — clearError() plus a
+    // real query succeeding is evidence the statement was released, not
+    // left dangling in a way that wedges the connection.
+    db.clearError()
+
+    db.execute("CREATE TABLE after_query_failure (x INTEGER)")
+    assert(!db.hasError())
+}
+
+@test
+func testSqliteUpdateReleasesStatementOnBindFailure() {
+    var conn = SqliteConnection{}
+    defer conn.close()
+    var db = openSqliteDb(&conn)
+
+    db.execute("CREATE TABLE bind_fail (x INTEGER)")
+    assert(!db.hasError())
+
+    // Run the same failing bind many times — if the statement leaked each
+    // time, this is the kind of loop that would exhaust real resources in
+    // a long-running server; it must at least not crash or wedge the
+    // connection either way.
+    for (var i = 0; i < 50; i += 1) {
+        var count = db.update($"INSERT INTO bind_fail VALUES ($1)", null as (*void))
+        assert(count == 0_i64)
+        db.clearError()
+    }
+
+    db.execute("INSERT INTO bind_fail VALUES (1)")
+    assert(!db.hasError())
+}
+
 @test
 func testSqliteBindAllTypes() {
     var conn = SqliteConnection{}

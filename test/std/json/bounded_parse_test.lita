@@ -113,3 +113,113 @@ func testNegativeFloatFillingBuffer() {
     assert(!parser.hasError())
     assert(node != null)
 }
+
+// ── Fix: positive number lookahead (nextToken '0'..'9' case) missing the
+//    same streamEnd guard the '-' case above already had ──────────────────
+
+@test
+func testPositiveIntegerFillingBuffer() {
+    // "5" exactly filling the buffer, no leading '-'. Before fix: nextToken's
+    // digit-case lookahead loop and scanInt()'s own main loop both read
+    // *stream unconditionally, past streamEnd.
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("5", 1))
+    assert(!parser.hasError())
+    assert(node != null)
+    assert(node.asLong() == 5_i64)
+}
+
+@test
+func testPositiveFloatFillingBuffer() {
+    // "3.14" exactly filling the buffer, no leading '-'.
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit("3.14", 4))
+    assert(!parser.hasError())
+    assert(node != null)
+}
+
+// ── Fix: skipComments '//' line comment reaching EOF without '\n' ──────────
+
+@test
+func testLineCommentAtEndOfBuffer() {
+    // "//x" with no trailing newline, filling the buffer exactly.
+    // Before fix: the do-while loop's first iteration dereferenced *l.stream
+    // one byte past streamEnd before the loop condition could catch it.
+    var s = "//x!!!"
+    assertParseErr(StringInit(s, 3))
+}
+
+@test
+func testLineCommentThenValueAtEndOfBuffer() {
+    // A '//' comment immediately followed by EOF is still an incomplete
+    // document (no value), so this should error out cleanly rather than
+    // crash.
+    var s = "//!!!"
+    assertParseErr(StringInit(s, 2))
+}
+
+// ── Fix: truncated multi-byte UTF-8 sequence at end of a string literal ────
+
+// LitaC source string literals have no \xNN escape, so a raw non-ASCII byte
+// (needed here to feed the parser a truncated multi-byte UTF-8 lead byte) is
+// built at runtime instead of embedded directly in the literal. `buf` is
+// owned by the caller so the returned String stays valid for its lifetime
+// (a local array returned by a String from inside this function would be a
+// dangling stack pointer once this function returned).
+func withTrailingByte(buf: *char, prefix: *const char, b: u8, sentinelCount: i32) : String {
+    var n = strlen(prefix)
+    memcpy(buf, prefix, n)
+    buf[n] = b as (char)
+    for(var i = 0; i < sentinelCount; i += 1) {
+        buf[n + 1 + i] = '!'
+    }
+    return StringInit(buf, n as (i32) + 1)
+}
+
+@test
+func testTruncatedTwoByteUtf8AtEnd() {
+    // {"k":"...  where the string is cut off right after a 2-byte UTF-8
+    // lead byte (0xC3), with no closing quote. Before fix: Utf8Decode read
+    // the second byte of the sequence past streamEnd.
+    var buf: [16]char
+    assertParseErr(withTrailingByte(buf, "{\"k\":\"", 0xc3_u8, 3))
+}
+
+@test
+func testTruncatedThreeByteUtf8AtEnd() {
+    // Same, but a 3-byte lead byte (0xE2), with zero continuation bytes
+    // available instead of the two it needs.
+    var buf: [16]char
+    assertParseErr(withTrailingByte(buf, "{\"k\":\"", 0xe2_u8, 3))
+}
+
+// ── Fix: scanMultiStr backslash eat without bounds check (backtick strings,
+//    mirroring the scanStr fix from testStringTrailingBackslash above) ─────
+
+@test
+func testMultiStringTrailingBackslash() {
+    // JSON bytes: {"k":`\ — backtick string with a trailing backslash and
+    // nothing after it.
+    var s = "{\"k\":`\\!!!"
+    assertParseErr(StringInit(s, 7))
+}
+
+// ── Fix: unbounded recursion in parseJsonArray/parseJsonObject ─────────────
+
+@test
+func testDeeplyNestedArrayDoesNotCrash() {
+    // Well past MAX_JSON_DEPTH (1000) nested arrays. Before the depth guard,
+    // this recursed once per '[' with no limit, which would eventually blow
+    // the native call stack (a trivial, remotely-triggerable DoS for any
+    // service parsing untrusted JSON bodies). Should now fail cleanly with a
+    // parse error instead of crashing.
+    const N = 5000
+    var buf: [N]char
+    for(var i = 0; i < N; i += 1) {
+        buf[i] = '['
+    }
+    var parser = JsonParserInit()
+    var node = parser.parseJson(StringInit(buf, N))
+    assert(parser.hasError())
+    assert(node == null)
+}

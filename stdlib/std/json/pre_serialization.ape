@@ -150,7 +150,15 @@ fn DeserializeStruct(sym) {
 fn DeserializeEnum(sym) {
    emit("public func (this: *%s) fromJson(context: *JsonContext, json: *JsonNode) : bool {\n", sym.name)
    emit("    if(!json) return true;")
-   emit("    var value = json.asString().toString(); \n")
+   // json here can be the JSON_NULL sentinel (an explicit `null` in the
+   // payload) or any other non-string type a client sent for this field —
+   // neither is caught by the `!json` check above, since both are non-null
+   // *JsonNode pointers. asString() returns null in both cases; chaining
+   // straight into .toString() on that null called strlen(null) unconditionally,
+   // crashing the process on any type-mismatched or null enum field.
+   emit("    var jsonStr = json.asString();\n")
+   emit("    if(!jsonStr) return true;\n")
+   emit("    var value = jsonStr.toString(); \n")
    var isFirst = true
    for(field in sym.enumDecl.fields) {
       var name = field.name

@@ -3,6 +3,7 @@ import "std/db/pool"
 import "std/db/postgres/postgres_db"
 import "std/libc"
 import "std/mem"
+import "std/string"
 
 // PgDriverConnect implements DbDriverFn so a PgConnection can be managed
 // by a ConnectionPool.
@@ -46,7 +47,22 @@ public func PgDriverConnect(
 
     var result = Connect(hostVal, portVal, path, userVal, passwordVal, pgConn, allocator)
     if (result.isError()) {
+        // result.description can be a *view* into pgConn.pg's own internal
+        // buffer (see ConnectDSN's comment — PQerrorMessage() isn't copied,
+        // deliberately, for the case where the connection is kept alive).
+        // Here we're about to tear the connection down instead, so copy the
+        // message out first or the caller gets a dangling pointer once
+        // PQfinish() runs. And it must be pgConn.close() — not a raw
+        // allocator.free() of just the wrapper struct — close() is what
+        // actually calls PQfinish() to release the underlying libpq
+        // connection/socket; freeing only the wrapper leaked that outright
+        // on every failed connection attempt (wrong password, unreachable
+        // host, DB down — routine failure modes for any pool that retries,
+        // not rare edge cases).
+        var errorCopy = result.description.copy(allocator)
+        pgConn.close()
         allocator.free(pgConn as (*void))
+        result.description = errorCopy
         return result
     }
 

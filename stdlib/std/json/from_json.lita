@@ -208,28 +208,48 @@ public func (this: *StringBuffer) fromJson(context: *JsonContext, json: *JsonNod
     if(!json) {
         return;
     }
-    this.format("%s", json.asString())
+    // asString() returns null for a JSON value that isn't a string (e.g. the
+    // field is JSON null, or a client sent the wrong type) — "%s" with a
+    // null argument is undefined behavior in C, so guard rather than pass it
+    // straight through.
+    var str = json.asString()
+    if(str) {
+        this.format("%s", str)
+    }
 }
 
 public func (this: *StringBuilder) fromJson(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;
     }
-    this.append("%s", json.asString())
+    var str = json.asString()
+    if(str) {
+        this.append("%s", str)
+    }
 }
 
 public func (this: *DateTime) fromJson(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;
     }
-    *this = DateTimeFromIso(json.asString().toString())
+    // asString() returns null when the JSON value isn't a string (JSON null,
+    // or a client sending the wrong type) — *const char.toString() calls
+    // strlen() unconditionally, which segfaults on null, so this can't be
+    // handed through unchecked.
+    var str = json.asString()
+    if(str) {
+        *this = DateTimeFromIso(str.toString())
+    }
 }
 
 public func (this: *Date) fromJson(context: *JsonContext, json: *JsonNode) {
     if(!json) {
         return;
     }
-    *this = DateFromIso(json.asString().toString())
+    var str = json.asString()
+    if(str) {
+        *this = DateFromIso(str.toString())
+    }
 }
 
 public func (this: *Map<K, V>) fromJson<K, V>(context: *JsonContext, json: *JsonNode) {
