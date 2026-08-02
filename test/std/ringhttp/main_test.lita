@@ -179,6 +179,42 @@ func test_static_webpage() {
     assert(fileContents.equals(resp.body))
 }
 
+// Regression test: the static-file fast path (http_worker.lita, before it
+// reaches the router) only checked `method == GET`, so HEAD requests for
+// static assets fell through to the router — which never has static paths
+// registered as routes — and 404'd, even though the kqueue/io_uring send
+// paths already had correct HEAD-for-file handling (skip the body, keep the
+// headers) that this bug made unreachable. Per RFC 7231 §4.3.2, HEAD must
+// behave like GET: same status and headers, empty body.
+@test("test static webpage HEAD request")
+func test_static_webpage_head() {
+    // Unlike test_static_webpage above, this needs the response headers map,
+    // so it can't use the bare `HttpResponse { .body = ... }` literal — that
+    // leaves .headers as a zero-value Map (capacity 0), which
+    // HttpHeadersCallback silently ignores, so no header would ever be
+    // captured regardless of what the server sent.
+    var resp = http::HttpResponseInit()
+    defer resp.body.free()
+    defer resp.headers.free()
+
+    http.head("http://localhost:9091/static/index.html", &resp)
+
+    var fileContents = StringBuilderInit(256)
+    defer fileContents.free()
+
+    var status = ReadFileFully($"../../test/std/ringhttp/static/index.html", &fileContents)
+    assert(status == FileStatus.Ok)
+    assert(resp.statusCode == 200)
+    assert(resp.body.length == 0)
+
+    var expectedLength = StringBuilderInit(16)
+    defer expectedLength.free()
+    expectedLength.appendI32(fileContents.length)
+
+    var contentLength = resp.headers.get($"Content-Length")
+    assert(contentLength.equals(expectedLength.toString()))
+}
+
 // Regression test for a splice-based static file response (ResponseType.FILE,
 // the io_uring queueWriteHttpFileResponse path — distinct from the /download
 // route above, which uses ResponseType.STREAM and never exercised this code).

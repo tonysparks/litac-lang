@@ -472,7 +472,10 @@ internal func (this: *WorkerThread) handleHttpRequest(
     connection.disableKeepAlive = (httpRequest.flags & HttpFlags.DISABLE_KEEP_ALIVE) != 0 ||
                                   (isHttp10 && !keepAliveOptIn)
 
-    if(httpRequest.method == HttpMethod.GET) {
+    // RFC 7231 §4.3.2: HEAD is identical to GET — the kqueue/io_uring send
+    // paths already special-case HEAD to skip the body (see flushResponse /
+    // queueWriteHttpResponse), so just let HEAD reach the same file lookup.
+    if(httpRequest.method == HttpMethod.GET || httpRequest.method == HttpMethod.HEAD) {
         if(httpRequest.path.startsWith(this.server.config.publicServerPath)) {
             return this.handleFileRequest(request, httpRequest)
         }
