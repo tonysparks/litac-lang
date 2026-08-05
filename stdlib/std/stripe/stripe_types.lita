@@ -1,0 +1,100 @@
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/array"
+
+@json
+public struct StripeCustomer {
+    id: String
+    email: String
+}
+
+@json
+public struct StripeCheckoutSession {
+    id: String
+    url: String
+    customer: String
+    subscription: String
+    payment_status: String
+    mode: String
+}
+
+@json
+public struct StripeBillingPortalSession {
+    id: String
+    url: String
+}
+
+@json
+public struct StripeSubscriptionItemPrice {
+    id: String
+}
+
+@json
+public struct StripeSubscriptionItem {
+    price: StripeSubscriptionItemPrice
+    // Billing-period fields live per-item (not on the parent Subscription) as of
+    // Stripe's 2025+ API versions — a subscription can mix items with different
+    // billing cycles, so each item tracks its own period. Read this, not a
+    // top-level field on StripeSubscription (which no longer carries one).
+    current_period_end: i64
+}
+
+@json
+public struct StripeSubscriptionItemList {
+    data: Array<StripeSubscriptionItem>
+}
+
+@json
+public struct StripeSubscription {
+    id: String
+    customer: String
+    status: String
+    items: StripeSubscriptionItemList
+}
+
+@json
+public struct StripeErrorDetail {
+    type: String
+    code: String
+    message: String
+}
+
+@json
+public struct StripeErrorResponse {
+    error: StripeErrorDetail
+}
+
+// -- Webhook event envelopes -------------------------------------------------
+//
+// Stripe's webhook `data.object` shape varies by event type, so rather than a
+// single generic envelope, each event family this package supports gets its own
+// non-generic wrapper struct — the shape @json parsing in this codebase already
+// supports (nested structs), with no dependency on generic-struct JSON support.
+
+@json
+public struct StripeCheckoutSessionEventData {
+    object: StripeCheckoutSession
+}
+
+@json
+public struct StripeCheckoutSessionEvent {
+    id: String
+    type: String
+    data: StripeCheckoutSessionEventData
+}
+
+@json
+public struct StripeSubscriptionEventData {
+    object: StripeSubscription
+}
+
+@json
+public struct StripeSubscriptionEvent {
+    id: String
+    type: String
+    data: StripeSubscriptionEventData
+}

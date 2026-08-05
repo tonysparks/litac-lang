@@ -1,0 +1,41 @@
+import "std/stripe/stripe_client"
+import "std/stripe/stripe_types"
+import "std/stripe/stripe_json"
+import "std/string"
+import "std/map"
+import "std/mem"
+import "std/log"
+
+// Creates a Stripe Checkout Session in subscription mode for customerId against
+// priceId (a monthly or yearly recurring Price configured in the Stripe Dashboard).
+// session.url is where the caller should redirect the browser; the session only
+// reflects a completed subscription once the checkout.session.completed webhook
+// fires — do not treat a successful call to this function as "the user paid".
+public func CreateCheckoutSession(
+    client: *StripeClient,
+    customerId: String,
+    priceId: String,
+    successUrl: String,
+    cancelUrl: String,
+    session: *StripeCheckoutSession,
+    allocator: *const Allocator
+) : bool {
+    var params = StripeParamsInit(allocator, 8)
+    defer params.free()
+    params.put($"mode", $"subscription")
+    params.put($"customer", customerId)
+    params.put($"line_items[0][price]", priceId)
+    params.put($"line_items[0][quantity]", $"1")
+    params.put($"success_url", successUrl)
+    params.put($"cancel_url", cancelUrl)
+
+    var resp = StripeRawResponse{}
+    var ok = client.post("checkout/sessions", &params, &resp, allocator)
+    if(!ok || resp.statusCode < 200 || resp.statusCode >= 300) {
+        Error("Stripe CreateCheckoutSession failed: status=%d body=%.*s\n",
+            resp.statusCode, resp.body.length, resp.body.buffer)
+        return false
+    }
+
+    return ParseStripeJson<StripeCheckoutSession>(session, resp.body, allocator)
+}

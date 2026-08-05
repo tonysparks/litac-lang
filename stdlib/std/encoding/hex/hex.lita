@@ -1,0 +1,44 @@
+import "std/string"
+
+const HEX_CHARS: *const char = "0123456789abcdef"
+
+// Encodes len bytes of data as lowercase hex into out.
+// out must point to a buffer of at least len*2 chars; the result is not NUL-terminated.
+public func HexEncode(data: *const u8, len: i32, out: *char) {
+    for(var i = 0; i < len; i += 1) {
+        var b = data[i]
+        out[i * 2]     = HEX_CHARS[(b >> 4) & 0xF_u8]
+        out[i * 2 + 1] = HEX_CHARS[b & 0xF_u8]
+    }
+}
+
+func hexNibble(c: char) : i32 {
+    if(c >= '0' && c <= '9') {
+        return (c - '0') as (i32)
+    }
+    if(c >= 'a' && c <= 'f') {
+        return (c - 'a' + 10) as (i32)
+    }
+    if(c >= 'A' && c <= 'F') {
+        return (c - 'A' + 10) as (i32)
+    }
+    return -1
+}
+
+// Decodes a hex string (upper or lower case) into out.
+// out must point to a buffer of at least hexStr.length/2 bytes.
+// Returns false if hexStr has odd length or contains non-hex characters.
+public func HexDecode(hexStr: String, out: *u8) : bool {
+    if(hexStr.length % 2 != 0) {
+        return false
+    }
+    for(var i = 0; i < hexStr.length; i += 2) {
+        var hi = hexNibble(hexStr.buffer[i])
+        var lo = hexNibble(hexStr.buffer[i + 1])
+        if(hi < 0 || lo < 0) {
+            return false
+        }
+        out[i / 2] = ((hi << 4) | lo) as (u8)
+    }
+    return true
+}

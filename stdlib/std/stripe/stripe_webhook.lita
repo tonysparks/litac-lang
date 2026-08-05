@@ -1,0 +1,108 @@
+import "std/stripe/stripe_types"
+import "std/stripe/stripe_json"
+import "std/crypto/hmac"
+import "std/crypto/sha256"
+import "std/crypto/subtle"
+import "std/encoding/hex"
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/libc"
+import "std/time"
+import "std/mem"
+
+// Default replay-protection window, matching Stripe's own recommended tolerance.
+public const STRIPE_WEBHOOK_DEFAULT_TOLERANCE_SECONDS: i64 = 300
+
+@json
+public struct StripeEvent {
+    id: String
+    type: String
+}
+
+// Parses "t=<unix-seconds>,v1=<hex-hmac>[,v0=...]" (Stripe may send multiple
+// signatures during a signing-secret rotation; only v1 is checked). Returns false
+// if either t or v1 is missing.
+func parseSignatureHeader(header: String, timestamp: *i64, signatureHex: *String) : bool {
+    ;*timestamp = -1
+    ;*signatureHex = String{}
+
+    var parts = header.split($",")
+    while(parts.hasNext()) {
+        var part = parts.next().trim()
+        var eq = part.indexOf($"=")
+        if(eq < 0) {
+            continue
+        }
+        var key = part.substring(0, eq)
+        var value = part.substring(eq + 1)
+
+        if(key.equals($"t")) {
+            ;*timestamp = strtol(value.buffer, null, 10)
+        } else if(key.equals($"v1")) {
+            ;*signatureHex = value
+        }
+    }
+
+    return *timestamp >= 0 && !signatureHex.empty()
+}
+
+// Verifies payload against Stripe's Stripe-Signature header value and, only on
+// success, parses `id`/`type` out of the (now-trusted) payload into event.
+//
+// Verification is HMAC-SHA256 (OpenSSL-backed, see std/crypto/hmac) over
+// "{timestamp}.{payload}" keyed by webhookSecret, per Stripe's documented webhook
+// signing scheme, plus a timestamp freshness check to prevent replay of a captured
+// request. A forged or replayed signature here would let an attacker fabricate
+// arbitrary billing events (e.g. a fake checkout.session.completed granting a free
+// subscription) — do not weaken or bypass this check.
+//
+// The event's `data.object` is NOT parsed by this function (its shape varies by
+// event.type). Once verified, callers should re-parse payload into a type-specific
+// envelope — e.g. ParseStripeJson<StripeCheckoutSessionEvent>(&full, payload, allocator)
+// — keyed off event.type, and only after this function has returned true.
+public func VerifyAndConstructEvent(
+    payload: String,
+    signatureHeader: String,
+    webhookSecret: String,
+    event: *StripeEvent,
+    allocator: *const Allocator,
+    toleranceSeconds: i64 = STRIPE_WEBHOOK_DEFAULT_TOLERANCE_SECONDS
+) : bool {
+    var timestamp: i64 = -1
+    var signatureHex = String{}
+    if(!parseSignatureHeader(signatureHeader, &timestamp, &signatureHex)) {
+        return false
+    }
+
+    var now = Now() as (i64)
+    var age = now - timestamp
+    if(age < 0) {
+        age = -age
+    }
+    if(age > toleranceSeconds) {
+        return false
+    }
+
+    var signedMsg = StringBuilderInit(payload.length + 32, allocator)
+    defer signedMsg.free()
+    signedMsg.append("%lld.%.*s", timestamp, payload.length, payload.buffer)
+
+    var mac = Sha256Buf{}
+    if(!HmacSha256(webhookSecret, signedMsg.toString(), &mac)) {
+        return false
+    }
+
+    var macHexBuf: [64]char
+    HexEncode(mac.buffer as (*const u8), 32, macHexBuf as (*char))
+    var expected = String { .buffer = macHexBuf as (*const char), .length = 64 }
+
+    if(!ConstantTimeEquals(signatureHex, expected)) {
+        return false
+    }
+
+    return ParseStripeJson<StripeEvent>(event, payload, allocator)
+}

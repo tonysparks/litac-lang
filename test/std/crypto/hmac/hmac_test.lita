@@ -1,0 +1,64 @@
+import "std/crypto/hmac"
+import "std/crypto/sha256"
+import "std/encoding/hex"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+func hexEqualsStr(digest: *const u8, digestLen: i32, expected: *const char) : bool {
+    var hexBuf: [64]char
+    HexEncode(digest, digestLen, hexBuf as (*char))
+    var actual = String { .buffer = hexBuf as (*const char), .length = digestLen * 2 }
+    var want = StringInit(expected, strlen(expected) as (i32))
+    return actual.equals(want)
+}
+
+// RFC 4231 / RFC 2202 test vectors.
+
+@test
+func testHmacSha256Rfc4231Case1() {
+    var key: [20]u8
+    for(var i = 0; i < 20; i += 1) {
+        key[i] = 0x0b_u8
+    }
+    var keyStr = String { .buffer = key as (*const char), .length = 20 }
+    var msg = $"Hi There"
+
+    var mac = Sha256Buf{}
+    assert(HmacSha256(keyStr, msg, &mac))
+    assert(hexEqualsStr(mac.buffer as (*const u8), 32,
+        "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"))
+}
+
+@test
+func testHmacSha256Rfc4231Case2() {
+    var key = $"Jefe"
+    var msg = $"what do ya want for nothing?"
+
+    var mac = Sha256Buf{}
+    assert(HmacSha256(key, msg, &mac))
+    assert(hexEqualsStr(mac.buffer as (*const u8), 32,
+        "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"))
+}
+
+@test
+func testHmacSha1Rfc2202Case2() {
+    var key = $"Jefe"
+    var msg = $"what do ya want for nothing?"
+
+    var mac = HmacSha1Buf{}
+    assert(HmacSha1(key, msg, &mac))
+    assert(hexEqualsStr(mac.buffer as (*const u8), 20,
+        "effcdf6ae5eb2fa2d27416d5f184df9c259a7c79"))
+}
+
+@test
+func testHmacWrongKeyProducesDifferentMac() {
+    var msg = $"same message"
+
+    var mac1 = Sha256Buf{}
+    var mac2 = Sha256Buf{}
+    assert(HmacSha256($"key-one", msg, &mac1))
+    assert(HmacSha256($"key-two", msg, &mac2))
+    assert(memcmp(mac1.buffer as (*const void), mac2.buffer as (*const void), 32_usize) != 0)
+}

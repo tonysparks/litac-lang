@@ -1,0 +1,32 @@
+import "std/stripe/stripe_client"
+import "std/stripe/stripe_types"
+import "std/stripe/stripe_json"
+import "std/string"
+import "std/map"
+import "std/mem"
+import "std/log"
+
+// Creates a Stripe Customer for email. Called lazily on first checkout —
+// callers should persist the returned id (customer.id) so subsequent
+// checkouts/portal sessions for the same user reuse it instead of creating
+// a new Customer every time.
+public func CreateCustomer(
+    client: *StripeClient,
+    email: String,
+    customer: *StripeCustomer,
+    allocator: *const Allocator
+) : bool {
+    var params = StripeParamsInit(allocator, 2)
+    defer params.free()
+    params.put($"email", email)
+
+    var resp = StripeRawResponse{}
+    var ok = client.post("customers", &params, &resp, allocator)
+    if(!ok || resp.statusCode < 200 || resp.statusCode >= 300) {
+        Error("Stripe CreateCustomer failed: status=%d body=%.*s\n",
+            resp.statusCode, resp.body.length, resp.body.buffer)
+        return false
+    }
+
+    return ParseStripeJson<StripeCustomer>(customer, resp.body, allocator)
+}

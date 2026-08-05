@@ -1,0 +1,48 @@
+import "std/crypto/sha256"
+import "std/encoding/hex"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+func hexEqualsStr(digest: *const u8, digestLen: i32, expected: *const char) : bool {
+    var hexBuf: [64]char
+    HexEncode(digest, digestLen, hexBuf as (*char))
+    var actual = String { .buffer = hexBuf as (*const char), .length = digestLen * 2 }
+    var want = StringInit(expected, strlen(expected) as (i32))
+    return actual.equals(want)
+}
+
+// FIPS 180-4 test vectors, cross-checked against `openssl dgst -sha256`.
+
+@test
+func testSha256Empty() {
+    var digest = Sha256Buf{}
+    assert(Sha256(null, 0, &digest))
+    assert(hexEqualsStr(digest.buffer as (*const u8), 32,
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"))
+}
+
+@test
+func testSha256Abc() {
+    var input: *const char = "abc"
+    var digest = Sha256Buf{}
+    assert(Sha256(input as (*const u8), 3, &digest))
+    assert(hexEqualsStr(digest.buffer as (*const u8), 32,
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"))
+}
+
+@test
+func testSha256DeterministicAndDistinct() {
+    var a: *const char = "hello world"
+    var b: *const char = "hello world!"
+
+    var digestA1 = Sha256Buf{}
+    var digestA2 = Sha256Buf{}
+    var digestB = Sha256Buf{}
+    assert(Sha256(a as (*const u8), strlen(a) as (i32), &digestA1))
+    assert(Sha256(a as (*const u8), strlen(a) as (i32), &digestA2))
+    assert(Sha256(b as (*const u8), strlen(b) as (i32), &digestB))
+
+    assert(memcmp(digestA1.buffer as (*const void), digestA2.buffer as (*const void), 32_usize) == 0)
+    assert(memcmp(digestA1.buffer as (*const void), digestB.buffer as (*const void), 32_usize) != 0)
+}

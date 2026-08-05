@@ -1,0 +1,32 @@
+import "std/stripe/stripe_client"
+import "std/stripe/stripe_types"
+import "std/stripe/stripe_json"
+import "std/string"
+import "std/string/builder"
+import "std/mem"
+import "std/log"
+
+// Fetches the current state of a Stripe Subscription by id. Useful for reconciling
+// local state against Stripe directly (e.g. on startup, or if a webhook was missed) —
+// the webhook stream (see std/stripe/stripe_webhook) is the primary source of truth
+// during normal operation.
+public func GetSubscription(
+    client: *StripeClient,
+    subscriptionId: String,
+    subscription: *StripeSubscription,
+    allocator: *const Allocator
+) : bool {
+    var pathSb = StringBuilderInit(64, allocator)
+    defer pathSb.free()
+    pathSb.append("subscriptions/%.*s", subscriptionId.length, subscriptionId.buffer)
+
+    var resp = StripeRawResponse{}
+    var ok = client.get(pathSb.cStr(), &resp, allocator)
+    if(!ok || resp.statusCode < 200 || resp.statusCode >= 300) {
+        Error("Stripe GetSubscription failed: status=%d body=%.*s\n",
+            resp.statusCode, resp.body.length, resp.body.buffer)
+        return false
+    }
+
+    return ParseStripeJson<StripeSubscription>(subscription, resp.body, allocator)
+}

@@ -1,0 +1,17 @@
+import "std/string"
+
+// Compares two strings in time independent of how many leading bytes match, so a
+// caller-supplied MAC can't be recovered byte-by-byte via a timing side channel.
+// Length is not treated as secret — callers comparing fixed-length MACs (the
+// common case) are unaffected; if length itself must stay secret, compare
+// against a fixed-length buffer instead of a variable-length String.
+public func ConstantTimeEquals(a: String, b: String) : bool {
+    if(a.length != b.length) {
+        return false
+    }
+    var diff = 0
+    for(var i = 0; i < a.length; i += 1) {
+        diff |= (a.buffer[i] as (i32)) ^ (b.buffer[i] as (i32))
+    }
+    return diff == 0
+}

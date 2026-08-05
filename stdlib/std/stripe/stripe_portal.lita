@@ -1,0 +1,34 @@
+import "std/stripe/stripe_client"
+import "std/stripe/stripe_types"
+import "std/stripe/stripe_json"
+import "std/string"
+import "std/map"
+import "std/mem"
+import "std/log"
+
+// Creates a Stripe Billing Portal Session for customerId. session.url is a
+// Stripe-hosted page where the customer can update payment methods, switch
+// plans, or cancel — callers should redirect to it rather than building
+// custom cancel/upgrade UI (Stripe owns proration and dunning there).
+public func CreatePortalSession(
+    client: *StripeClient,
+    customerId: String,
+    returnUrl: String,
+    session: *StripeBillingPortalSession,
+    allocator: *const Allocator
+) : bool {
+    var params = StripeParamsInit(allocator, 2)
+    defer params.free()
+    params.put($"customer", customerId)
+    params.put($"return_url", returnUrl)
+
+    var resp = StripeRawResponse{}
+    var ok = client.post("billing_portal/sessions", &params, &resp, allocator)
+    if(!ok || resp.statusCode < 200 || resp.statusCode >= 300) {
+        Error("Stripe CreatePortalSession failed: status=%d body=%.*s\n",
+            resp.statusCode, resp.body.length, resp.body.buffer)
+        return false
+    }
+
+    return ParseStripeJson<StripeBillingPortalSession>(session, resp.body, allocator)
+}

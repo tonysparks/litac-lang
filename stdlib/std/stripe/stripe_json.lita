@@ -1,0 +1,31 @@
+import "std/json"
+import "std/json/from_json"
+import "std/json/to_json"
+import "std/string"
+import "std/string/builder"
+import "std/mem"
+import "std/log"
+
+// Parses json into entity. Returns false if the payload isn't valid JSON;
+// fields present in json but not on T (Stripe's real payloads carry far more
+// fields than these narrowly-modeled structs capture) are silently ignored,
+// matching how the rest of this codebase's @json structs are used.
+public func ParseStripeJson<T>(entity: *T, json: String, allocator: *const Allocator) : bool {
+    var parser = JsonParserInit(allocator)
+    defer parser.free()
+
+    var node = parser.parseJson(json)
+    if(!node) {
+        Error("ParseStripeJson: parseJson failed, len=%d, error: %s\n", json.length, (&parser.errorMsg[0]) as (*const char))
+        return false
+    }
+    defer node.free()
+
+    var ctx = JsonContextInit(DefaultMakeFn, DefaultMakePtrFn, allocator, true)
+    entity.fromJson(&ctx, node)
+    return true
+}
+
+public func WriteStripeJson<T>(entity: *T, sb: *StringBuilder) {
+    entity.toJson(sb)
+}

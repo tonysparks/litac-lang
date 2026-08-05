@@ -1,0 +1,405 @@
+import "std/stripe/stripe_client"
+import "std/stripe/stripe_types"
+import "std/stripe/stripe_json"
+import "std/stripe/stripe_webhook"
+import "std/stripe/stripe_checkout"
+import "std/stripe/stripe_portal"
+import "std/stripe/stripe_customer"
+import "std/stripe/stripe_subscription"
+import "std/crypto/hmac"
+import "std/crypto/sha256"
+import "std/encoding/hex"
+import "std/http"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/map"
+import "std/array"
+import "std/time"
+import "std/assert"
+import "std/libc"
+import "std/mem"
+
+// ---------------------------------------------------------------------------
+// Form-urlencoding
+// ---------------------------------------------------------------------------
+
+@test
+func testEncodeFormBodySingleField() {
+    var params = StripeParamsInit(defaultAllocator, 2)
+    defer params.free()
+    params.put($"mode", $"subscription")
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    EncodeFormBody(&params, &sb)
+
+    assert(sb.toString().equals($"mode=subscription"))
+}
+
+@test
+func testEncodeFormBodyEncodesSpecialChars() {
+    var params = StripeParamsInit(defaultAllocator, 2)
+    defer params.free()
+    // Space, '@', and bracket-adjacent chars must be percent-encoded — '@' and ':'
+    // are reserved and would otherwise corrupt Stripe's own field parsing.
+    params.put($"success_url", $"https://app.example.com/ui?upgraded=1&x=a b")
+
+    var sb = StringBuilderInit(128)
+    defer sb.free()
+    EncodeFormBody(&params, &sb)
+
+    var encoded = sb.toString()
+    assert(encoded.startsWith($"success_url="))
+    // Raw space and '&' from the value must not appear unescaped, since that would
+    // silently truncate/corrupt the field when Stripe parses the form body.
+    assert(!encoded.contains($" "))
+    assert(encoded.contains($"%20"))
+    assert(encoded.contains($"%3F")) // '?'
+    assert(encoded.contains($"%3D")) // '='
+    assert(encoded.contains($"%26")) // '&'
+}
+
+@test
+func testEncodeFormBodyPreservesBracketKeyNotation() {
+    var params = StripeParamsInit(defaultAllocator, 2)
+    defer params.free()
+    // Keys are written verbatim — Stripe's own bracket nesting syntax for array
+    // fields (e.g. line_items[0][price]) must survive untouched, only values encode.
+    params.put($"line_items[0][price]", $"price_123")
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    EncodeFormBody(&params, &sb)
+
+    assert(sb.toString().equals($"line_items[0][price]=price_123"));
+}
+
+@test
+func testEncodeFormBodyMultipleFieldsJoinedWithAmpersand() {
+    var params = StripeParamsInit(defaultAllocator, 4)
+    defer params.free()
+    params.put($"a", $"1")
+    params.put($"b", $"2")
+
+    var sb = StringBuilderInit(64)
+    defer sb.free()
+    EncodeFormBody(&params, &sb)
+
+    var encoded = sb.toString()
+    assert(encoded.contains($"a=1"))
+    assert(encoded.contains($"b=2"))
+    assert(encoded.contains($"&"))
+    assert(encoded.length == sb.length) // sanity: no trailing/leading '&'
+    assert(!encoded.startsWith($"&"))
+    assert(!encoded.endsWith($"&"))
+}
+
+// ---------------------------------------------------------------------------
+// Webhook signature verification
+// ---------------------------------------------------------------------------
+
+// Builds a valid "t=<ts>,v1=<hex-hmac>" Stripe-Signature header for payload,
+// signed with secret at the given timestamp — mirrors what Stripe itself computes,
+// so these tests exercise the real verification path end-to-end (not a mock).
+func signWebhook(payload: String, secret: String, timestamp: i64, allocator: *const Allocator) : String {
+    var signedMsg = StringBuilderInit(payload.length + 32, allocator)
+    defer signedMsg.free()
+    signedMsg.append("%lld.%.*s", timestamp, payload.length, payload.buffer)
+
+    var mac = Sha256Buf{}
+    assert(HmacSha256(secret, signedMsg.toString(), &mac))
+
+    var macHex: [64]char
+    HexEncode(mac.buffer as (*const u8), 32, macHex as (*char))
+
+    var header = StringBuilderInit(96, allocator)
+    header.append("t=%lld,v1=%.*s", timestamp, 64, macHex as (*const char))
+    return header.toString()
+}
+
+@test
+func testVerifyValidSignatureSucceeds() {
+    var secret = $"whsec_test_secret"
+    var payload = $"{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\",\"data\":{\"object\":{}}}"
+    var now = Now() as (i64)
+
+    var header = signWebhook(payload, secret, now, defaultAllocator)
+
+    var event = StripeEvent{}
+    assert(VerifyAndConstructEvent(payload, header, secret, &event, defaultAllocator))
+    assert(event.id.equals($"evt_123"))
+    assert(event.type.equals($"checkout.session.completed"))
+}
+
+@test
+func testVerifyWrongSecretFails() {
+    var payload = $"{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"
+    var now = Now() as (i64)
+
+    var header = signWebhook(payload, $"whsec_correct", now, defaultAllocator)
+
+    var event = StripeEvent{}
+    assert(!VerifyAndConstructEvent(payload, header, $"whsec_wrong", &event, defaultAllocator))
+}
+
+@test
+func testVerifyTamperedPayloadFails() {
+    var secret = $"whsec_test_secret"
+    var payload = $"{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"
+    var now = Now() as (i64)
+
+    var header = signWebhook(payload, secret, now, defaultAllocator)
+
+    // Signature was computed over the original payload — a byte-for-byte different
+    // payload (as an attacker replaying a captured signature against forged data
+    // would send) must fail verification.
+    var tampered = $"{\"id\":\"evt_999\",\"type\":\"checkout.session.completed\"}"
+    var event = StripeEvent{}
+    assert(!VerifyAndConstructEvent(tampered, header, secret, &event, defaultAllocator))
+}
+
+@test
+func testVerifyStaleTimestampFails() {
+    var secret = $"whsec_test_secret"
+    var payload = $"{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"
+    var old = (Now() as (i64)) - 1000 // older than the default 300s tolerance
+
+    var header = signWebhook(payload, secret, old, defaultAllocator)
+
+    var event = StripeEvent{}
+    assert(!VerifyAndConstructEvent(payload, header, secret, &event, defaultAllocator))
+}
+
+@test
+func testVerifyWithinCustomToleranceSucceeds() {
+    var secret = $"whsec_test_secret"
+    var payload = $"{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"
+    var old = (Now() as (i64)) - 1000
+
+    var header = signWebhook(payload, secret, old, defaultAllocator)
+
+    var event = StripeEvent{}
+    assert(VerifyAndConstructEvent(payload, header, secret, &event, defaultAllocator, 2000))
+}
+
+@test
+func testVerifyMalformedHeaderFails() {
+    var secret = $"whsec_test_secret"
+    var payload = $"{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"
+
+    var event = StripeEvent{}
+    assert(!VerifyAndConstructEvent(payload, $"garbage-header", secret, &event, defaultAllocator))
+    assert(!VerifyAndConstructEvent(payload, $"", secret, &event, defaultAllocator))
+    assert(!VerifyAndConstructEvent(payload, $"t=12345", secret, &event, defaultAllocator)) // missing v1
+}
+
+@test
+func testVerifyThenParseCheckoutSessionEvent() {
+    var secret = $"whsec_test_secret"
+    var payload = $"""
+        {"id":"evt_abc","type":"checkout.session.completed","data":{"object":{"id":"cs_123","url":"https://checkout.stripe.com/x","customer":"cus_1","subscription":"sub_1","payment_status":"paid","mode":"subscription"}}}
+    """
+    var now = Now() as (i64)
+
+    var header = signWebhook(payload, secret, now, defaultAllocator)
+
+    var event = StripeEvent{}
+    assert(VerifyAndConstructEvent(payload, header, secret, &event, defaultAllocator))
+    assert(event.type.equals($"checkout.session.completed"))
+
+    // Only after verification succeeds should the type-specific envelope be parsed.
+    var full = StripeCheckoutSessionEvent{}
+    assert(ParseStripeJson<StripeCheckoutSessionEvent>(&full, payload, defaultAllocator))
+    assert(full.id.equals($"evt_abc"))
+    assert(full.data.object.id.equals($"cs_123"))
+    assert(full.data.object.customer.equals($"cus_1"))
+    assert(full.data.object.subscription.equals($"sub_1"))
+}
+
+@test
+func testVerifyThenParseSubscriptionEvent() {
+    var secret = $"whsec_test_secret"
+    // current_period_end lives per-item (Stripe's 2025+ API versions), not on the
+    // Subscription object itself — see StripeSubscriptionItem's comment.
+    var payload = $"""
+        {"id":"evt_def","type":"customer.subscription.updated","data":{"object":{"id":"sub_1","customer":"cus_1","status":"active","items":{"data":[{"price":{"id":"price_monthly"},"current_period_end":1700000000}]}}}}
+    """
+    var now = Now() as (i64)
+
+    var header = signWebhook(payload, secret, now, defaultAllocator)
+
+    var event = StripeEvent{}
+    assert(VerifyAndConstructEvent(payload, header, secret, &event, defaultAllocator))
+    assert(event.type.equals($"customer.subscription.updated"))
+
+    var full = StripeSubscriptionEvent{}
+    assert(ParseStripeJson<StripeSubscriptionEvent>(&full, payload, defaultAllocator))
+    assert(full.data.object.status.equals($"active"))
+    assert(full.data.object.items.data.size() == 1)
+    assert(full.data.object.items.data.getPtr(0).price.id.equals($"price_monthly"))
+    assert(full.data.object.items.data.getPtr(0).current_period_end == 1700000000_i64)
+}
+
+// ---------------------------------------------------------------------------
+// Mocked HTTP wrapper tests — @replace substitutes doStripeRequest so these
+// exercise CreateCheckoutSession/CreatePortalSession/CreateCustomer/GetSubscription
+// end-to-end (request building, response parsing, error handling) without any
+// real network call. Only one @replace target is allowed per compiled program,
+// so all wrapper-level tests below share the single fake below, configured via
+// the mock* globals each test sets before calling into the client.
+// ---------------------------------------------------------------------------
+
+var mockStatusCode: i32 = 200
+var mockBody = String{}
+var mockCapturedUrl = String{}
+var mockCapturedMethod = HttpRequestType.GET
+var mockCapturedBody = String{}
+
+func resetMock() {
+    mockStatusCode = 200
+    mockBody = String{}
+    mockCapturedUrl = String{}
+    mockCapturedMethod = HttpRequestType.GET
+    mockCapturedBody = String{}
+}
+
+@replace("std::stripe::stripe_client::doStripeRequest")
+func fakeDoStripeRequest(httpClient: *Http, req: *HttpRequest, resp: *HttpResponse) : bool {
+    // Copy rather than alias: req.url/req.body.data point into StringBuilders that
+    // StripeClient.post()/.get() free (via `defer`) as soon as this call returns,
+    // but tests read mockCaptured* after the wrapper function has already returned.
+    mockCapturedUrl = StringInit(req.url).copy(defaultAllocator)
+    mockCapturedMethod = req.type
+    if(req.body.kind == HttpBodyKind.BODY) {
+        mockCapturedBody = req.body.data.copy(defaultAllocator)
+    }
+    resp.statusCode = mockStatusCode
+    resp.body.clear()
+    resp.body.appendString(mockBody)
+    return true
+}
+
+func testClient() : StripeClient {
+    var client = StripeClient{}
+    client.init($"sk_test_123", null)
+    return client
+}
+
+@test
+func testCreateCheckoutSessionSuccess() {
+    resetMock()
+    mockStatusCode = 200
+    mockBody = $"""
+        {"id":"cs_123","url":"https://checkout.stripe.com/pay/cs_123","customer":"cus_1","subscription":"","payment_status":"unpaid","mode":"subscription"}
+    """
+
+    var client = testClient()
+    var session = StripeCheckoutSession{}
+    var ok = CreateCheckoutSession(&client, $"cus_1", $"price_monthly",
+        $"https://app.example.com/success", $"https://app.example.com/cancel",
+        &session, defaultAllocator)
+
+    assert(ok)
+    assert(session.id.equals($"cs_123"))
+    assert(session.url.equals($"https://checkout.stripe.com/pay/cs_123"))
+
+    // Verify the request that was actually sent, not just the parsed response.
+    assert(mockCapturedUrl.endsWith($"checkout/sessions"))
+    assert(mockCapturedMethod == HttpRequestType.POST)
+    assert(mockCapturedBody.contains($"mode=subscription"))
+    assert(mockCapturedBody.contains($"customer=cus_1"))
+    assert(mockCapturedBody.contains($"line_items[0][price]=price_monthly"))
+}
+
+@test
+func testCreateCheckoutSessionHttpErrorFails() {
+    resetMock()
+    mockStatusCode = 402
+    mockBody = $"""
+        {"error":{"type":"card_error","code":"card_declined","message":"Your card was declined."}}
+    """
+
+    var client = testClient()
+    var session = StripeCheckoutSession{}
+    var ok = CreateCheckoutSession(&client, $"cus_1", $"price_monthly",
+        $"https://app.example.com/success", $"https://app.example.com/cancel",
+        &session, defaultAllocator)
+
+    assert(!ok)
+}
+
+@test
+func testCreatePortalSessionSuccess() {
+    resetMock()
+    mockStatusCode = 200
+    mockBody = $"""
+        {"id":"bps_123","url":"https://billing.stripe.com/session/bps_123"}
+    """
+
+    var client = testClient()
+    var session = StripeBillingPortalSession{}
+    var ok = CreatePortalSession(&client, $"cus_1", $"https://app.example.com/ui", &session, defaultAllocator)
+
+    assert(ok)
+    assert(session.id.equals($"bps_123"))
+    assert(session.url.equals($"https://billing.stripe.com/session/bps_123"))
+    assert(mockCapturedUrl.endsWith($"billing_portal/sessions"))
+    assert(mockCapturedBody.contains($"customer=cus_1"))
+}
+
+@test
+func testCreateCustomerSuccess() {
+    resetMock()
+    mockStatusCode = 200
+    mockBody = $"""
+        {"id":"cus_new","email":"user@example.com"}
+    """
+
+    var client = testClient()
+    var customer = StripeCustomer{}
+    var ok = CreateCustomer(&client, $"user@example.com", &customer, defaultAllocator)
+
+    assert(ok)
+    assert(customer.id.equals($"cus_new"))
+    assert(customer.email.equals($"user@example.com"))
+    assert(mockCapturedUrl.endsWith($"customers"))
+    assert(mockCapturedBody.contains($"email=user%40example.com"))
+}
+
+@test
+func testGetSubscriptionSuccess() {
+    resetMock()
+    mockStatusCode = 200
+    mockBody = $"""
+        {"id":"sub_1","customer":"cus_1","status":"active","items":{"data":[{"price":{"id":"price_yearly"},"current_period_end":1700000000}]}}
+    """
+
+    var client = testClient()
+    var sub = StripeSubscription{}
+    var ok = GetSubscription(&client, $"sub_1", &sub, defaultAllocator)
+
+    assert(ok)
+    assert(sub.id.equals($"sub_1"))
+    assert(sub.status.equals($"active"))
+    assert(sub.items.data.size() == 1)
+    assert(sub.items.data.getPtr(0).price.id.equals($"price_yearly"))
+    assert(sub.items.data.getPtr(0).current_period_end == 1700000000_i64)
+    assert(mockCapturedUrl.endsWith($"subscriptions/sub_1"))
+    assert(mockCapturedMethod == HttpRequestType.GET)
+}
+
+@test
+func testGetSubscriptionNotFoundFails() {
+    resetMock()
+    mockStatusCode = 404
+    mockBody = $"""
+        {"error":{"type":"invalid_request_error","code":"resource_missing","message":"No such subscription"}}
+    """
+
+    var client = testClient()
+    var sub = StripeSubscription{}
+    var ok = GetSubscription(&client, $"sub_missing", &sub, defaultAllocator)
+
+    assert(!ok)
+}

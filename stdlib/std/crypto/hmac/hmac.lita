@@ -1,0 +1,39 @@
+import "std/ssl/openssl"
+import "std/crypto/sha256"
+
+public const HMAC_SHA256_SIZE: i32 = 32
+public const HMAC_SHA1_SIZE:   i32 = 20
+
+// Fixed-size backing storage for an HMAC-SHA1 digest (20 bytes — HMAC-SHA1's output
+// size differs from HMAC-SHA256's, unlike Sha256Buf which HmacSha256 shares with
+// plain SHA-256 below since both happen to be 32 bytes).
+public struct HmacSha1Buf {
+    buffer: [HMAC_SHA1_SIZE]u8
+}
+
+// Computes HMAC-SHA256(key, message) via OpenSSL's audited one-shot HMAC() and
+// writes the MAC to out. Reuses std/crypto/sha256's Sha256Buf — see its comment
+// for why HMAC-SHA256 and plain SHA-256 share one 32-byte buffer type.
+public func HmacSha256(key: String, message: String, out: *Sha256Buf) : bool {
+    var outLen: u32 = 0
+    var result = HMAC(
+        EVP_sha256(),
+        key.buffer as (*const void), key.length,
+        message.buffer as (*const u8), message.length as (usize),
+        out.buffer as (*u8), &outLen
+    )
+    return result != null && outLen == HMAC_SHA256_SIZE as (u32)
+}
+
+// Computes HMAC-SHA1(key, message) via OpenSSL's audited one-shot HMAC() and
+// writes the MAC to out.
+public func HmacSha1(key: String, message: String, out: *HmacSha1Buf) : bool {
+    var outLen: u32 = 0
+    var result = HMAC(
+        EVP_sha1(),
+        key.buffer as (*const void), key.length,
+        message.buffer as (*const u8), message.length as (usize),
+        out.buffer as (*u8), &outLen
+    )
+    return result != null && outLen == HMAC_SHA1_SIZE as (u32)
+}

@@ -1,4 +1,4 @@
-// OpenSSL @foreign bindings for TLS support in ringhttp.
+// OpenSSL @foreign bindings for TLS, AEAD (AES-GCM), digest (SHA-256/SHA-1), and HMAC support.
 //
 // macOS: links against Homebrew OpenSSL 3 at /opt/homebrew/opt/openssl@3.
 // Linux: links against the system libssl/libcrypto (-lssl -lcrypto).
@@ -6,6 +6,7 @@
 @include("<openssl/ssl.h>");
 @include("<openssl/err.h>");
 @include("<openssl/evp.h>");
+@include("<openssl/hmac.h>");
 
 #if (OS == "MAC")
     @compiler_option(
@@ -283,4 +284,40 @@ public func EVP_CIPHER_CTX_ctrl(ctx: *EVP_CIPHER_CTX, type_: i32, arg: i32, ptr:
 public const EVP_CTRL_GCM_SET_IVLEN: i32 = 0x9
 public const EVP_CTRL_GCM_GET_TAG:   i32 = 0x10
 public const EVP_CTRL_GCM_SET_TAG:   i32 = 0x11
+
+// ---------------------------------------------------------------------------
+// EVP message digest (SHA-256, SHA-1) and HMAC
+// ---------------------------------------------------------------------------
+
+@foreign
+public struct EVP_MD {}
+
+@foreign
+public struct EVP_MD_CTX {}
+
+@foreign
+public func EVP_MD_CTX_new() : *EVP_MD_CTX;
+
+@foreign
+public func EVP_MD_CTX_free(ctx: *EVP_MD_CTX);
+
+@foreign
+public func EVP_sha1() : *const EVP_MD;
+
+@foreign
+public func EVP_sha256() : *const EVP_MD;
+
+@foreign
+public func EVP_DigestInit_ex(ctx: *EVP_MD_CTX, type_: *const EVP_MD, impl: *void) : i32;
+
+@foreign
+public func EVP_DigestUpdate(ctx: *EVP_MD_CTX, data: *const void, count: usize) : i32;
+
+@foreign
+public func EVP_DigestFinal_ex(ctx: *EVP_MD_CTX, md: *u8, size: *u32) : i32;
+
+// One-shot HMAC. Returns md on success, null on failure.
+@foreign
+public func HMAC(evp_md: *const EVP_MD, key: *const void, key_len: i32,
+                  d: *const u8, n: usize, md: *u8, md_len: *u32) : *u8;
 

@@ -1,0 +1,22 @@
+import "std/crypto/subtle"
+import "std/assert"
+
+@test
+func testConstantTimeEqualsMatch() {
+    assert(ConstantTimeEquals($"abc123", $"abc123"))
+}
+
+@test
+func testConstantTimeEqualsMismatch() {
+    assert(!ConstantTimeEquals($"abc123", $"abc124"))
+}
+
+@test
+func testConstantTimeEqualsDifferentLength() {
+    assert(!ConstantTimeEquals($"short", $"a-much-longer-string"))
+}
+
+@test
+func testConstantTimeEqualsEmpty() {
+    assert(ConstantTimeEquals($"", $""))
+}

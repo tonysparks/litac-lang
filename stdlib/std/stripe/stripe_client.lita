@@ -1,0 +1,136 @@
+import "std/http"
+import "std/string"
+import "std/string/builder"
+import "std/string/buffer"
+import "std/url/encoding"
+import "std/map"
+import "std/mem"
+
+public typedef Map<String, String> as StripeParams;
+
+public func StripeParamsInit(allocator: *const Allocator, initialSize: i32 = 8) : StripeParams {
+    var params = StripeParams{}
+    params.init(String{}, initialSize, allocator, String{})
+    return params
+}
+
+public const STRIPE_API_BASE: *const char = "https://api.stripe.com/v1"
+
+public struct StripeClient {
+    secretKey: String
+    apiBase: *const char
+    httpClient: *Http
+}
+
+public func (this: *StripeClient) init(secretKey: String, httpClient: *Http, apiBase: *const char = STRIPE_API_BASE) {
+    this.secretKey = secretKey
+    this.httpClient = httpClient
+    this.apiBase = apiBase
+}
+
+// Form-urlencodes params as "key1=value1&key2=value2..." into sb. Keys are written
+// verbatim — callers own Stripe's bracket-notation nesting (e.g. "line_items[0][price]");
+// values are percent-encoded per RFC 3986 via std/url's UrlEncode.
+public func EncodeFormBody(params: *StripeParams, sb: *StringBuilder) {
+    var first = true
+    var iter = params.iter()
+    while(iter.hasNext()) {
+        var entry = iter.next()
+        if(!first) {
+            sb.append("&")
+        }
+        first = false
+        sb.append("%.*s=", entry.key.length, entry.key.buffer)
+        UrlEncode(entry.value, sb)
+    }
+}
+
+public struct StripeRawResponse {
+    statusCode: i32
+    body: String
+}
+
+// The actual network I/O, factored out as a free function so tests can substitute
+// it via @replace("std::stripe::stripe_client::doStripeRequest") to simulate Stripe
+// responses without a real HTTP call — see test/std/stripe_test.lita.
+public func doStripeRequest(httpClient: *Http, req: *HttpRequest, resp: *HttpResponse) : bool {
+    return httpClient.makeRequest(req, resp)
+}
+
+// Issues an authenticated POST to {apiBase}/{path} with params form-urlencoded in
+// the body — Stripe's REST API takes form-encoded request bodies, unlike most JSON
+// APIs (though its responses are JSON). Returns false only on transport failure;
+// check resp.statusCode for the HTTP-level outcome, matching std/http's own
+// Http.post() contract.
+public func (this: *StripeClient) post(
+    path: *const char,
+    params: *StripeParams,
+    resp: *StripeRawResponse,
+    allocator: *const Allocator
+) : bool {
+    var bodySb = StringBuilderInit(512, allocator)
+    defer bodySb.free()
+    EncodeFormBody(params, &bodySb)
+
+    var urlSb = StringBuilderInit(128, allocator)
+    defer urlSb.free()
+    urlSb.append("%s/%s", this.apiBase, path)
+
+    var authSb = StringBuilderInit(64, allocator)
+    defer authSb.free()
+    authSb.append("Bearer %.*s", this.secretKey.length, this.secretKey.buffer)
+
+    var headers = HeadersInit(4, allocator)
+    defer headers.free()
+    headers.put($"Authorization", authSb.toString())
+    headers.put($"Content-Type", $"application/x-www-form-urlencoded")
+
+    // httpResp.body is not freed here: resp.body aliases it and callers rely on
+    // that after this function returns. Reclaimed with the caller's allocator lifetime.
+    var httpResp = HttpResponseInit(4096, allocator)
+
+    var req = HttpRequest {
+        .url = urlSb.cStr(),
+        .type = HttpRequestType.POST,
+        .headers = headers,
+        .body = HttpBody { .kind = HttpBodyKind.BODY, .data = bodySb.toString() }
+    }
+    var ok = doStripeRequest(this.httpClient, &req, &httpResp)
+
+    resp.statusCode = httpResp.statusCode
+    resp.body = httpResp.body.toString()
+    return ok
+}
+
+// Issues an authenticated GET to {apiBase}/{path}.
+public func (this: *StripeClient) get(
+    path: *const char,
+    resp: *StripeRawResponse,
+    allocator: *const Allocator
+) : bool {
+    var urlSb = StringBuilderInit(128, allocator)
+    defer urlSb.free()
+    urlSb.append("%s/%s", this.apiBase, path)
+
+    var authSb = StringBuilderInit(64, allocator)
+    defer authSb.free()
+    authSb.append("Bearer %.*s", this.secretKey.length, this.secretKey.buffer)
+
+    var headers = HeadersInit(2, allocator)
+    defer headers.free()
+    headers.put($"Authorization", authSb.toString())
+
+    var httpResp = HttpResponseInit(4096, allocator)
+
+    var req = HttpRequest {
+        .url = urlSb.cStr(),
+        .type = HttpRequestType.GET,
+        .headers = headers,
+        .body = HttpBody { .kind = HttpBodyKind.NONE }
+    }
+    var ok = doStripeRequest(this.httpClient, &req, &httpResp)
+
+    resp.statusCode = httpResp.statusCode
+    resp.body = httpResp.body.toString()
+    return ok
+}

@@ -1,0 +1,54 @@
+import "std/encoding/hex"
+import "std/string"
+import "std/assert"
+import "std/libc"
+
+@test
+func testHexEncodeDecodeRoundtrip() {
+    var data: [4]u8
+    data[0] = 0xDE_u8
+    data[1] = 0xAD_u8
+    data[2] = 0xBE_u8
+    data[3] = 0xEF_u8
+
+    var hexBuf: [8]char
+    HexEncode(data as (*const u8), 4, hexBuf as (*char))
+    assert(strncmp(hexBuf as (*const char), "deadbeef", 8_usize) == 0)
+
+    var decoded: [4]u8
+    var hexStr = String { .buffer = hexBuf as (*const char), .length = 8 }
+    assert(HexDecode(hexStr, decoded as (*u8)))
+    assert(memcmp(data as (*const void), decoded as (*const void), 4_usize) == 0)
+}
+
+@test
+func testHexDecodeOddLengthFails() {
+    var out: [4]u8
+    assert(!HexDecode($"abc", out as (*u8)))
+}
+
+@test
+func testHexDecodeInvalidCharFails() {
+    var out: [4]u8
+    assert(!HexDecode($"zz00", out as (*u8)))
+}
+
+@test
+func testHexEncodeUppercaseHexDecodes() {
+    var data: [2]u8
+    data[0] = 0xAB_u8
+    data[1] = 0xCD_u8
+
+    // HexEncode itself is lowercase-only; HexDecode must still accept uppercase
+    // input (some external senders emit uppercase hex).
+    var decoded: [2]u8
+    assert(HexDecode($"ABCD", decoded as (*u8)))
+    assert(memcmp(data as (*const void), decoded as (*const void), 2_usize) == 0)
+}
+
+@test
+func testHexEncodeEmptyProducesNothing() {
+    var hexBuf: [1]char
+    HexEncode(null, 0, hexBuf as (*char))
+    // Not crashing on a zero-length encode is the assertion here.
+}
