@@ -1,0 +1,32 @@
+import "std/stripe/stripe_client"
+import "std/stripe/stripe_types"
+import "std/stripe/stripe_json"
+import "std/string"
+import "std/string/builder"
+import "std/mem"
+import "std/log"
+
+// Lists paid invoices created at or after sinceEpoch (Unix seconds), newest
+// first — Stripe's default invoice list order. Single page, up to 100 results
+// (Stripe's max page size); callers needing more than that should page via
+// has_more/starting_after, which this does not yet implement.
+public func ListPaidInvoicesSince(
+    client: *StripeClient,
+    sinceEpoch: i64,
+    invoices: *StripeInvoiceList,
+    allocator: *const Allocator
+) : bool {
+    var pathSb = StringBuilderInit(96, allocator)
+    defer pathSb.free()
+    pathSb.append("invoices?status=paid&created[gte]=%lld&limit=100", sinceEpoch)
+
+    var resp = StripeRawResponse{}
+    var ok = client.get(pathSb.cStr(), &resp, allocator)
+    if(!ok || resp.statusCode < 200 || resp.statusCode >= 300) {
+        Error("Stripe ListPaidInvoicesSince failed: status=%d body=%.*s\n",
+            resp.statusCode, resp.body.length, resp.body.buffer)
+        return false
+    }
+
+    return ParseStripeJson<StripeInvoiceList>(invoices, resp.body, allocator)
+}

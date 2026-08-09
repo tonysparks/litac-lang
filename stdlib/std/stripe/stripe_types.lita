@@ -57,6 +57,20 @@ public struct StripeSubscription {
 }
 
 @json
+public struct StripeInvoice {
+    id: String
+    status: String
+    amount_paid: i64
+    created: i64
+}
+
+@json
+public struct StripeInvoiceList {
+    data: Array<StripeInvoice>
+    has_more: bool
+}
+
+@json
 public struct StripeErrorDetail {
     type: String
     code: String
