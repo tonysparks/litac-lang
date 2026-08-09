@@ -41,3 +41,14 @@ func testNetworkUsageReturnsSaneValues() {
     assert(rx >= 0)
     assert(tx >= 0)
 }
+
+@test
+func testProcessMemoryReturnsSaneValues() {
+    var rss: i64 = -1
+    var ok = ProcessMemory(&rss)
+    assert(ok == true)
+    assert(rss > 0)
+    // Sanity ceiling, not a real limit — catches a badly wrong unit
+    // conversion (e.g. KB reported as bytes) rather than a real process.
+    assert(rss < 10_i64 * 1024_i64 * 1024_i64 * 1024_i64)
+}

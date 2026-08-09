@@ -10,8 +10,10 @@
     #include <sys/sysctl.h>
     #include <mach/mach.h>
     #include <mach/mach_host.h>
+    #include <mach/task_info.h>
 
     typedef vm_statistics64_data_t lita_vmstat64_t;
+    typedef mach_task_basic_info_data_t lita_task_basic_info_t;
     """);
 
     @foreign("lita_vmstat64_t")
@@ -20,8 +22,29 @@
         inactive_count: u32
     }
 
+    @foreign("lita_task_basic_info_t")
+    struct TaskBasicInfo {
+        resident_size: u64
+    }
+
     @foreign
     func sysctlbyname(name: *const char, oldp: *void, oldlenp: *usize, newp: *void, newlen: usize) : i32;
+
+    @foreign
+    func mach_task_self() : u32;
+
+    // Real signature: kern_return_t task_info(task_name_t, task_flavor_t,
+    // task_info_t, mach_msg_type_number_t*) where task_info_t is
+    // `integer_t *` (i.e. `int *`) — same reasoning as hostStatistics64's
+    // `info` param below: declared with that exact type, cast at the call site.
+    @foreign("task_info")
+    func taskInfo(target: u32, flavor: i32, info: *i32, count: *u32) : i32;
+
+    @foreign
+    const MACH_TASK_BASIC_INFO: i32;
+
+    @foreign
+    const MACH_TASK_BASIC_INFO_COUNT: u32;
 
     @foreign
     func mach_host_self() : u32;
@@ -83,6 +106,19 @@
         ;*freeBytes = ((vmstat.free_count + vmstat.inactive_count) as (u64) * pageSize) as (i64)
         return true
     }
+
+    // Current resident set size (actual physical RAM in use right now) of
+    // this process — unlike getrusage's ru_maxrss, which is a high-water
+    // mark that never decreases and is bytes on macOS but KB on Linux.
+    public func ProcessMemory(residentBytes: *i64) : bool {
+        var info: TaskBasicInfo
+        var count: u32 = MACH_TASK_BASIC_INFO_COUNT
+        if(taskInfo(mach_task_self(), MACH_TASK_BASIC_INFO, (&info) as (*i32), &count) != KERN_SUCCESS) {
+            return false
+        }
+        ;*residentBytes = info.resident_size as (i64)
+        return true
+    }
 #elseif (OS == "LINUX")
     import "std/libc"
     import "std/string"
@@ -138,6 +174,33 @@
 
         ;*totalBytes = totalKb * 1024_i64
         ;*freeBytes  = availKb * 1024_i64
+        return true
+    }
+
+    // Current resident set size of this process, from /proc/self/status'
+    // VmRSS — the instantaneous figure, unlike getrusage's ru_maxrss which
+    // is a high-water mark that never decreases.
+    public func ProcessMemory(residentBytes: *i64) : bool {
+        var fp = fopen("/proc/self/status", "r")
+        if(fp == null) {
+            return false
+        }
+        defer fclose(fp)
+
+        var rssKb: i64 = -1
+        var buf: [256]char
+        while(fgets(buf, 256, fp) != null) {
+            var line = CString(buf).toString()
+            if(parseMemInfoValue(line, $"VmRSS:", &rssKb)) {
+                break
+            }
+        }
+
+        if(rssKb < 0) {
+            return false
+        }
+
+        ;*residentBytes = rssKb * 1024_i64
         return true
     }
 #else_error "SystemMemory not supported on this platform"
