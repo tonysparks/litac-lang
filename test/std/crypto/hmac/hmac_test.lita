@@ -1,3 +1,10 @@
+// std/crypto/hmac (and sha256, transitively) is OpenSSL-backed, which isn't
+// installed on the Windows CI runner (see .github/workflows/main.yml) —
+// skipped there.
+#if OS == "WINDOWS"
+#ignore
+#end
+
 import "std/crypto/hmac"
 import "std/crypto/sha256"
 import "std/encoding/hex"

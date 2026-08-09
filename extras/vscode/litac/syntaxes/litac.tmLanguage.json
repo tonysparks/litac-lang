@@ -8,7 +8,7 @@
 		},
 		{
 			"name": "keyword.preprocessor.litac",
-			"match": "#(?:if|static_if|else|elseif|end)\\b"
+			"match": "#(?:if|static_if|else|elseif|end|ignore)\\b"
 		},
 		{
 			"name": "keyword.other.litac",

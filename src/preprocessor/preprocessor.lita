@@ -141,11 +141,25 @@ public func (this: *Preprocessor) eval(comp: *CompStmt) : bool {
     end: *CompStmt
     evaluatedStmt: *Stmt
 */
+// Returns true if a '#ignore' was encountered in a taken branch — the caller
+// (Parser.parseModuleDeclaration/parseModule) uses this to stop parsing the
+// rest of the file. This is a plain return value rather than state stashed
+// on `module` (e.g. a ModuleFlags bit) specifically because `module` outlives
+// this one parse: the @test harness's #postcheck script (see
+// std/builtins.lita CreateTests) later re-parses synthesized declarations
+// against the same *Module, and any such flag would still be set from this
+// call, wrongly truncating that unrelated parse too.
+//
+// '#ignore' itself isn't a body statement — it's parsed the same way
+// '#end'/'#else_error' are (see compStatement's IGNORE case): as the
+// CompStmt that terminates the branch's body, landing in comp.end. So a
+// taken branch just checks comp.end.type once its normal body is merged;
+// no special-casing inside the body loop below is needed.
 @profile
 public func (this: *Preprocessor) evaluateForModule(
     module: *Module,
     moduleStmt: *ModuleStmt,
-    comp: *CompStmt) {
+    comp: *CompStmt) : bool {
 
     assert(comp != null)
 
@@ -204,11 +218,17 @@ public func (this: *Preprocessor) evaluateForModule(
                     }
                 }
             }
+
+            if(comp.end && comp.end.type.equals(IGNORE)) {
+                return true
+            }
         }
         else if(comp.end) {
-            this.evaluateForModule(module, moduleStmt, comp.end)
+            return this.evaluateForModule(module, moduleStmt, comp.end)
         }
     }
+
+    return false
 }
 
 @profile

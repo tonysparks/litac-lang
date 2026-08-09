@@ -62,6 +62,7 @@ public const POSTCHECK = InternedString{};
 public const POSTPARSE = InternedString{};
 public const END = InternedString{};
 public const ELSE_ERROR = InternedString{};
+public const IGNORE = InternedString{};
 
 // notes
 public const INCLUDE = InternedString{};
@@ -153,6 +154,7 @@ public func (this: *Strings) init(allocator: *const Allocator) {
     this.internConstant("postparse", 9, &POSTPARSE)
     this.internConstant("end", 3, &END)
     this.internConstant("else_error", 10, &ELSE_ERROR)
+    this.internConstant("ignore", 6, &IGNORE)
 
     // notes
     this.internConstant("include", 7, &INCLUDE)

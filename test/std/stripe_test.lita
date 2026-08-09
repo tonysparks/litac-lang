@@ -1,3 +1,8 @@
+// std/crypto/hmac + std/crypto/sha256 pull in OpenSSL, which isn't installed
+// on the Windows CI runner (see .github/workflows/main.yml) — skipped there.
+#if OS == "WINDOWS"
+#ignore
+#end
 import "std/stripe/stripe_client"
 import "std/stripe/stripe_types"
 import "std/stripe/stripe_json"

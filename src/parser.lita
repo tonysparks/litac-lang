@@ -148,7 +148,14 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
 
     while(!p.atEnd()) {
         var errorCount = p.numOfErrors()
-        p.parseModuleDeclaration(moduleStmt)
+
+        // A top-level '#ignore' (see the IGNORE case in compStatement and
+        // Preprocessor.evaluateForModule) reports true here once its
+        // enclosing #if branch is evaluated — stop parsing the rest of
+        // this file's tokens entirely.
+        if(p.parseModuleDeclaration(moduleStmt)) {
+            break;
+        }
 
         if(p.numOfErrors() > errorCount) {
             p.adjust(DECL_ADJUST_TOKENS, DECL_ADJUST_TOKENS_COUNT)
@@ -159,7 +166,7 @@ public func (p: *Parser) parseModule() : *ModuleStmt {
     return moduleStmt
 }
 
-func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
+func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) : bool {
 
     if(p.match(TokenType.IMPORT)) {
         var importDecl = p.importDeclaration()
@@ -174,15 +181,15 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
         if(!compStmt || compStmt.kind != StmtKind.COMP_STMT) {
             // TODO: Mark error?
             //assert(false)
-            return;
+            return false;
         }
 
-        p.lita.preprocessor.evaluateForModule(p.module, moduleStmt, compStmt as (*CompStmt))
+        return p.lita.preprocessor.evaluateForModule(p.module, moduleStmt, compStmt as (*CompStmt))
     }
     else {
         var notes = Array<*NoteStmt>{}
         if(!p.notes(&notes)) {
-            return;
+            return false;
         }
 
         var visibility = Visibility.PRIVATE
@@ -233,11 +240,11 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
             if(!notes.empty()) {
                 moduleStmt.notes.addAll(notes)
             }
-            return;
+            return false;
         }
         else {
             p.errorAtToken(p.peek(), ErrorCode.UNEXPECTED_TOKEN)
-            return;
+            return false;
         }
 
         var decl = moduleStmt.declarations.last()
@@ -245,6 +252,8 @@ func (p: *Parser) parseModuleDeclaration(moduleStmt: *ModuleStmt) {
         decl.attributes.visibility = visibility
         decl.attributes.isGlobal = true
     }
+
+    return false;
 }
 
 func (p: *Parser) parseCompileTimeBody() : *Stmt {
@@ -1824,6 +1833,12 @@ func (p: *Parser) compStatement(isStaticIf: bool = false) : *Stmt {
         return NewCompStmt(pos, p.pos(), type, message.str, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
     }
     else if(type.equals(END)) {
+        return NewCompStmt(pos, p.pos(), type, String{}, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
+    }
+    // '#ignore' — a bare directive like '#end', so nothing further to parse
+    // here. See Preprocessor.evaluateForModule for what it actually does
+    // (checks comp.end.type for IGNORE and stops the parse).
+    else if(type.equals(IGNORE)) {
         return NewCompStmt(pos, p.pos(), type, String{}, Array<*Stmt>{}, null, false, isStaticIf, p.allocator)
     }
     else {
