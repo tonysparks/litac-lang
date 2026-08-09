@@ -1,0 +1,144 @@
+// @foreign structs below only declare the handful of fields this file
+// actually reads. That's safe here (not a raw memory reinterpretation): each
+// struct is aliased via a C typedef to the real system type, so generated
+// field access (e.g. `s.free_count`) compiles directly against the real
+// struct from the real header — field order/completeness in the LitaC
+// declaration doesn't matter, only that the accessed field names/types
+// are correct.
+#if (OS == "MAC")
+    @raw("""
+    #include <sys/sysctl.h>
+    #include <mach/mach.h>
+    #include <mach/mach_host.h>
+
+    typedef vm_statistics64_data_t lita_vmstat64_t;
+    """);
+
+    @foreign("lita_vmstat64_t")
+    struct VmStatistics64 {
+        free_count:     u32
+        inactive_count: u32
+    }
+
+    @foreign
+    func sysctlbyname(name: *const char, oldp: *void, oldlenp: *usize, newp: *void, newlen: usize) : i32;
+
+    @foreign
+    func mach_host_self() : u32;
+
+    // vm_size_t is `unsigned long` on Darwin — a distinct type name from u64's
+    // `unsigned long long` despite matching width, so host_page_size's real
+    // prototype needs this alias (kept as its own strict foreign type, not
+    // just folded into u64) rather than a plain *u64 param, to avoid an
+    // incompatible-pointer-types warning at the call site.
+    @foreign(.strict = true)
+    typedef u64 as vm_size_t;
+
+    @foreign
+    func host_page_size(host: u32, size: *vm_size_t) : i32;
+
+    // Real signature: kern_return_t host_statistics64(host_t, host_flavor_t,
+    // host_info64_t, mach_msg_type_number_t*) where host_info64_t is
+    // `integer_t *` (i.e. `int *`) — declared here with that exact parameter
+    // type (not *VmStatistics64) so this matches the real header's prototype
+    // exactly; the cast to *i32 happens at the call site below, mirroring the
+    // real C API's own (host_info64_t) cast.
+    @foreign("host_statistics64")
+    func hostStatistics64(host: u32, flavor: i32, info: *i32, count: *u32) : i32;
+
+    @foreign
+    const HOST_VM_INFO64: i32;
+
+    @foreign
+    const HOST_VM_INFO64_COUNT: u32;
+
+    @foreign
+    const KERN_SUCCESS: i32;
+
+    public func SystemMemory(totalBytes: *i64, freeBytes: *i64) : bool {
+        var total: u64 = 0
+        var size: usize = sizeof(:u64)
+        if(sysctlbyname("hw.memsize", (&total) as (*void), &size, null, 0_usize) != 0) {
+            return false
+        }
+
+        var pageSize: vm_size_t = 0
+        var host = mach_host_self()
+        if(host_page_size(host, &pageSize) != KERN_SUCCESS) {
+            return false
+        }
+
+        var vmstat: VmStatistics64
+        var count: u32 = HOST_VM_INFO64_COUNT
+        if(hostStatistics64(host, HOST_VM_INFO64, (&vmstat) as (*i32), &count) != KERN_SUCCESS) {
+            return false
+        }
+
+        ;*totalBytes = total as (i64)
+        // vm_stat's raw free_count is famously misleading on macOS — it stays
+        // near-zero in normal operation because the kernel uses spare RAM
+        // aggressively for file cache. Inactive pages are reclaimed before
+        // swapping, so free+inactive is a much closer match to what Activity
+        // Monitor calls "available" than free_count alone.
+        ;*freeBytes = ((vmstat.free_count + vmstat.inactive_count) as (u64) * pageSize) as (i64)
+        return true
+    }
+#elseif (OS == "LINUX")
+    import "std/libc"
+    import "std/string"
+    import "std/string/buffer"
+    import "std/fmt"
+
+    // /proc/meminfo is a virtual file — fseek/ftell can't size it up front
+    // (it reports 0), so this streams it line-by-line via fgets rather than
+    // reusing ReadFileFully. MemAvailable (not MemFree) accounts for
+    // reclaimable cache/buffers, matching what `free -h` reports as actually
+    // usable; present since Linux 3.14.
+    func parseMemInfoValue(line: String, prefix: String, valueKb: *i64) : bool {
+        if(!line.startsWith(prefix)) {
+            return false
+        }
+        var rest = line.substring(prefix.length).trim()
+        var parsed = rest.parseInt()
+        if(parsed.error != ParseError.NONE || parsed.len == 0) {
+            return false
+        }
+        ;*valueKb = parsed.value
+        return true
+    }
+
+    public func SystemMemory(totalBytes: *i64, freeBytes: *i64) : bool {
+        var fp = fopen("/proc/meminfo", "r")
+        if(fp == null) {
+            return false
+        }
+        defer fclose(fp)
+
+        var totalKb: i64 = -1
+        var availKb: i64 = -1
+
+        var buf: [256]char
+        while(fgets(buf, 256, fp) != null) {
+            var line = CString(buf).toString()
+
+            if(totalKb < 0) {
+                parseMemInfoValue(line, $"MemTotal:", &totalKb)
+            } else if(availKb < 0) {
+                parseMemInfoValue(line, $"MemAvailable:", &availKb)
+            }
+
+            if(totalKb >= 0 && availKb >= 0) {
+                break
+            }
+        }
+
+        if(totalKb < 0 || availKb < 0) {
+            return false
+        }
+
+        ;*totalBytes = totalKb * 1024_i64
+        ;*freeBytes  = availKb * 1024_i64
+        return true
+    }
+#else_error "SystemMemory not supported on this platform"
+#end

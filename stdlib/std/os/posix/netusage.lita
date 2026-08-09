@@ -1,0 +1,154 @@
+// Cumulative bytes sent/received across all non-loopback network interfaces
+// since they came up (effectively since boot) — a single counter read, not a
+// live rate. Two reads apart shows growth, not throughput.
+//
+// @foreign structs below only declare the handful of fields this file
+// actually reads — safe because each is aliased via a C typedef to the real
+// system type, so field access compiles directly against the real struct
+// from the real header. See meminfo.lita for the same reasoning in more detail.
+#if (OS == "MAC")
+    @raw("""
+    #include <sys/socket.h>
+    #include <net/if.h>
+    #include <ifaddrs.h>
+
+    typedef struct ifaddrs lita_ifaddrs_t;
+    typedef struct sockaddr lita_sockaddr_t;
+    typedef struct if_data lita_if_data_t;
+    """);
+
+    @foreign("lita_ifaddrs_t")
+    struct Ifaddrs {
+        ifa_next:  *Ifaddrs
+        ifa_flags: u32
+        ifa_addr:  *LitaSockaddr
+        ifa_data:  *void
+    }
+
+    @foreign("lita_sockaddr_t")
+    struct LitaSockaddr {
+        sa_family: u8
+    }
+
+    @foreign("lita_if_data_t")
+    struct IfData {
+        ifi_ibytes: u32
+        ifi_obytes: u32
+    }
+
+    @foreign
+    func getifaddrs(ifap: **Ifaddrs) : i32;
+
+    @foreign
+    func freeifaddrs(ifa: *Ifaddrs) : void;
+
+    @foreign
+    const AF_LINK: i32;
+
+    @foreign
+    const IFF_LOOPBACK: i32;
+
+    public func NetworkUsage(rxBytes: *i64, txBytes: *i64) : bool {
+        var head: *Ifaddrs
+        if(getifaddrs(&head) != 0) {
+            return false
+        }
+        defer freeifaddrs(head)
+
+        var rx: u64 = 0
+        var tx: u64 = 0
+        var ifa = head
+        while(ifa != null) {
+            var isLink = ifa.ifa_addr != null && ifa.ifa_addr.sa_family as (i32) == AF_LINK
+            var isLoopback = (ifa.ifa_flags as (i32) & IFF_LOOPBACK) != 0
+            if(isLink && !isLoopback && ifa.ifa_data != null) {
+                var data = ifa.ifa_data as (*IfData)
+                rx += data.ifi_ibytes as (u64)
+                tx += data.ifi_obytes as (u64)
+            }
+            ifa = ifa.ifa_next
+        }
+
+        ;*rxBytes = rx as (i64)
+        ;*txBytes = tx as (i64)
+        return true
+    }
+#elseif (OS == "LINUX")
+    import "std/libc"
+    import "std/string"
+    import "std/string/buffer"
+    import "std/fmt"
+
+    // /proc/net/dev is plain text — parsed directly rather than binding
+    // rtnl_link_stats, same reasoning as /proc/meminfo in meminfo.lita.
+    // Columns after "iface:" are 8 receive fields then 8 transmit fields;
+    // field 0 is rx bytes, field 8 is tx bytes.
+    func parseDevLine(line: String, rx: *u64, tx: *u64) : bool {
+        var colonIdx = line.indexOf($":")
+        if(colonIdx < 0) {
+            return false
+        }
+
+        var iface = line.substring(0, colonIdx).trim()
+        if(iface.equals($"lo")) {
+            return false
+        }
+
+        var rest = line.substring(colonIdx + 1)
+        var iter = rest.split($" ")
+
+        var idx = 0
+        var rxBytes: i64 = -1
+        var txBytes: i64 = -1
+        while(iter.hasNext()) {
+            var tok = iter.next().trim()
+            if(tok.empty()) {
+                continue
+            }
+            if(idx == 0) {
+                var parsed = tok.parseInt()
+                if(parsed.error == ParseError.NONE) {
+                    rxBytes = parsed.value
+                }
+            } else if(idx == 8) {
+                var parsed = tok.parseInt()
+                if(parsed.error == ParseError.NONE) {
+                    txBytes = parsed.value
+                }
+                break
+            }
+            idx += 1
+        }
+
+        if(rxBytes < 0 || txBytes < 0) {
+            return false
+        }
+        ;*rx += rxBytes as (u64)
+        ;*tx += txBytes as (u64)
+        return true
+    }
+
+    public func NetworkUsage(rxBytes: *i64, txBytes: *i64) : bool {
+        var fp = fopen("/proc/net/dev", "r")
+        if(fp == null) {
+            return false
+        }
+        defer fclose(fp)
+
+        var rx: u64 = 0
+        var tx: u64 = 0
+
+        var buf: [512]char
+        fgets(buf, 512, fp) // header line 1
+        fgets(buf, 512, fp) // header line 2
+        while(fgets(buf, 512, fp) != null) {
+            var line = CString(buf).toString()
+            parseDevLine(line, &rx, &tx)
+        }
+
+        ;*rxBytes = rx as (i64)
+        ;*txBytes = tx as (i64)
+        return true
+    }
+#else_error "NetworkUsage not supported on this platform"
+#end

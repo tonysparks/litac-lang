@@ -1,0 +1,31 @@
+@include("<sys/statvfs.h>");
+
+@raw("""
+typedef struct statvfs statvfs_t;
+""");
+
+// Field widths in the real header vary by platform (e.g. 32-bit block counts
+// on macOS vs 64-bit on Linux); declaring them here as u64 is safe since field
+// access compiles directly against the header's struct statvfs, and the
+// narrower real value is widened on assignment.
+@foreign("statvfs_t")
+public struct Statvfs {
+    f_frsize: u64
+    f_blocks: u64
+    f_bavail: u64
+}
+
+@foreign
+func statvfs(path: *const char, buf: *Statvfs) : i32;
+
+// Total and available (non-root) byte capacity of the filesystem containing
+// `path`. Returns false if the statvfs(2) call fails (e.g. path doesn't exist).
+public func DiskUsage(path: *const char, totalBytes: *i64, availableBytes: *i64) : bool {
+    var st: Statvfs
+    if(statvfs(path, &st) != 0) {
+        return false
+    }
+    ;*totalBytes = (st.f_frsize * st.f_blocks) as (i64)
+    ;*availableBytes = (st.f_frsize * st.f_bavail) as (i64)
+    return true
+}

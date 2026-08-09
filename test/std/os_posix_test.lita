@@ -1,0 +1,36 @@
+import "std/os/posix/statvfs"
+import "std/os/posix/meminfo"
+import "std/os/posix/netusage"
+import "std/assert"
+
+@test
+func testDiskUsageReturnsSaneValues() {
+    var total: i64 = -1
+    var available: i64 = -1
+    var ok = DiskUsage("/", &total, &available)
+    assert(ok == true)
+    assert(total > 0)
+    assert(available >= 0)
+    assert(available <= total)
+}
+
+@test
+func testSystemMemoryReturnsSaneValues() {
+    var total: i64 = -1
+    var free: i64 = -1
+    var ok = SystemMemory(&total, &free)
+    assert(ok == true)
+    assert(total > 0)
+    assert(free >= 0)
+    assert(free <= total)
+}
+
+@test
+func testNetworkUsageReturnsSaneValues() {
+    var rx: i64 = -1
+    var tx: i64 = -1
+    var ok = NetworkUsage(&rx, &tx)
+    assert(ok == true)
+    assert(rx >= 0)
+    assert(tx >= 0)
+}
