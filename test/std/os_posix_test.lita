@@ -1,3 +1,8 @@
+// DiskUsage/SystemMemory/NetworkUsage are POSIX-only (statvfs, Mach/sysctl on
+// macOS, /proc on Linux) — no Windows implementation exists, so this whole
+// file is skipped there rather than failing the build, same pattern as the
+// ringhttp tests (see e.g. test/std/ringhttp/mime_test.lita).
+#if OS != "WINDOWS"
 import "std/os/posix/statvfs"
 import "std/os/posix/meminfo"
 import "std/os/posix/netusage"
@@ -34,3 +39,4 @@ func testNetworkUsageReturnsSaneValues() {
     assert(rx >= 0)
     assert(tx >= 0)
 }
+#end
