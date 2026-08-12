@@ -98,6 +98,11 @@ public struct HttpOptions {
     //         for self-signed certs in tests or internal services).
     verifySsl: bool
 
+    // Path to a CA bundle file (CURLOPT_CAINFO) to validate the server's certificate
+    // against, overriding curl's own compiled-in default CA bundle path. null = use
+    // curl's default. Only meaningful when verifySsl is true.
+    caPath: *const char
+
     // Maximum time in seconds for the entire request (0 = use default of 30).
     timeoutInSec: i64
 
@@ -240,7 +245,9 @@ public func (this: *Http) makeRequest(req: *HttpRequest, resp: *HttpResponse) : 
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_MAXREDIRS, 8_i64);
     curl_easy_setopt<bool>(curl, CURLoption.CURLOPT_SSL_VERIFYPEER, this.options.verifySsl);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_SSL_VERIFYHOST, this.options.verifySsl ? 2_i64 : 0_i64);
-    // curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_CAINFO, "%windir%\\system32\\curl-ca-bundle.crt");
+    if(this.options.caPath) {
+        curl_easy_setopt<*const char>(curl, CURLoption.CURLOPT_CAINFO, this.options.caPath);
+    }
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_TIMEOUT,
         this.options.timeoutInSec > 0 ? this.options.timeoutInSec : 30_i64);
     curl_easy_setopt<i64>(curl, CURLoption.CURLOPT_CONNECTTIMEOUT,
