@@ -1,9 +1,13 @@
 import "std/ssl/openssl"
+import "std/libc"
 
 // EC (P-256) key handling, ECDH, and ES256 (ECDSA-SHA256) signing — built
 // for Web Push (RFC 8291/8292): VAPID JWT signing and the ECDH step of
 // message encryption. Not a general-purpose EC library — P-256 only, and
 // only the operations Web Push actually needs.
+//
+// Built on OpenSSL 3.0's modern EVP_PKEY/OSSL_PARAM API throughout — no
+// legacy EC_KEY calls, so no -Wdeprecated-declarations noise.
 
 public const EC_P256_PRIVATE_KEY_SIZE: i32 = 32
 public const EC_P256_PUBLIC_KEY_SIZE:  i32 = 65 // uncompressed point: 0x04 || X(32) || Y(32)
@@ -13,40 +17,75 @@ public const EC_P256_PUBLIC_KEY_SIZE:  i32 = 65 // uncompressed point: 0x04 || X
 public const ECDSA_P1363_SIGNATURE_SIZE: i32 = 64
 
 public struct EcKeyPair {
-    pkey:  *EVP_PKEY // wraps eckey; used for EVP-level operations (derive, sign)
-    eckey: *EC_KEY   // kept alongside pkey — public-key export only works on this
-}
-
-func wrapEcKey(eckey: *EC_KEY, pair: *EcKeyPair) : bool {
-    var pkey = EVP_PKEY_new()
-    if(!pkey) {
-        EC_KEY_free(eckey)
-        return false
-    }
-    if(EVP_PKEY_set1_EC_KEY(pkey, eckey) != 1) {
-        EVP_PKEY_free(pkey)
-        EC_KEY_free(eckey)
-        return false
-    }
-
-    pair.pkey = pkey
-    pair.eckey = eckey
-    return true
+    pkey: *EVP_PKEY
 }
 
 // Generates a fresh P-256 keypair (both private and public). Used both for
 // one-time VAPID identity generation and for the per-message ephemeral
 // keypair RFC 8291 encryption requires.
 public func EcGenerateKeyPair(pair: *EcKeyPair) : bool {
-    var eckey = EC_KEY_new_by_curve_name(NID_X9_62_PRIME256V1)
-    if(!eckey) {
+    pair.pkey = EVP_PKEY_Q_keygen(null, null, "EC", "P-256")
+    return pair.pkey != null
+}
+
+// Builds an EVP_PKEY from raw bytes via an OSSL_PARAM_BLD — the documented
+// OpenSSL 3.0 way to import a keypair/pubkey without a legacy EC_KEY
+// intermediate. privateKey may be null (see EcPublicKeyFromRaw) to import a
+// public-only key.
+func fromRaw(privateKey: *const u8, publicKey: *const u8, pair: *EcKeyPair) : bool {
+    var bld = OSSL_PARAM_BLD_new()
+    if(!bld) {
         return false
     }
-    if(EC_KEY_generate_key(eckey) != 1) {
-        EC_KEY_free(eckey)
+    defer OSSL_PARAM_BLD_free(bld)
+
+    var ok = OSSL_PARAM_BLD_push_utf8_string(bld, "group", "P-256", 0) == 1
+    ok = ok && OSSL_PARAM_BLD_push_octet_string(bld, "pub", publicKey as (*const void), EC_P256_PUBLIC_KEY_SIZE as (usize)) == 1
+
+    // OSSL_PARAM_BLD_push_BN keeps a reference to *priv rather than copying
+    // it — priv must stay alive until OSSL_PARAM_BLD_to_param() below, not
+    // freed right after the push (confirmed via a standalone repro: freeing
+    // early silently zeroes the private key in the resulting param set).
+    var priv: *BIGNUM = null
+    if(ok && privateKey) {
+        priv = BN_bin2bn(privateKey, EC_P256_PRIVATE_KEY_SIZE, null)
+        ok = ok && priv != null
+        ok = ok && OSSL_PARAM_BLD_push_BN(bld, "priv", priv) == 1
+    }
+    if(!ok) {
+        if(priv) {
+            BN_free(priv)
+        }
         return false
     }
-    return wrapEcKey(eckey, pair)
+
+    var params = OSSL_PARAM_BLD_to_param(bld)
+    if(priv) {
+        BN_free(priv)
+    }
+    if(!params) {
+        return false
+    }
+    defer OSSL_PARAM_free(params)
+
+    var ctx = EVP_PKEY_CTX_new_from_name(null, "EC", null)
+    if(!ctx) {
+        return false
+    }
+    defer EVP_PKEY_CTX_free(ctx)
+
+    if(EVP_PKEY_fromdata_init(ctx) != 1) {
+        return false
+    }
+
+    var pkey: *EVP_PKEY = null
+    var selection = privateKey ? EVP_PKEY_SELECT_KEYPAIR : EVP_PKEY_SELECT_PUBLIC_KEY
+    if(EVP_PKEY_fromdata(ctx, &pkey, selection, params) != 1) {
+        return false
+    }
+
+    pair.pkey = pkey
+    return true
 }
 
 // Reconstructs a full keypair from its raw serialized form: a
@@ -56,48 +95,14 @@ public func EcGenerateKeyPair(pair: *EcKeyPair) : bool {
 // startup, rather than recomputing the public point from the private
 // scalar every time.
 public func EcKeyPairFromRaw(privateKey: *const u8, publicKey: *const u8, pair: *EcKeyPair) : bool {
-    var eckey = EC_KEY_new_by_curve_name(NID_X9_62_PRIME256V1)
-    if(!eckey) {
-        return false
-    }
-
-    var bn = BN_bin2bn(privateKey, EC_P256_PRIVATE_KEY_SIZE, null)
-    if(!bn) {
-        EC_KEY_free(eckey)
-        return false
-    }
-    var privOk = EC_KEY_set_private_key(eckey, bn) == 1
-    BN_free(bn)
-    if(!privOk) {
-        EC_KEY_free(eckey)
-        return false
-    }
-
-    var pubPtr = publicKey
-    if(!o2i_ECPublicKey(&eckey, &pubPtr, EC_P256_PUBLIC_KEY_SIZE as (i64))) {
-        EC_KEY_free(eckey)
-        return false
-    }
-
-    return wrapEcKey(eckey, pair)
+    return fromRaw(privateKey, publicKey, pair)
 }
 
 // Imports only a public key — e.g. a browser's subscription p256dh point.
 // Not usable for signing (no private scalar); only as the peer side of
 // EcdhDerive.
 public func EcPublicKeyFromRaw(publicKey: *const u8, pair: *EcKeyPair) : bool {
-    var eckey = EC_KEY_new_by_curve_name(NID_X9_62_PRIME256V1)
-    if(!eckey) {
-        return false
-    }
-
-    var pubPtr = publicKey
-    if(!o2i_ECPublicKey(&eckey, &pubPtr, EC_P256_PUBLIC_KEY_SIZE as (i64))) {
-        EC_KEY_free(eckey)
-        return false
-    }
-
-    return wrapEcKey(eckey, pair)
+    return fromRaw(null, publicKey, pair)
 }
 
 public func (this: *EcKeyPair) free() {
@@ -105,27 +110,33 @@ public func (this: *EcKeyPair) free() {
         EVP_PKEY_free(this.pkey)
         this.pkey = null
     }
-    if(this.eckey) {
-        EC_KEY_free(this.eckey)
-        this.eckey = null
-    }
 }
 
 // Exports the public key as an EC_P256_PUBLIC_KEY_SIZE-byte uncompressed
 // point (0x04 || X || Y). out must point to a buffer of at least that size.
 public func (this: *EcKeyPair) exportPublicKey(out: *u8) : bool {
-    var ptr = out
-    var n = i2o_ECPublicKey(this.eckey, &ptr)
-    return n == EC_P256_PUBLIC_KEY_SIZE
+    var ptr: *u8 = null
+    var n = EVP_PKEY_get1_encoded_public_key(this.pkey, &ptr)
+    if(!ptr) {
+        return false
+    }
+    defer CRYPTO_free(ptr as (*void), null, 0)
+
+    if(n != EC_P256_PUBLIC_KEY_SIZE as (usize)) {
+        return false
+    }
+    memcpy(out, ptr, n)
+    return true
 }
 
 // Exports the private scalar as an EC_P256_PRIVATE_KEY_SIZE-byte big-endian
 // value. out must point to a buffer of at least that size.
 public func (this: *EcKeyPair) exportPrivateKey(out: *u8) : bool {
-    var bn = EC_KEY_get0_private_key(this.eckey)
-    if(!bn) {
+    var bn: *BIGNUM = null
+    if(EVP_PKEY_get_bn_param(this.pkey, "priv", &bn) != 1 || !bn) {
         return false
     }
+    defer BN_free(bn)
     return BN_bn2binpad(bn, out, EC_P256_PRIVATE_KEY_SIZE) == EC_P256_PRIVATE_KEY_SIZE
 }
 

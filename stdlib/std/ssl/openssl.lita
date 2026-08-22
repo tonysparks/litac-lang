@@ -7,6 +7,7 @@
 @include("<openssl/err.h>");
 @include("<openssl/evp.h>");
 @include("<openssl/hmac.h>");
+@include("<openssl/param_build.h>");
 
 #if (OS == "MAC")
     @compiler_option(
@@ -326,12 +327,12 @@ public func HMAC(evp_md: *const EVP_MD, key: *const void, key_len: i32,
 
 // ---------------------------------------------------------------------------
 // EC (P-256) keys, ECDH, ECDSA — used by std/crypto/ec (Web Push: VAPID
-// signing, subscription-key ECDH). Built on the legacy EC_KEY API rather
-// than the OpenSSL 3.0 OSSL_PARAM builder API: EC_KEY_* is marked
-// OSSL_DEPRECATEDIN_3_0 (generates a deprecation warning, still fully
-// functional — OpenSSL has not announced a removal version) but is a much
-// smaller binding surface for the same result. EVP_PKEY wraps an EC_KEY for
-// operations (derive, sign) that require the modern API.
+// signing, subscription-key ECDH). Built entirely on the modern OpenSSL 3.0
+// EVP_PKEY/OSSL_PARAM API (no legacy EC_KEY calls) — keygen and pubkey
+// export are one-liners (EVP_PKEY_Q_keygen, EVP_PKEY_get1_encoded_public_key);
+// importing a keypair from raw bytes goes through an OSSL_PARAM_BLD, the
+// documented way to build an EVP_PKEY from caller-supplied group/point/
+// scalar values without a legacy EC_KEY as an intermediate.
 // ---------------------------------------------------------------------------
 
 @foreign
@@ -341,55 +342,86 @@ public struct EVP_PKEY {}
 public struct EVP_PKEY_CTX {}
 
 @foreign
-public struct EC_KEY {}
-
-@foreign
 public struct BIGNUM {}
 
 @foreign
 public struct ECDSA_SIG {}
 
+@foreign
+public struct OSSL_PARAM_BLD {}
+
+@foreign
+public struct OSSL_PARAM {}
+
 // NID_X9_62_prime256v1 — the P-256 curve. Stable across OpenSSL versions.
 public const NID_X9_62_PRIME256V1: i32 = 415
 
-@foreign
-public func EC_KEY_new_by_curve_name(nid: i32) : *EC_KEY;
-
-@foreign
-public func EC_KEY_generate_key(key: *EC_KEY) : i32;
-
-@foreign
-public func EC_KEY_free(key: *EC_KEY);
-
-@foreign
-public func EC_KEY_get0_private_key(key: *const EC_KEY) : *const BIGNUM;
-
-@foreign
-public func EC_KEY_set_private_key(key: *EC_KEY, prv: *const BIGNUM) : i32;
-
-// Imports an uncompressed EC point (0x04 || X || Y) as *key's public point.
-// *key must already have its curve set (e.g. via EC_KEY_new_by_curve_name).
-// Advances *in_ by len, per OpenSSL's o2i/d2i convention.
-@foreign
-public func o2i_ECPublicKey(key: **EC_KEY, in_: **const u8, len: i64) : *EC_KEY;
-
-// Exports the public point in uncompressed form (65 bytes for P-256).
-// *out must point to a pre-allocated buffer; pass its address — does NOT
-// allocate on our behalf (that mode is only when *out itself is null).
-@foreign
-public func i2o_ECPublicKey(key: *const EC_KEY, out: **u8) : i32;
-
-@foreign
-public func EVP_PKEY_new() : *EVP_PKEY;
+// EVP_PKEY_fromdata() "selection" bitmasks. Computed from OpenSSL's
+// OSSL_KEYMGMT_SELECT_* bits (core_dispatch.h) rather than binding those
+// individually — this is the only place the combinations are needed.
+public const EVP_PKEY_SELECT_PUBLIC_KEY: i32 = 0x86 // domain params | public key
+public const EVP_PKEY_SELECT_KEYPAIR:    i32 = 0x87 // domain params | public key | private key
 
 @foreign
 public func EVP_PKEY_free(pkey: *EVP_PKEY);
 
+// One-liner keygen: EVP_PKEY_Q_keygen(null, null, "EC", "P-256").
 @foreign
-public func EVP_PKEY_set1_EC_KEY(pkey: *EVP_PKEY, key: *EC_KEY) : i32;
+public func EVP_PKEY_Q_keygen(libctx: *void, propq: *const char, type_: *const char, ...) : *EVP_PKEY;
+
+// Exports the public point in uncompressed form (65 bytes for P-256).
+// Allocates *ppub via OpenSSL's allocator — caller must OPENSSL_free it.
+@foreign
+public func EVP_PKEY_get1_encoded_public_key(pkey: *EVP_PKEY, ppub: **u8) : usize;
+
+// Reads a BIGNUM-typed param — for EC keys, OSSL_PKEY_PARAM_PRIV_KEY = "priv"
+// is this type (not an octet string). Caller owns *bn, must BN_free it.
+@foreign
+public func EVP_PKEY_get_bn_param(pkey: *const EVP_PKEY, key_name: *const char, bn: **BIGNUM) : i32;
 
 @foreign
 public func EVP_PKEY_CTX_new(pkey: *EVP_PKEY, e: *void) : *EVP_PKEY_CTX;
+
+// type_ = "EC" for P-256 keypair/pubkey import via EVP_PKEY_fromdata.
+@foreign
+public func EVP_PKEY_CTX_new_from_name(libctx: *void, type_: *const char, propq: *const char) : *EVP_PKEY_CTX;
+
+@foreign
+public func EVP_PKEY_fromdata_init(ctx: *EVP_PKEY_CTX) : i32;
+
+@foreign
+public func EVP_PKEY_fromdata(ctx: *EVP_PKEY_CTX, ppkey: **EVP_PKEY, selection: i32, param: *OSSL_PARAM) : i32;
+
+@foreign
+public func OSSL_PARAM_BLD_new() : *OSSL_PARAM_BLD;
+
+@foreign
+public func OSSL_PARAM_BLD_free(bld: *OSSL_PARAM_BLD);
+
+@foreign
+public func OSSL_PARAM_BLD_to_param(bld: *OSSL_PARAM_BLD) : *OSSL_PARAM;
+
+// key = "group" (curve name, e.g. "P-256").
+@foreign
+public func OSSL_PARAM_BLD_push_utf8_string(bld: *OSSL_PARAM_BLD, key: *const char, buf: *const char, bsize: usize) : i32;
+
+// key = "pub" (uncompressed EC point).
+@foreign
+public func OSSL_PARAM_BLD_push_octet_string(bld: *OSSL_PARAM_BLD, key: *const char, buf: *const void, bsize: usize) : i32;
+
+// key = "priv" (private scalar, as a BIGNUM).
+@foreign
+public func OSSL_PARAM_BLD_push_BN(bld: *OSSL_PARAM_BLD, key: *const char, bn: *const BIGNUM) : i32;
+
+@foreign
+public func OSSL_PARAM_free(param: *OSSL_PARAM);
+
+// Frees buffers OpenSSL itself allocated (e.g. EVP_PKEY_get1_encoded_public_key's
+// output). OPENSSL_free() is a macro around this (passing __FILE__/__LINE__ for
+// its leak-tracking build); file/line are diagnostic-only, so passing null/0
+// directly through CRYPTO_free is equivalent for our purposes.
+@foreign
+public func CRYPTO_free(ptr: *void, file: *const char, line: i32);
 
 @foreign
 public func EVP_PKEY_CTX_free(ctx: *EVP_PKEY_CTX);
