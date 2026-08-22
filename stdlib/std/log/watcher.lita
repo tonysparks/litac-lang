@@ -7,6 +7,7 @@ import "std/json"
 import "std/http/http"
 import "std/map"
 import "std/libc"
+import "std/net/posix_socket"
 import "std/system"
 import "std/log"
 import "std/io"
@@ -203,7 +204,23 @@ func (this: *FileTailer) loadOffset() : i64 {
     var buf: [32]char
     var n = fread(buf, 1, 31, f)
     buf[n] = 0
-    return strtol(buf, null, 10)
+    var parsed = strtol(buf, null, 10)
+
+    // A negative or out-of-range value (corrupted state file, torn write,
+    // strtol clamping an unparseable string to LONG_MIN/MAX) must never be
+    // trusted as-is: fseek() on a bogus offset silently fails and leaves
+    // the read position wherever it already was, which then causes poll()
+    // to replay from byte 0 forever, re-dispatching everything on every
+    // single tick. Fall back to the same safe "skip existing history"
+    // behavior as a missing state file instead.
+    var size = this.currentFileSize()
+    if(parsed < 0 || parsed > size) {
+        Error("FileTailer: ignoring corrupt persisted offset %lld in '%.*s' (file size %lld) — resetting to current end of file\n",
+            parsed, this.offsetStatePath.length, this.offsetStatePath.buffer, size
+        )
+        return size
+    }
+    return parsed
 }
 
 func (this: *FileTailer) saveOffset() {
@@ -212,6 +229,14 @@ func (this: *FileTailer) saveOffset() {
 
     var f = fopen(stateBuf, "wb")
     if(!f) {
+        // A silent failure here means the offset never advances: the next
+        // poll starts from the same stale position and redispatches
+        // whatever it already sent, forever, with nothing in the logs to
+        // explain why. Always surface it.
+        Error("FileTailer: failed to persist offset to '%.*s': %s\n",
+            this.offsetStatePath.length, this.offsetStatePath.buffer,
+            strerror(errno)
+        )
         return;
     }
     defer fclose(f)
@@ -234,7 +259,18 @@ func (this: *FileTailer) poll(linearAllocator: *LinearAllocator, router: *Notify
     }
     defer fclose(f)
 
-    fseek(f, this.offset, SEEK_SET)
+    // An unchecked failure here silently leaves the read position wherever
+    // fopen left it (byte 0) instead of this.offset, which reprocesses and
+    // redispatches the entire file on this and every subsequent tick. Bail
+    // out for this tick rather than read from the wrong place — offset
+    // isn't touched, so the next tick retries from the same, still-correct,
+    // starting point.
+    if(fseek(f, this.offset, SEEK_SET) != 0) {
+        Error("FileTailer: fseek to offset %lld in '%.*s' failed: %s\n",
+            this.offset, this.path.length, this.path.buffer, strerror(errno)
+        )
+        return;
+    }
 
     var buf: [POLL_READ_CHUNK]char
     var advanced = false

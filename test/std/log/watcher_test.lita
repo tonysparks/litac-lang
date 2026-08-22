@@ -207,6 +207,50 @@ func testResumesFromPersistedOffsetAcrossInstances() {
     assert(strcmp(sinkB.msgs[0], "after-restart") == 0)
 }
 
+@test("A corrupted persisted offset is discarded instead of causing an endless full replay")
+func testCorruptedOffsetFallsBackSafely() {
+    var logPathBuf: [PATH_BUF_SIZE]char
+    var offsetPathBuf: [PATH_BUF_SIZE]char
+    var logPath = watcherTestPath(logPathBuf, "corrupt_offset.log")
+    var offsetPath = watcherTestPath(offsetPathBuf, "corrupt_offset.offset")
+    remove(logPath.buffer)
+    remove(offsetPath.buffer)
+
+    // Simulates the exact production incident: existing log content, plus
+    // an offset state file holding a bogus negative value (e.g. from a
+    // torn write or a bad strtol parse) instead of a real byte offset.
+    // Unvalidated, fseek() to a negative offset silently fails and leaves
+    // the read position at 0, so every poll would redispatch this entire
+    // file — forever, since offset += consumed starting from a garbage
+    // base never becomes valid again on its own.
+    writeFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t0\",\"msg\":\"already-sent-before-corruption\"}\n")
+    writeFile(offsetPath, "-9223372036853540912")
+
+    var watcherA: LogWatcher
+    watcherA.init(logPath, offsetPath, defaultAllocator)
+    var sinkA: RecordingSink
+    watcherA.addRule($"ERROR", $"", &sinkA)
+    watcherA.pollOnce()
+
+    // Recovers like a first run: treats existing content as history, not
+    // as something to redispatch — the safe fallback, not a crash or a
+    // resurfaced duplicate.
+    assert(sinkA.count == 0)
+
+    // Confirms the corruption didn't just get echoed straight back out:
+    // a fresh instance now sees only what's genuinely new afterward.
+    appendFile(logPath, "{\"level\":\"ERROR\",\"time\":\"t1\",\"msg\":\"after-recovery\"}\n")
+
+    var watcherB: LogWatcher
+    watcherB.init(logPath, offsetPath, defaultAllocator)
+    var sinkB: RecordingSink
+    watcherB.addRule($"ERROR", $"", &sinkB)
+    watcherB.pollOnce()
+
+    assert(sinkB.count == 1)
+    assert(strcmp(sinkB.msgs[0], "after-recovery") == 0)
+}
+
 @test("A one-shot invocation that finds nothing new still persists a baseline for the next one")
 func testOneShotWithNothingNewStillPersistsBaseline() {
     var logPathBuf: [PATH_BUF_SIZE]char
